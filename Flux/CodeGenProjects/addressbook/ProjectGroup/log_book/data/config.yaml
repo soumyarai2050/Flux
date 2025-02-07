@@ -22,12 +22,12 @@ dataclass_override_type: "native"
 beanie_override_type: "native"
 cache_override_type: "bare"
 
-# to be used in pair_strat_log_book to take out counts of created from waiting queue to execute create in db
-portfolio_alert_configs:
+# to be used in pair_plan_log_book to take out counts of created from waiting queue to execute create in db
+contact_alert_configs:
   transaction_counts_per_call_for_server: 200
   transaction_counts_per_call_for_tail_ex: 100
   transaction_timeout_secs: 2  # secs
-strat_alert_config:
+plan_alert_config:
   transaction_counts_per_call_for_server: 200
   transaction_counts_per_call_for_tail_ex: 100
   transaction_timeout_secs: 2  # secs
@@ -51,7 +51,7 @@ simulate_log_book: True
 field_seperator: "~~"
 key_val_seperator: "^^"
 pattern_for_log_simulator: "$$$"
-pattern_for_pair_strat_db_updates: "^^^"
+pattern_for_pair_plan_db_updates: "^^^"
 pattern_to_restart_tail_process: "---"
 pattern_to_force_kill_tail_process: "-@-"
 pattern_to_remove_file_from_created_cache: "-*-"
@@ -60,7 +60,7 @@ pattern_to_remove_file_from_created_cache: "-*-"
 regex_file_name: "suppress_alert_regex.txt"
 regex_lock_file_name: "suppress_alert_regex.txt.lock"
 
-strat_pause_regex_pattern:
+plan_pause_regex_pattern:
   - "^LMT_UP_DN:"
   - "^Chore found overfilled for"
 pos_disable_regex_pattern:

@@ -94,7 +94,7 @@ public:
     }
 
     // Write data to shared memory
-    void write_to_shared_memory(const T& new_data) {
+    bool write_to_shared_memory(const T& new_data) {
         if (try_lock()) {  // Attempt to acquire the lock without blocking
             std::memcpy(&m_shm_data_->data, &new_data, sizeof(T)); // Copy data to shared memory
             if(!m_shm_signature_set){
@@ -105,8 +105,9 @@ public:
             unlock(); // Release the lock
             sem_post(mp_sem_); // Signal that data is available
             m_binary_file_writer_.write(m_shm_data_->data);
+            return true;
         } else {
-            LOG_DEBUG_IMPL(GetCppAppLogger(), "Skipping write as shared memory is locked by another process.");
+            return false;
         }
     }
 

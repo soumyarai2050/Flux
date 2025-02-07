@@ -16,12 +16,12 @@ import timeit
 def test_sanity_new_chores(static_data_, clean_and_set_limits,
                            pair_securities_with_sides_, expected_chore_limits_):
     # waiting for 30 sec for bucket_server to mark service up if not marked yet since it waits for USD px to be
-    # available in pair_strat service and for USD px fx_symbol_overview is set by clean_and_set_limits
+    # available in pair_plan service and for USD px fx_symbol_overview is set by clean_and_set_limits
     time.sleep(30)
 
     new_chore_list: List[NewChoreBaseModel] = []
     for _ in range(5):
-        sec_id = f"CB_Sec_{random.randint(1, 10)}"
+        sec_id = f"Type1_Sec_{random.randint(1, 10)}"
         side = random.choice([Side.BUY, Side.SELL])
         px = random.randint(90, 100)
         qty = random.randint(80, 90)

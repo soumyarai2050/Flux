@@ -11,7 +11,7 @@ import polars as pl
 
 # project imports
 from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import get_strat_key_from_pair_strat
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import get_plan_key_from_pair_plan
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.ORMModel.street_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.ORMModel.photo_book_service_model_imports import *
@@ -38,13 +38,13 @@ def test_clean_database_n_logs():
     clean_project_logs()
 
 
-def test_sanity_create_strat_parallel(static_data_, clean_and_set_limits, buy_sell_symbol_list, pair_strat_,
-                                       expected_strat_limits_, expected_start_status_, symbol_overview_obj_list,
+def test_sanity_create_plan_parallel(static_data_, clean_and_set_limits, buy_sell_symbol_list, pair_plan_,
+                                       expected_plan_limits_, expected_start_status_, symbol_overview_obj_list,
                                        market_depth_basemodel_list):
     max_count = int(len(buy_sell_symbol_list)/2)
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_count) as executor:
-        results = [executor.submit(create_n_activate_strat, buy_symbol, sell_symbol, copy.deepcopy(pair_strat_),
-                                   copy.deepcopy(expected_strat_limits_),
+        results = [executor.submit(create_n_activate_plan, buy_symbol, sell_symbol, copy.deepcopy(pair_plan_),
+                                   copy.deepcopy(expected_plan_limits_),
                                    copy.deepcopy(expected_start_status_), copy.deepcopy(symbol_overview_obj_list),
                                    copy.deepcopy(market_depth_basemodel_list), None, None)
                    for buy_symbol, sell_symbol in buy_sell_symbol_list[:max_count]]
@@ -723,8 +723,8 @@ def test_patch_all_json_list_in_df_out_client(clean_and_set_limits, web_client):
                 formatted_dt_utc = pendulum.DateTime.utcnow().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
                 obj.date = pendulum.parse(formatted_dt_utc)
 
-            sample_ts_model_objects_json_list = [obj.to_dict(exclude_none=True)
-                                                 for obj in sample_model_objects_list]
+            sample_ts_model_objects_json_list = generic_encoder(sample_model_objects_list, msgspec_basemodel.enc_hook,
+                                                                by_alias=True, exclude_none=True)
             return_value = patch_all_json_list_in_df_out_client(sample_ts_model_objects_json_list, return_obj_copy=return_value_type)
             if return_value_type or return_value_type is None:
                 assert isinstance(return_value, pl.DataFrame), \
@@ -796,32 +796,32 @@ def test_patch_all_df_in_df_out_client(clean_and_set_limits, web_client):
 @pytest.mark.parametrize("web_client", clients_list)
 def test_patch_all_repeated_field_handling(clean_and_set_limits, web_client):
     for index, return_value_type in enumerate([True, None, False]):
-        portfolio_limits_objects_list = [
-            PortfolioLimitsBaseModel.from_kwargs(_id=2 + (index * 3), max_open_baskets=20),
-            PortfolioLimitsBaseModel.from_kwargs(_id=3 + (index * 3), max_open_baskets=30),
-            PortfolioLimitsBaseModel.from_kwargs(_id=4 + (index * 3), max_open_baskets=45)
+        contact_limits_objects_list = [
+            ContactLimitsBaseModel.from_kwargs(_id=2 + (index * 3), max_open_baskets=20),
+            ContactLimitsBaseModel.from_kwargs(_id=3 + (index * 3), max_open_baskets=30),
+            ContactLimitsBaseModel.from_kwargs(_id=4 + (index * 3), max_open_baskets=45)
         ]
 
-        web_client.create_all_portfolio_limits_client(portfolio_limits_objects_list)
+        web_client.create_all_contact_limits_client(contact_limits_objects_list)
 
-        fetched_get_all_obj_list = web_client.get_all_portfolio_limits_client()
+        fetched_get_all_obj_list = web_client.get_all_contact_limits_client()
 
-        for obj in portfolio_limits_objects_list:
+        for obj in contact_limits_objects_list:
             assert obj in fetched_get_all_obj_list, f"Couldn't find object {obj} in get-all list " \
                                                     f"{fetched_get_all_obj_list}"
 
         # updating values
-        portfolio_limits_objects_json_list = []
-        for obj in portfolio_limits_objects_list:
+        contact_limits_objects_json_list = []
+        for obj in contact_limits_objects_list:
             obj.eligible_brokers = []
             for broker_obj_id in [1, 2]:
                 broker = broker_fixture()
                 broker.id = f"{broker_obj_id}"
                 broker.bkr_priority = broker_obj_id
                 obj.eligible_brokers.append(broker)
-            portfolio_limits_objects_json_list.append(obj.to_dict(exclude_none=True))
+            contact_limits_objects_json_list.append(obj.to_dict(exclude_none=True))
 
-        return_value = web_client.patch_all_portfolio_limits_client(portfolio_limits_objects_json_list,
+        return_value = web_client.patch_all_contact_limits_client(contact_limits_objects_json_list,
                                                                     return_obj_copy=return_value_type)
         if return_value_type:
             assert isinstance(return_value, List), ("Mismatched: returned value from client must be list, "
@@ -829,23 +829,23 @@ def test_patch_all_repeated_field_handling(clean_and_set_limits, web_client):
         else:
             assert return_value
 
-        for expected_obj in portfolio_limits_objects_list:
-            updated_portfolio_limits = web_client.get_portfolio_limits_client(portfolio_limits_id=expected_obj.id)
-            assert expected_obj.to_dict() == updated_portfolio_limits.to_dict(), \
-                f"Mismatched: expected obj {expected_obj} received {updated_portfolio_limits}"
+        for expected_obj in contact_limits_objects_list:
+            updated_contact_limits = web_client.get_contact_limits_client(contact_limits_id=expected_obj.id)
+            assert expected_obj.to_dict() == updated_contact_limits.to_dict(), \
+                f"Mismatched: expected obj {expected_obj} received {updated_contact_limits}"
 
         delete_broker = BrokerBaseModel()
         delete_broker.id = "1"
 
-        delete_obj = PortfolioLimitsBaseModel.from_kwargs(_id=4 + (index * 3), eligible_brokers=[delete_broker])
+        delete_obj = ContactLimitsBaseModel.from_kwargs(_id=4 + (index * 3), eligible_brokers=[delete_broker])
         delete_obj_json = delete_obj.to_dict(exclude_none=True)
 
-        web_client.patch_all_portfolio_limits_client([delete_obj_json])
+        web_client.patch_all_contact_limits_client([delete_obj_json])
 
-        updated_portfolio_limits = web_client.get_portfolio_limits_client(portfolio_limits_id=4)
+        updated_contact_limits = web_client.get_contact_limits_client(contact_limits_id=4)
 
-        assert delete_broker.id not in [broker.id for broker in updated_portfolio_limits.eligible_brokers], \
-            f"Deleted obj: {delete_obj} using patch still found in updated object: {updated_portfolio_limits}"
+        assert delete_broker.id not in [broker.id for broker in updated_contact_limits.eligible_brokers], \
+            f"Deleted obj: {delete_obj} using patch still found in updated object: {updated_contact_limits}"
 
 
 
@@ -1028,35 +1028,35 @@ def test_sample_model_file_upload_query():
             os.remove(destination_file_path)
 
 
-# sanity test to create and activate pair_strat
+# sanity test to create and activate pair_plan
 @pytest.mark.nightly
-def test_create_pair_strat(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-                           expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+def test_create_pair_plan(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+                           expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
                            market_depth_basemodel_list):
-    # creates and activates multiple pair_strats
+    # creates and activates multiple pair_plans
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:1]
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
-        create_n_activate_strat(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-                                expected_strat_status_, symbol_overview_obj_list,
+        create_n_activate_plan(leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_,
+                                expected_plan_status_, symbol_overview_obj_list,
                                 market_depth_basemodel_list)
 
 
 def test_place_chores_with_manual_executor_port(
-        leg1_leg2_symbol_list, pair_strat_,
-        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+        leg1_leg2_symbol_list, pair_plan_,
+        expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         market_depth_basemodel_list, last_barter_fixture_list, refresh_sec_update_fixture):
     buy_symbol, sell_symbol = leg1_leg2_symbol_list[0]
     max_loop_count_per_side = 1
-    expected_strat_limits_.max_open_chores_per_side = 10
-    expected_strat_limits_.residual_restriction.max_residual = 111360
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.max_open_chores_per_side = 10
+    expected_plan_limits_.residual_restriction.max_residual = 111360
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
     port = 0    # <<<<<< manually replace this with running executor port to place chores
     cpp_port = 0    # <<<<<< manually replace this with running cpp port to place chores
     executor_web_client = StreetBookServiceHttpClient(host='127.0.0.1', port=port)
     create_market_depth(buy_symbol, sell_symbol, market_depth_basemodel_list, cpp_port)
-    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(strat_id=1)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(plan_id=1)
 
     try:
         # updating yaml_configs according to this test
@@ -1075,7 +1075,7 @@ def test_place_chores_with_manual_executor_port(
             run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, cpp_port)
 
             time.sleep(1)
-            # update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
+            # update_tob_through_market_depth_to_place_buy_chore(active_pair_plan.cpp_port, bid_buy_top_market_depth,
             #                                                    ask_sell_top_market_depth)
             place_new_chore(buy_symbol, Side.BUY, 98, 95, executor_web_client, InstrumentType.CB)
             ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
@@ -1083,7 +1083,7 @@ def test_place_chores_with_manual_executor_port(
                                                                                last_chore_id=buy_ack_chore_id)
             buy_ack_chore_id = ack_chore_journal.chore.chore_id
 
-            if not executor_config_yaml_dict.get("allow_multiple_open_chores_per_strat"):
+            if not executor_config_yaml_dict.get("allow_multiple_open_chores_per_plan"):
                 # Sleeping to let the chore get cxlled
                 time.sleep(residual_wait_sec)
 
@@ -1094,7 +1094,7 @@ def test_place_chores_with_manual_executor_port(
             # required to make buy side tob latest
             run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], cpp_port)
 
-            # update_tob_through_market_depth_to_place_sell_chore(active_pair_strat.cpp_port, ask_sell_top_market_depth,
+            # update_tob_through_market_depth_to_place_sell_chore(active_pair_plan.cpp_port, ask_sell_top_market_depth,
             #                                                     bid_buy_top_market_depth)
             place_new_chore(sell_symbol, Side.SELL, 98, 95, executor_web_client, InstrumentType.EQT)
 
@@ -1103,7 +1103,7 @@ def test_place_chores_with_manual_executor_port(
                                                                                last_chore_id=sell_ack_chore_id)
             sell_ack_chore_id = ack_chore_journal.chore.chore_id
 
-            if not executor_config_yaml_dict.get("allow_multiple_open_chores_per_strat"):
+            if not executor_config_yaml_dict.get("allow_multiple_open_chores_per_plan"):
                 # Sleeping to let the chore get cxlled
                 time.sleep(residual_wait_sec)
 
@@ -1120,28 +1120,28 @@ def test_place_chores_with_manual_executor_port(
 
 # sanity test to create chores
 @pytest.mark.nightly
-def test_place_sanity_chores(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-                             expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+def test_place_sanity_chores(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+                             expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
                              last_barter_fixture_list, market_depth_basemodel_list,
                              buy_chore_, sell_chore_,
                              max_loop_count_per_side, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
 
-    place_sanity_chores(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
+    place_sanity_chores(buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_, expected_plan_status_,
                         symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
                         max_loop_count_per_side, refresh_sec_update_fixture)
 
 
-def test_place_sanity_parallel_chores(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-                                      expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+def test_place_sanity_parallel_chores(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+                                      expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
                                       last_barter_fixture_list, market_depth_basemodel_list,
                                       buy_chore_, sell_chore_,
                                       max_loop_count_per_side, refresh_sec_update_fixture):
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
-        results = [executor.submit(place_sanity_chores, leg1_symbol, leg2_symbol, copy.deepcopy(pair_strat_),
-                                   copy.deepcopy(expected_strat_limits_),
-                                   copy.deepcopy(expected_strat_status_), copy.deepcopy(symbol_overview_obj_list),
+        results = [executor.submit(place_sanity_chores, leg1_symbol, leg2_symbol, copy.deepcopy(pair_plan_),
+                                   copy.deepcopy(expected_plan_limits_),
+                                   copy.deepcopy(expected_plan_status_), copy.deepcopy(symbol_overview_obj_list),
                                    copy.deepcopy(last_barter_fixture_list), copy.deepcopy(market_depth_basemodel_list),
                                    max_loop_count_per_side,
                                    refresh_sec_update_fixture)
@@ -1152,16 +1152,16 @@ def test_place_sanity_parallel_chores(static_data_, clean_and_set_limits, leg1_l
                 raise Exception(future.exception())
 
 
-# async def _submit_task_for_place_sanity_complete_buy_sell_pair_chores_with_pair_strat(
-#         leg1_leg2_symbol_list, pair_strat_list, expected_strat_limits_, expected_strat_status_,
+# async def _submit_task_for_place_sanity_complete_buy_sell_pair_chores_with_pair_plan(
+#         leg1_leg2_symbol_list, pair_plan_list, expected_plan_limits_, expected_plan_status_,
 #         symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list, max_loop_count_per_side,
 #         refresh_sec_update_fixture):
 #
 #     tasks = []
 #     for idx, leg1_leg2_symbol in leg1_leg2_symbol_list:
-#         task = asyncio.create_task(_place_sanity_complete_buy_sell_pair_chores_with_pair_strat(
-#             leg1_leg2_symbol[0], leg1_leg2_symbol[1], pair_strat_list[idx],
-#             copy.deepcopy(expected_strat_limits_), copy.deepcopy(expected_strat_status_),
+#         task = asyncio.create_task(_place_sanity_complete_buy_sell_pair_chores_with_pair_plan(
+#             leg1_leg2_symbol[0], leg1_leg2_symbol[1], pair_plan_list[idx],
+#             copy.deepcopy(expected_plan_limits_), copy.deepcopy(expected_plan_status_),
 #             copy.deepcopy(symbol_overview_obj_list),
 #             copy.deepcopy(last_barter_fixture_list), copy.deepcopy(market_depth_basemodel_list),
 #             max_loop_count_per_side, refresh_sec_update_fixture
@@ -1175,7 +1175,7 @@ def test_place_sanity_parallel_chores(static_data_, clean_and_set_limits, leg1_l
 #             completed_tasks, pending_tasks = \
 #                 await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED, timeout=60)
 #         except Exception as e:
-#             print(f"_place_sanity_complete_buy_sell_pair_chores_with_pair_strat "
+#             print(f"_place_sanity_complete_buy_sell_pair_chores_with_pair_plan "
 #                               f"asyncio.wait failed with exception: {e}")
 #         while completed_tasks:
 #             completed_task = None
@@ -1183,30 +1183,30 @@ def test_place_sanity_parallel_chores(static_data_, clean_and_set_limits, leg1_l
 #                 completed_task = completed_tasks.pop()
 #                 completed_task.result()
 #             except Exception as e:
-#                 pair_strat_id = int(completed_task.get_name())
-#                 print(f"_place_sanity_complete_buy_sell_pair_chores_with_pair_strat failed for "
-#                                   f"pair_strat_id: {pair_strat_id}, exception: {e}")
+#                 pair_plan_id = int(completed_task.get_name())
+#                 print(f"_place_sanity_complete_buy_sell_pair_chores_with_pair_plan failed for "
+#                                   f"pair_plan_id: {pair_plan_id}, exception: {e}")
 #         if pending_tasks:
 #             tasks = [*pending_tasks, ]
 #         else:
 #             break
 #
 #
-# def _place_sanity_complete_buy_sell_pair_chores_with_pair_strat(
-#         buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+# def _place_sanity_complete_buy_sell_pair_chores_with_pair_plan(
+#         buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
 #         last_barter_fixture_list, market_depth_basemodel_list, max_loop_count_per_side, refresh_sec_update_fixture):
-#     expected_strat_limits_.max_open_chores_per_side = 10
-#     expected_strat_limits_.residual_restriction.max_residual = 111360
-#     expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+#     expected_plan_limits_.max_open_chores_per_side = 10
+#     expected_plan_limits_.residual_restriction.max_residual = 111360
+#     expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
 #     residual_wait_sec = 4 * refresh_sec_update_fixture
 #
-#     active_pair_strat, executor_web_client = move_snoozed_pair_strat_to_ready_n_then_active(
-#         pair_strat_, market_depth_basemodel_list, symbol_overview_obj_list,
-#         expected_strat_limits_, expected_strat_status_)
+#     active_pair_plan, executor_web_client = move_snoozed_pair_plan_to_ready_n_then_active(
+#         pair_plan_, market_depth_basemodel_list, symbol_overview_obj_list,
+#         expected_plan_limits_, expected_plan_status_)
 #
-#     run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+#     run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 #
-#     config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
+#     config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_plan.id)
 #
 #     try:
 #         # updating yaml_configs according to this test
@@ -1223,7 +1223,7 @@ def test_place_sanity_parallel_chores(static_data_, clean_and_set_limits, leg1_l
 #         buy_ack_chore_id = None
 #         sell_ack_chore_id = None
 #         for loop_count in range(total_chore_count_for_each_side):
-#             run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port,
+#             run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port,
 #                            create_counts_per_side=2)
 #
 #             buy_chore: NewChoreBaseModel = place_new_chore(buy_symbol, Side.BUY, 10, 90, executor_web_client)
@@ -1238,14 +1238,14 @@ def test_place_sanity_parallel_chores(static_data_, clean_and_set_limits, leg1_l
 #             sell_ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
 #                                                                                sell_symbol, executor_web_client,
 #                                                                                last_chore_id=sell_ack_chore_id)
-#             strat_status: StratStatusBaseModel = executor_web_client.get_strat_status_client(active_pair_strat.id)
-#             strat_view: StratViewBaseModel = email_book_service_native_web_client.get_strat_view_client(
-#                 active_pair_strat.id)
+#             plan_status: PlanStatusBaseModel = executor_web_client.get_plan_status_client(active_pair_plan.id)
+#             plan_view: PlanViewBaseModel = email_book_service_native_web_client.get_plan_view_client(
+#                 active_pair_plan.id)
 #             sell_ack_chore_id = sell_ack_chore_journal.chore.chore_id
-#             assert strat_status.balance_notional == strat_view.balance_notional, \
-#                 f"Mismatched {strat_status.balance_notional = }, {strat_view.balance_notional = }"
+#             assert plan_status.balance_notional == plan_view.balance_notional, \
+#                 f"Mismatched {plan_status.balance_notional = }, {plan_view.balance_notional = }"
 #
-#         return buy_symbol, sell_symbol, active_pair_strat, executor_web_client
+#         return buy_symbol, sell_symbol, active_pair_plan, executor_web_client
 #
 #     except AssertionError as e:
 #         raise AssertionError(e)
@@ -1258,33 +1258,33 @@ def test_place_sanity_parallel_chores(static_data_, clean_and_set_limits, leg1_l
 #
 #
 # @pytest.mark.nightly
-# def test_place_sanity_parallel_buy_sell_pair_chores_to_check_strat_view(
-#         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-#         expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+# def test_place_sanity_parallel_buy_sell_pair_chores_to_check_plan_view(
+#         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+#         expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
 #         last_barter_fixture_list, market_depth_basemodel_list,
-#         buy_chore_, sell_chore_, expected_portfolio_limits_, refresh_sec_update_fixture):
-#     # Updating portfolio limits
-#     expected_portfolio_limits_.rolling_max_chore_count.max_rolling_tx_count = 51
-#     expected_portfolio_limits_.max_open_baskets = 51
-#     expected_portfolio_limits_.max_gross_n_open_notional = 5_000_000
-#     email_book_service_native_web_client.put_portfolio_limits_client(expected_portfolio_limits_)
+#         buy_chore_, sell_chore_, expected_contact_limits_, refresh_sec_update_fixture):
+#     # Updating contact limits
+#     expected_contact_limits_.rolling_max_chore_count.max_rolling_tx_count = 51
+#     expected_contact_limits_.max_open_baskets = 51
+#     expected_contact_limits_.max_gross_n_open_notional = 5_000_000
+#     email_book_service_native_web_client.put_contact_limits_client(expected_contact_limits_)
 #
 #     max_loop_count_per_side = 50
 #     leg1_leg2_symbol_list = []
-#     total_strats = 20
-#     pair_strat_list = []
-#     for i in range(1, total_strats + 1):
-#         leg1_symbol = f"CB_Sec_{i}"
-#         leg2_symbol = f"EQT_Sec_{i}"
+#     total_plans = 20
+#     pair_plan_list = []
+#     for i in range(1, total_plans + 1):
+#         leg1_symbol = f"Type1_Sec_{i}"
+#         leg2_symbol = f"Type2_Sec_{i}"
 #         leg1_leg2_symbol_list.append((leg1_symbol, leg2_symbol))
 #
-#         stored_pair_strat_basemodel = create_strat(leg1_symbol, leg2_symbol, pair_strat_)
-#         pair_strat_list.append(stored_pair_strat_basemodel)
+#         stored_pair_plan_basemodel = create_plan(leg1_symbol, leg2_symbol, pair_plan_)
+#         pair_plan_list.append(stored_pair_plan_basemodel)
 #         time.sleep(2)
 #
 #     asyncio_loop = asyncio.new_event_loop()
-#     run_coro = _submit_task_for_place_sanity_complete_buy_sell_pair_chores_with_pair_strat(
-#         leg1_leg2_symbol_list, pair_strat_list, expected_strat_limits_, expected_strat_status_,
+#     run_coro = _submit_task_for_place_sanity_complete_buy_sell_pair_chores_with_pair_plan(
+#         leg1_leg2_symbol_list, pair_plan_list, expected_plan_limits_, expected_plan_status_,
 #         symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list, max_loop_count_per_side,
 #         refresh_sec_update_fixture)
 #     future = asyncio.run_coroutine_threadsafe(run_coro, asyncio_loop)
@@ -1292,53 +1292,53 @@ def test_place_sanity_parallel_chores(static_data_, clean_and_set_limits, leg1_l
 #     try:
 #         future.result()
 #     except Exception as e:
-#         logging.exception(f"test_place_sanity_parallel_buy_sell_pair_chores_to_check_strat_view "
+#         logging.exception(f"test_place_sanity_parallel_buy_sell_pair_chores_to_check_plan_view "
 #                           f"failed with exception: {e}")
 #     px = 10
 #     qty = 90
-#     strats_count = len(leg1_leg2_symbol_list)
-#     strat_view_list = email_book_service_native_web_client.get_all_strat_view_client()
-#     expected_balance_notional = (expected_strat_limits_.max_single_leg_notional -
-#                                  strats_count * max_loop_count_per_side * qty * get_px_in_usd(px))
-#     for strat_view in strat_view_list:
-#         assert (strat_view.balance_notional == expected_balance_notional,
+#     plans_count = len(leg1_leg2_symbol_list)
+#     plan_view_list = email_book_service_native_web_client.get_all_plan_view_client()
+#     expected_balance_notional = (expected_plan_limits_.max_single_leg_notional -
+#                                  plans_count * max_loop_count_per_side * qty * get_px_in_usd(px))
+#     for plan_view in plan_view_list:
+#         assert (plan_view.balance_notional == expected_balance_notional,
 #                 (f"Mismatched: overall_buy_notional must be "
-#                  f"{expected_balance_notional}, found {strat_view.balance_notional}"))
+#                  f"{expected_balance_notional}, found {plan_view.balance_notional}"))
 #
 #     px = 110
 #     qty = 7
-#     strats_count = len(leg1_leg2_symbol_list)
-#     strat_view_list = email_book_service_native_web_client.get_all_strat_view_client()
-#     expected_balance_notional = (expected_strat_limits_.max_single_leg_notional -
-#                                  strats_count * max_loop_count_per_side * qty * get_px_in_usd(px))
-#     for strat_view in strat_view_list:
-#         assert (strat_view.balance_notional == expected_balance_notional,
+#     plans_count = len(leg1_leg2_symbol_list)
+#     plan_view_list = email_book_service_native_web_client.get_all_plan_view_client()
+#     expected_balance_notional = (expected_plan_limits_.max_single_leg_notional -
+#                                  plans_count * max_loop_count_per_side * qty * get_px_in_usd(px))
+#     for plan_view in plan_view_list:
+#         assert (plan_view.balance_notional == expected_balance_notional,
 #                 (f"Mismatched: overall_buy_notional must be "
-#                  f"{expected_balance_notional}, found {strat_view.balance_notional}"))
+#                  f"{expected_balance_notional}, found {plan_view.balance_notional}"))
 
 
 # Test for some manual check - not checking anything functionally
-# def handle_test_buy_sell_with_sleep_delays(buy_symbol: str, sell_symbol: str, pair_strat_: PairStratBaseModel,
-#                                            expected_strat_limits_: StratLimits,
-#                                            expected_strat_status_: StratStatus,
+# def handle_test_buy_sell_with_sleep_delays(buy_symbol: str, sell_symbol: str, pair_plan_: PairPlanBaseModel,
+#                                            expected_plan_limits_: PlanLimits,
+#                                            expected_plan_status_: PlanStatus,
 #                                            last_barter_fixture_list: List[Dict],
 #                                            symbol_overview_obj_list: List[SymbolOverviewBaseModel],
 #                                            market_depth_basemodel_list: List[MarketDepthBaseModel]):
 #     chore_counts = 10
-#     active_strat, executor_web_client = (
-#         create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-#                                            expected_strat_status_, symbol_overview_obj_list,
+#     active_plan, executor_web_client = (
+#         create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+#                                            expected_plan_status_, symbol_overview_obj_list,
 #                                            last_barter_fixture_list, market_depth_basemodel_list))
 #
 #     for chore_count in range(chore_counts):
 #         # Buy Chore
-#         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+#         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 #         print(f"LastBarters created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 #         # Running TopOfBook (this triggers expected buy chore)
 #         run_buy_top_of_book(buy_symbol, sell_symbol, executor_web_client[0], False)
 #
 #         # Sell Chore
-#         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+#         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 #         print(f"LastBarters created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 #         # Running TopOfBook (this triggers expected buy chore)
 #         run_sell_top_of_book(buy_symbol, sell_symbol, executor_web_client[1], False)
@@ -1346,14 +1346,14 @@ def test_place_sanity_parallel_chores(static_data_, clean_and_set_limits, leg1_l
 #         time.sleep(10)
 #
 #
-# def test_place_sanity_chores_with_sleep_delays(clean_and_set_limits, buy_sell_symbol_list, pair_strat_,
-#                                                expected_strat_limits_,
-#                                                expected_strat_status_, last_barter_fixture_list,
+# def test_place_sanity_chores_with_sleep_delays(clean_and_set_limits, buy_sell_symbol_list, pair_plan_,
+#                                                expected_plan_limits_,
+#                                                expected_plan_status_, last_barter_fixture_list,
 #                                                symbol_overview_obj_list, market_depth_basemodel_list):
 #     symbol_pair_counter = 1
 #     with concurrent.futures.ThreadPoolExecutor(max_workers=len(buy_sell_symbol_list)) as executor:
 #         results = [executor.submit(handle_test_buy_sell_with_sleep_delays, buy_symbol, sell_symbol,
-#                                    pair_strat_, expected_strat_limits_, expected_strat_status_,
+#                                    pair_plan_, expected_plan_limits_, expected_plan_status_,
 #                                    last_barter_fixture_list, symbol_overview_obj_list, market_depth_basemodel_list)
 #                    for buy_symbol, sell_symbol in buy_sell_symbol_list]
 #
@@ -1363,7 +1363,7 @@ def test_place_sanity_parallel_chores(static_data_, clean_and_set_limits, leg1_l
 
 
 # def test_create_sanity_last_barter(static_data_, clean_and_set_limits, last_barter_fixture_list):
-#     symbols = ["CB_Sec_1", "CB_Sec_2", "CB_Sec_3", "CB_Sec_4"]
+#     symbols = ["Type1_Sec_1", "Type1_Sec_2", "Type1_Sec_3", "Type1_Sec_4"]
 #     px_portions = [(40, 55), (56, 70), (71, 85), (86, 100)]
 #     total_loops = 600
 #     loop_wait = 1   # sec
@@ -1392,11 +1392,11 @@ def test_place_sanity_parallel_chores(static_data_, clean_and_set_limits, leg1_l
 #     # create all dashes
 #     for index in range(1000):
 #         dash_obj: DashBaseModel = DashBaseModel(**dash_)
-#         dash_obj.rt_dash.leg1.sec.sec_id = f"CB_Sec_{index + 1}"
+#         dash_obj.rt_dash.leg1.sec.sec_id = f"Type1_Sec_{index + 1}"
 #         stored_leg1_vwap = dash_obj.rt_dash.leg1.vwap
 #         dash_obj.rt_dash.leg1.vwap = stored_leg1_vwap + random.randint(0, 30)
 #         dash_obj.rt_dash.leg1.vwap_change = (dash_obj.rt_dash.leg1.vwap - stored_leg1_vwap ) * 100 / stored_leg1_vwap
-#         dash_obj.rt_dash.leg2.sec.sec_id = f"EQT_Sec_{index + 1}"
+#         dash_obj.rt_dash.leg2.sec.sec_id = f"Type2_Sec_{index + 1}"
 #         stored_leg2_vwap = dash_obj.rt_dash.leg2.vwap
 #         dash_obj.rt_dash.leg2.vwap = stored_leg2_vwap + random.randint(0, 10) / 10
 #         dash_obj.rt_dash.leg2.vwap_change = (dash_obj.rt_dash.leg2.vwap - stored_leg2_vwap) * 100 / stored_leg2_vwap
@@ -1473,47 +1473,47 @@ def test_place_sanity_parallel_chores(static_data_, clean_and_set_limits, leg1_l
 
 
 @pytest.mark.nightly
-def test_add_brokers_to_portfolio_limits(clean_and_set_limits):
-    """Adding Broker entries in portfolio limits"""
+def test_add_brokers_to_contact_limits(clean_and_set_limits):
+    """Adding Broker entries in contact limits"""
     broker = broker_fixture()
 
-    portfolio_limits_basemodel = PortfolioLimitsBaseModel.from_kwargs(_id=1, eligible_brokers=[broker])
-    email_book_service_native_web_client.patch_portfolio_limits_client(
-        portfolio_limits_basemodel.to_dict(exclude_none=True))
+    contact_limits_basemodel = ContactLimitsBaseModel.from_kwargs(_id=1, eligible_brokers=[broker])
+    email_book_service_native_web_client.patch_contact_limits_client(
+        contact_limits_basemodel.to_dict(exclude_none=True))
 
-    stored_portfolio_limits_ = email_book_service_native_web_client.get_portfolio_limits_client(1)
-    for stored_broker in stored_portfolio_limits_.eligible_brokers:
+    stored_contact_limits_ = email_book_service_native_web_client.get_contact_limits_client(1)
+    for stored_broker in stored_contact_limits_.eligible_brokers:
         stored_broker.id = None
     broker.id = None
 
-    assert broker in stored_portfolio_limits_.eligible_brokers, f"Couldn't find broker {broker} in " \
+    assert broker in stored_contact_limits_.eligible_brokers, f"Couldn't find broker {broker} in " \
                                                                 f"eligible_broker " \
-                                                                f"{stored_portfolio_limits_.eligible_brokers}"
+                                                                f"{stored_contact_limits_.eligible_brokers}"
 
 
 @pytest.mark.nightly
-def test_strat_gets_deleted_even_when_symbol_overview_is_not_found(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+def test_plan_gets_deleted_even_when_symbol_overview_is_not_found(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+        expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         last_barter_fixture_list, market_depth_basemodel_list,
         buy_chore_, sell_chore_, max_loop_count_per_side, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
 
-    created_pair_strat = create_strat(buy_symbol, sell_symbol, pair_strat_)
+    created_pair_plan = create_plan(buy_symbol, sell_symbol, pair_plan_)
     time.sleep(30)
 
-    # deleting strat without creating symbol overview
-    expected_delete_res = {'msg': 'Deletion Successful', 'id': created_pair_strat.id}
-    delete_res = email_book_service_native_web_client.delete_pair_strat_client(created_pair_strat.id)
+    # deleting plan without creating symbol overview
+    expected_delete_res = {'msg': 'Deletion Successful', 'id': created_pair_plan.id}
+    delete_res = email_book_service_native_web_client.delete_pair_plan_client(created_pair_plan.id)
     assert delete_res == expected_delete_res, \
         f"Mismatch: expected delete response: {expected_delete_res}, got {delete_res}"
 
-    # cleanup before leaving this test - since strat is deleted any test after this will not be able to know that
+    # cleanup before leaving this test - since plan is deleted any test after this will not be able to know that
     # its tail executor also needs to be handled to handling it now
     # force killing all tails
     time.sleep(2)
-    kill_tail_executor_for_strat_id(created_pair_strat.id)
+    kill_tail_executor_for_plan_id(created_pair_plan.id)
 
 
 @pytest.mark.nightly1
@@ -1521,11 +1521,11 @@ def test_buy_sell_chore_multi_pair_serialized(static_data_, clean_and_set_limits
                                               buy_chore_, sell_chore_, buy_fill_journal_,
                                               sell_fill_journal_, expected_buy_chore_snapshot_,
                                               expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-                                              pair_strat_, expected_strat_limits_, expected_strat_status_,
-                                              expected_strat_brief_, expected_portfolio_status_,
+                                              pair_plan_, expected_plan_limits_, expected_plan_status_,
+                                              expected_plan_brief_, expected_contact_status_,
                                               last_barter_fixture_list, symbol_overview_obj_list,
                                               market_depth_basemodel_list, expected_chore_limits_,
-                                              expected_portfolio_limits_, max_loop_count_per_side,
+                                              expected_contact_limits_, max_loop_count_per_side,
                                               leg1_leg2_symbol_list, refresh_sec_update_fixture):
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:int(len(leg1_leg2_symbol_list) / 2)]
     overall_buy_notional = 0
@@ -1533,26 +1533,26 @@ def test_buy_sell_chore_multi_pair_serialized(static_data_, clean_and_set_limits
     overall_buy_fill_notional = 0
     overall_sell_fill_notional = 0
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
-        stored_pair_strat_basemodel = create_strat(leg1_symbol, leg2_symbol, pair_strat_)
+        stored_pair_plan_basemodel = create_plan(leg1_symbol, leg2_symbol, pair_plan_)
 
-        strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional = (
+        plan_buy_notional, plan_sell_notional, plan_buy_fill_notional, plan_sell_fill_notional = (
             handle_test_buy_sell_chore(leg1_symbol, leg2_symbol, max_loop_count_per_side,
                                        refresh_sec_update_fixture, buy_chore_, sell_chore_, buy_fill_journal_,
                                        sell_fill_journal_, expected_buy_chore_snapshot_, expected_sell_chore_snapshot_,
-                                       expected_symbol_side_snapshot_, stored_pair_strat_basemodel,
-                                       expected_strat_limits_, expected_strat_status_, expected_strat_brief_,
+                                       expected_symbol_side_snapshot_, stored_pair_plan_basemodel,
+                                       expected_plan_limits_, expected_plan_status_, expected_plan_brief_,
                                        last_barter_fixture_list, symbol_overview_obj_list,
                                        market_depth_basemodel_list))
-        overall_buy_notional += strat_buy_notional
-        overall_sell_notional += strat_sell_notional
-        overall_buy_fill_notional += strat_buy_fill_notional
-        overall_sell_fill_notional += strat_sell_fill_notional
+        overall_buy_notional += plan_buy_notional
+        overall_sell_notional += plan_sell_notional
+        overall_buy_fill_notional += plan_buy_fill_notional
+        overall_sell_fill_notional += plan_sell_fill_notional
 
-    expected_portfolio_status_.overall_buy_notional = overall_buy_notional
-    expected_portfolio_status_.overall_sell_notional = overall_sell_notional
-    expected_portfolio_status_.overall_buy_fill_notional = overall_buy_fill_notional
-    expected_portfolio_status_.overall_sell_fill_notional = overall_sell_fill_notional
-    verify_portfolio_status(expected_portfolio_status_)
+    expected_contact_status_.overall_buy_notional = overall_buy_notional
+    expected_contact_status_.overall_sell_notional = overall_sell_notional
+    expected_contact_status_.overall_buy_fill_notional = overall_buy_fill_notional
+    expected_contact_status_.overall_sell_fill_notional = overall_sell_fill_notional
+    verify_contact_status(expected_contact_status_)
 
 
 @pytest.mark.nightly
@@ -1560,11 +1560,11 @@ def test_buy_sell_chore_multi_pair_parallel(static_data_, clean_and_set_limits, 
                                             buy_chore_, sell_chore_, buy_fill_journal_,
                                             sell_fill_journal_, expected_buy_chore_snapshot_,
                                             expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-                                            pair_strat_, expected_strat_limits_, expected_strat_status_,
-                                            expected_strat_brief_, expected_portfolio_status_,
+                                            pair_plan_, expected_plan_limits_, expected_plan_status_,
+                                            expected_plan_brief_, expected_contact_status_,
                                             last_barter_fixture_list, symbol_overview_obj_list,
                                             market_depth_basemodel_list, expected_chore_limits_,
-                                            expected_portfolio_limits_, max_loop_count_per_side,
+                                            expected_contact_limits_, max_loop_count_per_side,
                                             leg1_leg2_symbol_list, refresh_sec_update_fixture):
     overall_buy_notional = 0
     overall_sell_notional = 0
@@ -1572,15 +1572,15 @@ def test_buy_sell_chore_multi_pair_parallel(static_data_, clean_and_set_limits, 
     overall_sell_fill_notional = 0
 
     leg1_leg2_symbol_list = []
-    total_strats = 10
-    pair_strat_list = []
-    for i in range(1, total_strats + 1):
-        leg1_symbol = f"CB_Sec_{i}"
-        leg2_symbol = f"EQT_Sec_{i}"
+    total_plans = 10
+    pair_plan_list = []
+    for i in range(1, total_plans + 1):
+        leg1_symbol = f"Type1_Sec_{i}"
+        leg2_symbol = f"Type2_Sec_{i}"
         leg1_leg2_symbol_list.append((leg1_symbol, leg2_symbol))
 
-        stored_pair_strat_basemodel = create_strat(leg1_symbol, leg2_symbol, pair_strat_)
-        pair_strat_list.append(stored_pair_strat_basemodel)
+        stored_pair_plan_basemodel = create_plan(leg1_symbol, leg2_symbol, pair_plan_)
+        pair_plan_list.append(stored_pair_plan_basemodel)
         time.sleep(2)
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
@@ -1589,9 +1589,9 @@ def test_buy_sell_chore_multi_pair_parallel(static_data_, clean_and_set_limits, 
                                    copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_journal_),
                                    copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_chore_snapshot_),
                                    copy.deepcopy(expected_sell_chore_snapshot_),
-                                   copy.deepcopy(expected_symbol_side_snapshot_), pair_strat_list[idx],
-                                   copy.deepcopy(expected_strat_limits_),
-                                   copy.deepcopy(expected_strat_status_), copy.deepcopy(expected_strat_brief_),
+                                   copy.deepcopy(expected_symbol_side_snapshot_), pair_plan_list[idx],
+                                   copy.deepcopy(expected_plan_limits_),
+                                   copy.deepcopy(expected_plan_status_), copy.deepcopy(expected_plan_brief_),
                                    copy.deepcopy(last_barter_fixture_list), copy.deepcopy(symbol_overview_obj_list),
                                    copy.deepcopy(market_depth_basemodel_list), False)
                    for idx, leg1_leg2_symbol in enumerate(leg1_leg2_symbol_list)]
@@ -1600,17 +1600,17 @@ def test_buy_sell_chore_multi_pair_parallel(static_data_, clean_and_set_limits, 
             if future.exception() is not None:
                 raise Exception(future.exception())
             else:
-                strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional = future.result()
-                overall_buy_notional += strat_buy_notional
-                overall_sell_notional += strat_sell_notional
-                overall_buy_fill_notional += strat_buy_fill_notional
-                overall_sell_fill_notional += strat_sell_fill_notional
+                plan_buy_notional, plan_sell_notional, plan_buy_fill_notional, plan_sell_fill_notional = future.result()
+                overall_buy_notional += plan_buy_notional
+                overall_sell_notional += plan_sell_notional
+                overall_buy_fill_notional += plan_buy_fill_notional
+                overall_sell_fill_notional += plan_sell_fill_notional
 
-    expected_portfolio_status_.overall_buy_notional = overall_buy_notional
-    expected_portfolio_status_.overall_sell_notional = overall_sell_notional
-    expected_portfolio_status_.overall_buy_fill_notional = overall_buy_fill_notional
-    expected_portfolio_status_.overall_sell_fill_notional = overall_sell_fill_notional
-    verify_portfolio_status(expected_portfolio_status_)
+    expected_contact_status_.overall_buy_notional = overall_buy_notional
+    expected_contact_status_.overall_sell_notional = overall_sell_notional
+    expected_contact_status_.overall_buy_fill_notional = overall_buy_fill_notional
+    expected_contact_status_.overall_sell_fill_notional = overall_sell_fill_notional
+    verify_contact_status(expected_contact_status_)
 
 
 @pytest.mark.nightly
@@ -1618,61 +1618,61 @@ def test_same_pair_parallel_run(static_data_, clean_and_set_limits, pair_securit
                                 buy_chore_, sell_chore_, buy_fill_journal_,
                                 sell_fill_journal_, expected_buy_chore_snapshot_,
                                 expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-                                pair_strat_, expected_strat_limits_, expected_strat_status_,
-                                expected_strat_brief_, expected_portfolio_status_,
+                                pair_plan_, expected_plan_limits_, expected_plan_status_,
+                                expected_plan_brief_, expected_contact_status_,
                                 last_barter_fixture_list, symbol_overview_obj_list,
                                 market_depth_basemodel_list, expected_chore_limits_,
-                                expected_portfolio_limits_, max_loop_count_per_side,
+                                expected_contact_limits_, max_loop_count_per_side,
                                 leg1_leg2_symbol_list, refresh_sec_update_fixture):
     overall_buy_notional = 0
     overall_sell_notional = 0
     overall_buy_fill_notional = 0
     overall_sell_fill_notional = 0
 
-    total_strats = 10
-    leg1_symbol = "CB_Sec_1"
-    leg2_symbol = "EQT_Sec_1"
+    total_plans = 10
+    leg1_symbol = "Type1_Sec_1"
+    leg2_symbol = "Type2_Sec_1"
 
-    buy_sell_pair_strat = create_strat(leg1_symbol, leg2_symbol, pair_strat_)
+    buy_sell_pair_plan = create_plan(leg1_symbol, leg2_symbol, pair_plan_)
     time.sleep(2)
 
-    sell_buy_pair_strat = create_strat(leg1_symbol, leg2_symbol, pair_strat_,
+    sell_buy_pair_plan = create_plan(leg1_symbol, leg2_symbol, pair_plan_,
                                        leg1_side=Side.SELL, leg2_side=Side.BUY)
     time.sleep(2)
 
-    pair_strat_to_test_callable_list = [
-        (buy_sell_pair_strat, handle_test_buy_sell_chore),
-        (sell_buy_pair_strat, handle_test_sell_buy_chore)
+    pair_plan_to_test_callable_list = [
+        (buy_sell_pair_plan, handle_test_buy_sell_chore),
+        (sell_buy_pair_plan, handle_test_sell_buy_chore)
     ]
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=len(pair_strat_to_test_callable_list)) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(pair_plan_to_test_callable_list)) as executor:
         results = [executor.submit(test_callable, leg1_symbol, leg2_symbol,
                                    max_loop_count_per_side, refresh_sec_update_fixture, copy.deepcopy(buy_chore_),
                                    copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_journal_),
                                    copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_chore_snapshot_),
                                    copy.deepcopy(expected_sell_chore_snapshot_),
-                                   copy.deepcopy(expected_symbol_side_snapshot_), create_pair_strat,
-                                   copy.deepcopy(expected_strat_limits_),
-                                   copy.deepcopy(expected_strat_status_), copy.deepcopy(expected_strat_brief_),
+                                   copy.deepcopy(expected_symbol_side_snapshot_), create_pair_plan,
+                                   copy.deepcopy(expected_plan_limits_),
+                                   copy.deepcopy(expected_plan_status_), copy.deepcopy(expected_plan_brief_),
                                    copy.deepcopy(last_barter_fixture_list), copy.deepcopy(symbol_overview_obj_list),
                                    copy.deepcopy(market_depth_basemodel_list), False)
-                   for create_pair_strat, test_callable in pair_strat_to_test_callable_list]
+                   for create_pair_plan, test_callable in pair_plan_to_test_callable_list]
 
         for future in concurrent.futures.as_completed(results):
             if future.exception() is not None:
                 raise future.exception()
             else:
-                strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional = future.result()
-                overall_buy_notional += strat_buy_notional
-                overall_sell_notional += strat_sell_notional
-                overall_buy_fill_notional += strat_buy_fill_notional
-                overall_sell_fill_notional += strat_sell_fill_notional
+                plan_buy_notional, plan_sell_notional, plan_buy_fill_notional, plan_sell_fill_notional = future.result()
+                overall_buy_notional += plan_buy_notional
+                overall_sell_notional += plan_sell_notional
+                overall_buy_fill_notional += plan_buy_fill_notional
+                overall_sell_fill_notional += plan_sell_fill_notional
 
-    expected_portfolio_status_.overall_buy_notional = overall_buy_notional
-    expected_portfolio_status_.overall_sell_notional = overall_sell_notional
-    expected_portfolio_status_.overall_buy_fill_notional = overall_buy_fill_notional
-    expected_portfolio_status_.overall_sell_fill_notional = overall_sell_fill_notional
-    verify_portfolio_status(expected_portfolio_status_)
+    expected_contact_status_.overall_buy_notional = overall_buy_notional
+    expected_contact_status_.overall_sell_notional = overall_sell_notional
+    expected_contact_status_.overall_buy_fill_notional = overall_buy_fill_notional
+    expected_contact_status_.overall_sell_fill_notional = overall_sell_fill_notional
+    verify_contact_status(expected_contact_status_)
 
 
 @pytest.mark.nightly
@@ -1681,61 +1681,61 @@ def test_same_pair_parallel_run_both_side_in_pair(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     overall_buy_notional = 0
     overall_sell_notional = 0
     overall_buy_fill_notional = 0
     overall_sell_fill_notional = 0
 
-    total_strats = 10
-    leg1_symbol = "CB_Sec_1"
-    leg2_symbol = "EQT_Sec_1"
+    total_plans = 10
+    leg1_symbol = "Type1_Sec_1"
+    leg2_symbol = "Type2_Sec_1"
 
-    buy_sell_pair_strat = create_strat(leg1_symbol, leg2_symbol, pair_strat_)
+    buy_sell_pair_plan = create_plan(leg1_symbol, leg2_symbol, pair_plan_)
     time.sleep(2)
 
-    sell_buy_pair_strat = create_strat(leg1_symbol, leg2_symbol, pair_strat_,
+    sell_buy_pair_plan = create_plan(leg1_symbol, leg2_symbol, pair_plan_,
                                        leg1_side=Side.SELL, leg2_side=Side.BUY)
     time.sleep(2)
 
-    pair_strat_to_test_callable_list = [
-        (buy_sell_pair_strat, handle_test_buy_sell_pair_chore),
-        (sell_buy_pair_strat, handle_test_sell_buy_pair_chore)
+    pair_plan_to_test_callable_list = [
+        (buy_sell_pair_plan, handle_test_buy_sell_pair_chore),
+        (sell_buy_pair_plan, handle_test_sell_buy_pair_chore)
     ]
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=len(pair_strat_to_test_callable_list)) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(pair_plan_to_test_callable_list)) as executor:
         results = [executor.submit(test_callable, leg1_symbol, leg2_symbol,
                                    max_loop_count_per_side, refresh_sec_update_fixture, copy.deepcopy(buy_chore_),
                                    copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_journal_),
                                    copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_chore_snapshot_),
                                    copy.deepcopy(expected_sell_chore_snapshot_),
-                                   copy.deepcopy(expected_symbol_side_snapshot_), create_pair_strat,
-                                   copy.deepcopy(expected_strat_limits_),
-                                   copy.deepcopy(expected_strat_status_), copy.deepcopy(expected_strat_brief_),
+                                   copy.deepcopy(expected_symbol_side_snapshot_), create_pair_plan,
+                                   copy.deepcopy(expected_plan_limits_),
+                                   copy.deepcopy(expected_plan_status_), copy.deepcopy(expected_plan_brief_),
                                    copy.deepcopy(last_barter_fixture_list), copy.deepcopy(symbol_overview_obj_list),
                                    copy.deepcopy(market_depth_basemodel_list), False)
-                   for create_pair_strat, test_callable in pair_strat_to_test_callable_list]
+                   for create_pair_plan, test_callable in pair_plan_to_test_callable_list]
 
         for future in concurrent.futures.as_completed(results):
             if future.exception() is not None:
                 raise future.exception()
             else:
-                strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional = future.result()
-                overall_buy_notional += strat_buy_notional
-                overall_sell_notional += strat_sell_notional
-                overall_buy_fill_notional += strat_buy_fill_notional
-                overall_sell_fill_notional += strat_sell_fill_notional
+                plan_buy_notional, plan_sell_notional, plan_buy_fill_notional, plan_sell_fill_notional = future.result()
+                overall_buy_notional += plan_buy_notional
+                overall_sell_notional += plan_sell_notional
+                overall_buy_fill_notional += plan_buy_fill_notional
+                overall_sell_fill_notional += plan_sell_fill_notional
 
-    expected_portfolio_status_.overall_buy_notional = overall_buy_notional
-    expected_portfolio_status_.overall_sell_notional = overall_sell_notional
-    expected_portfolio_status_.overall_buy_fill_notional = overall_buy_fill_notional
-    expected_portfolio_status_.overall_sell_fill_notional = overall_sell_fill_notional
-    verify_portfolio_status(expected_portfolio_status_)
+    expected_contact_status_.overall_buy_notional = overall_buy_notional
+    expected_contact_status_.overall_sell_notional = overall_sell_notional
+    expected_contact_status_.overall_buy_fill_notional = overall_buy_fill_notional
+    expected_contact_status_.overall_sell_fill_notional = overall_sell_fill_notional
+    verify_contact_status(expected_contact_status_)
 
 
 @pytest.mark.nightly
@@ -1744,28 +1744,28 @@ def test_same_pair_parallel_place_chore_in_sequence(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
 
-    total_strats = 10
-    leg1_symbol = "CB_Sec_1"
-    leg2_symbol = "EQT_Sec_1"
+    total_plans = 10
+    leg1_symbol = "Type1_Sec_1"
+    leg2_symbol = "Type2_Sec_1"
 
-    buy_sell_pair_strat = create_strat(leg1_symbol, leg2_symbol, pair_strat_)
+    buy_sell_pair_plan = create_plan(leg1_symbol, leg2_symbol, pair_plan_)
     time.sleep(2)
 
-    sell_buy_pair_strat = create_strat(leg1_symbol, leg2_symbol, pair_strat_,
+    sell_buy_pair_plan = create_plan(leg1_symbol, leg2_symbol, pair_plan_,
                                        leg1_side=Side.SELL, leg2_side=Side.BUY)
     time.sleep(2)
-    pair_strat_list = [buy_sell_pair_strat, sell_buy_pair_strat]
-    expected_strat_limits_list = [copy.deepcopy(expected_strat_limits_), copy.deepcopy(expected_strat_limits_)]
+    pair_plan_list = [buy_sell_pair_plan, sell_buy_pair_plan]
+    expected_plan_limits_list = [copy.deepcopy(expected_plan_limits_), copy.deepcopy(expected_plan_limits_)]
 
     max_loop_count_per_side = 2
-    strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional = (
+    plan_buy_notional, plan_sell_notional, plan_buy_fill_notional, plan_sell_fill_notional = (
         handle_test_buy_sell_n_sell_buy_pair_chore(
             max_loop_count_per_side,
             refresh_sec_update_fixture, buy_chore_,
@@ -1774,31 +1774,31 @@ def test_same_pair_parallel_place_chore_in_sequence(
             expected_buy_chore_snapshot_,
             expected_sell_chore_snapshot_,
             expected_symbol_side_snapshot_,
-            pair_strat_list, expected_strat_limits_list,
-            expected_strat_status_, expected_strat_brief_,
+            pair_plan_list, expected_plan_limits_list,
+            expected_plan_status_, expected_plan_brief_,
             last_barter_fixture_list,
             symbol_overview_obj_list,
             market_depth_basemodel_list,
             False))
 
-    expected_portfolio_status_.overall_buy_notional = strat_buy_notional
-    expected_portfolio_status_.overall_sell_notional = strat_sell_notional
-    expected_portfolio_status_.overall_buy_fill_notional = strat_buy_fill_notional
-    expected_portfolio_status_.overall_sell_fill_notional = strat_sell_fill_notional
-    verify_portfolio_status(expected_portfolio_status_)
+    expected_contact_status_.overall_buy_notional = plan_buy_notional
+    expected_contact_status_.overall_sell_notional = plan_sell_notional
+    expected_contact_status_.overall_buy_fill_notional = plan_buy_fill_notional
+    expected_contact_status_.overall_sell_fill_notional = plan_sell_fill_notional
+    verify_contact_status(expected_contact_status_)
 
 
 @pytest.mark.nightly
-def test_same_n_opposite_strats_in_combination1(
+def test_same_n_opposite_plans_in_combination1(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
 
     overall_buy_notional = 0
@@ -1806,87 +1806,87 @@ def test_same_n_opposite_strats_in_combination1(
     overall_buy_fill_notional = 0
     overall_sell_fill_notional = 0
 
-    total_strats = 10
-    pair_strat_to_test_callable_list = []
+    total_plans = 10
+    pair_plan_to_test_callable_list = []
     for i in range(1, 5):
         if i < 3:
-            # round-trip strat pair - total 2
-            leg1_symbol = f"CB_Sec_{i}"
-            leg2_symbol = f"EQT_Sec_{i}"
+            # round-trip plan pair - total 2
+            leg1_symbol = f"Type1_Sec_{i}"
+            leg2_symbol = f"Type2_Sec_{i}"
 
-            buy_sell_pair_strat = create_strat(leg1_symbol, leg2_symbol, pair_strat_)
+            buy_sell_pair_plan = create_plan(leg1_symbol, leg2_symbol, pair_plan_)
             time.sleep(2)
 
-            sell_buy_pair_strat = create_strat(leg1_symbol, leg2_symbol, pair_strat_,
+            sell_buy_pair_plan = create_plan(leg1_symbol, leg2_symbol, pair_plan_,
                                                leg1_side=Side.SELL, leg2_side=Side.BUY)
             time.sleep(2)
 
-            pair_strat_to_test_callable_list.extend([
-                (leg1_symbol, leg2_symbol, buy_sell_pair_strat, handle_test_buy_sell_pair_chore),
-                (leg1_symbol, leg2_symbol, sell_buy_pair_strat, handle_test_sell_buy_pair_chore)
+            pair_plan_to_test_callable_list.extend([
+                (leg1_symbol, leg2_symbol, buy_sell_pair_plan, handle_test_buy_sell_pair_chore),
+                (leg1_symbol, leg2_symbol, sell_buy_pair_plan, handle_test_sell_buy_pair_chore)
             ])
         elif i < 4:
-            # premium buy-sell strat - total 1
-            leg1_symbol = f"CB_Sec_{i}"
-            leg2_symbol = f"EQT_Sec_{i}"
+            # premium buy-sell plan - total 1
+            leg1_symbol = f"Type1_Sec_{i}"
+            leg2_symbol = f"Type2_Sec_{i}"
 
-            buy_sell_pair_strat = create_strat(leg1_symbol, leg2_symbol, pair_strat_)
+            buy_sell_pair_plan = create_plan(leg1_symbol, leg2_symbol, pair_plan_)
             time.sleep(2)
-            pair_strat_to_test_callable_list.append((leg1_symbol, leg2_symbol, buy_sell_pair_strat,
+            pair_plan_to_test_callable_list.append((leg1_symbol, leg2_symbol, buy_sell_pair_plan,
                                                      handle_test_buy_sell_pair_chore))
         else:
-            # premium sell-buy strat - total 1
-            leg1_symbol = f"CB_Sec_{i}"
-            leg2_symbol = f"EQT_Sec_{i}"
+            # premium sell-buy plan - total 1
+            leg1_symbol = f"Type1_Sec_{i}"
+            leg2_symbol = f"Type2_Sec_{i}"
 
-            sell_buy_pair_strat = create_strat(leg1_symbol, leg2_symbol, pair_strat_,
+            sell_buy_pair_plan = create_plan(leg1_symbol, leg2_symbol, pair_plan_,
                                                leg1_side=Side.SELL, leg2_side=Side.BUY)
             time.sleep(2)
-            pair_strat_to_test_callable_list.append((leg1_symbol, leg2_symbol, sell_buy_pair_strat,
+            pair_plan_to_test_callable_list.append((leg1_symbol, leg2_symbol, sell_buy_pair_plan,
                                                      handle_test_sell_buy_pair_chore))
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=len(pair_strat_to_test_callable_list)) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(pair_plan_to_test_callable_list)) as executor:
         results = [executor.submit(test_callable, leg1_symbol, leg2_symbol,
                                    max_loop_count_per_side, refresh_sec_update_fixture, copy.deepcopy(buy_chore_),
                                    copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_journal_),
                                    copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_chore_snapshot_),
                                    copy.deepcopy(expected_sell_chore_snapshot_),
-                                   copy.deepcopy(expected_symbol_side_snapshot_), create_pair_strat,
-                                   copy.deepcopy(expected_strat_limits_),
-                                   copy.deepcopy(expected_strat_status_), copy.deepcopy(expected_strat_brief_),
+                                   copy.deepcopy(expected_symbol_side_snapshot_), create_pair_plan,
+                                   copy.deepcopy(expected_plan_limits_),
+                                   copy.deepcopy(expected_plan_status_), copy.deepcopy(expected_plan_brief_),
                                    copy.deepcopy(last_barter_fixture_list), copy.deepcopy(symbol_overview_obj_list),
                                    copy.deepcopy(market_depth_basemodel_list), False)
-                   for leg1_symbol, leg2_symbol, create_pair_strat, test_callable in
-                   pair_strat_to_test_callable_list]
+                   for leg1_symbol, leg2_symbol, create_pair_plan, test_callable in
+                   pair_plan_to_test_callable_list]
 
         for future in concurrent.futures.as_completed(results):
             if future.exception() is not None:
                 raise future.exception()
             else:
-                strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional = future.result()
-                overall_buy_notional += strat_buy_notional
-                overall_sell_notional += strat_sell_notional
-                overall_buy_fill_notional += strat_buy_fill_notional
-                overall_sell_fill_notional += strat_sell_fill_notional
+                plan_buy_notional, plan_sell_notional, plan_buy_fill_notional, plan_sell_fill_notional = future.result()
+                overall_buy_notional += plan_buy_notional
+                overall_sell_notional += plan_sell_notional
+                overall_buy_fill_notional += plan_buy_fill_notional
+                overall_sell_fill_notional += plan_sell_fill_notional
 
-    expected_portfolio_status_.overall_buy_notional = overall_buy_notional
-    expected_portfolio_status_.overall_sell_notional = overall_sell_notional
-    expected_portfolio_status_.overall_buy_fill_notional = overall_buy_fill_notional
-    expected_portfolio_status_.overall_sell_fill_notional = overall_sell_fill_notional
-    verify_portfolio_status(expected_portfolio_status_)
+    expected_contact_status_.overall_buy_notional = overall_buy_notional
+    expected_contact_status_.overall_sell_notional = overall_sell_notional
+    expected_contact_status_.overall_buy_fill_notional = overall_buy_fill_notional
+    expected_contact_status_.overall_sell_fill_notional = overall_sell_fill_notional
+    verify_contact_status(expected_contact_status_)
 
 
 @pytest.mark.nightly
-def test_same_n_opposite_strats_in_combination2(
+def test_same_n_opposite_plans_in_combination2(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
 
     overall_buy_notional = 0
@@ -1894,64 +1894,64 @@ def test_same_n_opposite_strats_in_combination2(
     overall_buy_fill_notional = 0
     overall_sell_fill_notional = 0
 
-    total_strats = 10
-    pair_strat_to_test_callable_list = []
-    # round-trip strat pair - total 2
-    leg1_symbol = f"CB_Sec_1"
-    leg2_symbol = f"EQT_Sec_1"
+    total_plans = 10
+    pair_plan_to_test_callable_list = []
+    # round-trip plan pair - total 2
+    leg1_symbol = f"Type1_Sec_1"
+    leg2_symbol = f"Type2_Sec_1"
 
-    buy_sell_pair_strat = create_strat(leg1_symbol, leg2_symbol, pair_strat_)
+    buy_sell_pair_plan = create_plan(leg1_symbol, leg2_symbol, pair_plan_)
     time.sleep(2)
 
-    sell_buy_pair_strat = create_strat(leg1_symbol, leg2_symbol, pair_strat_,
+    sell_buy_pair_plan = create_plan(leg1_symbol, leg2_symbol, pair_plan_,
                                        leg1_side=Side.SELL, leg2_side=Side.BUY)
     time.sleep(2)
-    pair_strat_to_test_callable_list.extend([
-        (leg1_symbol, leg2_symbol, buy_sell_pair_strat, handle_test_buy_sell_pair_chore),
-        (leg1_symbol, leg2_symbol, sell_buy_pair_strat, handle_test_sell_buy_pair_chore)
+    pair_plan_to_test_callable_list.extend([
+        (leg1_symbol, leg2_symbol, buy_sell_pair_plan, handle_test_buy_sell_pair_chore),
+        (leg1_symbol, leg2_symbol, sell_buy_pair_plan, handle_test_sell_buy_pair_chore)
     ])
 
-    pair_strat_data_for_ready = create_strat(leg1_symbol, leg2_symbol, pair_strat_)
+    pair_plan_data_for_ready = create_plan(leg1_symbol, leg2_symbol, pair_plan_)
     time.sleep(2)
 
-    leg1_symbol = f"CB_Sec_2"
-    leg2_symbol = f"EQT_Sec_2"
+    leg1_symbol = f"Type1_Sec_2"
+    leg2_symbol = f"Type2_Sec_2"
 
-    buy_sell_pair_strat = create_strat(leg1_symbol, leg2_symbol, pair_strat_)
+    buy_sell_pair_plan = create_plan(leg1_symbol, leg2_symbol, pair_plan_)
     time.sleep(2)
-    pair_strat_to_test_callable_list.extend([
-        (leg1_symbol, leg2_symbol, buy_sell_pair_strat, handle_test_buy_sell_pair_chore)
+    pair_plan_to_test_callable_list.extend([
+        (leg1_symbol, leg2_symbol, buy_sell_pair_plan, handle_test_buy_sell_pair_chore)
     ])
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=len(pair_strat_to_test_callable_list)) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(pair_plan_to_test_callable_list)) as executor:
         results = [executor.submit(test_callable, leg1_symbol, leg2_symbol,
                                    max_loop_count_per_side, refresh_sec_update_fixture, copy.deepcopy(buy_chore_),
                                    copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_journal_),
                                    copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_chore_snapshot_),
                                    copy.deepcopy(expected_sell_chore_snapshot_),
-                                   copy.deepcopy(expected_symbol_side_snapshot_), create_pair_strat,
-                                   copy.deepcopy(expected_strat_limits_),
-                                   copy.deepcopy(expected_strat_status_), copy.deepcopy(expected_strat_brief_),
+                                   copy.deepcopy(expected_symbol_side_snapshot_), create_pair_plan,
+                                   copy.deepcopy(expected_plan_limits_),
+                                   copy.deepcopy(expected_plan_status_), copy.deepcopy(expected_plan_brief_),
                                    copy.deepcopy(last_barter_fixture_list), copy.deepcopy(symbol_overview_obj_list),
                                    copy.deepcopy(market_depth_basemodel_list), False)
-                   for leg1_symbol, leg2_symbol, create_pair_strat, test_callable in
-                   pair_strat_to_test_callable_list]
+                   for leg1_symbol, leg2_symbol, create_pair_plan, test_callable in
+                   pair_plan_to_test_callable_list]
 
-        ready_strat_result = [executor.submit(move_snoozed_pair_strat_to_ready_n_then_active, pair_strat_data_for_ready,
+        ready_plan_result = [executor.submit(move_snoozed_pair_plan_to_ready_n_then_active, pair_plan_data_for_ready,
                                         copy.deepcopy(market_depth_basemodel_list),
                                         copy.deepcopy(symbol_overview_obj_list),
-                                        copy.deepcopy(expected_strat_limits_),
-                                        copy.deepcopy(expected_strat_status_), True)]
+                                        copy.deepcopy(expected_plan_limits_),
+                                        copy.deepcopy(expected_plan_status_), True)]
 
         for future in concurrent.futures.as_completed(results):
             if future.exception() is not None:
                 raise future.exception()
             else:
-                strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional = future.result()
-                overall_buy_notional += strat_buy_notional
-                overall_sell_notional += strat_sell_notional
-                overall_buy_fill_notional += strat_buy_fill_notional
-                overall_sell_fill_notional += strat_sell_fill_notional
+                plan_buy_notional, plan_sell_notional, plan_buy_fill_notional, plan_sell_fill_notional = future.result()
+                overall_buy_notional += plan_buy_notional
+                overall_sell_notional += plan_sell_notional
+                overall_buy_fill_notional += plan_buy_fill_notional
+                overall_sell_fill_notional += plan_sell_fill_notional
 
         for future in concurrent.futures.as_completed(results):
             if future.exception() is not None:
@@ -1959,11 +1959,11 @@ def test_same_n_opposite_strats_in_combination2(
         else:
             future.result()
 
-    expected_portfolio_status_.overall_buy_notional = overall_buy_notional
-    expected_portfolio_status_.overall_sell_notional = overall_sell_notional
-    expected_portfolio_status_.overall_buy_fill_notional = overall_buy_fill_notional
-    expected_portfolio_status_.overall_sell_fill_notional = overall_sell_fill_notional
-    verify_portfolio_status(expected_portfolio_status_)
+    expected_contact_status_.overall_buy_notional = overall_buy_notional
+    expected_contact_status_.overall_sell_notional = overall_sell_notional
+    expected_contact_status_.overall_buy_fill_notional = overall_buy_fill_notional
+    expected_contact_status_.overall_sell_fill_notional = overall_sell_fill_notional
+    verify_contact_status(expected_contact_status_)
 
 
 @pytest.mark.nightly
@@ -1971,11 +1971,11 @@ def test_sell_buy_chore_multi_pair_parallel(static_data_, clean_and_set_limits, 
                                             buy_chore_, sell_chore_, buy_fill_journal_,
                                             sell_fill_journal_, expected_buy_chore_snapshot_,
                                             expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-                                            pair_strat_, expected_strat_limits_, expected_strat_status_,
-                                            expected_strat_brief_, expected_portfolio_status_,
+                                            pair_plan_, expected_plan_limits_, expected_plan_status_,
+                                            expected_plan_brief_, expected_contact_status_,
                                             last_barter_fixture_list, symbol_overview_obj_list,
                                             market_depth_basemodel_list, expected_chore_limits_,
-                                            expected_portfolio_limits_, max_loop_count_per_side,
+                                            expected_contact_limits_, max_loop_count_per_side,
                                             leg1_leg2_symbol_list, refresh_sec_update_fixture):
     overall_buy_notional = 0
     overall_sell_notional = 0
@@ -1983,16 +1983,16 @@ def test_sell_buy_chore_multi_pair_parallel(static_data_, clean_and_set_limits, 
     overall_sell_fill_notional = 0
 
     leg1_leg2_symbol_list = []
-    total_strats = 10
-    pair_strat_list = []
-    for i in range(1, total_strats + 1):
-        leg1_symbol = f"CB_Sec_{i}"
-        leg2_symbol = f"EQT_Sec_{i}"
+    total_plans = 10
+    pair_plan_list = []
+    for i in range(1, total_plans + 1):
+        leg1_symbol = f"Type1_Sec_{i}"
+        leg2_symbol = f"Type2_Sec_{i}"
         leg1_leg2_symbol_list.append((leg1_symbol, leg2_symbol))
 
-        stored_pair_strat_basemodel = create_strat(leg1_symbol, leg2_symbol, pair_strat_,
+        stored_pair_plan_basemodel = create_plan(leg1_symbol, leg2_symbol, pair_plan_,
                                                    leg1_side=Side.SELL, leg2_side=Side.BUY)
-        pair_strat_list.append(stored_pair_strat_basemodel)
+        pair_plan_list.append(stored_pair_plan_basemodel)
         time.sleep(2)
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
@@ -2001,9 +2001,9 @@ def test_sell_buy_chore_multi_pair_parallel(static_data_, clean_and_set_limits, 
                                    copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_journal_),
                                    copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_chore_snapshot_),
                                    copy.deepcopy(expected_sell_chore_snapshot_),
-                                   copy.deepcopy(expected_symbol_side_snapshot_), pair_strat_list[idx],
-                                   copy.deepcopy(expected_strat_limits_),
-                                   copy.deepcopy(expected_strat_status_), copy.deepcopy(expected_strat_brief_),
+                                   copy.deepcopy(expected_symbol_side_snapshot_), pair_plan_list[idx],
+                                   copy.deepcopy(expected_plan_limits_),
+                                   copy.deepcopy(expected_plan_status_), copy.deepcopy(expected_plan_brief_),
                                    copy.deepcopy(last_barter_fixture_list), copy.deepcopy(symbol_overview_obj_list),
                                    copy.deepcopy(market_depth_basemodel_list), False)
                    for idx, leg1_leg2_symbol in enumerate(leg1_leg2_symbol_list)]
@@ -2012,17 +2012,17 @@ def test_sell_buy_chore_multi_pair_parallel(static_data_, clean_and_set_limits, 
             if future.exception() is not None:
                 raise Exception(future.exception())
             else:
-                strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional = future.result()
-                overall_buy_notional += strat_buy_notional
-                overall_sell_notional += strat_sell_notional
-                overall_buy_fill_notional += strat_buy_fill_notional
-                overall_sell_fill_notional += strat_sell_fill_notional
+                plan_buy_notional, plan_sell_notional, plan_buy_fill_notional, plan_sell_fill_notional = future.result()
+                overall_buy_notional += plan_buy_notional
+                overall_sell_notional += plan_sell_notional
+                overall_buy_fill_notional += plan_buy_fill_notional
+                overall_sell_fill_notional += plan_sell_fill_notional
 
-    expected_portfolio_status_.overall_buy_notional = overall_buy_notional
-    expected_portfolio_status_.overall_sell_notional = overall_sell_notional
-    expected_portfolio_status_.overall_buy_fill_notional = overall_buy_fill_notional
-    expected_portfolio_status_.overall_sell_fill_notional = overall_sell_fill_notional
-    verify_portfolio_status(expected_portfolio_status_)
+    expected_contact_status_.overall_buy_notional = overall_buy_notional
+    expected_contact_status_.overall_sell_notional = overall_sell_notional
+    expected_contact_status_.overall_buy_fill_notional = overall_buy_fill_notional
+    expected_contact_status_.overall_sell_fill_notional = overall_sell_fill_notional
+    verify_contact_status(expected_contact_status_)
 
 
 @pytest.mark.nightly1
@@ -2032,12 +2032,12 @@ def test_buy_sell_non_systematic_chore_multi_pair_serialized(static_data_, clean
                                                              sell_fill_journal_, expected_buy_chore_snapshot_,
                                                              expected_sell_chore_snapshot_,
                                                              expected_symbol_side_snapshot_,
-                                                             pair_strat_, expected_strat_limits_,
-                                                             expected_strat_status_,
-                                                             expected_strat_brief_, expected_portfolio_status_,
+                                                             pair_plan_, expected_plan_limits_,
+                                                             expected_plan_status_,
+                                                             expected_plan_brief_, expected_contact_status_,
                                                              last_barter_fixture_list, symbol_overview_obj_list,
                                                              market_depth_basemodel_list, expected_chore_limits_,
-                                                             expected_portfolio_limits_, max_loop_count_per_side,
+                                                             expected_contact_limits_, max_loop_count_per_side,
                                                              leg1_leg2_symbol_list, refresh_sec_update_fixture):
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:int(len(leg1_leg2_symbol_list) / 2)]
     overall_buy_notional = 0
@@ -2045,26 +2045,26 @@ def test_buy_sell_non_systematic_chore_multi_pair_serialized(static_data_, clean
     overall_buy_fill_notional = 0
     overall_sell_fill_notional = 0
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
-        stored_pair_strat_basemodel = create_strat(leg1_symbol, leg2_symbol, pair_strat_)
+        stored_pair_plan_basemodel = create_plan(leg1_symbol, leg2_symbol, pair_plan_)
 
-        strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional = (
+        plan_buy_notional, plan_sell_notional, plan_buy_fill_notional, plan_sell_fill_notional = (
             handle_test_buy_sell_chore(leg1_symbol, leg2_symbol, max_loop_count_per_side,
                                        refresh_sec_update_fixture, buy_chore_, sell_chore_, buy_fill_journal_,
                                        sell_fill_journal_, expected_buy_chore_snapshot_, expected_sell_chore_snapshot_,
-                                       expected_symbol_side_snapshot_, stored_pair_strat_basemodel,
-                                       expected_strat_limits_, expected_strat_status_, expected_strat_brief_,
+                                       expected_symbol_side_snapshot_, stored_pair_plan_basemodel,
+                                       expected_plan_limits_, expected_plan_status_, expected_plan_brief_,
                                        last_barter_fixture_list, symbol_overview_obj_list,
                                        market_depth_basemodel_list, is_non_systematic_run=True))
-        overall_buy_notional += strat_buy_notional
-        overall_sell_notional += strat_sell_notional
-        overall_buy_fill_notional += strat_buy_fill_notional
-        overall_sell_fill_notional += strat_sell_fill_notional
+        overall_buy_notional += plan_buy_notional
+        overall_sell_notional += plan_sell_notional
+        overall_buy_fill_notional += plan_buy_fill_notional
+        overall_sell_fill_notional += plan_sell_fill_notional
 
-    expected_portfolio_status_.overall_buy_notional = overall_buy_notional
-    expected_portfolio_status_.overall_sell_notional = overall_sell_notional
-    expected_portfolio_status_.overall_buy_fill_notional = overall_buy_fill_notional
-    expected_portfolio_status_.overall_sell_fill_notional = overall_sell_fill_notional
-    verify_portfolio_status(expected_portfolio_status_)
+    expected_contact_status_.overall_buy_notional = overall_buy_notional
+    expected_contact_status_.overall_sell_notional = overall_sell_notional
+    expected_contact_status_.overall_buy_fill_notional = overall_buy_fill_notional
+    expected_contact_status_.overall_sell_fill_notional = overall_sell_fill_notional
+    verify_contact_status(expected_contact_status_)
 
 
 @pytest.mark.nightly
@@ -2074,11 +2074,11 @@ def test_buy_sell_non_systematic_chore_multi_pair_parallel(static_data_, clean_a
                                                            sell_fill_journal_, expected_buy_chore_snapshot_,
                                                            expected_sell_chore_snapshot_,
                                                            expected_symbol_side_snapshot_,
-                                                           pair_strat_, expected_strat_limits_, expected_strat_status_,
-                                                           expected_strat_brief_, expected_portfolio_status_,
+                                                           pair_plan_, expected_plan_limits_, expected_plan_status_,
+                                                           expected_plan_brief_, expected_contact_status_,
                                                            last_barter_fixture_list, symbol_overview_obj_list,
                                                            market_depth_basemodel_list, expected_chore_limits_,
-                                                           expected_portfolio_limits_, max_loop_count_per_side,
+                                                           expected_contact_limits_, max_loop_count_per_side,
                                                            leg1_leg2_symbol_list, refresh_sec_update_fixture):
     overall_buy_notional = 0
     overall_sell_notional = 0
@@ -2086,15 +2086,15 @@ def test_buy_sell_non_systematic_chore_multi_pair_parallel(static_data_, clean_a
     overall_sell_fill_notional = 0
 
     leg1_leg2_symbol_list = []
-    total_strats = 10
-    pair_strat_list = []
-    for i in range(1, total_strats + 1):
-        leg1_symbol = f"CB_Sec_{i}"
-        leg2_symbol = f"EQT_Sec_{i}"
+    total_plans = 10
+    pair_plan_list = []
+    for i in range(1, total_plans + 1):
+        leg1_symbol = f"Type1_Sec_{i}"
+        leg2_symbol = f"Type2_Sec_{i}"
         leg1_leg2_symbol_list.append((leg1_symbol, leg2_symbol))
 
-        stored_pair_strat_basemodel = create_strat(leg1_symbol, leg2_symbol, pair_strat_)
-        pair_strat_list.append(stored_pair_strat_basemodel)
+        stored_pair_plan_basemodel = create_plan(leg1_symbol, leg2_symbol, pair_plan_)
+        pair_plan_list.append(stored_pair_plan_basemodel)
         time.sleep(2)
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
@@ -2103,9 +2103,9 @@ def test_buy_sell_non_systematic_chore_multi_pair_parallel(static_data_, clean_a
                                    copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_journal_),
                                    copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_chore_snapshot_),
                                    copy.deepcopy(expected_sell_chore_snapshot_),
-                                   copy.deepcopy(expected_symbol_side_snapshot_), pair_strat_list[idx],
-                                   copy.deepcopy(expected_strat_limits_),
-                                   copy.deepcopy(expected_strat_status_), copy.deepcopy(expected_strat_brief_),
+                                   copy.deepcopy(expected_symbol_side_snapshot_), pair_plan_list[idx],
+                                   copy.deepcopy(expected_plan_limits_),
+                                   copy.deepcopy(expected_plan_status_), copy.deepcopy(expected_plan_brief_),
                                    copy.deepcopy(last_barter_fixture_list), copy.deepcopy(symbol_overview_obj_list),
                                    copy.deepcopy(market_depth_basemodel_list), True)
                    for idx, buy_sell_symbol in enumerate(leg1_leg2_symbol_list)]
@@ -2114,17 +2114,17 @@ def test_buy_sell_non_systematic_chore_multi_pair_parallel(static_data_, clean_a
             if future.exception() is not None:
                 raise Exception(future.exception())
             else:
-                strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional = future.result()
-                overall_buy_notional += strat_buy_notional
-                overall_sell_notional += strat_sell_notional
-                overall_buy_fill_notional += strat_buy_fill_notional
-                overall_sell_fill_notional += strat_sell_fill_notional
+                plan_buy_notional, plan_sell_notional, plan_buy_fill_notional, plan_sell_fill_notional = future.result()
+                overall_buy_notional += plan_buy_notional
+                overall_sell_notional += plan_sell_notional
+                overall_buy_fill_notional += plan_buy_fill_notional
+                overall_sell_fill_notional += plan_sell_fill_notional
 
-    expected_portfolio_status_.overall_buy_notional = overall_buy_notional
-    expected_portfolio_status_.overall_sell_notional = overall_sell_notional
-    expected_portfolio_status_.overall_buy_fill_notional = overall_buy_fill_notional
-    expected_portfolio_status_.overall_sell_fill_notional = overall_sell_fill_notional
-    verify_portfolio_status(expected_portfolio_status_)
+    expected_contact_status_.overall_buy_notional = overall_buy_notional
+    expected_contact_status_.overall_sell_notional = overall_sell_notional
+    expected_contact_status_.overall_buy_fill_notional = overall_buy_fill_notional
+    expected_contact_status_.overall_sell_fill_notional = overall_sell_fill_notional
+    verify_contact_status(expected_contact_status_)
 
 
 @pytest.mark.nightly
@@ -2133,11 +2133,11 @@ def test_buy_sell_pair_chore(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     """
     triggers buy & sell pair chore (single buy chore followed by single sell chore) for max_loop_count_per_side times
@@ -2148,15 +2148,15 @@ def test_buy_sell_pair_chore(
     overall_sell_fill_notional = 0
 
     leg1_leg2_symbol_list = []
-    total_strats = 10
-    pair_strat_list = []
-    for i in range(1, total_strats + 1):
-        leg1_symbol = f"CB_Sec_{i}"
-        leg2_symbol = f"EQT_Sec_{i}"
+    total_plans = 10
+    pair_plan_list = []
+    for i in range(1, total_plans + 1):
+        leg1_symbol = f"Type1_Sec_{i}"
+        leg2_symbol = f"Type2_Sec_{i}"
         leg1_leg2_symbol_list.append((leg1_symbol, leg2_symbol))
 
-        stored_pair_strat_basemodel = create_strat(leg1_symbol, leg2_symbol, pair_strat_)
-        pair_strat_list.append(stored_pair_strat_basemodel)
+        stored_pair_plan_basemodel = create_plan(leg1_symbol, leg2_symbol, pair_plan_)
+        pair_plan_list.append(stored_pair_plan_basemodel)
         time.sleep(2)
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
@@ -2165,9 +2165,9 @@ def test_buy_sell_pair_chore(
                                    copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_journal_),
                                    copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_chore_snapshot_),
                                    copy.deepcopy(expected_sell_chore_snapshot_),
-                                   copy.deepcopy(expected_symbol_side_snapshot_), pair_strat_list[idx],
-                                   copy.deepcopy(expected_strat_limits_),
-                                   copy.deepcopy(expected_strat_status_), copy.deepcopy(expected_strat_brief_),
+                                   copy.deepcopy(expected_symbol_side_snapshot_), pair_plan_list[idx],
+                                   copy.deepcopy(expected_plan_limits_),
+                                   copy.deepcopy(expected_plan_status_), copy.deepcopy(expected_plan_brief_),
                                    copy.deepcopy(last_barter_fixture_list), copy.deepcopy(symbol_overview_obj_list),
                                    copy.deepcopy(market_depth_basemodel_list), False)
                    for idx, leg1_leg2_symbol in enumerate(leg1_leg2_symbol_list)]
@@ -2176,17 +2176,17 @@ def test_buy_sell_pair_chore(
             if future.exception() is not None:
                 raise Exception(future.exception())
             else:
-                strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional = future.result()
-                overall_buy_notional += strat_buy_notional
-                overall_sell_notional += strat_sell_notional
-                overall_buy_fill_notional += strat_buy_fill_notional
-                overall_sell_fill_notional += strat_sell_fill_notional
+                plan_buy_notional, plan_sell_notional, plan_buy_fill_notional, plan_sell_fill_notional = future.result()
+                overall_buy_notional += plan_buy_notional
+                overall_sell_notional += plan_sell_notional
+                overall_buy_fill_notional += plan_buy_fill_notional
+                overall_sell_fill_notional += plan_sell_fill_notional
 
-    expected_portfolio_status_.overall_buy_notional = overall_buy_notional
-    expected_portfolio_status_.overall_sell_notional = overall_sell_notional
-    expected_portfolio_status_.overall_buy_fill_notional = overall_buy_fill_notional
-    expected_portfolio_status_.overall_sell_fill_notional = overall_sell_fill_notional
-    verify_portfolio_status(expected_portfolio_status_)
+    expected_contact_status_.overall_buy_notional = overall_buy_notional
+    expected_contact_status_.overall_sell_notional = overall_sell_notional
+    expected_contact_status_.overall_buy_fill_notional = overall_buy_fill_notional
+    expected_contact_status_.overall_sell_fill_notional = overall_sell_fill_notional
+    verify_contact_status(expected_contact_status_)
 
 
 @pytest.mark.nightly
@@ -2195,11 +2195,11 @@ def test_sell_buy_pair_chore(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     """
     triggers sell & buy pair chore (single sell chore followed by single buy chore) for max_loop_count_per_side times
@@ -2210,16 +2210,16 @@ def test_sell_buy_pair_chore(
     overall_sell_fill_notional = 0
 
     leg1_leg2_symbol_list = []
-    total_strats = 10
-    pair_strat_list = []
-    for i in range(1, total_strats + 1):
-        leg1_symbol = f"CB_Sec_{i}"
-        leg2_symbol = f"EQT_Sec_{i}"
+    total_plans = 10
+    pair_plan_list = []
+    for i in range(1, total_plans + 1):
+        leg1_symbol = f"Type1_Sec_{i}"
+        leg2_symbol = f"Type2_Sec_{i}"
         leg1_leg2_symbol_list.append((leg1_symbol, leg2_symbol))
 
-        stored_pair_strat_basemodel = create_strat(leg1_symbol, leg2_symbol, pair_strat_,
+        stored_pair_plan_basemodel = create_plan(leg1_symbol, leg2_symbol, pair_plan_,
                                                    leg1_side=Side.SELL, leg2_side=Side.BUY)
-        pair_strat_list.append(stored_pair_strat_basemodel)
+        pair_plan_list.append(stored_pair_plan_basemodel)
         time.sleep(2)
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
@@ -2228,9 +2228,9 @@ def test_sell_buy_pair_chore(
                                    copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_journal_),
                                    copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_chore_snapshot_),
                                    copy.deepcopy(expected_sell_chore_snapshot_),
-                                   copy.deepcopy(expected_symbol_side_snapshot_), pair_strat_list[idx],
-                                   copy.deepcopy(expected_strat_limits_),
-                                   copy.deepcopy(expected_strat_status_), copy.deepcopy(expected_strat_brief_),
+                                   copy.deepcopy(expected_symbol_side_snapshot_), pair_plan_list[idx],
+                                   copy.deepcopy(expected_plan_limits_),
+                                   copy.deepcopy(expected_plan_status_), copy.deepcopy(expected_plan_brief_),
                                    copy.deepcopy(last_barter_fixture_list), copy.deepcopy(symbol_overview_obj_list),
                                    copy.deepcopy(market_depth_basemodel_list), False)
                    for idx, leg1_leg2_symbol in enumerate(leg1_leg2_symbol_list)]
@@ -2239,31 +2239,31 @@ def test_sell_buy_pair_chore(
             if future.exception() is not None:
                 raise Exception(future.exception())
             else:
-                strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional = future.result()
-                overall_buy_notional += strat_buy_notional
-                overall_sell_notional += strat_sell_notional
-                overall_buy_fill_notional += strat_buy_fill_notional
-                overall_sell_fill_notional += strat_sell_fill_notional
+                plan_buy_notional, plan_sell_notional, plan_buy_fill_notional, plan_sell_fill_notional = future.result()
+                overall_buy_notional += plan_buy_notional
+                overall_sell_notional += plan_sell_notional
+                overall_buy_fill_notional += plan_buy_fill_notional
+                overall_sell_fill_notional += plan_sell_fill_notional
 
-    expected_portfolio_status_.overall_buy_notional = overall_buy_notional
-    expected_portfolio_status_.overall_sell_notional = overall_sell_notional
-    expected_portfolio_status_.overall_buy_fill_notional = overall_buy_fill_notional
-    expected_portfolio_status_.overall_sell_fill_notional = overall_sell_fill_notional
-    verify_portfolio_status(expected_portfolio_status_)
+    expected_contact_status_.overall_buy_notional = overall_buy_notional
+    expected_contact_status_.overall_sell_notional = overall_sell_notional
+    expected_contact_status_.overall_buy_fill_notional = overall_buy_fill_notional
+    expected_contact_status_.overall_sell_fill_notional = overall_sell_fill_notional
+    verify_contact_status(expected_contact_status_)
 
 
 @pytest.mark.nightly
 @pytest.mark.parametrize("market_depth_basemodel_list", [5, 10, 20], indirect=True)
-def test_multiple_market_depths_in_strats(
+def test_multiple_market_depths_in_plans(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     overall_buy_notional = 0
     overall_sell_notional = 0
@@ -2281,21 +2281,21 @@ def test_multiple_market_depths_in_strats(
                        f"executor config file")
 
     leg1_leg2_symbol_list = []
-    total_strats = 10
-    pair_strat_list = []
-    for i in range(1, total_strats + 1):
-        leg1_symbol = f"CB_Sec_{i}"
-        leg2_symbol = f"EQT_Sec_{i}"
+    total_plans = 10
+    pair_plan_list = []
+    for i in range(1, total_plans + 1):
+        leg1_symbol = f"Type1_Sec_{i}"
+        leg2_symbol = f"Type2_Sec_{i}"
         leg1_leg2_symbol_list.append((leg1_symbol, leg2_symbol))
 
-        stored_pair_strat_basemodel = create_strat(leg1_symbol, leg2_symbol, pair_strat_)
+        stored_pair_plan_basemodel = create_plan(leg1_symbol, leg2_symbol, pair_plan_)
 
-        # setting exch_id based on parametrized value explicitly post strat create - create time exch_id is
+        # setting exch_id based on parametrized value explicitly post plan create - create time exch_id is
         # taken from static data so gets overrided by static data value
-        stored_pair_strat_basemodel.pair_strat_params.strat_leg1.exch_id = exch_id
-        stored_pair_strat_basemodel.pair_strat_params.strat_leg2.exch_id = exch_id
-        updated_pair_strat_basemodel = email_book_service_native_web_client.put_pair_strat_client(stored_pair_strat_basemodel)
-        pair_strat_list.append(updated_pair_strat_basemodel)
+        stored_pair_plan_basemodel.pair_plan_params.plan_leg1.exch_id = exch_id
+        stored_pair_plan_basemodel.pair_plan_params.plan_leg2.exch_id = exch_id
+        updated_pair_plan_basemodel = email_book_service_native_web_client.put_pair_plan_client(stored_pair_plan_basemodel)
+        pair_plan_list.append(updated_pair_plan_basemodel)
         time.sleep(2)
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
@@ -2304,9 +2304,9 @@ def test_multiple_market_depths_in_strats(
                                    copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_journal_),
                                    copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_chore_snapshot_),
                                    copy.deepcopy(expected_sell_chore_snapshot_),
-                                   copy.deepcopy(expected_symbol_side_snapshot_), pair_strat_list[idx],
-                                   copy.deepcopy(expected_strat_limits_),
-                                   copy.deepcopy(expected_strat_status_), copy.deepcopy(expected_strat_brief_),
+                                   copy.deepcopy(expected_symbol_side_snapshot_), pair_plan_list[idx],
+                                   copy.deepcopy(expected_plan_limits_),
+                                   copy.deepcopy(expected_plan_status_), copy.deepcopy(expected_plan_brief_),
                                    copy.deepcopy(last_barter_fixture_list), copy.deepcopy(symbol_overview_obj_list),
                                    copy.deepcopy(market_depth_basemodel_list), False)
                    for idx, leg1_leg2_symbol in enumerate(leg1_leg2_symbol_list)]
@@ -2315,30 +2315,30 @@ def test_multiple_market_depths_in_strats(
             if future.exception() is not None:
                 raise Exception(future.exception())
             else:
-                strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional = future.result()
-                overall_buy_notional += strat_buy_notional
-                overall_sell_notional += strat_sell_notional
-                overall_buy_fill_notional += strat_buy_fill_notional
-                overall_sell_fill_notional += strat_sell_fill_notional
+                plan_buy_notional, plan_sell_notional, plan_buy_fill_notional, plan_sell_fill_notional = future.result()
+                overall_buy_notional += plan_buy_notional
+                overall_sell_notional += plan_sell_notional
+                overall_buy_fill_notional += plan_buy_fill_notional
+                overall_sell_fill_notional += plan_sell_fill_notional
 
-    expected_portfolio_status_.overall_buy_notional = overall_buy_notional
-    expected_portfolio_status_.overall_sell_notional = overall_sell_notional
-    expected_portfolio_status_.overall_buy_fill_notional = overall_buy_fill_notional
-    expected_portfolio_status_.overall_sell_fill_notional = overall_sell_fill_notional
-    verify_portfolio_status(expected_portfolio_status_)
+    expected_contact_status_.overall_buy_notional = overall_buy_notional
+    expected_contact_status_.overall_sell_notional = overall_sell_notional
+    expected_contact_status_.overall_buy_fill_notional = overall_buy_fill_notional
+    expected_contact_status_.overall_sell_fill_notional = overall_sell_fill_notional
+    verify_contact_status(expected_contact_status_)
 
 
 @pytest.mark.nightly
-def test_asymmetric_market_depths_in_strats(
+def test_asymmetric_market_depths_in_plans(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     overall_buy_notional = 0
     overall_sell_notional = 0
@@ -2346,15 +2346,15 @@ def test_asymmetric_market_depths_in_strats(
     overall_sell_fill_notional = 0
 
     leg1_leg2_symbol_list = []
-    total_strats = 10
-    pair_strat_list = []
-    for i in range(1, total_strats + 1):
-        leg1_symbol = f"CB_Sec_{i}"
-        leg2_symbol = f"EQT_Sec_{i}"
+    total_plans = 10
+    pair_plan_list = []
+    for i in range(1, total_plans + 1):
+        leg1_symbol = f"Type1_Sec_{i}"
+        leg2_symbol = f"Type2_Sec_{i}"
         leg1_leg2_symbol_list.append((leg1_symbol, leg2_symbol))
 
-        stored_pair_strat_basemodel = create_strat(leg1_symbol, leg2_symbol, pair_strat_)
-        pair_strat_list.append(stored_pair_strat_basemodel)
+        stored_pair_plan_basemodel = create_plan(leg1_symbol, leg2_symbol, pair_plan_)
+        pair_plan_list.append(stored_pair_plan_basemodel)
         time.sleep(2)
 
     # keeping bid side length=3 and ask side length=4
@@ -2379,9 +2379,9 @@ def test_asymmetric_market_depths_in_strats(
                                    copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_journal_),
                                    copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_chore_snapshot_),
                                    copy.deepcopy(expected_sell_chore_snapshot_),
-                                   copy.deepcopy(expected_symbol_side_snapshot_), pair_strat_list[idx],
-                                   copy.deepcopy(expected_strat_limits_),
-                                   copy.deepcopy(expected_strat_status_), copy.deepcopy(expected_strat_brief_),
+                                   copy.deepcopy(expected_symbol_side_snapshot_), pair_plan_list[idx],
+                                   copy.deepcopy(expected_plan_limits_),
+                                   copy.deepcopy(expected_plan_status_), copy.deepcopy(expected_plan_brief_),
                                    copy.deepcopy(last_barter_fixture_list), copy.deepcopy(symbol_overview_obj_list),
                                    copy.deepcopy(market_depth_basemodel_list_), False)
                    for idx, leg1_leg2_symbol in enumerate(leg1_leg2_symbol_list)]
@@ -2390,41 +2390,41 @@ def test_asymmetric_market_depths_in_strats(
             if future.exception() is not None:
                 raise Exception(future.exception())
             else:
-                strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional = future.result()
-                overall_buy_notional += strat_buy_notional
-                overall_sell_notional += strat_sell_notional
-                overall_buy_fill_notional += strat_buy_fill_notional
-                overall_sell_fill_notional += strat_sell_fill_notional
+                plan_buy_notional, plan_sell_notional, plan_buy_fill_notional, plan_sell_fill_notional = future.result()
+                overall_buy_notional += plan_buy_notional
+                overall_sell_notional += plan_sell_notional
+                overall_buy_fill_notional += plan_buy_fill_notional
+                overall_sell_fill_notional += plan_sell_fill_notional
 
-    expected_portfolio_status_.overall_buy_notional = overall_buy_notional
-    expected_portfolio_status_.overall_sell_notional = overall_sell_notional
-    expected_portfolio_status_.overall_buy_fill_notional = overall_buy_fill_notional
-    expected_portfolio_status_.overall_sell_fill_notional = overall_sell_fill_notional
-    verify_portfolio_status(expected_portfolio_status_)
+    expected_contact_status_.overall_buy_notional = overall_buy_notional
+    expected_contact_status_.overall_sell_notional = overall_sell_notional
+    expected_contact_status_.overall_buy_fill_notional = overall_buy_fill_notional
+    expected_contact_status_.overall_sell_fill_notional = overall_sell_fill_notional
+    verify_contact_status(expected_contact_status_)
 
 
 @pytest.mark.nightly
-def test_trigger_kill_switch_systematic(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-                                        expected_strat_limits_, expected_strat_status_,
+def test_trigger_kill_switch_systematic(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+                                        expected_plan_limits_, expected_plan_status_,
                                         symbol_overview_obj_list, last_barter_fixture_list,
                                         market_depth_basemodel_list, refresh_sec_update_fixture):
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
 
-    created_pair_strat, executor_web_client = (
-        create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_strat_status_, symbol_overview_obj_list,
+    created_pair_plan, executor_web_client = (
+        create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_,
+                                           expected_plan_status_, symbol_overview_obj_list,
                                            last_barter_fixture_list,
                                            market_depth_basemodel_list))
 
     bid_buy_top_market_depth, ask_sell_top_market_depth = (
-        get_buy_bid_n_ask_sell_market_depth(leg1_symbol, leg2_symbol, created_pair_strat))
+        get_buy_bid_n_ask_sell_market_depth(leg1_symbol, leg2_symbol, created_pair_plan))
 
     # positive test
-    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, created_pair_plan.cpp_port)
     time.sleep(1)
-    update_tob_through_market_depth_to_place_buy_chore(created_pair_strat.cpp_port, bid_buy_top_market_depth,
+    update_tob_through_market_depth_to_place_buy_chore(created_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                        ask_sell_top_market_depth)
 
     # internally checks chore_journal existence
@@ -2439,13 +2439,13 @@ def test_trigger_kill_switch_systematic(static_data_, clean_and_set_limits, leg1
 
     # validating if bartering_link.trigger_kill_switch got called
     check_str = "Called BarteringLink.trigger_kill_switch"
-    alert_fail_msg = f"Can't find portfolio alert saying '{check_str}'"
+    alert_fail_msg = f"Can't find contact alert saying '{check_str}'"
     time.sleep(5)
-    check_alert_str_in_portfolio_alert(check_str, alert_fail_msg)
+    check_alert_str_in_contact_alert(check_str, alert_fail_msg)
 
-    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, created_pair_plan.cpp_port)
     time.sleep(1)
-    update_tob_through_market_depth_to_place_buy_chore(created_pair_strat.cpp_port, bid_buy_top_market_depth,
+    update_tob_through_market_depth_to_place_buy_chore(created_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                        ask_sell_top_market_depth)
     # internally checking buy chore
     chore_journal = \
@@ -2454,11 +2454,11 @@ def test_trigger_kill_switch_systematic(static_data_, clean_and_set_limits, leg1
                                                        last_chore_id=chore_journal.chore.chore_id,
                                                        expect_no_chore=True)
 
-    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, created_pair_plan.cpp_port)
     # required to make buy side tob latest
-    run_last_barter(leg1_symbol, leg2_symbol, [last_barter_fixture_list[0]], created_pair_strat.cpp_port)
+    run_last_barter(leg1_symbol, leg2_symbol, [last_barter_fixture_list[0]], created_pair_plan.cpp_port)
 
-    update_tob_through_market_depth_to_place_sell_chore(created_pair_strat.cpp_port, ask_sell_top_market_depth,
+    update_tob_through_market_depth_to_place_sell_chore(created_pair_plan.cpp_port, ask_sell_top_market_depth,
                                                         bid_buy_top_market_depth)
     # internally checking sell chore
     chore_journal = \
@@ -2468,25 +2468,25 @@ def test_trigger_kill_switch_systematic(static_data_, clean_and_set_limits, leg1
 
 @pytest.mark.nightly
 def test_trigger_kill_switch_non_systematic(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
-                                            pair_strat_, expected_strat_limits_,
-                                            expected_strat_status_, symbol_overview_obj_list,
+                                            pair_plan_, expected_plan_limits_,
+                                            expected_plan_status_, symbol_overview_obj_list,
                                             last_barter_fixture_list, market_depth_basemodel_list,
                                             buy_chore_, sell_chore_,
                                             refresh_sec_update_fixture):
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
 
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_web_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_web_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list, get_config_data=False)
 
     # positive test
     # placing buy chore
-    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
     place_new_chore(leg1_symbol, Side.BUY, buy_chore_.chore.px, buy_chore_.chore.qty, executor_web_client,
                     buy_inst_type)
     time.sleep(2)
@@ -2503,12 +2503,12 @@ def test_trigger_kill_switch_non_systematic(static_data_, clean_and_set_limits, 
 
     # validating if bartering_link.trigger_kill_switch got called
     check_str = "Called BarteringLink.trigger_kill_switch"
-    alert_fail_msg = f"Can't find portfolio alert saying '{check_str}'"
+    alert_fail_msg = f"Can't find contact alert saying '{check_str}'"
     time.sleep(5)
-    check_alert_str_in_portfolio_alert(check_str, alert_fail_msg)
+    check_alert_str_in_contact_alert(check_str, alert_fail_msg)
 
     # placing buy chore
-    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
     place_new_chore(leg1_symbol, Side.BUY, buy_chore_.chore.px, buy_chore_.chore.qty, executor_web_client,
                     buy_inst_type)
     time.sleep(2)
@@ -2519,7 +2519,7 @@ def test_trigger_kill_switch_non_systematic(static_data_, clean_and_set_limits, 
                                                                    expect_no_chore=True)
 
     # placing sell chore
-    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
     place_new_chore(leg2_symbol, Side.SELL, sell_chore_.chore.px, sell_chore_.chore.qty, executor_web_client,
                     sell_inst_type)
     time.sleep(2)
@@ -2530,18 +2530,18 @@ def test_trigger_kill_switch_non_systematic(static_data_, clean_and_set_limits, 
 
 
 @pytest.mark.nightly
-def test_revoke_kill_switch(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-                            expected_strat_limits_, expected_strat_status_,
+def test_revoke_kill_switch(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+                            expected_plan_limits_, expected_plan_status_,
                             symbol_overview_obj_list, last_barter_fixture_list,
                             market_depth_basemodel_list, refresh_sec_update_fixture):
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
 
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
-    created_pair_strat, executor_web_client = (
-        create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_strat_status_, symbol_overview_obj_list,
+    created_pair_plan, executor_web_client = (
+        create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_,
+                                           expected_plan_status_, symbol_overview_obj_list,
                                            last_barter_fixture_list,
                                            market_depth_basemodel_list))
 
@@ -2552,22 +2552,22 @@ def test_revoke_kill_switch(static_data_, clean_and_set_limits, leg1_leg2_symbol
     assert updated_system_control.kill_switch, "Unexpected: kill_switch is False, expected to be True"
 
     bid_buy_top_market_depth, ask_sell_top_market_depth = (
-        get_buy_bid_n_ask_sell_market_depth(leg1_symbol, leg2_symbol, created_pair_strat))
+        get_buy_bid_n_ask_sell_market_depth(leg1_symbol, leg2_symbol, created_pair_plan))
     time.sleep(2)
-    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, created_pair_plan.cpp_port)
     time.sleep(1)
-    update_tob_through_market_depth_to_place_buy_chore(created_pair_strat.cpp_port, bid_buy_top_market_depth,
+    update_tob_through_market_depth_to_place_buy_chore(created_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                        ask_sell_top_market_depth)
     # internally checking buy chore
     chore_journal = \
         get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                        leg1_symbol, executor_web_client, expect_no_chore=True)
 
-    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, created_pair_plan.cpp_port)
     # required to make buy side tob latest
-    run_last_barter(leg1_symbol, leg2_symbol, [last_barter_fixture_list[0]], created_pair_strat.cpp_port)
+    run_last_barter(leg1_symbol, leg2_symbol, [last_barter_fixture_list[0]], created_pair_plan.cpp_port)
 
-    update_tob_through_market_depth_to_place_sell_chore(created_pair_strat.cpp_port, ask_sell_top_market_depth,
+    update_tob_through_market_depth_to_place_sell_chore(created_pair_plan.cpp_port, ask_sell_top_market_depth,
                                                         bid_buy_top_market_depth)
     # internally checking sell chore
     chore_journal = \
@@ -2582,13 +2582,13 @@ def test_revoke_kill_switch(static_data_, clean_and_set_limits, leg1_leg2_symbol
 
     # validating if bartering_link.trigger_kill_switch got called
     check_str = "Called BarteringLink.revoke_kill_switch_n_resume_bartering"
-    alert_fail_msg = f"Can't find portfolio alert saying '{check_str}'"
+    alert_fail_msg = f"Can't find contact alert saying '{check_str}'"
     time.sleep(5)
-    check_alert_str_in_portfolio_alert(check_str, alert_fail_msg)
+    check_alert_str_in_contact_alert(check_str, alert_fail_msg)
 
-    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, created_pair_plan.cpp_port)
     time.sleep(1)
-    update_tob_through_market_depth_to_place_buy_chore(created_pair_strat.cpp_port, bid_buy_top_market_depth,
+    update_tob_through_market_depth_to_place_buy_chore(created_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                        ask_sell_top_market_depth)
 
     # internally checks chore_journal existence
@@ -2596,11 +2596,11 @@ def test_revoke_kill_switch(static_data_, clean_and_set_limits, leg1_leg2_symbol
                                                                                  leg1_symbol, executor_web_client)
     time.sleep(residual_wait_sec)
 
-    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, created_pair_plan.cpp_port)
     # required to make buy side tob latest
-    run_last_barter(leg1_symbol, leg2_symbol, [last_barter_fixture_list[0]], created_pair_strat.cpp_port)
+    run_last_barter(leg1_symbol, leg2_symbol, [last_barter_fixture_list[0]], created_pair_plan.cpp_port)
 
-    update_tob_through_market_depth_to_place_sell_chore(created_pair_strat.cpp_port, ask_sell_top_market_depth,
+    update_tob_through_market_depth_to_place_sell_chore(created_pair_plan.cpp_port, ask_sell_top_market_depth,
                                                         bid_buy_top_market_depth)
     # internally checking sell chore
     chore_journal = \
@@ -2610,8 +2610,8 @@ def test_revoke_kill_switch(static_data_, clean_and_set_limits, leg1_leg2_symbol
 
 @pytest.mark.nightly
 def test_trigger_switch_fail(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-        expected_strat_limits_, expected_strat_status_,
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+        expected_plan_limits_, expected_plan_status_,
         symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list):
 
@@ -2652,8 +2652,8 @@ def test_trigger_switch_fail(
 
 @pytest.mark.nightly
 def test_revoke_switch_fail(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-        expected_strat_limits_, expected_strat_status_,
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+        expected_plan_limits_, expected_plan_status_,
         symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list):
     config_file_path = STRAT_EXECUTOR / "data" / f"kill_switch_simulate_config.yaml"
@@ -2697,14 +2697,14 @@ def test_revoke_switch_fail(
 
 @pytest.mark.nightly
 def test_simulated_partial_fills(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
-                                 pair_strat_, expected_strat_limits_,
-                                 expected_strat_status_, symbol_overview_obj_list,
+                                 pair_plan_, expected_plan_limits_,
+                                 expected_plan_status_, symbol_overview_obj_list,
                                  last_barter_fixture_list, market_depth_basemodel_list,
                                  buy_chore_, sell_chore_,
                                  max_loop_count_per_side, refresh_sec_update_fixture):
     partial_filled_qty: int | None = None
     unfilled_amount: int | None = None
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
     # updating fixture values for this test-case
@@ -2712,13 +2712,13 @@ def test_simulated_partial_fills(static_data_, clean_and_set_limits, leg1_leg2_s
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:2]
 
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
-        created_pair_strat, executor_http_client = (
-            create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-                                               expected_strat_status_, symbol_overview_obj_list,
+        created_pair_plan, executor_http_client = (
+            create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_,
+                                               expected_plan_status_, symbol_overview_obj_list,
                                                last_barter_fixture_list,
                                                market_depth_basemodel_list))
 
-        config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_strat.id)
+        config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_plan.id)
 
         try:
             # updating yaml_configs according to this test
@@ -2740,21 +2740,21 @@ def test_simulated_partial_fills(static_data_, clean_and_set_limits, leg1_leg2_s
                                                                        leg2_symbol,
                                                                        last_barter_fixture_list,
                                                                        chore_id, config_dict,
-                                                                       created_pair_strat, executor_http_client)
+                                                                       created_pair_plan, executor_http_client)
                     total_partial_filled_qty += partial_filled_qty
-                    if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_strat"):
+                    if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
                         # Sleeping to let the chore get cxlled
                         time.sleep(residual_wait_sec)
                 time.sleep(5)
-                strat_status: StratStatusBaseModel = executor_http_client.get_strat_status_client(created_pair_strat.id)
+                plan_status: PlanStatusBaseModel = executor_http_client.get_plan_status_client(created_pair_plan.id)
                 if check_symbol == leg1_symbol:
-                    assert total_partial_filled_qty == strat_status.total_fill_buy_qty, (
+                    assert total_partial_filled_qty == plan_status.total_fill_buy_qty, (
                         f"Unmatched total_fill_buy_qty: expected {total_partial_filled_qty} "
-                        f"received {strat_status.total_fill_buy_qty}")
+                        f"received {plan_status.total_fill_buy_qty}")
                 else:
-                    assert total_partial_filled_qty == strat_status.total_fill_sell_qty, (
+                    assert total_partial_filled_qty == plan_status.total_fill_sell_qty, (
                            f"Unmatched total_fill_sell_qty: expected {total_partial_filled_qty} "
-                           f"received {strat_status.total_fill_sell_qty}")
+                           f"received {plan_status.total_fill_sell_qty}")
         except AssertionError as e:
             raise AssertionError(e)
         except Exception as e:
@@ -2767,14 +2767,14 @@ def test_simulated_partial_fills(static_data_, clean_and_set_limits, leg1_leg2_s
 
 @pytest.mark.nightly
 def test_simulated_multi_partial_fills(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
-                                       pair_strat_, expected_strat_limits_,
-                                       expected_strat_status_, symbol_overview_obj_list,
+                                       pair_plan_, expected_plan_limits_,
+                                       expected_plan_status_, symbol_overview_obj_list,
                                        last_barter_fixture_list, market_depth_basemodel_list,
                                        buy_chore_, sell_chore_,
                                        max_loop_count_per_side, refresh_sec_update_fixture):
 
     partial_filled_qty: int | None = None
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
     # updating fixture values for this test-case
@@ -2782,12 +2782,12 @@ def test_simulated_multi_partial_fills(static_data_, clean_and_set_limits, leg1_
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:2]
 
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
-        created_pair_strat, executor_http_client = (
-            create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-                                               expected_strat_status_, symbol_overview_obj_list,
+        created_pair_plan, executor_http_client = (
+            create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_,
+                                               expected_plan_status_, symbol_overview_obj_list,
                                                last_barter_fixture_list, market_depth_basemodel_list))
 
-        config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_strat.id)
+        config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_plan.id)
 
         try:
             # updating yaml_configs according to this test
@@ -2806,18 +2806,18 @@ def test_simulated_multi_partial_fills(static_data_, clean_and_set_limits, leg1_
                 for loop_count in range(1, max_loop_count_per_side + 1):
                     chore_id, partial_filled_qty = \
                         underlying_handle_simulated_multi_partial_fills_test(loop_count, check_symbol, leg1_symbol,
-                                                                             leg2_symbol, created_pair_strat,
+                                                                             leg2_symbol, created_pair_plan,
                                                                              last_barter_fixture_list, chore_id,
                                                                              executor_http_client, config_dict)
-                    if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_strat"):
+                    if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
                         # Sleeping to let the chore get cxlled
                         time.sleep(residual_wait_sec)
 
                 symbol_configs = get_symbol_configs(check_symbol, config_dict)
-                strat_status: StratStatusBaseModel = executor_http_client.get_strat_status_client(created_pair_strat.id)
+                plan_status: PlanStatusBaseModel = executor_http_client.get_plan_status_client(created_pair_plan.id)
 
-                total_fill_qty = strat_status.total_fill_buy_qty \
-                    if check_symbol == leg1_symbol else strat_status.total_fill_sell_qty
+                total_fill_qty = plan_status.total_fill_buy_qty \
+                    if check_symbol == leg1_symbol else plan_status.total_fill_sell_qty
                 expected_total_fill_qty = \
                     partial_filled_qty * max_loop_count_per_side * symbol_configs.get("total_fill_count")
                 assert expected_total_fill_qty == total_fill_qty, "total_fill_qty mismatched: expected " \
@@ -2835,18 +2835,18 @@ def test_simulated_multi_partial_fills(static_data_, clean_and_set_limits, leg1_
 
 @pytest.mark.nightly
 def test_filled_status(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
-                       pair_strat_, expected_strat_limits_,
-                       expected_strat_status_, symbol_overview_obj_list,
+                       pair_plan_, expected_plan_limits_,
+                       expected_plan_status_, symbol_overview_obj_list,
                        last_barter_fixture_list, market_depth_basemodel_list,
                        buy_chore_, sell_chore_, refresh_sec_update_fixture):
         buy_symbol = leg1_leg2_symbol_list[0][0]
         sell_symbol = leg1_leg2_symbol_list[0][1]
-        expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+        expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
 
-        (created_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+        (created_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
          config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-            buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-            expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+            buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+            expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
             market_depth_basemodel_list)
 
         try:
@@ -2860,7 +2860,7 @@ def test_filled_status(static_data_, clean_and_set_limits, leg1_leg2_symbol_list
             executor_http_client.barter_simulator_reload_config_query_client()
 
             # buy fills check
-            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_plan.cpp_port)
 
             px = 100
             qty = 90
@@ -2908,12 +2908,12 @@ def test_filled_status(static_data_, clean_and_set_limits, leg1_leg2_symbol_list
             YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
-def _check_over_fill_computes(sell_symbol, created_pair_strat, executor_http_client, chore_journal,
-                              latest_fill_journal, chore_snapshot_before_over_fill, expected_strat_limits_):
-    # Checking if strat went to pause
-    pair_strat = email_book_service_native_web_client.get_pair_strat_client(created_pair_strat.id)
-    assert pair_strat.strat_state == StratState.StratState_PAUSED, \
-        f"Expected Strat to be Paused, found state: {pair_strat.strat_state}, pair_strat: {pair_strat}"
+def _check_over_fill_computes(sell_symbol, created_pair_plan, executor_http_client, chore_journal,
+                              latest_fill_journal, chore_snapshot_before_over_fill, expected_plan_limits_):
+    # Checking if plan went to pause
+    pair_plan = email_book_service_native_web_client.get_pair_plan_client(created_pair_plan.id)
+    assert pair_plan.plan_state == PlanState.PlanState_PAUSED, \
+        f"Expected Plan to be Paused, found state: {pair_plan.plan_state}, pair_plan: {pair_plan}"
 
     chore_snapshot = get_chore_snapshot_from_chore_id(chore_journal.chore.chore_id, executor_http_client)
     assert chore_snapshot.chore_status == ChoreStatusType.OE_OVER_FILLED, \
@@ -2940,70 +2940,70 @@ def _check_over_fill_computes(sell_symbol, created_pair_strat, executor_http_cli
         (f"Mismatched: expected symbol_side_snapshot total_filled_qty: {chore_snapshot.filled_qty}, "
          f"found: {symbol_side_snapshot.total_filled_qty = }")
 
-    strat_brief = executor_http_client.get_strat_brief_client(created_pair_strat.id)
-    assert strat_brief.pair_buy_side_bartering_brief.open_qty == 0, \
+    plan_brief = executor_http_client.get_plan_brief_client(created_pair_plan.id)
+    assert plan_brief.pair_buy_side_bartering_brief.open_qty == 0, \
         (f"Mismatched: expected buy_side_bartering_brief open_qty: 0, "
-         f"found: {strat_brief.pair_buy_side_bartering_brief.open_qty = }")
-    assert strat_brief.pair_buy_side_bartering_brief.open_notional == 0, \
-        ("Mismatched: expected strat_brief.pair_buy_side_bartering_brief.open_notional: 0, "
-         f"found: {strat_brief.pair_buy_side_bartering_brief.open_notional = }")
+         f"found: {plan_brief.pair_buy_side_bartering_brief.open_qty = }")
+    assert plan_brief.pair_buy_side_bartering_brief.open_notional == 0, \
+        ("Mismatched: expected plan_brief.pair_buy_side_bartering_brief.open_notional: 0, "
+         f"found: {plan_brief.pair_buy_side_bartering_brief.open_notional = }")
 
     # only leg1 chores were placed so no hedge ratio is required in consumable_notional
-    consumable_notional = (expected_strat_limits_.max_single_leg_notional -
+    consumable_notional = (expected_plan_limits_.max_single_leg_notional -
                            symbol_side_snapshot.total_fill_notional)
-    assert strat_brief.pair_buy_side_bartering_brief.consumable_notional == consumable_notional, \
-        (f"Mismatched: expected strat_brief.pair_buy_side_bartering_brief.consumable_notional: {consumable_notional}, "
-         f"found: {strat_brief.pair_buy_side_bartering_brief.consumable_notional=}")
+    assert plan_brief.pair_buy_side_bartering_brief.consumable_notional == consumable_notional, \
+        (f"Mismatched: expected plan_brief.pair_buy_side_bartering_brief.consumable_notional: {consumable_notional}, "
+         f"found: {plan_brief.pair_buy_side_bartering_brief.consumable_notional=}")
     total_security_size: int = \
         static_data.get_security_float_from_ticker(chore_snapshot.chore_brief.security.sec_id)
-    consumable_concentration = ((total_security_size / 100 * expected_strat_limits_.max_concentration) -
+    consumable_concentration = ((total_security_size / 100 * expected_plan_limits_.max_concentration) -
                                 symbol_side_snapshot.total_filled_qty)
-    assert strat_brief.pair_buy_side_bartering_brief.consumable_concentration == consumable_concentration, \
-        (f"Mismatched: expected strat_brief.pair_buy_side_bartering_brief.consumable_concentration: "
-         f"{consumable_concentration}, found: {strat_brief.pair_buy_side_bartering_brief.consumable_concentration=}")
+    assert plan_brief.pair_buy_side_bartering_brief.consumable_concentration == consumable_concentration, \
+        (f"Mismatched: expected plan_brief.pair_buy_side_bartering_brief.consumable_concentration: "
+         f"{consumable_concentration}, found: {plan_brief.pair_buy_side_bartering_brief.consumable_concentration=}")
     consumable_cxl_qty = \
         (((symbol_side_snapshot.total_filled_qty + symbol_side_snapshot.total_cxled_qty) / 100) *
-         expected_strat_limits_.cancel_rate.max_cancel_rate) - symbol_side_snapshot.total_cxled_qty
-    assert strat_brief.pair_buy_side_bartering_brief.consumable_cxl_qty == consumable_cxl_qty, \
-        (f"Mismatched: expected strat_brief.pair_buy_side_bartering_brief.consumable_cxl_qty: "
-         f"{consumable_cxl_qty}, found: {strat_brief.pair_buy_side_bartering_brief.consumable_cxl_qty=}")
+         expected_plan_limits_.cancel_rate.max_cancel_rate) - symbol_side_snapshot.total_cxled_qty
+    assert plan_brief.pair_buy_side_bartering_brief.consumable_cxl_qty == consumable_cxl_qty, \
+        (f"Mismatched: expected plan_brief.pair_buy_side_bartering_brief.consumable_cxl_qty: "
+         f"{consumable_cxl_qty}, found: {plan_brief.pair_buy_side_bartering_brief.consumable_cxl_qty=}")
     sell_symbol_side_snapshot_list = (
         executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(sell_symbol, Side.SELL))
     sell_symbol_side_snapshot = sell_symbol_side_snapshot_list[0]
-    consumable_nett_filled_notional = (expected_strat_limits_.max_net_filled_notional -
+    consumable_nett_filled_notional = (expected_plan_limits_.max_net_filled_notional -
                                        abs(symbol_side_snapshot.total_fill_notional -
                                            sell_symbol_side_snapshot.total_fill_notional))
-    assert (strat_brief.consumable_nett_filled_notional ==
+    assert (plan_brief.consumable_nett_filled_notional ==
             consumable_nett_filled_notional), \
-        (f"Mismatched: expected strat_brief.consumable_nett_filled_notional: "
+        (f"Mismatched: expected plan_brief.consumable_nett_filled_notional: "
          f"{consumable_nett_filled_notional}, found: "
-         f"{strat_brief.consumable_nett_filled_notional=}")
+         f"{plan_brief.consumable_nett_filled_notional=}")
 
-    strat_status = executor_http_client.get_strat_status_client(created_pair_strat.id)
-    assert strat_status.total_open_buy_qty == 0, \
-        (f"Mismatched: expected strat_status.total_open_buy_qty: 0, "
-         f"found: {strat_status.total_open_buy_qty=}")
-    assert strat_status.total_open_buy_notional == 0, \
-        (f"Mismatched: expected strat_status.total_open_buy_notional: 0, "
-         f"found: {strat_status.total_open_buy_notional=}")
-    assert strat_status.total_fill_buy_qty == chore_snapshot.filled_qty, \
-        (f"Mismatched: expected strat_status.total_fill_buy_qty: {chore_snapshot.filled_qty}, "
-         f"found: {strat_status.total_fill_buy_qty=}")
-    assert (strat_status.total_fill_buy_notional ==
+    plan_status = executor_http_client.get_plan_status_client(created_pair_plan.id)
+    assert plan_status.total_open_buy_qty == 0, \
+        (f"Mismatched: expected plan_status.total_open_buy_qty: 0, "
+         f"found: {plan_status.total_open_buy_qty=}")
+    assert plan_status.total_open_buy_notional == 0, \
+        (f"Mismatched: expected plan_status.total_open_buy_notional: 0, "
+         f"found: {plan_status.total_open_buy_notional=}")
+    assert plan_status.total_fill_buy_qty == chore_snapshot.filled_qty, \
+        (f"Mismatched: expected plan_status.total_fill_buy_qty: {chore_snapshot.filled_qty}, "
+         f"found: {plan_status.total_fill_buy_qty=}")
+    assert (plan_status.total_fill_buy_notional ==
             chore_snapshot.filled_qty * get_px_in_usd(chore_snapshot.last_update_fill_px)), \
-        (f"Mismatched: expected strat_status.total_fill_buy_notional: {chore_snapshot.filled_qty}, "
-         f"found: {strat_status.total_fill_buy_notional=}")
+        (f"Mismatched: expected plan_status.total_fill_buy_notional: {chore_snapshot.filled_qty}, "
+         f"found: {plan_status.total_fill_buy_notional=}")
 
-    portfolio_status = email_book_service_native_web_client.get_portfolio_status_client(1)
-    assert (portfolio_status.overall_buy_notional ==
+    contact_status = email_book_service_native_web_client.get_contact_status_client(1)
+    assert (contact_status.overall_buy_notional ==
             (chore_snapshot_before_over_fill.last_update_fill_qty *
              get_px_in_usd(chore_snapshot_before_over_fill.last_update_fill_px) +
              chore_snapshot.last_update_fill_qty * get_px_in_usd(chore_snapshot.last_update_fill_px)))
 
 
 @pytest.mark.nightly
-def test_over_fill(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
-                   expected_strat_status_, symbol_overview_obj_list,
+def test_over_fill(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_, expected_plan_limits_,
+                   expected_plan_status_, symbol_overview_obj_list,
                    last_barter_fixture_list, market_depth_basemodel_list,
                    buy_chore_, sell_chore_, refresh_sec_update_fixture):
     """
@@ -3011,14 +3011,14 @@ def test_over_fill(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pa
     """
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
 
-    created_pair_strat, executor_http_client = (
-        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+    created_pair_plan, executor_http_client = (
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+                                           expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
                                            market_depth_basemodel_list))
 
-    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_strat.id)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_plan.id)
 
     try:
         # updating yaml_configs according to this test
@@ -3031,12 +3031,12 @@ def test_over_fill(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pa
         executor_http_client.barter_simulator_reload_config_query_client()
 
         bid_buy_top_market_depth, ask_sell_top_market_depth = (
-            get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, created_pair_strat))
+            get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, created_pair_plan))
 
         # buy fills check
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_plan.cpp_port)
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(created_pair_strat.cpp_port, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(created_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
         time.sleep(2)  # delay for chore to get placed
 
@@ -3068,13 +3068,13 @@ def test_over_fill(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pa
         assert latest_fill_journal.fill_qty == filled_qty, f"fill_qty mismatched: expected {filled_qty} " \
                                                            f"received {latest_fill_journal.fill_qty}"
 
-        _check_over_fill_computes(sell_symbol, created_pair_strat, executor_http_client, ack_chore_journal,
-                                  latest_fill_journal, chore_snapshot_before_over_fill, expected_strat_limits_)
+        _check_over_fill_computes(sell_symbol, created_pair_plan, executor_http_client, ack_chore_journal,
+                                  latest_fill_journal, chore_snapshot_before_over_fill, expected_plan_limits_)
 
         time.sleep(5)
         check_str = "Unexpected: Received fill that will make chore_snapshot OVER_FILLED"
         assert_fail_msg = f"Couldn't find any alert saying: {check_str}"
-        check_alert_str_in_strat_alerts_n_portfolio_alerts(created_pair_strat.id, check_str, assert_fail_msg)
+        check_alert_str_in_plan_alerts_n_contact_alerts(created_pair_plan.id, check_str, assert_fail_msg)
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -3088,23 +3088,23 @@ def test_over_fill(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pa
 
 @pytest.mark.nightly
 def test_over_fill_after_fulfill(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
         buy_chore_, sell_chore_, refresh_sec_update_fixture):
     """
     Test case when chore_snapshot is in OE_FILLED and fill is triggered to make it over_filled - fill after FILLED
-    must be ignored and strat must be PAUSED with alert
+    must be ignored and plan must be PAUSED with alert
     """
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
 
-    created_pair_strat, executor_http_client = (
-        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+    created_pair_plan, executor_http_client = (
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+                                           expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
                                            market_depth_basemodel_list))
 
-    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_strat.id)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_plan.id)
 
     try:
         # updating yaml_configs according to this test
@@ -3117,12 +3117,12 @@ def test_over_fill_after_fulfill(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         bid_buy_top_market_depth, ask_sell_top_market_depth = (
-            get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, created_pair_strat))
+            get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, created_pair_plan))
 
         # buy fills check
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_plan.cpp_port)
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(created_pair_strat.cpp_port, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(created_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
         time.sleep(5)  # delay for chore to get placed
 
@@ -3163,15 +3163,15 @@ def test_over_fill_after_fulfill(
             (f"ChoreStatus mismatched: expected status ChoreStatusType.OE_FILLED received "
              f"{chore_snapshot_after_over_fill.chore_status = }")
 
-        # Checking if strat went to pause
-        pair_strat = email_book_service_native_web_client.get_pair_strat_client(created_pair_strat.id)
-        assert pair_strat.strat_state == StratState.StratState_PAUSED, \
-            f"Expected Strat to be Paused, found state: {pair_strat.strat_state}, pair_strat: {pair_strat}"
+        # Checking if plan went to pause
+        pair_plan = email_book_service_native_web_client.get_pair_plan_client(created_pair_plan.id)
+        assert pair_plan.plan_state == PlanState.PlanState_PAUSED, \
+            f"Expected Plan to be Paused, found state: {pair_plan.plan_state}, pair_plan: {pair_plan}"
 
         time.sleep(5)
         check_str = "Unsupported - Fill received for completely filled chore_snapshot"
         assert_fail_msg = f"Couldn't find any alert saying: {check_str}"
-        check_alert_str_in_strat_alerts_n_portfolio_alerts(created_pair_strat.id, check_str, assert_fail_msg)
+        check_alert_str_in_plan_alerts_n_contact_alerts(created_pair_plan.id, check_str, assert_fail_msg)
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -3184,25 +3184,25 @@ def test_over_fill_after_fulfill(
 
 
 @pytest.mark.nightly
-def test_ack_to_rej_chores(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-                           expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+def test_ack_to_rej_chores(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+                           expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
                            last_barter_fixture_list, market_depth_basemodel_list,
                            max_loop_count_per_side, refresh_sec_update_fixture):
     # updating fixture values for this test-case
     max_loop_count_per_side = 5
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:2]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
         # explicitly setting waived_initial_chores to 10 for this test case
-        expected_strat_limits_.cancel_rate.waived_initial_chores = 10
-        created_pair_strat, executor_http_client = (
-            create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-                                               expected_strat_status_, symbol_overview_obj_list,
+        expected_plan_limits_.cancel_rate.waived_initial_chores = 10
+        created_pair_plan, executor_http_client = (
+            create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_,
+                                               expected_plan_status_, symbol_overview_obj_list,
                                                last_barter_fixture_list, market_depth_basemodel_list))
 
-        config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_strat.id)
+        config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_plan.id)
 
         try:
             # updating yaml_configs according to this test
@@ -3215,7 +3215,7 @@ def test_ack_to_rej_chores(static_data_, clean_and_set_limits, leg1_leg2_symbol_
             # updating simulator's configs
             executor_http_client.barter_simulator_reload_config_query_client()
 
-            handle_rej_chore_test(leg1_symbol, leg2_symbol, created_pair_strat, expected_strat_limits_,
+            handle_rej_chore_test(leg1_symbol, leg2_symbol, created_pair_plan, expected_plan_limits_,
                                   last_barter_fixture_list, max_loop_count_per_side,
                                   True, executor_http_client, config_dict, residual_wait_sec)
         except AssertionError as e:
@@ -3230,25 +3230,25 @@ def test_ack_to_rej_chores(static_data_, clean_and_set_limits, leg1_leg2_symbol_
 
 
 @pytest.mark.nightly
-def test_unack_to_rej_chores(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-                             expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+def test_unack_to_rej_chores(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+                             expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
                              last_barter_fixture_list, market_depth_basemodel_list,
                              max_loop_count_per_side, refresh_sec_update_fixture):
     # updating fixture values for this test-case
     max_loop_count_per_side = 5
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:2]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
         # explicitly setting waived_initial_chores to 10 for this test case
-        expected_strat_limits_.cancel_rate.waived_initial_chores = 10
-        created_pair_strat, executor_http_client = (
-            create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-                                               expected_strat_status_, symbol_overview_obj_list,
+        expected_plan_limits_.cancel_rate.waived_initial_chores = 10
+        created_pair_plan, executor_http_client = (
+            create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_,
+                                               expected_plan_status_, symbol_overview_obj_list,
                                                last_barter_fixture_list, market_depth_basemodel_list))
 
-        config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_strat.id)
+        config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_plan.id)
 
         try:
             # updating yaml_configs according to this test
@@ -3261,7 +3261,7 @@ def test_unack_to_rej_chores(static_data_, clean_and_set_limits, leg1_leg2_symbo
             # updating simulator's configs
             executor_http_client.barter_simulator_reload_config_query_client()
 
-            handle_rej_chore_test(leg1_symbol, leg2_symbol, created_pair_strat, expected_strat_limits_,
+            handle_rej_chore_test(leg1_symbol, leg2_symbol, created_pair_plan, expected_plan_limits_,
                                   last_barter_fixture_list, max_loop_count_per_side,
                                   False, executor_http_client, config_dict, residual_wait_sec)
         except AssertionError as e:
@@ -3277,24 +3277,24 @@ def test_unack_to_rej_chores(static_data_, clean_and_set_limits, leg1_leg2_symbo
 
 @pytest.mark.nightly
 def test_cxl_rej_n_revert_to_acked(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
-                                   pair_strat_, expected_strat_limits_,
-                                   expected_strat_status_, symbol_overview_obj_list,
+                                   pair_plan_, expected_plan_limits_,
+                                   expected_plan_status_, symbol_overview_obj_list,
                                    last_barter_fixture_list, market_depth_basemodel_list,
                                    buy_chore_, sell_chore_,
                                    max_loop_count_per_side, refresh_sec_update_fixture):
     # updating fixture values for this test-case
     max_loop_count_per_side = 5
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:2]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
 
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
-        created_pair_strat, executor_http_client = (
-            create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-                                               expected_strat_status_, symbol_overview_obj_list,
+        created_pair_plan, executor_http_client = (
+            create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_,
+                                               expected_plan_status_, symbol_overview_obj_list,
                                                last_barter_fixture_list,
                                                market_depth_basemodel_list))
 
-        config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_strat.id)
+        config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_plan.id)
 
         try:
             # updating yaml_configs according to this test
@@ -3308,7 +3308,7 @@ def test_cxl_rej_n_revert_to_acked(static_data_, clean_and_set_limits, leg1_leg2
             executor_http_client.barter_simulator_reload_config_query_client()
 
             bid_buy_top_market_depth, ask_sell_top_market_depth = (
-                get_buy_bid_n_ask_sell_market_depth(leg1_symbol, leg2_symbol, created_pair_strat))
+                get_buy_bid_n_ask_sell_market_depth(leg1_symbol, leg2_symbol, created_pair_plan))
 
             for check_symbol in [leg1_symbol, leg2_symbol]:
                 continues_chore_count, continues_special_chore_count = get_continuous_chore_configs(check_symbol,
@@ -3318,17 +3318,17 @@ def test_cxl_rej_n_revert_to_acked(static_data_, clean_and_set_limits, leg1_leg2
                 last_cxl_chore_id = None
                 last_cxl_rej_chore_id = None
                 for loop_count in range(1, max_loop_count_per_side + 1):
-                    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
+                    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, created_pair_plan.cpp_port)
                     if check_symbol == leg1_symbol:
                         time.sleep(1)
-                        update_tob_through_market_depth_to_place_buy_chore(created_pair_strat.cpp_port,
+                        update_tob_through_market_depth_to_place_buy_chore(created_pair_plan.cpp_port,
                                                                            bid_buy_top_market_depth,
                                                                            ask_sell_top_market_depth)
                     else:
                         # required to make buy side tob latest
-                        run_last_barter(leg1_symbol, leg2_symbol, [last_barter_fixture_list[0]], created_pair_strat.cpp_port)
+                        run_last_barter(leg1_symbol, leg2_symbol, [last_barter_fixture_list[0]], created_pair_plan.cpp_port)
 
-                        update_tob_through_market_depth_to_place_sell_chore(created_pair_strat.cpp_port,
+                        update_tob_through_market_depth_to_place_sell_chore(created_pair_plan.cpp_port,
                                                                             ask_sell_top_market_depth,
                                                                             bid_buy_top_market_depth)
                     time.sleep(10)  # delay for chore to get placed and trigger cxl
@@ -3363,24 +3363,24 @@ def test_cxl_rej_n_revert_to_acked(static_data_, clean_and_set_limits, leg1_leg2
 
 @pytest.mark.nightly
 def test_cxl_rej_n_revert_to_unack(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
-                                   pair_strat_, expected_strat_limits_,
-                                   expected_strat_status_, symbol_overview_obj_list,
+                                   pair_plan_, expected_plan_limits_,
+                                   expected_plan_status_, symbol_overview_obj_list,
                                    last_barter_fixture_list, market_depth_basemodel_list,
                                    buy_chore_, sell_chore_,
                                    max_loop_count_per_side, refresh_sec_update_fixture):
     # updating fixture values for this test-case
     max_loop_count_per_side = 5
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:2]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
 
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
-        created_pair_strat, executor_http_client = (
-            create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-                                               expected_strat_status_, symbol_overview_obj_list,
+        created_pair_plan, executor_http_client = (
+            create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_,
+                                               expected_plan_status_, symbol_overview_obj_list,
                                                last_barter_fixture_list,
                                                market_depth_basemodel_list))
 
-        config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_strat.id)
+        config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_plan.id)
 
         try:
             # updating yaml_configs according to this test
@@ -3395,7 +3395,7 @@ def test_cxl_rej_n_revert_to_unack(static_data_, clean_and_set_limits, leg1_leg2
             executor_http_client.barter_simulator_reload_config_query_client()
 
             bid_buy_top_market_depth, ask_sell_top_market_depth = (
-                get_buy_bid_n_ask_sell_market_depth(leg1_symbol, leg2_symbol, created_pair_strat))
+                get_buy_bid_n_ask_sell_market_depth(leg1_symbol, leg2_symbol, created_pair_plan))
 
             for check_symbol in [leg1_symbol, leg2_symbol]:
                 continues_chore_count, continues_special_chore_count = get_continuous_chore_configs(check_symbol,
@@ -3405,17 +3405,17 @@ def test_cxl_rej_n_revert_to_unack(static_data_, clean_and_set_limits, leg1_leg2
                 last_cxl_chore_id = None
                 last_cxl_rej_chore_id = None
                 for loop_count in range(1, max_loop_count_per_side + 1):
-                    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
+                    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, created_pair_plan.cpp_port)
                     if check_symbol == leg1_symbol:
                         time.sleep(1)
-                        update_tob_through_market_depth_to_place_buy_chore(created_pair_strat.cpp_port,
+                        update_tob_through_market_depth_to_place_buy_chore(created_pair_plan.cpp_port,
                                                                            bid_buy_top_market_depth,
                                                                            ask_sell_top_market_depth)
                     else:
                         # required to make buy side tob latest
-                        run_last_barter(leg1_symbol, leg2_symbol, [last_barter_fixture_list[0]], created_pair_strat.cpp_port)
+                        run_last_barter(leg1_symbol, leg2_symbol, [last_barter_fixture_list[0]], created_pair_plan.cpp_port)
 
-                        update_tob_through_market_depth_to_place_sell_chore(created_pair_strat.cpp_port,
+                        update_tob_through_market_depth_to_place_sell_chore(created_pair_plan.cpp_port,
                                                                             ask_sell_top_market_depth,
                                                                             bid_buy_top_market_depth)
                     time.sleep(10)  # delay for chore to get placed and trigger cxl
@@ -3450,21 +3450,21 @@ def test_cxl_rej_n_revert_to_unack(static_data_, clean_and_set_limits, leg1_leg2
 
 @pytest.mark.nightly
 def test_cxl_rej_n_revert_to_filled(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
-                                    pair_strat_, expected_strat_limits_,
-                                    expected_strat_status_, symbol_overview_obj_list,
+                                    pair_plan_, expected_plan_limits_,
+                                    expected_plan_status_, symbol_overview_obj_list,
                                     last_barter_fixture_list, market_depth_basemodel_list,
                                     buy_chore_, sell_chore_,
                                     max_loop_count_per_side, refresh_sec_update_fixture):
     # updating fixture values for this test-case
     max_loop_count_per_side = 5
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:2]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
 
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
-        (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+        (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
          config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-            leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-            expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+            leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_,
+            expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
             market_depth_basemodel_list)
 
         try:
@@ -3488,7 +3488,7 @@ def test_cxl_rej_n_revert_to_filled(static_data_, clean_and_set_limits, leg1_leg
                 last_cxl_chore_id = None
                 last_cxl_rej_chore_id = None
                 for loop_count in range(1, max_loop_count_per_side + 1):
-                    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+                    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
                     if check_symbol == leg1_symbol:
                         px = 100
                         qty = 90
@@ -3547,22 +3547,22 @@ def test_cxl_rej_n_revert_to_filled(static_data_, clean_and_set_limits, leg1_leg
 
 def test_no_cxl_req_from_residual_refresh_is_state_already_cxl_req(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
-        pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list,
+        pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list,
         market_depth_basemodel_list, last_barter_fixture_list,
         refresh_sec_update_fixture):
-    # creating strat
+    # creating plan
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
     max_loop_count_per_side = 2
     residual_wait_sec = 4 * refresh_sec_update_fixture
-    created_pair_strat, executor_http_client = (
-        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_strat_status_, symbol_overview_obj_list,
+    created_pair_plan, executor_http_client = (
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+                                           expected_plan_status_, symbol_overview_obj_list,
                                            last_barter_fixture_list,
                                            market_depth_basemodel_list))
 
-    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_strat.id)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_plan.id)
 
     try:
         # updating yaml_configs according to this test
@@ -3577,11 +3577,11 @@ def test_no_cxl_req_from_residual_refresh_is_state_already_cxl_req(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         bid_buy_top_market_depth, ask_sell_top_market_depth = (
-            get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, created_pair_strat))
+            get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, created_pair_plan))
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_plan.cpp_port)
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(created_pair_strat.cpp_port, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(created_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
 
         cxl_req_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL,
@@ -3602,16 +3602,16 @@ def test_no_cxl_req_from_residual_refresh_is_state_already_cxl_req(
 
 
 @pytest.mark.nightly
-def test_alert_handling_for_pair_strat(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
-                                       pair_strat_, expected_strat_limits_,
-                                       expected_strat_status_, symbol_overview_obj_list,
+def test_alert_handling_for_pair_plan(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
+                                       pair_plan_, expected_plan_limits_,
+                                       expected_plan_status_, symbol_overview_obj_list,
                                        market_depth_basemodel_list):
-    # creating strat
+    # creating plan
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
     total_loop_count = 5
-    active_pair_strat, executor_http_client = create_n_activate_strat(buy_symbol, sell_symbol, pair_strat_,
-                                                                      expected_strat_limits_, expected_strat_status_,
+    active_pair_plan, executor_http_client = create_n_activate_plan(buy_symbol, sell_symbol, pair_plan_,
+                                                                      expected_plan_limits_, expected_plan_status_,
                                                                       symbol_overview_obj_list,
                                                                       market_depth_basemodel_list)
     broker_id_list = []
@@ -3619,33 +3619,33 @@ def test_alert_handling_for_pair_strat(static_data_, clean_and_set_limits, leg1_
         broker = broker_fixture()
         broker.id = Broker.next_id()
 
-        strat_limits: StratLimitsBaseModel = StratLimitsBaseModel.from_kwargs(_id=active_pair_strat.id,
+        plan_limits: PlanLimitsBaseModel = PlanLimitsBaseModel.from_kwargs(_id=active_pair_plan.id,
                                                                               eligible_brokers=[broker])
-        updated_strat_limits = executor_http_client.patch_strat_limits_client(
-            strat_limits.to_dict(exclude_none=True))
+        updated_plan_limits = executor_http_client.patch_plan_limits_client(
+            plan_limits.to_dict(exclude_none=True))
 
-        assert broker in updated_strat_limits.eligible_brokers, f"couldn't find {broker} in " \
+        assert broker in updated_plan_limits.eligible_brokers, f"couldn't find {broker} in " \
                                                                 f"eligible_brokers list " \
-                                                                f"{updated_strat_limits.eligible_brokers}"
+                                                                f"{updated_plan_limits.eligible_brokers}"
         broker_id_list.append(broker.id)
 
     # deleting broker
     for broker_id in broker_id_list:
         delete_intended_broker = BrokerBaseModel(id=broker_id)
-        strat_limits: StratLimitsBaseModel = StratLimitsBaseModel.from_kwargs(_id=active_pair_strat.id,
+        plan_limits: PlanLimitsBaseModel = PlanLimitsBaseModel.from_kwargs(_id=active_pair_plan.id,
                                                                   eligible_brokers=[delete_intended_broker])
-        updated_strat_limits = executor_http_client.patch_strat_limits_client(
-            strat_limits.to_dict(exclude_none=True))
+        updated_plan_limits = executor_http_client.patch_plan_limits_client(
+            plan_limits.to_dict(exclude_none=True))
 
-        broker_id_list = [broker.id for broker in updated_strat_limits.eligible_brokers]
+        broker_id_list = [broker.id for broker in updated_plan_limits.eligible_brokers]
         assert broker_id not in broker_id_list, f"Unexpectedly found broker_id {broker_id} in broker_id list " \
                                                 f"{broker_id_list}"
 
 
 @pytest.mark.nightly
 def test_underlying_account_cumulative_fill_qty_query(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
-                                                      pair_strat_, expected_strat_limits_,
-                                                      expected_strat_status_, symbol_overview_obj_list,
+                                                      pair_plan_, expected_plan_limits_,
+                                                      expected_plan_status_, symbol_overview_obj_list,
                                                       last_barter_fixture_list, market_depth_basemodel_list,
                                                       refresh_sec_update_fixture):
     underlying_account_prefix: str = "Acc"
@@ -3655,19 +3655,19 @@ def test_underlying_account_cumulative_fill_qty_query(static_data_, clean_and_se
     sell_chore_id = None
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:2]
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
-        expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+        expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
         residual_wait_sec = 4 * refresh_sec_update_fixture
-        active_pair_strat, executor_http_client = (
-            create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-                                               expected_strat_status_, symbol_overview_obj_list,
+        active_pair_plan, executor_http_client = (
+            create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_,
+                                               expected_plan_status_, symbol_overview_obj_list,
                                                last_barter_fixture_list, market_depth_basemodel_list))
 
         bid_buy_top_market_depth, ask_sell_top_market_depth = (
-            get_buy_bid_n_ask_sell_market_depth(leg1_symbol, leg2_symbol, active_pair_strat))
+            get_buy_bid_n_ask_sell_market_depth(leg1_symbol, leg2_symbol, active_pair_plan))
 
         # buy handling
         buy_tob_last_update_date_time_tracker, buy_chore_id = \
-            create_fills_for_underlying_account_test(leg1_symbol, leg2_symbol, active_pair_strat,
+            create_fills_for_underlying_account_test(leg1_symbol, leg2_symbol, active_pair_plan,
                                                      buy_tob_last_update_date_time_tracker, buy_chore_id,
                                                      underlying_account_prefix, Side.BUY, executor_http_client,
                                                      bid_buy_top_market_depth, ask_sell_top_market_depth,
@@ -3677,7 +3677,7 @@ def test_underlying_account_cumulative_fill_qty_query(static_data_, clean_and_se
 
         # sell handling
         sell_tob_last_update_date_time_tracker, sell_chore_id = \
-            create_fills_for_underlying_account_test(leg1_symbol, leg2_symbol, active_pair_strat,
+            create_fills_for_underlying_account_test(leg1_symbol, leg2_symbol, active_pair_plan,
                                                      sell_tob_last_update_date_time_tracker, sell_chore_id,
                                                      underlying_account_prefix, Side.SELL, executor_http_client,
                                                      bid_buy_top_market_depth, ask_sell_top_market_depth,
@@ -3713,25 +3713,25 @@ def test_underlying_account_cumulative_fill_qty_query(static_data_, clean_and_se
 
 @pytest.mark.nightly
 def test_last_n_sec_chore_qty_sum(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
-                                  pair_strat_, expected_strat_limits_,
-                                  expected_strat_status_, symbol_overview_obj_list,
+                                  pair_plan_, expected_plan_limits_,
+                                  expected_plan_status_, symbol_overview_obj_list,
                                   last_barter_fixture_list, market_depth_basemodel_list,
                                   buy_fill_journal_, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
     total_chore_count_for_each_side = 5
-    expected_strat_limits_ = copy.deepcopy(expected_strat_limits_)
-    expected_strat_limits_.residual_restriction.max_residual = 105000
-    expected_strat_limits_.max_open_chores_per_side = 10
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_ = copy.deepcopy(expected_plan_limits_)
+    expected_plan_limits_.residual_restriction.max_residual = 105000
+    expected_plan_limits_.max_open_chores_per_side = 10
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    active_pair_strat, executor_http_client = (
-        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+    active_pair_plan, executor_http_client = (
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+                                           expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
                                            market_depth_basemodel_list))
 
-    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_plan.id)
 
     try:
         # updating yaml_configs according to this test
@@ -3744,16 +3744,16 @@ def test_last_n_sec_chore_qty_sum(static_data_, clean_and_set_limits, leg1_leg2_
         executor_http_client.barter_simulator_reload_config_query_client()
 
         bid_buy_top_market_depth, ask_sell_top_market_depth = (
-            get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_strat))
+            get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_plan))
 
         # buy testing
         buy_new_chore_id = None
         chore_create_time_list = []
         chore_qty_list = []
         for loop_count in range(total_chore_count_for_each_side):
-            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
             time.sleep(1)
-            update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
+            update_tob_through_market_depth_to_place_buy_chore(active_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                                ask_sell_top_market_depth)
 
             ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
@@ -3762,7 +3762,7 @@ def test_last_n_sec_chore_qty_sum(static_data_, clean_and_set_limits, leg1_leg2_
             buy_new_chore_id = ack_chore_journal.chore.chore_id
             chore_create_time_list.append(ack_chore_journal.chore_event_date_time)
             chore_qty_list.append(ack_chore_journal.chore.qty)
-            if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_strat"):
+            if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
                 time.sleep(residual_wait_sec)   # wait for this chore to get cancelled by residual
             else:
                 time.sleep(2)
@@ -3775,17 +3775,17 @@ def test_last_n_sec_chore_qty_sum(static_data_, clean_and_set_limits, leg1_leg2_
             last_n_sec = int(math.ceil(delta.total_seconds())) + 1
             last_n_sec_qty += chore_qty_list[loop_count]
 
-            # making portfolio_limits_obj.rolling_max_chore_count.rolling_tx_count_period_seconds computed last_n_sec(s)
+            # making contact_limits_obj.rolling_max_chore_count.rolling_tx_count_period_seconds computed last_n_sec(s)
             # this is required as last_n_sec_chore_qty takes internally this limit as last_n_sec to provide chore_qty
             # in query
             rolling_max_chore_count = RollingMaxChoreCountBaseModel(rolling_tx_count_period_seconds=last_n_sec)
-            portfolio_limits = PortfolioLimitsBaseModel.from_kwargs(_id=1, rolling_max_chore_count=rolling_max_chore_count)
-            updated_portfolio_limits = \
-                email_book_service_native_web_client.patch_portfolio_limits_client(
-                    portfolio_limits.to_dict(exclude_none=True))
-            assert updated_portfolio_limits.rolling_max_chore_count.rolling_tx_count_period_seconds == last_n_sec, \
+            contact_limits = ContactLimitsBaseModel.from_kwargs(_id=1, rolling_max_chore_count=rolling_max_chore_count)
+            updated_contact_limits = \
+                email_book_service_native_web_client.patch_contact_limits_client(
+                    contact_limits.to_dict(exclude_none=True))
+            assert updated_contact_limits.rolling_max_chore_count.rolling_tx_count_period_seconds == last_n_sec, \
                 f"Unexpected last_n_sec value: expected {last_n_sec}, " \
-                f"received {updated_portfolio_limits.rolling_max_chore_count.rolling_tx_count_period_seconds}"
+                f"received {updated_contact_limits.rolling_max_chore_count.rolling_tx_count_period_seconds}"
 
             call_date_time = DateTime.utcnow()
             executor_check_snapshot_obj = \
@@ -3809,26 +3809,26 @@ def test_last_n_sec_chore_qty_sum(static_data_, clean_and_set_limits, leg1_leg2_
 
 
 @pytest.mark.nightly
-def test_acked_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-                               expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+def test_acked_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+                               expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
                                last_barter_fixture_list, market_depth_basemodel_list,
                                buy_chore_, sell_chore_,
                                max_loop_count_per_side, refresh_sec_update_fixture):
     # updating fixture values for this test-case
     max_loop_count_per_side = 5
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:2]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
         # explicitly setting waived_initial_chores to 10 for this test case
-        expected_strat_limits_.cancel_rate.waived_initial_chores = 10
-        active_pair_strat, executor_http_client = (
-            create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-                                               expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        expected_plan_limits_.cancel_rate.waived_initial_chores = 10
+        active_pair_plan, executor_http_client = (
+            create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_,
+                                               expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
                                                market_depth_basemodel_list))
 
-        config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
+        config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_plan.id)
 
         try:
             # updating yaml_configs according to this test
@@ -3841,7 +3841,7 @@ def test_acked_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_leg2_sym
             # updating simulator's configs
             executor_http_client.barter_simulator_reload_config_query_client()
 
-            handle_unsolicited_cxl(leg1_symbol, leg2_symbol, active_pair_strat, last_barter_fixture_list,
+            handle_unsolicited_cxl(leg1_symbol, leg2_symbol, active_pair_plan, last_barter_fixture_list,
                                    max_loop_count_per_side, executor_http_client, config_dict, residual_wait_sec)
         except AssertionError as e:
             raise AssertionError(e)
@@ -3855,27 +3855,27 @@ def test_acked_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_leg2_sym
 
 
 @pytest.mark.nightly
-def test_unacked_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
-                                 expected_strat_status_, symbol_overview_obj_list,
+def test_unacked_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_, expected_plan_limits_,
+                                 expected_plan_status_, symbol_overview_obj_list,
                                  last_barter_fixture_list, market_depth_basemodel_list,
                                  buy_chore_, sell_chore_,
                                  max_loop_count_per_side, refresh_sec_update_fixture):
     # updating fixture values for this test-case
     max_loop_count_per_side = 5
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:2]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
         # explicitly setting waived_initial_chores to 10 for this test case
-        expected_strat_limits_.cancel_rate.waived_initial_chores = 10
-        active_pair_strat, executor_http_client = (
-            create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-                                               expected_strat_status_, symbol_overview_obj_list,
+        expected_plan_limits_.cancel_rate.waived_initial_chores = 10
+        active_pair_plan, executor_http_client = (
+            create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_,
+                                               expected_plan_status_, symbol_overview_obj_list,
                                                last_barter_fixture_list,
                                                market_depth_basemodel_list))
 
-        config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
+        config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_plan.id)
 
         try:
             # updating yaml_configs according to this test
@@ -3888,7 +3888,7 @@ def test_unacked_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_leg2_s
             # updating simulator's configs
             executor_http_client.barter_simulator_reload_config_query_client()
 
-            handle_unsolicited_cxl(leg1_symbol, leg2_symbol, active_pair_strat, last_barter_fixture_list,
+            handle_unsolicited_cxl(leg1_symbol, leg2_symbol, active_pair_plan, last_barter_fixture_list,
                                    max_loop_count_per_side, executor_http_client, config_dict, residual_wait_sec)
         except AssertionError as e:
             raise AssertionError(e)
@@ -3902,107 +3902,107 @@ def test_unacked_unsolicited_cxl(static_data_, clean_and_set_limits, leg1_leg2_s
 
 
 @pytest.mark.nightly
-def test_pair_strat_related_models_update_counters(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
-                                                   pair_strat_, expected_strat_limits_, expected_strat_status_,
+def test_pair_plan_related_models_update_counters(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
+                                                   pair_plan_, expected_plan_limits_, expected_plan_status_,
                                                    symbol_overview_obj_list, last_barter_fixture_list,
                                                    market_depth_basemodel_list,
                                                    refresh_sec_update_fixture):
-    activated_strats = []
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    activated_plans = []
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
 
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:5]
-    # creates and activates multiple pair_strats
+    # creates and activates multiple pair_plans
     for buy_symbol, sell_symbol in leg1_leg2_symbol_list:
-        activated_strat, executor_http_client = (
-            create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                               expected_strat_status_, symbol_overview_obj_list,
+        activated_plan, executor_http_client = (
+            create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+                                               expected_plan_status_, symbol_overview_obj_list,
                                                last_barter_fixture_list, market_depth_basemodel_list))
-        activated_strats.append((activated_strat, executor_http_client))
+        activated_plans.append((activated_plan, executor_http_client))
 
-    for index, (activated_strat, executor_http_client) in enumerate(activated_strats):
-        # updating pair_strat_params
-        pair_strat = \
-            PairStratBaseModel.from_kwargs(_id=activated_strat.id,
-                                           pair_strat_params=PairStratParamsBaseModel(common_premium=index))
-        updates_pair_strat = email_book_service_native_web_client.patch_pair_strat_client(
-            pair_strat.to_dict(exclude_none=True))
-        assert updates_pair_strat.pair_strat_params_update_seq_num == \
-               activated_strat.pair_strat_params_update_seq_num + 1, (
-                f"Mismatched pair_strat_params_update_seq_num: expected "
-                f"{activated_strat.pair_strat_params_update_seq_num + 1}, received "
-                f"{updates_pair_strat.pair_strat_params_update_seq_num}")
+    for index, (activated_plan, executor_http_client) in enumerate(activated_plans):
+        # updating pair_plan_params
+        pair_plan = \
+            PairPlanBaseModel.from_kwargs(_id=activated_plan.id,
+                                           pair_plan_params=PairPlanParamsBaseModel(common_premium=index))
+        updates_pair_plan = email_book_service_native_web_client.patch_pair_plan_client(
+            pair_plan.to_dict(exclude_none=True))
+        assert updates_pair_plan.pair_plan_params_update_seq_num == \
+               activated_plan.pair_plan_params_update_seq_num + 1, (
+                f"Mismatched pair_plan_params_update_seq_num: expected "
+                f"{activated_plan.pair_plan_params_update_seq_num + 1}, received "
+                f"{updates_pair_plan.pair_plan_params_update_seq_num}")
 
-    for index, (activated_strat, executor_http_client) in enumerate(activated_strats):
-        strat_limits_obj = executor_http_client.get_strat_limits_client(activated_strat.id)
+    for index, (activated_plan, executor_http_client) in enumerate(activated_plans):
+        plan_limits_obj = executor_http_client.get_plan_limits_client(activated_plan.id)
 
-        # updating strat_limits
-        strat_limits = StratLimitsBaseModel.from_kwargs(_id=activated_strat.id, max_concentration=index)
-        updates_strat_limits = executor_http_client.patch_strat_limits_client(
-            strat_limits.to_dict(exclude_none=True))
-        assert updates_strat_limits.strat_limits_update_seq_num == \
-               strat_limits_obj.strat_limits_update_seq_num + 1, (
-                f"Mismatched strat_limits_update_seq_num: expected "
-                f"{strat_limits_obj.strat_limits_update_seq_num + 1}, received "
-                f"{updates_strat_limits.strat_limits_update_seq_num}")
+        # updating plan_limits
+        plan_limits = PlanLimitsBaseModel.from_kwargs(_id=activated_plan.id, max_concentration=index)
+        updates_plan_limits = executor_http_client.patch_plan_limits_client(
+            plan_limits.to_dict(exclude_none=True))
+        assert updates_plan_limits.plan_limits_update_seq_num == \
+               plan_limits_obj.plan_limits_update_seq_num + 1, (
+                f"Mismatched plan_limits_update_seq_num: expected "
+                f"{plan_limits_obj.plan_limits_update_seq_num + 1}, received "
+                f"{updates_plan_limits.plan_limits_update_seq_num}")
 
-    for index, (activated_strat, executor_http_client) in enumerate(activated_strats):
-        strat_status_obj = executor_http_client.get_strat_status_client(activated_strat.id)
+    for index, (activated_plan, executor_http_client) in enumerate(activated_plans):
+        plan_status_obj = executor_http_client.get_plan_status_client(activated_plan.id)
 
-        # updating strat_status
-        strat_status = StratStatusBaseModel.from_kwargs(_id=activated_strat.id, average_premuim=index)
-        updates_strat_status = executor_http_client.patch_strat_status_client(
-            strat_status.to_dict(exclude_none=True))
-        assert updates_strat_status.strat_status_update_seq_num == \
-               strat_status_obj.strat_status_update_seq_num + 1, (
-                f"Mismatched strat_limits_update_seq_num: expected "
-                f"{strat_status_obj.strat_status_update_seq_num + 1}, received "
-                f"{updates_strat_status.strat_status_update_seq_num}")
+        # updating plan_status
+        plan_status = PlanStatusBaseModel.from_kwargs(_id=activated_plan.id, average_premuim=index)
+        updates_plan_status = executor_http_client.patch_plan_status_client(
+            plan_status.to_dict(exclude_none=True))
+        assert updates_plan_status.plan_status_update_seq_num == \
+               plan_status_obj.plan_status_update_seq_num + 1, (
+                f"Mismatched plan_limits_update_seq_num: expected "
+                f"{plan_status_obj.plan_status_update_seq_num + 1}, received "
+                f"{updates_plan_status.plan_status_update_seq_num}")
 
 
-# @@@ deprecated: Not applicable anymore after PortfolioAlert model changes
+# @@@ deprecated: Not applicable anymore after ContactAlert model changes
 # @pytest.mark.nightly
-# def test_portfolio_alert_updates(static_data_, clean_and_set_limits, sample_alert):
-#     stored_portfolio_alert = log_book_web_client.get_portfolio_alert_client(portfolio_alert_id=1)
+# def test_contact_alert_updates(static_data_, clean_and_set_limits, sample_alert):
+#     stored_contact_alert = log_book_web_client.get_contact_alert_client(contact_alert_id=1)
 #
 #     alert = copy.deepcopy(sample_alert)
-#     portfolio_alert_basemodel = PortfolioAlertBaseModel(_id=1, alerts=[alert])
-#     updated_portfolio_alert = log_book_web_client.patch_portfolio_alert_client(
-#             jsonable_encoder(portfolio_alert_basemodel, by_alias=True, exclude_none=True))
-#     assert stored_portfolio_alert.alert_update_seq_num + 1 == updated_portfolio_alert.alert_update_seq_num, \
-#         f"Mismatched alert_update_seq_num: expected {stored_portfolio_alert.alert_update_seq_num + 1}, " \
-#         f"received {updated_portfolio_alert.alert_update_seq_num}"
+#     contact_alert_basemodel = ContactAlertBaseModel(_id=1, alerts=[alert])
+#     updated_contact_alert = log_book_web_client.patch_contact_alert_client(
+#             jsonable_encoder(contact_alert_basemodel, by_alias=True, exclude_none=True))
+#     assert stored_contact_alert.alert_update_seq_num + 1 == updated_contact_alert.alert_update_seq_num, \
+#         f"Mismatched alert_update_seq_num: expected {stored_contact_alert.alert_update_seq_num + 1}, " \
+#         f"received {updated_contact_alert.alert_update_seq_num}"
 #
 #     max_loop_count = 5
 #     for loop_count in range(max_loop_count):
 #         alert.alert_brief = f"Test update - {loop_count}"
-#         portfolio_alert_basemodel = PortfolioAlertBaseModel(_id=1, alerts=[alert])
-#         alert_updated_portfolio_alert = log_book_web_client.patch_portfolio_alert_client(
-#                 jsonable_encoder(portfolio_alert_basemodel, by_alias=True, exclude_none=True))
-#         assert updated_portfolio_alert.alert_update_seq_num + (loop_count + 1) == \
-#                alert_updated_portfolio_alert.alert_update_seq_num, (
+#         contact_alert_basemodel = ContactAlertBaseModel(_id=1, alerts=[alert])
+#         alert_updated_contact_alert = log_book_web_client.patch_contact_alert_client(
+#                 jsonable_encoder(contact_alert_basemodel, by_alias=True, exclude_none=True))
+#         assert updated_contact_alert.alert_update_seq_num + (loop_count + 1) == \
+#                alert_updated_contact_alert.alert_update_seq_num, (
 #                 f"Mismatched alert_update_seq_num: expected "
-#                 f"{updated_portfolio_alert.alert_update_seq_num + (loop_count + 1)}, "
-#                 f"received {alert_updated_portfolio_alert.alert_update_seq_num}")
+#                 f"{updated_contact_alert.alert_update_seq_num + (loop_count + 1)}, "
+#                 f"received {alert_updated_contact_alert.alert_update_seq_num}")
 
 
 @pytest.mark.nightly
-def test_partial_ack(static_data_, clean_and_set_limits, pair_strat_,
-                     expected_strat_limits_,
-                     expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+def test_partial_ack(static_data_, clean_and_set_limits, pair_plan_,
+                     expected_plan_limits_,
+                     expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
                      market_depth_basemodel_list, leg1_leg2_symbol_list, refresh_sec_update_fixture):
     partial_ack_qty: int | None = None
 
     # updating fixture values for this test-case
     max_loop_count_per_side = 5
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:2]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
-        (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+        (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
          config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-            leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-            expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+            leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_,
+            expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
             market_depth_basemodel_list)
 
         try:
@@ -4019,7 +4019,7 @@ def test_partial_ack(static_data_, clean_and_set_limits, pair_strat_,
             new_chore_id = None
             acked_chore_id = None
             for loop_count in range(1, max_loop_count_per_side + 1):
-                run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+                run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
                 px = 100
                 qty = 90
                 place_new_chore(leg1_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
@@ -4029,20 +4029,20 @@ def test_partial_ack(static_data_, clean_and_set_limits, pair_strat_,
                     handle_partial_ack_checks(leg1_symbol, new_chore_id, acked_chore_id, executor_http_client,
                                               config_dict)
 
-                if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_strat"):
+                if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
                     time.sleep(residual_wait_sec)    # wait to make this open chore residual
 
             time.sleep(5)
-            strat_status = executor_http_client.get_strat_status_client(active_pair_strat.id)
-            assert partial_ack_qty * max_loop_count_per_side == strat_status.total_fill_buy_qty, \
+            plan_status = executor_http_client.get_plan_status_client(active_pair_plan.id)
+            assert partial_ack_qty * max_loop_count_per_side == plan_status.total_fill_buy_qty, \
                 f"Mismatched total_fill_buy_qty: Expected {partial_ack_qty * max_loop_count_per_side}, " \
-                f"received {strat_status.total_fill_buy_qty}"
+                f"received {plan_status.total_fill_buy_qty}"
 
             # sell fills check
             new_chore_id = None
             acked_chore_id = None
             for loop_count in range(1, max_loop_count_per_side + 1):
-                run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+                run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
                 px = 110
                 qty = 95
                 place_new_chore(leg2_symbol, Side.SELL, px, qty, executor_http_client, sell_inst_type)
@@ -4052,13 +4052,13 @@ def test_partial_ack(static_data_, clean_and_set_limits, pair_strat_,
                     handle_partial_ack_checks(leg2_symbol, new_chore_id, acked_chore_id, executor_http_client,
                                               config_dict)
 
-                if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_strat"):
+                if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
                     time.sleep(residual_wait_sec)    # wait to make this open chore residual
 
-            strat_status = executor_http_client.get_strat_status_client(active_pair_strat.id)
-            assert partial_ack_qty * max_loop_count_per_side == strat_status.total_fill_sell_qty, \
+            plan_status = executor_http_client.get_plan_status_client(active_pair_plan.id)
+            assert partial_ack_qty * max_loop_count_per_side == plan_status.total_fill_sell_qty, \
                 f"Mismatched total_fill_sell_qty: Expected {partial_ack_qty * max_loop_count_per_side}, " \
-                f"received {strat_status.total_fill_sell_qty}"
+                f"received {plan_status.total_fill_sell_qty}"
         except AssertionError as e:
             raise AssertionError(e)
         except Exception as e:
@@ -4071,16 +4071,16 @@ def test_partial_ack(static_data_, clean_and_set_limits, pair_strat_,
 
 
 @pytest.mark.nightly
-def test_update_residual_query(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-                               expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+def test_update_residual_query(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+                               expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
                                last_barter_fixture_list, market_depth_basemodel_list,
                                refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
-    active_pair_strat, executor_http_client = (
-        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_strat_status_, symbol_overview_obj_list,
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    active_pair_plan, executor_http_client = (
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+                                           expected_plan_status_, symbol_overview_obj_list,
                                            last_barter_fixture_list,
                                            market_depth_basemodel_list))
     total_loop_count = 5
@@ -4096,55 +4096,55 @@ def test_update_residual_query(static_data_, clean_and_set_limits, leg1_leg2_sym
         # buy side
         executor_http_client.update_residuals_query_client(buy_symbol, Side.BUY, residual_qty)
         buy_residual_qty += residual_qty
-        strat_status = executor_http_client.get_strat_status_client(active_pair_strat.id)
-        strat_brief_list = executor_http_client.get_all_strat_brief_client()
+        plan_status = executor_http_client.get_plan_status_client(active_pair_plan.id)
+        plan_brief_list = executor_http_client.get_all_plan_brief_client()
 
-        # since only one strat is created in this test
-        strat_brief = strat_brief_list[0]
+        # since only one plan is created in this test
+        plan_brief = plan_brief_list[0]
 
         buy_residual_notional = buy_residual_qty * get_px_in_usd(buy_last_barter_px)
         residual_notional = abs(buy_residual_notional - sell_residual_notional)
-        assert buy_residual_qty == strat_brief.pair_buy_side_bartering_brief.residual_qty, \
+        assert buy_residual_qty == plan_brief.pair_buy_side_bartering_brief.residual_qty, \
             f"Mismatch residual_qty: expected {buy_residual_qty} received " \
-            f"{strat_brief.pair_buy_side_bartering_brief.residual_qty}"
-        assert residual_notional == strat_status.residual.residual_notional, \
+            f"{plan_brief.pair_buy_side_bartering_brief.residual_qty}"
+        assert residual_notional == plan_status.residual.residual_notional, \
             f"Mismatch buy residual_notional, expected {residual_notional}, received " \
-            f"{strat_status.residual.residual_notional}"
+            f"{plan_status.residual.residual_notional}"
 
         # sell side
         executor_http_client.update_residuals_query_client(sell_symbol, Side.SELL, residual_qty)
         sell_residual_qty += residual_qty
-        strat_status = executor_http_client.get_strat_status_client(active_pair_strat.id)
-        strat_brief_list = executor_http_client.get_all_strat_brief_client()
+        plan_status = executor_http_client.get_plan_status_client(active_pair_plan.id)
+        plan_brief_list = executor_http_client.get_all_plan_brief_client()
 
-        # since only one strat is created in this test
-        strat_brief = strat_brief_list[0]
+        # since only one plan is created in this test
+        plan_brief = plan_brief_list[0]
 
         sell_residual_notional = sell_residual_qty * get_px_in_usd(sell_last_barter_px)
         residual_notional = abs(buy_residual_notional - sell_residual_notional)
-        assert sell_residual_qty == strat_brief.pair_sell_side_bartering_brief.residual_qty, \
+        assert sell_residual_qty == plan_brief.pair_sell_side_bartering_brief.residual_qty, \
             f"Mismatch residual_qty: expected {sell_residual_qty}, received " \
-            f"{strat_brief.pair_sell_side_bartering_brief.residual_qty}"
-        assert strat_status.residual.residual_notional == residual_notional, \
+            f"{plan_brief.pair_sell_side_bartering_brief.residual_qty}"
+        assert plan_status.residual.residual_notional == residual_notional, \
             (f"Mismatch sell residual_notional: expected {residual_notional} received "
-             f"{strat_status.residual.residual_notional}")
+             f"{plan_status.residual.residual_notional}")
 
 
 @pytest.mark.nightly
-def test_ack_post_unack_unsol_cxl(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-                                  expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+def test_ack_post_unack_unsol_cxl(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+                                  expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
                                   last_barter_fixture_list, market_depth_basemodel_list,
                                   buy_chore_, sell_chore_,
                                   max_loop_count_per_side, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -4161,7 +4161,7 @@ def test_ack_post_unack_unsol_cxl(static_data_, clean_and_set_limits, leg1_leg2_
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
         px = 100
         qty = 90
         place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
@@ -4188,9 +4188,9 @@ def test_ack_post_unack_unsol_cxl(static_data_, clean_and_set_limits, leg1_leg2_
 
         check_str = ("Unexpected: Received chore_journal of event: ChoreEventType.OE_ACK on chore of "
                      "chore_snapshot status: ChoreStatusType.OE_DOD")
-        assert_fail_msg = f"Can't find alert of {check_str} in neither strat_alert nor portfolio_alert"
+        assert_fail_msg = f"Can't find alert of {check_str} in neither plan_alert nor contact_alert"
         time.sleep(5)
-        check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+        check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -4205,19 +4205,19 @@ def test_ack_post_unack_unsol_cxl(static_data_, clean_and_set_limits, leg1_leg2_
 
 @pytest.mark.nightly
 def test_fill_post_unack_unsol_cxl(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+        expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         last_barter_fixture_list, market_depth_basemodel_list,
         buy_chore_, sell_chore_, max_loop_count_per_side, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -4244,7 +4244,7 @@ def test_fill_post_unack_unsol_cxl(
                 buy_qty = qty
                 buy_px = px
 
-            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             latest_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW, chore_symbol,
@@ -4318,53 +4318,53 @@ def test_fill_post_unack_unsol_cxl(
                  f"{symbol_side_snapshot.last_update_fill_qty = }")
 
             buy_last_barter_px, sell_last_barter_px = get_both_side_last_barter_px()
-            strat_limits = executor_http_client.get_strat_limits_client(1)
-            strat_brief = executor_http_client.get_strat_brief_client(active_pair_strat.id)
+            plan_limits = executor_http_client.get_plan_limits_client(1)
+            plan_brief = executor_http_client.get_plan_brief_client(active_pair_plan.id)
             if side == Side.BUY:
-                strat_brief_bartering_brief = strat_brief.pair_buy_side_bartering_brief
+                plan_brief_bartering_brief = plan_brief.pair_buy_side_bartering_brief
                 hedge_ratio = 1
             else:
-                strat_brief_bartering_brief = strat_brief.pair_sell_side_bartering_brief
-                hedge_ratio = active_pair_strat.pair_strat_params.hedge_ratio
-            assert (strat_brief_bartering_brief.open_qty == 0), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.open_qty: "
-                 f"0, found {strat_brief_bartering_brief.open_qty = }")
-            assert (strat_brief_bartering_brief.open_notional == 0), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.open_notional: "
-                 f"0, found {strat_brief_bartering_brief.open_notional = }")
-            assert (strat_brief_bartering_brief.residual_qty == chore_snapshot.cxled_qty), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.residual_qty: "
-                 f"{chore_snapshot.cxled_qty}, found {strat_brief_bartering_brief.open_notional = }")
-            assert (strat_brief_bartering_brief.consumable_open_chores == 5), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_open_chores: "
-                 f"5, found {strat_brief_bartering_brief.consumable_open_chores = }")
-            assert (strat_brief_bartering_brief.all_bkr_cxlled_qty == chore_snapshot.cxled_qty), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.all_bkr_cxlled_qty: "
-                 f"{chore_snapshot.cxled_qty}, found {strat_brief_bartering_brief.all_bkr_cxlled_qty = }")
-            assert (strat_brief_bartering_brief.consumable_notional == (
-                    (strat_limits.max_single_leg_notional * hedge_ratio) - symbol_side_snapshot.total_fill_notional)), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_notional: "
-                 f"{(strat_limits.max_single_leg_notional * hedge_ratio) - symbol_side_snapshot.total_fill_notional}, "
-                 f"found {strat_brief_bartering_brief.consumable_notional = }")
-            assert (strat_brief_bartering_brief.consumable_open_notional == strat_limits.max_open_single_leg_notional), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_open_notional: "
-                 f"{strat_limits.max_open_single_leg_notional}, "
-                 f"found {strat_brief_bartering_brief.consumable_open_notional = }")
+                plan_brief_bartering_brief = plan_brief.pair_sell_side_bartering_brief
+                hedge_ratio = active_pair_plan.pair_plan_params.hedge_ratio
+            assert (plan_brief_bartering_brief.open_qty == 0), \
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.open_qty: "
+                 f"0, found {plan_brief_bartering_brief.open_qty = }")
+            assert (plan_brief_bartering_brief.open_notional == 0), \
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.open_notional: "
+                 f"0, found {plan_brief_bartering_brief.open_notional = }")
+            assert (plan_brief_bartering_brief.residual_qty == chore_snapshot.cxled_qty), \
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.residual_qty: "
+                 f"{chore_snapshot.cxled_qty}, found {plan_brief_bartering_brief.open_notional = }")
+            assert (plan_brief_bartering_brief.consumable_open_chores == 5), \
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.consumable_open_chores: "
+                 f"5, found {plan_brief_bartering_brief.consumable_open_chores = }")
+            assert (plan_brief_bartering_brief.all_bkr_cxlled_qty == chore_snapshot.cxled_qty), \
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.all_bkr_cxlled_qty: "
+                 f"{chore_snapshot.cxled_qty}, found {plan_brief_bartering_brief.all_bkr_cxlled_qty = }")
+            assert (plan_brief_bartering_brief.consumable_notional == (
+                    (plan_limits.max_single_leg_notional * hedge_ratio) - symbol_side_snapshot.total_fill_notional)), \
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.consumable_notional: "
+                 f"{(plan_limits.max_single_leg_notional * hedge_ratio) - symbol_side_snapshot.total_fill_notional}, "
+                 f"found {plan_brief_bartering_brief.consumable_notional = }")
+            assert (plan_brief_bartering_brief.consumable_open_notional == plan_limits.max_open_single_leg_notional), \
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.consumable_open_notional: "
+                 f"{plan_limits.max_open_single_leg_notional}, "
+                 f"found {plan_brief_bartering_brief.consumable_open_notional = }")
             total_security_size: int = \
                 static_data.get_security_float_from_ticker(chore_snapshot.chore_brief.security.sec_id)
-            assert (strat_brief_bartering_brief.consumable_concentration == (
-                    (total_security_size / 100 * strat_limits.max_concentration) -
+            assert (plan_brief_bartering_brief.consumable_concentration == (
+                    (total_security_size / 100 * plan_limits.max_concentration) -
                     symbol_side_snapshot.total_filled_qty)), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_concentration: "
-                 f"{(total_security_size / 100 * strat_limits.max_concentration) - symbol_side_snapshot.total_filled_qty}, "
-                 f"found {strat_brief_bartering_brief.consumable_concentration = }")
-            assert (strat_brief_bartering_brief.consumable_cxl_qty == (
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.consumable_concentration: "
+                 f"{(total_security_size / 100 * plan_limits.max_concentration) - symbol_side_snapshot.total_filled_qty}, "
+                 f"found {plan_brief_bartering_brief.consumable_concentration = }")
+            assert (plan_brief_bartering_brief.consumable_cxl_qty == (
                     (((symbol_side_snapshot.total_filled_qty +
-                       symbol_side_snapshot.total_cxled_qty) / 100) * strat_limits.cancel_rate.max_cancel_rate) -
+                       symbol_side_snapshot.total_cxled_qty) / 100) * plan_limits.cancel_rate.max_cancel_rate) -
                     symbol_side_snapshot.total_cxled_qty)), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_cxl_qty: "
-                 f"{strat_limits.max_open_single_leg_notional}, "
-                 f"found {strat_brief_bartering_brief.consumable_cxl_qty = }")
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.consumable_cxl_qty: "
+                 f"{plan_limits.max_open_single_leg_notional}, "
+                 f"found {plan_brief_bartering_brief.consumable_cxl_qty = }")
             if side == Side.BUY:
                 other_side_residual_qty = 0
             else:
@@ -4375,112 +4375,112 @@ def test_fill_post_unack_unsol_cxl(
             else:
                 current_last_barter_px = sell_last_barter_px
                 other_last_barter_px = buy_last_barter_px
-            assert (strat_brief_bartering_brief.indicative_consumable_residual == (
-                    strat_limits.residual_restriction.max_residual -
-                    ((strat_brief_bartering_brief.residual_qty *
+            assert (plan_brief_bartering_brief.indicative_consumable_residual == (
+                    plan_limits.residual_restriction.max_residual -
+                    ((plan_brief_bartering_brief.residual_qty *
                       get_px_in_usd(current_last_barter_px)) - (
                              other_side_residual_qty * get_px_in_usd(other_last_barter_px))))), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.indicative_consumable_residual: "
-                 f"{strat_limits.max_open_single_leg_notional}, "
-                 f"found {strat_brief_bartering_brief.indicative_consumable_residual = }")
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.indicative_consumable_residual: "
+                 f"{plan_limits.max_open_single_leg_notional}, "
+                 f"found {plan_brief_bartering_brief.indicative_consumable_residual = }")
 
             if side == Side.BUY:
                 other_side_fill_notional = 0
             else:
                 other_side_fill_notional = buy_symbol_side_snapshot.total_fill_notional
-            assert (strat_brief.consumable_nett_filled_notional == (
-                    strat_limits.max_net_filled_notional -
+            assert (plan_brief.consumable_nett_filled_notional == (
+                    plan_limits.max_net_filled_notional -
                     abs(symbol_side_snapshot.total_fill_notional - other_side_fill_notional))), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief."
-                 f"consumable_nett_filled_notional: {strat_limits.max_open_single_leg_notional}, "
-                 f"found {strat_brief.consumable_nett_filled_notional=}")
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief."
+                 f"consumable_nett_filled_notional: {plan_limits.max_open_single_leg_notional}, "
+                 f"found {plan_brief.consumable_nett_filled_notional=}")
 
-            strat_status = executor_http_client.get_strat_status_client(active_pair_strat.id)
+            plan_status = executor_http_client.get_plan_status_client(active_pair_plan.id)
             if side == Side.BUY:
-                total_qty = strat_status.total_buy_qty
-                total_open_qty = strat_status.total_open_buy_qty
-                total_open_notional = strat_status.total_open_buy_notional
-                avg_open_px = strat_status.avg_open_buy_px
-                total_fill_qty = strat_status.total_fill_buy_qty
-                total_fill_notional = strat_status.total_fill_buy_notional
-                avg_fill_px = strat_status.avg_fill_buy_px
-                total_cxl_qty = strat_status.total_cxl_buy_qty
-                total_cxl_notional = strat_status.total_cxl_buy_notional
-                avg_cxl_px = strat_status.avg_cxl_buy_px
+                total_qty = plan_status.total_buy_qty
+                total_open_qty = plan_status.total_open_buy_qty
+                total_open_notional = plan_status.total_open_buy_notional
+                avg_open_px = plan_status.avg_open_buy_px
+                total_fill_qty = plan_status.total_fill_buy_qty
+                total_fill_notional = plan_status.total_fill_buy_notional
+                avg_fill_px = plan_status.avg_fill_buy_px
+                total_cxl_qty = plan_status.total_cxl_buy_qty
+                total_cxl_notional = plan_status.total_cxl_buy_notional
+                avg_cxl_px = plan_status.avg_cxl_buy_px
             else:
-                total_qty = strat_status.total_sell_qty
-                total_open_qty = strat_status.total_open_sell_qty
-                total_open_notional = strat_status.total_open_sell_notional
-                avg_open_px = strat_status.avg_open_sell_px
-                total_fill_qty = strat_status.total_fill_sell_qty
-                total_fill_notional = strat_status.total_fill_sell_notional
-                avg_fill_px = strat_status.avg_fill_sell_px
-                total_cxl_qty = strat_status.total_cxl_sell_qty
-                total_cxl_notional = strat_status.total_cxl_sell_notional
-                avg_cxl_px = strat_status.avg_cxl_sell_px
+                total_qty = plan_status.total_sell_qty
+                total_open_qty = plan_status.total_open_sell_qty
+                total_open_notional = plan_status.total_open_sell_notional
+                avg_open_px = plan_status.avg_open_sell_px
+                total_fill_qty = plan_status.total_fill_sell_qty
+                total_fill_notional = plan_status.total_fill_sell_notional
+                avg_fill_px = plan_status.avg_fill_sell_px
+                total_cxl_qty = plan_status.total_cxl_sell_qty
+                total_cxl_notional = plan_status.total_cxl_sell_notional
+                avg_cxl_px = plan_status.avg_cxl_sell_px
 
-            total_open_exposure = strat_status.total_open_exposure
-            total_fill_exposure = strat_status.total_fill_exposure
-            total_cxl_exposure = strat_status.total_cxl_exposure
+            total_open_exposure = plan_status.total_open_exposure
+            total_fill_exposure = plan_status.total_fill_exposure
+            total_cxl_exposure = plan_status.total_cxl_exposure
             assert total_qty == chore_snapshot.chore_brief.qty, \
-                (f"Mismatched: expected strat_status.total_{side.lower()}_qty: "
+                (f"Mismatched: expected plan_status.total_{side.lower()}_qty: "
                  f"{chore_snapshot.chore_brief.qty}, found {total_qty = }")
             assert total_open_qty == 0, \
-                (f"Mismatched: expected strat_status total_open_{side.lower()}_qty: "
+                (f"Mismatched: expected plan_status total_open_{side.lower()}_qty: "
                  f"0, found {total_open_qty = }")
             assert (total_open_notional == 0), \
-                (f"Mismatched: expected strat_status.total_open_{side.lower()}_notional: "
+                (f"Mismatched: expected plan_status.total_open_{side.lower()}_notional: "
                  f"0, found {total_open_notional = }")
             assert (avg_open_px == 0), \
-                (f"Mismatched: expected strat_status.avg_open_{side.lower()}_px: "
+                (f"Mismatched: expected plan_status.avg_open_{side.lower()}_px: "
                  f"0, found {avg_open_px = }")
             assert (total_fill_qty == 0), \
-                (f"Mismatched: expected strat_status.total_fill_{side.lower()}_qty: "
+                (f"Mismatched: expected plan_status.total_fill_{side.lower()}_qty: "
                  f"0, found {total_fill_qty = }")
             assert (total_fill_notional == 0), \
-                (f"Mismatched: expected strat_status.total_fill_{side.lower()}_notional: "
+                (f"Mismatched: expected plan_status.total_fill_{side.lower()}_notional: "
                  f"0, found {total_fill_notional = }")
             assert (avg_fill_px == 0), \
-                (f"Mismatched: expected strat_status.avg_fill_{side.lower()}_px: "
+                (f"Mismatched: expected plan_status.avg_fill_{side.lower()}_px: "
                  f"0, found {avg_fill_px = }")
             assert (total_cxl_qty == qty), \
-                (f"Mismatched: expected strat_status.total_cxl_{side.lower()}_qty: "
+                (f"Mismatched: expected plan_status.total_cxl_{side.lower()}_qty: "
                  f"{qty}, found {total_cxl_qty = }")
             assert (total_cxl_notional == qty * get_px_in_usd(px)), \
-                (f"Mismatched: expected strat_status.total_cxl_{side.lower()}_notional: "
+                (f"Mismatched: expected plan_status.total_cxl_{side.lower()}_notional: "
                  f"{qty * get_px_in_usd(px)}, found {total_cxl_notional = }")
             assert (avg_cxl_px == px), \
-                (f"Mismatched: expected strat_status.avg_cxl_{side.lower()}_px: "
+                (f"Mismatched: expected plan_status.avg_cxl_{side.lower()}_px: "
                  f"{px}, found {avg_cxl_px = }")
             if side == Side.BUY:
                 assert (total_open_exposure == 0), \
-                    (f"Mismatched: expected strat_status.total_open_exposure: "
+                    (f"Mismatched: expected plan_status.total_open_exposure: "
                      f"0, found {total_open_exposure = }")
                 assert (total_fill_exposure == 0), \
-                    (f"Mismatched: expected strat_status.total_fill_exposure: "
+                    (f"Mismatched: expected plan_status.total_fill_exposure: "
                      f"0, found {total_fill_exposure = }")
                 assert (total_cxl_exposure == qty * get_px_in_usd(px)), \
-                    (f"Mismatched: expected strat_status.total_cxl_exposure: "
+                    (f"Mismatched: expected plan_status.total_cxl_exposure: "
                      f"{qty * get_px_in_usd(px)}, found {total_cxl_exposure = }")
             else:
                 assert (total_open_exposure == 0), \
-                    (f"Mismatched: expected strat_status.total_open_exposure: "
+                    (f"Mismatched: expected plan_status.total_open_exposure: "
                      f"0, found {total_open_exposure = }")
                 assert (total_fill_exposure == buy_filled_qty * get_px_in_usd(buy_px)), \
-                    (f"Mismatched: expected strat_status.total_fill_exposure: "
+                    (f"Mismatched: expected plan_status.total_fill_exposure: "
                      f"{buy_filled_qty * get_px_in_usd(buy_px)}, found {total_fill_exposure = }")
                 assert (total_cxl_exposure == (buy_qty - buy_filled_qty) * get_px_in_usd(buy_px) - qty * get_px_in_usd(px)), \
-                    (f"Mismatched: expected strat_status.total_cxl_exposure: "
+                    (f"Mismatched: expected plan_status.total_cxl_exposure: "
                      f"{(buy_qty - buy_filled_qty) * get_px_in_usd(buy_px) - qty * get_px_in_usd(px)}, "
                      f"found {total_cxl_exposure = }")
 
-            portfolio_status = email_book_service_native_web_client.get_portfolio_status_client(1)
+            contact_status = email_book_service_native_web_client.get_contact_status_client(1)
             if side == Side.BUY:
-                overall_notional = portfolio_status.overall_buy_notional
+                overall_notional = contact_status.overall_buy_notional
             else:
-                overall_notional = portfolio_status.overall_sell_notional
+                overall_notional = contact_status.overall_sell_notional
             assert (overall_notional == 0), \
-                (f"Mismatched: expected portfolio_status.overall_{side.lower()}_notional: "
+                (f"Mismatched: expected contact_status.overall_{side.lower()}_notional: "
                  f"0, found {overall_notional = }")
 
             # applying ack leading to overfill
@@ -4556,51 +4556,51 @@ def test_fill_post_unack_unsol_cxl(
                  f"{symbol_side_snapshot.last_update_fill_qty = }")
 
             buy_last_barter_px, sell_last_barter_px = get_both_side_last_barter_px()
-            strat_limits = executor_http_client.get_strat_limits_client(1)
-            strat_brief = executor_http_client.get_strat_brief_client(active_pair_strat.id)
+            plan_limits = executor_http_client.get_plan_limits_client(1)
+            plan_brief = executor_http_client.get_plan_brief_client(active_pair_plan.id)
             if side == Side.BUY:
-                strat_brief_bartering_brief = strat_brief.pair_buy_side_bartering_brief
+                plan_brief_bartering_brief = plan_brief.pair_buy_side_bartering_brief
             else:
-                strat_brief_bartering_brief = strat_brief.pair_sell_side_bartering_brief
-            assert (strat_brief_bartering_brief.open_qty == 0), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.open_qty: "
-                 f"0, found {strat_brief_bartering_brief.open_qty = }")
-            assert (strat_brief_bartering_brief.open_notional == 0), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.open_notional: "
-                 f"0, found {strat_brief_bartering_brief.open_notional = }")
-            assert (strat_brief_bartering_brief.residual_qty == (qty - filled_qty)), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.residual_qty: "
-                 f"{qty - filled_qty}, found {strat_brief_bartering_brief.residual_qty = }")
-            assert (strat_brief_bartering_brief.consumable_open_chores == 5), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_open_chores: "
-                 f"5, found {strat_brief_bartering_brief.consumable_open_chores = }")
-            assert (strat_brief_bartering_brief.all_bkr_cxlled_qty == (qty - filled_qty)), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.all_bkr_cxlled_qty: "
-                 f"{(qty - filled_qty)}, found {strat_brief_bartering_brief.all_bkr_cxlled_qty = }")
-            assert (strat_brief_bartering_brief.consumable_notional == (
-                    (strat_limits.max_single_leg_notional * hedge_ratio) - symbol_side_snapshot.total_fill_notional)), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_notional: "
-                 f"{(strat_limits.max_single_leg_notional * hedge_ratio) - symbol_side_snapshot.total_fill_notional}, "
-                 f"found {strat_brief_bartering_brief.consumable_notional = }")
-            assert (strat_brief_bartering_brief.consumable_open_notional == strat_limits.max_open_single_leg_notional), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_open_notional: "
-                 f"{strat_limits.max_open_single_leg_notional}, "
-                 f"found {strat_brief_bartering_brief.consumable_open_notional = }")
+                plan_brief_bartering_brief = plan_brief.pair_sell_side_bartering_brief
+            assert (plan_brief_bartering_brief.open_qty == 0), \
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.open_qty: "
+                 f"0, found {plan_brief_bartering_brief.open_qty = }")
+            assert (plan_brief_bartering_brief.open_notional == 0), \
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.open_notional: "
+                 f"0, found {plan_brief_bartering_brief.open_notional = }")
+            assert (plan_brief_bartering_brief.residual_qty == (qty - filled_qty)), \
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.residual_qty: "
+                 f"{qty - filled_qty}, found {plan_brief_bartering_brief.residual_qty = }")
+            assert (plan_brief_bartering_brief.consumable_open_chores == 5), \
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.consumable_open_chores: "
+                 f"5, found {plan_brief_bartering_brief.consumable_open_chores = }")
+            assert (plan_brief_bartering_brief.all_bkr_cxlled_qty == (qty - filled_qty)), \
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.all_bkr_cxlled_qty: "
+                 f"{(qty - filled_qty)}, found {plan_brief_bartering_brief.all_bkr_cxlled_qty = }")
+            assert (plan_brief_bartering_brief.consumable_notional == (
+                    (plan_limits.max_single_leg_notional * hedge_ratio) - symbol_side_snapshot.total_fill_notional)), \
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.consumable_notional: "
+                 f"{(plan_limits.max_single_leg_notional * hedge_ratio) - symbol_side_snapshot.total_fill_notional}, "
+                 f"found {plan_brief_bartering_brief.consumable_notional = }")
+            assert (plan_brief_bartering_brief.consumable_open_notional == plan_limits.max_open_single_leg_notional), \
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.consumable_open_notional: "
+                 f"{plan_limits.max_open_single_leg_notional}, "
+                 f"found {plan_brief_bartering_brief.consumable_open_notional = }")
             total_security_size: int = \
                 static_data.get_security_float_from_ticker(chore_snapshot.chore_brief.security.sec_id)
-            assert (strat_brief_bartering_brief.consumable_concentration == (
-                    (total_security_size / 100 * strat_limits.max_concentration) -
+            assert (plan_brief_bartering_brief.consumable_concentration == (
+                    (total_security_size / 100 * plan_limits.max_concentration) -
                     symbol_side_snapshot.total_filled_qty)), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_concentration: "
-                 f"{(total_security_size / 100 * strat_limits.max_concentration) - symbol_side_snapshot.total_filled_qty}, "
-                 f"found {strat_brief_bartering_brief.consumable_concentration = }")
-            assert (strat_brief_bartering_brief.consumable_cxl_qty == (
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.consumable_concentration: "
+                 f"{(total_security_size / 100 * plan_limits.max_concentration) - symbol_side_snapshot.total_filled_qty}, "
+                 f"found {plan_brief_bartering_brief.consumable_concentration = }")
+            assert (plan_brief_bartering_brief.consumable_cxl_qty == (
                     (((symbol_side_snapshot.total_filled_qty +
-                       symbol_side_snapshot.total_cxled_qty) / 100) * strat_limits.cancel_rate.max_cancel_rate) -
+                       symbol_side_snapshot.total_cxled_qty) / 100) * plan_limits.cancel_rate.max_cancel_rate) -
                     symbol_side_snapshot.total_cxled_qty)), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_cxl_qty: "
-                 f"{strat_limits.max_open_single_leg_notional}, "
-                 f"found {strat_brief_bartering_brief.consumable_cxl_qty = }")
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.consumable_cxl_qty: "
+                 f"{plan_limits.max_open_single_leg_notional}, "
+                 f"found {plan_brief_bartering_brief.consumable_cxl_qty = }")
             if side == Side.BUY:
                 other_side_residual_qty = 0
                 current_last_barter_px = buy_last_barter_px
@@ -4610,115 +4610,115 @@ def test_fill_post_unack_unsol_cxl(
                 current_last_barter_px = sell_last_barter_px
                 other_last_barter_px = buy_last_barter_px
 
-            assert (strat_brief_bartering_brief.indicative_consumable_residual == (
-                    strat_limits.residual_restriction.max_residual -
-                    ((strat_brief_bartering_brief.residual_qty *
+            assert (plan_brief_bartering_brief.indicative_consumable_residual == (
+                    plan_limits.residual_restriction.max_residual -
+                    ((plan_brief_bartering_brief.residual_qty *
                       get_px_in_usd(current_last_barter_px)) - (
                              other_side_residual_qty * get_px_in_usd(other_last_barter_px))))), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.indicative_consumable_residual: "
-                 f"{strat_limits.residual_restriction.max_residual - ((strat_brief_bartering_brief.residual_qty * get_px_in_usd(current_last_barter_px)) - (other_side_residual_qty * get_px_in_usd(other_last_barter_px)))}, "
-                 f"found {strat_brief_bartering_brief.indicative_consumable_residual = }")
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.indicative_consumable_residual: "
+                 f"{plan_limits.residual_restriction.max_residual - ((plan_brief_bartering_brief.residual_qty * get_px_in_usd(current_last_barter_px)) - (other_side_residual_qty * get_px_in_usd(other_last_barter_px)))}, "
+                 f"found {plan_brief_bartering_brief.indicative_consumable_residual = }")
 
             if side == Side.BUY:
                 other_side_fill_notional = 0
             else:
                 other_side_fill_notional = buy_symbol_side_snapshot.total_fill_notional
-            assert (strat_brief.consumable_nett_filled_notional == (
-                    strat_limits.max_net_filled_notional -
+            assert (plan_brief.consumable_nett_filled_notional == (
+                    plan_limits.max_net_filled_notional -
                     abs(symbol_side_snapshot.total_fill_notional - other_side_fill_notional))), \
                 (
-                    f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief."
-                    f"consumable_nett_filled_notional: {strat_limits.max_open_single_leg_notional}, "
-                    f"found {strat_brief.consumable_nett_filled_notional = }")
+                    f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief."
+                    f"consumable_nett_filled_notional: {plan_limits.max_open_single_leg_notional}, "
+                    f"found {plan_brief.consumable_nett_filled_notional = }")
 
-            strat_status = executor_http_client.get_strat_status_client(active_pair_strat.id)
+            plan_status = executor_http_client.get_plan_status_client(active_pair_plan.id)
             if side == Side.BUY:
-                total_qty = strat_status.total_buy_qty
-                total_open_qty = strat_status.total_open_buy_qty
-                total_open_notional = strat_status.total_open_buy_notional
-                avg_open_px = strat_status.avg_open_buy_px
-                total_fill_qty = strat_status.total_fill_buy_qty
-                total_fill_notional = strat_status.total_fill_buy_notional
-                avg_fill_px = strat_status.avg_fill_buy_px
-                total_cxl_qty = strat_status.total_cxl_buy_qty
-                total_cxl_notional = strat_status.total_cxl_buy_notional
-                avg_cxl_px = strat_status.avg_cxl_buy_px
+                total_qty = plan_status.total_buy_qty
+                total_open_qty = plan_status.total_open_buy_qty
+                total_open_notional = plan_status.total_open_buy_notional
+                avg_open_px = plan_status.avg_open_buy_px
+                total_fill_qty = plan_status.total_fill_buy_qty
+                total_fill_notional = plan_status.total_fill_buy_notional
+                avg_fill_px = plan_status.avg_fill_buy_px
+                total_cxl_qty = plan_status.total_cxl_buy_qty
+                total_cxl_notional = plan_status.total_cxl_buy_notional
+                avg_cxl_px = plan_status.avg_cxl_buy_px
             else:
-                total_qty = strat_status.total_sell_qty
-                total_open_qty = strat_status.total_open_sell_qty
-                total_open_notional = strat_status.total_open_sell_notional
-                avg_open_px = strat_status.avg_open_sell_px
-                total_fill_qty = strat_status.total_fill_sell_qty
-                total_fill_notional = strat_status.total_fill_sell_notional
-                avg_fill_px = strat_status.avg_fill_sell_px
-                total_cxl_qty = strat_status.total_cxl_sell_qty
-                total_cxl_notional = strat_status.total_cxl_sell_notional
-                avg_cxl_px = strat_status.avg_cxl_sell_px
+                total_qty = plan_status.total_sell_qty
+                total_open_qty = plan_status.total_open_sell_qty
+                total_open_notional = plan_status.total_open_sell_notional
+                avg_open_px = plan_status.avg_open_sell_px
+                total_fill_qty = plan_status.total_fill_sell_qty
+                total_fill_notional = plan_status.total_fill_sell_notional
+                avg_fill_px = plan_status.avg_fill_sell_px
+                total_cxl_qty = plan_status.total_cxl_sell_qty
+                total_cxl_notional = plan_status.total_cxl_sell_notional
+                avg_cxl_px = plan_status.avg_cxl_sell_px
 
-            total_open_exposure = strat_status.total_open_exposure
-            total_fill_exposure = strat_status.total_fill_exposure
-            total_cxl_exposure = strat_status.total_cxl_exposure
+            total_open_exposure = plan_status.total_open_exposure
+            total_fill_exposure = plan_status.total_fill_exposure
+            total_cxl_exposure = plan_status.total_cxl_exposure
             assert total_qty == qty, \
-                (f"Mismatched: expected strat_status.total_{side.lower()}_qty: "
+                (f"Mismatched: expected plan_status.total_{side.lower()}_qty: "
                  f"{qty}, found {total_qty = }")
             assert total_open_qty == 0, \
-                (f"Mismatched: expected strat_status total_open_{side.lower()}_qty: "
+                (f"Mismatched: expected plan_status total_open_{side.lower()}_qty: "
                  f"0, found {total_open_qty = }")
             assert (total_open_notional == 0), \
-                (f"Mismatched: expected strat_status.total_open_{side.lower()}_notional: "
+                (f"Mismatched: expected plan_status.total_open_{side.lower()}_notional: "
                  f"0, found {total_open_notional = }")
             assert (avg_open_px == 0), \
-                (f"Mismatched: expected strat_status.avg_open_{side.lower()}_px: "
+                (f"Mismatched: expected plan_status.avg_open_{side.lower()}_px: "
                  f"0, found {avg_open_px = }")
             assert (total_fill_qty == filled_qty), \
-                (f"Mismatched: expected strat_status.total_fill_{side.lower()}_qty: "
+                (f"Mismatched: expected plan_status.total_fill_{side.lower()}_qty: "
                  f"{filled_qty}, found {total_fill_qty = }")
             assert (total_fill_notional == filled_qty * get_px_in_usd(px)), \
-                (f"Mismatched: expected strat_status.total_fill_{side.lower()}_notional: "
+                (f"Mismatched: expected plan_status.total_fill_{side.lower()}_notional: "
                  f"{filled_qty * get_px_in_usd(px)}, found {total_fill_notional = }")
             assert (avg_fill_px == px), \
-                (f"Mismatched: expected strat_status.avg_fill_{side.lower()}_px: "
+                (f"Mismatched: expected plan_status.avg_fill_{side.lower()}_px: "
                  f"{px}, found {avg_fill_px = }")
             assert (total_cxl_qty == (qty - filled_qty)), \
-                (f"Mismatched: expected strat_status.total_cxl_{side.lower()}_qty: "
+                (f"Mismatched: expected plan_status.total_cxl_{side.lower()}_qty: "
                  f"{qty - filled_qty}, found {total_cxl_qty = }")
             assert (total_cxl_notional == (qty - filled_qty) * get_px_in_usd(px)), \
-                (f"Mismatched: expected strat_status.total_cxl_{side.lower()}_notional: "
+                (f"Mismatched: expected plan_status.total_cxl_{side.lower()}_notional: "
                  f"{(qty - filled_qty) * get_px_in_usd(px)}, found {total_cxl_notional = }")
             assert (avg_cxl_px == px), \
-                (f"Mismatched: expected strat_status.avg_cxl_{side.lower()}_px: "
+                (f"Mismatched: expected plan_status.avg_cxl_{side.lower()}_px: "
                  f"{px}, found {avg_cxl_px = }")
             if side == Side.BUY:
                 assert (total_open_exposure == 0), \
-                    (f"Mismatched: expected strat_status.total_open_exposure: "
+                    (f"Mismatched: expected plan_status.total_open_exposure: "
                      f"0, found {total_open_exposure = }")
                 assert (total_fill_exposure == filled_qty * get_px_in_usd(px)), \
-                    (f"Mismatched: expected strat_status.total_fill_exposure: "
+                    (f"Mismatched: expected plan_status.total_fill_exposure: "
                      f"{filled_qty * get_px_in_usd(px)}, found {total_fill_exposure = }")
                 assert (total_cxl_exposure == (qty - filled_qty) * get_px_in_usd(px)), \
-                    (f"Mismatched: expected strat_status.total_cxl_exposure: "
+                    (f"Mismatched: expected plan_status.total_cxl_exposure: "
                      f"0, found {total_cxl_exposure = }")
             else:
                 assert (total_open_exposure == 0), \
-                    (f"Mismatched: expected strat_status.total_open_exposure: "
+                    (f"Mismatched: expected plan_status.total_open_exposure: "
                      f"0, found {total_open_exposure = }")
                 assert (total_fill_exposure == (
                         buy_filled_qty * get_px_in_usd(buy_px) - filled_qty * get_px_in_usd(px))), \
-                    (f"Mismatched: expected strat_status.total_fill_exposure: "
+                    (f"Mismatched: expected plan_status.total_fill_exposure: "
                      f"{buy_filled_qty * get_px_in_usd(buy_px) - filled_qty * get_px_in_usd(px)}, "
                      f"found {total_fill_exposure = }")
                 assert (total_cxl_exposure == (buy_qty - buy_filled_qty) * get_px_in_usd(buy_px) - (qty - filled_qty) * get_px_in_usd(px)), \
-                    (f"Mismatched: expected strat_status.total_cxl_exposure: "
+                    (f"Mismatched: expected plan_status.total_cxl_exposure: "
                      f"{(buy_qty - buy_filled_qty) * get_px_in_usd(buy_px) - (qty - filled_qty) * get_px_in_usd(px)}, "
                      f"found {total_cxl_exposure = }")
 
-            portfolio_status = email_book_service_native_web_client.get_portfolio_status_client(1)
+            contact_status = email_book_service_native_web_client.get_contact_status_client(1)
             if side == Side.BUY:
-                overall_notional = portfolio_status.overall_buy_notional
+                overall_notional = contact_status.overall_buy_notional
             else:
-                overall_notional = portfolio_status.overall_sell_notional
+                overall_notional = contact_status.overall_sell_notional
             assert (overall_notional == filled_qty * get_px_in_usd(px)), \
-                (f"Mismatched: expected portfolio_status.overall_{side.lower()}_notional: "
+                (f"Mismatched: expected contact_status.overall_{side.lower()}_notional: "
                  f"{filled_qty * get_px_in_usd(px)}, found {overall_notional = }")
 
     except AssertionError as e:
@@ -4734,19 +4734,19 @@ def test_fill_post_unack_unsol_cxl(
 
 @pytest.mark.nightly
 def test_fulfill_post_unack_unsol_cxl(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+        expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         last_barter_fixture_list, market_depth_basemodel_list,
         buy_chore_, sell_chore_, max_loop_count_per_side, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -4774,7 +4774,7 @@ def test_fulfill_post_unack_unsol_cxl(
                 buy_px = px
                 buy_qty = qty
 
-            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             latest_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW, chore_symbol,
@@ -4848,53 +4848,53 @@ def test_fulfill_post_unack_unsol_cxl(
                  f"{symbol_side_snapshot.last_update_fill_qty = }")
 
             buy_last_barter_px, sell_last_barter_px = get_both_side_last_barter_px()
-            strat_limits = executor_http_client.get_strat_limits_client(1)
-            strat_brief = executor_http_client.get_strat_brief_client(active_pair_strat.id)
+            plan_limits = executor_http_client.get_plan_limits_client(1)
+            plan_brief = executor_http_client.get_plan_brief_client(active_pair_plan.id)
             if side == Side.BUY:
-                strat_brief_bartering_brief = strat_brief.pair_buy_side_bartering_brief
+                plan_brief_bartering_brief = plan_brief.pair_buy_side_bartering_brief
                 hedge_ratio = 1
             else:
-                strat_brief_bartering_brief = strat_brief.pair_sell_side_bartering_brief
-                hedge_ratio = active_pair_strat.pair_strat_params.hedge_ratio
-            assert (strat_brief_bartering_brief.open_qty == 0), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.open_qty: "
-                 f"0, found {strat_brief_bartering_brief.open_qty=}")
-            assert (strat_brief_bartering_brief.open_notional == 0), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.open_notional: "
-                 f"0, found {strat_brief_bartering_brief.open_notional=}")
-            assert (strat_brief_bartering_brief.residual_qty == chore_snapshot.cxled_qty), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.residual_qty: "
-                 f"{chore_snapshot.cxled_qty}, found {strat_brief_bartering_brief.open_notional=}")
-            assert (strat_brief_bartering_brief.consumable_open_chores == 5), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_open_chores: "
-                 f"5, found {strat_brief_bartering_brief.consumable_open_chores=}")
-            assert (strat_brief_bartering_brief.all_bkr_cxlled_qty == chore_snapshot.cxled_qty), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.all_bkr_cxlled_qty: "
-                 f"{chore_snapshot.cxled_qty}, found {strat_brief_bartering_brief.all_bkr_cxlled_qty=}")
-            assert (strat_brief_bartering_brief.consumable_notional == (
-                    (strat_limits.max_single_leg_notional * hedge_ratio) - symbol_side_snapshot.total_fill_notional)), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_notional: "
-                 f"{(strat_limits.max_single_leg_notional * hedge_ratio) - symbol_side_snapshot.total_fill_notional}, "
-                 f"found {strat_brief_bartering_brief.consumable_notional = }")
-            assert (strat_brief_bartering_brief.consumable_open_notional == strat_limits.max_open_single_leg_notional), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_open_notional: "
-                 f"{strat_limits.max_open_single_leg_notional}, "
-                 f"found {strat_brief_bartering_brief.consumable_open_notional=}")
+                plan_brief_bartering_brief = plan_brief.pair_sell_side_bartering_brief
+                hedge_ratio = active_pair_plan.pair_plan_params.hedge_ratio
+            assert (plan_brief_bartering_brief.open_qty == 0), \
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.open_qty: "
+                 f"0, found {plan_brief_bartering_brief.open_qty=}")
+            assert (plan_brief_bartering_brief.open_notional == 0), \
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.open_notional: "
+                 f"0, found {plan_brief_bartering_brief.open_notional=}")
+            assert (plan_brief_bartering_brief.residual_qty == chore_snapshot.cxled_qty), \
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.residual_qty: "
+                 f"{chore_snapshot.cxled_qty}, found {plan_brief_bartering_brief.open_notional=}")
+            assert (plan_brief_bartering_brief.consumable_open_chores == 5), \
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.consumable_open_chores: "
+                 f"5, found {plan_brief_bartering_brief.consumable_open_chores=}")
+            assert (plan_brief_bartering_brief.all_bkr_cxlled_qty == chore_snapshot.cxled_qty), \
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.all_bkr_cxlled_qty: "
+                 f"{chore_snapshot.cxled_qty}, found {plan_brief_bartering_brief.all_bkr_cxlled_qty=}")
+            assert (plan_brief_bartering_brief.consumable_notional == (
+                    (plan_limits.max_single_leg_notional * hedge_ratio) - symbol_side_snapshot.total_fill_notional)), \
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.consumable_notional: "
+                 f"{(plan_limits.max_single_leg_notional * hedge_ratio) - symbol_side_snapshot.total_fill_notional}, "
+                 f"found {plan_brief_bartering_brief.consumable_notional = }")
+            assert (plan_brief_bartering_brief.consumable_open_notional == plan_limits.max_open_single_leg_notional), \
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.consumable_open_notional: "
+                 f"{plan_limits.max_open_single_leg_notional}, "
+                 f"found {plan_brief_bartering_brief.consumable_open_notional=}")
             total_security_size: int = \
                 static_data.get_security_float_from_ticker(chore_snapshot.chore_brief.security.sec_id)
-            assert (strat_brief_bartering_brief.consumable_concentration == (
-                    (total_security_size / 100 * strat_limits.max_concentration) -
+            assert (plan_brief_bartering_brief.consumable_concentration == (
+                    (total_security_size / 100 * plan_limits.max_concentration) -
                     symbol_side_snapshot.total_filled_qty)), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_concentration: "
-                 f"{(total_security_size / 100 * strat_limits.max_concentration) - symbol_side_snapshot.total_filled_qty}, "
-                 f"found {strat_brief_bartering_brief.consumable_concentration=}")
-            assert (strat_brief_bartering_brief.consumable_cxl_qty == (
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.consumable_concentration: "
+                 f"{(total_security_size / 100 * plan_limits.max_concentration) - symbol_side_snapshot.total_filled_qty}, "
+                 f"found {plan_brief_bartering_brief.consumable_concentration=}")
+            assert (plan_brief_bartering_brief.consumable_cxl_qty == (
                     (((symbol_side_snapshot.total_filled_qty +
-                       symbol_side_snapshot.total_cxled_qty) / 100) * strat_limits.cancel_rate.max_cancel_rate) -
+                       symbol_side_snapshot.total_cxled_qty) / 100) * plan_limits.cancel_rate.max_cancel_rate) -
                     symbol_side_snapshot.total_cxled_qty)), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_cxl_qty: "
-                 f"{strat_limits.max_open_single_leg_notional}, "
-                 f"found {strat_brief_bartering_brief.consumable_cxl_qty=}")
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.consumable_cxl_qty: "
+                 f"{plan_limits.max_open_single_leg_notional}, "
+                 f"found {plan_brief_bartering_brief.consumable_cxl_qty=}")
             other_side_residual_qty = 0
             if side == Side.BUY:
                 current_last_barter_px = buy_last_barter_px
@@ -4902,112 +4902,112 @@ def test_fulfill_post_unack_unsol_cxl(
             else:
                 current_last_barter_px = sell_last_barter_px
                 other_last_barter_px = buy_last_barter_px
-            assert (strat_brief_bartering_brief.indicative_consumable_residual == (
-                    strat_limits.residual_restriction.max_residual -
-                    ((strat_brief_bartering_brief.residual_qty *
+            assert (plan_brief_bartering_brief.indicative_consumable_residual == (
+                    plan_limits.residual_restriction.max_residual -
+                    ((plan_brief_bartering_brief.residual_qty *
                       get_px_in_usd(current_last_barter_px)) - (
                              other_side_residual_qty * get_px_in_usd(other_last_barter_px))))), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.indicative_consumable_residual: "
-                 f"{strat_limits.residual_restriction.max_residual - ((strat_brief_bartering_brief.residual_qty * get_px_in_usd(current_last_barter_px)) - (other_side_residual_qty * get_px_in_usd(other_last_barter_px)))}, "
-                 f"found {strat_brief_bartering_brief.indicative_consumable_residual=}")
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.indicative_consumable_residual: "
+                 f"{plan_limits.residual_restriction.max_residual - ((plan_brief_bartering_brief.residual_qty * get_px_in_usd(current_last_barter_px)) - (other_side_residual_qty * get_px_in_usd(other_last_barter_px)))}, "
+                 f"found {plan_brief_bartering_brief.indicative_consumable_residual=}")
 
             if side == Side.BUY:
                 other_side_fill_notional = 0
             else:
                 other_side_fill_notional = buy_symbol_side_snapshot.total_fill_notional
-            assert (strat_brief.consumable_nett_filled_notional == (
-                    strat_limits.max_net_filled_notional -
+            assert (plan_brief.consumable_nett_filled_notional == (
+                    plan_limits.max_net_filled_notional -
                     abs(symbol_side_snapshot.total_fill_notional - other_side_fill_notional))), \
                 (
-                    f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief."
-                    f"consumable_nett_filled_notional: {strat_limits.max_open_single_leg_notional}, "
-                    f"found {strat_brief.consumable_nett_filled_notional=}")
+                    f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief."
+                    f"consumable_nett_filled_notional: {plan_limits.max_open_single_leg_notional}, "
+                    f"found {plan_brief.consumable_nett_filled_notional=}")
 
-            strat_status = executor_http_client.get_strat_status_client(active_pair_strat.id)
+            plan_status = executor_http_client.get_plan_status_client(active_pair_plan.id)
             if side == Side.BUY:
-                total_qty = strat_status.total_buy_qty
-                total_open_qty = strat_status.total_open_buy_qty
-                total_open_notional = strat_status.total_open_buy_notional
-                avg_open_px = strat_status.avg_open_buy_px
-                total_fill_qty = strat_status.total_fill_buy_qty
-                total_fill_notional = strat_status.total_fill_buy_notional
-                avg_fill_px = strat_status.avg_fill_buy_px
-                total_cxl_qty = strat_status.total_cxl_buy_qty
-                total_cxl_notional = strat_status.total_cxl_buy_notional
-                avg_cxl_px = strat_status.avg_cxl_buy_px
+                total_qty = plan_status.total_buy_qty
+                total_open_qty = plan_status.total_open_buy_qty
+                total_open_notional = plan_status.total_open_buy_notional
+                avg_open_px = plan_status.avg_open_buy_px
+                total_fill_qty = plan_status.total_fill_buy_qty
+                total_fill_notional = plan_status.total_fill_buy_notional
+                avg_fill_px = plan_status.avg_fill_buy_px
+                total_cxl_qty = plan_status.total_cxl_buy_qty
+                total_cxl_notional = plan_status.total_cxl_buy_notional
+                avg_cxl_px = plan_status.avg_cxl_buy_px
             else:
-                total_qty = strat_status.total_sell_qty
-                total_open_qty = strat_status.total_open_sell_qty
-                total_open_notional = strat_status.total_open_sell_notional
-                avg_open_px = strat_status.avg_open_sell_px
-                total_fill_qty = strat_status.total_fill_sell_qty
-                total_fill_notional = strat_status.total_fill_sell_notional
-                avg_fill_px = strat_status.avg_fill_sell_px
-                total_cxl_qty = strat_status.total_cxl_sell_qty
-                total_cxl_notional = strat_status.total_cxl_sell_notional
-                avg_cxl_px = strat_status.avg_cxl_sell_px
+                total_qty = plan_status.total_sell_qty
+                total_open_qty = plan_status.total_open_sell_qty
+                total_open_notional = plan_status.total_open_sell_notional
+                avg_open_px = plan_status.avg_open_sell_px
+                total_fill_qty = plan_status.total_fill_sell_qty
+                total_fill_notional = plan_status.total_fill_sell_notional
+                avg_fill_px = plan_status.avg_fill_sell_px
+                total_cxl_qty = plan_status.total_cxl_sell_qty
+                total_cxl_notional = plan_status.total_cxl_sell_notional
+                avg_cxl_px = plan_status.avg_cxl_sell_px
 
-            total_open_exposure = strat_status.total_open_exposure
-            total_fill_exposure = strat_status.total_fill_exposure
-            total_cxl_exposure = strat_status.total_cxl_exposure
+            total_open_exposure = plan_status.total_open_exposure
+            total_fill_exposure = plan_status.total_fill_exposure
+            total_cxl_exposure = plan_status.total_cxl_exposure
             assert total_qty == chore_snapshot.chore_brief.qty, \
-                (f"Mismatched: expected strat_status.total_{side.lower()}_qty: "
+                (f"Mismatched: expected plan_status.total_{side.lower()}_qty: "
                  f"{chore_snapshot.chore_brief.qty}, found {total_qty=}")
             assert total_open_qty == 0, \
-                (f"Mismatched: expected strat_status total_open_{side.lower()}_qty: "
+                (f"Mismatched: expected plan_status total_open_{side.lower()}_qty: "
                  f"0, found {total_open_qty=}")
             assert (total_open_notional == 0), \
-                (f"Mismatched: expected strat_status.total_open_{side.lower()}_notional: "
+                (f"Mismatched: expected plan_status.total_open_{side.lower()}_notional: "
                  f"0, found {total_open_notional=}")
             assert (avg_open_px == 0), \
-                (f"Mismatched: expected strat_status.avg_open_{side.lower()}_px: "
+                (f"Mismatched: expected plan_status.avg_open_{side.lower()}_px: "
                  f"0, found {avg_open_px=}")
             assert (total_fill_qty == 0), \
-                (f"Mismatched: expected strat_status.total_fill_{side.lower()}_qty: "
+                (f"Mismatched: expected plan_status.total_fill_{side.lower()}_qty: "
                  f"0, found {total_fill_qty=}")
             assert (total_fill_notional == 0), \
-                (f"Mismatched: expected strat_status.total_fill_{side.lower()}_notional: "
+                (f"Mismatched: expected plan_status.total_fill_{side.lower()}_notional: "
                  f"0, found {total_fill_notional=}")
             assert (avg_fill_px == 0), \
-                (f"Mismatched: expected strat_status.avg_fill_{side.lower()}_px: "
+                (f"Mismatched: expected plan_status.avg_fill_{side.lower()}_px: "
                  f"0, found {avg_fill_px=}")
             assert (total_cxl_qty == qty), \
-                (f"Mismatched: expected strat_status.total_cxl_{side.lower()}_qty: "
+                (f"Mismatched: expected plan_status.total_cxl_{side.lower()}_qty: "
                  f"{qty}, found {total_cxl_qty=}")
             assert (total_cxl_notional == qty * get_px_in_usd(px)), \
-                (f"Mismatched: expected strat_status.total_cxl_{side.lower()}_notional: "
+                (f"Mismatched: expected plan_status.total_cxl_{side.lower()}_notional: "
                  f"{qty * get_px_in_usd(px)}, found {total_cxl_notional=}")
             assert (avg_cxl_px == px), \
-                (f"Mismatched: expected strat_status.avg_cxl_{side.lower()}_px: "
+                (f"Mismatched: expected plan_status.avg_cxl_{side.lower()}_px: "
                  f"{px}, found {avg_cxl_px=}")
             if side == Side.BUY:
                 assert (total_open_exposure == 0), \
-                    (f"Mismatched: expected strat_status.total_open_exposure: "
+                    (f"Mismatched: expected plan_status.total_open_exposure: "
                      f"0, found {total_open_exposure=}")
                 assert (total_fill_exposure == 0), \
-                    (f"Mismatched: expected strat_status.total_fill_exposure: "
+                    (f"Mismatched: expected plan_status.total_fill_exposure: "
                      f"0, found {total_fill_exposure=}")
                 assert (total_cxl_exposure == qty * get_px_in_usd(px)), \
-                    (f"Mismatched: expected strat_status.total_cxl_exposure: "
+                    (f"Mismatched: expected plan_status.total_cxl_exposure: "
                      f"{qty * get_px_in_usd(px)}, found {total_cxl_exposure=}")
             else:
                 assert (total_open_exposure == 0), \
-                    (f"Mismatched: expected strat_status.total_open_exposure: "
+                    (f"Mismatched: expected plan_status.total_open_exposure: "
                      f"0, found {total_open_exposure=}")
                 assert (total_fill_exposure == buy_qty * get_px_in_usd(buy_px)), \
-                    (f"Mismatched: expected strat_status.total_fill_exposure: "
+                    (f"Mismatched: expected plan_status.total_fill_exposure: "
                      f"{buy_qty * get_px_in_usd(px)}, found {total_fill_exposure=}")
                 assert (total_cxl_exposure == - qty * get_px_in_usd(px)), \
-                    (f"Mismatched: expected strat_status.total_cxl_exposure: "
+                    (f"Mismatched: expected plan_status.total_cxl_exposure: "
                      f"{- qty * get_px_in_usd(px)}, found {total_cxl_exposure=}")
 
-            portfolio_status = email_book_service_native_web_client.get_portfolio_status_client(1)
+            contact_status = email_book_service_native_web_client.get_contact_status_client(1)
             if side == Side.BUY:
-                overall_notional = portfolio_status.overall_buy_notional
+                overall_notional = contact_status.overall_buy_notional
             else:
-                overall_notional = portfolio_status.overall_sell_notional
+                overall_notional = contact_status.overall_sell_notional
             assert (overall_notional == 0), \
-                (f"Mismatched: expected portfolio_status.overall_{side.lower()}_notional: "
+                (f"Mismatched: expected contact_status.overall_{side.lower()}_notional: "
                  f"0, found {overall_notional=}")
 
             # applying ack leading to fulfill
@@ -5089,178 +5089,178 @@ def test_fulfill_post_unack_unsol_cxl(
                      f"{symbol_side_snapshot.last_update_fill_qty = }")
 
                 buy_last_barter_px, sell_last_barter_px = get_both_side_last_barter_px()
-                strat_limits = executor_http_client.get_strat_limits_client(1)
-                strat_brief = executor_http_client.get_strat_brief_client(active_pair_strat.id)
+                plan_limits = executor_http_client.get_plan_limits_client(1)
+                plan_brief = executor_http_client.get_plan_brief_client(active_pair_plan.id)
                 if side == Side.BUY:
-                    strat_brief_bartering_brief = strat_brief.pair_buy_side_bartering_brief
+                    plan_brief_bartering_brief = plan_brief.pair_buy_side_bartering_brief
                 else:
-                    strat_brief_bartering_brief = strat_brief.pair_sell_side_bartering_brief
-                assert (strat_brief_bartering_brief.open_qty == 0), \
-                    (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.open_qty: "
-                     f"0, found {strat_brief_bartering_brief.open_qty = }")
-                assert (strat_brief_bartering_brief.open_notional == 0), \
-                    (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.open_notional: "
-                     f"0, found {strat_brief_bartering_brief.open_notional = }")
-                assert (strat_brief_bartering_brief.residual_qty == 0), \
-                    (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.residual_qty: "
-                     f"0, found {strat_brief_bartering_brief.residual_qty = }")
-                assert (strat_brief_bartering_brief.consumable_open_chores == 5), \
-                    (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_open_chores: "
-                     f"5, found {strat_brief_bartering_brief.consumable_open_chores = }")
-                assert (strat_brief_bartering_brief.all_bkr_cxlled_qty == 0), \
-                    (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.all_bkr_cxlled_qty: "
-                     f"0, found {strat_brief_bartering_brief.all_bkr_cxlled_qty = }")
-                assert (strat_brief_bartering_brief.consumable_notional == (
-                        (strat_limits.max_single_leg_notional * hedge_ratio) - symbol_side_snapshot.total_fill_notional)), \
-                    (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_notional: "
-                     f"{(strat_limits.max_single_leg_notional * hedge_ratio) - symbol_side_snapshot.total_fill_notional}, "
-                     f"found {strat_brief_bartering_brief.consumable_notional = }")
-                assert (strat_brief_bartering_brief.consumable_open_notional == strat_limits.max_open_single_leg_notional), \
-                    (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_open_notional: "
-                     f"{strat_limits.max_open_single_leg_notional}, "
-                     f"found {strat_brief_bartering_brief.consumable_open_notional = }")
+                    plan_brief_bartering_brief = plan_brief.pair_sell_side_bartering_brief
+                assert (plan_brief_bartering_brief.open_qty == 0), \
+                    (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.open_qty: "
+                     f"0, found {plan_brief_bartering_brief.open_qty = }")
+                assert (plan_brief_bartering_brief.open_notional == 0), \
+                    (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.open_notional: "
+                     f"0, found {plan_brief_bartering_brief.open_notional = }")
+                assert (plan_brief_bartering_brief.residual_qty == 0), \
+                    (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.residual_qty: "
+                     f"0, found {plan_brief_bartering_brief.residual_qty = }")
+                assert (plan_brief_bartering_brief.consumable_open_chores == 5), \
+                    (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.consumable_open_chores: "
+                     f"5, found {plan_brief_bartering_brief.consumable_open_chores = }")
+                assert (plan_brief_bartering_brief.all_bkr_cxlled_qty == 0), \
+                    (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.all_bkr_cxlled_qty: "
+                     f"0, found {plan_brief_bartering_brief.all_bkr_cxlled_qty = }")
+                assert (plan_brief_bartering_brief.consumable_notional == (
+                        (plan_limits.max_single_leg_notional * hedge_ratio) - symbol_side_snapshot.total_fill_notional)), \
+                    (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.consumable_notional: "
+                     f"{(plan_limits.max_single_leg_notional * hedge_ratio) - symbol_side_snapshot.total_fill_notional}, "
+                     f"found {plan_brief_bartering_brief.consumable_notional = }")
+                assert (plan_brief_bartering_brief.consumable_open_notional == plan_limits.max_open_single_leg_notional), \
+                    (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.consumable_open_notional: "
+                     f"{plan_limits.max_open_single_leg_notional}, "
+                     f"found {plan_brief_bartering_brief.consumable_open_notional = }")
                 total_security_size: int = \
                     static_data.get_security_float_from_ticker(chore_snapshot.chore_brief.security.sec_id)
-                assert (strat_brief_bartering_brief.consumable_concentration == (
-                        (total_security_size / 100 * strat_limits.max_concentration) -
+                assert (plan_brief_bartering_brief.consumable_concentration == (
+                        (total_security_size / 100 * plan_limits.max_concentration) -
                         symbol_side_snapshot.total_filled_qty)), \
-                    (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_concentration: "
-                     f"{(total_security_size / 100 * strat_limits.max_concentration) - symbol_side_snapshot.total_filled_qty}, "
-                     f"found {strat_brief_bartering_brief.consumable_concentration = }")
-                assert (strat_brief_bartering_brief.consumable_cxl_qty == (
+                    (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.consumable_concentration: "
+                     f"{(total_security_size / 100 * plan_limits.max_concentration) - symbol_side_snapshot.total_filled_qty}, "
+                     f"found {plan_brief_bartering_brief.consumable_concentration = }")
+                assert (plan_brief_bartering_brief.consumable_cxl_qty == (
                         (((symbol_side_snapshot.total_filled_qty +
-                           symbol_side_snapshot.total_cxled_qty) / 100) * strat_limits.cancel_rate.max_cancel_rate) -
+                           symbol_side_snapshot.total_cxled_qty) / 100) * plan_limits.cancel_rate.max_cancel_rate) -
                         symbol_side_snapshot.total_cxled_qty)), \
-                    (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_cxl_qty: "
-                     f"{strat_limits.max_open_single_leg_notional}, "
-                     f"found {strat_brief_bartering_brief.consumable_cxl_qty = }")
+                    (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.consumable_cxl_qty: "
+                     f"{plan_limits.max_open_single_leg_notional}, "
+                     f"found {plan_brief_bartering_brief.consumable_cxl_qty = }")
                 other_side_residual_qty = 0
-                assert (strat_brief_bartering_brief.indicative_consumable_residual == (
-                        strat_limits.residual_restriction.max_residual -
-                        ((strat_brief_bartering_brief.residual_qty *
+                assert (plan_brief_bartering_brief.indicative_consumable_residual == (
+                        plan_limits.residual_restriction.max_residual -
+                        ((plan_brief_bartering_brief.residual_qty *
                           get_px_in_usd(current_last_barter_px)) - (
                                  other_side_residual_qty * get_px_in_usd(other_last_barter_px))))), \
-                    (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.indicative_consumable_residual: "
-                     f"{strat_limits.residual_restriction.max_residual - ((strat_brief_bartering_brief.residual_qty * get_px_in_usd(current_last_barter_px)) - (other_side_residual_qty * get_px_in_usd(other_last_barter_px)))}, "
-                     f"found {strat_brief_bartering_brief.indicative_consumable_residual = }")
+                    (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.indicative_consumable_residual: "
+                     f"{plan_limits.residual_restriction.max_residual - ((plan_brief_bartering_brief.residual_qty * get_px_in_usd(current_last_barter_px)) - (other_side_residual_qty * get_px_in_usd(other_last_barter_px)))}, "
+                     f"found {plan_brief_bartering_brief.indicative_consumable_residual = }")
 
                 if side == Side.BUY:
                     other_side_fill_notional = 0
                 else:
                     other_side_fill_notional = buy_symbol_side_snapshot.total_fill_notional
-                assert (strat_brief.consumable_nett_filled_notional == (
-                        strat_limits.max_net_filled_notional -
+                assert (plan_brief.consumable_nett_filled_notional == (
+                        plan_limits.max_net_filled_notional -
                         abs(symbol_side_snapshot.total_fill_notional - other_side_fill_notional))), \
                     (
-                        f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief."
-                        f"consumable_nett_filled_notional: {strat_limits.max_open_single_leg_notional}, "
-                        f"found {strat_brief.consumable_nett_filled_notional = }")
+                        f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief."
+                        f"consumable_nett_filled_notional: {plan_limits.max_open_single_leg_notional}, "
+                        f"found {plan_brief.consumable_nett_filled_notional = }")
 
-                strat_status = executor_http_client.get_strat_status_client(active_pair_strat.id)
+                plan_status = executor_http_client.get_plan_status_client(active_pair_plan.id)
                 if side == Side.BUY:
-                    total_qty = strat_status.total_buy_qty
-                    total_open_qty = strat_status.total_open_buy_qty
-                    total_open_notional = strat_status.total_open_buy_notional
-                    avg_open_px = strat_status.avg_open_buy_px
-                    total_fill_qty = strat_status.total_fill_buy_qty
-                    total_fill_notional = strat_status.total_fill_buy_notional
-                    avg_fill_px = strat_status.avg_fill_buy_px
-                    total_cxl_qty = strat_status.total_cxl_buy_qty
-                    total_cxl_notional = strat_status.total_cxl_buy_notional
-                    avg_cxl_px = strat_status.avg_cxl_buy_px
+                    total_qty = plan_status.total_buy_qty
+                    total_open_qty = plan_status.total_open_buy_qty
+                    total_open_notional = plan_status.total_open_buy_notional
+                    avg_open_px = plan_status.avg_open_buy_px
+                    total_fill_qty = plan_status.total_fill_buy_qty
+                    total_fill_notional = plan_status.total_fill_buy_notional
+                    avg_fill_px = plan_status.avg_fill_buy_px
+                    total_cxl_qty = plan_status.total_cxl_buy_qty
+                    total_cxl_notional = plan_status.total_cxl_buy_notional
+                    avg_cxl_px = plan_status.avg_cxl_buy_px
                 else:
-                    total_qty = strat_status.total_sell_qty
-                    total_open_qty = strat_status.total_open_sell_qty
-                    total_open_notional = strat_status.total_open_sell_notional
-                    avg_open_px = strat_status.avg_open_sell_px
-                    total_fill_qty = strat_status.total_fill_sell_qty
-                    total_fill_notional = strat_status.total_fill_sell_notional
-                    avg_fill_px = strat_status.avg_fill_sell_px
-                    total_cxl_qty = strat_status.total_cxl_sell_qty
-                    total_cxl_notional = strat_status.total_cxl_sell_notional
-                    avg_cxl_px = strat_status.avg_cxl_sell_px
+                    total_qty = plan_status.total_sell_qty
+                    total_open_qty = plan_status.total_open_sell_qty
+                    total_open_notional = plan_status.total_open_sell_notional
+                    avg_open_px = plan_status.avg_open_sell_px
+                    total_fill_qty = plan_status.total_fill_sell_qty
+                    total_fill_notional = plan_status.total_fill_sell_notional
+                    avg_fill_px = plan_status.avg_fill_sell_px
+                    total_cxl_qty = plan_status.total_cxl_sell_qty
+                    total_cxl_notional = plan_status.total_cxl_sell_notional
+                    avg_cxl_px = plan_status.avg_cxl_sell_px
 
-                total_open_exposure = strat_status.total_open_exposure
-                total_fill_exposure = strat_status.total_fill_exposure
-                total_cxl_exposure = strat_status.total_cxl_exposure
+                total_open_exposure = plan_status.total_open_exposure
+                total_fill_exposure = plan_status.total_fill_exposure
+                total_cxl_exposure = plan_status.total_cxl_exposure
                 assert total_qty == qty, \
-                    (f"Mismatched: expected strat_status.total_{side.lower()}_qty: "
+                    (f"Mismatched: expected plan_status.total_{side.lower()}_qty: "
                      f"{qty}, found {total_qty = }")
                 assert total_open_qty == 0, \
-                    (f"Mismatched: expected strat_status total_open_{side.lower()}_qty: "
+                    (f"Mismatched: expected plan_status total_open_{side.lower()}_qty: "
                      f"0, found {total_open_qty = }")
                 assert (total_open_notional == 0), \
-                    (f"Mismatched: expected strat_status.total_open_{side.lower()}_notional: "
+                    (f"Mismatched: expected plan_status.total_open_{side.lower()}_notional: "
                      f"0, found {total_open_notional = }")
                 assert (avg_open_px == 0), \
-                    (f"Mismatched: expected strat_status.avg_open_{side.lower()}_px: "
+                    (f"Mismatched: expected plan_status.avg_open_{side.lower()}_px: "
                      f"0, found {avg_open_px = }")
                 assert (total_fill_qty == qty), \
-                    (f"Mismatched: expected strat_status.total_fill_{side.lower()}_qty: "
+                    (f"Mismatched: expected plan_status.total_fill_{side.lower()}_qty: "
                      f"{qty}, found {total_fill_qty = }")
                 assert (total_fill_notional == qty * get_px_in_usd(px)), \
-                    (f"Mismatched: expected strat_status.total_fill_{side.lower()}_notional: "
+                    (f"Mismatched: expected plan_status.total_fill_{side.lower()}_notional: "
                      f"{qty * get_px_in_usd(px)}, found {total_fill_notional = }")
                 assert (avg_fill_px == px), \
-                    (f"Mismatched: expected strat_status.avg_fill_{side.lower()}_px: "
+                    (f"Mismatched: expected plan_status.avg_fill_{side.lower()}_px: "
                      f"{px}, found {avg_fill_px = }")
                 assert (total_cxl_qty == 0), \
-                    (f"Mismatched: expected strat_status.total_cxl_{side.lower()}_qty: "
+                    (f"Mismatched: expected plan_status.total_cxl_{side.lower()}_qty: "
                      f"0, found {total_cxl_qty = }")
                 assert (total_cxl_notional == 0), \
-                    (f"Mismatched: expected strat_status.total_cxl_{side.lower()}_notional: "
+                    (f"Mismatched: expected plan_status.total_cxl_{side.lower()}_notional: "
                      f"0, found {total_cxl_notional = }")
                 assert (avg_cxl_px == 0), \
-                    (f"Mismatched: expected strat_status.avg_cxl_{side.lower()}_px: "
+                    (f"Mismatched: expected plan_status.avg_cxl_{side.lower()}_px: "
                      f"0, found {avg_cxl_px = }")
                 if side == Side.BUY:
                     assert (total_open_exposure == 0), \
-                        (f"Mismatched: expected strat_status.total_open_exposure: "
+                        (f"Mismatched: expected plan_status.total_open_exposure: "
                          f"0, found {total_open_exposure = }")
                     assert (total_fill_exposure == qty * get_px_in_usd(px)), \
-                        (f"Mismatched: expected strat_status.total_fill_exposure: "
+                        (f"Mismatched: expected plan_status.total_fill_exposure: "
                          f"{qty * get_px_in_usd(px)}, found {total_fill_exposure = }")
                     assert (total_cxl_exposure == 0), \
-                        (f"Mismatched: expected strat_status.total_cxl_exposure: "
+                        (f"Mismatched: expected plan_status.total_cxl_exposure: "
                          f"0, found {total_cxl_exposure = }")
                 else:
                     assert (total_open_exposure == 0), \
-                        (f"Mismatched: expected strat_status.total_open_exposure: "
+                        (f"Mismatched: expected plan_status.total_open_exposure: "
                          f"0, found {total_open_exposure = }")
                     assert (total_fill_exposure == (
                             buy_qty * get_px_in_usd(buy_px) - qty * get_px_in_usd(px))), \
-                        (f"Mismatched: expected strat_status.total_fill_exposure: "
+                        (f"Mismatched: expected plan_status.total_fill_exposure: "
                          f"{buy_qty * get_px_in_usd(buy_px) - qty * get_px_in_usd(px)}, "
                          f"found {total_fill_exposure = }")
                     assert (total_cxl_exposure == 0), \
-                        (f"Mismatched: expected strat_status.total_cxl_exposure: "
+                        (f"Mismatched: expected plan_status.total_cxl_exposure: "
                          f"0, found {total_cxl_exposure = }")
 
-                portfolio_status = email_book_service_native_web_client.get_portfolio_status_client(1)
+                contact_status = email_book_service_native_web_client.get_contact_status_client(1)
                 if side == Side.BUY:
-                    overall_notional = portfolio_status.overall_buy_notional
+                    overall_notional = contact_status.overall_buy_notional
                 else:
-                    overall_notional = portfolio_status.overall_sell_notional
+                    overall_notional = contact_status.overall_sell_notional
                 assert (overall_notional == qty * get_px_in_usd(px)), \
-                    (f"Mismatched: expected portfolio_status.overall_{side.lower()}_notional: "
+                    (f"Mismatched: expected contact_status.overall_{side.lower()}_notional: "
                      f"{qty * get_px_in_usd(px)}, found {overall_notional = }")
 
-            # Checking alert in strat_alert
+            # Checking alert in plan_alert
             time.sleep(2)
             if executor_config_dict.get("pause_fulfill_post_chore_dod"):
                 check_str = ("Unexpected: Received fill that makes chore_snapshot OE_FILLED which is already of "
-                             "state OE_DOD, ignoring this fill and putting this strat to PAUSE")
+                             "state OE_DOD, ignoring this fill and putting this plan to PAUSE")
                 time.sleep(2)
 
-                pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat.id)
-                assert pair_strat.strat_state == StratState.StratState_PAUSED, \
-                    f"Mismatch: pair_strat must have strat_state PAUSED but found {pair_strat.strat_state = }"
+                pair_plan = email_book_service_native_web_client.get_pair_plan_client(active_pair_plan.id)
+                assert pair_plan.plan_state == PlanState.PlanState_PAUSED, \
+                    f"Mismatch: pair_plan must have plan_state PAUSED but found {pair_plan.plan_state = }"
             else:
                 check_str = "Received fill that makes chore_snapshot OE_FILLED which is already of state OE_DOD"
                 time.sleep(2)
 
-            assert_fail_msg = f"Can't find alert of {check_str} in neither strat_alert nor portfolio_alert"
-            check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+            assert_fail_msg = f"Can't find alert of {check_str} in neither plan_alert nor contact_alert"
+            check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -5275,19 +5275,19 @@ def test_fulfill_post_unack_unsol_cxl(
 
 @pytest.mark.nightly
 def test_overfill_post_unack_unsol_cxl(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+        expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         last_barter_fixture_list, market_depth_basemodel_list,
         buy_chore_, sell_chore_, max_loop_count_per_side, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -5313,7 +5313,7 @@ def test_overfill_post_unack_unsol_cxl(
                 buy_overfill_qty = overfill_qty
                 buy_px = px
 
-            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             latest_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW, chore_symbol,
@@ -5386,53 +5386,53 @@ def test_overfill_post_unack_unsol_cxl(
                  f"{symbol_side_snapshot.last_update_fill_qty = }")
 
             buy_last_barter_px, sell_last_barter_px = get_both_side_last_barter_px()
-            strat_limits = executor_http_client.get_strat_limits_client(1)
-            strat_brief = executor_http_client.get_strat_brief_client(active_pair_strat.id)
+            plan_limits = executor_http_client.get_plan_limits_client(1)
+            plan_brief = executor_http_client.get_plan_brief_client(active_pair_plan.id)
             if side == Side.BUY:
-                strat_brief_bartering_brief = strat_brief.pair_buy_side_bartering_brief
+                plan_brief_bartering_brief = plan_brief.pair_buy_side_bartering_brief
                 hedge_ratio = 1
             else:
-                strat_brief_bartering_brief = strat_brief.pair_sell_side_bartering_brief
-                hedge_ratio = active_pair_strat.pair_strat_params.hedge_ratio
-            assert (strat_brief_bartering_brief.open_qty == 0), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.open_qty: "
-                 f"0, found {strat_brief_bartering_brief.open_qty = }")
-            assert (strat_brief_bartering_brief.open_notional == 0), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.open_notional: "
-                 f"0, found {strat_brief_bartering_brief.open_notional = }")
-            assert (strat_brief_bartering_brief.residual_qty == chore_snapshot.cxled_qty), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.residual_qty: "
-                 f"{chore_snapshot.cxled_qty}, found {strat_brief_bartering_brief.open_notional = }")
-            assert (strat_brief_bartering_brief.consumable_open_chores == 5), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_open_chores: "
-                 f"5, found {strat_brief_bartering_brief.consumable_open_chores = }")
-            assert (strat_brief_bartering_brief.all_bkr_cxlled_qty == chore_snapshot.cxled_qty), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.all_bkr_cxlled_qty: "
-                 f"{chore_snapshot.cxled_qty}, found {strat_brief_bartering_brief.all_bkr_cxlled_qty = }")
-            assert (strat_brief_bartering_brief.consumable_notional == (
-                    (strat_limits.max_single_leg_notional * hedge_ratio) - symbol_side_snapshot.total_fill_notional)), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_notional: "
-                 f"{(strat_limits.max_single_leg_notional * hedge_ratio) - symbol_side_snapshot.total_fill_notional}, "
-                 f"found {strat_brief_bartering_brief.consumable_notional = }")
-            assert (strat_brief_bartering_brief.consumable_open_notional == strat_limits.max_open_single_leg_notional), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_open_notional: "
-                 f"{strat_limits.max_open_single_leg_notional}, "
-                 f"found {strat_brief_bartering_brief.consumable_open_notional = }")
+                plan_brief_bartering_brief = plan_brief.pair_sell_side_bartering_brief
+                hedge_ratio = active_pair_plan.pair_plan_params.hedge_ratio
+            assert (plan_brief_bartering_brief.open_qty == 0), \
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.open_qty: "
+                 f"0, found {plan_brief_bartering_brief.open_qty = }")
+            assert (plan_brief_bartering_brief.open_notional == 0), \
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.open_notional: "
+                 f"0, found {plan_brief_bartering_brief.open_notional = }")
+            assert (plan_brief_bartering_brief.residual_qty == chore_snapshot.cxled_qty), \
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.residual_qty: "
+                 f"{chore_snapshot.cxled_qty}, found {plan_brief_bartering_brief.open_notional = }")
+            assert (plan_brief_bartering_brief.consumable_open_chores == 5), \
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.consumable_open_chores: "
+                 f"5, found {plan_brief_bartering_brief.consumable_open_chores = }")
+            assert (plan_brief_bartering_brief.all_bkr_cxlled_qty == chore_snapshot.cxled_qty), \
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.all_bkr_cxlled_qty: "
+                 f"{chore_snapshot.cxled_qty}, found {plan_brief_bartering_brief.all_bkr_cxlled_qty = }")
+            assert (plan_brief_bartering_brief.consumable_notional == (
+                    (plan_limits.max_single_leg_notional * hedge_ratio) - symbol_side_snapshot.total_fill_notional)), \
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.consumable_notional: "
+                 f"{(plan_limits.max_single_leg_notional * hedge_ratio) - symbol_side_snapshot.total_fill_notional}, "
+                 f"found {plan_brief_bartering_brief.consumable_notional = }")
+            assert (plan_brief_bartering_brief.consumable_open_notional == plan_limits.max_open_single_leg_notional), \
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.consumable_open_notional: "
+                 f"{plan_limits.max_open_single_leg_notional}, "
+                 f"found {plan_brief_bartering_brief.consumable_open_notional = }")
             total_security_size: int = \
                 static_data.get_security_float_from_ticker(chore_snapshot.chore_brief.security.sec_id)
-            assert (strat_brief_bartering_brief.consumable_concentration == (
-                    (total_security_size / 100 * strat_limits.max_concentration) -
+            assert (plan_brief_bartering_brief.consumable_concentration == (
+                    (total_security_size / 100 * plan_limits.max_concentration) -
                     symbol_side_snapshot.total_filled_qty)), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_concentration: "
-                 f"{(total_security_size / 100 * strat_limits.max_concentration) - symbol_side_snapshot.total_filled_qty}, "
-                 f"found {strat_brief_bartering_brief.consumable_concentration = }")
-            assert (strat_brief_bartering_brief.consumable_cxl_qty == (
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.consumable_concentration: "
+                 f"{(total_security_size / 100 * plan_limits.max_concentration) - symbol_side_snapshot.total_filled_qty}, "
+                 f"found {plan_brief_bartering_brief.consumable_concentration = }")
+            assert (plan_brief_bartering_brief.consumable_cxl_qty == (
                     (((symbol_side_snapshot.total_filled_qty +
-                       symbol_side_snapshot.total_cxled_qty) / 100) * strat_limits.cancel_rate.max_cancel_rate) -
+                       symbol_side_snapshot.total_cxled_qty) / 100) * plan_limits.cancel_rate.max_cancel_rate) -
                     symbol_side_snapshot.total_cxled_qty)), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_cxl_qty: "
-                 f"{strat_limits.max_open_single_leg_notional}, "
-                 f"found {strat_brief_bartering_brief.consumable_cxl_qty = }")
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.consumable_cxl_qty: "
+                 f"{plan_limits.max_open_single_leg_notional}, "
+                 f"found {plan_brief_bartering_brief.consumable_cxl_qty = }")
             other_side_residual_qty = 0
             if side == Side.BUY:
                 current_last_barter_px = buy_last_barter_px
@@ -5440,111 +5440,111 @@ def test_overfill_post_unack_unsol_cxl(
             else:
                 current_last_barter_px = sell_last_barter_px
                 other_last_barter_px = buy_last_barter_px
-            assert (strat_brief_bartering_brief.indicative_consumable_residual == (
-                    strat_limits.residual_restriction.max_residual -
-                    ((strat_brief_bartering_brief.residual_qty *
+            assert (plan_brief_bartering_brief.indicative_consumable_residual == (
+                    plan_limits.residual_restriction.max_residual -
+                    ((plan_brief_bartering_brief.residual_qty *
                       get_px_in_usd(current_last_barter_px)) - (
                             other_side_residual_qty * get_px_in_usd(other_last_barter_px))))), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.indicative_consumable_residual: "
-                 f"{strat_limits.residual_restriction.max_residual - ((strat_brief_bartering_brief.residual_qty * get_px_in_usd(current_last_barter_px)) - (other_side_residual_qty * get_px_in_usd(other_last_barter_px)))}, "
-                 f"found {strat_brief_bartering_brief.indicative_consumable_residual = }")
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.indicative_consumable_residual: "
+                 f"{plan_limits.residual_restriction.max_residual - ((plan_brief_bartering_brief.residual_qty * get_px_in_usd(current_last_barter_px)) - (other_side_residual_qty * get_px_in_usd(other_last_barter_px)))}, "
+                 f"found {plan_brief_bartering_brief.indicative_consumable_residual = }")
 
             if side == Side.BUY:
                 other_side_fill_notional = 0
             else:
                 other_side_fill_notional = buy_symbol_side_snapshot.total_fill_notional
-            assert (strat_brief.consumable_nett_filled_notional == (
-                    strat_limits.max_net_filled_notional -
+            assert (plan_brief.consumable_nett_filled_notional == (
+                    plan_limits.max_net_filled_notional -
                     abs(symbol_side_snapshot.total_fill_notional - other_side_fill_notional))), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief."
-                 f"consumable_nett_filled_notional: {strat_limits.max_open_single_leg_notional}, "
-                 f"found {strat_brief.consumable_nett_filled_notional=}")
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief."
+                 f"consumable_nett_filled_notional: {plan_limits.max_open_single_leg_notional}, "
+                 f"found {plan_brief.consumable_nett_filled_notional=}")
 
-            strat_status = executor_http_client.get_strat_status_client(active_pair_strat.id)
+            plan_status = executor_http_client.get_plan_status_client(active_pair_plan.id)
             if side == Side.BUY:
-                total_qty = strat_status.total_buy_qty
-                total_open_qty = strat_status.total_open_buy_qty
-                total_open_notional = strat_status.total_open_buy_notional
-                avg_open_px = strat_status.avg_open_buy_px
-                total_fill_qty = strat_status.total_fill_buy_qty
-                total_fill_notional = strat_status.total_fill_buy_notional
-                avg_fill_px = strat_status.avg_fill_buy_px
-                total_cxl_qty = strat_status.total_cxl_buy_qty
-                total_cxl_notional = strat_status.total_cxl_buy_notional
-                avg_cxl_px = strat_status.avg_cxl_buy_px
+                total_qty = plan_status.total_buy_qty
+                total_open_qty = plan_status.total_open_buy_qty
+                total_open_notional = plan_status.total_open_buy_notional
+                avg_open_px = plan_status.avg_open_buy_px
+                total_fill_qty = plan_status.total_fill_buy_qty
+                total_fill_notional = plan_status.total_fill_buy_notional
+                avg_fill_px = plan_status.avg_fill_buy_px
+                total_cxl_qty = plan_status.total_cxl_buy_qty
+                total_cxl_notional = plan_status.total_cxl_buy_notional
+                avg_cxl_px = plan_status.avg_cxl_buy_px
             else:
-                total_qty = strat_status.total_sell_qty
-                total_open_qty = strat_status.total_open_sell_qty
-                total_open_notional = strat_status.total_open_sell_notional
-                avg_open_px = strat_status.avg_open_sell_px
-                total_fill_qty = strat_status.total_fill_sell_qty
-                total_fill_notional = strat_status.total_fill_sell_notional
-                avg_fill_px = strat_status.avg_fill_sell_px
-                total_cxl_qty = strat_status.total_cxl_sell_qty
-                total_cxl_notional = strat_status.total_cxl_sell_notional
-                avg_cxl_px = strat_status.avg_cxl_sell_px
+                total_qty = plan_status.total_sell_qty
+                total_open_qty = plan_status.total_open_sell_qty
+                total_open_notional = plan_status.total_open_sell_notional
+                avg_open_px = plan_status.avg_open_sell_px
+                total_fill_qty = plan_status.total_fill_sell_qty
+                total_fill_notional = plan_status.total_fill_sell_notional
+                avg_fill_px = plan_status.avg_fill_sell_px
+                total_cxl_qty = plan_status.total_cxl_sell_qty
+                total_cxl_notional = plan_status.total_cxl_sell_notional
+                avg_cxl_px = plan_status.avg_cxl_sell_px
 
-            total_open_exposure = strat_status.total_open_exposure
-            total_fill_exposure = strat_status.total_fill_exposure
-            total_cxl_exposure = strat_status.total_cxl_exposure
+            total_open_exposure = plan_status.total_open_exposure
+            total_fill_exposure = plan_status.total_fill_exposure
+            total_cxl_exposure = plan_status.total_cxl_exposure
             assert total_qty == chore_snapshot.chore_brief.qty, \
-                (f"Mismatched: expected strat_status.total_{side.lower()}_qty: "
+                (f"Mismatched: expected plan_status.total_{side.lower()}_qty: "
                  f"{chore_snapshot.chore_brief.qty}, found {total_qty = }")
             assert total_open_qty == 0, \
-                (f"Mismatched: expected strat_status total_open_{side.lower()}_qty: "
+                (f"Mismatched: expected plan_status total_open_{side.lower()}_qty: "
                  f"0, found {total_open_qty = }")
             assert (total_open_notional == 0), \
-                (f"Mismatched: expected strat_status.total_open_{side.lower()}_notional: "
+                (f"Mismatched: expected plan_status.total_open_{side.lower()}_notional: "
                  f"0, found {total_open_notional = }")
             assert (avg_open_px == 0), \
-                (f"Mismatched: expected strat_status.avg_open_{side.lower()}_px: "
+                (f"Mismatched: expected plan_status.avg_open_{side.lower()}_px: "
                  f"0, found {avg_open_px = }")
             assert (total_fill_qty == 0), \
-                (f"Mismatched: expected strat_status.total_fill_{side.lower()}_qty: "
+                (f"Mismatched: expected plan_status.total_fill_{side.lower()}_qty: "
                  f"0, found {total_fill_qty = }")
             assert (total_fill_notional == 0), \
-                (f"Mismatched: expected strat_status.total_fill_{side.lower()}_notional: "
+                (f"Mismatched: expected plan_status.total_fill_{side.lower()}_notional: "
                  f"0, found {total_fill_notional = }")
             assert (avg_fill_px == 0), \
-                (f"Mismatched: expected strat_status.avg_fill_{side.lower()}_px: "
+                (f"Mismatched: expected plan_status.avg_fill_{side.lower()}_px: "
                  f"0, found {avg_fill_px = }")
             assert (total_cxl_qty == qty), \
-                (f"Mismatched: expected strat_status.total_cxl_{side.lower()}_qty: "
+                (f"Mismatched: expected plan_status.total_cxl_{side.lower()}_qty: "
                  f"{qty}, found {total_cxl_qty = }")
             assert (total_cxl_notional == qty * get_px_in_usd(px)), \
-                (f"Mismatched: expected strat_status.total_cxl_{side.lower()}_notional: "
+                (f"Mismatched: expected plan_status.total_cxl_{side.lower()}_notional: "
                  f"{qty * get_px_in_usd(px)}, found {total_cxl_notional = }")
             assert (avg_cxl_px == px), \
-                (f"Mismatched: expected strat_status.avg_cxl_{side.lower()}_px: "
+                (f"Mismatched: expected plan_status.avg_cxl_{side.lower()}_px: "
                  f"{px}, found {avg_cxl_px = }")
             if side == Side.BUY:
                 assert (total_open_exposure == 0), \
-                    (f"Mismatched: expected strat_status.total_open_exposure: "
+                    (f"Mismatched: expected plan_status.total_open_exposure: "
                      f"0, found {total_open_exposure = }")
                 assert (total_fill_exposure == 0), \
-                    (f"Mismatched: expected strat_status.total_fill_exposure: "
+                    (f"Mismatched: expected plan_status.total_fill_exposure: "
                      f"0, found {total_fill_exposure = }")
                 assert (total_cxl_exposure == qty * get_px_in_usd(px)), \
-                    (f"Mismatched: expected strat_status.total_cxl_exposure: "
+                    (f"Mismatched: expected plan_status.total_cxl_exposure: "
                      f"{qty * get_px_in_usd(px)}, found {total_cxl_exposure = }")
             else:
                 assert (total_open_exposure == 0), \
-                    (f"Mismatched: expected strat_status.total_open_exposure: "
+                    (f"Mismatched: expected plan_status.total_open_exposure: "
                      f"0, found {total_open_exposure = }")
                 assert (total_fill_exposure == buy_overfill_qty * get_px_in_usd(buy_px)), \
-                    (f"Mismatched: expected strat_status.total_fill_exposure: "
+                    (f"Mismatched: expected plan_status.total_fill_exposure: "
                      f"{buy_overfill_qty * get_px_in_usd(px)}, found {total_fill_exposure = }")
                 assert (total_cxl_exposure == - qty * get_px_in_usd(px)), \
-                    (f"Mismatched: expected strat_status.total_cxl_exposure: "
+                    (f"Mismatched: expected plan_status.total_cxl_exposure: "
                      f"{- qty * get_px_in_usd(px)}, found {total_cxl_exposure = }")
 
-            portfolio_status = email_book_service_native_web_client.get_portfolio_status_client(1)
+            contact_status = email_book_service_native_web_client.get_contact_status_client(1)
             if side == Side.BUY:
-                overall_notional = portfolio_status.overall_buy_notional
+                overall_notional = contact_status.overall_buy_notional
             else:
-                overall_notional = portfolio_status.overall_sell_notional
+                overall_notional = contact_status.overall_sell_notional
             assert (overall_notional == 0), \
-                (f"Mismatched: expected portfolio_status.overall_{side.lower()}_notional: "
+                (f"Mismatched: expected contact_status.overall_{side.lower()}_notional: "
                  f"0, found {overall_notional = }")
 
             # applying ack leading to overfill
@@ -5616,173 +5616,173 @@ def test_overfill_post_unack_unsol_cxl(
                  f"{symbol_side_snapshot.last_update_fill_qty = }")
 
             buy_last_barter_px, sell_last_barter_px = get_both_side_last_barter_px()
-            strat_limits = executor_http_client.get_strat_limits_client(1)
-            strat_brief = executor_http_client.get_strat_brief_client(active_pair_strat.id)
+            plan_limits = executor_http_client.get_plan_limits_client(1)
+            plan_brief = executor_http_client.get_plan_brief_client(active_pair_plan.id)
             if side == Side.BUY:
-                strat_brief_bartering_brief = strat_brief.pair_buy_side_bartering_brief
+                plan_brief_bartering_brief = plan_brief.pair_buy_side_bartering_brief
             else:
-                strat_brief_bartering_brief = strat_brief.pair_sell_side_bartering_brief
-            assert (strat_brief_bartering_brief.open_qty == 0), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.open_qty: "
-                 f"0, found {strat_brief_bartering_brief.open_qty = }")
-            assert (strat_brief_bartering_brief.open_notional == 0), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.open_notional: "
-                 f"0, found {strat_brief_bartering_brief.open_notional = }")
-            assert (strat_brief_bartering_brief.residual_qty == 0), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.residual_qty: "
-                 f"0, found {strat_brief_bartering_brief.residual_qty = }")
-            assert (strat_brief_bartering_brief.consumable_open_chores == 5), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_open_chores: "
-                 f"5, found {strat_brief_bartering_brief.consumable_open_chores = }")
-            assert (strat_brief_bartering_brief.all_bkr_cxlled_qty == 0), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.all_bkr_cxlled_qty: "
-                 f"0, found {strat_brief_bartering_brief.all_bkr_cxlled_qty = }")
-            assert (strat_brief_bartering_brief.consumable_notional == (
-                    (strat_limits.max_single_leg_notional * hedge_ratio) - symbol_side_snapshot.total_fill_notional)), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_notional: "
-                 f"{(strat_limits.max_single_leg_notional * hedge_ratio) - symbol_side_snapshot.total_fill_notional}, "
-                 f"found {strat_brief_bartering_brief.consumable_notional = }")
-            assert (strat_brief_bartering_brief.consumable_open_notional == strat_limits.max_open_single_leg_notional), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_open_notional: "
-                 f"{strat_limits.max_open_single_leg_notional}, "
-                 f"found {strat_brief_bartering_brief.consumable_open_notional = }")
+                plan_brief_bartering_brief = plan_brief.pair_sell_side_bartering_brief
+            assert (plan_brief_bartering_brief.open_qty == 0), \
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.open_qty: "
+                 f"0, found {plan_brief_bartering_brief.open_qty = }")
+            assert (plan_brief_bartering_brief.open_notional == 0), \
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.open_notional: "
+                 f"0, found {plan_brief_bartering_brief.open_notional = }")
+            assert (plan_brief_bartering_brief.residual_qty == 0), \
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.residual_qty: "
+                 f"0, found {plan_brief_bartering_brief.residual_qty = }")
+            assert (plan_brief_bartering_brief.consumable_open_chores == 5), \
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.consumable_open_chores: "
+                 f"5, found {plan_brief_bartering_brief.consumable_open_chores = }")
+            assert (plan_brief_bartering_brief.all_bkr_cxlled_qty == 0), \
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.all_bkr_cxlled_qty: "
+                 f"0, found {plan_brief_bartering_brief.all_bkr_cxlled_qty = }")
+            assert (plan_brief_bartering_brief.consumable_notional == (
+                    (plan_limits.max_single_leg_notional * hedge_ratio) - symbol_side_snapshot.total_fill_notional)), \
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.consumable_notional: "
+                 f"{(plan_limits.max_single_leg_notional * hedge_ratio) - symbol_side_snapshot.total_fill_notional}, "
+                 f"found {plan_brief_bartering_brief.consumable_notional = }")
+            assert (plan_brief_bartering_brief.consumable_open_notional == plan_limits.max_open_single_leg_notional), \
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.consumable_open_notional: "
+                 f"{plan_limits.max_open_single_leg_notional}, "
+                 f"found {plan_brief_bartering_brief.consumable_open_notional = }")
             total_security_size: int = \
                 static_data.get_security_float_from_ticker(chore_snapshot.chore_brief.security.sec_id)
-            assert (strat_brief_bartering_brief.consumable_concentration == (
-                    (total_security_size / 100 * strat_limits.max_concentration) -
+            assert (plan_brief_bartering_brief.consumable_concentration == (
+                    (total_security_size / 100 * plan_limits.max_concentration) -
                     symbol_side_snapshot.total_filled_qty)), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_concentration: "
-                 f"{(total_security_size / 100 * strat_limits.max_concentration) - symbol_side_snapshot.total_filled_qty}, "
-                 f"found {strat_brief_bartering_brief.consumable_concentration = }")
-            assert (strat_brief_bartering_brief.consumable_cxl_qty == (
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.consumable_concentration: "
+                 f"{(total_security_size / 100 * plan_limits.max_concentration) - symbol_side_snapshot.total_filled_qty}, "
+                 f"found {plan_brief_bartering_brief.consumable_concentration = }")
+            assert (plan_brief_bartering_brief.consumable_cxl_qty == (
                     (((symbol_side_snapshot.total_filled_qty +
-                       symbol_side_snapshot.total_cxled_qty) / 100) * strat_limits.cancel_rate.max_cancel_rate) -
+                       symbol_side_snapshot.total_cxled_qty) / 100) * plan_limits.cancel_rate.max_cancel_rate) -
                     symbol_side_snapshot.total_cxled_qty)), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_cxl_qty: "
-                 f"{strat_limits.max_open_single_leg_notional}, "
-                 f"found {strat_brief_bartering_brief.consumable_cxl_qty = }")
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.consumable_cxl_qty: "
+                 f"{plan_limits.max_open_single_leg_notional}, "
+                 f"found {plan_brief_bartering_brief.consumable_cxl_qty = }")
             other_side_residual_qty = 0
-            assert (strat_brief_bartering_brief.indicative_consumable_residual == (
-                    strat_limits.residual_restriction.max_residual -
-                    ((strat_brief_bartering_brief.residual_qty *
+            assert (plan_brief_bartering_brief.indicative_consumable_residual == (
+                    plan_limits.residual_restriction.max_residual -
+                    ((plan_brief_bartering_brief.residual_qty *
                       get_px_in_usd(current_last_barter_px)) - (
                              other_side_residual_qty * get_px_in_usd(other_last_barter_px))))), \
-                (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.indicative_consumable_residual: "
-                 f"{strat_limits.residual_restriction.max_residual - ((strat_brief_bartering_brief.residual_qty * get_px_in_usd(current_last_barter_px)) - (other_side_residual_qty * get_px_in_usd(other_last_barter_px)))}, "
-                 f"found {strat_brief_bartering_brief.indicative_consumable_residual = }")
+                (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.indicative_consumable_residual: "
+                 f"{plan_limits.residual_restriction.max_residual - ((plan_brief_bartering_brief.residual_qty * get_px_in_usd(current_last_barter_px)) - (other_side_residual_qty * get_px_in_usd(other_last_barter_px)))}, "
+                 f"found {plan_brief_bartering_brief.indicative_consumable_residual = }")
 
             if side == Side.BUY:
                 other_side_fill_notional = 0
             else:
                 other_side_fill_notional = buy_symbol_side_snapshot.total_fill_notional
-            assert (strat_brief.consumable_nett_filled_notional == (
-                    strat_limits.max_net_filled_notional -
+            assert (plan_brief.consumable_nett_filled_notional == (
+                    plan_limits.max_net_filled_notional -
                     abs(symbol_side_snapshot.total_fill_notional - other_side_fill_notional))), \
                 (
-                    f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief."
-                    f"consumable_nett_filled_notional: {strat_limits.max_open_single_leg_notional}, "
-                    f"found {strat_brief.consumable_nett_filled_notional=}")
+                    f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief."
+                    f"consumable_nett_filled_notional: {plan_limits.max_open_single_leg_notional}, "
+                    f"found {plan_brief.consumable_nett_filled_notional=}")
 
-            strat_status = executor_http_client.get_strat_status_client(active_pair_strat.id)
+            plan_status = executor_http_client.get_plan_status_client(active_pair_plan.id)
             if side == Side.BUY:
-                total_qty = strat_status.total_buy_qty
-                total_open_qty = strat_status.total_open_buy_qty
-                total_open_notional = strat_status.total_open_buy_notional
-                avg_open_px = strat_status.avg_open_buy_px
-                total_fill_qty = strat_status.total_fill_buy_qty
-                total_fill_notional = strat_status.total_fill_buy_notional
-                avg_fill_px = strat_status.avg_fill_buy_px
-                total_cxl_qty = strat_status.total_cxl_buy_qty
-                total_cxl_notional = strat_status.total_cxl_buy_notional
-                avg_cxl_px = strat_status.avg_cxl_buy_px
+                total_qty = plan_status.total_buy_qty
+                total_open_qty = plan_status.total_open_buy_qty
+                total_open_notional = plan_status.total_open_buy_notional
+                avg_open_px = plan_status.avg_open_buy_px
+                total_fill_qty = plan_status.total_fill_buy_qty
+                total_fill_notional = plan_status.total_fill_buy_notional
+                avg_fill_px = plan_status.avg_fill_buy_px
+                total_cxl_qty = plan_status.total_cxl_buy_qty
+                total_cxl_notional = plan_status.total_cxl_buy_notional
+                avg_cxl_px = plan_status.avg_cxl_buy_px
             else:
-                total_qty = strat_status.total_sell_qty
-                total_open_qty = strat_status.total_open_sell_qty
-                total_open_notional = strat_status.total_open_sell_notional
-                avg_open_px = strat_status.avg_open_sell_px
-                total_fill_qty = strat_status.total_fill_sell_qty
-                total_fill_notional = strat_status.total_fill_sell_notional
-                avg_fill_px = strat_status.avg_fill_sell_px
-                total_cxl_qty = strat_status.total_cxl_sell_qty
-                total_cxl_notional = strat_status.total_cxl_sell_notional
-                avg_cxl_px = strat_status.avg_cxl_sell_px
+                total_qty = plan_status.total_sell_qty
+                total_open_qty = plan_status.total_open_sell_qty
+                total_open_notional = plan_status.total_open_sell_notional
+                avg_open_px = plan_status.avg_open_sell_px
+                total_fill_qty = plan_status.total_fill_sell_qty
+                total_fill_notional = plan_status.total_fill_sell_notional
+                avg_fill_px = plan_status.avg_fill_sell_px
+                total_cxl_qty = plan_status.total_cxl_sell_qty
+                total_cxl_notional = plan_status.total_cxl_sell_notional
+                avg_cxl_px = plan_status.avg_cxl_sell_px
 
-            total_open_exposure = strat_status.total_open_exposure
-            total_fill_exposure = strat_status.total_fill_exposure
-            total_cxl_exposure = strat_status.total_cxl_exposure
+            total_open_exposure = plan_status.total_open_exposure
+            total_fill_exposure = plan_status.total_fill_exposure
+            total_cxl_exposure = plan_status.total_cxl_exposure
             assert total_qty == qty, \
-                (f"Mismatched: expected strat_status.total_{side.lower()}_qty: "
+                (f"Mismatched: expected plan_status.total_{side.lower()}_qty: "
                  f"{qty}, found {total_qty = }")
             assert total_open_qty == 0, \
-                (f"Mismatched: expected strat_status total_open_{side.lower()}_qty: "
+                (f"Mismatched: expected plan_status total_open_{side.lower()}_qty: "
                  f"0, found {total_open_qty = }")
             assert (total_open_notional == 0), \
-                (f"Mismatched: expected strat_status.total_open_{side.lower()}_notional: "
+                (f"Mismatched: expected plan_status.total_open_{side.lower()}_notional: "
                  f"0, found {total_open_notional = }")
             assert (avg_open_px == 0), \
-                (f"Mismatched: expected strat_status.avg_open_{side.lower()}_px: "
+                (f"Mismatched: expected plan_status.avg_open_{side.lower()}_px: "
                  f"0, found {avg_open_px = }")
             assert (total_fill_qty == overfill_qty), \
-                (f"Mismatched: expected strat_status.total_fill_{side.lower()}_qty: "
+                (f"Mismatched: expected plan_status.total_fill_{side.lower()}_qty: "
                  f"{overfill_qty}, found {total_fill_qty = }")
             assert (total_fill_notional == overfill_qty * get_px_in_usd(px)), \
-                (f"Mismatched: expected strat_status.total_fill_{side.lower()}_notional: "
+                (f"Mismatched: expected plan_status.total_fill_{side.lower()}_notional: "
                  f"{overfill_qty * get_px_in_usd(px)}, found {total_fill_notional = }")
             assert (avg_fill_px == px), \
-                (f"Mismatched: expected strat_status.avg_fill_{side.lower()}_px: "
+                (f"Mismatched: expected plan_status.avg_fill_{side.lower()}_px: "
                  f"{px}, found {avg_fill_px = }")
             assert (total_cxl_qty == 0), \
-                (f"Mismatched: expected strat_status.total_cxl_{side.lower()}_qty: "
+                (f"Mismatched: expected plan_status.total_cxl_{side.lower()}_qty: "
                  f"0, found {total_cxl_qty = }")
             assert (total_cxl_notional == 0), \
-                (f"Mismatched: expected strat_status.total_cxl_{side.lower()}_notional: "
+                (f"Mismatched: expected plan_status.total_cxl_{side.lower()}_notional: "
                  f"0, found {total_cxl_notional = }")
             assert (avg_cxl_px == 0), \
-                (f"Mismatched: expected strat_status.avg_cxl_{side.lower()}_px: "
+                (f"Mismatched: expected plan_status.avg_cxl_{side.lower()}_px: "
                  f"0, found {avg_cxl_px = }")
             if side == Side.BUY:
                 assert (total_open_exposure == 0), \
-                    (f"Mismatched: expected strat_status.total_open_exposure: "
+                    (f"Mismatched: expected plan_status.total_open_exposure: "
                      f"0, found {total_open_exposure = }")
                 assert (total_fill_exposure == overfill_qty * get_px_in_usd(px)), \
-                    (f"Mismatched: expected strat_status.total_fill_exposure: "
+                    (f"Mismatched: expected plan_status.total_fill_exposure: "
                      f"{overfill_qty * get_px_in_usd(px)}, found {total_fill_exposure = }")
                 assert (total_cxl_exposure == 0), \
-                    (f"Mismatched: expected strat_status.total_cxl_exposure: "
+                    (f"Mismatched: expected plan_status.total_cxl_exposure: "
                      f"0, found {total_cxl_exposure = }")
             else:
                 assert (total_open_exposure == 0), \
-                    (f"Mismatched: expected strat_status.total_open_exposure: "
+                    (f"Mismatched: expected plan_status.total_open_exposure: "
                      f"0, found {total_open_exposure = }")
                 assert (total_fill_exposure == (
                         buy_overfill_qty * get_px_in_usd(buy_px) - overfill_qty * get_px_in_usd(px))), \
-                    (f"Mismatched: expected strat_status.total_fill_exposure: "
+                    (f"Mismatched: expected plan_status.total_fill_exposure: "
                      f"{buy_overfill_qty * get_px_in_usd(buy_px) - overfill_qty * get_px_in_usd(px)}, "
                      f"found {total_fill_exposure = }")
                 assert (total_cxl_exposure == 0), \
-                    (f"Mismatched: expected strat_status.total_cxl_exposure: "
+                    (f"Mismatched: expected plan_status.total_cxl_exposure: "
                      f"0, found {total_cxl_exposure = }")
 
-            portfolio_status = email_book_service_native_web_client.get_portfolio_status_client(1)
+            contact_status = email_book_service_native_web_client.get_contact_status_client(1)
             if side == Side.BUY:
-                overall_notional = portfolio_status.overall_buy_notional
+                overall_notional = contact_status.overall_buy_notional
             else:
-                overall_notional = portfolio_status.overall_sell_notional
+                overall_notional = contact_status.overall_sell_notional
             assert (overall_notional == overfill_qty * get_px_in_usd(px)), \
-                (f"Mismatched: expected portfolio_status.overall_{side.lower()}_notional: "
+                (f"Mismatched: expected contact_status.overall_{side.lower()}_notional: "
                  f"{overfill_qty * get_px_in_usd(px)}, found {overall_notional = }")
 
-            # Checking alert in strat_alert
+            # Checking alert in plan_alert
             check_str = "Unexpected: Received fill that will make chore_snapshot OVER_FILLED which is already OE_DOD"
-            assert_fail_msg = f"Can't find alert of {check_str} in neither strat_alert nor portfolio_alert"
+            assert_fail_msg = f"Can't find alert of {check_str} in neither plan_alert nor contact_alert"
             time.sleep(5)
-            check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+            check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
-            # forcefully turning strat to active again for checking sell chore
+            # forcefully turning plan to active again for checking sell chore
             if side == Side.BUY:
-                pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat.id)
-                pair_strat.strat_state = StratState.StratState_ACTIVE
-                email_book_service_native_web_client.put_pair_strat_client(pair_strat)
+                pair_plan = email_book_service_native_web_client.get_pair_plan_client(active_pair_plan.id)
+                pair_plan.plan_state = PlanState.PlanState_ACTIVE
+                email_book_service_native_web_client.put_pair_plan_client(pair_plan)
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -5797,19 +5797,19 @@ def test_overfill_post_unack_unsol_cxl(
 
 @pytest.mark.nightly
 def test_fill_pre_chore_ack(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+        expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         last_barter_fixture_list, market_depth_basemodel_list,
         buy_chore_, sell_chore_, max_loop_count_per_side, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -5827,7 +5827,7 @@ def test_fill_pre_chore_ack(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
         px = 100
         qty = 90
         place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
@@ -5839,7 +5839,7 @@ def test_fill_pre_chore_ack(
                      "putting chore to ChoreStatusType.OE_ACKED status and applying fill")
         assert_fail_msg = f"can't find alert saying {check_str!r}"
         time.sleep(5)
-        check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+        check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
         fills_journal_list: List[FillsJournalBaseModel] = (
             get_fill_journals_for_chore_id(latest_unack_obj.chore.chore_id, executor_http_client))
@@ -5864,7 +5864,7 @@ def test_fill_pre_chore_ack(
                      "chore_snapshot status: ChoreStatusType.OE_ACKED")
         assert_fail_msg = f"can't find alert saying {check_str!r}"
         time.sleep(5)
-        check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+        check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -5879,19 +5879,19 @@ def test_fill_pre_chore_ack(
 
 @pytest.mark.nightly
 def test_fulfill_pre_chore_ack(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+        expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         last_barter_fixture_list, market_depth_basemodel_list,
         buy_chore_, sell_chore_, max_loop_count_per_side, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -5908,7 +5908,7 @@ def test_fulfill_pre_chore_ack(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
         px = 100
         qty = 90
         place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
@@ -5920,7 +5920,7 @@ def test_fulfill_pre_chore_ack(
                      "putting chore to ChoreStatusType.OE_FILLED status and applying fill")
         assert_fail_msg = f"can't find alert saying {check_str!r}"
         time.sleep(5)
-        check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+        check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
         fills_journal_list: List[FillsJournalBaseModel] = (
             get_fill_journals_for_chore_id(latest_unack_obj.chore.chore_id, executor_http_client))
@@ -5945,7 +5945,7 @@ def test_fulfill_pre_chore_ack(
                      "chore_snapshot status: ChoreStatusType.OE_FILLED")
         assert_fail_msg = f"can't find alert saying {check_str!r}"
         time.sleep(5)
-        check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+        check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -5960,19 +5960,19 @@ def test_fulfill_pre_chore_ack(
 
 @pytest.mark.nightly
 def test_overfill_pre_chore_ack(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+        expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         last_barter_fixture_list, market_depth_basemodel_list,
         buy_chore_, sell_chore_, max_loop_count_per_side, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -5986,7 +5986,7 @@ def test_overfill_pre_chore_ack(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
         px = 100
         qty = 90
         place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
@@ -6008,15 +6008,15 @@ def test_overfill_pre_chore_ack(
             (f"Mismatch chore_snapshot.filled_qty, expected {fills_journal_list[0].fill_qty}, "
              f"received {chore_snapshot.filled_qty}")
 
-        pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat.id)
-        assert pair_strat.strat_state == StratState.StratState_PAUSED, \
-            f"Mismatched: pair_strat status must be PAUSED but found {pair_strat.strat_state}"
+        pair_plan = email_book_service_native_web_client.get_pair_plan_client(active_pair_plan.id)
+        assert pair_plan.plan_state == PlanState.PlanState_PAUSED, \
+            f"Mismatched: pair_plan status must be PAUSED but found {pair_plan.plan_state}"
 
         check_str = ("Unexpected: Received fill that will make chore_snapshot OVER_FILLED to chore "
                      "which is still OE_UNACK")
         assert_fail_msg = f"can't find alert saying {check_str!r}"
         time.sleep(5)
-        check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+        check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
         # applying ack post fills received
         executor_http_client.barter_simulator_process_chore_ack_query_client(
@@ -6031,7 +6031,7 @@ def test_overfill_pre_chore_ack(
                      "status: ChoreStatusType.OE_OVER_FILLED")
         assert_fail_msg = f"can't find alert saying {check_str!r}"
         time.sleep(5)
-        check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+        check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -6044,28 +6044,28 @@ def test_overfill_pre_chore_ack(
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
-# strat pause tests
+# plan pause tests
 @pytest.mark.nightly
-def test_strat_pause_on_residual_notional_breach(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
-                                                 pair_strat_, expected_strat_limits_,
-                                                 expected_strat_status_, symbol_overview_obj_list,
+def test_plan_pause_on_residual_notional_breach(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
+                                                 pair_plan_, expected_plan_limits_,
+                                                 expected_plan_status_, symbol_overview_obj_list,
                                                  last_barter_fixture_list, market_depth_basemodel_list,
                                                  buy_chore_, sell_chore_,
                                                  refresh_sec_update_fixture):
 
-    expected_strat_limits_.residual_restriction.max_residual = 0
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.max_residual = 0
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    buy_symbol, sell_symbol, active_pair_strat, executor_http_client = (
-        underlying_pre_requisites_for_limit_test(leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
-                                                 expected_strat_status_, symbol_overview_obj_list,
+    buy_symbol, sell_symbol, active_pair_plan, executor_http_client = (
+        underlying_pre_requisites_for_limit_test(leg1_leg2_symbol_list, pair_plan_, expected_plan_limits_,
+                                                 expected_plan_status_, symbol_overview_obj_list,
                                                  last_barter_fixture_list, market_depth_basemodel_list))
 
-    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_strat)
-    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_strat)
+    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_plan)
+    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_plan)
 
-    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_plan.id)
 
     try:
         # updating yaml_configs according to this test
@@ -6093,7 +6093,7 @@ def test_strat_pause_on_residual_notional_breach(static_data_, clean_and_set_lim
         new_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW, buy_symbol,
                                                                            executor_http_client)
         time.sleep(5)
-        check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_message)
+        check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_message)
     except AssertionError as e:
         raise AssertionError(e)
     except Exception as e:
@@ -6105,18 +6105,18 @@ def test_strat_pause_on_residual_notional_breach(static_data_, clean_and_set_lim
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
-def _strat_pause_on_negative_consumable_cxl_qty_without_fill(leg1_leg2_symbol_list,
-                                                             pair_strat_, expected_strat_limits_,
-                                                             expected_strat_status_, symbol_overview_obj_list,
+def _plan_pause_on_negative_consumable_cxl_qty_without_fill(leg1_leg2_symbol_list,
+                                                             pair_plan_, expected_plan_limits_,
+                                                             expected_plan_status_, symbol_overview_obj_list,
                                                              last_barter_fixture_list, market_depth_basemodel_list,
                                                              refresh_sec_update_fixture, check_side):
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
 
     # explicitly setting waived_initial_chores to 10 for this test case
-    expected_strat_limits_.cancel_rate.waived_initial_chores = 0
-    expected_strat_limits_.cancel_rate.max_cancel_rate = 1
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.cancel_rate.waived_initial_chores = 0
+    expected_plan_limits_.cancel_rate.max_cancel_rate = 1
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
     if check_side == Side.BUY:
@@ -6132,12 +6132,12 @@ def _strat_pause_on_negative_consumable_cxl_qty_without_fill(leg1_leg2_symbol_li
         sell_symbol = leg1_symbol
         check_symbol = sell_symbol
 
-    active_pair_strat, executor_http_client = (
-        create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+    active_pair_plan, executor_http_client = (
+        create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_,
+                                           expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
                                            market_depth_basemodel_list, leg1_side=leg1_side, leg2_side=leg2_side))
 
-    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_plan.id)
 
     try:
         # updating yaml_configs according to this test
@@ -6151,8 +6151,8 @@ def _strat_pause_on_negative_consumable_cxl_qty_without_fill(leg1_leg2_symbol_li
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        handle_test_for_strat_pause_on_less_consumable_cxl_qty_without_fill(
-            buy_symbol, sell_symbol, active_pair_strat, last_barter_fixture_list,
+        handle_test_for_plan_pause_on_less_consumable_cxl_qty_without_fill(
+            buy_symbol, sell_symbol, active_pair_plan, last_barter_fixture_list,
             check_side, executor_http_client)
     except AssertionError as e:
         raise AssertionError(e)
@@ -6165,21 +6165,21 @@ def _strat_pause_on_negative_consumable_cxl_qty_without_fill(leg1_leg2_symbol_li
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
-def _strat_pause_on_negative_consumable_cxl_qty_due_to_waived_min_rolling_notional_without_fill(
-        leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+def _plan_pause_on_negative_consumable_cxl_qty_due_to_waived_min_rolling_notional_without_fill(
+        leg1_leg2_symbol_list, pair_plan_, expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         last_barter_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture, check_side):
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
 
-    # explicitly setting strat_limits.cancel_rate values for this test
-    expected_strat_limits_.cancel_rate.waived_initial_chores = 0
-    expected_strat_limits_.cancel_rate.max_cancel_rate = 1
-    expected_strat_limits_.cancel_rate.waived_min_rolling_period_seconds = 100
+    # explicitly setting plan_limits.cancel_rate values for this test
+    expected_plan_limits_.cancel_rate.waived_initial_chores = 0
+    expected_plan_limits_.cancel_rate.max_cancel_rate = 1
+    expected_plan_limits_.cancel_rate.waived_min_rolling_period_seconds = 100
     # one positive chore is placed making last 100 sec chore notional to 18000 (px=100, qty=90), next negative chore
     # will find that waived_min_rolling_notional < last 100 sec chore_notional (35000 < 36000) resulting trigger 
-    # of strat pause since max_cancel_rate is very less
-    expected_strat_limits_.cancel_rate.waived_min_rolling_notional = 35000
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    # of plan pause since max_cancel_rate is very less
+    expected_plan_limits_.cancel_rate.waived_min_rolling_notional = 35000
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
     if check_side == Side.BUY:
@@ -6195,15 +6195,15 @@ def _strat_pause_on_negative_consumable_cxl_qty_due_to_waived_min_rolling_notion
         sell_symbol = leg1_symbol
         check_symbol = sell_symbol
 
-    active_pair_strat, executor_http_client = (
-        create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+    active_pair_plan, executor_http_client = (
+        create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_,
+                                           expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
                                            market_depth_basemodel_list, leg1_side=leg1_side, leg2_side=leg2_side))
 
-    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_plan.id)
 
-    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_strat)
-    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_strat)
+    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_plan)
+    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_plan)
     inst_type: InstrumentType = buy_inst_type if check_side == Side.BUY else sell_inst_type
 
     try:
@@ -6219,7 +6219,7 @@ def _strat_pause_on_negative_consumable_cxl_qty_due_to_waived_min_rolling_notion
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # positive test - chore will be placed making last n sec chore notional 18000
-        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
         px = 100
         qty = 90
         # placing new non-systematic new_chore
@@ -6229,13 +6229,13 @@ def _strat_pause_on_negative_consumable_cxl_qty_due_to_waived_min_rolling_notion
                                                                              ChoreEventType.OE_UNSOL_CXL], check_symbol,
                                                                             executor_http_client)
 
-        # checking strat pause
-        pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat.id)
-        assert pair_strat.strat_state == StratState.StratState_ACTIVE, \
-            f"Mismatched strat state, expected: ACTIVE, found {pair_strat.strat_state}"
+        # checking plan pause
+        pair_plan = email_book_service_native_web_client.get_pair_plan_client(active_pair_plan.id)
+        assert pair_plan.plan_state == PlanState.PlanState_ACTIVE, \
+            f"Mismatched plan state, expected: ACTIVE, found {pair_plan.plan_state}"
 
-        handle_test_for_strat_pause_on_less_consumable_cxl_qty_without_fill(
-            buy_symbol, sell_symbol, active_pair_strat, last_barter_fixture_list,
+        handle_test_for_plan_pause_on_less_consumable_cxl_qty_without_fill(
+            buy_symbol, sell_symbol, active_pair_plan, last_barter_fixture_list,
             check_side, executor_http_client, last_cxl_chore_id=cxl_chore_journal.chore.chore_id)
     except AssertionError as e:
         raise AssertionError(e)
@@ -6249,65 +6249,65 @@ def _strat_pause_on_negative_consumable_cxl_qty_due_to_waived_min_rolling_notion
 
 
 @pytest.mark.nightly
-def test_strat_pause_on_negative_buy_consumable_cxl_qty_without_fill(static_data_, clean_and_set_limits,
+def test_plan_pause_on_negative_buy_consumable_cxl_qty_without_fill(static_data_, clean_and_set_limits,
                                                                      leg1_leg2_symbol_list,
-                                                                     pair_strat_, expected_strat_limits_,
-                                                                     expected_strat_status_, symbol_overview_obj_list,
+                                                                     pair_plan_, expected_plan_limits_,
+                                                                     expected_plan_status_, symbol_overview_obj_list,
                                                                      last_barter_fixture_list, market_depth_basemodel_list,
                                                                      refresh_sec_update_fixture):
-    _strat_pause_on_negative_consumable_cxl_qty_without_fill(leg1_leg2_symbol_list,
-                                                             pair_strat_, expected_strat_limits_,
-                                                             expected_strat_status_, symbol_overview_obj_list,
+    _plan_pause_on_negative_consumable_cxl_qty_without_fill(leg1_leg2_symbol_list,
+                                                             pair_plan_, expected_plan_limits_,
+                                                             expected_plan_status_, symbol_overview_obj_list,
                                                              last_barter_fixture_list, market_depth_basemodel_list,
                                                              refresh_sec_update_fixture, Side.BUY)
 
 
 @pytest.mark.nightly
-def test_strat_pause_on_negative_buy_consumable_cxl_qty_due_to_waived_min_rolling_notional_without_fill(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
+def test_plan_pause_on_negative_buy_consumable_cxl_qty_due_to_waived_min_rolling_notional_without_fill(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
         buy_chore_, sell_chore_, refresh_sec_update_fixture):
-    _strat_pause_on_negative_consumable_cxl_qty_due_to_waived_min_rolling_notional_without_fill(
-        leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+    _plan_pause_on_negative_consumable_cxl_qty_due_to_waived_min_rolling_notional_without_fill(
+        leg1_leg2_symbol_list, pair_plan_, expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         last_barter_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture, Side.BUY)
 
 
 @pytest.mark.nightly
-def test_strat_pause_on_negative_sell_consumable_cxl_qty_without_fill(static_data_, clean_and_set_limits,
+def test_plan_pause_on_negative_sell_consumable_cxl_qty_without_fill(static_data_, clean_and_set_limits,
                                                                       leg1_leg2_symbol_list,
-                                                                      pair_strat_, expected_strat_limits_,
-                                                                      expected_strat_status_, symbol_overview_obj_list,
+                                                                      pair_plan_, expected_plan_limits_,
+                                                                      expected_plan_status_, symbol_overview_obj_list,
                                                                       last_barter_fixture_list, market_depth_basemodel_list,
                                                                       refresh_sec_update_fixture):
-    _strat_pause_on_negative_consumable_cxl_qty_without_fill(leg1_leg2_symbol_list,
-                                                             pair_strat_, expected_strat_limits_,
-                                                             expected_strat_status_, symbol_overview_obj_list,
+    _plan_pause_on_negative_consumable_cxl_qty_without_fill(leg1_leg2_symbol_list,
+                                                             pair_plan_, expected_plan_limits_,
+                                                             expected_plan_status_, symbol_overview_obj_list,
                                                              last_barter_fixture_list, market_depth_basemodel_list,
                                                              refresh_sec_update_fixture, Side.SELL)
 
 
 @pytest.mark.nightly
-def test_strat_pause_on_negative_sell_consumable_cxl_qty_due_to_waived_min_rolling_notional_without_fill(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
+def test_plan_pause_on_negative_sell_consumable_cxl_qty_due_to_waived_min_rolling_notional_without_fill(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
         buy_chore_, sell_chore_, refresh_sec_update_fixture):
-    _strat_pause_on_negative_consumable_cxl_qty_due_to_waived_min_rolling_notional_without_fill(
-        leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+    _plan_pause_on_negative_consumable_cxl_qty_due_to_waived_min_rolling_notional_without_fill(
+        leg1_leg2_symbol_list, pair_plan_, expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         last_barter_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture, Side.SELL)
 
 
-def _strat_pause_on_negative_consumable_cxl_qty_with_fill(leg1_leg2_symbol_list,
-                                                          pair_strat_, expected_strat_limits_,
-                                                          expected_strat_status_, symbol_overview_obj_list,
+def _plan_pause_on_negative_consumable_cxl_qty_with_fill(leg1_leg2_symbol_list,
+                                                          pair_plan_, expected_plan_limits_,
+                                                          expected_plan_status_, symbol_overview_obj_list,
                                                           last_barter_fixture_list, market_depth_basemodel_list,
                                                           refresh_sec_update_fixture, check_side):
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
 
     # explicitly setting waived_initial_chores to 10 for this test case
-    expected_strat_limits_.cancel_rate.waived_initial_chores = 0
-    expected_strat_limits_.cancel_rate.max_cancel_rate = 19
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.cancel_rate.waived_initial_chores = 0
+    expected_plan_limits_.cancel_rate.max_cancel_rate = 19
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
 
     if check_side == Side.BUY:
         leg1_side = Side.BUY
@@ -6322,13 +6322,13 @@ def _strat_pause_on_negative_consumable_cxl_qty_with_fill(leg1_leg2_symbol_list,
         sell_symbol = leg1_symbol
         check_symbol = sell_symbol
 
-    active_pair_strat, executor_http_client = (
-        create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+    active_pair_plan, executor_http_client = (
+        create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_,
+                                           expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
                                            market_depth_basemodel_list, leg1_side=leg1_side,
                                            leg2_side=leg2_side))
 
-    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_plan.id)
 
     try:
         # updating yaml_configs according to this test
@@ -6340,8 +6340,8 @@ def _strat_pause_on_negative_consumable_cxl_qty_with_fill(leg1_leg2_symbol_list,
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        handle_test_for_strat_pause_on_less_consumable_cxl_qty_with_fill(
-            buy_symbol, sell_symbol, active_pair_strat, last_barter_fixture_list,
+        handle_test_for_plan_pause_on_less_consumable_cxl_qty_with_fill(
+            buy_symbol, sell_symbol, active_pair_plan, last_barter_fixture_list,
             check_side, executor_http_client)
 
     except AssertionError as e:
@@ -6355,21 +6355,21 @@ def _strat_pause_on_negative_consumable_cxl_qty_with_fill(leg1_leg2_symbol_list,
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
-def _strat_pause_on_negative_consumable_cxl_qty_due_to_waived_min_rolling_notional_with_fill(
-        leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+def _plan_pause_on_negative_consumable_cxl_qty_due_to_waived_min_rolling_notional_with_fill(
+        leg1_leg2_symbol_list, pair_plan_, expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         last_barter_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture, check_side):
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
 
-    # explicitly setting strat_limits.cancel_rate values for this test
-    expected_strat_limits_.cancel_rate.waived_initial_chores = 0
-    expected_strat_limits_.cancel_rate.max_cancel_rate = 19
-    expected_strat_limits_.cancel_rate.waived_min_rolling_period_seconds = 100
+    # explicitly setting plan_limits.cancel_rate values for this test
+    expected_plan_limits_.cancel_rate.waived_initial_chores = 0
+    expected_plan_limits_.cancel_rate.max_cancel_rate = 19
+    expected_plan_limits_.cancel_rate.waived_min_rolling_period_seconds = 100
     # one positive chore is placed making last 100 sec chore notional to 18000 (px=100, qty=90), next negative chore
     # will find that waived_min_rolling_notional < last 100 sec chore_notional (35000 < 36000) resulting trigger
-    # of strat pause since max_cancel_rate is very less
-    expected_strat_limits_.cancel_rate.waived_min_rolling_notional = 35000
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    # of plan pause since max_cancel_rate is very less
+    expected_plan_limits_.cancel_rate.waived_min_rolling_notional = 35000
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
     if check_side == Side.BUY:
@@ -6385,16 +6385,16 @@ def _strat_pause_on_negative_consumable_cxl_qty_due_to_waived_min_rolling_notion
         sell_symbol = leg1_symbol
         check_symbol = sell_symbol
 
-    active_pair_strat, executor_http_client = (
-        create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+    active_pair_plan, executor_http_client = (
+        create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_,
+                                           expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
                                            market_depth_basemodel_list, leg1_side=leg1_side,
                                            leg2_side=leg2_side))
 
-    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_strat.id)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_pair_plan.id)
 
-    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_strat)
-    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_strat)
+    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_plan)
+    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_plan)
     inst_type: InstrumentType = buy_inst_type if check_side == Side.BUY else sell_inst_type
 
     try:
@@ -6408,7 +6408,7 @@ def _strat_pause_on_negative_consumable_cxl_qty_due_to_waived_min_rolling_notion
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # positive test - chore will be placed making last n sec chore notional 18000
-        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
         px = 100
         qty = 90
         # placing new non-systematic new_chore
@@ -6418,13 +6418,13 @@ def _strat_pause_on_negative_consumable_cxl_qty_due_to_waived_min_rolling_notion
                                                                              ChoreEventType.OE_UNSOL_CXL], check_symbol,
                                                                             executor_http_client)
 
-        # checking strat pause
-        pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat.id)
-        assert pair_strat.strat_state == StratState.StratState_ACTIVE, \
-            f"Mismatched strat state, expected: ACTIVE, found {pair_strat.strat_state}"
+        # checking plan pause
+        pair_plan = email_book_service_native_web_client.get_pair_plan_client(active_pair_plan.id)
+        assert pair_plan.plan_state == PlanState.PlanState_ACTIVE, \
+            f"Mismatched plan state, expected: ACTIVE, found {pair_plan.plan_state}"
 
-        handle_test_for_strat_pause_on_less_consumable_cxl_qty_with_fill(
-            buy_symbol, sell_symbol, active_pair_strat, last_barter_fixture_list,
+        handle_test_for_plan_pause_on_less_consumable_cxl_qty_with_fill(
+            buy_symbol, sell_symbol, active_pair_plan, last_barter_fixture_list,
             check_side, executor_http_client, last_cxl_chore_id=cxl_chore_journal.chore.chore_id)
 
     except AssertionError as e:
@@ -6439,63 +6439,63 @@ def _strat_pause_on_negative_consumable_cxl_qty_due_to_waived_min_rolling_notion
 
 
 @pytest.mark.nightly
-def test_strat_pause_on_negative_buy_consumable_cxl_qty_with_fill(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
-                                                                  pair_strat_, expected_strat_limits_,
-                                                                  expected_strat_status_, symbol_overview_obj_list,
+def test_plan_pause_on_negative_buy_consumable_cxl_qty_with_fill(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
+                                                                  pair_plan_, expected_plan_limits_,
+                                                                  expected_plan_status_, symbol_overview_obj_list,
                                                                   last_barter_fixture_list, market_depth_basemodel_list,
                                                                   buy_chore_, sell_chore_,
                                                                   refresh_sec_update_fixture):
-    _strat_pause_on_negative_consumable_cxl_qty_with_fill(leg1_leg2_symbol_list,
-                                                          pair_strat_, expected_strat_limits_,
-                                                          expected_strat_status_, symbol_overview_obj_list,
+    _plan_pause_on_negative_consumable_cxl_qty_with_fill(leg1_leg2_symbol_list,
+                                                          pair_plan_, expected_plan_limits_,
+                                                          expected_plan_status_, symbol_overview_obj_list,
                                                           last_barter_fixture_list, market_depth_basemodel_list,
                                                           refresh_sec_update_fixture, check_side=Side.BUY)
 
 
 @pytest.mark.nightly1
-def test_strat_pause_on_buy_negative_consumable_cxl_qty_due_to_waived_min_rolling_notional_with_fill(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
+def test_plan_pause_on_buy_negative_consumable_cxl_qty_due_to_waived_min_rolling_notional_with_fill(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
         refresh_sec_update_fixture):
-    _strat_pause_on_negative_consumable_cxl_qty_due_to_waived_min_rolling_notional_with_fill(
-        leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+    _plan_pause_on_negative_consumable_cxl_qty_due_to_waived_min_rolling_notional_with_fill(
+        leg1_leg2_symbol_list, pair_plan_, expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         last_barter_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture, check_side=Side.BUY)
 
 
 @pytest.mark.nightly
-def test_strat_pause_on_negative_sell_consumable_cxl_qty_with_fill(static_data_, clean_and_set_limits,
+def test_plan_pause_on_negative_sell_consumable_cxl_qty_with_fill(static_data_, clean_and_set_limits,
                                                                    leg1_leg2_symbol_list,
-                                                                   pair_strat_, expected_strat_limits_,
-                                                                   expected_strat_status_, symbol_overview_obj_list,
+                                                                   pair_plan_, expected_plan_limits_,
+                                                                   expected_plan_status_, symbol_overview_obj_list,
                                                                    last_barter_fixture_list, market_depth_basemodel_list,
                                                                    buy_chore_, sell_chore_,
                                                                    refresh_sec_update_fixture):
-    _strat_pause_on_negative_consumable_cxl_qty_with_fill(leg1_leg2_symbol_list,
-                                                          pair_strat_, expected_strat_limits_,
-                                                          expected_strat_status_, symbol_overview_obj_list,
+    _plan_pause_on_negative_consumable_cxl_qty_with_fill(leg1_leg2_symbol_list,
+                                                          pair_plan_, expected_plan_limits_,
+                                                          expected_plan_status_, symbol_overview_obj_list,
                                                           last_barter_fixture_list, market_depth_basemodel_list,
                                                           refresh_sec_update_fixture, check_side=Side.SELL)
 
 
 @pytest.mark.nightly
-def test_strat_pause_on_sell_negative_consumable_cxl_qty_due_to_waived_min_rolling_notional_with_fill(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
+def test_plan_pause_on_sell_negative_consumable_cxl_qty_due_to_waived_min_rolling_notional_with_fill(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
         refresh_sec_update_fixture):
-    _strat_pause_on_negative_consumable_cxl_qty_due_to_waived_min_rolling_notional_with_fill(
-        leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+    _plan_pause_on_negative_consumable_cxl_qty_due_to_waived_min_rolling_notional_with_fill(
+        leg1_leg2_symbol_list, pair_plan_, expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         last_barter_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture, check_side=Side.SELL)
 
 
 @pytest.mark.nightly
-def test_alert_agg_sequence_in_portfolio_alerts(clean_and_set_limits, sample_alert):
-    portfolio_alerts = log_book_web_client.get_all_portfolio_alert_client()
+def test_alert_agg_sequence_in_contact_alerts(clean_and_set_limits, sample_alert):
+    contact_alerts = log_book_web_client.get_all_contact_alert_client()
 
     sev = [Severity.Severity_CRITICAL, Severity.Severity_ERROR, Severity.Severity_WARNING,
            Severity.Severity_INFO, Severity.Severity_DEBUG]
     counter = 0
     for i in range(5):
-        alert = PortfolioAlertBaseModel()
+        alert = ContactAlertBaseModel()
         alert.last_update_analyzer_time = DateTime.utcnow()
         alert.alert_brief = f"Sample Alert: {i + 1}"
         alert.severity = sev[counter]
@@ -6503,25 +6503,25 @@ def test_alert_agg_sequence_in_portfolio_alerts(clean_and_set_limits, sample_ale
         if counter > 4:
             counter = 0
 
-        portfolio_alerts.append(alert)
-        log_book_web_client.handle_portfolio_alerts_from_tail_executor_query_client(
+        contact_alerts.append(alert)
+        log_book_web_client.handle_contact_alerts_from_tail_executor_query_client(
             [{"severity": alert.severity, "alert_brief": alert.alert_brief,
                           "alert_meta": AlertMetaBaseModel(first_detail="Sample detail").to_dict(exclude_none=True)}])
 
     # sorting alert list for this test comparison
-    portfolio_alerts.sort(key=lambda x: x.last_update_analyzer_time, reverse=False)
+    contact_alerts.sort(key=lambda x: x.last_update_analyzer_time, reverse=False)
 
-    sorted_alert_list: List[PortfolioAlertBaseModel] = []
+    sorted_alert_list: List[ContactAlertBaseModel] = []
     for sev in Severity:
         if sev.value != Severity.Severity_UNSPECIFIED:
-            for alert in portfolio_alerts:
+            for alert in contact_alerts:
                 if alert.severity == sev.value:
                     sorted_alert_list.append(alert)
     time.sleep(5)
-    agg_sorted_alerts: List[PortfolioAlertBaseModel] = log_book_web_client.get_all_portfolio_alert_client()
+    agg_sorted_alerts: List[ContactAlertBaseModel] = log_book_web_client.get_all_contact_alert_client()
     for alert in agg_sorted_alerts:
         alert.last_update_analyzer_time = pendulum.parse(str(alert.last_update_analyzer_time)).in_timezone("utc")
-    for alert in portfolio_alerts:
+    for alert in contact_alerts:
         alert.last_update_analyzer_time = \
             alert.last_update_analyzer_time.replace(microsecond=
                                                 int(str(alert.last_update_analyzer_time.microsecond)[:3] + "000"))
@@ -6533,22 +6533,22 @@ def test_alert_agg_sequence_in_portfolio_alerts(clean_and_set_limits, sample_ale
 
 
 @pytest.mark.nightly
-def test_alert_agg_sequence_in_strat_alert(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-                                           expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+def test_alert_agg_sequence_in_plan_alert(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+                                           expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
                                            market_depth_basemodel_list, sample_alert):
     leg1_symbol, leg2_symbol = leg1_leg2_symbol_list[0]
-    active_pair_strat, executor_http_client = (
-        create_n_activate_strat(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-                                expected_strat_status_, symbol_overview_obj_list,
+    active_pair_plan, executor_http_client = (
+        create_n_activate_plan(leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_,
+                                expected_plan_status_, symbol_overview_obj_list,
                                 market_depth_basemodel_list))
 
-    new_strat_alerts = []
+    new_plan_alerts = []
 
     sev = [Severity.Severity_CRITICAL, Severity.Severity_ERROR, Severity.Severity_WARNING,
            Severity.Severity_INFO, Severity.Severity_DEBUG]
     counter = 0
     for i in range(5):
-        alert = StratAlertBaseModel()
+        alert = PlanAlertBaseModel()
         alert.last_update_analyzer_time = DateTime.utcnow()
         alert.alert_brief = f"Sample Alert: {i + 1}"
         alert.severity = sev[counter]
@@ -6556,40 +6556,40 @@ def test_alert_agg_sequence_in_strat_alert(static_data_, clean_and_set_limits, l
         if counter > 4:
             counter = 0
 
-        new_strat_alerts.append(alert)
-        log_book_web_client.handle_strat_alerts_from_tail_executor_query_client(
-            [{"strat_id": active_pair_strat.id, "severity": alert.severity, "alert_brief": alert.alert_brief,
+        new_plan_alerts.append(alert)
+        log_book_web_client.handle_plan_alerts_from_tail_executor_query_client(
+            [{"plan_id": active_pair_plan.id, "severity": alert.severity, "alert_brief": alert.alert_brief,
                           "alert_meta": AlertMetaBaseModel(first_detail="Sample detail").to_dict(exclude_none=True)}])
 
     time.sleep(5)
 
-    agg_sorted_alerts: List[StratAlertBaseModel] = log_book_web_client.filtered_strat_alert_by_strat_id_query_client(active_pair_strat.id)
+    agg_sorted_alerts: List[PlanAlertBaseModel] = log_book_web_client.filtered_plan_alert_by_plan_id_query_client(active_pair_plan.id)
 
     # putting all alerts apart from newly added alerts
     already_existing_alerts = []
     for stored_alert in agg_sorted_alerts:
-        for new_alert in new_strat_alerts:
+        for new_alert in new_plan_alerts:
             if stored_alert.alert_brief == new_alert.alert_brief:
                 break
         else:
             already_existing_alerts.append(stored_alert)
 
     # putting already_existing_alerts with newly_added alerts before sorting
-    new_strat_alerts.extend(already_existing_alerts)
+    new_plan_alerts.extend(already_existing_alerts)
 
     # sorting alert list for this test comparison
-    new_strat_alerts.sort(key=lambda x: x.last_update_analyzer_time, reverse=False)
+    new_plan_alerts.sort(key=lambda x: x.last_update_analyzer_time, reverse=False)
 
-    sorted_alert_list: List[StratAlertBaseModel] = []
+    sorted_alert_list: List[PlanAlertBaseModel] = []
     for sev in Severity:
         if sev.value != Severity.Severity_UNSPECIFIED:
-            for alert in new_strat_alerts:
+            for alert in new_plan_alerts:
                 if alert.severity == sev.value:
                     sorted_alert_list.append(alert)
     time.sleep(5)
     for alert in agg_sorted_alerts:
         alert.last_update_analyzer_time = pendulum.parse(str(alert.last_update_analyzer_time)).in_timezone("utc")
-    for alert in new_strat_alerts:
+    for alert in new_plan_alerts:
         alert.last_update_analyzer_time = \
             alert.last_update_analyzer_time.replace(microsecond=
                                                 int(str(alert.last_update_analyzer_time.microsecond)[:3] + "000"))
@@ -6609,12 +6609,12 @@ def test_alert_agg_sequence_in_strat_alert(static_data_, clean_and_set_limits, l
 #         alert.last_update_date_time = DateTime.utcnow()
 #
 #         alert_list.append(alert)
-#         portfolio_alert_basemodel = PortfolioAlertBaseModel(_id=1, alerts=[alert])
-#         json_obj = jsonable_encoder(portfolio_alert_basemodel, by_alias=True, exclude_none=True)
-#         updated_portfolio_alert = log_book_web_client.patch_portfolio_alert_client(json_obj)
+#         contact_alert_basemodel = ContactAlertBaseModel(_id=1, alerts=[alert])
+#         json_obj = jsonable_encoder(contact_alert_basemodel, by_alias=True, exclude_none=True)
+#         updated_contact_alert = log_book_web_client.patch_contact_alert_client(json_obj)
 #
-#     portfolio_alert = log_book_web_client.get_portfolio_alert_client(portfolio_alert_id=1)
-#     agg_sorted_alerts: List[Alert] = portfolio_alert.alerts
+#     contact_alert = log_book_web_client.get_contact_alert_client(contact_alert_id=1)
+#     agg_sorted_alerts: List[Alert] = contact_alert.alerts
 #     # for alert in agg_sorted_alerts:
 #     #     alert.last_update_date_time = pendulum.parse(str(alert.last_update_date_time)).in_timezone("utc")
 #     # for alert in alert_list:
@@ -6755,7 +6755,7 @@ def test_alert_agg_sequence_in_strat_alert(static_data_, clean_and_set_limits, l
 
 # @@@@ deprecated test: No use case for projection in street_book or phone_book
 # def test_projection_http_query(clean_and_set_limits, bar_data_):
-#     for index, symbol_n_exch_id_tuple in enumerate([("CB_Sec_1", "Exch1"), ("CB_Sec_2", "Exch2")]):
+#     for index, symbol_n_exch_id_tuple in enumerate([("Type1_Sec_1", "Exch1"), ("Type1_Sec_2", "Exch2")]):
 #         created_objs: List[BarDataBaseModel] = []
 #         symbol, exch_id = symbol_n_exch_id_tuple
 #         for i in range(5*index, 5*(index+1)):
@@ -6827,21 +6827,21 @@ def test_get_max_id_query(clean_and_set_limits):
 
 @pytest.mark.nightly
 def test_get_market_depths_query(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+        expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         market_depth_basemodel_list, last_barter_fixture_list, refresh_sec_update_fixture):
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:2]
 
-    pair_strat_n_http_client_tuple_list = []
+    pair_plan_n_http_client_tuple_list = []
     for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list:
-        expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+        expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
         activated_pair_start, executor_http_client = (
-            create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-                                               expected_strat_status_, symbol_overview_obj_list,
+            create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_,
+                                               expected_plan_status_, symbol_overview_obj_list,
                                                last_barter_fixture_list,
                                                market_depth_basemodel_list))
 
-        pair_strat_n_http_client_tuple_list.append((activated_pair_start, executor_http_client))
+        pair_plan_n_http_client_tuple_list.append((activated_pair_start, executor_http_client))
 
     bid_pos_to_market_depth_dict = {}
     ask_pos_to_market_depth_dict = {}
@@ -6864,11 +6864,11 @@ def test_get_market_depths_query(
 
             market_depth_.cumulative_avg_px = cum_notional / cum_qty
 
-    for pair_strat_n_http_client_tuple in pair_strat_n_http_client_tuple_list:
-        pair_strat, executor_http_client = pair_strat_n_http_client_tuple
+    for pair_plan_n_http_client_tuple in pair_plan_n_http_client_tuple_list:
+        pair_plan, executor_http_client = pair_plan_n_http_client_tuple
 
-        query_symbol_side_list = [(pair_strat.pair_strat_params.strat_leg1.sec.sec_id, TickType.BID),
-                                  (pair_strat.pair_strat_params.strat_leg2.sec.sec_id, TickType.ASK)]
+        query_symbol_side_list = [(pair_plan.pair_plan_params.plan_leg1.sec.sec_id, TickType.BID),
+                                  (pair_plan.pair_plan_params.plan_leg2.sec.sec_id, TickType.ASK)]
 
         market_depth_list: List[MarketDepthBaseModel] = (
             executor_http_client.get_market_depths_query_client(query_symbol_side_list))
@@ -6910,21 +6910,21 @@ def test_get_market_depths_query(
 
 
 @pytest.mark.nightly
-def test_fills_after_cxl_request(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-                                 expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+def test_fills_after_cxl_request(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+                                 expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
                                  last_barter_fixture_list, market_depth_basemodel_list,
                                  buy_chore_, sell_chore_, max_loop_count_per_side,
-                                 buy_fill_journal_, sell_fill_journal_, expected_strat_brief_,
+                                 buy_fill_journal_, sell_fill_journal_, expected_plan_brief_,
                                  refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (created_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (created_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -6939,7 +6939,7 @@ def test_fills_after_cxl_request(static_data_, clean_and_set_limits, leg1_leg2_s
 
         for symbol, side in [(buy_symbol, Side.BUY), (sell_symbol, Side.SELL)]:
             # Placing buy chores
-            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_plan.cpp_port)
             if symbol == buy_symbol:
                 px = 100
                 qty = 90
@@ -6993,52 +6993,52 @@ def test_fills_after_cxl_request(static_data_, clean_and_set_limits, leg1_leg2_s
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
-def _verify_server_ready_state_in_reloaded_strat(pair_strat_id: int, existing_executor_port: int, 
+def _verify_server_ready_state_in_reloaded_plan(pair_plan_id: int, existing_executor_port: int, 
                                                  residual_wait_sec: int, buy_symbol: str, sell_symbol: str):
     # no need to verify server_ready_state == 1 - executor db still contains symbol overview of before unload 
-    # so when strat reloads init checks passes to init symbol overview cache and marks strat ready 
+    # so when plan reloads init checks passes to init symbol overview cache and marks plan ready 
 
-    loaded_pair_strat = email_book_service_native_web_client.get_pair_strat_client(pair_strat_id)
-    executor_http_client = StreetBookServiceHttpClient.set_or_get_if_instance_exists(loaded_pair_strat.host,
-                                                                                        loaded_pair_strat.port)
-    assert loaded_pair_strat.server_ready_state == 2, \
-        ("Unexpected: After strat is loaded by this point since all service up check is done server_ready_state "
-         f"must be 2, found {loaded_pair_strat.server_ready_state}, pair_strat: {loaded_pair_strat}")
-    assert loaded_pair_strat.strat_state == StratState.StratState_READY, \
-        (f"Unexpected, StratState must be READY but found state: {loaded_pair_strat.strat_state}, "
-         f"pair_strat: {loaded_pair_strat}")
+    loaded_pair_plan = email_book_service_native_web_client.get_pair_plan_client(pair_plan_id)
+    executor_http_client = StreetBookServiceHttpClient.set_or_get_if_instance_exists(loaded_pair_plan.host,
+                                                                                        loaded_pair_plan.port)
+    assert loaded_pair_plan.server_ready_state == 2, \
+        ("Unexpected: After plan is loaded by this point since all service up check is done server_ready_state "
+         f"must be 2, found {loaded_pair_plan.server_ready_state}, pair_plan: {loaded_pair_plan}")
+    assert loaded_pair_plan.plan_state == PlanState.PlanState_READY, \
+        (f"Unexpected, PlanState must be READY but found state: {loaded_pair_plan.plan_state}, "
+         f"pair_plan: {loaded_pair_plan}")
 
-    pair_strat = PairStratBaseModel.from_kwargs(_id=pair_strat_id, strat_state=StratState.StratState_ACTIVE)
-    activated_pair_strat = email_book_service_native_web_client.patch_pair_strat_client(
-        pair_strat.to_dict(exclude_none=True))
-    assert activated_pair_strat.strat_state == StratState.StratState_ACTIVE, \
-        (f"StratState Mismatched, expected StratState: {StratState.StratState_ACTIVE}, "
-         f"received pair_strat's strat_state: {activated_pair_strat.strat_state}")
-    print(f"StratStatus updated to Active state, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
+    pair_plan = PairPlanBaseModel.from_kwargs(_id=pair_plan_id, plan_state=PlanState.PlanState_ACTIVE)
+    activated_pair_plan = email_book_service_native_web_client.patch_pair_plan_client(
+        pair_plan.to_dict(exclude_none=True))
+    assert activated_pair_plan.plan_state == PlanState.PlanState_ACTIVE, \
+        (f"PlanState Mismatched, expected PlanState: {PlanState.PlanState_ACTIVE}, "
+         f"received pair_plan's plan_state: {activated_pair_plan.plan_state}")
+    print(f"PlanStatus updated to Active state, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
     time.sleep(10)
-    loaded_pair_strat = email_book_service_native_web_client.get_pair_strat_client(pair_strat_id)
-    assert loaded_pair_strat.server_ready_state == 3, \
-        ("Unexpected: After strat is loaded by this point, since strat is activated, server_ready_state "
-         f"must be 3, found {loaded_pair_strat.server_ready_state}, pair_strat: {loaded_pair_strat}")
-    return executor_http_client, activated_pair_strat
+    loaded_pair_plan = email_book_service_native_web_client.get_pair_plan_client(pair_plan_id)
+    assert loaded_pair_plan.server_ready_state == 3, \
+        ("Unexpected: After plan is loaded by this point, since plan is activated, server_ready_state "
+         f"must be 3, found {loaded_pair_plan.server_ready_state}, pair_plan: {loaded_pair_plan}")
+    return executor_http_client, activated_pair_plan
 
 
 @pytest.mark.nightly
-def test_unload_reload_strat_from_collection(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+def test_unload_reload_plan_from_collection(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+        expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         last_barter_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    created_pair_strat, executor_web_client = (
-        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+    created_pair_plan, executor_web_client = (
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+                                           expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
                                            market_depth_basemodel_list))
 
-    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_strat.id)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_plan.id)
 
     try:
         # updating yaml_configs according to this test
@@ -7051,37 +7051,37 @@ def test_unload_reload_strat_from_collection(
 
         total_chore_count_for_each_side = 1
         place_sanity_chores_for_executor(
-            buy_symbol, sell_symbol, created_pair_strat, total_chore_count_for_each_side, last_barter_fixture_list,
+            buy_symbol, sell_symbol, created_pair_plan, total_chore_count_for_each_side, last_barter_fixture_list,
             residual_wait_sec, executor_web_client)
-        executor_port = created_pair_strat.port
+        executor_port = created_pair_plan.port
 
-        # Unloading Strat
-        # making this strat DONE
-        email_book_service_native_web_client.patch_pair_strat_client(
-            PairStratBaseModel.from_kwargs(_id=created_pair_strat.id,
-                                           strat_state=StratState.StratState_DONE).to_dict(exclude_none=True))
+        # Unloading Plan
+        # making this plan DONE
+        email_book_service_native_web_client.patch_pair_plan_client(
+            PairPlanBaseModel.from_kwargs(_id=created_pair_plan.id,
+                                           plan_state=PlanState.PlanState_DONE).to_dict(exclude_none=True))
 
-        strat_key = get_strat_key_from_pair_strat(created_pair_strat)
+        plan_key = get_plan_key_from_pair_plan(created_pair_plan)
 
-        strat_collection = email_book_service_native_web_client.get_strat_collection_client(1)
-        strat_collection.loaded_strat_keys.remove(strat_key)
-        strat_collection.buffered_strat_keys.append(strat_key)
+        plan_collection = email_book_service_native_web_client.get_plan_collection_client(1)
+        plan_collection.loaded_plan_keys.remove(plan_key)
+        plan_collection.buffered_plan_keys.append(plan_key)
 
-        email_book_service_native_web_client.put_strat_collection_client(strat_collection)
+        email_book_service_native_web_client.put_plan_collection_client(plan_collection)
 
         time.sleep(5)
 
-        pair_strat = email_book_service_native_web_client.get_pair_strat_client(created_pair_strat.id)
-        assert pair_strat.server_ready_state == 0, \
-            "Mismatch: server_ready_state must be 0 after strat unload"
+        pair_plan = email_book_service_native_web_client.get_pair_plan_client(created_pair_plan.id)
+        assert pair_plan.server_ready_state == 0, \
+            "Mismatch: server_ready_state must be 0 after plan unload"
 
-        # Reloading strat
-        strat_collection = email_book_service_native_web_client.get_strat_collection_client(1)
-        strat_collection.buffered_strat_keys.remove(strat_key)
-        strat_collection.loaded_strat_keys.append(strat_key)
-        email_book_service_native_web_client.put_strat_collection_client(strat_collection)
+        # Reloading plan
+        plan_collection = email_book_service_native_web_client.get_plan_collection_client(1)
+        plan_collection.buffered_plan_keys.remove(plan_key)
+        plan_collection.loaded_plan_keys.append(plan_key)
+        email_book_service_native_web_client.put_plan_collection_client(plan_collection)
 
-        time.sleep(residual_wait_sec)   # waiting for strat to get loaded completely
+        time.sleep(residual_wait_sec)   # waiting for plan to get loaded completely
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -7091,8 +7091,8 @@ def test_unload_reload_strat_from_collection(
         raise Exception(e)
     # Since config file is removed while unloading - no need to revert changes
 
-    executor_http_client, activated_pair_strat = (
-        _verify_server_ready_state_in_reloaded_strat(created_pair_strat.id, executor_port,
+    executor_http_client, activated_pair_plan = (
+        _verify_server_ready_state_in_reloaded_plan(created_pair_plan.id, executor_port,
                                                      residual_wait_sec, buy_symbol, sell_symbol))
 
     time.sleep(5)
@@ -7107,12 +7107,12 @@ def test_unload_reload_strat_from_collection(
 
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        # updating market_depth to update shm cache in reloaded strat with existing data
-        update_market_depth(activated_pair_strat.cpp_port)
+        # updating market_depth to update shm cache in reloaded plan with existing data
+        update_market_depth(activated_pair_plan.cpp_port)
 
         total_chore_count_for_each_side = 2
         place_sanity_chores_for_executor(
-            buy_symbol, sell_symbol, activated_pair_strat, total_chore_count_for_each_side, last_barter_fixture_list,
+            buy_symbol, sell_symbol, activated_pair_plan, total_chore_count_for_each_side, last_barter_fixture_list,
             residual_wait_sec, executor_http_client, True)
 
     except AssertionError as e:
@@ -7126,21 +7126,21 @@ def test_unload_reload_strat_from_collection(
 
 
 @pytest.mark.nightly
-def test_unload_strat_from_strat_view_unload_ui_button(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+def test_unload_plan_from_plan_view_unload_ui_button(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+        expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         last_barter_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    created_pair_strat, executor_web_client = (
-        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+    created_pair_plan, executor_web_client = (
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+                                           expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
                                            market_depth_basemodel_list))
 
-    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_strat.id)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_plan.id)
 
     try:
         # updating yaml_configs according to this test
@@ -7153,35 +7153,35 @@ def test_unload_strat_from_strat_view_unload_ui_button(
 
         total_chore_count_for_each_side = 1
         place_sanity_chores_for_executor(
-            buy_symbol, sell_symbol, created_pair_strat, total_chore_count_for_each_side, last_barter_fixture_list,
+            buy_symbol, sell_symbol, created_pair_plan, total_chore_count_for_each_side, last_barter_fixture_list,
             residual_wait_sec, executor_web_client)
 
-        # Unloading Strat
-        strat_view_obj = photo_book_web_client.get_strat_view_client(created_pair_strat.id)
-        # simulating ui button update - making unload_strat True
-        strat_view_obj.unload_strat = True
-        update_strat_view = photo_book_web_client.put_strat_view_client(strat_view_obj)
-        assert update_strat_view == strat_view_obj, \
-            f"Mismatched strat_view: expected {strat_view_obj}, updated {update_strat_view}"
+        # Unloading Plan
+        plan_view_obj = photo_book_web_client.get_plan_view_client(created_pair_plan.id)
+        # simulating ui button update - making unload_plan True
+        plan_view_obj.unload_plan = True
+        update_plan_view = photo_book_web_client.put_plan_view_client(plan_view_obj)
+        assert update_plan_view == plan_view_obj, \
+            f"Mismatched plan_view: expected {plan_view_obj}, updated {update_plan_view}"
 
         time.sleep(20)
 
-        # verifying pair_strat
-        pair_strat = email_book_service_native_web_client.get_pair_strat_client(created_pair_strat.id)
-        assert pair_strat.server_ready_state == 0, \
-            "Mismatch: server_ready_state must be 0 after strat unload"
+        # verifying pair_plan
+        pair_plan = email_book_service_native_web_client.get_pair_plan_client(created_pair_plan.id)
+        assert pair_plan.server_ready_state == 0, \
+            "Mismatch: server_ready_state must be 0 after plan unload"
 
-        # verifying strat_collection
-        strat_key = get_strat_key_from_pair_strat(created_pair_strat)
-        strat_collection = email_book_service_native_web_client.get_strat_collection_client(1)
-        assert strat_key in strat_collection.buffered_strat_keys, \
-            f"Not Found: expected {strat_key=} in {strat_collection.buffered_strat_keys=}"
+        # verifying plan_collection
+        plan_key = get_plan_key_from_pair_plan(created_pair_plan)
+        plan_collection = email_book_service_native_web_client.get_plan_collection_client(1)
+        assert plan_key in plan_collection.buffered_plan_keys, \
+            f"Not Found: expected {plan_key=} in {plan_collection.buffered_plan_keys=}"
 
-        # verifying unload_strat is updated back to default state
+        # verifying unload_plan is updated back to default state
         time.sleep(2)
-        update_strat_view = photo_book_web_client.get_strat_view_client(strat_view_obj.id)
-        assert not update_strat_view.unload_strat, \
-            f"Mismatched strat_view.unload_strat: expected False, found True"
+        update_plan_view = photo_book_web_client.get_plan_view_client(plan_view_obj.id)
+        assert not update_plan_view.unload_plan, \
+            f"Mismatched plan_view.unload_plan: expected False, found True"
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -7193,15 +7193,15 @@ def test_unload_strat_from_strat_view_unload_ui_button(
 
 
 @pytest.mark.nightly
-def test_unload_multiple_strats_from_strat_view_unload_ui_button(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+def test_unload_multiple_plans_from_plan_view_unload_ui_button(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+        expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         last_barter_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture):
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:10]
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
-        results = [executor.submit(create_n_activate_strat, leg1_symbol, leg2_symbol, copy.deepcopy(pair_strat_),
-                                   copy.deepcopy(expected_strat_limits_),
-                                   copy.deepcopy(expected_strat_status_), copy.deepcopy(symbol_overview_obj_list),
+        results = [executor.submit(create_n_activate_plan, leg1_symbol, leg2_symbol, copy.deepcopy(pair_plan_),
+                                   copy.deepcopy(expected_plan_limits_),
+                                   copy.deepcopy(expected_plan_status_), copy.deepcopy(symbol_overview_obj_list),
                                    copy.deepcopy(market_depth_basemodel_list), None, None, None)
                    for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list]
 
@@ -7209,49 +7209,49 @@ def test_unload_multiple_strats_from_strat_view_unload_ui_button(
             if future.exception() is not None:
                 raise Exception(future.exception())
 
-    pair_strats = email_book_service_beanie_web_client.get_all_pair_strat_client()
-    for pair_strat in pair_strats:
-        strat_view_dict = {'_id': pair_strat.id, 'unload_strat': True}
-        strat_view = photo_book_web_client.patch_strat_view_client(strat_view_dict)
+    pair_plans = email_book_service_beanie_web_client.get_all_pair_plan_client()
+    for pair_plan in pair_plans:
+        plan_view_dict = {'_id': pair_plan.id, 'unload_plan': True}
+        plan_view = photo_book_web_client.patch_plan_view_client(plan_view_dict)
         
     time.sleep(20)
-    # checking if all strats are shifted to unloaded keys in strat_collection and are not active anymore
-    strat_collection = email_book_service_native_web_client.get_strat_collection_client(strat_collection_id=1)
-    pair_strats = email_book_service_beanie_web_client.get_all_pair_strat_client()
-    for pair_strat in pair_strats:
-        strat_key = get_strat_key_from_pair_strat(pair_strat)
-        assert strat_key not in strat_collection.loaded_strat_keys, \
-            f"Mismatch: {strat_key=} must not be in {strat_collection.loaded_strat_keys=}"
-        assert strat_key in strat_collection.buffered_strat_keys, \
-            f"Mismatch: {strat_key=} must be in {strat_collection.buffered_strat_keys=}"
-        assert pair_strat.strat_state == StratState.StratState_SNOOZED, \
-            f"Mismatch: strat_state must be {StratState.StratState_SNOOZED}, found {pair_strat.strat_state=}"
-        assert pair_strat.port is None, \
-            f"Mismatch: pair_strat.port must be None, found {pair_strat.port=}"
+    # checking if all plans are shifted to unloaded keys in plan_collection and are not active anymore
+    plan_collection = email_book_service_native_web_client.get_plan_collection_client(plan_collection_id=1)
+    pair_plans = email_book_service_beanie_web_client.get_all_pair_plan_client()
+    for pair_plan in pair_plans:
+        plan_key = get_plan_key_from_pair_plan(pair_plan)
+        assert plan_key not in plan_collection.loaded_plan_keys, \
+            f"Mismatch: {plan_key=} must not be in {plan_collection.loaded_plan_keys=}"
+        assert plan_key in plan_collection.buffered_plan_keys, \
+            f"Mismatch: {plan_key=} must be in {plan_collection.buffered_plan_keys=}"
+        assert pair_plan.plan_state == PlanState.PlanState_SNOOZED, \
+            f"Mismatch: plan_state must be {PlanState.PlanState_SNOOZED}, found {pair_plan.plan_state=}"
+        assert pair_plan.port is None, \
+            f"Mismatch: pair_plan.port must be None, found {pair_plan.port=}"
 
-    # cleanup before leaving this test - since strats are unloaded any test after this will not be able to know that
+    # cleanup before leaving this test - since plans are unloaded any test after this will not be able to know that
     # its tail executors also needs to be handled to handling them now
     # force killing all tails
-    for pair_strat in pair_strats:
-        kill_tail_executor_for_strat_id(pair_strat.id)
+    for pair_plan in pair_plans:
+        kill_tail_executor_for_plan_id(pair_plan.id)
     
 
 @pytest.mark.nightly
-def test_recycle_strat_from_strat_view_recycle_ui_button(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+def test_recycle_plan_from_plan_view_recycle_ui_button(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+        expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         last_barter_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    created_pair_strat, executor_web_client = (
-        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+    created_pair_plan, executor_web_client = (
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+                                           expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
                                            market_depth_basemodel_list))
 
-    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_strat.id)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_plan.id)
 
     try:
         # updating yaml_configs according to this test
@@ -7264,20 +7264,20 @@ def test_recycle_strat_from_strat_view_recycle_ui_button(
 
         total_chore_count_for_each_side = 1
         place_sanity_chores_for_executor(
-            buy_symbol, sell_symbol, created_pair_strat, total_chore_count_for_each_side, last_barter_fixture_list,
+            buy_symbol, sell_symbol, created_pair_plan, total_chore_count_for_each_side, last_barter_fixture_list,
             residual_wait_sec, executor_web_client)
 
-        executor_port = created_pair_strat.port
+        executor_port = created_pair_plan.port
 
-        # Recycling Strat
-        strat_view_obj = photo_book_web_client.get_strat_view_client(created_pair_strat.id)
-        # simulating ui button update - making recycle_strat True
-        strat_view_obj.recycle_strat = True
-        update_strat_view = photo_book_web_client.put_strat_view_client(strat_view_obj)
-        assert update_strat_view == strat_view_obj, \
-            f"Mismatched strat_view: expected {strat_view_obj}, updated {update_strat_view}"
+        # Recycling Plan
+        plan_view_obj = photo_book_web_client.get_plan_view_client(created_pair_plan.id)
+        # simulating ui button update - making recycle_plan True
+        plan_view_obj.recycle_plan = True
+        update_plan_view = photo_book_web_client.put_plan_view_client(plan_view_obj)
+        assert update_plan_view == plan_view_obj, \
+            f"Mismatched plan_view: expected {plan_view_obj}, updated {update_plan_view}"
 
-        time.sleep(2*residual_wait_sec)   # waiting for strat to get loaded completely
+        time.sleep(2*residual_wait_sec)   # waiting for plan to get loaded completely
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -7287,13 +7287,13 @@ def test_recycle_strat_from_strat_view_recycle_ui_button(
         raise Exception(e)
     # Since config file is removed while unloading - no need to revert changes
 
-    # verifying recycle_strat is updated back to default state
-    update_strat_view = photo_book_web_client.get_strat_view_client(strat_view_obj.id)
-    assert not update_strat_view.recycle_strat, \
-        f"Mismatched strat_view.unload_strat: expected False, found True"
+    # verifying recycle_plan is updated back to default state
+    update_plan_view = photo_book_web_client.get_plan_view_client(plan_view_obj.id)
+    assert not update_plan_view.recycle_plan, \
+        f"Mismatched plan_view.unload_plan: expected False, found True"
 
-    executor_http_client, activated_pair_strat = (
-        _verify_server_ready_state_in_reloaded_strat(created_pair_strat.id, executor_port,
+    executor_http_client, activated_pair_plan = (
+        _verify_server_ready_state_in_reloaded_plan(created_pair_plan.id, executor_port,
                                                      residual_wait_sec, buy_symbol, sell_symbol))
 
     time.sleep(5)
@@ -7308,12 +7308,12 @@ def test_recycle_strat_from_strat_view_recycle_ui_button(
 
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        # updating market_depth to update cache in reloaded strat
-        update_market_depth(activated_pair_strat.cpp_port)
+        # updating market_depth to update cache in reloaded plan
+        update_market_depth(activated_pair_plan.cpp_port)
 
         total_chore_count_for_each_side = 2
         place_sanity_chores_for_executor(
-            buy_symbol, sell_symbol, activated_pair_strat, total_chore_count_for_each_side, last_barter_fixture_list,
+            buy_symbol, sell_symbol, activated_pair_plan, total_chore_count_for_each_side, last_barter_fixture_list,
             residual_wait_sec, executor_http_client, True)
 
     except AssertionError as e:
@@ -7327,15 +7327,15 @@ def test_recycle_strat_from_strat_view_recycle_ui_button(
 
 
 @pytest.mark.nightly
-def test_recycle_multiple_strats_from_strat_view_recycle_ui_button(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+def test_recycle_multiple_plans_from_plan_view_recycle_ui_button(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+        expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         last_barter_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture):
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:10]
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
-        results = [executor.submit(create_n_activate_strat, leg1_symbol, leg2_symbol, copy.deepcopy(pair_strat_),
-                                   copy.deepcopy(expected_strat_limits_),
-                                   copy.deepcopy(expected_strat_status_), copy.deepcopy(symbol_overview_obj_list),
+        results = [executor.submit(create_n_activate_plan, leg1_symbol, leg2_symbol, copy.deepcopy(pair_plan_),
+                                   copy.deepcopy(expected_plan_limits_),
+                                   copy.deepcopy(expected_plan_status_), copy.deepcopy(symbol_overview_obj_list),
                                    copy.deepcopy(market_depth_basemodel_list), None, None, None)
                    for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list]
 
@@ -7343,40 +7343,40 @@ def test_recycle_multiple_strats_from_strat_view_recycle_ui_button(
             if future.exception() is not None:
                 raise Exception(future.exception())
 
-    pair_strats = email_book_service_beanie_web_client.get_all_pair_strat_client()
-    for pair_strat in pair_strats:
-        strat_view_dict = {'_id': pair_strat.id, 'recycle_strat': True}
-        strat_view = photo_book_web_client.patch_strat_view_client(strat_view_dict)
+    pair_plans = email_book_service_beanie_web_client.get_all_pair_plan_client()
+    for pair_plan in pair_plans:
+        plan_view_dict = {'_id': pair_plan.id, 'recycle_plan': True}
+        plan_view = photo_book_web_client.patch_plan_view_client(plan_view_dict)
 
-    time.sleep(10 * refresh_sec_update_fixture)  # waiting for strat to get loaded completely
+    time.sleep(10 * refresh_sec_update_fixture)  # waiting for plan to get loaded completely
 
-    # checking if all strats are shifted to unloaded keys in strat_collection and are not active anymore
-    strat_collection = email_book_service_native_web_client.get_strat_collection_client(strat_collection_id=1)
-    pair_strats = email_book_service_beanie_web_client.get_all_pair_strat_client()
-    for pair_strat in pair_strats:
-        strat_key = get_strat_key_from_pair_strat(pair_strat)
-        assert strat_key in strat_collection.loaded_strat_keys, \
-            f"Mismatch: {strat_key=} must be in {strat_collection.loaded_strat_keys=}"
-        assert strat_key not in strat_collection.buffered_strat_keys, \
-            f"Mismatch: {strat_key=} must not be in {strat_collection.buffered_strat_keys=}"
-        assert pair_strat.strat_state == StratState.StratState_READY, \
-            f"Mismatch: strat_state must be {StratState.StratState_READY}, found {pair_strat.strat_state=}"
-        assert pair_strat.port is not None, \
-            f"Mismatch: pair_strat.port must not be None, found {pair_strat.port=}"
+    # checking if all plans are shifted to unloaded keys in plan_collection and are not active anymore
+    plan_collection = email_book_service_native_web_client.get_plan_collection_client(plan_collection_id=1)
+    pair_plans = email_book_service_beanie_web_client.get_all_pair_plan_client()
+    for pair_plan in pair_plans:
+        plan_key = get_plan_key_from_pair_plan(pair_plan)
+        assert plan_key in plan_collection.loaded_plan_keys, \
+            f"Mismatch: {plan_key=} must be in {plan_collection.loaded_plan_keys=}"
+        assert plan_key not in plan_collection.buffered_plan_keys, \
+            f"Mismatch: {plan_key=} must not be in {plan_collection.buffered_plan_keys=}"
+        assert pair_plan.plan_state == PlanState.PlanState_READY, \
+            f"Mismatch: plan_state must be {PlanState.PlanState_READY}, found {pair_plan.plan_state=}"
+        assert pair_plan.port is not None, \
+            f"Mismatch: pair_plan.port must not be None, found {pair_plan.port=}"
 
 
-def _check_all_strat_pause_by_system_control_ui_button_update(
-        leg1_leg2_symbol_list, pair_strat_,
-        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+def _check_all_plan_pause_by_system_control_ui_button_update(
+        leg1_leg2_symbol_list, pair_plan_,
+        expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         last_barter_fixture_list, market_depth_basemodel_list,
         max_loop_count_per_side, refresh_sec_update_fixture, update_type: str):
     max_loop_count_per_side = 2
     leg1_leg2_symbol_list = leg1_leg2_symbol_list[:10]
-    result_list: List[Tuple[str, str, PairStratBaseModel, StreetBookServiceHttpClient]] = []
+    result_list: List[Tuple[str, str, PairPlanBaseModel, StreetBookServiceHttpClient]] = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
-        results = [executor.submit(place_sanity_chores, leg1_symbol, leg2_symbol, copy.deepcopy(pair_strat_),
-                                   copy.deepcopy(expected_strat_limits_),
-                                   copy.deepcopy(expected_strat_status_), copy.deepcopy(symbol_overview_obj_list),
+        results = [executor.submit(place_sanity_chores, leg1_symbol, leg2_symbol, copy.deepcopy(pair_plan_),
+                                   copy.deepcopy(expected_plan_limits_),
+                                   copy.deepcopy(expected_plan_status_), copy.deepcopy(symbol_overview_obj_list),
                                    copy.deepcopy(last_barter_fixture_list), copy.deepcopy(market_depth_basemodel_list),
                                    max_loop_count_per_side, refresh_sec_update_fixture)
                    for leg1_symbol, leg2_symbol in leg1_leg2_symbol_list]
@@ -7385,20 +7385,20 @@ def _check_all_strat_pause_by_system_control_ui_button_update(
             if future.exception() is not None:
                 raise Exception(future.exception())
             else:
-                buy_symbol, sell_symbol, created_pair_strat, executor_web_client = future.result()
-                result_list.append((buy_symbol, sell_symbol, created_pair_strat, executor_web_client))
+                buy_symbol, sell_symbol, created_pair_plan, executor_web_client = future.result()
+                result_list.append((buy_symbol, sell_symbol, created_pair_plan, executor_web_client))
 
-    # Simulating all strat pause - initiating all start pause using pause_all_strats field update in system_control
+    # Simulating all plan pause - initiating all start pause using pause_all_plans field update in system_control
     if update_type.lower() == "patch":
-        system_control_obj = SystemControlBaseModel(id=1, kill_switch=False, pause_all_strats=True, 
-                                                    load_buffer_strats=False, cxl_baskets=False)
+        system_control_obj = SystemControlBaseModel(id=1, kill_switch=False, pause_all_plans=True, 
+                                                    load_buffer_plans=False, cxl_baskets=False)
         updated_system_control = email_book_service_native_web_client.patch_system_control_client(
             system_control_obj.to_json_dict(exclude_none=True))
         assert updated_system_control == system_control_obj, \
             f"Mismatch system_control: expected: {system_control_obj}, updated: {updated_system_control}"
     else:
         system_control_obj = email_book_service_native_web_client.get_system_control_client(system_control_id=1)
-        system_control_obj.pause_all_strats = True
+        system_control_obj.pause_all_plans = True
         updated_system_control = email_book_service_native_web_client.put_system_control_client(
             system_control_obj)
         assert updated_system_control == system_control_obj, \
@@ -7407,142 +7407,142 @@ def _check_all_strat_pause_by_system_control_ui_button_update(
     time.sleep(5)
 
     # checking alert
-    check_str = "Triggered pause_all_strat event at"
-    assert_fail_msg = f"Can't find alert of {check_str!r} in portfolio_alert"
-    check_alert_str_in_portfolio_alert(check_str, assert_fail_msg)
+    check_str = "Triggered pause_all_plan event at"
+    assert_fail_msg = f"Can't find alert of {check_str!r} in contact_alert"
+    check_alert_str_in_contact_alert(check_str, assert_fail_msg)
 
-    # verifying all strat pause
-    pair_strat_list = email_book_service_beanie_web_client.get_all_pair_strat_client()
-    for pair_strat_ in pair_strat_list:
-        assert pair_strat_.strat_state == StratState.StratState_PAUSED, \
-            f"Mismatched pair_strat.strat_state: expected: {pair_strat_.strat_state}, updated {StratState.StratState_PAUSED}"
+    # verifying all plan pause
+    pair_plan_list = email_book_service_beanie_web_client.get_all_pair_plan_client()
+    for pair_plan_ in pair_plan_list:
+        assert pair_plan_.plan_state == PlanState.PlanState_PAUSED, \
+            f"Mismatched pair_plan.plan_state: expected: {pair_plan_.plan_state}, updated {PlanState.PlanState_PAUSED}"
 
 
 @pytest.mark.nightly
-def test_all_strat_pause_by_system_control_ui_button_though_patch(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+def test_all_plan_pause_by_system_control_ui_button_though_patch(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+        expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         last_barter_fixture_list, market_depth_basemodel_list,
         buy_chore_, sell_chore_, max_loop_count_per_side, refresh_sec_update_fixture):
-    _check_all_strat_pause_by_system_control_ui_button_update(
-        leg1_leg2_symbol_list, pair_strat_,
-        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+    _check_all_plan_pause_by_system_control_ui_button_update(
+        leg1_leg2_symbol_list, pair_plan_,
+        expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         last_barter_fixture_list, market_depth_basemodel_list,
         max_loop_count_per_side, refresh_sec_update_fixture, "patch")
 
 
 @pytest.mark.nightly
-def test_all_strat_pause_by_system_control_ui_button_though_put(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+def test_all_plan_pause_by_system_control_ui_button_though_put(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+        expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         last_barter_fixture_list, market_depth_basemodel_list,
         buy_chore_, sell_chore_, max_loop_count_per_side, refresh_sec_update_fixture):
-    _check_all_strat_pause_by_system_control_ui_button_update(
-        leg1_leg2_symbol_list, pair_strat_,
-        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+    _check_all_plan_pause_by_system_control_ui_button_update(
+        leg1_leg2_symbol_list, pair_plan_,
+        expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         last_barter_fixture_list, market_depth_basemodel_list,
         max_loop_count_per_side, refresh_sec_update_fixture, "put")
 
 
 @pytest.mark.nightly
-def test_sequenced_active_strats_with_same_symbol_side_block_with_leg1_buy(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
+def test_sequenced_active_plans_with_same_symbol_side_block_with_leg1_buy(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
         buy_chore_, sell_chore_, max_loop_count_per_side,
         expected_chore_limits_, refresh_sec_update_fixture):
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
 
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
-    created_pair_strat, executor_http_client = (
-        create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    created_pair_plan, executor_http_client = (
+        create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_,
+                                           expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
                                            market_depth_basemodel_list))
 
-    # First created strat is already active, checking if next strat, if tries to get activated with same symbol-side
+    # First created plan is already active, checking if next plan, if tries to get activated with same symbol-side
     # gets exception
 
     try:
-        created_pair_strat, executor_http_client = (
-            create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-                                               expected_strat_status_, symbol_overview_obj_list,
+        created_pair_plan, executor_http_client = (
+            create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_,
+                                               expected_plan_status_, symbol_overview_obj_list,
                                                last_barter_fixture_list,
                                                market_depth_basemodel_list))
     except Exception as e:
-        err_str_ = "Ongoing strat already exists with same symbol-side pair legs"
+        err_str_ = "Ongoing plan already exists with same symbol-side pair legs"
         assert err_str_ in str(e), \
-            (f"Strat tring to be activated with same symbol-side must raise exception with description: "
+            (f"Plan tring to be activated with same symbol-side must raise exception with description: "
              f"{err_str_} but can't find this description, exception: {e}")
     else:
-        assert False, ("Strat with same symbol-side must raise exception while another strat is already ongoing, "
+        assert False, ("Plan with same symbol-side must raise exception while another plan is already ongoing, "
                        "but got activated likely because of some bug")
 
 
 @pytest.mark.nightly
-def test_sequenced_active_strats_with_same_symbol_side_block_with_leg1_sell(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
+def test_sequenced_active_plans_with_same_symbol_side_block_with_leg1_sell(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
         buy_chore_, sell_chore_, max_loop_count_per_side,
         expected_chore_limits_, refresh_sec_update_fixture):
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
 
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
-    created_pair_strat, executor_http_client = (
-        create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    created_pair_plan, executor_http_client = (
+        create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_,
+                                           expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
                                            market_depth_basemodel_list, leg1_side=Side.SELL,
                                            leg2_side=Side.BUY))
 
-    # First created strat is already active, checking if next strat, if tries to get activated with same symbol-side
+    # First created plan is already active, checking if next plan, if tries to get activated with same symbol-side
     # gets exception
 
     try:
-        created_pair_strat, executor_http_client = (
-            create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-                                               expected_strat_status_, symbol_overview_obj_list,
+        created_pair_plan, executor_http_client = (
+            create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_,
+                                               expected_plan_status_, symbol_overview_obj_list,
                                                last_barter_fixture_list,
                                                market_depth_basemodel_list, leg1_side=Side.SELL,
                                                leg2_side=Side.BUY))
     except Exception as e:
-        err_str_ = "Ongoing strat already exists with same symbol-side pair legs"
+        err_str_ = "Ongoing plan already exists with same symbol-side pair legs"
         assert err_str_ in str(e), \
-            (f"Strat tring to be activated with same symbol-side must raise exception with description: "
+            (f"Plan tring to be activated with same symbol-side must raise exception with description: "
              f"{err_str_} but can't find this description, exception: {e}")
     else:
-        assert False, ("Strat with same symbol-side must raise exception while another strat is already ongoing, "
+        assert False, ("Plan with same symbol-side must raise exception while another plan is already ongoing, "
                        "but got activated likely because of some bug")
 
 
-# @@@ failing since strat is now paused instead of DONE once completed and 2 strats can't be ongoing
+# @@@ failing since plan is now paused instead of DONE once completed and 2 plans can't be ongoing
 @pytest.mark.nightly
-def _test_sequenced_fully_consume_same_symbol_strats(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
+def _test_sequenced_fully_consume_same_symbol_plans(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
         buy_chore_, sell_chore_, max_loop_count_per_side, expected_chore_limits_, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
 
-    expected_strat_limits_.max_single_leg_notional = 18000
-    expected_strat_limits_.max_open_single_leg_notional = 18000
-    expected_strat_limits_.max_net_filled_notional = 18000
-    expected_strat_limits_.min_chore_notional = 15000
-    strat_done_after_exhausted_consumable_notional(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
+    expected_plan_limits_.max_single_leg_notional = 18000
+    expected_plan_limits_.max_open_single_leg_notional = 18000
+    expected_plan_limits_.max_net_filled_notional = 18000
+    expected_plan_limits_.min_chore_notional = 15000
+    plan_done_after_exhausted_consumable_notional(
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_, expected_plan_status_,
         symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
         refresh_sec_update_fixture, Side.BUY)
 
-    strat_done_after_exhausted_consumable_notional(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
+    plan_done_after_exhausted_consumable_notional(
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_, expected_plan_status_,
         symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
         refresh_sec_update_fixture, Side.BUY)
 
 
 # fixme: log file generation logic is disabled
 @pytest.mark.nightly2
-def test_opp_symbol_strat_activate_block_in_single_day_with_buy_first(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
+def test_opp_symbol_plan_activate_block_in_single_day_with_buy_first(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
         buy_chore_, sell_chore_, max_loop_count_per_side, expected_chore_limits_,
         refresh_sec_update_fixture):
     barter_data_file_path = PAIR_STRAT_ENGINE_DIR / "data" / "barter_ready_records.csv"
@@ -7553,53 +7553,53 @@ def test_opp_symbol_strat_activate_block_in_single_day_with_buy_first(
         leg1_symbol = leg1_leg2_symbol_list[0][0]
         leg2_symbol = leg1_leg2_symbol_list[0][1]
 
-        # updated values to enable lock file generation when strat is activated
+        # updated values to enable lock file generation when plan is activated
         csv_data_df.loc[csv_data_df['ticker'] == leg1_symbol, 'settled_tradable'] = False
         csv_data_df.loc[csv_data_df['ticker'] == leg1_symbol, 'executed_tradable'] = False
         csv_data_df.loc[csv_data_df['ticker'] == leg2_symbol, 'settled_tradable'] = False
         csv_data_df.loc[csv_data_df['ticker'] == leg2_symbol, 'executed_tradable'] = False
         csv_data_df.to_csv(barter_data_file_path, index=False)
 
-        # updating static data in pair-strat engine service
+        # updating static data in pair-plan engine service
         email_book_service_native_web_client.reload_bartering_data_query_client()
 
-        expected_strat_limits_1 = copy.deepcopy(expected_strat_limits_)
-        expected_strat_limits_1.max_single_leg_notional = 18000
-        expected_strat_limits_1.max_open_single_leg_notional = 18000
-        expected_strat_limits_1.max_net_filled_notional = 18000
-        expected_strat_limits_1.min_chore_notional = 15000
-        strat_done_after_exhausted_consumable_notional(
-            leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_1, expected_strat_status_,
+        expected_plan_limits_1 = copy.deepcopy(expected_plan_limits_)
+        expected_plan_limits_1.max_single_leg_notional = 18000
+        expected_plan_limits_1.max_open_single_leg_notional = 18000
+        expected_plan_limits_1.max_net_filled_notional = 18000
+        expected_plan_limits_1.min_chore_notional = 15000
+        plan_done_after_exhausted_consumable_notional(
+            leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_1, expected_plan_status_,
             symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
             refresh_sec_update_fixture, Side.BUY)
 
         try:
-            strat_done_after_exhausted_consumable_notional(
-                leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
+            plan_done_after_exhausted_consumable_notional(
+                leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_, expected_plan_status_,
                 symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
                 refresh_sec_update_fixture, Side.BUY, leg_1_side=Side.SELL, leg_2_side=Side.BUY)
         except Exception as e:
-            err_str_ = ("Found strat activated today with symbols of this strat being used in opposite sides - "
-                        "can't activate this strat today")
+            err_str_ = ("Found plan activated today with symbols of this plan being used in opposite sides - "
+                        "can't activate this plan today")
             if err_str_ not in str(e):
                 raise e
         else:
-            assert False, ("Strat with opposite symbol-side must raise exception while activating in same day of "
-                           "other strat activated, but got activated likely because of some bug")
+            assert False, ("Plan with opposite symbol-side must raise exception while activating in same day of "
+                           "other plan activated, but got activated likely because of some bug")
     except Exception as e:
         raise e
     finally:
         # reverting file changes
         recovery_df.to_csv(barter_data_file_path, index=False)
-        # updating static data in pair-strat engine service
+        # updating static data in pair-plan engine service
         email_book_service_native_web_client.reload_bartering_data_query_client()
 
 
 # fixme: log file generation logic is disabled
 @pytest.mark.nightly2
-def test_opp_symbol_strat_activate_block_in_single_day_with_sell_first(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
+def test_opp_symbol_plan_activate_block_in_single_day_with_sell_first(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
         buy_chore_, sell_chore_, max_loop_count_per_side, expected_chore_limits_,
         refresh_sec_update_fixture):
     barter_data_file_path = PAIR_STRAT_ENGINE_DIR / "data" / "barter_ready_records.csv"
@@ -7610,92 +7610,92 @@ def test_opp_symbol_strat_activate_block_in_single_day_with_sell_first(
         leg1_symbol = leg1_leg2_symbol_list[0][0]
         leg2_symbol = leg1_leg2_symbol_list[0][1]
 
-        # updated values to enable lock file generation when strat is activated
+        # updated values to enable lock file generation when plan is activated
         csv_data_df.loc[csv_data_df['ticker'] == leg1_symbol, 'settled_tradable'] = False
         csv_data_df.loc[csv_data_df['ticker'] == leg1_symbol, 'executed_tradable'] = False
         csv_data_df.loc[csv_data_df['ticker'] == leg2_symbol, 'settled_tradable'] = False
         csv_data_df.loc[csv_data_df['ticker'] == leg2_symbol, 'executed_tradable'] = False
         csv_data_df.to_csv(barter_data_file_path)
 
-        # updating static data in pair-strat engine service
+        # updating static data in pair-plan engine service
         email_book_service_native_web_client.reload_bartering_data_query_client()
 
-        expected_strat_limits_.max_single_leg_notional = 21000
-        expected_strat_limits_.max_open_single_leg_notional = 21000
-        expected_strat_limits_.max_net_filled_notional = 21000
-        expected_strat_limits_.min_chore_notional = 15000
-        strat_done_after_exhausted_consumable_notional(
-            leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
+        expected_plan_limits_.max_single_leg_notional = 21000
+        expected_plan_limits_.max_open_single_leg_notional = 21000
+        expected_plan_limits_.max_net_filled_notional = 21000
+        expected_plan_limits_.min_chore_notional = 15000
+        plan_done_after_exhausted_consumable_notional(
+            leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_, expected_plan_status_,
             symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
             refresh_sec_update_fixture, Side.SELL, leg_1_side=Side.SELL, leg_2_side=Side.BUY)
 
         try:
-            strat_done_after_exhausted_consumable_notional(
-                leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
+            plan_done_after_exhausted_consumable_notional(
+                leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_, expected_plan_status_,
                 symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
                 refresh_sec_update_fixture, Side.SELL)
         except Exception as e:
-            err_str_ = ("Found strat activated today with symbols of this strat being used in opposite sides - "
-                        "can't activate this strat today")
+            err_str_ = ("Found plan activated today with symbols of this plan being used in opposite sides - "
+                        "can't activate this plan today")
             assert err_str_ in str(e), \
-                (f"Strat created with opposite symbol-side must raise exception with description: {err_str_} but "
+                (f"Plan created with opposite symbol-side must raise exception with description: {err_str_} but "
                  f"can't find this description, exception: {e}")
         else:
-            assert False, ("Strat with opposite symbol-side must raise exception while activating in same day of "
-                           "other strat activated, but got activated likely because of some bug")
+            assert False, ("Plan with opposite symbol-side must raise exception while activating in same day of "
+                           "other plan activated, but got activated likely because of some bug")
     except Exception as e:
         raise e
     finally:
         # reverting file changes
         recovery_df.to_csv(barter_data_file_path)
-        # updating static data in pair-strat engine service
+        # updating static data in pair-plan engine service
         email_book_service_native_web_client.reload_bartering_data_query_client()
 
 
 @pytest.mark.nightly
-def test_sequenced_fully_consume_diff_symbol_strats(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
+def test_sequenced_fully_consume_diff_symbol_plans(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
         buy_chore_, sell_chore_, max_loop_count_per_side, expected_chore_limits_,
         refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
 
-    expected_strat_limits_.max_single_leg_notional = 18000
-    expected_strat_limits_.max_open_single_leg_notional = 18000
-    expected_strat_limits_.max_net_filled_notional = 18000
-    expected_strat_limits_.min_chore_notional = 15000
-    strat_done_after_exhausted_consumable_notional(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
+    expected_plan_limits_.max_single_leg_notional = 18000
+    expected_plan_limits_.max_open_single_leg_notional = 18000
+    expected_plan_limits_.max_net_filled_notional = 18000
+    expected_plan_limits_.min_chore_notional = 15000
+    plan_done_after_exhausted_consumable_notional(
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_, expected_plan_status_,
         symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
         refresh_sec_update_fixture, Side.BUY)
 
     buy_symbol = leg1_leg2_symbol_list[1][0]
     sell_symbol = leg1_leg2_symbol_list[1][1]
-    strat_done_after_exhausted_consumable_notional(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
+    plan_done_after_exhausted_consumable_notional(
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_, expected_plan_status_,
         symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
         refresh_sec_update_fixture, Side.BUY)
 
 
 @pytest.mark.nightly
-def test_reactivate_after_pause_strat(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+def test_reactivate_after_pause_plan(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+        expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         market_depth_basemodel_list, last_barter_fixture_list,
         refresh_sec_update_fixture):
-    # creates and activates multiple pair_strats
+    # creates and activates multiple pair_plans
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    activated_pair_strat, executor_http_client = (
-        create_n_activate_strat(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                expected_strat_status_, symbol_overview_obj_list,
+    activated_pair_plan, executor_http_client = (
+        create_n_activate_plan(buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+                                expected_plan_status_, symbol_overview_obj_list,
                                 market_depth_basemodel_list))
 
-    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(activated_pair_strat.id)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(activated_pair_plan.id)
 
     try:
         # updating yaml_configs according to this test
@@ -7707,21 +7707,21 @@ def test_reactivate_after_pause_strat(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         time.sleep(2)
-        pause_pair_strat = PairStratBaseModel.from_kwargs(_id=activated_pair_strat.id,
-                                              strat_state=StratState.StratState_PAUSED)
-        email_book_service_native_web_client.patch_pair_strat_client(
-            pause_pair_strat.to_dict(exclude_none=True))
+        pause_pair_plan = PairPlanBaseModel.from_kwargs(_id=activated_pair_plan.id,
+                                              plan_state=PlanState.PlanState_PAUSED)
+        email_book_service_native_web_client.patch_pair_plan_client(
+            pause_pair_plan.to_dict(exclude_none=True))
 
         time.sleep(2)
-        reactivate_pair_strat = PairStratBaseModel.from_kwargs(_id=activated_pair_strat.id,
-                                                   strat_state=StratState.StratState_ACTIVE)
-        email_book_service_native_web_client.patch_pair_strat_client(
-            reactivate_pair_strat.to_dict(exclude_none=True))
+        reactivate_pair_plan = PairPlanBaseModel.from_kwargs(_id=activated_pair_plan.id,
+                                                   plan_state=PlanState.PlanState_ACTIVE)
+        email_book_service_native_web_client.patch_pair_plan_client(
+            reactivate_pair_plan.to_dict(exclude_none=True))
 
         time.sleep(2)
         total_chore_count_for_each_side = 2
         place_sanity_chores_for_executor(
-            buy_symbol, sell_symbol, activated_pair_strat, total_chore_count_for_each_side, last_barter_fixture_list,
+            buy_symbol, sell_symbol, activated_pair_plan, total_chore_count_for_each_side, last_barter_fixture_list,
             residual_wait_sec, executor_http_client)
     except AssertionError as e:
         raise AssertionError(e)
@@ -7734,126 +7734,126 @@ def test_reactivate_after_pause_strat(
 
 
 @pytest.mark.nightly
-def test_pause_done_n_unload_strat(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-                                   expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+def test_pause_done_n_unload_plan(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+                                   expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
                                    market_depth_basemodel_list, last_barter_fixture_list,
                                    refresh_sec_update_fixture):
     # making limits suitable for this test
-    expected_strat_limits_.max_open_chores_per_side = 10
-    expected_strat_limits_.residual_restriction.max_residual = 105000
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.max_open_chores_per_side = 10
+    expected_plan_limits_.residual_restriction.max_residual = 105000
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    active_strat_list: List[PairStratBaseModel] = []
+    active_plan_list: List[PairPlanBaseModel] = []
     for buy_symbol, sell_symbol in leg1_leg2_symbol_list[:2]:
-        activated_pair_strat, executor_web_client = (
-            create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                               expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        activated_pair_plan, executor_web_client = (
+            create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+                                               expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
                                                market_depth_basemodel_list))
-        active_strat_list.append(activated_pair_strat)
+        active_plan_list.append(activated_pair_plan)
 
-    email_book_service_native_web_client.patch_pair_strat_client(
-        PairStratBaseModel.from_kwargs(_id=active_strat_list[-1].id,
-                                       strat_state=StratState.StratState_READY).to_dict(exclude_none=True))
+    email_book_service_native_web_client.patch_pair_plan_client(
+        PairPlanBaseModel.from_kwargs(_id=active_plan_list[-1].id,
+                                       plan_state=PlanState.PlanState_READY).to_dict(exclude_none=True))
 
     time.sleep(5)
 
-    for active_strat in active_strat_list:
+    for active_plan in active_plan_list:
 
-        if active_strat != active_strat_list[-1]:
-            email_book_service_native_web_client.patch_pair_strat_client(
-                PairStratBaseModel.from_kwargs(_id=active_strat.id,
-                                               strat_state=StratState.StratState_PAUSED).to_dict(exclude_none=True))
-
-            time.sleep(5)
-            email_book_service_native_web_client.patch_pair_strat_client(
-                PairStratBaseModel.from_kwargs(_id=active_strat.id,
-                                               strat_state=StratState.StratState_DONE).to_dict(exclude_none=True))
+        if active_plan != active_plan_list[-1]:
+            email_book_service_native_web_client.patch_pair_plan_client(
+                PairPlanBaseModel.from_kwargs(_id=active_plan.id,
+                                               plan_state=PlanState.PlanState_PAUSED).to_dict(exclude_none=True))
 
             time.sleep(5)
-        strat_key = get_strat_key_from_pair_strat(active_strat)
-        strat_collection = email_book_service_native_web_client.get_strat_collection_client(1)
-        strat_collection.loaded_strat_keys.remove(strat_key)
-        strat_collection.buffered_strat_keys.append(strat_key)
+            email_book_service_native_web_client.patch_pair_plan_client(
+                PairPlanBaseModel.from_kwargs(_id=active_plan.id,
+                                               plan_state=PlanState.PlanState_DONE).to_dict(exclude_none=True))
 
-        email_book_service_native_web_client.put_strat_collection_client(strat_collection)
+            time.sleep(5)
+        plan_key = get_plan_key_from_pair_plan(active_plan)
+        plan_collection = email_book_service_native_web_client.get_plan_collection_client(1)
+        plan_collection.loaded_plan_keys.remove(plan_key)
+        plan_collection.buffered_plan_keys.append(plan_key)
+
+        email_book_service_native_web_client.put_plan_collection_client(plan_collection)
         time.sleep(2)
 
-        pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_strat.id)
-        assert pair_strat.server_ready_state == 0, \
-            "Mismatch: server_ready_state must be 0 after strat unload"
+        pair_plan = email_book_service_native_web_client.get_pair_plan_client(active_plan.id)
+        assert pair_plan.server_ready_state == 0, \
+            "Mismatch: server_ready_state must be 0 after plan unload"
 
-    # loading strat to get it deleted by clean_n_set_limits of another tests
-    for index, active_strat in enumerate(active_strat_list):
-        strat_key = get_strat_key_from_pair_strat(active_strat)
-        strat_collection = email_book_service_native_web_client.get_strat_collection_client(1)
-        strat_collection.loaded_strat_keys.append(strat_key)
-        strat_collection.buffered_strat_keys.remove(strat_key)
+    # loading plan to get it deleted by clean_n_set_limits of another tests
+    for index, active_plan in enumerate(active_plan_list):
+        plan_key = get_plan_key_from_pair_plan(active_plan)
+        plan_collection = email_book_service_native_web_client.get_plan_collection_client(1)
+        plan_collection.loaded_plan_keys.append(plan_key)
+        plan_collection.buffered_plan_keys.remove(plan_key)
 
-        email_book_service_native_web_client.put_strat_collection_client(strat_collection)
-        time.sleep(residual_wait_sec)   # waiting for strat to get loaded completely
+        email_book_service_native_web_client.put_plan_collection_client(plan_collection)
+        time.sleep(residual_wait_sec)   # waiting for plan to get loaded completely
 
-        pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_strat.id)
+        pair_plan = email_book_service_native_web_client.get_pair_plan_client(active_plan.id)
         executor_http_client = StreetBookServiceHttpClient.set_or_get_if_instance_exists(
-            pair_strat.host, pair_strat.port)
-        buy_symbol = active_strat.pair_strat_params.strat_leg1.sec.sec_id
-        sell_symbol = active_strat.pair_strat_params.strat_leg2.sec.sec_id
+            pair_plan.host, pair_plan.port)
+        buy_symbol = active_plan.pair_plan_params.plan_leg1.sec.sec_id
+        sell_symbol = active_plan.pair_plan_params.plan_leg2.sec.sec_id
         run_symbol_overview(buy_symbol, sell_symbol, symbol_overview_obj_list, executor_http_client)
     time.sleep(residual_wait_sec)
 
 
-def _frequent_update_strat_view_in_strat(buy_symbol, sell_symbol, pair_strat_,
-        expected_strat_limits_, expected_start_status_, symbol_overview_obj_list,
+def _frequent_update_plan_view_in_plan(buy_symbol, sell_symbol, pair_plan_,
+        expected_plan_limits_, expected_start_status_, symbol_overview_obj_list,
         last_barter_fixture_list, market_depth_basemodel_list,
         refresh_sec):
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec
     residual_wait_sec = 4 * refresh_sec
 
-    created_pair_strat, executor_web_client = (
-        move_snoozed_pair_strat_to_ready_n_then_active(pair_strat_, market_depth_basemodel_list,
-                                                       symbol_overview_obj_list, expected_strat_limits_,
+    created_pair_plan, executor_web_client = (
+        move_snoozed_pair_plan_to_ready_n_then_active(pair_plan_, market_depth_basemodel_list,
+                                                       symbol_overview_obj_list, expected_plan_limits_,
                                                        expected_start_status_))
 
     loop_count = 2000
     for i in range(loop_count):
         if i % 2 == 0:
-            strat_view_obj = StratViewBaseModel.from_kwargs(_id=created_pair_strat.id, market_premium=i)
+            plan_view_obj = PlanViewBaseModel.from_kwargs(_id=created_pair_plan.id, market_premium=i)
         else:
-            strat_view_obj = StratViewBaseModel.from_kwargs(_id=created_pair_strat.id, balance_notional=i)
-        photo_book_web_client.patch_strat_view_client(strat_view_obj.to_dict(exclude_none=True))
+            plan_view_obj = PlanViewBaseModel.from_kwargs(_id=created_pair_plan.id, balance_notional=i)
+        photo_book_web_client.patch_plan_view_client(plan_view_obj.to_dict(exclude_none=True))
 
-    updated_strat_view = photo_book_web_client.get_strat_view_client(created_pair_strat.id)
-    assert updated_strat_view.market_premium == loop_count-2, \
-        (f"Mismatched: market_premium must be {loop_count-2} but found {updated_strat_view.market_premium}, "
-         f"_id: {created_pair_strat.id}")
-    assert updated_strat_view.balance_notional == loop_count-1, \
-        (f"Mismatched: balance_notional must be {loop_count-1} but found {updated_strat_view.balance_notional}, "
-         f"_id: {created_pair_strat.id}")
+    updated_plan_view = photo_book_web_client.get_plan_view_client(created_pair_plan.id)
+    assert updated_plan_view.market_premium == loop_count-2, \
+        (f"Mismatched: market_premium must be {loop_count-2} but found {updated_plan_view.market_premium}, "
+         f"_id: {created_pair_plan.id}")
+    assert updated_plan_view.balance_notional == loop_count-1, \
+        (f"Mismatched: balance_notional must be {loop_count-1} but found {updated_plan_view.balance_notional}, "
+         f"_id: {created_pair_plan.id}")
 
 
 @pytest.mark.nightly
-def test_log_book_frequent_pair_strat_updates(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+def test_log_book_frequent_pair_plan_updates(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+        expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         market_depth_basemodel_list, last_barter_fixture_list,
         refresh_sec_update_fixture):
 
     leg1_leg2_symbol_list = []
-    total_strats = 10
-    pair_strat_list = []
-    for i in range(1, total_strats + 1):
-        leg1_symbol = f"CB_Sec_{i}"
-        leg2_symbol = f"EQT_Sec_{i}"
+    total_plans = 10
+    pair_plan_list = []
+    for i in range(1, total_plans + 1):
+        leg1_symbol = f"Type1_Sec_{i}"
+        leg2_symbol = f"Type2_Sec_{i}"
         leg1_leg2_symbol_list.append((leg1_symbol, leg2_symbol))
 
-        stored_pair_strat_basemodel = create_strat(leg1_symbol, leg2_symbol, pair_strat_)
-        pair_strat_list.append(stored_pair_strat_basemodel)
+        stored_pair_plan_basemodel = create_plan(leg1_symbol, leg2_symbol, pair_plan_)
+        pair_plan_list.append(stored_pair_plan_basemodel)
         time.sleep(2)
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
-        results = [executor.submit(_frequent_update_strat_view_in_strat, buy_sell_symbol[0], buy_sell_symbol[1],
-                                   pair_strat_list[idx],
-                                   deepcopy(expected_strat_limits_), deepcopy(expected_strat_status_),
+        results = [executor.submit(_frequent_update_plan_view_in_plan, buy_sell_symbol[0], buy_sell_symbol[1],
+                                   pair_plan_list[idx],
+                                   deepcopy(expected_plan_limits_), deepcopy(expected_plan_status_),
                                    deepcopy(symbol_overview_obj_list),
                                    deepcopy(last_barter_fixture_list), deepcopy(market_depth_basemodel_list),
                                    refresh_sec_update_fixture)
@@ -7865,11 +7865,11 @@ def test_log_book_frequent_pair_strat_updates(
 
 
 def _check_all_computes_in_models_other_than_chore_snapshot(
-        active_pair_strat: PairStratBaseModel, symbol, side, executor_http_client, chore_snapshot,
+        active_pair_plan: PairPlanBaseModel, symbol, side, executor_http_client, chore_snapshot,
         new_qty, new_px, chore_status, open_qty, open_notional, open_px, filled_qty,
         filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px, other_side_residual_qty,
         other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-        residual_qty: int | None = None, is_sell_buy_strat: bool = False):
+        residual_qty: int | None = None, is_sell_buy_plan: bool = False):
     symbol_side_snapshot_list = (
         executor_http_client.get_symbol_side_snapshot_from_symbol_side_query_client(symbol, side))
     assert len(symbol_side_snapshot_list) == 1, \
@@ -7909,64 +7909,64 @@ def _check_all_computes_in_models_other_than_chore_snapshot(
          f"{symbol_side_snapshot.last_update_fill_qty = }")
 
     leg1_last_barter_px, leg2_last_barter_px = get_both_side_last_barter_px()
-    strat_limits = executor_http_client.get_strat_limits_client(active_pair_strat.id)
-    strat_brief = executor_http_client.get_strat_brief_client(active_pair_strat.id)
+    plan_limits = executor_http_client.get_plan_limits_client(active_pair_plan.id)
+    plan_brief = executor_http_client.get_plan_brief_client(active_pair_plan.id)
     hedge_ratio = 1.0
     if side == Side.BUY:
-        strat_brief_bartering_brief = strat_brief.pair_buy_side_bartering_brief
-        if is_sell_buy_strat:
-            hedge_ratio = active_pair_strat.pair_strat_params.hedge_ratio
+        plan_brief_bartering_brief = plan_brief.pair_buy_side_bartering_brief
+        if is_sell_buy_plan:
+            hedge_ratio = active_pair_plan.pair_plan_params.hedge_ratio
     else:
-        strat_brief_bartering_brief = strat_brief.pair_sell_side_bartering_brief
-        if not is_sell_buy_strat:   # is buy-sell strat
-            hedge_ratio = active_pair_strat.pair_strat_params.hedge_ratio
+        plan_brief_bartering_brief = plan_brief.pair_sell_side_bartering_brief
+        if not is_sell_buy_plan:   # is buy-sell plan
+            hedge_ratio = active_pair_plan.pair_plan_params.hedge_ratio
         
-    assert (strat_brief_bartering_brief.open_qty == open_qty), \
-        (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.open_qty: "
-         f"{open_qty}, found {strat_brief_bartering_brief.open_qty = }")
-    assert (strat_brief_bartering_brief.open_notional == open_notional), \
-        (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.open_notional: "
-         f"{open_notional}, found {strat_brief_bartering_brief.open_notional = }")
-    assert (strat_brief_bartering_brief.residual_qty == residual_qty), \
-        (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.residual_qty: "
-         f"{residual_qty}, found {strat_brief_bartering_brief.residual_qty = }")
+    assert (plan_brief_bartering_brief.open_qty == open_qty), \
+        (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.open_qty: "
+         f"{open_qty}, found {plan_brief_bartering_brief.open_qty = }")
+    assert (plan_brief_bartering_brief.open_notional == open_notional), \
+        (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.open_notional: "
+         f"{open_notional}, found {plan_brief_bartering_brief.open_notional = }")
+    assert (plan_brief_bartering_brief.residual_qty == residual_qty), \
+        (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.residual_qty: "
+         f"{residual_qty}, found {plan_brief_bartering_brief.residual_qty = }")
     if chore_status in [ChoreStatusType.OE_DOD, ChoreStatusType.OE_FILLED,
                         ChoreStatusType.OE_OVER_FILLED, ChoreStatusType.OE_OVER_CXLED]:
         consumable_open_chores = 5
     else:
         consumable_open_chores = 4
-    assert (strat_brief_bartering_brief.consumable_open_chores == consumable_open_chores), \
-        (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_open_chores: "
-         f"{consumable_open_chores}, found {strat_brief_bartering_brief.consumable_open_chores = }")
-    assert (strat_brief_bartering_brief.all_bkr_cxlled_qty == cxled_qty), \
-        (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.all_bkr_cxlled_qty: "
-         f"{cxled_qty}, found {strat_brief_bartering_brief.all_bkr_cxlled_qty = }")
-    assert (strat_brief_bartering_brief.consumable_notional == (
-            (strat_limits.max_single_leg_notional * hedge_ratio) - symbol_side_snapshot.total_fill_notional - open_notional)), \
-        (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_notional: "
-         f"{(strat_limits.max_single_leg_notional * hedge_ratio) - symbol_side_snapshot.total_fill_notional - open_notional}, "
-         f"found {strat_brief_bartering_brief.consumable_notional=}")
-    assert (strat_brief_bartering_brief.consumable_open_notional ==
-            strat_limits.max_open_single_leg_notional - open_notional), \
-        (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_open_notional: "
-         f"{strat_limits.max_open_single_leg_notional - open_notional}, "
-         f"found {strat_brief_bartering_brief.consumable_open_notional = }")
+    assert (plan_brief_bartering_brief.consumable_open_chores == consumable_open_chores), \
+        (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.consumable_open_chores: "
+         f"{consumable_open_chores}, found {plan_brief_bartering_brief.consumable_open_chores = }")
+    assert (plan_brief_bartering_brief.all_bkr_cxlled_qty == cxled_qty), \
+        (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.all_bkr_cxlled_qty: "
+         f"{cxled_qty}, found {plan_brief_bartering_brief.all_bkr_cxlled_qty = }")
+    assert (plan_brief_bartering_brief.consumable_notional == (
+            (plan_limits.max_single_leg_notional * hedge_ratio) - symbol_side_snapshot.total_fill_notional - open_notional)), \
+        (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.consumable_notional: "
+         f"{(plan_limits.max_single_leg_notional * hedge_ratio) - symbol_side_snapshot.total_fill_notional - open_notional}, "
+         f"found {plan_brief_bartering_brief.consumable_notional=}")
+    assert (plan_brief_bartering_brief.consumable_open_notional ==
+            plan_limits.max_open_single_leg_notional - open_notional), \
+        (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.consumable_open_notional: "
+         f"{plan_limits.max_open_single_leg_notional - open_notional}, "
+         f"found {plan_brief_bartering_brief.consumable_open_notional = }")
     total_security_size: int = \
         static_data.get_security_float_from_ticker(chore_snapshot.chore_brief.security.sec_id)
-    assert (strat_brief_bartering_brief.consumable_concentration == (
-            (total_security_size / 100 * strat_limits.max_concentration) -
+    assert (plan_brief_bartering_brief.consumable_concentration == (
+            (total_security_size / 100 * plan_limits.max_concentration) -
             (open_qty + symbol_side_snapshot.total_filled_qty))), \
-        (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_concentration: "
-         f"{(total_security_size / 100 * strat_limits.max_concentration) - (open_qty + symbol_side_snapshot.total_filled_qty)}, "
-         f"found {strat_brief_bartering_brief.consumable_concentration = }")
-    assert (strat_brief_bartering_brief.consumable_cxl_qty == (
+        (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.consumable_concentration: "
+         f"{(total_security_size / 100 * plan_limits.max_concentration) - (open_qty + symbol_side_snapshot.total_filled_qty)}, "
+         f"found {plan_brief_bartering_brief.consumable_concentration = }")
+    assert (plan_brief_bartering_brief.consumable_cxl_qty == (
             (((open_qty + symbol_side_snapshot.total_filled_qty +
-               symbol_side_snapshot.total_cxled_qty) / 100) * strat_limits.cancel_rate.max_cancel_rate) -
+               symbol_side_snapshot.total_cxled_qty) / 100) * plan_limits.cancel_rate.max_cancel_rate) -
             symbol_side_snapshot.total_cxled_qty)), \
-        (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_cxl_qty: "
-         f"{(((open_qty + symbol_side_snapshot.total_filled_qty + symbol_side_snapshot.total_cxled_qty) / 100) * strat_limits.cancel_rate.max_cancel_rate) - symbol_side_snapshot.total_cxled_qty}, "
-         f"found {strat_brief_bartering_brief.consumable_cxl_qty = }")
-    if not is_sell_buy_strat:
+        (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.consumable_cxl_qty: "
+         f"{(((open_qty + symbol_side_snapshot.total_filled_qty + symbol_side_snapshot.total_cxled_qty) / 100) * plan_limits.cancel_rate.max_cancel_rate) - symbol_side_snapshot.total_cxled_qty}, "
+         f"found {plan_brief_bartering_brief.consumable_cxl_qty = }")
+    if not is_sell_buy_plan:
         if side == Side.BUY:
             current_last_barter_px = leg1_last_barter_px
             other_last_barter_px = leg2_last_barter_px
@@ -7981,111 +7981,111 @@ def _check_all_computes_in_models_other_than_chore_snapshot(
             current_last_barter_px = leg2_last_barter_px
             other_last_barter_px = leg1_last_barter_px
 
-    assert (strat_brief_bartering_brief.indicative_consumable_residual == (
-            strat_limits.residual_restriction.max_residual -
-            ((strat_brief_bartering_brief.residual_qty *
+    assert (plan_brief_bartering_brief.indicative_consumable_residual == (
+            plan_limits.residual_restriction.max_residual -
+            ((plan_brief_bartering_brief.residual_qty *
               get_px_in_usd(current_last_barter_px)) - (
                      other_side_residual_qty * get_px_in_usd(other_last_barter_px))))), \
-        (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.indicative_consumable_residual: "
-         f"{strat_limits.residual_restriction.max_residual - ((strat_brief_bartering_brief.residual_qty * get_px_in_usd(current_last_barter_px)) - (other_side_residual_qty * get_px_in_usd(other_last_barter_px)))}, "
-         f"found {strat_brief_bartering_brief.indicative_consumable_residual = }")
-    assert (strat_brief.consumable_nett_filled_notional == (
-            strat_limits.max_net_filled_notional -
+        (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.indicative_consumable_residual: "
+         f"{plan_limits.residual_restriction.max_residual - ((plan_brief_bartering_brief.residual_qty * get_px_in_usd(current_last_barter_px)) - (other_side_residual_qty * get_px_in_usd(other_last_barter_px)))}, "
+         f"found {plan_brief_bartering_brief.indicative_consumable_residual = }")
+    assert (plan_brief.consumable_nett_filled_notional == (
+            plan_limits.max_net_filled_notional -
             abs(symbol_side_snapshot.total_fill_notional - other_side_fill_notional))), \
-        (f"Mismatched: expected strat_brief.pair_{side.lower()}_side_bartering_brief.consumable_nett_filled_notional: "
-         f"{strat_limits.max_open_single_leg_notional}, "
-         f"found {strat_brief_bartering_brief.consumable_nett_filled_notional = }")
+        (f"Mismatched: expected plan_brief.pair_{side.lower()}_side_bartering_brief.consumable_nett_filled_notional: "
+         f"{plan_limits.max_open_single_leg_notional}, "
+         f"found {plan_brief_bartering_brief.consumable_nett_filled_notional = }")
 
-    strat_status = executor_http_client.get_strat_status_client(active_pair_strat.id)
+    plan_status = executor_http_client.get_plan_status_client(active_pair_plan.id)
     if side == Side.BUY:
-        total_qty = strat_status.total_buy_qty
-        total_open_qty = strat_status.total_open_buy_qty
-        total_open_notional = strat_status.total_open_buy_notional
-        avg_open_px = strat_status.avg_open_buy_px
-        total_fill_qty = strat_status.total_fill_buy_qty
-        total_fill_notional = strat_status.total_fill_buy_notional
-        avg_fill_px = strat_status.avg_fill_buy_px
-        total_cxl_qty = strat_status.total_cxl_buy_qty
-        total_cxl_notional = strat_status.total_cxl_buy_notional
-        avg_cxl_px = strat_status.avg_cxl_buy_px
+        total_qty = plan_status.total_buy_qty
+        total_open_qty = plan_status.total_open_buy_qty
+        total_open_notional = plan_status.total_open_buy_notional
+        avg_open_px = plan_status.avg_open_buy_px
+        total_fill_qty = plan_status.total_fill_buy_qty
+        total_fill_notional = plan_status.total_fill_buy_notional
+        avg_fill_px = plan_status.avg_fill_buy_px
+        total_cxl_qty = plan_status.total_cxl_buy_qty
+        total_cxl_notional = plan_status.total_cxl_buy_notional
+        avg_cxl_px = plan_status.avg_cxl_buy_px
     else:
-        total_qty = strat_status.total_sell_qty
-        total_open_qty = strat_status.total_open_sell_qty
-        total_open_notional = strat_status.total_open_sell_notional
-        avg_open_px = strat_status.avg_open_sell_px
-        total_fill_qty = strat_status.total_fill_sell_qty
-        total_fill_notional = strat_status.total_fill_sell_notional
-        avg_fill_px = strat_status.avg_fill_sell_px
-        total_cxl_qty = strat_status.total_cxl_sell_qty
-        total_cxl_notional = strat_status.total_cxl_sell_notional
-        avg_cxl_px = strat_status.avg_cxl_sell_px
+        total_qty = plan_status.total_sell_qty
+        total_open_qty = plan_status.total_open_sell_qty
+        total_open_notional = plan_status.total_open_sell_notional
+        avg_open_px = plan_status.avg_open_sell_px
+        total_fill_qty = plan_status.total_fill_sell_qty
+        total_fill_notional = plan_status.total_fill_sell_notional
+        avg_fill_px = plan_status.avg_fill_sell_px
+        total_cxl_qty = plan_status.total_cxl_sell_qty
+        total_cxl_notional = plan_status.total_cxl_sell_notional
+        avg_cxl_px = plan_status.avg_cxl_sell_px
 
-    total_open_exposure = strat_status.total_open_exposure
-    total_fill_exposure = strat_status.total_fill_exposure
-    total_cxl_exposure = strat_status.total_cxl_exposure
+    total_open_exposure = plan_status.total_open_exposure
+    total_fill_exposure = plan_status.total_fill_exposure
+    total_cxl_exposure = plan_status.total_cxl_exposure
     assert total_qty == new_qty, \
-        (f"Mismatched: expected strat_status.total_{side.lower()}_qty: "
+        (f"Mismatched: expected plan_status.total_{side.lower()}_qty: "
          f"{new_qty}, found {total_qty = }")
     assert total_open_qty == open_qty, \
-        (f"Mismatched: expected strat_status total_open_{side.lower()}_qty: "
+        (f"Mismatched: expected plan_status total_open_{side.lower()}_qty: "
          f"{open_qty}, found {total_open_qty = }")
     assert (total_open_notional == open_notional), \
-        (f"Mismatched: expected strat_status.total_open_{side.lower()}_notional: "
+        (f"Mismatched: expected plan_status.total_open_{side.lower()}_notional: "
          f"{open_notional}, found {total_open_notional = }")
     assert (avg_open_px == open_px), \
-        (f"Mismatched: expected strat_status.avg_open_{side.lower()}_px: "
+        (f"Mismatched: expected plan_status.avg_open_{side.lower()}_px: "
          f"{open_px}, found {avg_open_px = }")
     assert (total_fill_qty == filled_qty), \
-        (f"Mismatched: expected strat_status.total_fill_{side.lower()}_qty: "
+        (f"Mismatched: expected plan_status.total_fill_{side.lower()}_qty: "
          f"{filled_qty}, found {total_fill_qty = }")
     assert (total_fill_notional == filled_notional), \
-        (f"Mismatched: expected strat_status.total_fill_{side.lower()}_notional: "
+        (f"Mismatched: expected plan_status.total_fill_{side.lower()}_notional: "
          f"{filled_notional}, found {total_fill_notional = }")
     assert (avg_fill_px == filled_px), \
-        (f"Mismatched: expected strat_status.avg_fill_{side.lower()}_px: "
+        (f"Mismatched: expected plan_status.avg_fill_{side.lower()}_px: "
          f"{filled_px}, found {avg_fill_px = }")
     assert (total_cxl_qty == cxled_qty), \
-        (f"Mismatched: expected strat_status.total_cxl_{side.lower()}_qty: "
+        (f"Mismatched: expected plan_status.total_cxl_{side.lower()}_qty: "
          f"{cxled_qty}, found {total_cxl_qty = }")
     assert (total_cxl_notional == cxled_notional), \
-        (f"Mismatched: expected strat_status.total_cxl_{side.lower()}_notional: "
+        (f"Mismatched: expected plan_status.total_cxl_{side.lower()}_notional: "
          f"{cxled_notional}, found {total_cxl_notional = }")
     assert (avg_cxl_px == cxled_px), \
-        (f"Mismatched: expected strat_status.avg_cxl_{side.lower()}_px: "
+        (f"Mismatched: expected plan_status.avg_cxl_{side.lower()}_px: "
          f"{cxled_px}, found {avg_cxl_px = }")
     assert (total_open_exposure == open_exposure), \
-        (f"Mismatched: expected strat_status.total_open_exposure: "
+        (f"Mismatched: expected plan_status.total_open_exposure: "
          f"{open_exposure}, found {total_open_exposure = }")
     assert (total_fill_exposure == filled_exposure), \
-        (f"Mismatched: expected strat_status.total_fill_exposure: "
+        (f"Mismatched: expected plan_status.total_fill_exposure: "
          f"{filled_exposure}, found {total_fill_exposure = }")
     assert (total_cxl_exposure == cxled_exposure), \
-        (f"Mismatched: expected strat_status.total_cxl_exposure: "
+        (f"Mismatched: expected plan_status.total_cxl_exposure: "
          f"{cxled_exposure}, found {total_cxl_exposure = }")
 
-    portfolio_status = email_book_service_native_web_client.get_portfolio_status_client(1)
+    contact_status = email_book_service_native_web_client.get_contact_status_client(1)
     if side == Side.BUY:
-        overall_notional = portfolio_status.overall_buy_notional
-        overall_fill_notional = portfolio_status.overall_buy_fill_notional
+        overall_notional = contact_status.overall_buy_notional
+        overall_fill_notional = contact_status.overall_buy_fill_notional
     else:
-        overall_notional = portfolio_status.overall_sell_notional
-        overall_fill_notional = portfolio_status.overall_sell_fill_notional
+        overall_notional = contact_status.overall_sell_notional
+        overall_fill_notional = contact_status.overall_sell_fill_notional
     assert (overall_notional == open_notional + filled_notional), \
-        (f"Mismatched: expected portfolio_status.overall_{side.lower()}_notional: "
+        (f"Mismatched: expected contact_status.overall_{side.lower()}_notional: "
          f"{open_notional + filled_notional}, found {overall_notional = }")
     assert (overall_fill_notional == filled_notional), \
-        (f"Mismatched: expected portfolio_status.overall_{side.lower()}_fill_notional: "
+        (f"Mismatched: expected contact_status.overall_{side.lower()}_fill_notional: "
          f"{filled_notional}, found {overall_fill_notional = }")
 
 
 def check_all_computes_for_amend(
-        active_pair_strat, symbol, side, chore_id, executor_http_client,
+        active_pair_plan, symbol, side, chore_id, executor_http_client,
         new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
         pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty,
         open_qty, open_notional, open_px, filled_qty,
         filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px, other_side_residual_qty,
         other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-        residual_qty: int | None = None, is_sell_buy_strat: bool = False, total_lapsed_post_unack_amend: int = 0,
+        residual_qty: int | None = None, is_sell_buy_plan: bool = False, total_lapsed_post_unack_amend: int = 0,
         total_lapsed_qty: int = 0):
     chore_snapshot = get_chore_snapshot_from_chore_id(chore_id,
                                                       executor_http_client)
@@ -8141,11 +8141,11 @@ def check_all_computes_for_amend(
              f"found {chore_snapshot.total_lapsed_post_unack_amend}")
 
     _check_all_computes_in_models_other_than_chore_snapshot(
-        active_pair_strat, symbol, side, executor_http_client, chore_snapshot,
+        active_pair_plan, symbol, side, executor_http_client, chore_snapshot,
         new_qty, new_px, chore_status, open_qty, open_notional, open_px, filled_qty,
         filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px, other_side_residual_qty,
         other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-        residual_qty, is_sell_buy_strat)
+        residual_qty, is_sell_buy_plan)
 
 
 @pytest.mark.nightly
@@ -8154,21 +8154,21 @@ def test_simple_non_risky_amend_based_on_qty(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -8184,7 +8184,7 @@ def test_simple_non_risky_amend_based_on_qty(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -8232,7 +8232,7 @@ def test_simple_non_risky_amend_based_on_qty(
                 filled_exposure = buy_filled_notional - filled_qty * get_px_in_usd(px)
                 cxled_exposure = buy_cxl_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -8296,7 +8296,7 @@ def test_simple_non_risky_amend_based_on_qty(
                 cxled_exposure = buy_cxl_notional
             last_filled_qty = filled_qty
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -8353,7 +8353,7 @@ def test_simple_non_risky_amend_based_on_qty(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             last_filled_qty = filled_qty
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -8408,7 +8408,7 @@ def test_simple_non_risky_amend_based_on_qty(
                 residual_qty = cxled_qty
             last_filled_qty = filled_qty
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -8427,21 +8427,21 @@ def test_simple_risky_amend_based_on_qty(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -8457,7 +8457,7 @@ def test_simple_risky_amend_based_on_qty(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -8506,7 +8506,7 @@ def test_simple_risky_amend_based_on_qty(
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -8572,7 +8572,7 @@ def test_simple_risky_amend_based_on_qty(
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -8594,7 +8594,7 @@ def test_simple_risky_amend_based_on_qty(
             pending_amend_dn_qty = 0
             pending_amend_up_qty = 0
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -8640,7 +8640,7 @@ def test_simple_risky_amend_based_on_qty(
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -8660,21 +8660,21 @@ def test_simple_non_risky_amend_based_on_px(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -8690,7 +8690,7 @@ def test_simple_non_risky_amend_based_on_px(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -8740,7 +8740,7 @@ def test_simple_non_risky_amend_based_on_px(
                 filled_exposure = buy_filled_notional - filled_qty * get_px_in_usd(px)
                 cxled_exposure = buy_cxl_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -8796,7 +8796,7 @@ def test_simple_non_risky_amend_based_on_px(
                 filled_exposure = buy_filled_notional - filled_qty * get_px_in_usd(px)
                 cxled_exposure = buy_cxl_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -8837,7 +8837,7 @@ def test_simple_non_risky_amend_based_on_px(
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -8876,7 +8876,7 @@ def test_simple_non_risky_amend_based_on_px(
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -8896,21 +8896,21 @@ def test_simple_risky_amend_based_on_px(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -8926,7 +8926,7 @@ def test_simple_risky_amend_based_on_px(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -8974,7 +8974,7 @@ def test_simple_risky_amend_based_on_px(
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -9032,7 +9032,7 @@ def test_simple_risky_amend_based_on_px(
                 cxled_exposure = buy_cxl_notional
             last_filled_qty = filled_qty
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -9053,7 +9053,7 @@ def test_simple_risky_amend_based_on_px(
             pending_amend_dn_px = 0
             pending_amend_up_px = 0
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -9093,7 +9093,7 @@ def test_simple_risky_amend_based_on_px(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             last_filled_qty = filled_qty
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -9113,22 +9113,22 @@ def test_simple_non_risky_amend_based_on_qty_and_px(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
 
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -9142,7 +9142,7 @@ def test_simple_non_risky_amend_based_on_qty_and_px(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -9190,7 +9190,7 @@ def test_simple_non_risky_amend_based_on_qty_and_px(
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -9251,7 +9251,7 @@ def test_simple_non_risky_amend_based_on_qty_and_px(
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -9305,7 +9305,7 @@ def test_simple_non_risky_amend_based_on_qty_and_px(
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -9347,7 +9347,7 @@ def test_simple_non_risky_amend_based_on_qty_and_px(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             last_filled_qty = filled_qty
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -9367,21 +9367,21 @@ def test_simple_risky_amend_based_on_px_and_qty(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -9395,7 +9395,7 @@ def test_simple_risky_amend_based_on_px_and_qty(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -9443,7 +9443,7 @@ def test_simple_risky_amend_based_on_px_and_qty(
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -9514,7 +9514,7 @@ def test_simple_risky_amend_based_on_px_and_qty(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             last_filled_qty = filled_qty
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -9538,7 +9538,7 @@ def test_simple_risky_amend_based_on_px_and_qty(
             pending_amend_up_px = 0
             pending_amend_up_qty = 0
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -9578,7 +9578,7 @@ def test_simple_risky_amend_based_on_px_and_qty(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             last_filled_qty = filled_qty
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -9598,21 +9598,21 @@ def test_non_risky_amend_based_on_qty_and_px_with_fill_before_amd_ack(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -9626,7 +9626,7 @@ def test_non_risky_amend_based_on_qty_and_px_with_fill_before_amd_ack(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -9674,7 +9674,7 @@ def test_non_risky_amend_based_on_qty_and_px_with_fill_before_amd_ack(
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -9735,7 +9735,7 @@ def test_non_risky_amend_based_on_qty_and_px_with_fill_before_amd_ack(
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -9778,7 +9778,7 @@ def test_non_risky_amend_based_on_qty_and_px_with_fill_before_amd_ack(
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -9834,7 +9834,7 @@ def test_non_risky_amend_based_on_qty_and_px_with_fill_before_amd_ack(
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -9876,7 +9876,7 @@ def test_non_risky_amend_based_on_qty_and_px_with_fill_before_amd_ack(
                 cxled_exposure = buy_cxl_notional - cxled_notional
 
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -9896,21 +9896,21 @@ def test_non_risky_amend_based_on_qty_and_px_with_fulfill_before_amd_ack(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -9924,7 +9924,7 @@ def test_non_risky_amend_based_on_qty_and_px_with_fulfill_before_amd_ack(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -9971,7 +9971,7 @@ def test_non_risky_amend_based_on_qty_and_px_with_fulfill_before_amd_ack(
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -10033,7 +10033,7 @@ def test_non_risky_amend_based_on_qty_and_px_with_fulfill_before_amd_ack(
                 cxled_exposure = buy_cxl_notional - cxled_notional
 
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -10077,7 +10077,7 @@ def test_non_risky_amend_based_on_qty_and_px_with_fulfill_before_amd_ack(
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -10141,7 +10141,7 @@ def test_non_risky_amend_based_on_qty_and_px_with_fulfill_before_amd_ack(
                 cxled_exposure = buy_cxl_notional - cxled_notional
 
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -10149,28 +10149,28 @@ def test_non_risky_amend_based_on_qty_and_px_with_fulfill_before_amd_ack(
                 residual_qty=residual_qty)
 
             if side == Side.BUY:
-                paused_pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat.id)
-                assert paused_pair_strat.strat_state == StratState.StratState_PAUSED, \
-                    f"Mismatched: strat state must be PAUSED, found: {paused_pair_strat.strat_state}"
+                paused_pair_plan = email_book_service_native_web_client.get_pair_plan_client(active_pair_plan.id)
+                assert paused_pair_plan.plan_state == PlanState.PlanState_PAUSED, \
+                    f"Mismatched: plan state must be PAUSED, found: {paused_pair_plan.plan_state}"
 
-                # Checking alert in strat_alert
+                # Checking alert in plan_alert
                 time.sleep(5)
                 check_str = ("Received ChoreEventType.OE_AMD_ACK for amend qty which makes chore OVER_CXLED to chore "
                              "which was ChoreStatusType.OE_FILLED before")
-                assert_fail_msg = f"Can't find alert of {check_str!r} in neither strat_alert nor portfolio_alert"
-                check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+                assert_fail_msg = f"Can't find alert of {check_str!r} in neither plan_alert nor contact_alert"
+                check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
-                # forcefully turning strat to active again for checking sell chore
-                pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat.id)
-                pair_strat.strat_state = StratState.StratState_ACTIVE
-                email_book_service_native_web_client.put_pair_strat_client(pair_strat)
+                # forcefully turning plan to active again for checking sell chore
+                pair_plan = email_book_service_native_web_client.get_pair_plan_client(active_pair_plan.id)
+                pair_plan.plan_state = PlanState.PlanState_ACTIVE
+                email_book_service_native_web_client.put_pair_plan_client(pair_plan)
                 time.sleep(5)
             else:
                 time.sleep(5)
                 check_str = ("Received ChoreEventType.OE_AMD_ACK for amend qty which makes chore back to ACKED "
                              "which was FILLED before amend")
                 assert_fail_msg = f"Can't find alert: {check_str!r}"
-                check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+                check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
                 time.sleep(residual_wait_sec)
 
@@ -10196,7 +10196,7 @@ def test_non_risky_amend_based_on_qty_and_px_with_fulfill_before_amd_ack(
                 cxled_exposure = buy_cxl_notional - cxled_notional
 
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -10217,21 +10217,21 @@ def test_non_risky_amend_based_on_qty_and_px_with_overfill_before_amd_ack(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -10245,7 +10245,7 @@ def test_non_risky_amend_based_on_qty_and_px_with_overfill_before_amd_ack(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -10293,7 +10293,7 @@ def test_non_risky_amend_based_on_qty_and_px_with_overfill_before_amd_ack(
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -10355,7 +10355,7 @@ def test_non_risky_amend_based_on_qty_and_px_with_overfill_before_amd_ack(
                 cxled_exposure = buy_cxl_notional - cxled_notional
 
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -10399,21 +10399,21 @@ def test_non_risky_amend_based_on_qty_and_px_with_overfill_before_amd_ack(
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
                 other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
                 residual_qty=residual_qty)
 
-            paused_pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat.id)
-            assert paused_pair_strat.strat_state == StratState.StratState_PAUSED, \
-                f"Mismatched: strat state must be PAUSED, found: {paused_pair_strat.strat_state}"
+            paused_pair_plan = email_book_service_native_web_client.get_pair_plan_client(active_pair_plan.id)
+            assert paused_pair_plan.plan_state == PlanState.PlanState_PAUSED, \
+                f"Mismatched: plan state must be PAUSED, found: {paused_pair_plan.plan_state}"
 
             time.sleep(5)
             check_str = "Unexpected: Received fill that will make chore_snapshot OVER_FILLED"
             assert_fail_msg = f"Can't find alert: {check_str!r}"
-            check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+            check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
             # Placing Amend ACK chore and checking amend should be applied on ack
             executor_http_client.barter_simulator_process_amend_ack_query_client(
@@ -10472,25 +10472,25 @@ def test_non_risky_amend_based_on_qty_and_px_with_overfill_before_amd_ack(
                 cxled_exposure = buy_cxl_notional - cxled_notional
 
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
                 other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
                 residual_qty=residual_qty)
 
-            # Checking alert in strat_alert
+            # Checking alert in plan_alert
             time.sleep(5)
             check_str = ("Received ChoreEventType.OE_AMD_ACK for amend qty which makes chore OVER_CXLED to "
                          "chore which was ChoreStatusType.OE_OVER_FILLED before")
-            assert_fail_msg = f"Can't find alert of {check_str!r} in neither strat_alert nor portfolio_alert"
-            check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+            assert_fail_msg = f"Can't find alert of {check_str!r} in neither plan_alert nor contact_alert"
+            check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
             if side == Side.BUY:
-                # forcefully turning strat to active again for checking sell chore
-                pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat.id)
-                pair_strat.strat_state = StratState.StratState_ACTIVE
-                email_book_service_native_web_client.put_pair_strat_client(pair_strat)
+                # forcefully turning plan to active again for checking sell chore
+                pair_plan = email_book_service_native_web_client.get_pair_plan_client(active_pair_plan.id)
+                pair_plan.plan_state = PlanState.PlanState_ACTIVE
+                email_book_service_native_web_client.put_pair_plan_client(pair_plan)
 
     except AssertionError as e:
         print(e)
@@ -10505,24 +10505,24 @@ def test_non_risky_amend_up_based_on_qty_and_px_with_overfill_before_n_filled_po
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     """
     Amend Up is non-risky on sell side so using sell side only in this test
     """
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list, leg1_side=Side.SELL, leg2_side=Side.BUY)
 
     try:
@@ -10536,7 +10536,7 @@ def test_non_risky_amend_up_based_on_qty_and_px_with_overfill_before_n_filled_po
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         for px, qty, chore_symbol, side in [(95, 110, leg1_symbol, Side.SELL)]:
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, sell_inst_type)
@@ -10570,12 +10570,12 @@ def test_non_risky_amend_up_based_on_qty_and_px_with_overfill_before_n_filled_po
             filled_exposure = - filled_notional
             cxled_exposure = - cxled_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                 other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                residual_qty=residual_qty, is_sell_buy_strat=True)
+                residual_qty=residual_qty, is_sell_buy_plan=True)
 
             # Placing Amend req chore and checking computes should stay same since it is non-risky amend
             amend_px = 1
@@ -10614,12 +10614,12 @@ def test_non_risky_amend_up_based_on_qty_and_px_with_overfill_before_n_filled_po
             cxled_exposure = - cxled_notional
 
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                 other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                residual_qty=residual_qty, is_sell_buy_strat=True)
+                residual_qty=residual_qty, is_sell_buy_plan=True)
 
             # placing fills before receiving AMD_ACK - makes chore filled
             executor_http_client.barter_simulator_process_fill_query_client(
@@ -10648,21 +10648,21 @@ def test_non_risky_amend_up_based_on_qty_and_px_with_overfill_before_n_filled_po
             filled_exposure = - filled_notional
             cxled_exposure = - cxled_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
                 other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                residual_qty=residual_qty, is_sell_buy_strat=True)
+                residual_qty=residual_qty, is_sell_buy_plan=True)
 
-            paused_pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat.id)
-            assert paused_pair_strat.strat_state == StratState.StratState_PAUSED, \
-                f"Mismatched: strat state must be PAUSED, found: {paused_pair_strat.strat_state}"
+            paused_pair_plan = email_book_service_native_web_client.get_pair_plan_client(active_pair_plan.id)
+            assert paused_pair_plan.plan_state == PlanState.PlanState_PAUSED, \
+                f"Mismatched: plan state must be PAUSED, found: {paused_pair_plan.plan_state}"
 
             time.sleep(5)
             check_str = "Unexpected: Received fill that will make chore_snapshot OVER_FILLED"
             assert_fail_msg = f"Can't find alert: {check_str!r}"
-            check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+            check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
             # Placing Amend ACK chore and checking amend should be applied on ack
             executor_http_client.barter_simulator_process_amend_ack_query_client(
@@ -10695,23 +10695,23 @@ def test_non_risky_amend_up_based_on_qty_and_px_with_overfill_before_n_filled_po
             cxled_exposure = - cxled_notional
 
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
                 other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                residual_qty=residual_qty, is_sell_buy_strat=True)
+                residual_qty=residual_qty, is_sell_buy_plan=True)
 
-            # Checking alert in strat_alert
+            # Checking alert in plan_alert
             time.sleep(5)
             check_str = ("Received ChoreEventType.OE_AMD_ACK for amend qty which makes chore FILLED "
                          "which was OVER_FILLED before amend")
-            assert_fail_msg = f"Can't find alert of {check_str!r} in neither strat_alert nor portfolio_alert"
-            check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+            assert_fail_msg = f"Can't find alert of {check_str!r} in neither plan_alert nor contact_alert"
+            check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
-            paused_pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat.id)
-            assert paused_pair_strat.strat_state == StratState.StratState_ACTIVE, \
-                f"Mismatched: strat state must be ACTIVE, found: {paused_pair_strat.strat_state}"
+            paused_pair_plan = email_book_service_native_web_client.get_pair_plan_client(active_pair_plan.id)
+            assert paused_pair_plan.plan_state == PlanState.PlanState_ACTIVE, \
+                f"Mismatched: plan state must be ACTIVE, found: {paused_pair_plan.plan_state}"
 
     except AssertionError as e:
         print(e)
@@ -10726,24 +10726,24 @@ def test_non_risky_amend_up_based_on_qty_and_px_with_overfill_before_n_acked_pos
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     """
     Amend Up is non-risky on sell side so using sell side only in this test
     """
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list, leg1_side=Side.SELL, leg2_side=Side.BUY)
 
     try:
@@ -10757,7 +10757,7 @@ def test_non_risky_amend_up_based_on_qty_and_px_with_overfill_before_n_acked_pos
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         for px, qty, chore_symbol, side in [(95, 110, leg1_symbol, Side.SELL)]:
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, sell_inst_type)
@@ -10791,12 +10791,12 @@ def test_non_risky_amend_up_based_on_qty_and_px_with_overfill_before_n_acked_pos
             filled_exposure = - filled_notional
             cxled_exposure = - cxled_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                 other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                residual_qty=residual_qty, is_sell_buy_strat=True)
+                residual_qty=residual_qty, is_sell_buy_plan=True)
 
             # Placing Amend req chore and checking computes should stay same since it is non-risky amend
             amend_px = 1
@@ -10835,12 +10835,12 @@ def test_non_risky_amend_up_based_on_qty_and_px_with_overfill_before_n_acked_pos
             cxled_exposure = - cxled_notional
 
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                 other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                residual_qty=residual_qty, is_sell_buy_strat=True)
+                residual_qty=residual_qty, is_sell_buy_plan=True)
 
             # placing fills before receiving AMD_ACK - makes chore filled
             executor_http_client.barter_simulator_process_fill_query_client(
@@ -10869,21 +10869,21 @@ def test_non_risky_amend_up_based_on_qty_and_px_with_overfill_before_n_acked_pos
             filled_exposure = - filled_notional
             cxled_exposure = - cxled_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
                 other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                residual_qty=residual_qty, is_sell_buy_strat=True)
+                residual_qty=residual_qty, is_sell_buy_plan=True)
 
-            paused_pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat.id)
-            assert paused_pair_strat.strat_state == StratState.StratState_PAUSED, \
-                f"Mismatched: strat state must be PAUSED, found: {paused_pair_strat.strat_state}"
+            paused_pair_plan = email_book_service_native_web_client.get_pair_plan_client(active_pair_plan.id)
+            assert paused_pair_plan.plan_state == PlanState.PlanState_PAUSED, \
+                f"Mismatched: plan state must be PAUSED, found: {paused_pair_plan.plan_state}"
 
             time.sleep(5)
             check_str = "Unexpected: Received fill that will make chore_snapshot OVER_FILLED"
             assert_fail_msg = f"Can't find alert: {check_str!r}"
-            check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+            check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
             # Placing Amend ACK chore and checking amend should be applied on ack
             executor_http_client.barter_simulator_process_amend_ack_query_client(
@@ -10916,23 +10916,23 @@ def test_non_risky_amend_up_based_on_qty_and_px_with_overfill_before_n_acked_pos
             cxled_exposure = - cxled_notional
 
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
                 other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                residual_qty=residual_qty, is_sell_buy_strat=True)
+                residual_qty=residual_qty, is_sell_buy_plan=True)
 
-            # Checking alert in strat_alert
+            # Checking alert in plan_alert
             time.sleep(5)
             check_str = ("Received ChoreEventType.OE_AMD_ACK for amend qty which makes chore back to ACKED "
                          "which was OVER_FILLED before amend")
-            assert_fail_msg = f"Can't find alert of {check_str!r} in neither strat_alert nor portfolio_alert"
-            check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+            assert_fail_msg = f"Can't find alert of {check_str!r} in neither plan_alert nor contact_alert"
+            check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
-            paused_pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat.id)
-            assert paused_pair_strat.strat_state == StratState.StratState_ACTIVE, \
-                f"Mismatched: strat state must be ACTIVE, found: {paused_pair_strat.strat_state}"
+            paused_pair_plan = email_book_service_native_web_client.get_pair_plan_client(active_pair_plan.id)
+            assert paused_pair_plan.plan_state == PlanState.PlanState_ACTIVE, \
+                f"Mismatched: plan state must be ACTIVE, found: {paused_pair_plan.plan_state}"
 
             # waiting for chore to get cxled
             time.sleep(residual_wait_sec)
@@ -10956,12 +10956,12 @@ def test_non_risky_amend_up_based_on_qty_and_px_with_overfill_before_n_acked_pos
             cxled_exposure = - cxled_notional
 
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
                 other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                residual_qty=residual_qty, is_sell_buy_strat=True)
+                residual_qty=residual_qty, is_sell_buy_plan=True)
 
     except AssertionError as e:
         print(e)
@@ -10976,21 +10976,21 @@ def test_risky_amend_based_on_px_and_qty_with_fill_before_amd_ack(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -11006,7 +11006,7 @@ def test_risky_amend_based_on_px_and_qty_with_fill_before_amd_ack(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -11054,7 +11054,7 @@ def test_risky_amend_based_on_px_and_qty_with_fill_before_amd_ack(
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -11123,7 +11123,7 @@ def test_risky_amend_based_on_px_and_qty_with_fill_before_amd_ack(
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -11159,7 +11159,7 @@ def test_risky_amend_based_on_px_and_qty_with_fill_before_amd_ack(
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -11198,7 +11198,7 @@ def test_risky_amend_based_on_px_and_qty_with_fill_before_amd_ack(
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -11239,7 +11239,7 @@ def test_risky_amend_based_on_px_and_qty_with_fill_before_amd_ack(
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -11259,21 +11259,21 @@ def test_risky_amend_based_on_px_and_qty_with_fulfill_before_amd_ack(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -11289,7 +11289,7 @@ def test_risky_amend_based_on_px_and_qty_with_fulfill_before_amd_ack(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -11337,7 +11337,7 @@ def test_risky_amend_based_on_px_and_qty_with_fulfill_before_amd_ack(
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -11408,7 +11408,7 @@ def test_risky_amend_based_on_px_and_qty_with_fulfill_before_amd_ack(
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -11445,7 +11445,7 @@ def test_risky_amend_based_on_px_and_qty_with_fulfill_before_amd_ack(
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -11486,7 +11486,7 @@ def test_risky_amend_based_on_px_and_qty_with_fulfill_before_amd_ack(
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -11506,21 +11506,21 @@ def test_risky_amend_based_on_px_and_qty_with_overfill_before_amd_ack(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -11536,7 +11536,7 @@ def test_risky_amend_based_on_px_and_qty_with_overfill_before_amd_ack(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -11584,7 +11584,7 @@ def test_risky_amend_based_on_px_and_qty_with_overfill_before_amd_ack(
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -11653,7 +11653,7 @@ def test_risky_amend_based_on_px_and_qty_with_overfill_before_amd_ack(
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -11690,21 +11690,21 @@ def test_risky_amend_based_on_px_and_qty_with_overfill_before_amd_ack(
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
                 other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
                 residual_qty=residual_qty)
 
-            paused_pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat.id)
-            assert paused_pair_strat.strat_state == StratState.StratState_PAUSED, \
-                f"Mismatched: strat state must be PAUSED, found: {paused_pair_strat.strat_state}"
+            paused_pair_plan = email_book_service_native_web_client.get_pair_plan_client(active_pair_plan.id)
+            assert paused_pair_plan.plan_state == PlanState.PlanState_PAUSED, \
+                f"Mismatched: plan state must be PAUSED, found: {paused_pair_plan.plan_state}"
 
             time.sleep(5)
             check_str = "Unexpected: Received fill that will make chore_snapshot OVER_FILLED"
             assert_fail_msg = f"Can't find alert: {check_str!r}"
-            check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+            check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
             # Placing Amend ACK chore and checking amend should be applied on ack
             executor_http_client.barter_simulator_process_amend_ack_query_client(
@@ -11740,7 +11740,7 @@ def test_risky_amend_based_on_px_and_qty_with_overfill_before_amd_ack(
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -11748,10 +11748,10 @@ def test_risky_amend_based_on_px_and_qty_with_overfill_before_amd_ack(
                 residual_qty=residual_qty)
 
             if side == Side.BUY:
-                # forcefully turning strat to active again for checking sell chore
-                pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat.id)
-                pair_strat.strat_state = StratState.StratState_ACTIVE
-                email_book_service_native_web_client.put_pair_strat_client(pair_strat)
+                # forcefully turning plan to active again for checking sell chore
+                pair_plan = email_book_service_native_web_client.get_pair_plan_client(active_pair_plan.id)
+                pair_plan.plan_state = PlanState.PlanState_ACTIVE
+                email_book_service_native_web_client.put_pair_plan_client(pair_plan)
 
     except AssertionError as e:
         print(e)
@@ -11766,11 +11766,11 @@ def test_non_risky_amend_based_on_px_and_qty_with_more_filled_qty_than_amend_qty
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     # IMPO: amending dn to qty less than open qty in non-risky case can only be possible in buy side since,
     # amend dn is non-risky in buy, sell side if amend_dn is done then it will be risky and amending up is not for
@@ -11778,13 +11778,13 @@ def test_non_risky_amend_based_on_px_and_qty_with_more_filled_qty_than_amend_qty
 
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -11800,7 +11800,7 @@ def test_non_risky_amend_based_on_px_and_qty_with_more_filled_qty_than_amend_qty
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY)]:
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, buy_inst_type)
@@ -11835,7 +11835,7 @@ def test_non_risky_amend_based_on_px_and_qty_with_more_filled_qty_than_amend_qty
             filled_exposure = filled_qty * get_px_in_usd(px)
             cxled_exposure = 0
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -11861,7 +11861,7 @@ def test_non_risky_amend_based_on_px_and_qty_with_more_filled_qty_than_amend_qty
             # not updating any value since this amend req should get rejected and values should stay unchanged
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -11877,7 +11877,7 @@ def test_non_risky_amend_based_on_px_and_qty_with_more_filled_qty_than_amend_qty
             time.sleep(5)
             check_str = "Unexpected: Amend qty is higher than open qty - ignoring is amend request"
             assert_fail_msg = f"Couldn't find any alert saying: {check_str}"
-            check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+            check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -11896,11 +11896,11 @@ def test_risky_amend_based_on_px_and_qty_with_more_filled_qty_than_amend_qty(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     # IMPO: amending dn to qty less than open qty in risky case can only be possible in sell side since,
     # amend dn is risky in sell, buy side if amend_dn is done then it will be non-risky and amending up is not for
@@ -11908,13 +11908,13 @@ def test_risky_amend_based_on_px_and_qty_with_more_filled_qty_than_amend_qty(
 
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list, leg1_side=Side.SELL, leg2_side=Side.BUY)
 
     try:
@@ -11928,7 +11928,7 @@ def test_risky_amend_based_on_px_and_qty_with_more_filled_qty_than_amend_qty(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         for px, qty, chore_symbol, side in [(110, 95, leg1_symbol, Side.SELL)]:
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, sell_inst_type)
@@ -11964,12 +11964,12 @@ def test_risky_amend_based_on_px_and_qty_with_more_filled_qty_than_amend_qty(
             cxled_exposure = 0
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty, is_sell_buy_strat=True)
+                    residual_qty=residual_qty, is_sell_buy_plan=True)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -11996,12 +11996,12 @@ def test_risky_amend_based_on_px_and_qty_with_more_filled_qty_than_amend_qty(
             # not updating any value since this amend req should get rejected and values should stay unchanged
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty, is_sell_buy_strat=True)
+                    residual_qty=residual_qty, is_sell_buy_plan=True)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -12012,7 +12012,7 @@ def test_risky_amend_based_on_px_and_qty_with_more_filled_qty_than_amend_qty(
             time.sleep(5)
             check_str = "Unexpected: Amend qty is higher than open qty - ignoring is amend request"
             assert_fail_msg = f"Couldn't find any alert saying: {check_str}"
-            check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+            check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -12031,11 +12031,11 @@ def test_non_risky_amend_dn_based_on_px_and_qty_with_chore_making_dod(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     # IMPO: amending dn to qty less than already filled qty in non-risky case can only be possible in buy side since,
     # amend dn is non-risky in buy, sell side if amend_dn is done then it will be risky and amending up is not for
@@ -12043,13 +12043,13 @@ def test_non_risky_amend_dn_based_on_px_and_qty_with_chore_making_dod(
 
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -12063,7 +12063,7 @@ def test_non_risky_amend_dn_based_on_px_and_qty_with_chore_making_dod(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY)]:
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, buy_inst_type)
@@ -12099,7 +12099,7 @@ def test_non_risky_amend_dn_based_on_px_and_qty_with_chore_making_dod(
             cxled_exposure = 0
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -12150,7 +12150,7 @@ def test_non_risky_amend_dn_based_on_px_and_qty_with_chore_making_dod(
 
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -12194,7 +12194,7 @@ def test_non_risky_amend_dn_based_on_px_and_qty_with_chore_making_dod(
 
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -12207,11 +12207,11 @@ def test_non_risky_amend_dn_based_on_px_and_qty_with_chore_making_dod(
                 print("Exception", e)
                 raise e
 
-            # Checking alert in strat_alert
+            # Checking alert in plan_alert
             time.sleep(5)
             check_str = "Received ChoreEventType.OE_AMD_ACK for amend qty which makes chore DOD"
-            assert_fail_msg = f"Can't find alert of {check_str!r} in neither strat_alert nor portfolio_alert"
-            check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+            assert_fail_msg = f"Can't find alert of {check_str!r} in neither plan_alert nor contact_alert"
+            check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -12230,11 +12230,11 @@ def test_risky_amend_dn_based_on_px_and_qty_with_amend_making_filled(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     # IMPO: amending dn to qty less than already filled qty in risky case can only be possible in sell side since,
     # amend dn is risky in sell, buy side if amend_dn is done then it will be non-risky and amending up is not for
@@ -12242,13 +12242,13 @@ def test_risky_amend_dn_based_on_px_and_qty_with_amend_making_filled(
 
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list, leg1_side=Side.SELL, leg2_side=Side.BUY)
 
     try:
@@ -12262,7 +12262,7 @@ def test_risky_amend_dn_based_on_px_and_qty_with_amend_making_filled(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         for px, qty, chore_symbol, side in [(110, 95, leg1_symbol, Side.SELL)]:
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, sell_inst_type)
@@ -12298,12 +12298,12 @@ def test_risky_amend_dn_based_on_px_and_qty_with_amend_making_filled(
             cxled_exposure = 0
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty, is_sell_buy_strat=True)
+                    residual_qty=residual_qty, is_sell_buy_plan=True)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise ass_e
@@ -12349,12 +12349,12 @@ def test_risky_amend_dn_based_on_px_and_qty_with_amend_making_filled(
 
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty, is_sell_buy_strat=True)
+                    residual_qty=residual_qty, is_sell_buy_plan=True)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise ass_e
@@ -12362,12 +12362,12 @@ def test_risky_amend_dn_based_on_px_and_qty_with_amend_making_filled(
                 print("Exception", e)
                 raise e
 
-            # Checking alert in strat_alert
+            # Checking alert in plan_alert
             time.sleep(5)
             check_str = "Received ChoreEventType.OE_AMD_DN_UNACK for amend qty which makes chore DOD"
 
-            assert_fail_msg = f"Can't find alert of {check_str} in neither strat_alert nor portfolio_alert"
-            check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+            assert_fail_msg = f"Can't find alert of {check_str} in neither plan_alert nor contact_alert"
+            check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
             # Placing Amend ACK chore and checking amend should be applied on ack
             executor_http_client.barter_simulator_process_amend_ack_query_client(
@@ -12386,12 +12386,12 @@ def test_risky_amend_dn_based_on_px_and_qty_with_amend_making_filled(
             pending_amend_up_qty = 0
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty, is_sell_buy_strat=True)
+                    residual_qty=residual_qty, is_sell_buy_plan=True)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise ass_e
@@ -12416,21 +12416,21 @@ def test_non_risky_amend_based_on_px_and_qty_with_cxl_req_n_cxl_ack_before_amend
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -12444,7 +12444,7 @@ def test_non_risky_amend_based_on_px_and_qty_with_cxl_req_n_cxl_ack_before_amend
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -12523,7 +12523,7 @@ def test_non_risky_amend_based_on_px_and_qty_with_cxl_req_n_cxl_ack_before_amend
 
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -12597,7 +12597,7 @@ def test_non_risky_amend_based_on_px_and_qty_with_cxl_req_n_cxl_ack_before_amend
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -12611,29 +12611,29 @@ def test_non_risky_amend_based_on_px_and_qty_with_cxl_req_n_cxl_ack_before_amend
                 raise Exception(e)
 
             if side == Side.BUY:
-                paused_pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat.id)
-                assert paused_pair_strat.strat_state == StratState.StratState_PAUSED, \
-                    f"Mismatched: strat state must be PAUSED, found: {paused_pair_strat.strat_state}"
+                paused_pair_plan = email_book_service_native_web_client.get_pair_plan_client(active_pair_plan.id)
+                assert paused_pair_plan.plan_state == PlanState.PlanState_PAUSED, \
+                    f"Mismatched: plan state must be PAUSED, found: {paused_pair_plan.plan_state}"
 
                 time.sleep(5)
                 check_str = ("Received ChoreEventType.OE_AMD_ACK for amend qty which makes chore OVER_CXLED to chore "
                              "which was ChoreStatusType.OE_DOD before")
-                assert_fail_msg = f"Can't find alert of {check_str!r} in neither strat_alert nor portfolio_alert"
-                check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id,
+                assert_fail_msg = f"Can't find alert of {check_str!r} in neither plan_alert nor contact_alert"
+                check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id,
                                                                    check_str, assert_fail_msg)
             else:
                 time.sleep(5)
                 check_str = ("Received ChoreEventType.OE_AMD_ACK for amend qty which makes chore DOD, before status "
                              "was ChoreStatusType.OE_DOD - applying amend and putting chore as DOD")
-                assert_fail_msg = f"Can't find alert of {check_str!r} in neither strat_alert nor portfolio_alert"
-                check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id,
+                assert_fail_msg = f"Can't find alert of {check_str!r} in neither plan_alert nor contact_alert"
+                check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id,
                                                                    check_str, assert_fail_msg)
 
             if side == Side.BUY:
-                # forcefully turning strat to active again for checking sell chore
-                pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat.id)
-                pair_strat.strat_state = StratState.StratState_ACTIVE
-                email_book_service_native_web_client.put_pair_strat_client(pair_strat)
+                # forcefully turning plan to active again for checking sell chore
+                pair_plan = email_book_service_native_web_client.get_pair_plan_client(active_pair_plan.id)
+                pair_plan.plan_state = PlanState.PlanState_ACTIVE
+                email_book_service_native_web_client.put_pair_plan_client(pair_plan)
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -12652,21 +12652,21 @@ def test_risky_amend_based_on_px_and_qty_with_cxl_req_n_cxl_ack_before_amend_ack
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -12680,7 +12680,7 @@ def test_risky_amend_based_on_px_and_qty_with_cxl_req_n_cxl_ack_before_amend_ack
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -12768,7 +12768,7 @@ def test_risky_amend_based_on_px_and_qty_with_cxl_req_n_cxl_ack_before_amend_ack
 
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -12835,7 +12835,7 @@ def test_risky_amend_based_on_px_and_qty_with_cxl_req_n_cxl_ack_before_amend_ack
 
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -12865,21 +12865,21 @@ def test_non_risky_amend_based_on_px_and_qty_with_cxl_req_after_amend_req_n_cxl_
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -12894,7 +12894,7 @@ def test_non_risky_amend_based_on_px_and_qty_with_cxl_req_after_amend_req_n_cxl_
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -12973,7 +12973,7 @@ def test_non_risky_amend_based_on_px_and_qty_with_cxl_req_after_amend_req_n_cxl_
 
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -13040,7 +13040,7 @@ def test_non_risky_amend_based_on_px_and_qty_with_cxl_req_after_amend_req_n_cxl_
 
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -13093,7 +13093,7 @@ def test_non_risky_amend_based_on_px_and_qty_with_cxl_req_after_amend_req_n_cxl_
 
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -13123,21 +13123,21 @@ def test_risky_amend_based_on_px_and_qty_with_cxl_req_after_amend_req_n_cxl_ack_
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -13152,7 +13152,7 @@ def test_risky_amend_based_on_px_and_qty_with_cxl_req_after_amend_req_n_cxl_ack_
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -13240,7 +13240,7 @@ def test_risky_amend_based_on_px_and_qty_with_cxl_req_after_amend_req_n_cxl_ack_
 
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -13275,7 +13275,7 @@ def test_risky_amend_based_on_px_and_qty_with_cxl_req_after_amend_req_n_cxl_ack_
             chore_status = ChoreStatusType.OE_CXL_UNACK
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -13328,7 +13328,7 @@ def test_risky_amend_based_on_px_and_qty_with_cxl_req_after_amend_req_n_cxl_ack_
 
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -13358,21 +13358,21 @@ def test_non_risky_amend_rej_based_on_px_and_qty(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -13385,7 +13385,7 @@ def test_non_risky_amend_rej_based_on_px_and_qty(
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -13460,7 +13460,7 @@ def test_non_risky_amend_rej_based_on_px_and_qty(
 
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -13506,7 +13506,7 @@ def test_non_risky_amend_rej_based_on_px_and_qty(
 
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -13553,7 +13553,7 @@ def test_non_risky_amend_rej_based_on_px_and_qty(
 
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -13583,21 +13583,21 @@ def test_risky_amend_rej_based_on_px_and_qty(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -13610,7 +13610,7 @@ def test_risky_amend_rej_based_on_px_and_qty(
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -13695,7 +13695,7 @@ def test_risky_amend_rej_based_on_px_and_qty(
 
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -13749,7 +13749,7 @@ def test_risky_amend_rej_based_on_px_and_qty(
 
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -13796,7 +13796,7 @@ def test_risky_amend_rej_based_on_px_and_qty(
 
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -13826,11 +13826,11 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_rej(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     """
     First buy chore is placed for 90 qty then amend req is placed for 100 qty since amend up is
@@ -13840,13 +13840,13 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_rej(
 
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -13860,7 +13860,7 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_rej(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY)]:
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, buy_inst_type)
@@ -13922,7 +13922,7 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_rej(
             cxled_exposure = cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -13964,7 +13964,7 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_rej(
             cxled_exposure = 0
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -13977,15 +13977,15 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_rej(
                 print("Exception", e)
                 raise Exception(e)
 
-            paused_pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat.id)
-            assert paused_pair_strat.strat_state == StratState.StratState_PAUSED, \
-                f"Mismatched: strat state must be PAUSED, found: {paused_pair_strat.strat_state}"
+            paused_pair_plan = email_book_service_native_web_client.get_pair_plan_client(active_pair_plan.id)
+            assert paused_pair_plan.plan_state == PlanState.PlanState_PAUSED, \
+                f"Mismatched: plan state must be PAUSED, found: {paused_pair_plan.plan_state}"
 
             time.sleep(5)
             check_str = ("Reverted amend changes post receiving OE_AMD_REJ on chore that had status .* "
-                         "- putting strat to pause and applying amend rollback")
+                         "- putting plan to pause and applying amend rollback")
             assert_fail_msg = f"Can't find alert: {check_str!r}"
-            check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+            check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -14004,11 +14004,11 @@ def test_risky_amend_rej_based_on_px_and_qty_making_chore_filled_post_rej(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     """
     First buy chore is placed for 90 qty then amend req is placed for 100 qty since amend up is
@@ -14018,13 +14018,13 @@ def test_risky_amend_rej_based_on_px_and_qty_making_chore_filled_post_rej(
 
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -14038,7 +14038,7 @@ def test_risky_amend_rej_based_on_px_and_qty_making_chore_filled_post_rej(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY)]:
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, buy_inst_type)
@@ -14099,7 +14099,7 @@ def test_risky_amend_rej_based_on_px_and_qty_making_chore_filled_post_rej(
             residual_qty = 0
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -14141,7 +14141,7 @@ def test_risky_amend_rej_based_on_px_and_qty_making_chore_filled_post_rej(
             cxled_exposure = 0
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -14159,7 +14159,7 @@ def test_risky_amend_rej_based_on_px_and_qty_making_chore_filled_post_rej(
                          "ChoreStatusType.OE_AMD_UP_UNACKED before amend applied - "
                          "status post amd_rej applied: ChoreStatusType.OE_FILLED")
             assert_fail_msg = f"Can't find alert: {check_str!r}"
-            check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+            check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -14178,11 +14178,11 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_ack_po
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     """
     First sell chore is placed for 110 qty then amend req is placed for 100 qty since amend dn is
@@ -14191,13 +14191,13 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_ack_po
     """
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list, leg1_side=Side.SELL, leg2_side=Side.BUY)
 
     try:
@@ -14211,7 +14211,7 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_ack_po
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         for px, qty, chore_symbol, side in [(95, 110, leg1_symbol, Side.SELL)]:
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, sell_inst_type)
@@ -14273,12 +14273,12 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_ack_po
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty, is_sell_buy_strat=True)
+                    residual_qty=residual_qty, is_sell_buy_plan=True)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -14286,14 +14286,14 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_ack_po
                 print("Exception", e)
                 raise Exception(e)
 
-            paused_pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat.id)
-            assert paused_pair_strat.strat_state == StratState.StratState_PAUSED, \
-                f"Mismatched: strat state must be PAUSED, found: {paused_pair_strat.strat_state}"
+            paused_pair_plan = email_book_service_native_web_client.get_pair_plan_client(active_pair_plan.id)
+            assert paused_pair_plan.plan_state == PlanState.PlanState_PAUSED, \
+                f"Mismatched: plan state must be PAUSED, found: {paused_pair_plan.plan_state}"
 
             time.sleep(5)
             check_str = "Unexpected: Received fill that will make chore_snapshot OVER_FILLED"
             assert_fail_msg = f"Can't find alert: {check_str!r}"
-            check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+            check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
             # Placing Amend REJ
             executor_http_client.barter_simulator_process_amend_rej_query_client(
@@ -14326,12 +14326,12 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_ack_po
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty, is_sell_buy_strat=True)
+                    residual_qty=residual_qty, is_sell_buy_plan=True)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -14339,15 +14339,15 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_ack_po
                 print("Exception", e)
                 raise Exception(e)
 
-            paused_pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat.id)
-            assert paused_pair_strat.strat_state == StratState.StratState_ACTIVE, \
-                f"Mismatched: strat state must be ACTIVE, found: {paused_pair_strat.strat_state}"
+            paused_pair_plan = email_book_service_native_web_client.get_pair_plan_client(active_pair_plan.id)
+            assert paused_pair_plan.plan_state == PlanState.PlanState_ACTIVE, \
+                f"Mismatched: plan state must be ACTIVE, found: {paused_pair_plan.plan_state}"
 
             time.sleep(5)
             check_str = ("Reverted amend changes post receiving OE_AMD_REJ on chore that had status .* "
-                         "- UNPAUSING strat and applying amend rollback")
+                         "- UNPAUSING plan and applying amend rollback")
             assert_fail_msg = f"Can't find alert: {check_str!r}"
-            check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+            check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
             # waiting for chore to get cxled
             time.sleep(residual_wait_sec)
@@ -14369,12 +14369,12 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_ack_po
             cxled_exposure = - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty, is_sell_buy_strat=True)
+                    residual_qty=residual_qty, is_sell_buy_plan=True)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -14399,11 +14399,11 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_filled
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     """
     First sell chore is placed for 110 qty then amend req is placed for 100 qty since amend dn is
@@ -14412,13 +14412,13 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_filled
     """
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list, leg1_side=Side.SELL, leg2_side=Side.BUY)
 
     try:
@@ -14434,7 +14434,7 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_filled
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         for px, qty, chore_symbol, side in [(95, 110, leg1_symbol, Side.SELL)]:
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, sell_inst_type)
@@ -14496,12 +14496,12 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_filled
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty, is_sell_buy_strat=True)
+                    residual_qty=residual_qty, is_sell_buy_plan=True)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -14509,14 +14509,14 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_filled
                 print("Exception", e)
                 raise Exception(e)
 
-            paused_pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat.id)
-            assert paused_pair_strat.strat_state == StratState.StratState_PAUSED, \
-                f"Mismatched: strat state must be PAUSED, found: {paused_pair_strat.strat_state}"
+            paused_pair_plan = email_book_service_native_web_client.get_pair_plan_client(active_pair_plan.id)
+            assert paused_pair_plan.plan_state == PlanState.PlanState_PAUSED, \
+                f"Mismatched: plan state must be PAUSED, found: {paused_pair_plan.plan_state}"
 
             time.sleep(5)
             check_str = "Unexpected: Received fill that will make chore_snapshot OVER_FILLED"
             assert_fail_msg = f"Can't find alert: {check_str!r}"
-            check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+            check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
             # Placing Amend REJ
             executor_http_client.barter_simulator_process_amend_rej_query_client(
@@ -14549,12 +14549,12 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_filled
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty, is_sell_buy_strat=True)
+                    residual_qty=residual_qty, is_sell_buy_plan=True)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -14562,15 +14562,15 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_filled
                 print("Exception", e)
                 raise Exception(e)
 
-            paused_pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat.id)
-            assert paused_pair_strat.strat_state == StratState.StratState_ACTIVE, \
-                f"Mismatched: strat state must be ACTIVE, found: {paused_pair_strat.strat_state}"
+            paused_pair_plan = email_book_service_native_web_client.get_pair_plan_client(active_pair_plan.id)
+            assert paused_pair_plan.plan_state == PlanState.PlanState_ACTIVE, \
+                f"Mismatched: plan state must be ACTIVE, found: {paused_pair_plan.plan_state}"
 
             time.sleep(5)
             check_str = ("Reverted amend changes post receiving OE_AMD_REJ on chore that had status .* "
-                         "- UNPAUSING strat and applying amend rollback")
+                         "- UNPAUSING plan and applying amend rollback")
             assert_fail_msg = f"Can't find alert: {check_str!r}"
-            check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+            check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -14589,11 +14589,11 @@ def test_risky_amend_rej_based_on_px_and_qty_with_filled_post_amd_req_n_acked_po
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     """
     First sell chore is placed for 110 qty then amend req is placed for 100 qty since amend dn is
@@ -14602,13 +14602,13 @@ def test_risky_amend_rej_based_on_px_and_qty_with_filled_post_amd_req_n_acked_po
     """
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list, leg1_side=Side.SELL, leg2_side=Side.BUY)
 
     try:
@@ -14624,7 +14624,7 @@ def test_risky_amend_rej_based_on_px_and_qty_with_filled_post_amd_req_n_acked_po
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         for px, qty, chore_symbol, side in [(95, 110, leg1_symbol, Side.SELL)]:
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, sell_inst_type)
@@ -14686,12 +14686,12 @@ def test_risky_amend_rej_based_on_px_and_qty_with_filled_post_amd_req_n_acked_po
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty, is_sell_buy_strat=True)
+                    residual_qty=residual_qty, is_sell_buy_plan=True)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -14730,12 +14730,12 @@ def test_risky_amend_rej_based_on_px_and_qty_with_filled_post_amd_req_n_acked_po
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty, is_sell_buy_strat=True)
+                    residual_qty=residual_qty, is_sell_buy_plan=True)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -14748,7 +14748,7 @@ def test_risky_amend_rej_based_on_px_and_qty_with_filled_post_amd_req_n_acked_po
                          "ChoreStatusType.OE_FILLED before amend applied - status post amd_rej applied: "
                          "ChoreStatusType.OE_ACKED")
             assert_fail_msg = f"Can't find alert: {check_str!r}"
-            check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+            check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
             # waiting for chore to get cxled
             time.sleep(residual_wait_sec)
@@ -14777,12 +14777,12 @@ def test_risky_amend_rej_based_on_px_and_qty_with_filled_post_amd_req_n_acked_po
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty, is_sell_buy_strat=True)
+                    residual_qty=residual_qty, is_sell_buy_plan=True)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -14807,21 +14807,21 @@ def test_non_risky_amend_rej_based_on_px_and_qty_with_cxl_unack_pre_amd_rej(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -14835,7 +14835,7 @@ def test_non_risky_amend_rej_based_on_px_and_qty_with_cxl_unack_pre_amd_rej(
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_residual_qty = None
         buy_filled_notional = None
@@ -14914,7 +14914,7 @@ def test_non_risky_amend_rej_based_on_px_and_qty_with_cxl_unack_pre_amd_rej(
 
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -14935,7 +14935,7 @@ def test_non_risky_amend_rej_based_on_px_and_qty_with_cxl_unack_pre_amd_rej(
             chore_status = ChoreStatusType.OE_CXL_UNACK
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -14965,7 +14965,7 @@ def test_non_risky_amend_rej_based_on_px_and_qty_with_cxl_unack_pre_amd_rej(
             pending_amend_up_qty = 0
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -15016,7 +15016,7 @@ def test_non_risky_amend_rej_based_on_px_and_qty_with_cxl_unack_pre_amd_rej(
 
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -15046,21 +15046,21 @@ def test_risky_amend_rej_based_on_px_and_qty_with_cxl_unack_pre_amd_rej(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -15074,7 +15074,7 @@ def test_risky_amend_rej_based_on_px_and_qty_with_cxl_unack_pre_amd_rej(
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -15159,7 +15159,7 @@ def test_risky_amend_rej_based_on_px_and_qty_with_cxl_unack_pre_amd_rej(
 
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -15180,7 +15180,7 @@ def test_risky_amend_rej_based_on_px_and_qty_with_cxl_unack_pre_amd_rej(
             chore_status = ChoreStatusType.OE_CXL_UNACK
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -15234,7 +15234,7 @@ def test_risky_amend_rej_based_on_px_and_qty_with_cxl_unack_pre_amd_rej(
 
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -15289,7 +15289,7 @@ def test_risky_amend_rej_based_on_px_and_qty_with_cxl_unack_pre_amd_rej(
 
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -15319,21 +15319,21 @@ def test_non_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -15346,7 +15346,7 @@ def test_non_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_residual_qty = None
         buy_filled_notional = None
@@ -15423,7 +15423,7 @@ def test_non_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
 
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -15472,7 +15472,7 @@ def test_non_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
 
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -15497,7 +15497,7 @@ def test_non_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
                                                                                   executor_http_client)
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -15514,7 +15514,7 @@ def test_non_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
             check_str = (f"Received AMD_REJ post chore DOD on chore_id: "
                          f".* - ignoring this amend chore_journal and chore will stay unchanged")
             assert_fail_msg = f"Can't find alert: {check_str!r}"
-            check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+            check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -15533,21 +15533,21 @@ def test_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -15560,7 +15560,7 @@ def test_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -15645,7 +15645,7 @@ def test_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
 
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -15698,7 +15698,7 @@ def test_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
 
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -15723,7 +15723,7 @@ def test_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
                                                                                   executor_http_client)
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -15740,7 +15740,7 @@ def test_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
             check_str = (f"Received AMD_REJ post chore DOD on chore_id: "
                          f".* - ignoring this amend chore_journal and chore will stay unchanged")
             assert_fail_msg = f"Can't find alert: {check_str!r}"
-            check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+            check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -15759,22 +15759,22 @@ def test_non_risky_multi_amend_based_on_qty_and_px(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
 
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -15788,7 +15788,7 @@ def test_non_risky_multi_amend_based_on_qty_and_px(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -15837,7 +15837,7 @@ def test_non_risky_multi_amend_based_on_qty_and_px(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -15902,7 +15902,7 @@ def test_non_risky_multi_amend_based_on_qty_and_px(
                     cxled_exposure = buy_cxl_notional - cxled_notional
                 try:
                     check_all_computes_for_amend(
-                        active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                        active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                         new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                         pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                         filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -15966,7 +15966,7 @@ def test_non_risky_multi_amend_based_on_qty_and_px(
                     cxled_exposure = buy_cxl_notional - cxled_notional
                 try:
                     check_all_computes_for_amend(
-                        active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                        active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                         new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                         pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                         filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -16016,7 +16016,7 @@ def test_non_risky_multi_amend_based_on_qty_and_px(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -16046,21 +16046,21 @@ def test_risky_multi_amend_based_on_px_and_qty(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -16076,7 +16076,7 @@ def test_risky_multi_amend_based_on_px_and_qty(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -16125,7 +16125,7 @@ def test_risky_multi_amend_based_on_px_and_qty(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -16208,7 +16208,7 @@ def test_risky_multi_amend_based_on_px_and_qty(
                     cxled_exposure = buy_cxl_notional - cxled_notional
                 try:
                     check_all_computes_for_amend(
-                        active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                        active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                         new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                         pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                         filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -16239,7 +16239,7 @@ def test_risky_multi_amend_based_on_px_and_qty(
                 pending_amend_up_qty = 0
                 try:
                     check_all_computes_for_amend(
-                        active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                        active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                         new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                         pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                         filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -16288,7 +16288,7 @@ def test_risky_multi_amend_based_on_px_and_qty(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -16318,11 +16318,11 @@ def test_multi_amends_based_on_qty_n_then_px(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     """
     Does multi-amend test - first amends non-risky qty to +-10 based on side, then risky qty to +-10, 
@@ -16331,13 +16331,13 @@ def test_multi_amends_based_on_qty_n_then_px(
     
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -16350,7 +16350,7 @@ def test_multi_amends_based_on_qty_n_then_px(
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_cxled_notional = None
         buy_residual_qty = None
@@ -16423,7 +16423,7 @@ def test_multi_amends_based_on_qty_n_then_px(
                 cxled_exposure = buy_cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -16482,7 +16482,7 @@ def test_multi_amends_based_on_qty_n_then_px(
                 cxled_exposure = buy_cxled_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -16557,7 +16557,7 @@ def test_multi_amends_based_on_qty_n_then_px(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -16604,7 +16604,7 @@ def test_multi_amends_based_on_qty_n_then_px(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -16666,7 +16666,7 @@ def test_multi_amends_based_on_qty_n_then_px(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -16715,7 +16715,7 @@ def test_multi_amends_based_on_qty_n_then_px(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -16778,7 +16778,7 @@ def test_multi_amends_based_on_qty_n_then_px(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -16823,7 +16823,7 @@ def test_multi_amends_based_on_qty_n_then_px(
                 cxled_exposure = buy_cxled_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -16870,7 +16870,7 @@ def test_multi_amends_based_on_qty_n_then_px(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -16900,11 +16900,11 @@ def test_multi_amends_based_on_qty_n_px1(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     """
     Does multi-amend test - first does non-risky amends on qty and px and then does risky amend
@@ -16912,13 +16912,13 @@ def test_multi_amends_based_on_qty_n_px1(
 
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -16933,7 +16933,7 @@ def test_multi_amends_based_on_qty_n_px1(
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_cxled_notional = None
         buy_residual_qty = None
@@ -17012,7 +17012,7 @@ def test_multi_amends_based_on_qty_n_px1(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -17077,7 +17077,7 @@ def test_multi_amends_based_on_qty_n_px1(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -17159,7 +17159,7 @@ def test_multi_amends_based_on_qty_n_px1(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -17207,7 +17207,7 @@ def test_multi_amends_based_on_qty_n_px1(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -17255,7 +17255,7 @@ def test_multi_amends_based_on_qty_n_px1(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -17286,11 +17286,11 @@ def test_multi_amends_based_on_qty_n_px2(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     """
     Does multi-amend test - first does risky amends on qty and px and then does non-risky amend
@@ -17298,13 +17298,13 @@ def test_multi_amends_based_on_qty_n_px2(
 
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -17319,7 +17319,7 @@ def test_multi_amends_based_on_qty_n_px2(
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_cxled_notional = None
         buy_residual_qty = None
@@ -17406,7 +17406,7 @@ def test_multi_amends_based_on_qty_n_px2(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -17453,7 +17453,7 @@ def test_multi_amends_based_on_qty_n_px2(
                 cxled_exposure = buy_cxled_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -17521,7 +17521,7 @@ def test_multi_amends_based_on_qty_n_px2(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -17579,7 +17579,7 @@ def test_multi_amends_based_on_qty_n_px2(
                 cxled_exposure = buy_cxled_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -17626,7 +17626,7 @@ def test_multi_amends_based_on_qty_n_px2(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -17658,22 +17658,22 @@ def test_partial_non_risky_amend(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
 
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -17687,7 +17687,7 @@ def test_partial_non_risky_amend(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -17735,7 +17735,7 @@ def test_partial_non_risky_amend(
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -17796,7 +17796,7 @@ def test_partial_non_risky_amend(
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -17851,7 +17851,7 @@ def test_partial_non_risky_amend(
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -17893,7 +17893,7 @@ def test_partial_non_risky_amend(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             last_filled_qty = filled_qty
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -17914,21 +17914,21 @@ def test_partial_risky_amend(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -17942,7 +17942,7 @@ def test_partial_risky_amend(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -17990,7 +17990,7 @@ def test_partial_risky_amend(
                 filled_exposure = buy_filled_notional - filled_notional
                 cxled_exposure = buy_cxl_notional - cxled_notional
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -18061,7 +18061,7 @@ def test_partial_risky_amend(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             last_filled_qty = filled_qty
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -18087,7 +18087,7 @@ def test_partial_risky_amend(
             pending_amend_up_px = 0
             pending_amend_up_qty = 0
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -18127,7 +18127,7 @@ def test_partial_risky_amend(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             last_filled_qty = filled_qty
             check_all_computes_for_amend(
-                active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                 new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                 pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                 filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -18142,11 +18142,11 @@ def test_partial_risky_amend(
 
 
 def check_all_computes_for_lapse(
-        active_pair_strat, symbol, side, chore_id, executor_http_client,
+        active_pair_plan, symbol, side, chore_id, executor_http_client,
         chore_qty, chore_px, chore_status, open_qty, open_notional, open_px, filled_qty,
         filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px, other_side_residual_qty,
         other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure, last_lapsed_qty, total_lapsed_qty,
-        residual_qty: int = 0, is_sell_buy_strat: bool = False):
+        residual_qty: int = 0, is_sell_buy_plan: bool = False):
     chore_snapshot = get_chore_snapshot_from_chore_id(chore_id,
                                                       executor_http_client)
     assert chore_snapshot.chore_status == chore_status, \
@@ -18181,11 +18181,11 @@ def check_all_computes_for_lapse(
          f"found {chore_snapshot.total_lapsed_qty}")
 
     _check_all_computes_in_models_other_than_chore_snapshot(
-        active_pair_strat, symbol, side, executor_http_client, chore_snapshot,
+        active_pair_plan, symbol, side, executor_http_client, chore_snapshot,
         chore_qty, chore_px, chore_status, open_qty, open_notional, open_px, filled_qty,
         filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px, other_side_residual_qty,
         other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-        residual_qty, is_sell_buy_strat)
+        residual_qty, is_sell_buy_plan)
 
 
 @pytest.mark.nightly
@@ -18194,21 +18194,21 @@ def test_lapse_partial_qty_in_chore(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -18222,7 +18222,7 @@ def test_lapse_partial_qty_in_chore(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_symbol_side_snapshot = None
         buy_filled_notional = None
@@ -18269,7 +18269,7 @@ def test_lapse_partial_qty_in_chore(
                 cxled_exposure = buy_cxl_notional
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     qty, px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
@@ -18320,7 +18320,7 @@ def test_lapse_partial_qty_in_chore(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     qty, px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure, 
@@ -18368,7 +18368,7 @@ def test_lapse_partial_qty_in_chore(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     qty, px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
@@ -18397,21 +18397,21 @@ def test_lapse_complete_qty_in_chore_with_none_qty(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -18425,7 +18425,7 @@ def test_lapse_complete_qty_in_chore_with_none_qty(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_symbol_side_snapshot = None
         buy_filled_notional = None
@@ -18472,7 +18472,7 @@ def test_lapse_complete_qty_in_chore_with_none_qty(
                 cxled_exposure = buy_cxl_notional
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     qty, px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
@@ -18526,7 +18526,7 @@ def test_lapse_complete_qty_in_chore_with_none_qty(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     qty, px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
@@ -18555,21 +18555,21 @@ def test_lapse_complete_qty_in_chore_with_providing_qty(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -18583,7 +18583,7 @@ def test_lapse_complete_qty_in_chore_with_providing_qty(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_symbol_side_snapshot = None
         buy_filled_notional = None
@@ -18630,7 +18630,7 @@ def test_lapse_complete_qty_in_chore_with_providing_qty(
                 cxled_exposure = buy_cxl_notional
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     qty, px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
@@ -18685,7 +18685,7 @@ def test_lapse_complete_qty_in_chore_with_providing_qty(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     qty, px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
@@ -18709,19 +18709,19 @@ def test_lapse_complete_qty_in_chore_with_providing_qty(
 
 
 def _handle_test_for_more_than_expected_lapse_qty(
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, leg1_leg2_symbol_list,
         refresh_sec_update_fixture, check_greater_than_chore_qty: bool, check_alert_str: str):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -18735,7 +18735,7 @@ def _handle_test_for_more_than_expected_lapse_qty(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_symbol_side_snapshot = None
         buy_filled_notional = None
@@ -18782,7 +18782,7 @@ def _handle_test_for_more_than_expected_lapse_qty(
                 cxled_exposure = buy_cxl_notional
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     qty, px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
@@ -18838,7 +18838,7 @@ def _handle_test_for_more_than_expected_lapse_qty(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     qty, px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
@@ -18853,7 +18853,7 @@ def _handle_test_for_more_than_expected_lapse_qty(
             time.sleep(5)
             # Checking alert for rejected chore_journal
             assert_fail_msg = f"Couldn't find any alert saying: {check_alert_str}"
-            check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_alert_str, assert_fail_msg)
+            check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_alert_str, assert_fail_msg)
 
     except AssertionError as e:
         raise e
@@ -18872,15 +18872,15 @@ def test_lapse_qty_more_than_unfilled_qty(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
 
-    check_str = "Unexpected: Lapse qty can't be greater than unfilled qty - putting strat to DOD state"
-    _handle_test_for_more_than_expected_lapse_qty(pair_strat_, expected_strat_limits_, expected_strat_status_,
+    check_str = "Unexpected: Lapse qty can't be greater than unfilled qty - putting plan to DOD state"
+    _handle_test_for_more_than_expected_lapse_qty(pair_plan_, expected_plan_limits_, expected_plan_status_,
                                                   last_barter_fixture_list, symbol_overview_obj_list,
                                                   market_depth_basemodel_list, leg1_leg2_symbol_list,
                                                   refresh_sec_update_fixture,
@@ -18893,14 +18893,14 @@ def test_lapse_check_reject_when_lapse_qty_gt_chore_qty(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
-    check_str = "Unexpected: Lapse qty can't be greater than chore_qty - putting strat to DOD state"
-    _handle_test_for_more_than_expected_lapse_qty(pair_strat_, expected_strat_limits_, expected_strat_status_,
+    check_str = "Unexpected: Lapse qty can't be greater than chore_qty - putting plan to DOD state"
+    _handle_test_for_more_than_expected_lapse_qty(pair_plan_, expected_plan_limits_, expected_plan_status_,
                                                   last_barter_fixture_list, symbol_overview_obj_list,
                                                   market_depth_basemodel_list, leg1_leg2_symbol_list,
                                                   refresh_sec_update_fixture,
@@ -18913,21 +18913,21 @@ def test_lapse_post_cxl_req_pre_cxl_ack(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -18942,7 +18942,7 @@ def test_lapse_post_cxl_req_pre_cxl_ack(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_symbol_side_snapshot = None
         buy_filled_notional = None
@@ -18988,7 +18988,7 @@ def test_lapse_post_cxl_req_pre_cxl_ack(
                 cxled_exposure = buy_cxl_notional
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     qty, px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
@@ -19046,7 +19046,7 @@ def test_lapse_post_cxl_req_pre_cxl_ack(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     qty, px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
@@ -19098,7 +19098,7 @@ def test_lapse_post_cxl_req_pre_cxl_ack(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     qty, px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
@@ -19127,21 +19127,21 @@ def test_lapse_in_btw_multi_fills(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -19155,7 +19155,7 @@ def test_lapse_in_btw_multi_fills(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_symbol_side_snapshot = None
         buy_filled_notional = None
@@ -19199,7 +19199,7 @@ def test_lapse_in_btw_multi_fills(
                 cxled_exposure = buy_cxl_notional
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     qty, px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
@@ -19250,7 +19250,7 @@ def test_lapse_in_btw_multi_fills(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     qty, px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
@@ -19308,7 +19308,7 @@ def test_lapse_in_btw_multi_fills(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     qty, px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, last_fill_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
@@ -19337,21 +19337,21 @@ def test_lapse_pre_fill_making_chore_filled(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -19365,7 +19365,7 @@ def test_lapse_pre_fill_making_chore_filled(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_symbol_side_snapshot = None
         buy_filled_notional = None
@@ -19409,7 +19409,7 @@ def test_lapse_pre_fill_making_chore_filled(
                 cxled_exposure = buy_cxl_notional
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     qty, px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
@@ -19460,7 +19460,7 @@ def test_lapse_pre_fill_making_chore_filled(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     qty, px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
@@ -19513,7 +19513,7 @@ def test_lapse_pre_fill_making_chore_filled(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     qty, px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, last_fill_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
@@ -19542,21 +19542,21 @@ def test_lapse_pre_fill_making_chore_over_filled(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -19570,7 +19570,7 @@ def test_lapse_pre_fill_making_chore_over_filled(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_symbol_side_snapshot = None
         buy_filled_notional = None
@@ -19614,7 +19614,7 @@ def test_lapse_pre_fill_making_chore_over_filled(
                 cxled_exposure = buy_cxl_notional
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     qty, px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
@@ -19665,7 +19665,7 @@ def test_lapse_pre_fill_making_chore_over_filled(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     qty, px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
@@ -19719,7 +19719,7 @@ def test_lapse_pre_fill_making_chore_over_filled(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     qty, px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, last_fill_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
@@ -19731,20 +19731,20 @@ def test_lapse_pre_fill_making_chore_over_filled(
                 print("Exception", e)
                 raise e
 
-            paused_pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat.id)
-            assert paused_pair_strat.strat_state == StratState.StratState_PAUSED, \
-                f"Mismatched: strat state must be PAUSED, found: {paused_pair_strat.strat_state}"
+            paused_pair_plan = email_book_service_native_web_client.get_pair_plan_client(active_pair_plan.id)
+            assert paused_pair_plan.plan_state == PlanState.PlanState_PAUSED, \
+                f"Mismatched: plan state must be PAUSED, found: {paused_pair_plan.plan_state}"
 
             time.sleep(5)
             check_str = "Unexpected: Received fill that will make chore_snapshot OVER_FILLED"
             assert_fail_msg = f"Couldn't find any alert saying: {check_str}"
-            check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+            check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
             if side == Side.BUY:
-                # forcefully turning strat to active again for checking sell chore
-                pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat.id)
-                pair_strat.strat_state = StratState.StratState_ACTIVE
-                email_book_service_native_web_client.put_pair_strat_client(pair_strat)
+                # forcefully turning plan to active again for checking sell chore
+                pair_plan = email_book_service_native_web_client.get_pair_plan_client(active_pair_plan.id)
+                pair_plan.plan_state = PlanState.PlanState_ACTIVE
+                email_book_service_native_web_client.put_pair_plan_client(pair_plan)
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -19763,21 +19763,21 @@ def test_multi_partial_lapse_till_chore_dod(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -19791,7 +19791,7 @@ def test_multi_partial_lapse_till_chore_dod(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_filled_notional = None
         buy_cxl_notional = None
@@ -19836,7 +19836,7 @@ def test_multi_partial_lapse_till_chore_dod(
                 cxled_exposure = buy_cxl_notional
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     qty, px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
@@ -19899,7 +19899,7 @@ def test_multi_partial_lapse_till_chore_dod(
                 last_filled_qty = filled_qty
                 try:
                     check_all_computes_for_lapse(
-                        active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                        active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                         qty, px, chore_status, open_qty, open_notional, open_px, filled_qty,
                         filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                         other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
@@ -19928,21 +19928,21 @@ def test_lapse_pre_non_risky_amend_ack(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -19956,7 +19956,7 @@ def test_lapse_pre_non_risky_amend_ack(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_filled_notional = None
         buy_cxl_notional = None
@@ -20005,7 +20005,7 @@ def test_lapse_pre_non_risky_amend_ack(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -20073,7 +20073,7 @@ def test_lapse_pre_non_risky_amend_ack(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -20122,7 +20122,7 @@ def test_lapse_pre_non_risky_amend_ack(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     qty, px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
@@ -20179,7 +20179,7 @@ def test_lapse_pre_non_risky_amend_ack(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -20228,7 +20228,7 @@ def test_lapse_pre_non_risky_amend_ack(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -20258,21 +20258,21 @@ def test_full_lapse_pre_non_risky_amend_ack(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -20286,7 +20286,7 @@ def test_full_lapse_pre_non_risky_amend_ack(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_filled_notional = None
         buy_cxl_notional = None
@@ -20335,7 +20335,7 @@ def test_full_lapse_pre_non_risky_amend_ack(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -20403,7 +20403,7 @@ def test_full_lapse_pre_non_risky_amend_ack(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -20454,7 +20454,7 @@ def test_full_lapse_pre_non_risky_amend_ack(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     qty, px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
@@ -20518,7 +20518,7 @@ def test_full_lapse_pre_non_risky_amend_ack(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -20532,30 +20532,30 @@ def test_full_lapse_pre_non_risky_amend_ack(
                 raise Exception(e)
 
             if side == Side.BUY:
-                paused_pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat.id)
-                assert paused_pair_strat.strat_state == StratState.StratState_PAUSED, \
-                    f"Mismatched: strat state must be PAUSED, found: {paused_pair_strat.strat_state}"
+                paused_pair_plan = email_book_service_native_web_client.get_pair_plan_client(active_pair_plan.id)
+                assert paused_pair_plan.plan_state == PlanState.PlanState_PAUSED, \
+                    f"Mismatched: plan state must be PAUSED, found: {paused_pair_plan.plan_state}"
 
                 time.sleep(5)
                 check_str = ("Received ChoreEventType.OE_AMD_ACK for amend qty which makes chore OVER_CXLED to chore "
                              "which was ChoreStatusType.OE_DOD before")
-                assert_fail_msg = f"Can't find alert of {check_str!r} in neither strat_alert nor portfolio_alert"
-                check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id,
+                assert_fail_msg = f"Can't find alert of {check_str!r} in neither plan_alert nor contact_alert"
+                check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id,
                                                                    check_str, assert_fail_msg)
             else:
                 check_str = ("Received ChoreEventType.OE_AMD_ACK for amend qty which makes chore DOD, before status "
                              "was ChoreStatusType.OE_DOD - applying amend and putting chore as DOD")
                 time.sleep(5)
 
-                assert_fail_msg = f"Can't find alert of {check_str!r} in neither strat_alert nor portfolio_alert"
-                check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id,
+                assert_fail_msg = f"Can't find alert of {check_str!r} in neither plan_alert nor contact_alert"
+                check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id,
                                                                    check_str, assert_fail_msg)
 
             if side == Side.BUY:
-                # forcefully turning strat to active again for checking sell chore
-                pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat.id)
-                pair_strat.strat_state = StratState.StratState_ACTIVE
-                email_book_service_native_web_client.put_pair_strat_client(pair_strat)
+                # forcefully turning plan to active again for checking sell chore
+                pair_plan = email_book_service_native_web_client.get_pair_plan_client(active_pair_plan.id)
+                pair_plan.plan_state = PlanState.PlanState_ACTIVE
+                email_book_service_native_web_client.put_pair_plan_client(pair_plan)
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -20574,21 +20574,21 @@ def test_lapse_pre_non_risky_amend_req(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -20602,7 +20602,7 @@ def test_lapse_pre_non_risky_amend_req(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_filled_notional = None
         buy_cxl_notional = None
@@ -20652,7 +20652,7 @@ def test_lapse_pre_non_risky_amend_req(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -20702,7 +20702,7 @@ def test_lapse_pre_non_risky_amend_req(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     qty, px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
@@ -20763,7 +20763,7 @@ def test_lapse_pre_non_risky_amend_req(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -20822,7 +20822,7 @@ def test_lapse_pre_non_risky_amend_req(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -20872,7 +20872,7 @@ def test_lapse_pre_non_risky_amend_req(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -20902,24 +20902,24 @@ def test_lapse_qty_n_amend_up_same_qty_in_non_risky_amend(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     """
     Amend up is non_risky on Sell side so using sell side only
     """
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list, leg1_side=Side.SELL, leg2_side=Side.BUY)
 
     try:
@@ -20933,7 +20933,7 @@ def test_lapse_qty_n_amend_up_same_qty_in_non_risky_amend(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         for px, qty, chore_symbol, side in [(95, 110, leg1_symbol, Side.SELL)]:
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, sell_inst_type)
@@ -20969,12 +20969,12 @@ def test_lapse_qty_n_amend_up_same_qty_in_non_risky_amend(
             cxled_exposure = - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty, is_sell_buy_strat=True)
+                    residual_qty=residual_qty, is_sell_buy_plan=True)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise ass_e
@@ -21008,11 +21008,11 @@ def test_lapse_qty_n_amend_up_same_qty_in_non_risky_amend(
             cxled_exposure = - cxled_notional
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     qty, px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    lapsed_qty, total_lapsed_qty, residual_qty=residual_qty, is_sell_buy_strat=True)
+                    lapsed_qty, total_lapsed_qty, residual_qty=residual_qty, is_sell_buy_plan=True)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise ass_e
@@ -21051,12 +21051,12 @@ def test_lapse_qty_n_amend_up_same_qty_in_non_risky_amend(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty, total_lapsed_qty=total_lapsed_qty, is_sell_buy_strat=True)
+                    residual_qty=residual_qty, total_lapsed_qty=total_lapsed_qty, is_sell_buy_plan=True)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise AssertionError(ass_e)
@@ -21091,12 +21091,12 @@ def test_lapse_qty_n_amend_up_same_qty_in_non_risky_amend(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty, total_lapsed_qty=total_lapsed_qty, is_sell_buy_strat=True)
+                    residual_qty=residual_qty, total_lapsed_qty=total_lapsed_qty, is_sell_buy_plan=True)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise ass_e
@@ -21127,12 +21127,12 @@ def test_lapse_qty_n_amend_up_same_qty_in_non_risky_amend(
             cxled_exposure = - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
-                    residual_qty=residual_qty, total_lapsed_qty=total_lapsed_qty, is_sell_buy_strat=True)
+                    residual_qty=residual_qty, total_lapsed_qty=total_lapsed_qty, is_sell_buy_plan=True)
             except AssertionError as ass_e:
                 print("ASSERT", ass_e)
                 raise ass_e
@@ -21157,24 +21157,24 @@ def test_lapse_qty_n_amend_up_same_qty_in_risky_amend(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     """
     Amend up is risky on Buy side so using buy side only
     """
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -21188,7 +21188,7 @@ def test_lapse_qty_n_amend_up_same_qty_in_risky_amend(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         for px, qty, chore_symbol, side in [(100, 90, buy_symbol, Side.BUY)]:
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, sell_inst_type)
@@ -21224,7 +21224,7 @@ def test_lapse_qty_n_amend_up_same_qty_in_risky_amend(
             cxled_exposure = cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -21263,7 +21263,7 @@ def test_lapse_qty_n_amend_up_same_qty_in_risky_amend(
             cxled_exposure = cxled_notional
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     qty, px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
@@ -21309,7 +21309,7 @@ def test_lapse_qty_n_amend_up_same_qty_in_risky_amend(
             cxled_exposure = cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -21340,7 +21340,7 @@ def test_lapse_qty_n_amend_up_same_qty_in_risky_amend(
             pending_amend_up_qty = 0
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -21375,7 +21375,7 @@ def test_lapse_qty_n_amend_up_same_qty_in_risky_amend(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -21405,21 +21405,21 @@ def test_lapse_pre_risky_amend_req(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -21433,7 +21433,7 @@ def test_lapse_pre_risky_amend_req(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_filled_notional = None
         buy_cxl_notional = None
@@ -21483,7 +21483,7 @@ def test_lapse_pre_risky_amend_req(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -21533,7 +21533,7 @@ def test_lapse_pre_risky_amend_req(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     qty, px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
@@ -21609,7 +21609,7 @@ def test_lapse_pre_risky_amend_req(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -21640,7 +21640,7 @@ def test_lapse_pre_risky_amend_req(
             pending_amend_up_qty = 0
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -21689,7 +21689,7 @@ def test_lapse_pre_risky_amend_req(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -21719,21 +21719,21 @@ def test_lapse_pre_risky_amend_ack(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -21747,7 +21747,7 @@ def test_lapse_pre_risky_amend_ack(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_filled_notional = None
         buy_cxl_notional = None
@@ -21797,7 +21797,7 @@ def test_lapse_pre_risky_amend_ack(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -21871,7 +21871,7 @@ def test_lapse_pre_risky_amend_ack(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -21919,7 +21919,7 @@ def test_lapse_pre_risky_amend_ack(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
@@ -21950,7 +21950,7 @@ def test_lapse_pre_risky_amend_ack(
             pending_amend_up_qty = 0
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -21999,7 +21999,7 @@ def test_lapse_pre_risky_amend_ack(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -22029,21 +22029,21 @@ def test_lapse_pre_risky_amend_ack(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -22057,7 +22057,7 @@ def test_lapse_pre_risky_amend_ack(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_filled_notional = None
         buy_cxl_notional = None
@@ -22107,7 +22107,7 @@ def test_lapse_pre_risky_amend_ack(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -22181,7 +22181,7 @@ def test_lapse_pre_risky_amend_ack(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -22229,7 +22229,7 @@ def test_lapse_pre_risky_amend_ack(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
@@ -22260,7 +22260,7 @@ def test_lapse_pre_risky_amend_ack(
             pending_amend_up_qty = 0
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -22309,7 +22309,7 @@ def test_lapse_pre_risky_amend_ack(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -22339,21 +22339,21 @@ def test_full_lapse_pre_risky_amend_ack(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -22367,7 +22367,7 @@ def test_full_lapse_pre_risky_amend_ack(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_filled_notional = None
         buy_cxl_notional = None
@@ -22417,7 +22417,7 @@ def test_full_lapse_pre_risky_amend_ack(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -22491,7 +22491,7 @@ def test_full_lapse_pre_risky_amend_ack(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -22541,7 +22541,7 @@ def test_full_lapse_pre_risky_amend_ack(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
@@ -22592,7 +22592,7 @@ def test_full_lapse_pre_risky_amend_ack(
 
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, last_filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -22622,21 +22622,21 @@ def test_lapse_post_non_risky_amend(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -22650,7 +22650,7 @@ def test_lapse_post_non_risky_amend(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_filled_notional = None
         buy_cxl_notional = None
@@ -22698,7 +22698,7 @@ def test_lapse_post_non_risky_amend(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -22766,7 +22766,7 @@ def test_lapse_post_non_risky_amend(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -22827,7 +22827,7 @@ def test_lapse_post_non_risky_amend(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -22877,7 +22877,7 @@ def test_lapse_post_non_risky_amend(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
@@ -22926,7 +22926,7 @@ def test_lapse_post_non_risky_amend(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -22956,21 +22956,21 @@ def test_lapse_pre_non_risky_amend_rej_req(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -22983,7 +22983,7 @@ def test_lapse_pre_non_risky_amend_rej_req(
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -23044,7 +23044,7 @@ def test_lapse_pre_non_risky_amend_rej_req(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     qty, px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
@@ -23104,7 +23104,7 @@ def test_lapse_pre_non_risky_amend_rej_req(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -23155,7 +23155,7 @@ def test_lapse_pre_non_risky_amend_rej_req(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -23207,7 +23207,7 @@ def test_lapse_pre_non_risky_amend_rej_req(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -23237,21 +23237,21 @@ def test_lapse_pre_non_risky_amend_rej_ack(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -23265,7 +23265,7 @@ def test_lapse_pre_non_risky_amend_rej_ack(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_filled_notional = None
         buy_cxl_notional = None
@@ -23315,7 +23315,7 @@ def test_lapse_pre_non_risky_amend_rej_ack(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -23384,7 +23384,7 @@ def test_lapse_pre_non_risky_amend_rej_ack(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -23433,7 +23433,7 @@ def test_lapse_pre_non_risky_amend_rej_ack(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     qty, px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
@@ -23481,7 +23481,7 @@ def test_lapse_pre_non_risky_amend_rej_ack(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -23532,7 +23532,7 @@ def test_lapse_pre_non_risky_amend_rej_ack(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -23562,21 +23562,21 @@ def test_full_lapse_pre_non_risky_amend_rej_ack(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -23590,7 +23590,7 @@ def test_full_lapse_pre_non_risky_amend_rej_ack(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # buy test
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_filled_notional = None
         buy_cxl_notional = None
@@ -23640,7 +23640,7 @@ def test_full_lapse_pre_non_risky_amend_rej_ack(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -23709,7 +23709,7 @@ def test_full_lapse_pre_non_risky_amend_rej_ack(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -23763,7 +23763,7 @@ def test_full_lapse_pre_non_risky_amend_rej_ack(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     qty, px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
@@ -23788,7 +23788,7 @@ def test_full_lapse_pre_non_risky_amend_rej_ack(
                                                                                   executor_http_client)
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -23805,7 +23805,7 @@ def test_full_lapse_pre_non_risky_amend_rej_ack(
             check_str = (f"Received AMD_REJ post chore DOD on chore_id: "
                          f".* - ignoring this amend chore_journal and chore will stay unchanged")
             assert_fail_msg = f"Can't find alert: {check_str!r}"
-            check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+            check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
     except AssertionError as e:
         raise e
@@ -23824,21 +23824,21 @@ def test_lapse_post_non_risky_amend_rej_ack(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -23851,7 +23851,7 @@ def test_lapse_post_non_risky_amend_rej_ack(
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -23900,7 +23900,7 @@ def test_lapse_post_non_risky_amend_rej_ack(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -23968,7 +23968,7 @@ def test_lapse_post_non_risky_amend_rej_ack(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -24014,7 +24014,7 @@ def test_lapse_post_non_risky_amend_rej_ack(
 
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -24063,7 +24063,7 @@ def test_lapse_post_non_risky_amend_rej_ack(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     qty, px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
@@ -24118,7 +24118,7 @@ def test_lapse_post_non_risky_amend_rej_ack(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -24148,21 +24148,21 @@ def test_lapse_pre_risky_amend_rej_req(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -24175,7 +24175,7 @@ def test_lapse_pre_risky_amend_rej_req(
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -24245,7 +24245,7 @@ def test_lapse_pre_risky_amend_rej_req(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     qty, px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
@@ -24325,7 +24325,7 @@ def test_lapse_pre_risky_amend_rej_req(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -24380,7 +24380,7 @@ def test_lapse_pre_risky_amend_rej_req(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -24429,7 +24429,7 @@ def test_lapse_pre_risky_amend_rej_req(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -24459,21 +24459,21 @@ def test_lapse_pre_risky_amend_rej_ack(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -24488,7 +24488,7 @@ def test_lapse_pre_risky_amend_rej_ack(
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -24587,7 +24587,7 @@ def test_lapse_pre_risky_amend_rej_ack(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -24635,7 +24635,7 @@ def test_lapse_pre_risky_amend_rej_ack(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
@@ -24692,7 +24692,7 @@ def test_lapse_pre_risky_amend_rej_ack(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -24747,7 +24747,7 @@ def test_lapse_pre_risky_amend_rej_ack(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -24777,21 +24777,21 @@ def test_full_lapse_pre_risky_amend_rej_ack(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -24806,7 +24806,7 @@ def test_full_lapse_pre_risky_amend_rej_ack(
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -24905,7 +24905,7 @@ def test_full_lapse_pre_risky_amend_rej_ack(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -24958,7 +24958,7 @@ def test_full_lapse_pre_risky_amend_rej_ack(
                 cxled_exposure = buy_cxl_notional - cxled_notional
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
@@ -24983,7 +24983,7 @@ def test_full_lapse_pre_risky_amend_rej_ack(
                                                                                   executor_http_client)
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -25000,7 +25000,7 @@ def test_full_lapse_pre_risky_amend_rej_ack(
             check_str = (f"Received AMD_REJ post chore DOD on chore_id: "
                          f".* - ignoring this amend chore_journal and chore will stay unchanged")
             assert_fail_msg = f"Can't find alert: {check_str!r}"
-            check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat.id, check_str, assert_fail_msg)
+            check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -25019,21 +25019,21 @@ def test_lapse_post_risky_amend_rej_ack(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -25046,7 +25046,7 @@ def test_lapse_post_risky_amend_rej_ack(
         # updating simulator's configs
         executor_http_client.barter_simulator_reload_config_query_client()
 
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
         buy_residual_qty = None
         buy_cxl_notional = None
@@ -25150,7 +25150,7 @@ def test_lapse_post_risky_amend_rej_ack(
 
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -25204,7 +25204,7 @@ def test_lapse_post_risky_amend_rej_ack(
 
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -25253,7 +25253,7 @@ def test_lapse_post_risky_amend_rej_ack(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_lapse(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     qty, px, chore_status, open_qty, open_notional, open_px, filled_qty,
                     filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
                     other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure,
@@ -25309,7 +25309,7 @@ def test_lapse_post_risky_amend_rej_ack(
             last_filled_qty = filled_qty
             try:
                 check_all_computes_for_amend(
-                    active_pair_strat, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
+                    active_pair_plan, chore_symbol, side, latest_ack_obj.chore.chore_id, executor_http_client,
                     new_qty, new_px, chore_status, pending_amend_dn_px, pending_amend_dn_qty, pending_amend_up_px,
                     pending_amend_up_qty, total_amend_dn_qty, total_amend_up_qty, open_qty, open_notional, open_px,
                     filled_qty, filled_notional, filled_px, filled_qty, cxled_qty, cxled_notional, cxled_px,
@@ -25346,24 +25346,24 @@ def test_verify_deadlock_in_update_residuals_query(
         buy_chore_, sell_chore_, buy_fill_journal_,
         sell_fill_journal_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
-        pair_strat_, expected_strat_limits_, expected_strat_status_,
-        expected_strat_brief_, expected_portfolio_status_,
+        pair_plan_, expected_plan_limits_, expected_plan_status_,
+        expected_plan_brief_, expected_contact_status_,
         last_barter_fixture_list, symbol_overview_obj_list,
         market_depth_basemodel_list, expected_chore_limits_,
-        expected_portfolio_limits_, max_loop_count_per_side,
+        expected_contact_limits_, max_loop_count_per_side,
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     """
     triggers buy & sell pair chore (single buy chore followed by single sell chore) for max_loop_count_per_side times
     """
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
      config_file_path, config_dict, config_dict_str) = handle_pre_chore_test_requirements(
-        buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-        expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+        buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+        expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list)
 
     try:
@@ -25392,7 +25392,7 @@ def test_verify_deadlock_in_update_residuals_query(
             if leg2_last_barter is not None:
                 last_barter_fixture_list[1]["market_barter_volume"][
                     "participation_period_last_barter_qty_sum"] = leg2_last_barter.market_barter_volume.participation_period_last_barter_qty_sum
-            leg1_last_barter, leg2_last_barter = run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+            leg1_last_barter, leg2_last_barter = run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
             px = 100
             qty = 90
@@ -25429,13 +25429,13 @@ def test_verify_deadlock_in_update_residuals_query(
 #     LogBarterSimulator.trigger_kill_switch()
 #     time.sleep(5)
 #
-#     portfolio_status_id = 1
-#     portfolio_status = email_book_service_native_web_client.get_portfolio_status_client(portfolio_status_id)
-#     assert portfolio_status.kill_switch
+#     contact_status_id = 1
+#     contact_status = email_book_service_native_web_client.get_contact_status_client(contact_status_id)
+#     assert contact_status.kill_switch
 #
 #     LogBarterSimulator.revoke_kill_switch_n_resume_bartering()
 #     time.sleep(5)
 #
-#     portfolio_status = email_book_service_native_web_client.get_portfolio_status_client(portfolio_status_id)
-#     assert not portfolio_status.kill_switch
+#     contact_status = email_book_service_native_web_client.get_contact_status_client(contact_status_id)
+#     assert not contact_status.kill_switch
 

@@ -9,16 +9,16 @@ import inspect
 from typing import Set
 
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.aggregate import (
-    get_ongoing_or_all_pair_strats_by_sec_id, get_ongoing_pair_strat_filter)
+    get_ongoing_or_all_pair_plans_by_sec_id, get_ongoing_pair_plan_filter)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.email_book_service_http_client import (
     EmailBookServiceHttpClient)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import (
-    get_field_seperator_pattern, get_key_val_seperator_pattern, get_pattern_for_pair_strat_db_updates, UpdateType)
+    get_field_seperator_pattern, get_key_val_seperator_pattern, get_pattern_for_pair_plan_db_updates, UpdateType)
 from FluxPythonUtils.scripts.utility_functions import (
     YAMLConfigurationManager, except_n_log_alert, parse_to_int)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.ORMModel.photo_book_service_model_imports import (
-    StratViewBaseModel)
+    PlanViewBaseModel)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.model_extensions import BrokerUtil
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecord, SecType
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import (
@@ -47,12 +47,12 @@ street_book_config_yaml_path: PurePath = STRAT_EXECUTOR_DATA_DIR / f"config.yaml
 street_book_config_yaml_dict = (
     YAMLConfigurationManager.load_yaml_configurations(str(street_book_config_yaml_path)))
 
-update_portfolio_status_lock: Lock = Lock()
+update_contact_status_lock: Lock = Lock()
 force_clear_positions_priority: int = 9
 force_clear_brokers = ["zerodha"]  # comparison is always lower cased
 
 
-def patch_portfolio_status(overall_buy_notional: float | None, overall_sell_notional: float | None) -> None:
+def patch_contact_status(overall_buy_notional: float | None, overall_sell_notional: float | None) -> None:
     """
     this function is generally invoked in extreme cases - best to not throw any further exceptions from here
     otherwise the program will terminate - log critical error and continue
@@ -67,25 +67,25 @@ def patch_portfolio_status(overall_buy_notional: float | None, overall_sell_noti
             kwargs.update(overall_sell_notional=overall_sell_notional)
             act = True
         if act:
-            with update_portfolio_status_lock:
-                portfolio_status_list: List[PortfolioStatusBaseModel] = \
-                    email_book_service_http_client.get_all_portfolio_status_client()
-                logging.debug(f"portfolio_status_list count: {len(portfolio_status_list)}")
-                if 0 == len(portfolio_status_list):  # no portfolio status set yet
-                    logging.error(f"patch_portfolio_status failed. no portfolio status obj found;;;"
+            with update_contact_status_lock:
+                contact_status_list: List[ContactStatusBaseModel] = \
+                    email_book_service_http_client.get_all_contact_status_client()
+                logging.debug(f"contact_status_list count: {len(contact_status_list)}")
+                if 0 == len(contact_status_list):  # no contact status set yet
+                    logging.error(f"patch_contact_status failed. no contact status obj found;;;"
                                   f"update request: {kwargs}")
-                elif 1 == len(portfolio_status_list):
-                    kwargs.update(_id=portfolio_status_list[0].id)
-                    updated_portfolio_status: PortfolioStatusBaseModel = PortfolioStatusBaseModel(**kwargs)
-                    email_book_service_http_client.patch_portfolio_status_client(updated_portfolio_status.to_json_dict(exclude_none=True))
+                elif 1 == len(contact_status_list):
+                    kwargs.update(_id=contact_status_list[0].id)
+                    updated_contact_status: ContactStatusBaseModel = ContactStatusBaseModel(**kwargs)
+                    email_book_service_http_client.patch_contact_status_client(updated_contact_status.to_json_dict(exclude_none=True))
                 else:
                     logging.critical(
-                        "multiple portfolio status entries not supported at this time! "
+                        "multiple contact status entries not supported at this time! "
                         "use swagger UI to delete redundant entries from DB and retry."
                         f"this blocks all update requests. update request being processed: {kwargs}")
         # else not action required - no action to take - ignore and continue
     except Exception as e:
-        logging.critical(f"something serious is wrong: patch_portfolio_status is throwing an exception!;;; "
+        logging.critical(f"something serious is wrong: patch_contact_status is throwing an exception!;;; "
                          f"exception: {e}", exc_info=True)
 
 
@@ -179,38 +179,38 @@ def is_service_up(ignore_error: bool = False, is_server: bool = False):
         return False
 
 
-def is_ongoing_strat(pair_strat: PairStrat | PairStratBaseModel | None) -> bool:
-    if not pair_strat:
-        logging.error(f"is_ongoing_strat invoked with {pair_strat=}, returning False")
+def is_ongoing_plan(pair_plan: PairPlan | PairPlanBaseModel | None) -> bool:
+    if not pair_plan:
+        logging.error(f"is_ongoing_plan invoked with {pair_plan=}, returning False")
         return False
-    return pair_strat.strat_state not in [StratState.StratState_UNSPECIFIED,
-                                          StratState.StratState_READY,
-                                          StratState.StratState_DONE,
-                                          StratState.StratState_SNOOZED]
+    return pair_plan.plan_state not in [PlanState.PlanState_UNSPECIFIED,
+                                          PlanState.PlanState_READY,
+                                          PlanState.PlanState_DONE,
+                                          PlanState.PlanState_SNOOZED]
 
 
 @except_n_log_alert()
-def create_portfolio_limits(eligible_brokers: List[BrokerBaseModel] | None = None) -> PortfolioLimitsBaseModel:
-    portfolio_limits_obj: PortfolioLimitsBaseModel = get_new_portfolio_limits(eligible_brokers, external_source=True)
+def create_contact_limits(eligible_brokers: List[BrokerBaseModel] | None = None) -> ContactLimitsBaseModel:
+    contact_limits_obj: ContactLimitsBaseModel = get_new_contact_limits(eligible_brokers, external_source=True)
     web_client_internal = get_internal_web_client()
-    created_portfolio_limits: PortfolioLimitsBaseModel = (
-        web_client_internal.create_portfolio_limits_client(portfolio_limits_obj))
-    logging.info(f"{created_portfolio_limits=}")
-    return created_portfolio_limits
+    created_contact_limits: ContactLimitsBaseModel = (
+        web_client_internal.create_contact_limits_client(contact_limits_obj))
+    logging.info(f"{created_contact_limits=}")
+    return created_contact_limits
 
 
 @except_n_log_alert()
-def get_portfolio_limits() -> PortfolioLimitsBaseModel | None:
+def get_contact_limits() -> ContactLimitsBaseModel | None:
     web_client = get_internal_web_client()
-    portfolio_limits_list: List[PortfolioLimitsBaseModel] = web_client.get_all_portfolio_limits_client()
-    if 0 == len(portfolio_limits_list):
+    contact_limits_list: List[ContactLimitsBaseModel] = web_client.get_all_contact_limits_client()
+    if 0 == len(contact_limits_list):
         return None
-    elif 1 < len(portfolio_limits_list):
-        err_str_ = (f"multiple: {len(portfolio_limits_list)} portfolio_limits entries not supported at this time! "
-                    f"use swagger UI to delete redundant entries: {portfolio_limits_list} from DB and retry")
+    elif 1 < len(contact_limits_list):
+        err_str_ = (f"multiple: {len(contact_limits_list)} contact_limits entries not supported at this time! "
+                    f"use swagger UI to delete redundant entries: {contact_limits_list} from DB and retry")
         raise Exception(err_str_)
     else:
-        return portfolio_limits_list[0]
+        return contact_limits_list[0]
 
 
 @except_n_log_alert()
@@ -226,33 +226,33 @@ def get_chore_limits() -> ChoreLimitsBaseModel | None:
         return chore_limits_list[0]
 
 
-def get_new_portfolio_status() -> PortfolioStatus:
-    portfolio_status: PortfolioStatus = PortfolioStatus(id=1, overall_buy_notional=0,
+def get_new_contact_status() -> ContactStatus:
+    contact_status: ContactStatus = ContactStatus(id=1, overall_buy_notional=0,
                                                         overall_sell_notional=0,
                                                         overall_buy_fill_notional=0,
                                                         overall_sell_fill_notional=0,
                                                         open_chores=0)
-    return portfolio_status
+    return contact_status
 
 
-def get_new_portfolio_limits(eligible_brokers: List[Broker] | None = None,
-                             external_source: bool = False) -> PortfolioLimits | PortfolioLimitsBaseModel:
+def get_new_contact_limits(eligible_brokers: List[Broker] | None = None,
+                             external_source: bool = False) -> ContactLimits | ContactLimitsBaseModel:
     if eligible_brokers is None:
         eligible_brokers = []
     # else using provided value
-    model_class_type = PortfolioLimits
+    model_class_type = ContactLimits
     if external_source:
-        model_class_type = PortfolioLimitsBaseModel
+        model_class_type = ContactLimitsBaseModel
 
     rolling_max_chore_count = RollingMaxChoreCount(max_rolling_tx_count=5, rolling_tx_count_period_seconds=2)
     rolling_max_reject_count = RollingMaxChoreCount(max_rolling_tx_count=5, rolling_tx_count_period_seconds=2)
-    portfolio_limits_obj = model_class_type(id=1, max_open_baskets=20, max_open_notional_per_side=100_000,
+    contact_limits_obj = model_class_type(id=1, max_open_baskets=20, max_open_notional_per_side=100_000,
                                             max_gross_n_open_notional=2_400_000,
                                             rolling_max_chore_count=rolling_max_chore_count,
                                             rolling_max_reject_count=rolling_max_reject_count,
                                             eligible_brokers=eligible_brokers,
                                             eligible_brokers_update_count=0)
-    return portfolio_limits_obj
+    return contact_limits_obj
 
 
 def get_new_chore_limits() -> ChoreLimits:
@@ -263,20 +263,20 @@ def get_new_chore_limits() -> ChoreLimits:
     return ord_limit_obj
 
 
-def get_new_strat_view_obj(obj_id: int) -> StratViewBaseModel:
-    strat_view_obj: StratViewBaseModel = StratViewBaseModel(id=obj_id, strat_alert_count=0)
-    return strat_view_obj
+def get_new_plan_view_obj(obj_id: int) -> PlanViewBaseModel:
+    plan_view_obj: PlanViewBaseModel = PlanViewBaseModel(id=obj_id, plan_alert_count=0)
+    return plan_view_obj
 
 
-def get_match_level(pair_strat: PairStrat, sec_id: str, side: Side) -> int:
+def get_match_level(pair_plan: PairPlan, sec_id: str, side: Side) -> int:
     match_level: int = 6  # no match
-    if pair_strat.pair_strat_params.strat_leg1.sec.sec_id == sec_id:
-        if pair_strat.pair_strat_params.strat_leg1.side == side:
+    if pair_plan.pair_plan_params.plan_leg1.sec.sec_id == sec_id:
+        if pair_plan.pair_plan_params.plan_leg1.side == side:
             match_level = 1  # symbol side match
         else:
             match_level = 2  # symbol match side mismatch
-    elif pair_strat.pair_strat_params.strat_leg2.sec.sec_id == sec_id:
-        if pair_strat.pair_strat_params.strat_leg2.side == side:
+    elif pair_plan.pair_plan_params.plan_leg2.sec.sec_id == sec_id:
+        if pair_plan.pair_plan_params.plan_leg2.side == side:
             match_level = 1
         else:
             match_level = 2
@@ -284,106 +284,106 @@ def get_match_level(pair_strat: PairStrat, sec_id: str, side: Side) -> int:
 
 
 # caller must take any locks as required for any read-write consistency - function operates without lock
-async def get_ongoing_strats_from_symbol_n_side(sec_id: str, side: Side) -> Tuple[List[PairStrat], List[PairStrat]]:
+async def get_ongoing_plans_from_symbol_n_side(sec_id: str, side: Side) -> Tuple[List[PairPlan], List[PairPlan]]:
     from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.email_book_service_http_msgspec_routes import \
-        underlying_read_pair_strat_http
-    read_pair_strat_filter = get_ongoing_pair_strat_filter(sec_id)
-    pair_strats: List[PairStrat] = await underlying_read_pair_strat_http(read_pair_strat_filter)
+        underlying_read_pair_plan_http
+    read_pair_plan_filter = get_ongoing_pair_plan_filter(sec_id)
+    pair_plans: List[PairPlan] = await underlying_read_pair_plan_http(read_pair_plan_filter)
 
-    match_level_1_pair_strats: List[PairStrat] = []
-    match_level_2_pair_strats: List[PairStrat] = []
-    for pair_strat in pair_strats:
-        match_level: int = get_match_level(pair_strat, sec_id, side)
+    match_level_1_pair_plans: List[PairPlan] = []
+    match_level_2_pair_plans: List[PairPlan] = []
+    for pair_plan in pair_plans:
+        match_level: int = get_match_level(pair_plan, sec_id, side)
         if match_level == 1:  # symbol side match
-            match_level_1_pair_strats.append(pair_strat)
+            match_level_1_pair_plans.append(pair_plan)
         elif match_level == 2:  # symbol match side mismatch
-            match_level_2_pair_strats.append(pair_strat)
+            match_level_2_pair_plans.append(pair_plan)
         # else not a match ignore
-    return match_level_1_pair_strats, match_level_2_pair_strats
+    return match_level_1_pair_plans, match_level_2_pair_plans
 
 
-async def get_single_exact_match_strat_from_symbol_n_side(sec_id: str, side: Side) -> PairStrat | None:
-    match_level_1_pair_strats, match_level_2_pair_strats = await get_ongoing_strats_from_symbol_n_side(sec_id, side)
-    if len(match_level_1_pair_strats) == 0 and len(match_level_2_pair_strats) == 0:
-        logging.info(f"No viable pair_strat for symbol_side_key: {get_symbol_side_key([(sec_id, side)])}")
+async def get_single_exact_match_plan_from_symbol_n_side(sec_id: str, side: Side) -> PairPlan | None:
+    match_level_1_pair_plans, match_level_2_pair_plans = await get_ongoing_plans_from_symbol_n_side(sec_id, side)
+    if len(match_level_1_pair_plans) == 0 and len(match_level_2_pair_plans) == 0:
+        logging.info(f"No viable pair_plan for symbol_side_key: {get_symbol_side_key([(sec_id, side)])}")
         return None
     else:
-        pair_strat: PairStrat | None = None
-        if len(match_level_1_pair_strats) == 1:
-            pair_strat = match_level_1_pair_strats[0]
+        pair_plan: PairPlan | None = None
+        if len(match_level_1_pair_plans) == 1:
+            pair_plan = match_level_1_pair_plans[0]
         else:
-            logging.error(f"error: processing {get_symbol_side_key([(sec_id, side)])} pair_strat should be "
-                          f"found only one in match_lvl_1, found {match_level_1_pair_strats}")
-        if pair_strat is None:
-            if len(match_level_2_pair_strats) == 1:  # symbol match side mismatch
-                pair_strat = match_level_2_pair_strats[0]
-                logging.error(f"error: pair_strat should be found in level 1 only, symbol_side_key: "
+            logging.error(f"error: processing {get_symbol_side_key([(sec_id, side)])} pair_plan should be "
+                          f"found only one in match_lvl_1, found {match_level_1_pair_plans}")
+        if pair_plan is None:
+            if len(match_level_2_pair_plans) == 1:  # symbol match side mismatch
+                pair_plan = match_level_2_pair_plans[0]
+                logging.error(f"error: pair_plan should be found in level 1 only, symbol_side_key: "
                               f"{get_symbol_side_key([(sec_id, side)])}")
             else:
                 logging.error(
-                    f"error: multiple ongoing pair strats matching symbol_side_key: "
+                    f"error: multiple ongoing pair plans matching symbol_side_key: "
                     f"{get_symbol_side_key([(sec_id, side)])} found, one "
-                    f"match expected, found: {len(match_level_2_pair_strats)}")
-        return pair_strat
+                    f"match expected, found: {len(match_level_2_pair_plans)}")
+        return pair_plan
 
 
-async def get_matching_strat_from_symbol_n_side(sec_id: str, side: Side,
-                                                no_ongoing_ok: bool = False) -> List[PairStrat] | None:
-    """TODO: Use flexible [if passed True by caller] to handle multi strats where non-active side is perfect match"""
-    match_level_1_pair_strats: List[PairStrat]
-    match_level_2_pair_strats: List[PairStrat]
-    match_level_1_pair_strats, match_level_2_pair_strats = await get_ongoing_strats_from_symbol_n_side(sec_id, side)
-    if len(match_level_1_pair_strats) == 0 and len(match_level_2_pair_strats) == 0:
-        logging.info(f"No viable pair_strat for symbol_side_key: {get_symbol_side_key([(sec_id, side)])}")
+async def get_matching_plan_from_symbol_n_side(sec_id: str, side: Side,
+                                                no_ongoing_ok: bool = False) -> List[PairPlan] | None:
+    """TODO: Use flexible [if passed True by caller] to handle multi plans where non-active side is perfect match"""
+    match_level_1_pair_plans: List[PairPlan]
+    match_level_2_pair_plans: List[PairPlan]
+    match_level_1_pair_plans, match_level_2_pair_plans = await get_ongoing_plans_from_symbol_n_side(sec_id, side)
+    if len(match_level_1_pair_plans) == 0 and len(match_level_2_pair_plans) == 0:
+        logging.info(f"No viable pair_plan for symbol_side_key: {get_symbol_side_key([(sec_id, side)])}")
         return
     else:
-        pair_strats: List[PairStrat] | None = None
-        if len(match_level_1_pair_strats) == 1:  # single strat found with both symbol side match
-            pair_strats = [match_level_1_pair_strats[0]]
+        pair_plans: List[PairPlan] | None = None
+        if len(match_level_1_pair_plans) == 1:  # single plan found with both symbol side match
+            pair_plans = [match_level_1_pair_plans[0]]
         else:
-            if len(match_level_1_pair_strats) == 0 and len(match_level_2_pair_strats) == 1:
-                logging.info(f"No viable pair_strat for symbol_side_key: {get_symbol_side_key([(sec_id, side)])}")
+            if len(match_level_1_pair_plans) == 0 and len(match_level_2_pair_plans) == 1:
+                logging.info(f"No viable pair_plan for symbol_side_key: {get_symbol_side_key([(sec_id, side)])}")
                 return
             else:
-                logging.error(f"error: processing {get_symbol_side_key([(sec_id, side)])} same symbol side pair_strat "
-                              f"should be found only 1, found {len(match_level_1_pair_strats)};;;"
-                              f"{match_level_1_pair_strats}")
-        if not pair_strats:  # both symbol-side match not found, try "symbol match side mismatch" - i.e. level 2
-            if len(match_level_2_pair_strats) == 1:  # symbol match side mismatch
-                found_strat: PairStrat = match_level_2_pair_strats[0]
-                logging.warning(f"No ongoing pair_strat for symbol_side_key: {get_symbol_side_key([(sec_id, side)])}; "
-                                f"found {found_strat.id=} with same symbol but different side;;;{found_strat=}")
+                logging.error(f"error: processing {get_symbol_side_key([(sec_id, side)])} same symbol side pair_plan "
+                              f"should be found only 1, found {len(match_level_1_pair_plans)};;;"
+                              f"{match_level_1_pair_plans}")
+        if not pair_plans:  # both symbol-side match not found, try "symbol match side mismatch" - i.e. level 2
+            if len(match_level_2_pair_plans) == 1:  # symbol match side mismatch
+                found_plan: PairPlan = match_level_2_pair_plans[0]
+                logging.warning(f"No ongoing pair_plan for symbol_side_key: {get_symbol_side_key([(sec_id, side)])}; "
+                                f"found {found_plan.id=} with same symbol but different side;;;{found_plan=}")
                 return
-            elif len(match_level_2_pair_strats) == 2:  # symbol match side mismatch for 2 exact pair strats
+            elif len(match_level_2_pair_plans) == 2:  # symbol match side mismatch for 2 exact pair plans
                 # this is okay for roundtrip or intraday tradable symbols
-                pair_strats = match_level_2_pair_strats
+                pair_plans = match_level_2_pair_plans
             else:
                 logging.error(
-                    f"error: multiple ongoing pair strats matching symbol_side_key: "
+                    f"error: multiple ongoing pair plans matching symbol_side_key: "
                     f"{get_symbol_side_key([(sec_id, side)])} found, one match expected, found: "
-                    f"{len(match_level_2_pair_strats)}")
-        return pair_strats
+                    f"{len(match_level_2_pair_plans)}")
+        return pair_plans
 
 
-def get_strat_key_from_pair_strat(pair_strat: PairStrat | PairStratBaseModel):
-    strat_key = f"{pair_strat.id}"
-    return strat_key
+def get_plan_key_from_pair_plan(pair_plan: PairPlan | PairPlanBaseModel):
+    plan_key = f"{pair_plan.id}"
+    return plan_key
 
 
-def get_id_from_strat_key(unloaded_strat_key: str) -> int:
-    parts: List[str] = (unloaded_strat_key.split("-"))
+def get_id_from_plan_key(unloaded_plan_key: str) -> int:
+    parts: List[str] = (unloaded_plan_key.split("-"))
     return parse_to_int(parts[-1])
 
 
-def pair_strat_client_call_log_str(basemodel_type: Type | None, client_callable: Callable,
+def pair_plan_client_call_log_str(basemodel_type: Type | None, client_callable: Callable,
                                    update_type: UpdateType | None = None, **kwargs) -> str:
     if update_type is None:
         update_type = UpdateType.JOURNAL_TYPE
 
     fld_sep: str = get_field_seperator_pattern()
     val_sep: str = get_key_val_seperator_pattern()
-    pair_strat_db_pattern: str = get_pattern_for_pair_strat_db_updates()
-    log_str = (f"{pair_strat_db_pattern}"
+    pair_plan_db_pattern: str = get_pattern_for_pair_plan_db_updates()
+    log_str = (f"{pair_plan_db_pattern}"
                f"{basemodel_type.__name__ if basemodel_type is not None else 'basemodel_type is None'}{fld_sep}{update_type.value}"
                f"{fld_sep}{client_callable.__name__}{fld_sep}")
     for k, v in kwargs.items():
@@ -394,11 +394,11 @@ def pair_strat_client_call_log_str(basemodel_type: Type | None, client_callable:
     return log_str
 
 
-def guaranteed_call_pair_strat_client(basemodel_type: MsgspecModel | None, client_callable: Callable,
+def guaranteed_call_pair_plan_client(basemodel_type: MsgspecModel | None, client_callable: Callable,
                                       **kwargs):
     """
     Call phone_book client call but if call fails for connection error or server not ready error logs it
-    with specific pattern which is matched by pair_strat_log_book and the call is call from there in loop till
+    with specific pattern which is matched by pair_plan_log_book and the call is call from there in loop till
     it is successfully done
     :param basemodel_type: BaseModel of Document type need to update/create,
                                     pass None if callable is query method
@@ -425,22 +425,22 @@ def guaranteed_call_pair_strat_client(basemodel_type: MsgspecModel | None, clien
         calframe = inspect.getouterframes(curframe, 2)
         if "Failed to establish a new connection: [Errno 111] Connection refused" in str(e):
             logging.exception("Connection Error in phone_book server call, likely server is "
-                              "down, putting pair_strat client call as log for pair_strat_log "
+                              "down, putting pair_plan client call as log for pair_plan_log "
                               f"analyzer handling - caller: {calframe[1][3]}")
         elif "service is not initialized yet" in str(e):
             logging.exception("phone_book service not up yet, likely server restarted, but is "
-                              "not ready yet, putting pair_strat client call as log for pair_strat_log "
+                              "not ready yet, putting pair_plan client call as log for pair_plan_log "
                               f"analyzer handling - caller: {calframe[1][3]}")
         elif "('Connection aborted.', ConnectionResetError(104, 'Connection reset by peer'))" in str(e):
-            logging.exception("phone_book service connection error, putting pair_strat client call "
-                              f"as log for pair_strat_log analyzer handling - caller: {calframe[1][3]}")
+            logging.exception("phone_book service connection error, putting pair_plan client call "
+                              f"as log for pair_plan_log analyzer handling - caller: {calframe[1][3]}")
         elif ("The Web Server may be down, too busy, or experiencing other problems preventing "
               "it from responding to requests" in str(e) and "status_code: 503" in str(e)):
             logging.exception("phone_book service connection error")
         else:
-            raise Exception(f"guaranteed_call_pair_strat_client called from {calframe[1][3]} failed "
+            raise Exception(f"guaranteed_call_pair_plan_client called from {calframe[1][3]} failed "
                             f"with exception: {e}")
-        log_str = pair_strat_client_call_log_str(basemodel_type, client_callable, **kwargs)
+        log_str = pair_plan_client_call_log_str(basemodel_type, client_callable, **kwargs)
         logging.db(log_str)
 
 
@@ -704,7 +704,7 @@ def compute_max_single_leg_notional(static_data, brokers: List[Broker | BrokerOp
 
 def get_usd_px(px: float, usd_fx: float):
     """
-    assumes single currency strat for now - may extend to accept symbol and send revised px according to
+    assumes single currency plan for now - may extend to accept symbol and send revised px according to
     underlying bartering currency
     """
     return px / usd_fx
@@ -761,7 +761,7 @@ def get_sod_borrow_intraday(sec_rec_by_sec_id_dict: Dict[str, SecurityRecord], l
                             # (position.consumed_size) - don't continue the loop - carry on to apply intraday]
                         else:  # this is settled_tradable and +ive - add to SOD sum
                             sod_sum += position.available_size
-                    # else no action, strat is adding more short on this leg; just ignore prior day SOD available_size
+                    # else no action, plan is adding more short on this leg; just ignore prior day SOD available_size
                     # not to be confused with "intraday short" (i.e. position.consumed_size) handled below
 
                     # 2. Handle Intraday [both long and short affect the outcome]
@@ -785,9 +785,9 @@ def get_sod_borrow_intraday(sec_rec_by_sec_id_dict: Dict[str, SecurityRecord], l
                 elif position.type == PositionType.LOCATE or position.type == PositionType.PTH:
                     if position.available_size < 0:  # PTHs / LOCATE(s) are always positive
                         ticker = sec_rec.ticker
-                        logging.error(f"Unexpected: -ive position found on {ticker} {leg_sec_type=} {leg_side=} strat "
+                        logging.error(f"Unexpected: -ive position found on {ticker} {leg_sec_type=} {leg_side=} plan "
                                       f"from: {broker.broker}, for {str(position.type)}, sending 0 "
-                                      f"max_single_leg_notional for the strat;;;{position=}; "
+                                      f"max_single_leg_notional for the plan;;;{position=}; "
                                       f"{get_symbol_side_key([(ticker, leg_side)])}")
                         return 0, 0, 0, 0
                     else:
@@ -807,7 +807,7 @@ def compute_max_cb_size_(sod_sum: int, borrow_sum: int, intraday_bot: int, intra
     # handle SOD
     if sod_sum > 0:
         max_size += sod_sum
-    # else not required: sec_type sod is negative, strat is going further short - ignore prior SOD short
+    # else not required: sec_type sod is negative, plan is going further short - ignore prior SOD short
 
     # handle intraday
     pre_intraday_max_size = max_size
@@ -818,29 +818,29 @@ def compute_max_cb_size_(sod_sum: int, borrow_sum: int, intraday_bot: int, intra
             # intraday BUY adds to max-size we can sell and intraday_sld depletes max_size
             max_size += intraday_bot + intraday_sld
         else:
-            # the strat is ongoing - use orig sld, new sld don't deplete max-size, they are likely from this strat
-            # sell strat Found intraday_sld represents prior run consumption if any + current run
+            # the plan is ongoing - use orig sld, new sld don't deplete max-size, they are likely from this plan
+            # sell plan Found intraday_sld represents prior run consumption if any + current run
             # prior run consumption is valid depletion so apply orig sld
-            # found intraday BUY is from some other strat thus adds to max-size we can sell
+            # found intraday BUY is from some other plan thus adds to max-size we can sell
             max_size += intraday_bot + (orig_intra_day_sld if orig_intra_day_sld else 0)
         orig_intra_day_bot = none_to_0(intraday_bot)
         orig_intra_day_sld = none_to_0(intraday_sld)
-        logging.warning(f"found intraday eligible long {intraday_bot} {sec_type} position while strat is to short "
+        logging.warning(f"found intraday eligible long {intraday_bot} {sec_type} position while plan is to short "
                         f"{sec_type}, positively affecting {pre_intraday_max_size=} to: {max_size=};;;prevent intraday "
                         f"based max_size change via static data intraday eligibility; check get_sod_borrow_intraday")
         # sec_type intraday blocked via static data executed_tradable [as of today]
     elif intraday_sld != 0:
         # we have intraday short position on sec_type (-ive value) adding to max_size will reduce the max_size
-        # do this only if strat is not ongoing - enables recovering consumption at executor start [for ongoing see else]
+        # do this only if plan is not ongoing - enables recovering consumption at executor start [for ongoing see else]
         # 0 is valid start position
         if orig_intra_day_bot is None and orig_intra_day_sld is None:
             max_size += intraday_sld
             orig_intra_day_bot = none_to_0(intraday_bot)
             orig_intra_day_sld = none_to_0(intraday_sld)
-            logging.warning(f"found short {intraday_sld} {sec_type} position while strat is to short {sec_type}, this "
+            logging.warning(f"found short {intraday_sld} {sec_type} position while plan is to short {sec_type}, this "
                             f"will negatively affect {pre_intraday_max_size=} to make it: {max_size=}")
         else:
-            # the strat is ongoing - use orig_intra_day(s) and ignore found intraday_sld (its current run
+            # the plan is ongoing - use orig_intra_day(s) and ignore found intraday_sld (its current run
             # consumption + prior run consumption if any)
             max_size += none_to_0(orig_intra_day_bot) + none_to_0(orig_intra_day_sld)
     else:
@@ -913,15 +913,15 @@ def get_filtered_brokers_by_sec_id_list(brokers: List[Broker | BrokerBaseModel],
     return filtered_brokers
 
 
-def get_both_sym_side_key_from_pair_strat(pair_strat: PairStrat | PairStratBaseModel | PairStratOptional) -> str | None:
+def get_both_sym_side_key_from_pair_plan(pair_plan: PairPlan | PairPlanBaseModel | PairPlanOptional) -> str | None:
     key: str | None = None
-    if (pair_strat and pair_strat.pair_strat_params and pair_strat.pair_strat_params.strat_leg1 and
-            pair_strat.pair_strat_params.strat_leg1.sec and pair_strat.pair_strat_params.strat_leg2 and
-            pair_strat.pair_strat_params.strat_leg2.sec):
-        key = (f"{pair_strat.pair_strat_params.strat_leg1.sec.sec_id}"
-               f"-{pair_strat.pair_strat_params.strat_leg1.side}"
-               f"-{pair_strat.pair_strat_params.strat_leg2.sec.sec_id}"
-               f"-{pair_strat.pair_strat_params.strat_leg2.side}")
+    if (pair_plan and pair_plan.pair_plan_params and pair_plan.pair_plan_params.plan_leg1 and
+            pair_plan.pair_plan_params.plan_leg1.sec and pair_plan.pair_plan_params.plan_leg2 and
+            pair_plan.pair_plan_params.plan_leg2.sec):
+        key = (f"{pair_plan.pair_plan_params.plan_leg1.sec.sec_id}"
+               f"-{pair_plan.pair_plan_params.plan_leg1.side}"
+               f"-{pair_plan.pair_plan_params.plan_leg2.sec.sec_id}"
+               f"-{pair_plan.pair_plan_params.plan_leg2.side}")
     # else not required - returning None (default value of key)
     return key
 

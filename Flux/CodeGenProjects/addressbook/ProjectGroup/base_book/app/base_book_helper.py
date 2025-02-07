@@ -139,13 +139,13 @@ def check_n_update_conv_px(ticker: str, conv_px: float | None, security_record: 
     return conv_px
 
 
-def get_pair_strat_id_from_cmd_argv(raise_exception: bool | None = True) -> int | None:
+def get_pair_plan_id_from_cmd_argv(raise_exception: bool | None = True) -> int | None:
     if len(sys.argv) > 2:
-        pair_strat_id = sys.argv[1]
-        return parse_to_int(pair_strat_id)
+        pair_plan_id = sys.argv[1]
+        return parse_to_int(pair_plan_id)
     else:
         if raise_exception:
-            err_str_ = ("Can't find pair_strat_id as cmd argument, "
+            err_str_ = ("Can't find pair_plan_id as cmd argument, "
                         "Usage: python launch_beanie_fastapi.py <PAIR_STRAT_ID>, "
                         f"current args: {sys.argv}")
             logging.error(err_str_)

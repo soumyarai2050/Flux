@@ -24,11 +24,11 @@ dataclass_override_type: "native"
 beanie_override_type: "native"
 cache_override_type: "bare"
 
-# to be used in pair_strat_log_book to take out counts of created from waiting queue to execute create in db
-portfolio_alert_configs:
+# to be used in pair_plan_log_book to take out counts of created from waiting queue to execute create in db
+contact_alert_configs:
   transaction_counts_per_call: 5
   transaction_timeout_secs: 2  # secs
-strat_alert_config:
+plan_alert_config:
   transaction_counts_per_call: 5
   transaction_timeout_secs: 2  # secs
 raw_perf_data_config:
@@ -53,4 +53,4 @@ pos_standby: False
 
 market:
   is_test_run: True
-  is_sanity_test_run: True  # controls invocation of Test Strat Code vs Actual Strat Code
+  is_sanity_test_run: True  # controls invocation of Test Plan Code vs Actual Plan Code

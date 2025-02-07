@@ -1,5 +1,5 @@
 symbol_configs:
-  ^CB_Sec_[1,3-9][0-9]?$:
+  ^Type1_Sec_[1,3-9][0-9]?$:
     simulate_reverse_path: False
     fill_percent: 100
     total_fill_count: 1
@@ -31,7 +31,7 @@ symbol_configs:
     continues_chore_count: 3
     continues_special_chore_count: 1
 
-  ^CB_Sec_2$:
+  ^Type1_Sec_2$:
     simulate_reverse_path: False
     fill_percent: 100
     total_fill_count: 1
@@ -60,7 +60,7 @@ symbol_configs:
     continues_chore_count: 3
     continues_special_chore_count: 2
 
-  ^EQT_Sec_1[0-9]?$:
+  ^Type2_Sec_1[0-9]?$:
     simulate_reverse_path: False
     fill_percent: 100
     total_fill_count: 1
@@ -89,7 +89,7 @@ symbol_configs:
     continues_chore_count: 3
     continues_special_chore_count: 2
 
-  ^EQT_Sec_[2-9][0-9]?$:
+  ^Type2_Sec_[2-9][0-9]?$:
     simulate_reverse_path: False
     fill_percent: 100
     total_fill_count: 1

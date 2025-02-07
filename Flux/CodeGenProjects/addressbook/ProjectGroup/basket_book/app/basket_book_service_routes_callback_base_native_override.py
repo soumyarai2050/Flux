@@ -116,7 +116,7 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
     def _app_launch_pre_thread_func(self):
         """
         sleep wait till engine is up
-        TODO LAZY: we should invoke _apply_checks_n_alert on all active pair strats at startup/re-start
+        TODO LAZY: we should invoke _apply_checks_n_alert on all active pair plans at startup/re-start
         """
 
         error_prefix = "_app_launch_pre_thread_func: "
@@ -143,7 +143,7 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                     if not self.service_up:
                         try:
                             if is_all_service_up(ignore_error=(service_up_no_error_retry_count > 0)):
-                                self.strat_cache: BasketCache = BasketCache()
+                                self.plan_cache: BasketCache = BasketCache()
 
                                 BarteringLinkBase.simulate_config_yaml_path = (
                                         CURRENT_PROJECT_DATA_DIR / "basket_simulate_config.yaml")
@@ -151,7 +151,7 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                 BasketBook.asyncio_loop = self.asyncio_loop
                                 BasketBarteringDataManager.asyncio_loop = self.asyncio_loop
                                 self.bartering_data_manager = (
-                                    BasketBarteringDataManager(BasketBook.executor_trigger, self.strat_cache))
+                                    BasketBarteringDataManager(BasketBook.executor_trigger, self.plan_cache))
                                 logging.debug(f"Created basket_bartering_data_manager")
                                 self.service_up = True
                                 should_sleep = False
@@ -372,7 +372,7 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         await self.handle_create_chore_journal_pre(chore_journal_obj)
 
     async def create_chore_journal_post(self, chore_journal_obj: ChoreJournal):
-        # updating bartering_data_manager's strat_cache
+        # updating bartering_data_manager's plan_cache
         self.bartering_data_manager.handle_chore_journal_get_all_ws(chore_journal_obj)
 
         async with BasketBookServiceRoutesCallbackBaseNativeOverride.journal_shared_lock:
@@ -385,7 +385,7 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         await self.handle_create_fills_journal_pre(fills_journal_obj)
 
     async def create_fills_journal_post(self, fills_journal_obj: FillsJournal):
-        # updating bartering_data_manager's strat_cache
+        # updating bartering_data_manager's plan_cache
         self.bartering_data_manager.handle_fills_journal_get_all_ws(fills_journal_obj)
 
         async with BasketBookServiceRoutesCallbackBaseNativeOverride.journal_shared_lock:

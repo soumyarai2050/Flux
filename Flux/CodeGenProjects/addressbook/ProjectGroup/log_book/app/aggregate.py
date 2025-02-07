@@ -4,7 +4,7 @@ import os
 
 # project imports
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.ORMModel.log_book_service_model_imports import (
-    PortfolioAlertBaseModel, StratAlertBaseModel, Severity)
+    ContactAlertBaseModel, PlanAlertBaseModel, Severity)
 from FluxPythonUtils.scripts.utility_functions import get_version_from_mongodb_uri
 from FluxPythonUtils.scripts.model_base_utils import MsgspecBaseModel
 # Below unused import is used by generated beanie file
@@ -35,7 +35,7 @@ def get_limit_n_sort_direction(limit: int) -> Tuple[int, int]:
     return limit, sort_direction
 
 
-# def add_strat_alert_aggregated_severity_field_n_alert_count(projection_aggregate_dict: Dict):
+# def add_plan_alert_aggregated_severity_field_n_alert_count(projection_aggregate_dict: Dict):
 #     severity_field: Dict = {
 #         '$switch': {
 #             'branches': [],
@@ -56,7 +56,7 @@ def get_limit_n_sort_direction(limit: int) -> Tuple[int, int]:
 #             )
 #         # else not required: Severity_UNSPECIFIED is set as default
 #
-#     projection_aggregate_dict["strat_alert_aggregated_severity"] = severity_field
+#     projection_aggregate_dict["plan_alert_aggregated_severity"] = severity_field
 #     projection_aggregate_dict["alert_count"] = {
 #         "$size": "$alerts"
 #     }
@@ -144,7 +144,7 @@ def get_limit_n_sort_direction(limit: int) -> Tuple[int, int]:
 #     agg_pipeline.extend(extend_agg_pipeline)
 #
 #
-# def get_limited_alerts_obj_v5(limit: int, model_type: Type[PortfolioAlertBaseModel] | Type[StratAlertBaseModel]):
+# def get_limited_alerts_obj_v5(limit: int, model_type: Type[ContactAlertBaseModel] | Type[PlanAlertBaseModel]):
 #     alert_obj_dict_for_grp_layer = model_type().model_dump()
 #     get_model_model_to_dict_for_v5_limit_agg(alert_obj_dict_for_grp_layer)
 #     alert_obj_dict_for_grp_layer["_id"] = "$_id"
@@ -154,16 +154,16 @@ def get_limit_n_sort_direction(limit: int) -> Tuple[int, int]:
 #     }
 #
 #     limit, sort_direction = get_limit_n_sort_direction(limit)
-#     portfolio_alert_obj_dict_for_project_layer = model_type().model_dump()
-#     get_model_model_to_dict_for_limit_agg(portfolio_alert_obj_dict_for_project_layer)
-#     portfolio_alert_obj_dict_for_project_layer["alerts"] = {
+#     contact_alert_obj_dict_for_project_layer = model_type().model_dump()
+#     get_model_model_to_dict_for_limit_agg(contact_alert_obj_dict_for_project_layer)
+#     contact_alert_obj_dict_for_project_layer["alerts"] = {
 #             "$slice": ["$alerts", limit]
 #         }
-#     portfolio_alert_obj_dict_for_project_layer["_id"] = 1
+#     contact_alert_obj_dict_for_project_layer["_id"] = 1
 #
-#     # adding additional field aggregate to update strat_alert_aggregated_severity and strat_alert_count - used
-#     # in updating specific strat_view's fields
-#     add_strat_alert_aggregated_severity_field_n_alert_count(portfolio_alert_obj_dict_for_project_layer)
+#     # adding additional field aggregate to update plan_alert_aggregated_severity and plan_alert_count - used
+#     # in updating specific plan_view's fields
+#     add_plan_alert_aggregated_severity_field_n_alert_count(contact_alert_obj_dict_for_project_layer)
 #
 #     agg_list = [
 #         {
@@ -178,7 +178,7 @@ def get_limit_n_sort_direction(limit: int) -> Tuple[int, int]:
 #         }, {
 #             '$group': alert_obj_dict_for_grp_layer
 #         }, {
-#             '$project': portfolio_alert_obj_dict_for_project_layer
+#             '$project': contact_alert_obj_dict_for_project_layer
 #         }
 #     ]
 #
@@ -189,7 +189,7 @@ def get_limit_n_sort_direction(limit: int) -> Tuple[int, int]:
 #
 # # deprecated
 # def _get_limited_alerts_obj_v6_n_above(limit: int,
-#                                       model_type: Type[PortfolioAlertBaseModel] | Type[StratAlertBaseModel]):
+#                                       model_type: Type[ContactAlertBaseModel] | Type[PlanAlertBaseModel]):
 #     model_type_obj = model_type().model_dump()
 #     get_model_model_to_dict_for_limit_agg(model_type_obj)
 #     limit, sort_direction = get_limit_n_sort_direction(limit)
@@ -204,9 +204,9 @@ def get_limit_n_sort_direction(limit: int) -> Tuple[int, int]:
 #             limit],
 #     }
 #
-#     # adding additional field aggregate to update strat_alert_aggregated_severity and strat_alert_count - used
-#     # in updating specific strat_view's fields
-#     add_strat_alert_aggregated_severity_field_n_alert_count(model_type_obj)
+#     # adding additional field aggregate to update plan_alert_aggregated_severity and plan_alert_count - used
+#     # in updating specific plan_view's fields
+#     add_plan_alert_aggregated_severity_field_n_alert_count(model_type_obj)
 #
 #     agg_pipeline = [
 #         {
@@ -221,8 +221,8 @@ def get_limit_n_sort_direction(limit: int) -> Tuple[int, int]:
 #
 #
 # def get_limited_alerts_obj_v6_n_above(limit: int,
-#                                       model_type: Type[PortfolioAlertBaseModel] | Type[StratAlertBaseModel],
-#                                       strat_id: int | None = None):
+#                                       model_type: Type[ContactAlertBaseModel] | Type[PlanAlertBaseModel],
+#                                       plan_id: int | None = None):
 #     model_type_obj = model_type().model_dump()
 #     get_model_model_to_dict_for_limit_agg(model_type_obj)
 #     limit, sort_direction = get_limit_n_sort_direction(limit)
@@ -237,9 +237,9 @@ def get_limit_n_sort_direction(limit: int) -> Tuple[int, int]:
 #             limit],
 #     }
 #
-#     # adding additional field aggregate to update strat_alert_aggregated_severity and strat_alert_count - used
-#     # in updating specific strat_view's fields
-#     add_strat_alert_aggregated_severity_field_n_alert_count(model_type_obj)
+#     # adding additional field aggregate to update plan_alert_aggregated_severity and plan_alert_count - used
+#     # in updating specific plan_view's fields
+#     add_plan_alert_aggregated_severity_field_n_alert_count(model_type_obj)
 #
 #     agg_pipeline = [
 #         {
@@ -252,25 +252,25 @@ def get_limit_n_sort_direction(limit: int) -> Tuple[int, int]:
 #
 #     return agg_pipeline
 #
-# def get_limited_portfolio_alerts_obj(limit: int):
+# def get_limited_contact_alerts_obj(limit: int):
 #     mongo_version = get_version_from_mongodb_uri(get_mongo_server_uri())
 #     mongo_version_start_num = mongo_version.split(".")[0]
 #     if int(mongo_version_start_num) < 6:
-#         return get_limited_alerts_obj_v5(limit, PortfolioAlertBaseModel)
+#         return get_limited_alerts_obj_v5(limit, ContactAlertBaseModel)
 #     else:
-#         return get_limited_alerts_obj_v6_n_above(limit, PortfolioAlertBaseModel)
+#         return get_limited_alerts_obj_v6_n_above(limit, ContactAlertBaseModel)
 #
 #
-# def get_limited_strat_alerts_obj(model_obj, limit: int):
+# def get_limited_plan_alerts_obj(model_obj, limit: int):
 #     mongo_version = get_version_from_mongodb_uri(get_mongo_server_uri())
 #     mongo_version_start_num = mongo_version.split(".")[0]
 #     if int(mongo_version_start_num) < 6:
-#         return get_limited_alerts_obj_v5(limit, StratAlertBaseModel)
+#         return get_limited_alerts_obj_v5(limit, PlanAlertBaseModel)
 #     else:
-#         return get_limited_alerts_obj_v6_n_above(limit, StratAlertBaseModel)
+#         return get_limited_alerts_obj_v6_n_above(limit, PlanAlertBaseModel)
 
 
-def get_strat_alerts_by_strat_id(strat_id: int):
+def get_plan_alerts_by_plan_id(plan_id: int):
     return {"aggregate": [
         {
             '$match': {
@@ -279,13 +279,13 @@ def get_strat_alerts_by_strat_id(strat_id: int):
         },
         {
             "$match": {
-                "strat_id": strat_id
+                "plan_id": plan_id
             }
         }
     ]}
 
 
-def get_total_strat_alert_count_n_highest_severity(strat_id: int):
+def get_total_plan_alert_count_n_highest_severity(plan_id: int):
     """
     - $facet Stage: Executes two sub-pipelines:
         * total_objects: Counts the total number of documents in the collection.
@@ -305,7 +305,7 @@ def get_total_strat_alert_count_n_highest_severity(strat_id: int):
         },
         {
             '$match': {
-                'strat_id': strat_id
+                'plan_id': plan_id
             }
         }, {
             '$facet': {
@@ -381,7 +381,7 @@ def get_total_strat_alert_count_n_highest_severity(strat_id: int):
 
 
 def sort_alerts_based_on_severity_n_last_update_analyzer_time(
-        strat_id_or_model_obj: int | MsgspecBaseModel | None = None, limit: int | None = None):
+        plan_id_or_model_obj: int | MsgspecBaseModel | None = None, limit: int | None = None):
     """
     - $addFields: Adds a new field severityPriority based on the priority mapping defined using $switch.
     - $switch: Evaluates each case expression and returns the value associated with the first case expression that
@@ -422,18 +422,18 @@ def sort_alerts_based_on_severity_n_last_update_analyzer_time(
         }
     ]
 
-    # if strat_id exists then adding match layer
-    if strat_id_or_model_obj is not None:
-        if isinstance(strat_id_or_model_obj, int):
-            strat_id: int = strat_id_or_model_obj
+    # if plan_id exists then adding match layer
+    if plan_id_or_model_obj is not None:
+        if isinstance(plan_id_or_model_obj, int):
+            plan_id: int = plan_id_or_model_obj
             agg_pipeline[1]["$match"] = {
-                'strat_id': strat_id
+                'plan_id': plan_id
             }
         else:
-            model_obj = strat_id_or_model_obj
-            if hasattr(model_obj, "strat_id") and model_obj.strat_id is not None:
+            model_obj = plan_id_or_model_obj
+            if hasattr(model_obj, "plan_id") and model_obj.plan_id is not None:
                 agg_pipeline[1]["$match"] = {
-                    'strat_id': model_obj.strat_id
+                    'plan_id': model_obj.plan_id
                 }
 
     counter = len(Severity) - 1  # removing UNSPECIFIED
@@ -462,7 +462,7 @@ def sort_alerts_based_on_severity_n_last_update_analyzer_time(
     return agg_pipeline
 
 
-def get_strat_alert_from_strat_id_n_alert_brief_regex(strat_id: int, brief_regex: str):
+def get_plan_alert_from_plan_id_n_alert_brief_regex(plan_id: int, brief_regex: str):
     agg_pipeline = {"aggregate": [
         {
             '$match': {
@@ -471,7 +471,7 @@ def get_strat_alert_from_strat_id_n_alert_brief_regex(strat_id: int, brief_regex
         },
         {
             '$match': {
-                'strat_id': strat_id
+                'plan_id': plan_id
             }
         },
         {
@@ -485,23 +485,23 @@ def get_strat_alert_from_strat_id_n_alert_brief_regex(strat_id: int, brief_regex
     return agg_pipeline
 
 
-def get_projection_strat_alert_id_by_strat_id(strat_id: int):
+def get_projection_plan_alert_id_by_plan_id(plan_id: int):
     agg_pipeline = {"aggregate": [
         {
             '$match': {
-                'strat_id': strat_id
+                'plan_id': plan_id
             }
         }, {
             '$group': {
                 '_id': 1,
-                'strat_alert_ids': {
+                'plan_alert_ids': {
                     '$push': '$_id'
                 }
             }
         }, {
             '$project': {
                 '_id': 0,
-                'strat_alert_ids': 1
+                'plan_alert_ids': 1
             }
         }
     ]}
@@ -510,9 +510,9 @@ def get_projection_strat_alert_id_by_strat_id(strat_id: int):
 
 if __name__ == "__main__":
     import pprint
-    # pprint.pprint(get_limited_alerts_obj_v5(5, StratAlertBaseModel))
-    # pprint.pprint(get_limited_alerts_obj_v6_n_above(5, StratAlertBaseModel))
-    # print(get_limited_strat_alerts_obj(5))
+    # pprint.pprint(get_limited_alerts_obj_v5(5, PlanAlertBaseModel))
+    # pprint.pprint(get_limited_alerts_obj_v6_n_above(5, PlanAlertBaseModel))
+    # print(get_limited_plan_alerts_obj(5))
     # pprint.pprint(sort_alerts_based_on_severity_n_last_update_date_time(1, -100))
-    pprint.pprint(get_total_strat_alert_count_n_highest_severity(1))
+    pprint.pprint(get_total_plan_alert_count_n_highest_severity(1))
 

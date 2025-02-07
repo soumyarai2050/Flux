@@ -51,16 +51,16 @@ class PosCache:
         self._static_data: Final[SecurityRecordManager] = static_data
         self.symbols_n_sec_id_source_dict: Dict[str, str] = {}
         self.sec_positions_header_str = (
-            "ticker, bkr, pos_disable, type, available, allocated, consumed, bot, sld, strat_consumed, acquire, "
-            "incurred, carry, mstrat, priority, premium_percentage")
+            "ticker, bkr, pos_disable, type, available, allocated, consumed, bot, sld, plan_consumed, acquire, "
+            "incurred, carry, mplan, priority, premium_percentage")
         # helps prevent reverse bartering on intraday positions where security level constraints exists
         self.no_executed_tradable_symbol_replenishing_side_dict: Dict[str, Side] = {}  # supplied by executor
-        # current strat bartering symbol and side dict - helps block intraday non recovery position updates
+        # current plan bartering symbol and side dict - helps block intraday non recovery position updates
         self.bartering_symbol_side_dict: Dict[str, Side] = {}  # supplied by executor
         self._sec_positions_dict: Dict[str, List[SecPosExtended]] = dict()
         self._pos_cache_lock: RLock = RLock()
         self._local_open_chores: int = 0
-        self._started: bool = False  # enables strat to control if trigger init required
+        self._started: bool = False  # enables plan to control if trigger init required
         self._start_lock: RLock = RLock()
         self.eqt_fallback_broker: str = "KOTAK"
         self.eqt_fallback_route: BrokerRoute = BrokerRoute.BR_QFII

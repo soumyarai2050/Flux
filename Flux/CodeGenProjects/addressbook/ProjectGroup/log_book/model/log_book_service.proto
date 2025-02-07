@@ -20,7 +20,7 @@ message AlertMeta {
   optional string latest_detail = 6;
 }
 
-message StratAlert {
+message PlanAlert {
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     CreateAllOp: AggregateType_UNSPECIFIED
@@ -46,20 +46,20 @@ message StratAlert {
     server_running_status_lvl: 1,
     override_default_crud: {
       ui_crud_type: GET_ALL,
-      query_name: "filtered_strat_alert_by_strat_id",
-      query_src_model_name: "PairStrat",
+      query_name: "filtered_plan_alert_by_plan_id",
+      query_src_model_name: "PairPlan",
       ui_query_params: {
-        query_param_field: "strat_id",
-        query_param_field_src: "PairStrat.id"
+        query_param_field: "plan_id",
+        query_param_field_src: "PairPlan.id"
       },
     },
     is_read_only: true,
     is_model_alert_type: true
   };
   option (FluxMsgJsonQuery) = {
-      QueryName: "create_or_update_strat_alert"
+      QueryName: "create_or_update_plan_alert"
       QueryParams: {
-        QueryParamName: "strat_id",
+        QueryParamName: "plan_id",
         QueryParamDataType: "int"
       }
       QueryParams: {
@@ -76,9 +76,9 @@ message StratAlert {
       }
   };
   option (FluxMsgJsonQuery) = {
-      QueryName: "filtered_strat_alert_by_strat_id",
+      QueryName: "filtered_plan_alert_by_plan_id",
       QueryParams: {
-        QueryParamName: "strat_id",
+        QueryParamName: "plan_id",
         QueryParamDataType: "int"
       }
       QueryParams: {
@@ -95,7 +95,7 @@ message StratAlert {
     override_get_all_limit_handling: true
   };
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  required int32 strat_id = 2 [(FluxFldServerPopulate) = true, (FluxFldHide) = "True", (FluxFldIndex) = true, (FluxFldOrmNoUpdate) = true];
+  required int32 plan_id = 2 [(FluxFldServerPopulate) = true, (FluxFldHide) = "True", (FluxFldIndex) = true, (FluxFldOrmNoUpdate) = true];
   optional bool dismiss = 3 [default=false, (FluxFldIndex) = true, (FluxFldUIUpdateOnly) = true, (FluxFldSequenceNumber) = 1, (FluxFldNoCommonKey) = true, (FluxFldButton) = {
     unpressed_caption: "dismiss",
     pressed_caption: "undo",
@@ -109,12 +109,12 @@ message StratAlert {
   required Severity severity = 4 [(FluxFldColor) = "Severity_CRITICAL=CRITICAL,Severity_ERROR=ERROR,Severity_WARNING=WARNING,Severity_INFO=INFO, Severity_DEBUG=DEBUG, Severity_UNSPECIFIED=UNSPECIFIED", (FluxFldOrmNoUpdate) = true];
   optional int32 alert_count = 5 [(FluxFldOrmNoUpdate) = true, (FluxFldColumnSize) = "small"];
   required string alert_brief = 6 [(FluxFldSizeMax) = 32, (FluxFldTextAlign) = "left", (FluxFldOrmNoUpdate) = true];
-  // must prefix strat:<strat-name> for strat alerts
+  // must prefix plan:<plan-name> for plan alerts
   optional AlertMeta alert_meta = 7 [(FluxFldAbbreviated) = "JSON", (FluxFldOrmNoUpdate) = true];
   optional int64 last_update_analyzer_time = 8 [(FluxFldValIsDateTime) = true, (FluxFldOrmNoUpdate) = true];
 }
 
-message PortfolioAlert {
+message ContactAlert {
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     CreateAllOp: AggregateType_UNSPECIFIED,
@@ -139,7 +139,7 @@ message PortfolioAlert {
     is_model_alert_type: true
   };
   option (FluxMsgJsonQuery) = {
-      QueryName: "create_or_update_portfolio_alert"
+      QueryName: "create_or_update_contact_alert"
       QueryParams: {
         QueryParamName: "severity",
         QueryParamDataType: "str"
@@ -155,7 +155,7 @@ message PortfolioAlert {
   };
   option (FluxMsgButtonQuery) = {
     query_data: {
-      QueryName: "dismiss_all_portfolio_alerts"
+      QueryName: "dismiss_all_contact_alerts"
       QueryType: HTTP
     };
     ui_button: {
@@ -196,7 +196,7 @@ message PortfolioAlert {
 message ExecutorEventMeta {
   option (FluxMsgStringLength) = 128;
 
-  required string strat_key = 1 [(FluxFldFilterEnable) = true];
+  required string plan_key = 1 [(FluxFldFilterEnable) = true];
   required string execution_date = 2 [(FluxFldFilterEnable) = true, (FluxFldHelp) = "dd-mm-yyyy"];
 }
 
@@ -230,11 +230,11 @@ message ExecutorEventJournal {
   required string event_detail = 5;
 }
 
-message RemoveStratAlertsForStratId {
+message RemovePlanAlertsForPlanId {
   option (FluxMsgJsonQuery) = {
-    QueryName: "remove_strat_alerts_for_strat_id"
+    QueryName: "remove_plan_alerts_for_plan_id"
     QueryParams: {
-      QueryParamName: "strat_id",
+      QueryParamName: "plan_id",
       QueryParamDataType: "int"
     }
   };
@@ -278,11 +278,11 @@ message LogBookRemoveFileFromCreatedCache {
   optional bool temp = 1;
 }
 
-message HandlePortfolioAlertsFromTailExecutor {
+message HandleContactAlertsFromTailExecutor {
     option (FluxMsgJsonQuery) = {
-      QueryName: "handle_portfolio_alerts_from_tail_executor"
+      QueryName: "handle_contact_alerts_from_tail_executor"
       QueryParams: {
-        QueryParamName: "portfolio_alert_data_list",
+        QueryParamName: "contact_alert_data_list",
         QueryParamDataType: "List[Dict]"
       }
       QueryRouteType: PATCH
@@ -290,11 +290,11 @@ message HandlePortfolioAlertsFromTailExecutor {
   optional bool temp = 1;
 }
 
-message HandleStratAlertsFromTailExecutor {
+message HandlePlanAlertsFromTailExecutor {
     option (FluxMsgJsonQuery) = {
-      QueryName: "handle_strat_alerts_from_tail_executor"
+      QueryName: "handle_plan_alerts_from_tail_executor"
       QueryParams: {
-        QueryParamName: "strat_alert_data_list",
+        QueryParamName: "plan_alert_data_list",
         QueryParamDataType: "List[Dict]"
       }
       QueryRouteType: PATCH
@@ -302,9 +302,9 @@ message HandleStratAlertsFromTailExecutor {
   optional bool temp = 1;
 }
 
-message PortfolioAlertFailLogger {
+message ContactAlertFailLogger {
     option (FluxMsgJsonQuery) = {
-      QueryName: "portfolio_alert_fail_logger"
+      QueryName: "contact_alert_fail_logger"
       QueryParams: {
         QueryParamName: "log_msg",
         QueryParamDataType: "str"
@@ -313,11 +313,11 @@ message PortfolioAlertFailLogger {
   optional bool temp = 1;
 }
 
-message DismissStratAlertByBriefStr {
+message DismissPlanAlertByBriefStr {
   option (FluxMsgJsonQuery) = {
-    QueryName: "dismiss_strat_alert_by_brief_str"
+    QueryName: "dismiss_plan_alert_by_brief_str"
     QueryParams: {
-      QueryParamName: "strat_id",
+      QueryParamName: "plan_id",
       QueryParamDataType: "int"
     },
     QueryParams: {
@@ -335,70 +335,70 @@ message ShutDownLogBook {
   optional bool temp = 1;
 }
 
-message StratAlertIdToObjCache {
+message PlanAlertIdToObjCache {
   option (FluxMsgJsonQuery) = {
-    QueryName: "verify_strat_alert_id_in_strat_alert_id_to_obj_cache_dict"
+    QueryName: "verify_plan_alert_id_in_plan_alert_id_to_obj_cache_dict"
     QueryParams: {
-      QueryParamName: "strat_alert_id",
+      QueryParamName: "plan_alert_id",
       QueryParamDataType: "int"
     }
   };
   optional bool is_id_present = 1;
 }
 
-message PortfolioAlertIdToObjCache {
+message ContactAlertIdToObjCache {
   option (FluxMsgJsonQuery) = {
-    QueryName: "verify_portfolio_alert_id_in_get_portfolio_alert_id_to_obj_cache_dict"
+    QueryName: "verify_contact_alert_id_in_get_contact_alert_id_to_obj_cache_dict"
     QueryParams: {
-      QueryParamName: "portfolio_alert_id",
+      QueryParamName: "contact_alert_id",
       QueryParamDataType: "int"
     }
   };
   optional bool is_id_present = 1;
 }
 
-message StratAlertCacheDictByStratIdDict {
+message PlanAlertCacheDictByPlanIdDict {
   option (FluxMsgJsonQuery) = {
-    QueryName: "verify_strat_alert_id_in_strat_alert_cache_dict_by_strat_id_dict"
+    QueryName: "verify_plan_alert_id_in_plan_alert_cache_dict_by_plan_id_dict"
     QueryParams: {
-      QueryParamName: "strat_id",
+      QueryParamName: "plan_id",
       QueryParamDataType: "int"
     },
     QueryParams: {
-      QueryParamName: "strat_cache_key",
+      QueryParamName: "plan_cache_key",
       QueryParamDataType: "str"
     }
   };
   optional bool is_key_present = 1;
 }
 
-message PortfolioAlertCacheDict {
+message ContactAlertCacheDict {
   option (FluxMsgJsonQuery) = {
-    QueryName: "verify_portfolio_alerts_cache_dict"
+    QueryName: "verify_contact_alerts_cache_dict"
     QueryParams: {
-      QueryParamName: "strat_cache_key",
+      QueryParamName: "plan_cache_key",
       QueryParamDataType: "str"
     }
   };
   optional bool is_key_present = 1;
 }
 
-message StratIdInStratAlertCacheDictByStratIdDict {
+message PlanIdInPlanAlertCacheDictByPlanIdDict {
   option (FluxMsgJsonQuery) = {
-    QueryName: "verify_strat_id_in_strat_alert_cache_dict_by_strat_id_dict"
+    QueryName: "verify_plan_id_in_plan_alert_cache_dict_by_plan_id_dict"
     QueryParams: {
-      QueryParamName: "strat_id",
+      QueryParamName: "plan_id",
       QueryParamDataType: "int"
     }
   };
   optional bool is_id_present = 1;
 }
 
-message StratStateUpdateMatcher {
+message PlanStateUpdateMatcher {
   option (FluxMsgJsonQuery) = {
-    QueryName: "strat_state_update_matcher"
+    QueryName: "plan_state_update_matcher"
     QueryParams: {
-      QueryParamName: "strat_id",
+      QueryParamName: "plan_id",
       QueryParamDataType: "int"
     },
     QueryParams: {
@@ -412,6 +412,23 @@ message StratStateUpdateMatcher {
   };
   optional bool temp = 1;
 }
+
+
+message EnableDisablePlanAlertCreate {
+  option (FluxMsgJsonQuery) = {
+    QueryName: "enable_disable_plan_alert_create"
+    QueryParams: {
+      QueryParamName: "plan_id",
+      QueryParamDataType: "int"
+    },
+    QueryParams: {
+      QueryParamName: "action",
+      QueryParamDataType: "bool"    // True to enable, False to disable
+    }
+  };
+  optional bool is_id_present = 1;
+}
+
 
 // used to avoid unused import warning by using any random msg or enum from imported file causing warning
 message ImportWarningAvoidDummyMessage {

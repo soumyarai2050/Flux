@@ -1,21 +1,21 @@
 from pendulum import DateTime
 from typing import Final, Dict, Set
 
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.generated.StreetBook.basket_book_service_base_strat_cache import BasketBookServiceBaseStratCache
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.StreetBook.email_book_service_base_strat_cache import \
-    EmailBookServiceBaseStratCache
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_strat_cache import BaseStratCache
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.generated.StreetBook.basket_book_service_base_plan_cache import BasketBookServiceBasePlanCache
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.StreetBook.email_book_service_base_plan_cache import \
+    EmailBookServiceBasePlanCache
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_plan_cache import BasePlanCache
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.generated.ORMModel.basket_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.generated.StreetBook.basket_book_service_key_handler import BasketBookServiceKeyHandler
 
 
-class BasketCache(BaseStratCache, BasketBookServiceBaseStratCache, EmailBookServiceBaseStratCache):
+class BasketCache(BasePlanCache, BasketBookServiceBasePlanCache, EmailBookServiceBasePlanCache):
     KeyHandler: Type[BasketBookServiceKeyHandler] = BasketBookServiceKeyHandler
 
     def __init__(self):
-        BaseStratCache.__init__(self)
-        BasketBookServiceBaseStratCache.__init__(self)
-        EmailBookServiceBaseStratCache.__init__(self)
+        BasePlanCache.__init__(self)
+        BasketBookServiceBasePlanCache.__init__(self)
+        EmailBookServiceBasePlanCache.__init__(self)
         self.unack_state_set: Set[str] = set()
 
     @staticmethod

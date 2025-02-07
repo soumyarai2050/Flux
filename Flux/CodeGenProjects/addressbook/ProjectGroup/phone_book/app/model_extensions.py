@@ -4,7 +4,7 @@ from typing import Dict, List, Tuple, Set
 from copy import deepcopy
 
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import (
-    Broker, BrokerBaseModel, SecPosition, SecPositionBaseModel, PositionType, Position, PositionBaseModel, Side)  # , PairStrat
+    Broker, BrokerBaseModel, SecPosition, SecPositionBaseModel, PositionType, Position, PositionBaseModel, Side)  # , PairPlan
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.generated.ORMModel.dept_book_service_model_imports import (
     OptimizerCriteria)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import (
@@ -14,10 +14,10 @@ from FluxPythonUtils.scripts.utility_functions import float_str
 from FluxPythonUtils.scripts.model_base_utils import MsgspecBaseModel
 
 
-# class PairStratUtil:
+# class PairPlanUtil:
 #     @staticmethod
-#     def get_strat_key(pair_strat: PairStrat):
-#         if pair_strat.pair_strat_params.strat_leg2.sec.sec_id is not None
+#     def get_plan_key(pair_plan: PairPlan):
+#         if pair_plan.pair_plan_params.plan_leg2.sec.sec_id is not None
 
 
 class New1LegChore(MsgspecBaseModel, kw_only=True):
@@ -457,7 +457,7 @@ class PositionUtil:
         if with_pos_disable:
             pos_disable_str = f"_{position.pos_disable}"
 
-        return f"{position.type}_{float_str(position.acquire_cost)}_{position.mstrat}_" \
+        return f"{position.type}_{float_str(position.acquire_cost)}_{position.mplan}_" \
                f"{float_str(position.carry_cost)}_{float_str(position.incurred_cost)}{pos_disable_str}"
 
     @staticmethod
@@ -635,27 +635,27 @@ class PositionUtil:
                                                  bot_size=compressed_bot_size,
                                                  sld_size=compressed_sld_size,
                                                  priority=compressed_priority)
-        compressed_position.mstrat = cls.get_merged_mstrat(position1, position2)
+        compressed_position.mplan = cls.get_merged_mplan(position1, position2)
         return compressed_position
 
     @staticmethod
-    def get_merged_mstrat(position1: Position | PositionBaseModel, position2: Position | PositionBaseModel) -> str:
-        def split_mstrats(string_: str | None):
+    def get_merged_mplan(position1: Position | PositionBaseModel, position2: Position | PositionBaseModel) -> str:
+        def split_mplans(string_: str | None):
             return string_.split("--") if string_ else ["None"]
 
-        position1_mstrats = split_mstrats(position1.mstrat)
-        position2_mstrats = split_mstrats(position2.mstrat)
+        position1_mplans = split_mplans(position1.mplan)
+        position2_mplans = split_mplans(position2.mplan)
 
-        unique_pos2_mstrats = set()
-        for position2_mstrat in position2_mstrats:
-            if position2_mstrat in position1_mstrats:
+        unique_pos2_mplans = set()
+        for position2_mplan in position2_mplans:
+            if position2_mplan in position1_mplans:
                 continue
             else:
                 try:
-                    unique_pos2_mstrats.add(position2_mstrat)
+                    unique_pos2_mplans.add(position2_mplan)
                 except KeyError as key_err:
-                    logging.error(f"Unexpected: found {position2_mstrat=} already present in {unique_pos2_mstrats=};;;"
+                    logging.error(f"Unexpected: found {position2_mplan=} already present in {unique_pos2_mplans=};;;"
                                   f"{key_err=}")
                     continue
-        position1_mstrats.extend(list(unique_pos2_mstrats))
-        return "--".join(sorted(position1_mstrats, reverse=True))
+        position1_mplans.extend(list(unique_pos2_mplans))
+        return "--".join(sorted(position1_mplans, reverse=True))

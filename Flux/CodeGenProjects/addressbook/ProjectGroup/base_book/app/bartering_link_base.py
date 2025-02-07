@@ -33,11 +33,11 @@ class BarteringLinkBase(ABC):
     chore_create_async_callable: Callable[..., Any] | None = None
     fill_create_async_callable: Callable[..., Any] | None = None
     executor_host = host
-    pair_strat_config_dict = pair_strat_config_yaml_dict
-    pair_strat_web_client: ClassVar[EmailBookServiceHttpClient] = email_book_service_http_client
-    portfolio_config_path: Final[PurePath] = (PurePath(__file__).parent.parent.parent / "street_book" / "data" /
+    pair_plan_config_dict = pair_plan_config_yaml_dict
+    pair_plan_web_client: ClassVar[EmailBookServiceHttpClient] = email_book_service_http_client
+    contact_config_path: Final[PurePath] = (PurePath(__file__).parent.parent.parent / "street_book" / "data" /
                                               "kill_switch_simulate_config.yaml")
-    portfolio_config_dict: ClassVar[Dict | None] = load_configs(str(portfolio_config_path))
+    contact_config_dict: ClassVar[Dict | None] = load_configs(str(contact_config_path))
 
     def __init__(self, inst_id: str | None = None):
         self.inst_id = inst_id
@@ -45,16 +45,16 @@ class BarteringLinkBase(ABC):
 
     def subscribe(self, listener_id: str, asyncio_loop: asyncio.AbstractEventLoop,
                   ric_filters: List[str] | None, sedol_filters: List[str] | None,
-                  block_bartering_symbol_side_events: Dict[str, Tuple[Side, str]], mstrat: str | None = None):
+                  block_bartering_symbol_side_events: Dict[str, Tuple[Side, str]], mplan: str | None = None):
         logging.warning("Warning: BarteringLinkBase subscribe invoked - subscribe call has no effect")
 
     def unsubscribe(self):
         logging.warning("Warning: BarteringLinkBase unsubscribe invoked - unsubscribe call has no effect")
 
     @classmethod
-    def reload_portfolio_configs(cls):
+    def reload_contact_configs(cls):
         # reloading executor configs
-        cls.portfolio_config_dict = load_configs(str(cls.portfolio_config_path))
+        cls.contact_config_dict = load_configs(str(cls.contact_config_path))
 
     @classmethod
     @final

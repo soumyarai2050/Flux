@@ -19,7 +19,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data im
     SecurityRecordManager)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
-    is_ongoing_strat, email_book_service_http_client)
+    is_ongoing_plan, email_book_service_http_client)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.barter_simulator import (
     BarterSimulator, BarteringLinkBase)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.aggregate import (
@@ -28,13 +28,13 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.aggregate impor
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book import (
     BaseBook)
 from FluxPythonUtils.scripts.service import Service
-# below import is required to symbol_cache to work - SymbolCacheContainer must import from base_strat_cache
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_strat_cache import BaseStratCache, SymbolCacheContainer, SymbolCache
+# below import is required to symbol_cache to work - SymbolCacheContainer must import from base_plan_cache
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_plan_cache import BasePlanCache, SymbolCacheContainer, SymbolCache
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_bartering_data_manager import (
     BaseBarteringDataManager)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import get_symbol_side_key
 
-BaseStratCacheType = TypeVar('BaseStratCacheType', bound=BaseStratCache)
+BasePlanCacheType = TypeVar('BasePlanCacheType', bound=BasePlanCache)
 BaseBarteringDataManagerType = TypeVar('BaseBarteringDataManagerType', bound=BaseBarteringDataManager)
 
 
@@ -64,7 +64,7 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
         self.asyncio_loop: asyncio.AbstractEventLoop | None = None
         self.static_data: SecurityRecordManager | None = None
         self.usd_fx = None
-        self.strat_cache: BaseStratCacheType | None = None
+        self.plan_cache: BasePlanCacheType | None = None
         self.min_refresh_interval = 30  # default - override in derived with configured value
         self.executor_config_yaml_dict: Dict | None = None  # override in derived with configured value
         self.project_config_yaml_dict: Dict | None = None  # override in derived with configured value
@@ -95,7 +95,7 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
 
     def get_usd_px(self, px: float, system_symbol: str):
         """
-        assumes single currency strat for now - may extend to accept symbol and send revised px according to
+        assumes single currency plan for now - may extend to accept symbol and send revised px according to
         underlying bartering currency
         """
         return px / self.usd_fx
@@ -162,9 +162,9 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
         if fx_symbol_overviews:
             fx_symbol_overview_: FxSymbolOverviewBaseModel
             for fx_symbol_overview_ in fx_symbol_overviews:
-                if fx_symbol_overview_.symbol in BaseStratCache.fx_symbol_overview_dict:
+                if fx_symbol_overview_.symbol in BasePlanCache.fx_symbol_overview_dict:
                     # fx_symbol_overview_dict is pre initialized with supported fx pair symbols and None objects
-                    BaseStratCache.fx_symbol_overview_dict[fx_symbol_overview_.symbol] = fx_symbol_overview_
+                    BasePlanCache.fx_symbol_overview_dict[fx_symbol_overview_.symbol] = fx_symbol_overview_
                     self.usd_fx = fx_symbol_overview_.closing_px
                     logging.debug(f"Updated {self.usd_fx=}")
                     return True
@@ -250,7 +250,7 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                 # we don't use extract availability list here - assumption 1 chore, maps to 1 position + this blocks
                 # non replenishing enabled intraday positions from flowing in
 
-                pos_cache = BaseStratCache.get_pos_cache_from_symbol_side(chore.security.sec_id, chore.side)
+                pos_cache = BasePlanCache.get_pos_cache_from_symbol_side(chore.security.sec_id, chore.side)
                 is_available, sec_pos_extended = pos_cache.extract_availability(new_ord)
                 if not is_available:
                     pos_disable_payload = {"symbol": chore_journal_obj.chore.bartering_security.sec_id,
@@ -456,7 +456,7 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                 # routes call before set_instance file call and set_instance file throws error that
                 # 'set instance is called more than once in one session'
                 if not chore_journal_obj.chore.px:  # market chore
-                    chore_journal_obj.chore.px = BaseStratCache.get_close_px(chore_journal_obj.chore.security.sec_id)
+                    chore_journal_obj.chore.px = BasePlanCache.get_close_px(chore_journal_obj.chore.security.sec_id)
                     if not chore_journal_obj.chore.px:
                         logging.error("ChoreEventType.OE_NEW came with no px, get_close_px failed unable to apply px")
                 chore_snapshot = ChoreSnapshot(id=ChoreSnapshot.next_id(),
@@ -642,7 +642,7 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                             # avoiding any lapse qty greater than chore qty
                             if lapsed_qty > chore_snapshot.chore_brief.qty:
                                 logging.critical(f"Unexpected: Lapse qty can't be greater than chore_qty - putting "
-                                                 f"strat to DOD state, {chore_journal_obj.chore.chore_id=}, "
+                                                 f"plan to DOD state, {chore_journal_obj.chore.chore_id=}, "
                                                  f"lapse_qty: {chore_journal_obj.chore.qty}, "
                                                  f"chore_qty: {chore_snapshot.chore_brief.qty}")
                                 # Passing chore_journal with passing OE_CXL_ACK as event so that all models
@@ -654,7 +654,7 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                             unfilled_qty = self.get_open_qty(chore_snapshot)
                             if lapsed_qty > unfilled_qty:
                                 logging.critical("Unexpected: Lapse qty can't be greater than unfilled qty - putting "
-                                                 f"strat to DOD state, {chore_journal_obj.chore.chore_id=}, "
+                                                 f"plan to DOD state, {chore_journal_obj.chore.chore_id=}, "
                                                  f"lapse_qty: {chore_journal_obj.chore.qty}, "
                                                  f"unfilled_qty: {unfilled_qty}")
                                 # Passing chore_journal with passing OE_CXL_ACK as event so that all models
@@ -1138,10 +1138,10 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                     # non-risky amend dn - any further amend dn will be added to extra cxled
                     logging.warning(f"Received {chore_event} for amend qty which makes chore OVER_CXLED to "
                                     f"chore which was {last_chore_status} before - amend applied and "
-                                    f"putting strat to PAUSE , chore_journal_key: "
+                                    f"putting plan to PAUSE , chore_journal_key: "
                                     f"{self.derived_class_type.get_chore_journal_log_key(chore_journal)};;; "
                                     f"{chore_journal=}, {chore_snapshot=}")
-                    self.pause_strat()
+                    self.pause_plan()
                     return ChoreStatusType.OE_OVER_CXLED
             else:
                 # Amend UP
@@ -1158,11 +1158,11 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                         elif last_chore_status == ChoreStatusType.OE_OVER_FILLED:
                             logging.warning(f"Received {chore_event} for amend qty which makes chore back to ACKED "
                                             f"which was OVER_FILLED before amend, chore_id: "
-                                            f"{chore_snapshot.chore_brief.chore_id} - setting strat back to ACTIVE"
+                                            f"{chore_snapshot.chore_brief.chore_id} - setting plan back to ACTIVE"
                                             f" and applying amend, also ignore OVERFILLED ALERT for this chore"
                                             f"chore_journal_key: {self.derived_class_type.get_chore_journal_log_key(chore_journal)};;; "
                                             f"{chore_journal=}, {chore_snapshot=}")
-                            self.unpause_strat()
+                            self.unpause_plan()
                         return ChoreStatusType.OE_ACKED
                 elif open_qty == 0:
                     # chore qty can be zero in below chore status cases
@@ -1174,11 +1174,11 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                     if last_chore_status == ChoreStatusType.OE_OVER_FILLED:
                         logging.warning(f"Received {chore_event} for amend qty which makes chore FILLED "
                                         f"which was OVER_FILLED before amend, chore_id: "
-                                        f"{chore_snapshot.chore_brief.chore_id} - setting strat back to ACTIVE"
+                                        f"{chore_snapshot.chore_brief.chore_id} - setting plan back to ACTIVE"
                                         f" and applying amend, also ignore OVERFILLED ALERT for this chore"
                                         f"chore_journal_key: {self.derived_class_type.get_chore_journal_log_key(chore_journal)};;; "
                                         f"{chore_journal=}, {chore_snapshot=}")
-                        self.unpause_strat()
+                        self.unpause_plan()
                         return ChoreStatusType.OE_FILLED
                     else:
                         logging.warning(
@@ -1192,10 +1192,10 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                     return last_chore_status
 
 
-    def pause_strat(self):
+    def pause_plan(self):
         pass
 
-    def unpause_strat(self):
+    def unpause_plan(self):
         pass
 
     def get_chore_status_post_amend_rej(
@@ -1221,11 +1221,11 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                                f"{last_chore_status} before amend applied - status post amd_rej applied: "
                                f"{ChoreStatusType.OE_ACKED}")
                     if last_chore_status == ChoreStatusType.OE_OVER_FILLED:
-                        log_str += (" - UNPAUSING strat and applying amend rollback, "
+                        log_str += (" - UNPAUSING plan and applying amend rollback, "
                                     f"chore_journal_key: {self.derived_class_type.get_chore_journal_log_key(chore_journal)};;; "
                                     f"{chore_journal=}, {chore_snapshot=}")
                         logging.warning(log_str)
-                        self.unpause_strat()
+                        self.unpause_plan()
                     elif last_chore_status == ChoreStatusType.OE_FILLED:
                         log_str += (f"chore_journal_key: {self.derived_class_type.get_chore_journal_log_key(chore_journal)};;; "
                                     f"{chore_journal=}, {chore_snapshot=}")
@@ -1241,11 +1241,11 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                         log_str = (f"Reverted amend changes post receiving OE_AMD_REJ on chore that had status "
                                    f"{last_chore_status} before amend applied - status post amd_rej applied: "
                                    f"{ChoreStatusType.OE_ACKED}")
-                        log_str += (" - UNPAUSING strat and applying amend rollback, "
+                        log_str += (" - UNPAUSING plan and applying amend rollback, "
                                     f"chore_journal_key: {self.derived_class_type.get_chore_journal_log_key(chore_journal)};;; "
                                     f"{chore_journal=}, {chore_snapshot=}")
                         logging.warning(log_str)
-                        self.unpause_strat()
+                        self.unpause_plan()
                     else:
                         log_str = (f"Reverted amend changes post receiving OE_AMD_REJ on chore that had status "
                                    f"{last_chore_status} before amend applied - status post amd_rej applied: "
@@ -1277,17 +1277,17 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                            f"{last_chore_status} before amend applied - status post amd_rej applied: "
                            f"{ChoreStatusType.OE_OVER_FILLED}")
                 if last_chore_status == ChoreStatusType.OE_OVER_FILLED:
-                    log_str += (" - strat must be at PAUSE already and "
+                    log_str += (" - plan must be at PAUSE already and "
                                 f"applying amend rollback, chore_journal_key: "
                                 f"{self.derived_class_type.get_chore_journal_log_key(chore_journal)};;; "
                                 f"{chore_journal=}, {chore_snapshot=}")
                     logging.warning(log_str)
                 else:
-                    log_str += (" - putting strat to pause and applying amend rollback, chore_journal_key: "
+                    log_str += (" - putting plan to pause and applying amend rollback, chore_journal_key: "
                                 f"{self.derived_class_type.get_chore_journal_log_key(chore_journal)};;; "
                                 f"{chore_journal=}, {chore_snapshot=}")
                     logging.warning(log_str)
-                    self.pause_strat()
+                    self.pause_plan()
                 return ChoreStatusType.OE_OVER_FILLED
 
     def pending_amend_type(self, chore_journal: ChoreJournal, chore_snapshot: ChoreSnapshot) -> ChoreEventType | None:
@@ -1318,7 +1318,7 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
         Checks if chore_snapshot holding chore_id of passed chore_journal has expected status
         from provided statuses list and then returns that chore_snapshot
         """
-        chore_snapshot_obj = self.strat_cache.get_chore_snapshot_from_chore_id(chore_journal_obj.chore.chore_id)
+        chore_snapshot_obj = self.plan_cache.get_chore_snapshot_from_chore_id(chore_journal_obj.chore.chore_id)
 
         if chore_snapshot_obj is not None:
             if chore_snapshot_obj.chore_status in expected_status_list:
@@ -1366,7 +1366,7 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
             return None
 
         async with (ChoreSnapshot.reentrant_lock):  # for read-write atomicity
-            chore_snapshot_obj = self.strat_cache.get_chore_snapshot_from_chore_id(fills_journal_obj.chore_id)
+            chore_snapshot_obj = self.plan_cache.get_chore_snapshot_from_chore_id(fills_journal_obj.chore_id)
 
             if chore_snapshot_obj is not None:
                 if chore_snapshot_obj.chore_status in [ChoreStatusType.OE_UNACK, ChoreStatusType.OE_ACKED,
@@ -1395,13 +1395,13 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                             # @@@ below error log is used in specific test case for string matching - if changed here
                             # needs to be changed in test also
                             logging.critical("Unexpected: Received fill that makes chore_snapshot OE_FILLED which is "
-                                             "already of state OE_DOD, ignoring this fill and putting this strat to "
+                                             "already of state OE_DOD, ignoring this fill and putting this plan to "
                                              f"PAUSE, symbol_side_key: "
                                              f"{self.derived_class_type.get_chore_snapshot_log_key(chore_snapshot_obj)}"
                                              f";;; {fills_journal_obj=}, {chore_snapshot_obj=}")
-                            self.pause_strat()
+                            self.pause_plan()
                             return None
-                            # pause_strat = True
+                            # pause_plan = True
                         else:
                             if received_fill_after_dod:
                                 # @@@ below error log is used in specific test case for string matching - if changed
@@ -1440,7 +1440,7 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                                 f"is already OE_DOD, {vacant_fill_qty=}, received "
                                 f"{fills_journal_obj.fill_qty=}, {non_required_received_fill_qty=} "
                                 f"from fills_journal_key of {fills_journal_obj.chore_id=} and "
-                                f"{fills_journal_obj.id=} - putting strat to PAUSE and applying fill, "
+                                f"{fills_journal_obj.id=} - putting plan to PAUSE and applying fill, "
                                 f"symbol_side_key: {self.derived_class_type.get_chore_snapshot_log_key(chore_snapshot_obj)}"
                                 f";;; {fills_journal_obj=}, {chore_snapshot_obj=}")
                             chore_snapshot_obj.cxled_qty -= int(fills_journal_obj.fill_qty -
@@ -1467,7 +1467,7 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                                 f"{vacant_fill_qty=}, received {fills_journal_obj.fill_qty=}, "
                                 f"{non_required_received_fill_qty=} "
                                 f"from fills_journal_key of {fills_journal_obj.chore_id=} and "
-                                f"{fills_journal_obj.id=} - putting strat to PAUSE and applying fill, "
+                                f"{fills_journal_obj.id=} - putting plan to PAUSE and applying fill, "
                                 f"symbol_side_key: {self.derived_class_type.get_chore_snapshot_log_key(chore_snapshot_obj)}"
                                 f";;; {fills_journal_obj=}, {chore_snapshot_obj=}")
                         else:
@@ -1478,12 +1478,12 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                                 f"{vacant_fill_qty=}, received {fills_journal_obj.fill_qty=}, "
                                 f"{non_required_received_fill_qty=} "
                                 f"from fills_journal_key of {fills_journal_obj.chore_id=} and "
-                                f"{fills_journal_obj.id=} - putting strat to PAUSE and applying fill, "
+                                f"{fills_journal_obj.id=} - putting plan to PAUSE and applying fill, "
                                 f"symbol_side_key: {self.derived_class_type.get_chore_snapshot_log_key(chore_snapshot_obj)}"
                                 f";;; {fills_journal_obj=}, {chore_snapshot_obj=}")
                         chore_snapshot_obj.chore_status = ChoreStatusType.OE_OVER_FILLED
-                        self.pause_strat()
-                        # pause_strat = True
+                        self.pause_plan()
+                        # pause_plan = True
                     else:
                         if received_fill_after_dod:
                             chore_snapshot_obj.cxled_qty = int(chore_snapshot_obj.cxled_qty -
@@ -1528,10 +1528,10 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                 elif chore_snapshot_obj.chore_status == ChoreStatusType.OE_FILLED:
                     err_str_ = (f"Unsupported - Fill received for completely filled chore_snapshot, "
                                 f"chore_snapshot_key: {self.derived_class_type.get_chore_snapshot_log_key(chore_snapshot_obj)}, "
-                                f"ignoring this fill journal - putting strat to PAUSE;;; "
+                                f"ignoring this fill journal - putting plan to PAUSE;;; "
                                 f"{fills_journal_obj=}, {chore_snapshot_obj=}")
                     logging.critical(err_str_)
-                    self.pause_strat()
+                    self.pause_plan()
                 else:
                     err_str_ = f"Unsupported - Fill received for chore_snapshot having status " \
                                f"{chore_snapshot_obj.chore_status}, chore_snapshot_key: " \
@@ -1540,7 +1540,7 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                     logging.error(err_str_)
             else:
                 err_str_ = (f"Could not find any chore snapshot with {fills_journal_obj.chore_id=} in "
-                            f"strat_cache, fill_journal_key: "
+                            f"plan_cache, fill_journal_key: "
                             f"{self.derived_class_type.get_fills_journal_log_key(fills_journal_obj)}")
                 logging.error(err_str_)
 
@@ -1553,40 +1553,40 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
 
     async def handle_partial_update_chore_journal_post(self, updated_chore_journal_obj_json: Dict[str, Any]):
         updated_chore_journal_obj = ChoreJournal.from_dict(updated_chore_journal_obj_json)
-        # updating bartering_data_manager's strat_cache
+        # updating bartering_data_manager's plan_cache
         self.bartering_data_manager.handle_chore_journal_get_all_ws(updated_chore_journal_obj)
 
     async def handle_create_chore_snapshot_post(self, chore_snapshot_obj: ChoreSnapshot):
-        # updating bartering_data_manager's strat_cache
+        # updating bartering_data_manager's plan_cache
         self.bartering_data_manager.handle_chore_snapshot_get_all_ws(chore_snapshot_obj)
 
     async def handle_update_chore_snapshot_post(self, updated_chore_snapshot_obj: ChoreSnapshot):
-        # updating bartering_data_manager's strat_cache
+        # updating bartering_data_manager's plan_cache
         self.bartering_data_manager.handle_chore_snapshot_get_all_ws(updated_chore_snapshot_obj)
 
     async def handle_partial_update_chore_snapshot_post(self, updated_chore_snapshot_obj_json: Dict[str, Any]):
         updated_chore_snapshot_obj = ChoreSnapshot.from_dict(updated_chore_snapshot_obj_json)
-        # updating bartering_data_manager's strat_cache
+        # updating bartering_data_manager's plan_cache
         self.bartering_data_manager.handle_chore_snapshot_get_all_ws(updated_chore_snapshot_obj)
 
     async def handle_partial_update_fills_journal_post(self, updated_fills_journal_obj_json: Dict[str, Any]):
         updated_fills_journal_obj = FillsJournal.from_dict(updated_fills_journal_obj_json)
-        # updating bartering_data_manager's strat_cache
+        # updating bartering_data_manager's plan_cache
         self.bartering_data_manager.handle_fills_journal_get_all_ws(updated_fills_journal_obj)
 
     async def handle_create_new_chore_post(self, new_chore_obj: NewChore):
-        # updating bartering_data_manager's strat_cache
+        # updating bartering_data_manager's plan_cache
         self.bartering_data_manager.handle_new_chore_get_all_ws(deepcopy(new_chore_obj))
         SymbolCacheContainer.release_semaphore()
 
     async def handle_create_cancel_chore_post(self, cancel_chore_obj: CancelChore):
-        # updating bartering_data_manager's strat_cache
+        # updating bartering_data_manager's plan_cache
         self.bartering_data_manager.handle_cancel_chore_get_all_ws(cancel_chore_obj)
         SymbolCacheContainer.release_semaphore()
 
     async def handle_partial_update_cancel_chore_post(self, updated_cancel_chore_obj_json: Dict[str, Any]):
         updated_cancel_chore_obj = CancelChore.from_dict(updated_cancel_chore_obj_json)
-        # updating bartering_data_manager's strat_cache
+        # updating bartering_data_manager's plan_cache
         self.bartering_data_manager.handle_cancel_chore_get_all_ws(updated_cancel_chore_obj)
         SymbolCacheContainer.release_semaphore()
 
@@ -1607,60 +1607,60 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
     async def handle_create_symbol_overview_post(self, symbol_overview_obj: SymbolOverview):
         symbol_overview_obj.force_publish = False  # setting it false if at create is it True
         # updating symbol_cache
-        self.strat_cache.handle_set_symbol_overview_in_symbol_cache(symbol_overview_obj)
+        self.plan_cache.handle_set_symbol_overview_in_symbol_cache(symbol_overview_obj)
 
         SymbolCacheContainer.release_semaphore()
 
     async def handle_update_symbol_overview_post(self, updated_symbol_overview_obj: SymbolOverview):
         # updating symbol_cache
-        self.strat_cache.handle_set_symbol_overview_in_symbol_cache(updated_symbol_overview_obj)
+        self.plan_cache.handle_set_symbol_overview_in_symbol_cache(updated_symbol_overview_obj)
         SymbolCacheContainer.release_semaphore()
 
     async def handle_partial_update_symbol_overview_post(self, updated_symbol_overview_obj_json: Dict[str, Any]):
         updated_symbol_overview_obj = SymbolOverview.from_dict(updated_symbol_overview_obj_json)
         # updating symbol_cache
-        self.strat_cache.handle_set_symbol_overview_in_symbol_cache(updated_symbol_overview_obj)
+        self.plan_cache.handle_set_symbol_overview_in_symbol_cache(updated_symbol_overview_obj)
         SymbolCacheContainer.release_semaphore()
 
     async def handle_create_all_symbol_overview_post(self, symbol_overview_obj_list: List[SymbolOverview]):
-        # updating bartering_data_manager's strat_cache
+        # updating bartering_data_manager's plan_cache
         for symbol_overview_obj in symbol_overview_obj_list:
             symbol_overview_obj.force_publish = False  # setting it false if at create it is True
             # updating symbol_cache
-            self.strat_cache.handle_set_symbol_overview_in_symbol_cache(symbol_overview_obj)
+            self.plan_cache.handle_set_symbol_overview_in_symbol_cache(symbol_overview_obj)
             SymbolCacheContainer.release_semaphore()
             # else not required: since symbol overview is required to make executor service ready,
-            #                    will add this to strat_cache explicitly using underlying http call
+            #                    will add this to plan_cache explicitly using underlying http call
 
     async def handle_update_all_symbol_overview_post(self, updated_symbol_overview_obj_list: List[SymbolOverview]):
-        # updating bartering_data_manager's strat_cache
+        # updating bartering_data_manager's plan_cache
         for symbol_overview_obj in updated_symbol_overview_obj_list:
             # updating symbol_cache
-            self.strat_cache.handle_set_symbol_overview_in_symbol_cache(symbol_overview_obj)
+            self.plan_cache.handle_set_symbol_overview_in_symbol_cache(symbol_overview_obj)
             SymbolCacheContainer.release_semaphore()
 
     async def handle_partial_update_all_symbol_overview_post(self, updated_symbol_overview_dict_list: List[Dict[str, Any]]):
         updated_symbol_overview_obj_list = SymbolOverview.from_dict_list(updated_symbol_overview_dict_list)
-        # updating bartering_data_manager's strat_cache
+        # updating bartering_data_manager's plan_cache
         for symbol_overview_obj in updated_symbol_overview_obj_list:
             # updating symbol_cache
-            self.strat_cache.handle_set_symbol_overview_in_symbol_cache(symbol_overview_obj)
+            self.plan_cache.handle_set_symbol_overview_in_symbol_cache(symbol_overview_obj)
             SymbolCacheContainer.release_semaphore()
 
     async def handle_create_top_of_book_post(self, top_of_book_obj: TopOfBook):
-        self.strat_cache.handle_set_tob_in_symbol_cache(top_of_book_obj)
-        # used for basket executor - strat executor releases semaphore from cpp app
+        self.plan_cache.handle_set_tob_in_symbol_cache(top_of_book_obj)
+        # used for basket executor - plan executor releases semaphore from cpp app
         SymbolCacheContainer.release_semaphore()
 
     async def handle_update_top_of_book_post(self, updated_top_of_book_obj: TopOfBook):
-        self.strat_cache.handle_set_tob_in_symbol_cache(updated_top_of_book_obj)
-        # used for basket executor - strat executor releases semaphore from cpp app
+        self.plan_cache.handle_set_tob_in_symbol_cache(updated_top_of_book_obj)
+        # used for basket executor - plan executor releases semaphore from cpp app
         SymbolCacheContainer.release_semaphore()
 
     async def handle_partial_update_top_of_book_post(self, updated_top_of_book_obj_json: Dict[str, Any]):
         updated_top_of_book_obj: TopOfBook = TopOfBook.from_dict(updated_top_of_book_obj_json)
-        self.strat_cache.handle_set_tob_in_symbol_cache(updated_top_of_book_obj)
-        # used for basket executor - strat executor releases semaphore from cpp app
+        self.plan_cache.handle_set_tob_in_symbol_cache(updated_top_of_book_obj)
+        # used for basket executor - plan executor releases semaphore from cpp app
         SymbolCacheContainer.release_semaphore()
 
     #####################
@@ -1697,7 +1697,7 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
     async def cxl_expired_open_chores(self):
         residual_mark_secs = self.get_residual_mark_secs()
 
-        open_chore_snapshots_list: List[ChoreSnapshot] = self.strat_cache.get_open_chore_snapshots()
+        open_chore_snapshots_list: List[ChoreSnapshot] = self.plan_cache.get_open_chore_snapshots()
 
         for open_chore_snapshot in open_chore_snapshots_list:
             if not self.executor_inst_id:

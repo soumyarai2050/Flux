@@ -74,7 +74,7 @@ class SecurityRecordManager:
         for barter_ready_record in barter_ready_record_list:
             self.barter_ready_records_by_ticker[barter_ready_record.ticker] = barter_ready_record
             if barter_ready_record.sec_type == SecType.CB:
-                eqt_ticker: str = "EQT_Sec_" + barter_ready_record.ticker.split("_")[-1]
+                eqt_ticker: str = "Type2_Sec_" + barter_ready_record.ticker.split("_")[-1]
                 self.barter_ready_eqt_ticker_by_cb_ticker[barter_ready_record.ticker] = eqt_ticker
                 if barter_ready_record.sedol:
                     self.barter_ready_cb_records_by_sedol[barter_ready_record.sedol] = barter_ready_record

@@ -77,21 +77,21 @@ class ChoreControl:
     max_spread_in_bips: ClassVar[int]
 
     @classmethod
-    def check_min_chore_notional_normal(cls, strat_limits: StratLimits | StratLimitsBaseModel,
+    def check_min_chore_notional_normal(cls, plan_limits: PlanLimits | PlanLimitsBaseModel,
                                         chore_usd_notional: float, system_symbol: str, side: Side):
         # min chore notional is to be an chore opportunity condition instead of chore check
         min_chore_notional: float
-        if (strat_limits.min_chore_notional_allowance and
-                strat_limits.min_chore_notional > strat_limits.min_chore_notional_allowance):
-            min_chore_notional = strat_limits.min_chore_notional - strat_limits.min_chore_notional_allowance
+        if (plan_limits.min_chore_notional_allowance and
+                plan_limits.min_chore_notional > plan_limits.min_chore_notional_allowance):
+            min_chore_notional = plan_limits.min_chore_notional - plan_limits.min_chore_notional_allowance
         else:
-            min_chore_notional = strat_limits.min_chore_notional
+            min_chore_notional = plan_limits.min_chore_notional
         if round(min_chore_notional) > round(chore_usd_notional):
-            if (strat_limits.min_chore_notional_allowance and
-                    strat_limits.min_chore_notional > strat_limits.min_chore_notional_allowance):
-                min_chore_notional_str = f"{strat_limits.min_chore_notional_allowance} applied {min_chore_notional}"
+            if (plan_limits.min_chore_notional_allowance and
+                    plan_limits.min_chore_notional > plan_limits.min_chore_notional_allowance):
+                min_chore_notional_str = f"{plan_limits.min_chore_notional_allowance} applied {min_chore_notional}"
             else:
-                min_chore_notional_str = f"{strat_limits.min_chore_notional=:.2f}"
+                min_chore_notional_str = f"{plan_limits.min_chore_notional=:.2f}"
             # @@@ below error log is used in specific test case for string matching - if changed here
             # needs to be changed in test also
             logging.error(f"blocked chore_opportunity {min_chore_notional_str} < {chore_usd_notional=:.2f}, "
@@ -101,10 +101,10 @@ class ChoreControl:
             return cls.ORDER_CONTROL_SUCCESS
 
     @classmethod
-    def check_min_chore_notional_relaxed(cls, strat_limits: StratLimits | StratLimitsBaseModel,
+    def check_min_chore_notional_relaxed(cls, plan_limits: PlanLimits | PlanLimitsBaseModel,
                                          chore_usd_notional: float, system_symbol: str, side: Side):
-        min_chore_notional_relaxed = random.randint(int(strat_limits.min_chore_notional),
-                                                    int(strat_limits.min_chore_notional+strat_limits.
+        min_chore_notional_relaxed = random.randint(int(plan_limits.min_chore_notional),
+                                                    int(plan_limits.min_chore_notional+plan_limits.
                                                         min_chore_notional_allowance))
 
         # min chore notional is to be an chore opportunity condition instead of chore check
@@ -119,11 +119,11 @@ class ChoreControl:
             return cls.ORDER_CONTROL_SUCCESS
 
     @classmethod
-    def check_min_chore_notional_aggressive(cls, strat_limits: StratLimits | StratLimitsBaseModel,
+    def check_min_chore_notional_aggressive(cls, plan_limits: PlanLimits | PlanLimitsBaseModel,
                                             chore_usd_notional: float, system_symbol: str, side: Side):
         # todo: currently same as normal - needs to be impl
         # min chore notional is to be an chore opportunity condition instead of chore check
-        return cls.check_min_chore_notional_normal(strat_limits, chore_usd_notional, system_symbol, side)
+        return cls.check_min_chore_notional_normal(plan_limits, chore_usd_notional, system_symbol, side)
 
     @classmethod
     def check_min_algo_chore_notional(cls, new_ord: NewChoreBaseModel, chore_usd_notional: float):
@@ -134,33 +134,33 @@ class ChoreControl:
         return cls.ORDER_CONTROL_SUCCESS
 
     @classmethod
-    def check_min_chore_notional(cls, strat_mode: StratMode, strat_limits: StratLimits | StratLimitsBaseModel,
+    def check_min_chore_notional(cls, plan_mode: PlanMode, plan_limits: PlanLimits | PlanLimitsBaseModel,
                                  new_ord: NewChoreBaseModel, chore_usd_notional: float):
         if new_ord.finishing_chore:
             # check_min_chore_notional should not be applied to finishing chore
             return cls.ORDER_CONTROL_SUCCESS
         # else continue with check
         system_symbol = new_ord.security.sec_id
-        if strat_mode == StratMode.StratMode_Aggressive:
+        if plan_mode == PlanMode.PlanMode_Aggressive:
             # min chore notional is to be an chore opportunity condition instead of chore check
-            checks_passed_ = ChoreControl.check_min_chore_notional_aggressive(strat_limits, chore_usd_notional,
+            checks_passed_ = ChoreControl.check_min_chore_notional_aggressive(plan_limits, chore_usd_notional,
                                                                               system_symbol, new_ord.side)
-        elif strat_mode == StratMode.StratMode_Relaxed:
-            checks_passed_ = ChoreControl.check_min_chore_notional_relaxed(strat_limits, chore_usd_notional,
+        elif plan_mode == PlanMode.PlanMode_Relaxed:
+            checks_passed_ = ChoreControl.check_min_chore_notional_relaxed(plan_limits, chore_usd_notional,
                                                                            system_symbol, new_ord.side)
         else:
-            checks_passed_ = ChoreControl.check_min_chore_notional_normal(strat_limits, chore_usd_notional,
+            checks_passed_ = ChoreControl.check_min_chore_notional_normal(plan_limits, chore_usd_notional,
                                                                           system_symbol, new_ord.side)
         return checks_passed_
 
     # todo: to be added when merge task is started
     # def check_chore_limits(self, top_of_book: TopOfBook, chore_limits: ChoreLimitsBaseModel,
-    #                        strat_mode: StratMode, new_ord: NewChoreBaseModel, chore_usd_notional: float,
+    #                        plan_mode: PlanMode, new_ord: NewChoreBaseModel, chore_usd_notional: float,
     #                        check_mask: int = ChoreControl.ORDER_CONTROL_SUCCESS):
     #     sys_symbol = new_ord.security.sec_id
     #     checks_passed: int = ChoreControl.ORDER_CONTROL_SUCCESS
     #     # TODO: min chore notional is to be a chore opportunity condition instead of chore check
-    #     checks_passed_ = ChoreControl.check_min_chore_notional(strat_mode, self.strat_limit, new_ord,
+    #     checks_passed_ = ChoreControl.check_min_chore_notional(plan_mode, self.plan_limit, new_ord,
     #                                                            chore_usd_notional)
     #     if checks_passed_ != ChoreControl.ORDER_CONTROL_SUCCESS:
     #         checks_passed |= checks_passed_

@@ -18,7 +18,7 @@ mongo_server: "mongodb://localhost:27017"
 # to be used by plugins to take proto files from these projects to generate combined output
 multi_project_plugin:
   - log_book:
-      - "PortfolioAlert"
+      - "ContactAlert"
   - phone_book:
       - "SystemControl"
       - "ChoreLimits"

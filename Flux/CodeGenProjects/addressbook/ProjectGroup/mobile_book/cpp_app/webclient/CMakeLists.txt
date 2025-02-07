@@ -30,9 +30,9 @@ include_directories(${gtest_SOURCE_DIR}/include ${gtest_SOURCE_DIR} ${MONGO_INCL
         ${Protobuf_INCLUDE_DIRS} ${CppCodec} ${CppTest} ${CppCodec} ${CppUtilGen} ${ProtoGenCc} ${PhoneBookProtoGenCc}  ${FluxCppCore} /usr/local/lib/quill)
 
 set(MD_MODEL ../../generated/CppProto2)
-set(Pair_Strat_Model ../../../phone_book/generated/CppProto2)
+set(Pair_Plan_Model ../../../phone_book/generated/CppProto2)
 protobuf_generate_cpp(PROTO_HDRS PROTO_SRCS
-        ${MD_MODEL}/mobile_book_service.proto ${Pair_Strat_Model}/strat_core.proto ${Pair_Strat_Model}/email_book_service.proto)
+        ${MD_MODEL}/mobile_book_service.proto ${Pair_Plan_Model}/plan_core.proto ${Pair_Plan_Model}/email_book_service.proto)
 
 set(SRC_FILES
         ${CppCodec_SRC}

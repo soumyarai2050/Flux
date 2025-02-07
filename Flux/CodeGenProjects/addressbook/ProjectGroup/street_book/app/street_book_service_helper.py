@@ -16,7 +16,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.app.post_book_service_helper import (
     post_book_service_http_client)
 
-update_strat_status_lock: threading.Lock = threading.Lock()
+update_plan_status_lock: threading.Lock = threading.Lock()
 
 
 def all_service_up_check(executor_client: StreetBookServiceHttpClient, ignore_error: bool = False):
@@ -42,34 +42,34 @@ def all_service_up_check(executor_client: StreetBookServiceHttpClient, ignore_er
         return False
 
 
-# def update_strat_alert_by_sec_and_side_async(sec_id: str, side: Side, alert_brief: str,
+# def update_plan_alert_by_sec_and_side_async(sec_id: str, side: Side, alert_brief: str,
 #                                              alert_details: str | None = None,
 #                                              severity: Severity = Severity.Severity_ERROR,
 #                                              impacted_chores: List[ChoreBrief] | None = None):
 #     impacted_chores = [] if impacted_chores is None else impacted_chores
 #     alert: Alert = create_alert(alert_brief, alert_details, impacted_chores, severity)
-#     with update_strat_status_lock:
-#         pair_strat: PairStratBaseModel = \
-#             email_book_service_http_client.get_ongoing_strat_from_symbol_side_query_client(sec_id, side)
-#         updated_strat_status: StratStatus = pair_strat.strat_status
-#         updated_strat_status.strat_state = pair_strat.strat_status.strat_state
-#         updated_strat_status.strat_alerts.append(alert)
-#         pair_strat_updated: PairStratOptional = PairStratOptional(_id=pair_strat.id, strat_status=updated_strat_status)
-#         email_book_service_http_client.patch_pair_strat_client(pair_strat_updated.dict(by_alias=True,
+#     with update_plan_status_lock:
+#         pair_plan: PairPlanBaseModel = \
+#             email_book_service_http_client.get_ongoing_plan_from_symbol_side_query_client(sec_id, side)
+#         updated_plan_status: PlanStatus = pair_plan.plan_status
+#         updated_plan_status.plan_state = pair_plan.plan_status.plan_state
+#         updated_plan_status.plan_alerts.append(alert)
+#         pair_plan_updated: PairPlanOptional = PairPlanOptional(_id=pair_plan.id, plan_status=updated_plan_status)
+#         email_book_service_http_client.patch_pair_plan_client(pair_plan_updated.dict(by_alias=True,
 #                                                                                           exclude_none=True),
 #                                                                   return_obj_copy=False)
 
 #
-# def update_strat_alert_async(strat_id: int, alert_brief: str, alert_details: str | None = None,
+# def update_plan_alert_async(plan_id: int, alert_brief: str, alert_details: str | None = None,
 #                              impacted_chores: List[ChoreBrief] | None = None,
 #                              severity: Severity = Severity.Severity_ERROR):
 #     alert: Alert = create_alert(alert_brief, alert_details, impacted_chores, severity)
-#     with update_strat_status_lock:
-#         pair_strat: PairStrat = email_book_service_http_client.get_pair_strat_client(strat_id)
-#         strat_status: StratStatus = StratStatus(strat_state=pair_strat.strat_status.strat_state,
-#                                                 strat_alerts=(pair_strat.strat_status.strat_alerts.append(alert)))
-#         pair_strat_updated: PairStratOptional = PairStratOptional(_id=pair_strat.id, strat_status=strat_status)
-#     email_book_service_http_client.patch_pair_strat_client(pair_strat_updated.dict(by_alias=True,
+#     with update_plan_status_lock:
+#         pair_plan: PairPlan = email_book_service_http_client.get_pair_plan_client(plan_id)
+#         plan_status: PlanStatus = PlanStatus(plan_state=pair_plan.plan_status.plan_state,
+#                                                 plan_alerts=(pair_plan.plan_status.plan_alerts.append(alert)))
+#         pair_plan_updated: PairPlanOptional = PairPlanOptional(_id=pair_plan.id, plan_status=plan_status)
+#     email_book_service_http_client.patch_pair_plan_client(pair_plan_updated.dict(by_alias=True,
 #                                                                                       exclude_none=True),
 #                                                               return_obj_copy=False)
 
@@ -90,14 +90,14 @@ def get_symbol_side_snapshot_log_key(
     return f"{symbol_side_key}-{base_symbol_side_snapshot_key}"
 
 
-def get_strat_brief_log_key(strat_brief: StratBrief | StratBriefBaseModel | StratBriefOptional):
-    buy_sec_id = strat_brief.pair_buy_side_bartering_brief.security.sec_id
-    buy_side = strat_brief.pair_buy_side_bartering_brief.side
-    sell_sec_id = strat_brief.pair_sell_side_bartering_brief.security.sec_id
-    sell_side = strat_brief.pair_sell_side_bartering_brief.side
+def get_plan_brief_log_key(plan_brief: PlanBrief | PlanBriefBaseModel | PlanBriefOptional):
+    buy_sec_id = plan_brief.pair_buy_side_bartering_brief.security.sec_id
+    buy_side = plan_brief.pair_buy_side_bartering_brief.side
+    sell_sec_id = plan_brief.pair_sell_side_bartering_brief.security.sec_id
+    sell_side = plan_brief.pair_sell_side_bartering_brief.side
     symbol_side_key = get_symbol_side_key([(buy_sec_id, buy_side), (sell_sec_id, sell_side)])
-    base_strat_brief_key = StreetBookServiceKeyHandler.get_log_key_from_strat_brief(strat_brief)
-    return f"{symbol_side_key}-{base_strat_brief_key}"
+    base_plan_brief_key = StreetBookServiceKeyHandler.get_log_key_from_plan_brief(plan_brief)
+    return f"{symbol_side_key}-{base_plan_brief_key}"
 
 
 def get_consumable_participation_qty(
@@ -149,7 +149,7 @@ async def get_consumable_participation_qty_underlying_http(symbol: str, side: Si
         return
 
 
-def get_new_strat_limits(eligible_brokers: List[Broker] | None = None) -> StratLimits:
+def get_new_plan_limits(eligible_brokers: List[Broker] | None = None) -> PlanLimits:
     # setting waived_min_rolling_notional to 0 disables waived_min_rolling_notional addon from cancel_rate check impl
     cancel_rate: CancelRate = CancelRate(max_cancel_rate=60, applicable_period_seconds=0, waived_initial_chores=5,
                                          waived_min_rolling_notional=0, waived_min_rolling_period_seconds=180)
@@ -158,7 +158,7 @@ def get_new_strat_limits(eligible_brokers: List[Broker] | None = None) -> StratL
                                        applicable_period_seconds=180, min_allowed_notional=0)
     market_depth: OpenInterestParticipation = OpenInterestParticipation(participation_rate=10, depth_levels=3)
     residual_restriction: ResidualRestriction = ResidualRestriction(max_residual=30_000, residual_mark_seconds=4)
-    strat_limits: StratLimits = StratLimits(max_open_chores_per_side=5,
+    plan_limits: PlanLimits = PlanLimits(max_open_chores_per_side=5,
                                             max_single_leg_notional=get_default_max_notional(),
                                             max_open_single_leg_notional=get_default_max_open_single_leg_notional(),
                                             max_net_filled_notional=get_default_max_net_filled_notional(),
@@ -170,11 +170,11 @@ def get_new_strat_limits(eligible_brokers: List[Broker] | None = None) -> StratL
                                             market_depth=market_depth,
                                             residual_restriction=residual_restriction,
                                             min_chore_notional=100, min_chore_notional_allowance=10)
-    return strat_limits
+    return plan_limits
 
 
-def get_new_strat_status(strat_limits_obj: StratLimits) -> StratStatus:
-    strat_status = StratStatus(total_buy_qty=0,
+def get_new_plan_status(plan_limits_obj: PlanLimits) -> PlanStatus:
+    plan_status = PlanStatus(total_buy_qty=0,
                                total_sell_qty=0, total_chore_qty=0, total_open_buy_qty=0,
                                total_open_sell_qty=0, avg_open_buy_px=0.0, avg_open_sell_px=0.0,
                                total_open_buy_notional=0.0, total_open_sell_notional=0.0,
@@ -185,9 +185,9 @@ def get_new_strat_status(strat_limits_obj: StratLimits) -> StratStatus:
                                total_cxl_sell_qty=0, avg_cxl_buy_px=0.0, avg_cxl_sell_px=0.0,
                                total_cxl_buy_notional=0.0, total_cxl_sell_notional=0.0,
                                total_cxl_exposure=0.0, average_premium=0.0,
-                               balance_notional=strat_limits_obj.max_single_leg_notional,
-                               strat_status_update_seq_num=0)
-    return strat_status
+                               balance_notional=plan_limits_obj.max_single_leg_notional,
+                               plan_status_update_seq_num=0)
+    return plan_status
 
 
 def get_default_max_notional() -> int:
@@ -202,6 +202,6 @@ def get_default_max_net_filled_notional() -> int:
     return 160_000
 
 
-def get_simulator_config_file_path(strat_id: int) -> str:
-    config_file_path = PurePath(__file__).parent.parent / "data" / f"executor_{strat_id}_simulate_config.yaml"
+def get_simulator_config_file_path(plan_id: int) -> str:
+    config_file_path = PurePath(__file__).parent.parent / "data" / f"executor_{plan_id}_simulate_config.yaml"
     return str(config_file_path)

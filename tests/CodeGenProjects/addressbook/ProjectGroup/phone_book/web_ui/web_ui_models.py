@@ -98,18 +98,18 @@ class Delay(Enum):
 
 
 class WidgetName(StrEnum):
-    PairStratParams = "pair_strat_params"
-    StratLimits = "strat_limits"
-    StratCollection = "strat_collection"
-    PortFolioLimits = "portfolio_limits"
+    PairPlanParams = "pair_plan_params"
+    PlanLimits = "plan_limits"
+    PlanCollection = "plan_collection"
+    PortFolioLimits = "contact_limits"
     ChoreLimits = "chore_limits"
-    PortFolioStatus = "portfolio_status"
-    StratStatus = "strat_status"
-    PortfolioAlert = "portfolio_alert"
+    PortFolioStatus = "contact_status"
+    PlanStatus = "plan_status"
+    ContactAlert = "contact_alert"
     FxSymbolOverview = "fx_symbol_overview"
     BasketChore = "basket_chore"
     SymbolSideSnapShot = "symbol_side_snapshot"
-    StratBrief = "strat_brief"
+    PlanBrief = "plan_brief"
     SymbolOverview = "symbol_overview"
 
 

@@ -29,8 +29,11 @@ log_book_service_http_client = \
     LogBookServiceHttpClient.set_or_get_if_instance_exists(la_host, la_port)
 
 datetime_str = datetime.datetime.now().strftime("%Y%m%d")
-portfolio_alert_fail_log = f"portfolio_alert_fail_logs_{datetime_str}.log"
-simulator_portfolio_alert_fail_log = f"simulator_portfolio_alert_fail_logs_{datetime_str}.log"
+contact_alert_fail_log = f"contact_alert_fail_logs_{datetime_str}.log"
+simulator_contact_alert_fail_log = f"simulator_contact_alert_fail_logs_{datetime_str}.log"
+
+# pattern to find non-existing ids of objects which were not found while patch-all
+non_existing_obj_read_fail_regex_pattern: Final[str] = ".*objects with ids: {(.*)} out of requested .*"
 
 
 class UpdateType(StrEnum):
@@ -47,33 +50,33 @@ class AlertsCacheCont(MsgspecBaseModel, kw_only=True):
 
 
 def create_alert(
-        strat_alert_type: Type[StratAlert] | Type[StratAlertBaseModel],
-        portfolio_alert_type: Type[PortfolioAlert] | Type[PortfolioAlertBaseModel],
-        alert_brief: str, severity: Severity = Severity.Severity_ERROR, strat_id: int | None = None,
-        alert_meta: AlertMeta | None = None) -> StratAlertBaseModel | PortfolioAlertBaseModel:
+        plan_alert_type: Type[PlanAlert] | Type[PlanAlertBaseModel],
+        contact_alert_type: Type[ContactAlert] | Type[ContactAlertBaseModel],
+        alert_brief: str, severity: Severity = Severity.Severity_ERROR, plan_id: int | None = None,
+        alert_meta: AlertMeta | None = None) -> PlanAlertBaseModel | ContactAlertBaseModel:
     """
-    Handles strat alerts if strat id is passed else handles portfolio alerts
+    Handles plan alerts if plan id is passed else handles contact alerts
     """
     kwargs = {}
     kwargs.update(severity=severity, alert_brief=alert_brief, dismiss=False,
                   last_update_analyzer_time=DateTime.utcnow(), alert_count=1)
     if alert_meta:
         kwargs['alert_meta'] = alert_meta
-    if strat_id is not None:
-        kwargs["strat_id"] = strat_id
-        start_alert = strat_alert_type.from_dict(kwargs)
-        if hasattr(strat_alert_type, "next_id"):
+    if plan_id is not None:
+        kwargs["plan_id"] = plan_id
+        start_alert = plan_alert_type.from_dict(kwargs)
+        if hasattr(plan_alert_type, "next_id"):
             # used in server process since db is initialized in that process -
             # putting id so that object can be cached with id - to avoid put http with cached obj without id
-            start_alert.id = strat_alert_type.next_id()
+            start_alert.id = plan_alert_type.next_id()
         return start_alert
     else:
-        portfolio_alert = portfolio_alert_type.from_dict(kwargs)
-        if hasattr(portfolio_alert_type, "next_id"):
+        contact_alert = contact_alert_type.from_dict(kwargs)
+        if hasattr(contact_alert_type, "next_id"):
             # used in server process since db is initialized in that process -
             # putting id so that object can be cached with id - to avoid put http with cached obj without id
-            portfolio_alert.id = portfolio_alert_type.next_id()
-        return portfolio_alert
+            contact_alert.id = contact_alert_type.next_id()
+        return contact_alert
 
 
 def is_log_book_service_up(ignore_error: bool = False) -> bool:
@@ -91,23 +94,23 @@ def is_log_book_service_up(ignore_error: bool = False) -> bool:
         return False
 
 
-def init_service(portfolio_alerts_cache: Dict[str, PortfolioAlertBaseModel]) -> bool:
+def init_service(contact_alerts_cache: Dict[str, ContactAlertBaseModel]) -> bool:
     if is_log_book_service_up(ignore_error=True):
         try:
             # block for task to finish
-            portfolio_alert_list: List[PortfolioAlertBaseModel] = (
-                log_book_service_http_client.get_all_portfolio_alert_client())  # returns list - empty or with objs
+            contact_alert_list: List[ContactAlertBaseModel] = (
+                log_book_service_http_client.get_all_contact_alert_client())  # returns list - empty or with objs
 
         except Exception as e:
-            err_str_ = f"get_all_portfolio_alert_client failed with exception: {e}"
+            err_str_ = f"get_all_contact_alert_client failed with exception: {e}"
             logging.error(err_str_)
             raise Exception(err_str_)
 
-        for portfolio_alert in portfolio_alert_list:
-            component_file_path, source_file_name, line_num = get_key_meta_data_from_obj(portfolio_alert)
-            alert_key = get_alert_cache_key(portfolio_alert.severity, portfolio_alert.alert_brief,
+        for contact_alert in contact_alert_list:
+            component_file_path, source_file_name, line_num = get_key_meta_data_from_obj(contact_alert)
+            alert_key = get_alert_cache_key(contact_alert.severity, contact_alert.alert_brief,
                                             component_file_path, source_file_name, line_num)
-            portfolio_alerts_cache[alert_key] = portfolio_alert
+            contact_alerts_cache[alert_key] = contact_alert
         return True
     return False
 
@@ -137,8 +140,8 @@ def get_pattern_to_remove_file_from_created_cache():
     return pattern
 
 
-def get_pattern_for_pair_strat_db_updates():
-    pattern = config_yaml_dict.get("pattern_for_pair_strat_db_updates")
+def get_pattern_for_pair_plan_db_updates():
+    pattern = config_yaml_dict.get("pattern_for_pair_plan_db_updates")
     if pattern is None:
         pattern = "^^^"
     return pattern
@@ -411,9 +414,9 @@ def handle_dynamic_queue_for_patch_n_patch_all(basemodel_type: str, method_name:
                     except Exception as e:
                         if not should_retry_due_to_server_down(e):  # stays within loop if server is down
                             logging.exception(e)
-                            raise Exception(e)
+                            raise e
             except Exception as e:
-                error_handler_callable(basemodel_type, update_type, e)
+                error_handler_callable(basemodel_type, update_type, e, pending_updates)
     except Exception as e:
         logging.exception(e)
         raise Exception(e)
@@ -424,8 +427,7 @@ def _alert_queue_handler_err_handler(e, model_obj_list, queue_obj, err_handling_
     # Handling patch-all race-condition if some obj got removed before getting updated due to wait
     # pattern1: happens in patch_all and in put_all when stored_obj is fetched before update operation and hence
     #           error is raised before updating obj
-    pattern1 = ".*objects with ids: {(.*)} out of requested .*"
-    match_list1: List[str] = re.findall(pattern1, str(e))
+    match_list1: List[str] = re.findall(non_existing_obj_read_fail_regex_pattern, str(e))
 
     # pattern2: happens in put_all when obj is updated and then missing ids are found and error is raised
     pattern2 = "Can't find document objects with ids: [(.*)] to update"
@@ -532,7 +534,7 @@ def alert_queue_handler_for_create_only(
 async def handle_alert_create_n_update_using_async_submit(
         alerts_cache_cont: AlertsCacheCont, underlying_create_all_web_client_callable,
         underlying_update_all_web_client_callable, queue_obj:
-        queue.Queue, err_handling_callable, model_class_type: Type[StratAlert | PortfolioAlert],
+        queue.Queue, err_handling_callable, model_class_type: Type[PlanAlert | ContactAlert],
         client_connection_fail_retry_secs: int | None = None):
     async with model_class_type.reentrant_lock:
         async with alerts_cache_cont.re_mutex:
@@ -578,7 +580,7 @@ async def get_remaining_timeout_secs(alerts_cache_cont: AlertsCacheCont, bulk_tr
         return remaining_timeout_secs
 
 
-async def update_alert_caches(alerts_cache_cont: AlertsCacheCont, alert_obj: StratAlert | PortfolioAlert) -> None:
+async def update_alert_caches(alerts_cache_cont: AlertsCacheCont, alert_obj: PlanAlert | ContactAlert) -> None:
     async with alerts_cache_cont.re_mutex:
         if alerts_cache_cont.alert_id_to_obj_dict.get(alert_obj.id) is not None:
             alerts_cache_cont.update_alert_obj_dict[alert_obj.id] = alert_obj
@@ -678,15 +680,15 @@ def get_alert_cache_key(severity: Severity, alert_brief: str, component_path: st
     return alert_key
 
 
-def create_or_update_alert(alerts_cache_dict: Dict[str, StratAlertBaseModel | StratAlert] |
-                                               Dict[str, StratAlertBaseModel | StratAlert] | None,
+def create_or_update_alert(alerts_cache_dict: Dict[str, PlanAlertBaseModel | PlanAlert] |
+                                               Dict[str, PlanAlertBaseModel | PlanAlert] | None,
                            alert_queue: queue.Queue,
-                           strat_alert_type: Type[StratAlert] | Type[StratAlertBaseModel],
-                           portfolio_alert_type: Type[PortfolioAlert] | Type[PortfolioAlertBaseModel],
-                           severity: Severity, alert_brief: str, strat_id: int | None = None,
+                           plan_alert_type: Type[PlanAlert] | Type[PlanAlertBaseModel],
+                           contact_alert_type: Type[ContactAlert] | Type[ContactAlertBaseModel],
+                           severity: Severity, alert_brief: str, plan_id: int | None = None,
                            alert_meta: AlertMeta | AlertMetaBaseModel | None = None) -> None:
     """
-    Handles strat alerts if strat id is passed else handles portfolio alerts
+    Handles plan alerts if plan id is passed else handles contact alerts
     """
     if alert_meta:
         cache_key = get_alert_cache_key(severity, alert_brief, alert_meta.component_file_path,
@@ -744,52 +746,52 @@ def create_or_update_alert(alerts_cache_dict: Dict[str, StratAlertBaseModel | St
                 alert_meta.latest_detail = None
 
         # create a new stored_alert
-        alert_obj: StratAlertBaseModel | PortfolioAlertBaseModel = (
-            create_alert(alert_brief=alert_brief, severity=severity, strat_id=strat_id,
-                         strat_alert_type=strat_alert_type, portfolio_alert_type=portfolio_alert_type,
+        alert_obj: PlanAlertBaseModel | ContactAlertBaseModel = (
+            create_alert(alert_brief=alert_brief, severity=severity, plan_id=plan_id,
+                         plan_alert_type=plan_alert_type, contact_alert_type=contact_alert_type,
                          alert_meta=alert_meta))
         alerts_cache_dict[cache_key] = alert_obj
         alert_queue.put(alert_obj)
 
 
-def update_strat_alert_cache(
-        strat_id: int, strat_alert_cache_by_strat_id_dict: Dict[int, Dict[str, StratAlertBaseModel | StratAlert]],
+def update_plan_alert_cache(
+        plan_id: int, plan_alert_cache_by_plan_id_dict: Dict[int, Dict[str, PlanAlertBaseModel | PlanAlert]],
         filter_query_callable: Callable[..., Any]) -> None:
-    if strat_id not in strat_alert_cache_by_strat_id_dict:
+    if plan_id not in plan_alert_cache_by_plan_id_dict:
         try:
             # block for task to finish
-            strat_alert_list: List[StratAlertBaseModel] = filter_query_callable(strat_id)
+            plan_alert_list: List[PlanAlertBaseModel] = filter_query_callable(plan_id)
         except Exception as e:
             err_str_ = f"{filter_query_callable.__name__} failed with exception: {e}"
             logging.error(err_str_)
             raise Exception(err_str_)
         else:
-            strat_alert_cache_by_strat_id_dict[strat_id] = {}
-            for strat_alert in strat_alert_list:
-                component_file_path, source_file_name, line_num = get_key_meta_data_from_obj(strat_alert)
-                alert_key = get_alert_cache_key(strat_alert.severity, strat_alert.alert_brief,
+            plan_alert_cache_by_plan_id_dict[plan_id] = {}
+            for plan_alert in plan_alert_list:
+                component_file_path, source_file_name, line_num = get_key_meta_data_from_obj(plan_alert)
+                alert_key = get_alert_cache_key(plan_alert.severity, plan_alert.alert_brief,
                                                 component_file_path, source_file_name, line_num)
-                strat_alert_cache_by_strat_id_dict[strat_id][alert_key] = strat_alert
+                plan_alert_cache_by_plan_id_dict[plan_id][alert_key] = plan_alert
 
 
-async def async_update_strat_alert_cache(
-        strat_id: int, strat_alert_cache_by_strat_id_dict: Dict[int, Dict[str, StratAlertBaseModel | StratAlert]],
+async def async_update_plan_alert_cache(
+        plan_id: int, plan_alert_cache_by_plan_id_dict: Dict[int, Dict[str, PlanAlertBaseModel | PlanAlert]],
         filter_query_callable: Callable[..., Any]) -> None:
-    if strat_id not in strat_alert_cache_by_strat_id_dict:
+    if plan_id not in plan_alert_cache_by_plan_id_dict:
         try:
             # block for task to finish
-            strat_alert_list: List[StratAlertBaseModel] = await filter_query_callable(strat_id)
+            plan_alert_list: List[PlanAlertBaseModel] = await filter_query_callable(plan_id)
         except Exception as e:
             err_str_ = f"{filter_query_callable.__name__} failed with exception: {e}"
             logging.error(err_str_)
             raise Exception(err_str_)
         else:
-            strat_alert_cache_by_strat_id_dict[strat_id] = {}
-            for strat_alert in strat_alert_list:
-                component_file_path, source_file_name, line_num = get_key_meta_data_from_obj(strat_alert)
-                alert_key = get_alert_cache_key(strat_alert.severity, strat_alert.alert_brief,
+            plan_alert_cache_by_plan_id_dict[plan_id] = {}
+            for plan_alert in plan_alert_list:
+                component_file_path, source_file_name, line_num = get_key_meta_data_from_obj(plan_alert)
+                alert_key = get_alert_cache_key(plan_alert.severity, plan_alert.alert_brief,
                                                 component_file_path, source_file_name, line_num)
-                strat_alert_cache_by_strat_id_dict[strat_id][alert_key] = strat_alert
+                plan_alert_cache_by_plan_id_dict[plan_id][alert_key] = plan_alert
 
 
 def get_alert_meta_obj(component_path: str | None = None,
@@ -830,7 +832,7 @@ def get_alert_meta_obj(component_path: str | None = None,
         return None
 
 
-def get_key_meta_data_from_obj(alert_obj: StratAlert | PortfolioAlert | StratAlertBaseModel | PortfolioAlertBaseModel):
+def get_key_meta_data_from_obj(alert_obj: PlanAlert | ContactAlert | PlanAlertBaseModel | ContactAlertBaseModel):
     component_file_path = None
     source_file_name = None
     line_num = None

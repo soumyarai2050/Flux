@@ -10,18 +10,18 @@ package post_book;
 option (FluxFileDateTimeGranularity) = MILLI_SEC;
 option (FluxFileDateTimePrintTimezone) = "LOCAL";
 
-message PortfolioStatusUpdatesContainer {
+message ContactStatusUpdatesContainer {
   optional float buy_notional_update = 1;
   optional float sell_notional_update = 2;
   optional float buy_fill_notional_update = 3;
   optional float sell_fill_notional_update = 4;
 }
 
-message CheckPortfolioLimits{
+message CheckContactLimits{
   option (FluxMsgJsonQuery) = {
-    QueryName: "check_portfolio_limits",
+    QueryName: "check_contact_limits",
     QueryParams: {
-      QueryParamName: "strat_id",
+      QueryParamName: "plan_id",
       QueryParamDataType: "int"
     }
     QueryParams: {
@@ -33,12 +33,12 @@ message CheckPortfolioLimits{
       QueryParamDataType: "ChoreSnapshotBaseModel"
     }
     QueryParams: {
-      QueryParamName: "strat_brief",
-      QueryParamDataType: "StratBriefBaseModel"
+      QueryParamName: "plan_brief",
+      QueryParamDataType: "PlanBriefBaseModel"
     }
     QueryParams: {
-      QueryParamName: "portfolio_status_updates",
-      QueryParamDataType: "PortfolioStatusUpdatesContainer"
+      QueryParamName: "contact_status_updates",
+      QueryParamDataType: "ContactStatusUpdatesContainer"
     }
     QueryRouteType: PATCH
   };
@@ -52,11 +52,11 @@ message ReloadCache{
   required bool reload_result = 1;
 }
 
-message IsPortfolioLimitsBreached{
+message IsContactLimitsBreached{
     option (FluxMsgJsonQuery) = {
-    QueryName: "is_portfolio_limits_breached"
+    QueryName: "is_contact_limits_breached"
   };
-  required bool is_portfolio_limits_breached = 1;
+  required bool is_contact_limits_breached = 1;
 }
 
 // used to avoid unused import warning by using any random msg or enum from imported file causing warning

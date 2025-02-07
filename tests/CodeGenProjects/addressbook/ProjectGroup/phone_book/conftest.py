@@ -43,7 +43,7 @@ def top_of_book_list_():
     leg1_last_barter_px, leg2_last_barter_px = get_both_side_last_barter_px()
     input_data = [
         {
-            "symbol": "CB_Sec_1",
+            "symbol": "Type1_Sec_1",
             "bid_quote": {
                 "px": 110,
                 "qty": 20,
@@ -69,7 +69,7 @@ def top_of_book_list_():
             "last_update_date_time": "2023-02-13T20:30:34.165Z"
         },
         {
-            "symbol": "EQT_Sec_1",
+            "symbol": "Type2_Sec_1",
             "bid_quote": {
                 "px": 110,
                 "qty": 20,
@@ -101,7 +101,7 @@ def top_of_book_list_():
 @pytest.fixture()
 def last_barter_fixture_list():
     input_data = []
-    for index, symbol_n_px in enumerate([("CB_Sec_1", 116), ("EQT_Sec_1", 117)]):
+    for index, symbol_n_px in enumerate([("Type1_Sec_1", 116), ("Type2_Sec_1", 117)]):
         symbol, px = symbol_n_px
         input_data.extend([
             {
@@ -146,12 +146,12 @@ def empty_pair_side_bartering_brief_obj(symbol: str, side: str, sec_id_source: s
 
 
 @pytest.fixture()
-def expected_strat_brief_(pair_securities_with_sides_):
+def expected_plan_brief_(pair_securities_with_sides_):
     pair_buy_side_bartering_brief = empty_pair_side_bartering_brief_obj(pair_securities_with_sides_["security1"]["sec_id"],
                                                                     pair_securities_with_sides_["side1"])
     pair_sell_side_bartering_brief = empty_pair_side_bartering_brief_obj(pair_securities_with_sides_["security2"]["sec_id"],
                                                                      pair_securities_with_sides_["side2"])
-    yield StratBriefBaseModel.from_kwargs(pair_buy_side_bartering_brief=pair_buy_side_bartering_brief,
+    yield PlanBriefBaseModel.from_kwargs(pair_buy_side_bartering_brief=pair_buy_side_bartering_brief,
                                           pair_sell_side_bartering_brief=pair_sell_side_bartering_brief,
                                           consumable_nett_filled_notional=160_000)
 
@@ -161,7 +161,7 @@ def expected_symbol_side_snapshot_():
     yield [
         SymbolSideSnapshotBaseModel.from_dict({
             "security": {
-              "sec_id": "CB_Sec_1",
+              "sec_id": "Type1_Sec_1",
               "sec_id_source": SecurityIdSource.TICKER
             },
             "side": "BUY",
@@ -180,7 +180,7 @@ def expected_symbol_side_snapshot_():
         }),
         SymbolSideSnapshotBaseModel.from_dict({
             "security": {
-                "sec_id": "EQT_Sec_1",
+                "sec_id": "Type2_Sec_1",
                 "sec_id_source": SecurityIdSource.TICKER
             },
             "side": "SELL",
@@ -368,7 +368,7 @@ def sample_alert():
             {
               "chore_id": "O1",
               "security": {
-                "sec_id": "CB_Sec_1",
+                "sec_id": "Type1_Sec_1",
                 "sec_id_source": SecurityIdSource.TICKER
               },
               "side": Side.BUY,
@@ -401,7 +401,7 @@ def dash_():
         "rt_dash": {
             "leg1": {
                 "sec": {
-                    "sec_id": "CB_Sec_1",
+                    "sec_id": "Type1_Sec_1",
                     "sec_id_source": "TICKER"
                 },
                 "exch_id": "EXCH1",
@@ -410,7 +410,7 @@ def dash_():
             },
             "leg2": {
                 "sec": {
-                    "sec_id": "EQT_Sec_1",
+                    "sec_id": "Type2_Sec_1",
                     "sec_id_source": "TICKER"
                 },
                 "exch_id": "EXCH2",
@@ -429,7 +429,7 @@ def bar_data_():
     current_time = DateTime.utcnow()
     bar_data_json = {
         "symbol_n_exch_id": {
-            "symbol": "CB_Sec_1",
+            "symbol": "Type1_Sec_1",
             "exch_id": "EXCH"
         },
         "start_time": current_time,

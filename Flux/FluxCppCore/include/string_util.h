@@ -7,6 +7,7 @@
 
 #include <bsoncxx/types.hpp>
 #include <date/date.h>
+#include "market_data_constants.h"
 
 namespace FluxCppCore {
 

@@ -15,7 +15,7 @@ class MobileBookServiceRoutesCallbackBaseNativeOverride(MobileBookServiceRoutesC
     @except_n_log_alert()
     def _app_launch_pre_thread_func(self):  # todo: impl this method for this server
         """
-        sleep wait till engine is up, then create portfolio limits if required
-        TODO LAZY: we should invoke _apply_checks_n_alert on all active pair strats at startup/re-start
+        sleep wait till engine is up, then create contact limits if required
+        TODO LAZY: we should invoke _apply_checks_n_alert on all active pair plans at startup/re-start
         """
         pass

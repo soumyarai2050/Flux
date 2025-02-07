@@ -27,22 +27,25 @@ namespace FluxCppCore {
     public:
         // Structure to hold WebSocket connections for a specific route
         struct RouteConnections {
+            std::mutex mutex;
             std::vector<std::shared_ptr<websocket::stream<tcp::socket>>> connections;
             std::shared_ptr<WebSocketRouteHandler> handler;
 
             void publish(const std::string& message) {
+                std::lock_guard<std::mutex> lock(mutex);
                 boost::system::error_code error_code;
                 for (auto it = connections.begin(); it != connections.end();) {
                     auto& ws_ptr = *it;
-                    ws_ptr->write(asio::buffer(message), error_code);
-                    if (error_code) {
-                        std::cout << std::format( "WebSocketServer: Error writing data to client. Error: {};;; Data: {}",
-                                     error_code.message(), message);
-                        LOG_ERROR_IMPL(GetCppAppLogger(), "WebSocketServer: Error writing data to client. Error: {};;; Data: {}",
-                                     error_code.message(), message);
-                        it = connections.erase(it);
-                    } else {
-                        ++it;
+                    if (ws_ptr->is_open()) {
+                        ws_ptr->write(asio::buffer(message), error_code);
+                        if (error_code) {
+                            ws_ptr->close(boost::beast::websocket::close_code::normal);
+                            LOG_ERROR_IMPL(GetCppAppLogger(), "WebSocketServer: Error writing data to client. Error: {};;; Data: {}",
+                                         error_code.message(), message);
+                            it = connections.erase(it);
+                        } else {
+                            ++it;
+                        }
                     }
                 }
             }
@@ -68,7 +71,6 @@ namespace FluxCppCore {
             auto route_path = handler->get_route_path();
             m_routes_[route_path] = std::make_shared<RouteConnections>();
             m_routes_[route_path]->handler = handler;
-            m_routes_.size();
         }
 
         bool publish_to_route(const std::string& route, const std::string& message) {

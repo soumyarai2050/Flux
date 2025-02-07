@@ -10,11 +10,11 @@ from fastapi.encoders import jsonable_encoder
 
 # Project specific imports
 from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import (
-    create_pre_chore_test_requirements, PAIR_STRAT_ENGINE_DIR, log_book_web_client, PortfolioAlertBaseModel,
-    StratState, create_pre_chore_test_requirements_for_log_book, STRAT_EXECUTOR)
+    create_pre_chore_test_requirements, PAIR_STRAT_ENGINE_DIR, log_book_web_client, ContactAlertBaseModel,
+    PlanState, create_pre_chore_test_requirements_for_log_book, STRAT_EXECUTOR)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.ORMModel.log_book_service_msgspec_model import (
-    Severity, StratAlertBaseModel)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.phone_book_log_book import StratLogDetail
+    Severity, PlanAlertBaseModel)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.phone_book_log_book import PlanLogDetail
 from FluxPythonUtils.log_book.log_book import LogBook, LogDetail
 
 PAIR_STRAT_ENGINE_LOG: PurePath = PAIR_STRAT_ENGINE_DIR / "log"
@@ -58,7 +58,7 @@ def generate_log_entry(is_error: bool) -> str:
     return log_entry
 
 
-def generate_log(severity: Severity, file_name: str, alert: str, is_portfolio_alert: bool = True) -> str:
+def generate_log(severity: Severity, file_name: str, alert: str, is_contact_alert: bool = True) -> str:
     # Get the current UTC time
     current_utc_time = datetime.datetime.utcnow()
 
@@ -75,7 +75,7 @@ def generate_log(severity: Severity, file_name: str, alert: str, is_portfolio_al
         alert_brief: str = alert
         alert_details: str = ""
 
-    if is_portfolio_alert:
+    if is_contact_alert:
         log_entry = f"{timestamp} : {log_level} : [{file_name}] : {alert_brief}"
     else:
         log_entry = (f"{timestamp} : {log_level} : {file_name} : sending alert with severity: "
@@ -94,8 +94,8 @@ def get_log_level_from_severity(severity: Severity) -> str:
     return severity_mapping.get(severity, "")
 
 
-def test_portfolio_alert(clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
-                         expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+def test_contact_alert(clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_, expected_plan_limits_,
+                         expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
                          market_depth_basemodel_list, top_of_book_list_, buy_chore_, sell_chore_,
                          max_loop_count_per_side):
 
@@ -106,15 +106,15 @@ def test_portfolio_alert(clean_and_set_limits, leg1_leg2_symbol_list, pair_strat
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
     # making limits suitable for this test
-    expected_strat_limits_.max_open_chores_per_side = 10
-    expected_strat_limits_.residual_restriction.max_residual = 105000
+    expected_plan_limits_.max_open_chores_per_side = 10
+    expected_plan_limits_.residual_restriction.max_residual = 105000
 
-    created_pair_strat, executor_web_client = (
-        create_pre_chore_test_requirements_for_log_book(buy_symbol, sell_symbol, pair_strat_,
-                                                            expected_strat_limits_, expected_strat_status_,
+    created_pair_plan, executor_web_client = (
+        create_pre_chore_test_requirements_for_log_book(buy_symbol, sell_symbol, pair_plan_,
+                                                            expected_plan_limits_, expected_plan_status_,
                                                             symbol_overview_obj_list, last_barter_fixture_list,
                                                             market_depth_basemodel_list, top_of_book_list_,
-                                                            StratState.StratState_ACTIVE))
+                                                            PlanState.PlanState_ACTIVE))
 
     pair_start_engine_log_file: str = str(PAIR_STRAT_ENGINE_LOG / pair_start_log_file_name)
     # Generate a list of log entries
@@ -125,11 +125,11 @@ def test_portfolio_alert(clean_and_set_limits, leg1_leg2_symbol_list, pair_strat
 
     time.sleep(10)
 
-    portfolio_alert_list: List[PortfolioAlertBaseModel] = log_book_web_client.get_all_portfolio_alert_client()
+    contact_alert_list: List[ContactAlertBaseModel] = log_book_web_client.get_all_contact_alert_client()
 
     alert_list: List[str] = []
-    for portfolio_alert in portfolio_alert_list:
-        for alert in portfolio_alert.alerts:
+    for contact_alert in contact_alert_list:
+        for alert in contact_alert.alerts:
             log_level: str = get_log_level_from_severity(alert.severity)
             alert_brief: str = jsonable_encoder(alert.alert_brief, by_alias=True, exclude_none=True)
             alert_list.append(alert_brief.replace(":   :", f": {log_level} :"))
@@ -137,12 +137,12 @@ def test_portfolio_alert(clean_and_set_limits, leg1_leg2_symbol_list, pair_strat
     assert log_entries[-1].split(";;;")[0] in alert_list, (f"log_entry: {log_entries[-1]} not found in "
                                                            f"{alert_list}")
 
-    created_pair_strat, executor_web_client = (
-        create_pre_chore_test_requirements_for_log_book(buy_symbol, sell_symbol, pair_strat_,
-                                                            expected_strat_limits_, expected_strat_status_,
+    created_pair_plan, executor_web_client = (
+        create_pre_chore_test_requirements_for_log_book(buy_symbol, sell_symbol, pair_plan_,
+                                                            expected_plan_limits_, expected_plan_status_,
                                                             symbol_overview_obj_list, last_barter_fixture_list,
                                                             market_depth_basemodel_list, top_of_book_list_,
-                                                            StratState.StratState_READY))
+                                                            PlanState.PlanState_READY))
 
     pair_start_engine_log_file: str = str(PAIR_STRAT_ENGINE_LOG / pair_start_log_file_name)
 
@@ -154,8 +154,8 @@ def test_portfolio_alert(clean_and_set_limits, leg1_leg2_symbol_list, pair_strat
         # log_file.write(log_entry.encode('utf-8'))
 
 
-def test_strat_alert(clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
-                     expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+def test_plan_alert(clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_, expected_plan_limits_,
+                     expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
                      market_depth_basemodel_list, top_of_book_list_, buy_chore_, sell_chore_, max_loop_count_per_side):
 
     date = str(datetime.date.today())
@@ -165,21 +165,21 @@ def test_strat_alert(clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, e
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
     # making limits suitable for this test
-    expected_strat_limits_.max_open_chores_per_side = 10
-    expected_strat_limits_.residual_restriction.max_residual = 105000
+    expected_plan_limits_.max_open_chores_per_side = 10
+    expected_plan_limits_.residual_restriction.max_residual = 105000
 
-    created_pair_strat, executor_web_client = (
-        create_pre_chore_test_requirements_for_log_book(buy_symbol, sell_symbol, pair_strat_,
-                                                            expected_strat_limits_, expected_strat_status_,
+    created_pair_plan, executor_web_client = (
+        create_pre_chore_test_requirements_for_log_book(buy_symbol, sell_symbol, pair_plan_,
+                                                            expected_plan_limits_, expected_plan_status_,
                                                             symbol_overview_obj_list, last_barter_fixture_list,
                                                             market_depth_basemodel_list, top_of_book_list_,
-                                                            StratState.StratState_ACTIVE))
+                                                            PlanState.PlanState_ACTIVE))
 
     pair_start_engine_log_file: str = str(PAIR_STRAT_ENGINE_LOG / pair_start_log_file_name)
     # Generate a list of log entries
     file_name: str = "utility_functions.py : 6"
     alert: str = ("blocked generated BUY chore, chore px: 115.0 > allowed max_px 9.5, symbol_side_key: "
-                  "%%symbol-side=EQT_Sec_1-BUY%%")
+                  "%%symbol-side=Type2_Sec_1-BUY%%")
     log_entries = [generate_log(Severity.Severity_ERROR, file_name, alert)]
 
     # for log in log_entries:
@@ -190,11 +190,11 @@ def test_strat_alert(clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, e
 
     time.sleep(10)
 
-    strat_alert_list: List[StratAlertBaseModel] = log_book_web_client.get_all_strat_alert_client()
+    plan_alert_list: List[PlanAlertBaseModel] = log_book_web_client.get_all_plan_alert_client()
 
     alert_list: List[str] = []
-    for strat_alert in strat_alert_list:
-        for alert in strat_alert.alerts:
+    for plan_alert in plan_alert_list:
+        for alert in plan_alert.alerts:
             print(f"Alert: {alert}")
             log_level: str = get_log_level_from_severity(alert.severity)
             alert_brief: str = jsonable_encoder(alert.alert_brief, by_alias=True, exclude_none=True)
@@ -204,8 +204,8 @@ def test_strat_alert(clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, e
                                                                              f"{log_entries[-1]} not found in {alert}")
 
 
-def test_strat_alert_patch_all(clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_, expected_strat_limits_,
-                               expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+def test_plan_alert_patch_all(clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_, expected_plan_limits_,
+                               expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
                                market_depth_basemodel_list, top_of_book_list_, buy_chore_, sell_chore_,
                                max_loop_count_per_side):
 
@@ -220,43 +220,43 @@ def test_strat_alert_patch_all(clean_and_set_limits, leg1_leg2_symbol_list, pair
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
     # making limits suitable for this test
-    expected_strat_limits_.max_open_chores_per_side = 10
-    expected_strat_limits_.residual_restriction.max_residual = 105000
+    expected_plan_limits_.max_open_chores_per_side = 10
+    expected_plan_limits_.residual_restriction.max_residual = 105000
 
-    created_pair_strat, executor_web_client = (
-        create_pre_chore_test_requirements_for_log_book(buy_symbol, sell_symbol, pair_strat_,
-                                                            expected_strat_limits_, expected_strat_status_,
+    created_pair_plan, executor_web_client = (
+        create_pre_chore_test_requirements_for_log_book(buy_symbol, sell_symbol, pair_plan_,
+                                                            expected_plan_limits_, expected_plan_status_,
                                                             symbol_overview_obj_list, last_barter_fixture_list,
                                                             market_depth_basemodel_list, top_of_book_list_,
-                                                            StratState.StratState_DONE))
+                                                            PlanState.PlanState_DONE))
 
-    created_pair_strat, executor_web_client = (
-        create_pre_chore_test_requirements_for_log_book(buy_symbol, sell_symbol, pair_strat_,
-                                                            expected_strat_limits_, expected_strat_status_,
+    created_pair_plan, executor_web_client = (
+        create_pre_chore_test_requirements_for_log_book(buy_symbol, sell_symbol, pair_plan_,
+                                                            expected_plan_limits_, expected_plan_status_,
                                                             symbol_overview_obj_list, last_barter_fixture_list,
                                                             market_depth_basemodel_list, top_of_book_list_,
-                                                            StratState.StratState_READY))
+                                                            PlanState.PlanState_READY))
 
-    created_pair_strat, executor_web_client = (
-        create_pre_chore_test_requirements_for_log_book(buy_symbol, sell_symbol, pair_strat_,
-                                                            expected_strat_limits_, expected_strat_status_,
+    created_pair_plan, executor_web_client = (
+        create_pre_chore_test_requirements_for_log_book(buy_symbol, sell_symbol, pair_plan_,
+                                                            expected_plan_limits_, expected_plan_status_,
                                                             symbol_overview_obj_list, last_barter_fixture_list,
                                                             market_depth_basemodel_list, top_of_book_list_,
-                                                            StratState.StratState_ACTIVE))
+                                                            PlanState.PlanState_ACTIVE))
 
-    log_book_web_client.delete_strat_alert_client(strat_alert_id=3)
+    log_book_web_client.delete_plan_alert_client(plan_alert_id=3)
 
     log_entries: List[str] = []
 
     # Generate a list of log entries
     file_name: str = "utility_functions.py : 6"
     alert: str = ("blocked generated BUY chore, chore px: 115.0 > allowed max_px 9.5, symbol_side_key: "
-                  "%%symbol-side=EQT_Sec_1-BUY%%")
+                  "%%symbol-side=Type2_Sec_1-BUY%%")
     log_entries.append(generate_log(Severity.Severity_ERROR, file_name, alert))
 
     file_name: str = "utility_functions.py : 102"
     alert: str = ("blocked generated BUY chore, chore px: 120.0 > allowed max_px 0.5, symbol_side_key: "
-                  "%%symbol-side=CB_Sec_1-BUY%%")
+                  "%%symbol-side=Type1_Sec_1-BUY%%")
     log_entries.append(generate_log(Severity.Severity_ERROR, file_name, alert))
 
     file_name: str = "utility_functions.py : 271"

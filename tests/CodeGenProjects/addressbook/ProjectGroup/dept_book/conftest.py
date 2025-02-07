@@ -22,7 +22,7 @@ def dash_():
         "rt_dash": {
             "leg1": {
                 "sec": {
-                    "sec_id": "CB_Sec_1",
+                    "sec_id": "Type1_Sec_1",
                     "sec_id_source": "TICKER"
                 },
                 "exch_id": "EXCH1",
@@ -31,7 +31,7 @@ def dash_():
             },
             "leg2": {
                 "sec": {
-                    "sec_id": "EQT_Sec_1",
+                    "sec_id": "Type2_Sec_1",
                     "sec_id_source": "TICKER"
                 },
                 "exch_id": "EXCH2",
@@ -50,7 +50,7 @@ def bar_data_():
     current_time = DateTime.utcnow()
     bar_data_json = {
         "symbol_n_exch_id": {
-            "symbol": "CB_Sec_1",
+            "symbol": "Type1_Sec_1",
             "exch_id": "EXCH"
         },
         "start_time": current_time,

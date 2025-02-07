@@ -59,9 +59,9 @@ message SymbolSideSnapshot{
       view_layout: UI_TABLE
     },
     server_running_status_lvl: 1,
-    depending_proto_model_name: "PairStrat",
-    depending_proto_model_field_name_for_host: "PairStrat.host",
-    depending_proto_model_field_name_for_port: "PairStrat.port",
+    depending_proto_model_name: "PairPlan",
+    depending_proto_model_field_name_for_host: "PairPlan.host",
+    depending_proto_model_field_name_for_port: "PairPlan.port",
     is_read_only: true
   };
   option (FluxMsgStringLength) = 128;
@@ -83,7 +83,7 @@ message SymbolSideSnapshot{
   optional int32 chore_count = 15 [(FluxFldNoCommonKey) = true];
 }
 
-message StratStatus{
+message PlanStatus{
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
@@ -97,16 +97,16 @@ message StratStatus{
     y: 23,
     w: 7,
     h: 8,
-    alert_bubble_source: "PairStrat.strat_status.strat_alerts",
-    alert_bubble_color: "PairStrat.strat_status.strat_alerts.severity",
+    alert_bubble_source: "PairPlan.plan_status.plan_alerts",
+    alert_bubble_color: "PairPlan.plan_status.plan_alerts.severity",
     widget_ui_data: {
       view_layout: UI_TABLE
     },
     server_running_status_lvl: 2,
-    depending_proto_model_name: "PairStrat",
+    depending_proto_model_name: "PairPlan",
     depends_on_other_model_for_id: true,
-    depending_proto_model_field_name_for_host: "PairStrat.host",
-    depending_proto_model_field_name_for_port: "PairStrat.port"
+    depending_proto_model_field_name_for_host: "PairPlan.host",
+    depending_proto_model_field_name_for_port: "PairPlan.port"
   };
   option (FluxMsgExecutorOptions) = {
     IsWebSocketModel: true,
@@ -116,7 +116,7 @@ message StratStatus{
     IsRepeated: false,
   };
   option (FluxMsgJsonQuery) = {
-      QueryName: "get_strat_status_from_cache"
+      QueryName: "get_plan_status_from_cache"
   };
   option (FluxMsgJsonQuery) = {
     QueryName: "update_residuals",
@@ -134,49 +134,49 @@ message StratStatus{
     }
   };
   option (FluxMsgJsonQuery) = {
-    QueryName: "put_strat_to_snooze",
+    QueryName: "put_plan_to_snooze",
   };
   option (FluxMsgStringLength) = 128;
 
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
 
-  optional int64 total_buy_qty = 3 [(FluxFldHelp) = "sum of all buy chore qty in chore brief of strat chore snapshot"];
-  optional int64 total_sell_qty = 4 [(FluxFldHelp) = "sum of all sell chore qty in chore brief of strat chore snapshot"];
+  optional int64 total_buy_qty = 3 [(FluxFldHelp) = "sum of all buy chore qty in chore brief of plan chore snapshot"];
+  optional int64 total_sell_qty = 4 [(FluxFldHelp) = "sum of all sell chore qty in chore brief of plan chore snapshot"];
   optional int64 total_chore_qty = 5 [(FluxFldHide) = "True", (FluxFldHelp) = "sum of above total_buy_qty + total_sell_qty"];
 
-  optional int64 total_open_buy_qty = 6 [(FluxFldHelp) = "sum of all open buy chore qty: StratChoreSnapshot-s chore_brief.qty minus its filled_qty provided its state is ack or unack"];
-  optional int64 total_open_sell_qty = 7 [(FluxFldHelp) = "sum of all open sell chore qty: StratChoreSnapshot-s chore_brief.qty minus its filled_qty provided its state is ack or unack"];
+  optional int64 total_open_buy_qty = 6 [(FluxFldHelp) = "sum of all open buy chore qty: PlanChoreSnapshot-s chore_brief.qty minus its filled_qty provided its state is ack or unack"];
+  optional int64 total_open_sell_qty = 7 [(FluxFldHelp) = "sum of all open sell chore qty: PlanChoreSnapshot-s chore_brief.qty minus its filled_qty provided its state is ack or unack"];
   optional float avg_open_buy_px = 8 [(FluxFldHelp) = "total_open_buy_notional / total_open_buy_qty"];
   optional float avg_open_sell_px = 9 [(FluxFldHelp) = "total_open_sell_notional / total_open_sell_qty"];
-  optional float total_open_buy_notional = 10 [(FluxFldTitle) = "total open buy $", (FluxFldNumberFormat) = "$", (FluxFldDisplayType) = "int", (FluxFldHelp) = "sum of all StratChoreSnapshot-s [open_buy_qty X price]"];
-  optional float total_open_sell_notional = 11 [(FluxFldTitle) = "total open sell $", (FluxFldNumberFormat) = "$", (FluxFldDisplayType) = "int", (FluxFldHelp) = "sum of all StratChoreSnapshot-s [open_sell_qty X price]"];
+  optional float total_open_buy_notional = 10 [(FluxFldTitle) = "total open buy $", (FluxFldNumberFormat) = "$", (FluxFldDisplayType) = "int", (FluxFldHelp) = "sum of all PlanChoreSnapshot-s [open_buy_qty X price]"];
+  optional float total_open_sell_notional = 11 [(FluxFldTitle) = "total open sell $", (FluxFldNumberFormat) = "$", (FluxFldDisplayType) = "int", (FluxFldHelp) = "sum of all PlanChoreSnapshot-s [open_sell_qty X price]"];
   optional float total_open_exposure = 12 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "total_open_buy_notional - total_open_sell_notional"];
 
-  optional int64 total_fill_buy_qty = 13 [(FluxFldHelp) = "sum of all fill buy chore qty from StratChoreSnapshot"];
-  optional int64 total_fill_sell_qty = 14 [(FluxFldHelp) = "sum of all fill sell chore qty from StratChoreSnapshot"];
+  optional int64 total_fill_buy_qty = 13 [(FluxFldHelp) = "sum of all fill buy chore qty from PlanChoreSnapshot"];
+  optional int64 total_fill_sell_qty = 14 [(FluxFldHelp) = "sum of all fill sell chore qty from PlanChoreSnapshot"];
   optional float avg_fill_buy_px = 15 [(FluxFldHelp) = "total_fill_buy_notional / total_fill_buy_qty"];
   optional float avg_fill_sell_px = 16 [(FluxFldHelp) = "total_fill_sell_notional / total_fill_sell_qty"];
-  optional float total_fill_buy_notional = 17 [(FluxFldTitle) = "total fill buy $", (FluxFldNumberFormat) = "$", (FluxFldDisplayType) = "int", (FluxFldHelp) = "sum of all fill buy notional from StratChoreSnapshot"];
-  optional float total_fill_sell_notional = 18 [(FluxFldTitle) = "total fill sell $", (FluxFldNumberFormat) = "$", (FluxFldDisplayType) = "int", (FluxFldHelp) = "sum of all fill sell notional from StratChoreSnapshot"];
+  optional float total_fill_buy_notional = 17 [(FluxFldTitle) = "total fill buy $", (FluxFldNumberFormat) = "$", (FluxFldDisplayType) = "int", (FluxFldHelp) = "sum of all fill buy notional from PlanChoreSnapshot"];
+  optional float total_fill_sell_notional = 18 [(FluxFldTitle) = "total fill sell $", (FluxFldNumberFormat) = "$", (FluxFldDisplayType) = "int", (FluxFldHelp) = "sum of all fill sell notional from PlanChoreSnapshot"];
   optional float total_fill_exposure = 19 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "total_fill_buy_notional - total_fill_sell_notional"];
 
-  optional int64 total_cxl_buy_qty = 20 [(FluxFldHelp) = "sum of all cxl buy chore qty from StratChoreSnapshot"];
-  optional int64 total_cxl_sell_qty = 21 [(FluxFldHelp) = "sum of all cxl sell chore qty from StratChoreSnapshot"];
+  optional int64 total_cxl_buy_qty = 20 [(FluxFldHelp) = "sum of all cxl buy chore qty from PlanChoreSnapshot"];
+  optional int64 total_cxl_sell_qty = 21 [(FluxFldHelp) = "sum of all cxl sell chore qty from PlanChoreSnapshot"];
   optional float avg_cxl_buy_px = 22 [(FluxFldHelp) = "total_cxl_buy_notional / total_cxl_buy_qty"];
   optional float avg_cxl_sell_px = 23 [(FluxFldHelp) = "total_cxl_sell_notional / total_cxl_sell_qty"];
-  optional float total_cxl_buy_notional = 24 [(FluxFldTitle) = "total cxl buy $", (FluxFldNumberFormat) = "$", (FluxFldDisplayType) = "int", (FluxFldHelp) = "sum of all cxl buy notional from StratChoreSnapshot"];
-  optional float total_cxl_sell_notional = 25 [(FluxFldTitle) = "total cxl sell $", (FluxFldNumberFormat) = "$", (FluxFldDisplayType) = "int", (FluxFldHelp) = "sum of all cxl sell notional from StratChoreSnapshot"];
+  optional float total_cxl_buy_notional = 24 [(FluxFldTitle) = "total cxl buy $", (FluxFldNumberFormat) = "$", (FluxFldDisplayType) = "int", (FluxFldHelp) = "sum of all cxl buy notional from PlanChoreSnapshot"];
+  optional float total_cxl_sell_notional = 25 [(FluxFldTitle) = "total cxl sell $", (FluxFldNumberFormat) = "$", (FluxFldDisplayType) = "int", (FluxFldHelp) = "sum of all cxl sell notional from PlanChoreSnapshot"];
   optional float total_cxl_exposure = 26 [(FluxFldDisplayType) = "int", (FluxFldHelp) = "total_cxl_buy_notional - total_cxl_sell_notional"];
 
-  // these are specific to CB-EQT strat - move to derived later
+  // these are specific to CB-EQT plan - move to derived later
   optional float average_premium = 27 [(FluxFldNumberFormat) = "%"];
   optional Residual residual = 28;
   optional float balance_notional = 29 [(FluxFldTitle) = "balance $", (FluxFldNumberFormat) = "$", (FluxFldDisplayType) = "int", (FluxFldDisplayZero) = true];
-  optional int64 strat_status_update_seq_num = 30 [(FluxFldHide) = "True"];
+  optional int64 plan_status_update_seq_num = 30 [(FluxFldHide) = "True"];
   optional int64 last_update_date_time = 31 [(FluxFldValIsDateTime) = true];
 }
 
-message StratLimits{
+message PlanLimits{
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
@@ -196,10 +196,10 @@ message StratLimits{
       view_layout: UI_TABLE
     },
     server_running_status_lvl: 2,
-    depending_proto_model_name: "PairStrat",
+    depending_proto_model_name: "PairPlan",
     depends_on_other_model_for_id: true,
-    depending_proto_model_field_name_for_host: "PairStrat.host",
-    depending_proto_model_field_name_for_port: "PairStrat.port",
+    depending_proto_model_field_name_for_host: "PairPlan.host",
+    depending_proto_model_field_name_for_port: "PairPlan.port",
   };
   option (FluxMsgExecutorOptions) = {
     IsWebSocketModel: true,
@@ -210,15 +210,15 @@ message StratLimits{
     IsRepeated: false
   };
   option (FluxMsgJsonQuery) = {
-      QueryName: "get_strat_limits_from_cache"
+      QueryName: "get_plan_limits_from_cache"
   };
   option (FluxMsgStringLength) = 128;
 
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  optional int32 max_open_chores_per_side = 2 [(FluxFldValMax) = "5", (FluxFldHelp) = "max simultaneous open chores allowed per side for this strat"];
+  optional int32 max_open_chores_per_side = 2 [(FluxFldValMax) = "5", (FluxFldHelp) = "max simultaneous open chores allowed per side for this plan"];
   optional float max_single_leg_notional = 3 [(FluxFldTitle) = "max single leg $", (FluxFldNumberFormat) = "$", (FluxFldDisplayType) = "int", (FluxFldValMax) = "10000000", (FluxFldHelp) = "consumption: open+executed, max eqt notional derived applying hedge ratio"];
   optional float max_open_single_leg_notional = 4 [(FluxFldTitle) = "max open single leg $", (FluxFldNumberFormat) = "$", (FluxFldDisplayType) = "int", (FluxFldValMax) = "5000000", (FluxFldHelp) = "max open eqt notional derived applying hedge ratio"];
-  optional float max_net_filled_notional = 5  [(FluxFldTitle) = "max net filled $", (FluxFldNumberFormat) = "$", (FluxFldDisplayType) = "int", (FluxFldValMax) = "5000000", (FluxFldHelp) = "absolute [buy fill - sell fill] maximum notional allowed for this strat"];
+  optional float max_net_filled_notional = 5  [(FluxFldTitle) = "max net filled $", (FluxFldNumberFormat) = "$", (FluxFldDisplayType) = "int", (FluxFldValMax) = "5000000", (FluxFldHelp) = "absolute [buy fill - sell fill] maximum notional allowed for this plan"];
   optional float max_concentration = 6 [(FluxFldValMax) = "10", (FluxFldHelp) = "max symbol specific concentration % (w.r.t. market total for the symbol)"];
   optional float limit_up_down_volume_participation_rate = 7 [(FluxFldValMax) = "30", (FluxFldHelp) = "At limit up down: % participation allowed against open interest on specific side of outstanding queue"];
   optional CancelRate cancel_rate = 8 [(FluxFldHelp) = "Allowed cxl size (side agnostic) as % of (open + executed + cxlled) volume (per broker per symbol) within configured interval; no time window implies SOD: window-start & checking-time as end; optionally if waived_min_rolling_notional is set to > 0, the check is not applied unless waived_min_rolling_period_seconds has open + executed notional more than waived_min_rolling_notional"];
@@ -226,10 +226,10 @@ message StratLimits{
   optional OpenInterestParticipation market_depth = 10 [(FluxFldHelp) = "% participation against open interest on specific side across specified depth levels"];
   optional ResidualRestriction residual_restriction = 11 [(FluxFldHelp) = "Max executed unhedged notional"];
   optional float min_chore_notional = 12 [(FluxFldTitle) = "min chore $", (FluxFldNumberFormat) = "$", (FluxFldDisplayType) = "int", (FluxFldValMin) = "1000", (FluxFldHelp) = "chore qty times limit px must be greater than this limit"];
-  optional int32 min_chore_notional_allowance = 13 [(FluxFldTitle) = "min chore allowance $", (FluxFldNumberFormat) = "$", (FluxFldValMax) = "50000", (FluxFldHelp) = "used by StratModeRelaxed to compute random next chore opportunity min-notional from the min-notional , min-notional + this-allowance range"];
-  // same as portfolio eligible_brokers except filtered by server [strat specific symbol(s)] + user allowed to mod down
+  optional int32 min_chore_notional_allowance = 13 [(FluxFldTitle) = "min chore allowance $", (FluxFldNumberFormat) = "$", (FluxFldValMax) = "50000", (FluxFldHelp) = "used by PlanModeRelaxed to compute random next chore opportunity min-notional from the min-notional , min-notional + this-allowance range"];
+  // same as contact eligible_brokers except filtered by server [plan specific symbol(s)] + user allowed to mod down
   repeated Broker eligible_brokers = 14 [(FluxFldHelp) = "SOD / Locate / PTH limits"];
-  optional int64 strat_limits_update_seq_num = 15 [(FluxFldHide) = "True"];
+  optional int64 plan_limits_update_seq_num = 15 [(FluxFldHide) = "True"];
   required bool eqt_sod_disable = 16 [default = false, (FluxFldButton) = {
     unpressed_caption: "EQT SOD DISABLE",
     pressed_caption: "DISABLING EQT SOD",
@@ -279,9 +279,9 @@ message LastNSecMarketBarterVol{
   optional int64 last_n_sec_barter_vol = 1;
 }
 
-message HandleStratActivate{
+message HandlePlanActivate{
   option (FluxMsgJsonQuery) = {
-    QueryName: "handle_strat_activate"
+    QueryName: "handle_plan_activate"
   };
   required bool resp = 1;
 }

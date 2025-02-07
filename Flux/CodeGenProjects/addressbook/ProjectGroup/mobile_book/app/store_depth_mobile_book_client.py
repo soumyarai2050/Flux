@@ -78,7 +78,7 @@ class StoreDepthMobileBookClient(IbApiClient):
         reqId:TickerId - The ticker id. Must be a unique value. When the market
             depth data returns, it will be identified by this tag. This is
             also used when canceling the market depth
-        contract:Contact - This structure contains a description of the contract
+        contract:Contract - This structure contains a description of the contract
             for which market depth data is being requested.
         numRows:int - Specifies the count of market depth rows to display.
         isSmartDepth:bool - specifies SMART depth request

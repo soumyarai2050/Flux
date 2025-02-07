@@ -30,7 +30,7 @@ message CancelRate{
 }
 
 message ResidualRestriction{
-  required float max_residual = 1 [(FluxFldValMax) = "500000", (FluxFldHelp) = "allowed max residual: pauses strat if this breaches"];
+  required float max_residual = 1 [(FluxFldValMax) = "500000", (FluxFldHelp) = "allowed max residual: pauses plan if this breaches"];
   required int32 residual_mark_seconds = 2 [(FluxFldHelp) = "residual is only marked if this period expires but residual does not go to 0; currently restricted to minimum of 2X app refresh interval"];
 }
 

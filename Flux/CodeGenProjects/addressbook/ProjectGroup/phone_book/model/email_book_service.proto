@@ -17,7 +17,7 @@ option (FluxFileWebPageUIData) = {
 option (FluxFileDateTimeGranularity) = MILLI_SEC;
 option (FluxFileDateTimePrintTimezone) = "LOCAL";
 
-message StratLeg {
+message PlanLeg {
   option (FluxMsgStringLength) = 128;
 
   optional string exch_id = 1 [(FluxFldServerPopulate) = true];
@@ -29,8 +29,8 @@ message StratLeg {
 }
 
 // Widget-2
-// Don't rename fields - if you must , update loaded_strat_keys abbreviation accordingly
-message PairStratParams {
+// Don't rename fields - if you must , update loaded_plan_keys abbreviation accordingly
+message PairPlanParams {
   option (FluxMsgWidgetUIDataElement) = {
     x: 0,
     y: 13,
@@ -44,15 +44,15 @@ message PairStratParams {
   option (FluxMsgStringLength) = 128;
 
   // server provided via security auto complete list (if available)
-  optional StratMode strat_mode = 1 [default=StratMode_Normal];
-  optional StratType strat_type = 2 [default=Premium, (FluxFldOrmNoUpdate) = true];
-  required StratLeg strat_leg1 = 3 [(FluxFldElaborateTitle) = true, (FluxFldAutoComplete) = "sec_id~PairStrat.pair_strat_params.strat_type, sec_id_source=TICKER, fallback_broker=KOTAK, fallback_route=BR_QFII", (FluxFldHelp) = "CB Tickers"];
-  optional StratLeg strat_leg2 = 4 [(FluxFldElaborateTitle) = true, (FluxFldAutoComplete) = "sec_id:EQT_List, sec_id_source=TICKER, fallback_broker=ZERODHA, fallback_route=BR_QFII, side=server_populate", (FluxFldHelp) = "EQT Tickers"];
+  optional PlanMode plan_mode = 1 [default=PlanMode_Normal];
+  optional PlanType plan_type = 2 [default=Premium, (FluxFldOrmNoUpdate) = true];
+  required PlanLeg plan_leg1 = 3 [(FluxFldElaborateTitle) = true, (FluxFldAutoComplete) = "sec_id~PairPlan.pair_plan_params.plan_type, sec_id_source=TICKER, fallback_broker=KOTAK, fallback_route=BR_QFII", (FluxFldHelp) = "CB Tickers"];
+  optional PlanLeg plan_leg2 = 4 [(FluxFldElaborateTitle) = true, (FluxFldAutoComplete) = "sec_id:EQT_List, sec_id_source=TICKER, fallback_broker=ZERODHA, fallback_route=BR_QFII, side=server_populate", (FluxFldHelp) = "EQT Tickers"];
   optional int32 exch_response_max_seconds = 5 [default = 30, (FluxFldHide) = "True", (FluxFldServerPopulate) = true];
-  // these are specific to CB-EQT strat - move to derived later
+  // these are specific to CB-EQT plan - move to derived later
   required float common_premium = 6 [(FluxFldNumberFormat) = "%", (FluxFldDiffThreshold) = 2, (FluxFldNoCommonKey) = true];
   optional float hedge_ratio = 7 [default = 1];
-  optional string mstrat = 8;
+  optional string mplan = 8;
 }
 
 
@@ -141,7 +141,7 @@ message SystemControl {
     pressed_value_as_text: "true",
     allow_force_update: true
   }];
-  required bool pause_all_strats = 3 [default = false, (FluxFldButton) = {
+  required bool pause_all_plans = 3 [default = false, (FluxFldButton) = {
     unpressed_caption: "PAUSE ALL STRATS",
     pressed_caption: "PAUSE IN PROGRESS",
     disabled_captions: "true=PAUSE IN PROGRESS"
@@ -154,7 +154,7 @@ message SystemControl {
     allow_force_update: true,
     hide_caption: true
   }];
-  required bool load_buffer_strats = 4 [default = false, (FluxFldButton) = {
+  required bool load_buffer_plans = 4 [default = false, (FluxFldButton) = {
     unpressed_caption: "LOAD BUFFERED",
     pressed_caption: "LOAD IN PROGRESS",
     disabled_captions: "true=LOAD IN PROGRESS"
@@ -179,7 +179,7 @@ message SystemControl {
 }
 
 //Widget - 9
-message PortfolioStatus {
+message ContactStatus {
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
@@ -199,7 +199,7 @@ message PortfolioStatus {
     }
   };
   option (FluxMsgJsonQuery) = {
-    QueryName: "update_portfolio_status_by_chore_or_fill_data",
+    QueryName: "update_contact_status_by_chore_or_fill_data",
     QueryParams: {
       QueryParamName: "overall_buy_notional",
       QueryParamDataType: "float | None = None"
@@ -232,8 +232,8 @@ message PortfolioStatus {
   optional int32 open_chores = 6;
 }
 
-// Don't rename fields - if you must , update loaded_strat_keys abbreviation accordingly
-message PairStrat {
+// Don't rename fields - if you must , update loaded_plan_keys abbreviation accordingly
+message PairPlan {
     option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
@@ -247,14 +247,14 @@ message PairStrat {
     PassStoredObjToPartialUpdateAllPostCallback: True
   };
     option (FluxMsgJsonQuery) = {
-      QueryName: "get_pair_strat_sec_filter_json",
+      QueryName: "get_pair_plan_sec_filter_json",
       QueryParams: {
         QueryParamName: "security_id",
         QueryParamDataType: "str"
       }
   };
     option (FluxMsgJsonQuery) = {
-    QueryName: "get_ongoing_or_single_exact_non_ongoing_pair_strat_from_symbol_side",
+    QueryName: "get_ongoing_or_single_exact_non_ongoing_pair_plan_from_symbol_side",
     QueryParams: {
       QueryParamName: "sec_id",
       QueryParamDataType: "str"
@@ -265,8 +265,8 @@ message PairStrat {
     }
   };
     option (FluxMsgJsonQuery) = {
-    QueryName: "get_all_pair_strats_from_symbol_side",
-    AggregateVarName: "get_all_pair_strat_from_symbol_n_side",
+    QueryName: "get_all_pair_plans_from_symbol_side",
+    AggregateVarName: "get_all_pair_plan_from_symbol_n_side",
     QueryParams: {
       QueryParamName: "sec_id",
       QueryParamDataType: "str"
@@ -277,7 +277,7 @@ message PairStrat {
     }
   };
     option (FluxMsgJsonQuery) = {
-      QueryName: "filtered_notify_pair_strat_update",
+      QueryName: "filtered_notify_pair_plan_update",
       QueryParams: {
         QueryParamName: "symbols",
         QueryParamDataType: "List[str]"
@@ -285,19 +285,19 @@ message PairStrat {
       QueryType: WS
   };
   option (FluxMsgJsonQuery) = {
-    QueryName: "update_pair_strat_to_non_running_state",
+    QueryName: "update_pair_plan_to_non_running_state",
     QueryParams: {
-      QueryParamName: "pair_strat_id",
+      QueryParamName: "pair_plan_id",
       QueryParamDataType: "int"
     }
   };
   option (FluxMsgJsonQuery) = {
-    QueryName: "pause_all_active_strats"
+    QueryName: "pause_all_active_plans"
   };
   option (FluxMsgJsonQuery) = {
-    QueryName: "register_pair_strat_for_recovery",
+    QueryName: "register_pair_plan_for_recovery",
     QueryParams: {
-      QueryParamName: "pair_strat_id",
+      QueryParamName: "pair_plan_id",
       QueryParamDataType: "int"
     }
   };
@@ -306,9 +306,9 @@ message PairStrat {
       EnableNotifyAll: false,
       IsTopLvlModel: false,
       ExecutorKeyCounts: 2,
-      ExecutorKeySequence: "pair_strat_params.strat_leg1.sec.sec_id-pair_strat_params.strat_leg1.side",
-      ExecutorKeySequence: "pair_strat_params.strat_leg2.sec.sec_id-pair_strat_params.strat_leg2.side",
-      LogKeySequence: "pair_strat_params.strat_leg1.sec.sec_id-pair_strat_params.strat_leg2.sec.sec_id-id",
+      ExecutorKeySequence: "pair_plan_params.plan_leg1.sec.sec_id-pair_plan_params.plan_leg1.side",
+      ExecutorKeySequence: "pair_plan_params.plan_leg2.sec.sec_id-pair_plan_params.plan_leg2.side",
+      LogKeySequence: "pair_plan_params.plan_leg1.sec.sec_id-pair_plan_params.plan_leg2.sec.sec_id-id",
       IsRepeated: false
     };
     option (FluxMsgCRUDSharedLock) = "residual_compute_shared_lock";
@@ -320,29 +320,28 @@ message PairStrat {
     // CodeGen to handle appropriate datetime generation if the FluxFldValIsDateTime option is set
     optional int64 last_active_date_time = 2 [(FluxFldHide) = "True", (FluxFldValSortWeight) = 2, (FluxFldServerPopulate) = true, (FluxFldValIsDateTime) = true];
     optional int32  frequency = 3 [(FluxFldHide) = "True", (FluxFldValSortWeight) = 1, (FluxFldServerPopulate) = true];
-    required PairStratParams pair_strat_params = 4 [(FluxFldAutoComplete) = "mstrat:Mstrat_List"];
-    optional int64 pair_strat_params_update_seq_num = 7 [(FluxFldHide) = "True"];
+    required PairPlanParams pair_plan_params = 4 [(FluxFldAutoComplete) = "mplan:Mplan_List"];
+    optional int64 pair_plan_params_update_seq_num = 7 [(FluxFldHide) = "True"];
     optional string host = 8 [(FluxFldHide) = "True"];
     optional int64 port = 9 [(FluxFldHide) = "True"];
     optional int64 cpp_port = 10 [(FluxFldHide) = "True"];
-    optional int64 cpp_ws_port = 11 [(FluxFldHide) = "True"];
-    optional int64 server_ready_state = 12 [default=0, (FluxFldHide) = "True", (FluxFldServerPopulate) = true, (FluxFldServerReadyStatus) = true];
+    optional int64 server_ready_state = 11 [default=0, (FluxFldHide) = "True", (FluxFldServerPopulate) = true, (FluxFldServerReadyStatus) = true];
     // UI can only move from READY, PAUSED, ERROR states to ACTIVE or from ACTIVE to PAUSED - this triggers auto-save {UI sends model update to server}
-    required StratState strat_state = 13 [default = StratState_SNOOZED, (FluxFldButton) = {
+    required PlanState plan_state = 12 [default = PlanState_SNOOZED, (FluxFldButton) = {
       unpressed_caption: "Activate",
       pressed_caption: "Pause",
-      disabled_captions: "StratState_DONE=Done",
+      disabled_captions: "PlanState_DONE=Done",
       button_type: BUTTON_TYPE_RECTANGLE,
       button_size: BUTTON_SIZE_MEDIUM,
-      value_color_map: "StratState_READY=INFO,StratState_ACTIVE=SUCCESS,StratState_PAUSED=WARNING,StratState_ERROR=ERROR,StratState_DONE=DEBUG"
-      action: "flux_trigger_strat",
-      pressed_value_as_text: "StratState_ACTIVE",
+      value_color_map: "PlanState_READY=INFO,PlanState_ACTIVE=SUCCESS,PlanState_PAUSED=WARNING,PlanState_ERROR=ERROR,PlanState_DONE=DEBUG"
+      action: "flux_trigger_plan",
+      pressed_value_as_text: "PlanState_ACTIVE",
       allow_force_update: true
     }];
 }
 
 // Widget - 1
-message StratCollection {
+message PlanCollection {
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
@@ -369,16 +368,16 @@ message StratCollection {
     default_rows_per_page: 50
   };
   option (FluxMsgJsonQuery) = {
-    QueryName: "unload_strat_from_strat_id",
+    QueryName: "unload_plan_from_plan_id",
     QueryParams: {
-      QueryParamName: "strat_id",
+      QueryParamName: "plan_id",
       QueryParamDataType: "int"
     }
   };
   option (FluxMsgJsonQuery) = {
-    QueryName: "reload_strat_from_strat_id",
+    QueryName: "reload_plan_from_plan_id",
     QueryParams: {
-      QueryParamName: "strat_id",
+      QueryParamName: "plan_id",
       QueryParamDataType: "int"
     }
   };
@@ -388,15 +387,15 @@ message StratCollection {
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   // leg1_sec_id-leg2_sec_id-leg1_side-uid
-  repeated string loaded_strat_keys = 2 [(FluxFldAbbreviated) = "Id:PairStrat.id^Tickers:PairStrat.pair_strat_params.strat_leg2.sec.sec_id-PairStrat.pair_strat_params.strat_leg1.sec.sec_id^Side:PairStrat.pair_strat_params.strat_leg1.side^Company:PairStrat.pair_strat_params.strat_leg2.company-PairStrat.pair_strat_params.strat_leg1.company^Strat State:PairStrat.strat_state^Strat Notional:StratView.balance_notional^P Limit:PairStrat.pair_strat_params.common_premium^P Avg:StratView.average_premium^P Mkt:StratView.market_premium^Fill Buy $:StratView.total_fill_buy_notional^Fill Sell $:StratView.total_fill_sell_notional^Unload:StratView.unload_strat^Recycle:StratView.recycle_strat", (FluxFldAlertBubbleSource) = "StratView.strat_alert_count", (FluxFldAlertBubbleColor) = "StratView.strat_alert_aggregated_severity"];
+  repeated string loaded_plan_keys = 2 [(FluxFldAbbreviated) = "Id:PairPlan.id^Tickers:PairPlan.pair_plan_params.plan_leg2.sec.sec_id-PairPlan.pair_plan_params.plan_leg1.sec.sec_id^Side:PairPlan.pair_plan_params.plan_leg1.side^Company:PairPlan.pair_plan_params.plan_leg2.company-PairPlan.pair_plan_params.plan_leg1.company^Plan State:PairPlan.plan_state^Plan Notional:PlanView.balance_notional^P Limit:PairPlan.pair_plan_params.common_premium^P Avg:PlanView.average_premium^P Mkt:PlanView.market_premium^Fill Buy $:PlanView.total_fill_buy_notional^Fill Sell $:PlanView.total_fill_sell_notional^Unload:PlanView.unload_plan^Recycle:PlanView.recycle_plan", (FluxFldAlertBubbleSource) = "PlanView.plan_alert_count", (FluxFldAlertBubbleColor) = "PlanView.plan_alert_aggregated_severity"];
   //show 9 most recently used (weight:2) & 9 most frequently used (weight: 1)
   //Sort by type, merge by weight, FILTER OUT loaded
-  repeated string buffered_strat_keys = 3 [(FluxFldAbbreviated) = "Tickers/Side:PairStrat.pair_strat_params.strat_leg2.sec.sec_id-PairStrat.pair_strat_params.strat_leg1.sec.sec_id-PairStrat.pair_strat_params.strat_leg1.side-PairStrat.id"];
+  repeated string buffered_plan_keys = 3 [(FluxFldAbbreviated) = "Tickers/Side:PairPlan.pair_plan_params.plan_leg2.sec.sec_id-PairPlan.pair_plan_params.plan_leg1.sec.sec_id-PairPlan.pair_plan_params.plan_leg1.side-PairPlan.id"];
 }
 
-message DismissFilterPortfolioLimitBroker{
+message DismissFilterContactLimitBroker{
   option (FluxMsgJsonQuery) = {
-    QueryName: "get_dismiss_filter_portfolio_limit_brokers",
+    QueryName: "get_dismiss_filter_contact_limit_brokers",
     QueryParams: {
       QueryParamName: "security_id1",
       QueryParamDataType: "str"
@@ -606,15 +605,15 @@ message SymbolNExchange{
   optional string group = 3;
 }
 
-message OngoingStratsSymbolNExchange{
+message OngoingPlansSymbolNExchange{
   option (FluxMsgJsonQuery) = {
-      QueryName: "get_ongoing_strats_symbol_n_exch"
+      QueryName: "get_ongoing_plans_symbol_n_exch"
   };
   repeated SymbolNExchange symbol_n_exchange = 1;
 }
 
-message PairStratList {
-  repeated PairStrat pair_strat = 1;
+message PairPlanList {
+  repeated PairPlan pair_plan = 1;
 }
 
 message LogSimulatorReloadConfig{

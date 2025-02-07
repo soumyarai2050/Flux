@@ -19,38 +19,38 @@ custom_log_lvls = config_yaml_dict.get("custom_logger_lvls")
 add_logging_levels([] if custom_log_lvls is None else custom_log_lvls)
 
 
-def unload_strat(strat_id: int, force: bool = False):
-    pair_strat_obj: PairStratBaseModel = email_book_service_http_client.get_pair_strat_client(strat_id)
-    active_strat: bool = pair_strat_obj.strat_state not in [StratState.StratState_SNOOZED, StratState.StratState_READY]
-    # pause all active strat and force it to DONE
-    if pair_strat_obj.strat_state == StratState.StratState_ACTIVE:
+def unload_plan(plan_id: int, force: bool = False):
+    pair_plan_obj: PairPlanBaseModel = email_book_service_http_client.get_pair_plan_client(plan_id)
+    active_plan: bool = pair_plan_obj.plan_state not in [PlanState.PlanState_SNOOZED, PlanState.PlanState_READY]
+    # pause all active plan and force it to DONE
+    if pair_plan_obj.plan_state == PlanState.PlanState_ACTIVE:
         if not force:
-            err_str_ = ("unload_strat failed, cannot unload strat in ACTIVE state. Force trigger script to unload "
-                        "running strat")
+            err_str_ = ("unload_plan failed, cannot unload plan in ACTIVE state. Force trigger script to unload "
+                        "running plan")
             logging.error(err_str_)
             raise Exception(err_str_)
 
-        pair_strat_obj = email_book_service_http_client.patch_pair_strat_client(
-            {'_id': strat_id, 'strat_state': StratState.StratState_PAUSED})
+        pair_plan_obj = email_book_service_http_client.patch_pair_plan_client(
+            {'_id': plan_id, 'plan_state': PlanState.PlanState_PAUSED})
         time.sleep(5)
 
-    if pair_strat_obj.strat_state in [StratState.StratState_PAUSED, StratState.StratState_ERROR]:
-        pair_strat_obj = email_book_service_http_client.patch_pair_strat_client(
-            {'_id': strat_id, 'strat_state': StratState.StratState_DONE})
+    if pair_plan_obj.plan_state in [PlanState.PlanState_PAUSED, PlanState.PlanState_ERROR]:
+        pair_plan_obj = email_book_service_http_client.patch_pair_plan_client(
+            {'_id': plan_id, 'plan_state': PlanState.PlanState_DONE})
         time.sleep(5)
 
-    email_book_service_http_client.unload_strat_from_strat_id_query_client(strat_id)
+    email_book_service_http_client.unload_plan_from_plan_id_query_client(plan_id)
     market: Market = Market(MarketID.IN)
     if not market.is_test_run and not market.is_sanity_test_run:
-        # remove strat lock files if no chores found
-        delete_strat_lock_files_if_no_barters(strat_id, active_strat)
+        # remove plan lock files if no chores found
+        delete_plan_lock_files_if_no_barters(plan_id, active_plan)
 
 
-def recycle_strat(strat_id: int, force: bool = False):
-    unload_strat(strat_id, force)
+def recycle_plan(plan_id: int, force: bool = False):
+    unload_plan(plan_id, force)
     time.sleep(2)
-    email_book_service_http_client.reload_strat_from_strat_id_query_client(strat_id)
+    email_book_service_http_client.reload_plan_from_plan_id_query_client(plan_id)
 
 
-def delete_strat_lock_files_if_no_barters(strat_id: int, active_strat: bool = True):
+def delete_plan_lock_files_if_no_barters(plan_id: int, active_plan: bool = True):
     pass

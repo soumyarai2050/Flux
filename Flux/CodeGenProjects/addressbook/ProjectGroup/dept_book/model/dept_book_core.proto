@@ -19,8 +19,8 @@ enum CBCreditSpreadSource {
     CBCreditSpreadSource_EXTERNAL = 3;
 }
 
-enum StratType {
-    StratType_UNSPECIFIED = 1;
+enum PlanType {
+    PlanType_UNSPECIFIED = 1;
 }
 
 message PxRange {
@@ -72,7 +72,7 @@ message DashLeg {
     optional float vwap = 5 [(FluxFldServerPopulate) = true];
     optional float vwap_change = 6 [(FluxFldServerPopulate) = true, (FluxFldNumberFormat) = "%", (FluxFldHelp) = "Against yesterday close px"];
     optional float market_notional = 7 [(FluxFldServerPopulate) = true, (FluxFldDisplayType) = "int", (FluxFldTitle) = "market $", (FluxFldNumberFormat) = "$", (FluxFldHelp) = "market current total last barter notional"];
-    optional float consumed_notional = 8 [(FluxFldServerPopulate) = true, (FluxFldDisplayType) = "int", (FluxFldTitle) = "consumed $", (FluxFldNumberFormat) = "$", (FluxFldHelp) = "all strat total leg filled notional"];
+    optional float consumed_notional = 8 [(FluxFldServerPopulate) = true, (FluxFldDisplayType) = "int", (FluxFldTitle) = "consumed $", (FluxFldNumberFormat) = "$", (FluxFldHelp) = "all plan total leg filled notional"];
 }
 
 message InventorySummary {
@@ -86,7 +86,7 @@ message InventoryRequest {
 
     required string id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
     optional string requestor = 2;
-    optional StratType strat_type = 3;
+    optional PlanType plan_type = 3;
     optional InventorySource inventory_source = 4;
     optional int64 update_time = 5 [(FluxFldValIsDateTime) = true, (FluxFldServerPopulate) = true];
     optional int64 qty = 6 [(FluxFldServerPopulate) = true];
@@ -99,7 +99,7 @@ message InventoryCSVRequest {
   option (FluxMsgStringLength) = 128;
 
     optional string user = 1;
-    optional string strategy = 2;
+    optional string planegy = 2;
     required string ric = 3;
     optional int64 update_time = 4 [(FluxFldValIsDateTime) = true];
     optional int64 quantity = 5 [(FluxFldServerPopulate) = true];

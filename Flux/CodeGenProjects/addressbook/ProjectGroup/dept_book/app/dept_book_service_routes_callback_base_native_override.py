@@ -9,7 +9,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.generated.FastApi.d
     DeptBookServiceRoutesCallback)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.app.dept_book_service_helper import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
-    get_new_portfolio_limits)
+    get_new_contact_limits)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.app.aggregate import (
     get_vwap_projection_from_bar_data_agg_pipeline, get_vwap_n_vwap_change_projection_from_bar_data_agg_pipeline,
     get_vwap_change_projection_from_bar_data_agg_pipeline, get_premium_projection_from_bar_data_agg_pipeline,
@@ -21,8 +21,8 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.service_state 
 
 
 class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallback):
-    underlying_read_portfolio_limits_http_json_dict: Callable[..., Any] | None = None
-    underlying_create_portfolio_limits_http: Callable[..., Any] | None = None
+    underlying_read_contact_limits_http_json_dict: Callable[..., Any] | None = None
+    underlying_create_contact_limits_http: Callable[..., Any] | None = None
     underlying_read_dash_filters_collection_http_json_dict: Callable[..., Any] | None = None
     underlying_create_dash_filters_collection_http: Callable[..., Any] | None = None
     underlying_read_dash_collection_by_id_http: Callable[..., Any] | None = None
@@ -44,12 +44,12 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
     @classmethod
     def initialize_underlying_http_callables(cls):
         from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.generated.FastApi.dept_book_service_http_msgspec_routes import (
-            underlying_read_portfolio_limits_http_json_dict, underlying_create_portfolio_limits_http,
+            underlying_read_contact_limits_http_json_dict, underlying_create_contact_limits_http,
             underlying_read_dash_filters_collection_http_json_dict, underlying_create_dash_filters_collection_http,
             underlying_read_dash_collection_by_id_http, underlying_create_dash_collection_http,
             underlying_update_dash_collection_http, underlying_read_bar_data_http)
-        cls.underlying_read_portfolio_limits_http_json_dict = underlying_read_portfolio_limits_http_json_dict
-        cls.underlying_create_portfolio_limits_http = underlying_create_portfolio_limits_http
+        cls.underlying_read_contact_limits_http_json_dict = underlying_read_contact_limits_http_json_dict
+        cls.underlying_create_contact_limits_http = underlying_create_contact_limits_http
         cls.underlying_read_dash_filters_collection_http_json_dict = underlying_read_dash_filters_collection_http_json_dict
         cls.underlying_create_dash_filters_collection_http = underlying_create_dash_filters_collection_http
         cls.underlying_read_dash_collection_by_id_http = underlying_read_dash_collection_by_id_http
@@ -61,7 +61,7 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
     def _app_launch_pre_thread_func(self):
         """
         sleep wait till engine is up
-        TODO LAZY: we should invoke _apply_checks_n_alert on all active pair strats at startup/re-start
+        TODO LAZY: we should invoke _apply_checks_n_alert on all active pair plans at startup/re-start
         """
 
         error_prefix = "_app_launch_pre_thread_func: "
@@ -93,7 +93,7 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
                                 self.service_up = future.result()
                                 should_sleep = False
                             except Exception as e:
-                                err_str_ = (f"_check_and_create_portfolio_status_and_chore_n_portfolio_limits "
+                                err_str_ = (f"_check_and_create_contact_status_and_chore_n_contact_limits "
                                             f"failed with exception: {e}")
                                 logging.exception(err_str_)
                                 raise Exception(err_str_)
@@ -136,7 +136,7 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
     @staticmethod
     async def _check_and_create_start_up_models() -> bool:
         try:
-            await DeptBookServiceRoutesCallbackBaseNativeOverride._check_n_create_portfolio_limits()
+            await DeptBookServiceRoutesCallbackBaseNativeOverride._check_n_create_contact_limits()
             await DeptBookServiceRoutesCallbackBaseNativeOverride._check_n_create_dash_filters_collection()
         except Exception as e:
             logging.exception(f"_check_and_create_start_up_models failed, exception: {e}")
@@ -145,14 +145,14 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
             return True
 
     @staticmethod
-    async def _check_n_create_portfolio_limits():
-        async with PortfolioLimits.reentrant_lock:
-            portfolio_limits_list: List[Dict] = (
-                await DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_read_portfolio_limits_http_json_dict())
-            if 0 == len(portfolio_limits_list):  # no portfolio_limits set yet, create one
-                portfolio_limits = get_new_portfolio_limits()
-                await DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_create_portfolio_limits_http(
-                    portfolio_limits, return_obj_copy=False)
+    async def _check_n_create_contact_limits():
+        async with ContactLimits.reentrant_lock:
+            contact_limits_list: List[Dict] = (
+                await DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_read_contact_limits_http_json_dict())
+            if 0 == len(contact_limits_list):  # no contact_limits set yet, create one
+                contact_limits = get_new_contact_limits()
+                await DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_create_contact_limits_http(
+                    contact_limits, return_obj_copy=False)
 
     @staticmethod
     async def _check_n_create_dash_filters_collection():

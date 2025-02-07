@@ -57,9 +57,9 @@ sample_cum_aggregate_pipeline = {"aggregate": [
 ]}
 
 
-def get_ongoing_or_all_pair_strats_by_sec_id(sec_id: str, side: str):
+def get_ongoing_or_all_pair_plans_by_sec_id(sec_id: str, side: str):
     """
-    pipeline to return all pair_strats that are ongoing or if no ongoing is found then return all pair_strats with
+    pipeline to return all pair_plans that are ongoing or if no ongoing is found then return all pair_plans with
     sec_id of any leg as passed value
     """
     agg_pipeline = {
@@ -70,11 +70,11 @@ def get_ongoing_or_all_pair_strats_by_sec_id(sec_id: str, side: str):
                         {
                             '$and': [
                                 {
-                                    'pair_strat_params.strat_leg1.sec.sec_id': {
+                                    'pair_plan_params.plan_leg1.sec.sec_id': {
                                         '$eq': sec_id
                                     }
                                 }, {
-                                    'pair_strat_params.strat_leg1.side': {
+                                    'pair_plan_params.plan_leg1.side': {
                                         '$eq': side
                                     }
                                 }
@@ -82,11 +82,11 @@ def get_ongoing_or_all_pair_strats_by_sec_id(sec_id: str, side: str):
                         }, {
                             '$and': [
                                 {
-                                    'pair_strat_params.strat_leg2.sec.sec_id': {
+                                    'pair_plan_params.plan_leg2.sec.sec_id': {
                                         '$eq': sec_id
                                     }
                                 }, {
-                                    'pair_strat_params.strat_leg2.side': {
+                                    'pair_plan_params.plan_leg2.side': {
                                         '$eq': side
                                     }
                                 }
@@ -101,16 +101,16 @@ def get_ongoing_or_all_pair_strats_by_sec_id(sec_id: str, side: str):
                             '$match': {
                                 '$or': [
                                     {
-                                        'strat_state': {
-                                            '$eq': 'StratState_ACTIVE'
+                                        'plan_state': {
+                                            '$eq': 'PlanState_ACTIVE'
                                         }
                                     }, {
-                                        'strat_state': {
-                                            '$eq': 'StratState_PAUSED'
+                                        'plan_state': {
+                                            '$eq': 'PlanState_PAUSED'
                                         }
                                     }, {
-                                        'strat_state': {
-                                            '$eq': 'StratState_ERROR'
+                                        'plan_state': {
+                                            '$eq': 'PlanState_ERROR'
                                         }
                                     }
                                 ]
@@ -157,7 +157,7 @@ def get_ongoing_or_all_pair_strats_by_sec_id(sec_id: str, side: str):
     return agg_pipeline
 
 
-def get_ongoing_pair_strat_filter(security_id: str | None = None):
+def get_ongoing_pair_plan_filter(security_id: str | None = None):
     agg_pipeline = {"aggregate": [
         {
             "$match": {}
@@ -166,18 +166,18 @@ def get_ongoing_pair_strat_filter(security_id: str | None = None):
             "$match": {
                 "$or": [
                     {
-                        "strat_state": {
-                            "$eq": "StratState_ACTIVE"
+                        "plan_state": {
+                            "$eq": "PlanState_ACTIVE"
                         }
                     },
                     {
-                        "strat_state": {
-                            "$eq": "StratState_PAUSED"
+                        "plan_state": {
+                            "$eq": "PlanState_PAUSED"
                         }
                     },
                     {
-                        "strat_state": {
-                            "$eq": "StratState_ERROR"
+                        "plan_state": {
+                            "$eq": "PlanState_ERROR"
                         }
                     }
                 ]
@@ -189,12 +189,12 @@ def get_ongoing_pair_strat_filter(security_id: str | None = None):
         agg_pipeline["aggregate"][0]["$match"] = {
             "$or": [
                 {
-                    "pair_strat_params.strat_leg1.sec.sec_id": {
+                    "pair_plan_params.plan_leg1.sec.sec_id": {
                         "$eq": security_id
                     }
                 },
                 {
-                    "pair_strat_params.strat_leg2.sec.sec_id": {
+                    "pair_plan_params.plan_leg2.sec.sec_id": {
                         "$eq": security_id
                     }
                 }
@@ -204,7 +204,7 @@ def get_ongoing_pair_strat_filter(security_id: str | None = None):
     return agg_pipeline
 
 
-def get_all_pair_strat_from_symbol_n_side(sec_id: str, side: Side):
+def get_all_pair_plan_from_symbol_n_side(sec_id: str, side: Side):
     agg_pipeline = {
         "aggregate": [
             {
@@ -215,12 +215,12 @@ def get_all_pair_strat_from_symbol_n_side(sec_id: str, side: Side):
                                 {
                                     "$and": [
                                         {
-                                            "pair_strat_params.strat_leg1.sec.sec_id": {
+                                            "pair_plan_params.plan_leg1.sec.sec_id": {
                                                 "$eq": sec_id
                                             }
                                         },
                                         {
-                                            "pair_strat_params.strat_leg1.side": {
+                                            "pair_plan_params.plan_leg1.side": {
                                                 "$eq": side
                                             }
                                         }
@@ -229,12 +229,12 @@ def get_all_pair_strat_from_symbol_n_side(sec_id: str, side: Side):
                                 {
                                     "$and": [
                                         {
-                                            "pair_strat_params.strat_leg2.sec.sec_id": {
+                                            "pair_plan_params.plan_leg2.sec.sec_id": {
                                                 "$eq": sec_id
                                             }
                                         },
                                         {
-                                            "pair_strat_params.strat_leg2.side": {
+                                            "pair_plan_params.plan_leg2.side": {
                                                 "$eq": side
                                             }
                                         }
@@ -261,5 +261,5 @@ def get_all_pair_strat_from_symbol_n_side(sec_id: str, side: Side):
     # without_symbol_agg_query = get_last_n_sec_chores_by_event(None, 5, "OE_NEW")
     # print(without_symbol_agg_query)
 
-    # print(get_limited_portfolio_alerts_obj(5))
-    # print(get_limited_strat_alerts_obj(5))
+    # print(get_limited_contact_alerts_obj(5))
+    # print(get_limited_plan_alerts_obj(5))

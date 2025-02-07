@@ -20,7 +20,7 @@ from FluxPythonUtils.scripts.utility_functions import parse_to_int
 
 class StreetBookPlugin(BaseProtoPlugin):
     """
-    Plugin to generate strat executor helping scripts
+    Plugin to generate plan executor helping scripts
     """
 
     def __init__(self, base_dir_path: str):
@@ -36,8 +36,8 @@ class StreetBookPlugin(BaseProtoPlugin):
         self.file_name_cap_camel_cased = ""
         self.model_file_name = ""
         self.ws_data_manager_file_name: str = ""
-        self.base_strat_cache_file_name: str = ""
-        self.base_strat_cache_class_name: str = ""
+        self.base_plan_cache_file_name: str = ""
+        self.base_plan_cache_class_name: str = ""
         self.base_bartering_cache_file_name: str = ""
         self.base_bartering_cache_class_name: str = ""
         self.key_handler_file_name: str = ""
@@ -91,8 +91,8 @@ class StreetBookPlugin(BaseProtoPlugin):
     def set_data_members(self, file: protogen.File):
         file_name_snake_cased = convert_camel_case_to_specific_case(self.file_name)
         self.ws_data_manager_file_name = f"{file_name_snake_cased}_ws_data_manager"
-        self.base_strat_cache_file_name = f"{file_name_snake_cased}_base_strat_cache"
-        self.base_strat_cache_class_name = f"{self.file_name_cap_camel_cased}BaseStratCache"
+        self.base_plan_cache_file_name = f"{file_name_snake_cased}_base_plan_cache"
+        self.base_plan_cache_class_name = f"{self.file_name_cap_camel_cased}BasePlanCache"
         self.base_bartering_cache_file_name = f"{file_name_snake_cased}_base_bartering_cache"
         self.base_bartering_cache_class_name = f"{self.file_name_cap_camel_cased}BaseBarteringCache"
         self.model_file_name = f"{file_name_snake_cased}_beanie_model"
@@ -146,7 +146,7 @@ class StreetBookPlugin(BaseProtoPlugin):
         content_str += "\t\t\t\tkwargs = {'"+f"{message_name_snake_cased}_"+"': "+f"{message_name_snake_cased}_"+"}\n"
         content_str += f"\t\t\t\tself.underlying_handle_{message_name_snake_cased}_ws(**kwargs)\n"
         content_str += f"\t\t\t\tif self.{message_name_snake_cased}_ws_get_all_cont.notify:\n"
-        content_str += f"\t\t\t\t\tself.strat_cache.notify_all()\n"
+        content_str += f"\t\t\t\t\tself.plan_cache.notify_all()\n"
         content_str += f'\t\t\t\tlogging.info(f"Added '+f'{message_name_snake_cased}' + \
                        ' with id: {'+f'{message_name_snake_cased}'+'_.id}")\n'
         content_str += f"\t\t\telse:\n"
@@ -164,7 +164,7 @@ class StreetBookPlugin(BaseProtoPlugin):
         content_str += "\t\t\t\t\tkwargs = {'" + f"{message_name_snake_cased}_" + "': " + f"{message_name_snake_cased}_" + "}\n"
         content_str += f"\t\t\t\t\tself.underlying_handle_{message_name_snake_cased}_ws(**kwargs)\n"
         content_str += f"\t\t\t\t\tif self.{message_name_snake_cased}_ws_get_all_cont.notify:\n"
-        content_str += f"\t\t\t\t\t\tself.strat_cache.notify_all()\n"
+        content_str += f"\t\t\t\t\t\tself.plan_cache.notify_all()\n"
         content_str += '\t\t\t\t\tlogging.debug(f"updated ' + f'{message_name_snake_cased}' + \
                        ' with id: {' + f'{message_name_snake_cased}' + '_.id}")\n'
         content_str += f"\t\t\t\telse:\n"
@@ -183,12 +183,12 @@ class StreetBookPlugin(BaseProtoPlugin):
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         content_str = f'\tdef handle_{message_name_snake_cased}_get_all_ws(self, ' \
                       f'{message_name_snake_cased}_: {message_name}BaseModel | {message_name}, **kwargs):\n'
-        content_str += "\t\twith self.strat_cache.re_ent_lock:\n"
-        content_str += f"\t\t\tself.strat_cache.set_{message_name_snake_cased}({message_name_snake_cased}_)\n"
+        content_str += "\t\twith self.plan_cache.re_ent_lock:\n"
+        content_str += f"\t\t\tself.plan_cache.set_{message_name_snake_cased}({message_name_snake_cased}_)\n"
         content_str += '\t\tkwargs = {' + f'"{message_name_snake_cased}_"' + f': {message_name_snake_cased}_' + '}\n'
         content_str += f"\t\tself.underlying_handle_{message_name_snake_cased}_ws(**kwargs)\n"
         content_str += f"\t\tif self.{message_name_snake_cased}_ws_get_all_cont.notify:\n"
-        content_str += f"\t\t\tself.strat_cache.notify_semaphore.release()\n"
+        content_str += f"\t\t\tself.plan_cache.notify_semaphore.release()\n"
         content_str += (f'\t\tlogging.debug(f"Updated {message_name_snake_cased} cache;;;'
                         f'{message_name_snake_cased}_: ') + '{' + f'{message_name_snake_cased}' + '_}' + '")\n'
         return content_str
@@ -206,9 +206,9 @@ class StreetBookPlugin(BaseProtoPlugin):
         content_str += "from threading import Thread\n"
         content_str += "from typing import Callable, Type\n\n"
         content_str += "# Project imports\n"
-        base_strat_cache_import_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR",
-                                                                     self.base_strat_cache_file_name)
-        content_str += f"from {base_strat_cache_import_path} import {self.base_strat_cache_class_name}\n"
+        base_plan_cache_import_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR",
+                                                                     self.base_plan_cache_file_name)
+        content_str += f"from {base_plan_cache_import_path} import {self.base_plan_cache_class_name}\n"
         base_bartering_cache_import_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR",
                                                                        self.base_bartering_cache_file_name)
         content_str += \
@@ -232,9 +232,9 @@ class StreetBookPlugin(BaseProtoPlugin):
         file_name_camel_cased = convert_to_capitalized_camel_case(file_name)
         file_name_camel_cased = file_name_camel_cased[0].upper() + file_name_camel_cased[1:]
         content_str += f"class {file_name_camel_cased}DataManager({file_name_camel_cased}WSClient):\n"
-        content_str += f"\tdef __init__(self, host: str, port: int, strat_cache: {self.base_strat_cache_class_name}):\n"
+        content_str += f"\tdef __init__(self, host: str, port: int, plan_cache: {self.base_plan_cache_class_name}):\n"
         content_str += f"\t\tsuper().__init__(host, port)\n"
-        content_str += "\t\tself.strat_cache = strat_cache\n"
+        content_str += "\t\tself.plan_cache = plan_cache\n"
         content_str += \
             f"\t\tself.bartering_cache: {self.base_bartering_cache_class_name} = {self.base_bartering_cache_class_name}()\n"
         for message in self.ws_manager_required_messages:
@@ -331,7 +331,7 @@ class StreetBookPlugin(BaseProtoPlugin):
             output_str += "\t\treturn key\n\n"
         return output_str
 
-    def _strat_cache_get_model_interface_content(self, message: protogen.Message,
+    def _plan_cache_get_model_interface_content(self, message: protogen.Message,
                                                  is_repeated: bool,
                                                  cache_as_dict_with_key_field: str | None = None) -> str:
         message_name = message.proto.name
@@ -371,7 +371,7 @@ class StreetBookPlugin(BaseProtoPlugin):
                            f"{key_field_name})\n\n")
         return output_str
 
-    def _strat_cache_set_model_interface_content(self, message: protogen.Message, is_repeated: bool,
+    def _plan_cache_set_model_interface_content(self, message: protogen.Message, is_repeated: bool,
                                                  cache_as_dict_with_key_field: str | None = None) -> str:
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
@@ -401,7 +401,7 @@ class StreetBookPlugin(BaseProtoPlugin):
         output_str += f"\t\treturn self._{message_name_snake_cased}{extra_str}_update_date_time\n\n"
         return output_str
 
-    def base_strat_cache_file_content(self, file: protogen.File) -> str:
+    def base_plan_cache_file_content(self, file: protogen.File) -> str:
         output_str = "# primary imports\n"
         output_str += "from threading import RLock, Lock, Semaphore\n"
         output_str += "from typing import Dict, Tuple, Optional, ClassVar, List\n"
@@ -411,9 +411,9 @@ class StreetBookPlugin(BaseProtoPlugin):
         model_file_name = f"{self.orm_model_dir_name}.{file_name}_model_imports"
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", model_file_name)
         output_str += f'from {model_file_path} import *\n\n\n'
-        output_str += f"class {self.base_strat_cache_class_name}:\n"
-        output_str += f"\tstrat_cache_dict: Dict[str, '{self.base_strat_cache_class_name}'] = dict()\n"
-        output_str += "\tadd_to_strat_cache_rlock: RLock = RLock()\n\n"
+        output_str += f"class {self.base_plan_cache_class_name}:\n"
+        output_str += f"\tplan_cache_dict: Dict[str, '{self.base_plan_cache_class_name}'] = dict()\n"
+        output_str += "\tadd_to_plan_cache_rlock: RLock = RLock()\n\n"
         output_str += "\tdef __init__(self):\n"
         output_str += "\t\tself.re_ent_lock: RLock = RLock()\n"
         output_str += "\t\tself.notify_semaphore = Semaphore()\n"
@@ -450,53 +450,53 @@ class StreetBookPlugin(BaseProtoPlugin):
 
         output_str += "\t@classmethod\n"
         output_str += "\tdef notify_all(cls):\n"
-        output_str += "\t\tfor strat_cache in cls.strat_cache_dict.values():\n"
-        output_str += "\t\t\tstrat_cache.notify_semaphore.release()\n\n"
+        output_str += "\t\tfor plan_cache in cls.plan_cache_dict.values():\n"
+        output_str += "\t\t\tplan_cache.notify_semaphore.release()\n\n"
         output_str += "\t@classmethod\n"
-        output_str += f"\tdef add(cls, key: str, strat_cache_: '{self.base_strat_cache_class_name}'):\n"
-        output_str += "\t\twith cls.add_to_strat_cache_rlock:\n"
-        output_str += "\t\t\tstrat_cache: cls | None = cls.strat_cache_dict.get(key)\n"
-        output_str += "\t\t\tif strat_cache is None:\n"
-        output_str += "\t\t\t\tcls.strat_cache_dict[key] = strat_cache_\n"
+        output_str += f"\tdef add(cls, key: str, plan_cache_: '{self.base_plan_cache_class_name}'):\n"
+        output_str += "\t\twith cls.add_to_plan_cache_rlock:\n"
+        output_str += "\t\t\tplan_cache: cls | None = cls.plan_cache_dict.get(key)\n"
+        output_str += "\t\t\tif plan_cache is None:\n"
+        output_str += "\t\t\t\tcls.plan_cache_dict[key] = plan_cache_\n"
         output_str += "\t\t\telse:\n"
-        output_str += '\t\t\t\terror_str: str = f"Existing StratCache found for add StratCache request, key: {key};;; ' \
-                      'existing_cache: {strat_cache}, strat_cache send to add: {strat_cache_}"\n'
+        output_str += '\t\t\t\terror_str: str = f"Existing PlanCache found for add PlanCache request, key: {key};;; ' \
+                      'existing_cache: {plan_cache}, plan_cache send to add: {plan_cache_}"\n'
         output_str += "\t\t\t\tlogging.error(error_str)\n"
         output_str += "\t\t\t\traise Exception(error_str)\n\n"
         output_str += "\t@classmethod\n"
         output_str += "\tdef pop(cls, key1: str, key2: str):\n"
-        output_str += "\t\twith cls.add_to_strat_cache_rlock:\n"
-        output_str += "\t\t\tcls.strat_cache_dict.pop(key1)\n"
-        output_str += "\t\t\tcls.strat_cache_dict.pop(key2)\n\n"
+        output_str += "\t\twith cls.add_to_plan_cache_rlock:\n"
+        output_str += "\t\t\tcls.plan_cache_dict.pop(key1)\n"
+        output_str += "\t\t\tcls.plan_cache_dict.pop(key2)\n\n"
         output_str += "\t@classmethod\n"
         output_str += \
-            f"\tdef get(cls, key1: str, key2: str | None = None) -> Optional['{self.base_strat_cache_class_name}']:\n"
-        output_str += f"\t\tstrat_cache: cls = cls.strat_cache_dict.get(key1)\n"
-        output_str += f"\t\tif strat_cache is None and key2 is not None:\n"
-        output_str += f"\t\t\tstrat_cache: cls = cls.strat_cache_dict.get(key2)\n"
-        output_str += f"\t\treturn strat_cache\n\n"
+            f"\tdef get(cls, key1: str, key2: str | None = None) -> Optional['{self.base_plan_cache_class_name}']:\n"
+        output_str += f"\t\tplan_cache: cls = cls.plan_cache_dict.get(key1)\n"
+        output_str += f"\t\tif plan_cache is None and key2 is not None:\n"
+        output_str += f"\t\t\tplan_cache: cls = cls.plan_cache_dict.get(key2)\n"
+        output_str += f"\t\treturn plan_cache\n\n"
         output_str += f"\t@classmethod\n"
-        output_str += f"\tdef guaranteed_get_by_key(cls, key1, key2) -> '{self.base_strat_cache_class_name}':\n"
-        output_str += f"\t\tstrat_cache: cls = cls.get(key1)\n"
-        output_str += f"\t\tif strat_cache is None:\n"
-        output_str += f"\t\t\twith cls.add_to_strat_cache_rlock:\n"
-        output_str += f"\t\t\t\tstrat_cache2: cls = cls.get(key2)\n"
-        output_str += f"\t\t\t\tif strat_cache2 is None:  # key2 is guaranteed None, key1 maybe None\n"
-        output_str += f"\t\t\t\t\tstrat_cache1: cls = cls.get(key1)\n"
-        output_str += f"\t\t\t\t\tif strat_cache1 is None:  # DCLP (maybe apply SM-DCLP)  " \
+        output_str += f"\tdef guaranteed_get_by_key(cls, key1, key2) -> '{self.base_plan_cache_class_name}':\n"
+        output_str += f"\t\tplan_cache: cls = cls.get(key1)\n"
+        output_str += f"\t\tif plan_cache is None:\n"
+        output_str += f"\t\t\twith cls.add_to_plan_cache_rlock:\n"
+        output_str += f"\t\t\t\tplan_cache2: cls = cls.get(key2)\n"
+        output_str += f"\t\t\t\tif plan_cache2 is None:  # key2 is guaranteed None, key1 maybe None\n"
+        output_str += f"\t\t\t\t\tplan_cache1: cls = cls.get(key1)\n"
+        output_str += f"\t\t\t\t\tif plan_cache1 is None:  # DCLP (maybe apply SM-DCLP)  " \
                       f"# both key-1 and key-1 are none - add\n"
-        output_str += f"\t\t\t\t\t\tstrat_cache = cls()\n"
-        output_str += f"\t\t\t\t\t\tcls.add(key1, strat_cache)\n"
-        output_str += f"\t\t\t\t\t\tcls.add(key2, strat_cache)\n"
-        output_str += '\t\t\t\t\t\tlogging.info(f"Created strat_cache for key: {key1} {key2}")\n'
+        output_str += f"\t\t\t\t\t\tplan_cache = cls()\n"
+        output_str += f"\t\t\t\t\t\tcls.add(key1, plan_cache)\n"
+        output_str += f"\t\t\t\t\t\tcls.add(key2, plan_cache)\n"
+        output_str += '\t\t\t\t\t\tlogging.info(f"Created plan_cache for key: {key1} {key2}")\n'
         output_str += '\t\t\t\t\telse:\n'
-        output_str += '\t\t\t\t\t\tcls.add(key2, strat_cache1)  # add key1 found cache to key2\n'
+        output_str += '\t\t\t\t\t\tcls.add(key2, plan_cache1)  # add key1 found cache to key2\n'
         output_str += '\t\t\t\telse:  # key2 is has cache, key1 maybe None\n'
-        output_str += '\t\t\t\t\tstrat_cache1: cls = cls.get(key1)\n'
-        output_str += '\t\t\t\t\tif strat_cache1 is None:\n'
-        output_str += '\t\t\t\t\t\tcls.add(key1, strat_cache2) # add key2 found cache to key1\n'
-        output_str += '\t\t\t\t\t\tstrat_cache = strat_cache2\n'
-        output_str += '\t\treturn strat_cache\n\n'
+        output_str += '\t\t\t\t\tplan_cache1: cls = cls.get(key1)\n'
+        output_str += '\t\t\t\t\tif plan_cache1 is None:\n'
+        output_str += '\t\t\t\t\t\tcls.add(key1, plan_cache2) # add key2 found cache to key1\n'
+        output_str += '\t\t\t\t\t\tplan_cache = plan_cache2\n'
+        output_str += '\t\treturn plan_cache\n\n'
 
         for message in self.ws_manager_required_messages:
 
@@ -508,9 +508,9 @@ class StreetBookPlugin(BaseProtoPlugin):
                 option_value_dict.get(StreetBookPlugin.executor_option_cache_as_dict_with_key_field))
 
             if message not in self.ws_manager_required_top_lvl_messages:
-                output_str += self._strat_cache_get_model_interface_content(message, is_repeated,
+                output_str += self._plan_cache_get_model_interface_content(message, is_repeated,
                                                                             cache_as_dict_with_key_field)
-                output_str += self._strat_cache_set_model_interface_content(message, is_repeated,
+                output_str += self._plan_cache_set_model_interface_content(message, is_repeated,
                                                                             cache_as_dict_with_key_field)
 
         return output_str
@@ -556,9 +556,9 @@ class StreetBookPlugin(BaseProtoPlugin):
                             message, StreetBookPlugin.flux_msg_executor_options)
                     is_repeated = option_value_dict.get(StreetBookPlugin.executor_option_is_repeated_field)
 
-                    output_str += self._strat_cache_get_model_interface_content(message, is_repeated)
+                    output_str += self._plan_cache_get_model_interface_content(message, is_repeated)
                     # output_str += self._bartering_cache_set_model_interface_content(message, is_repeated)
-                    output_str += self._strat_cache_set_model_interface_content(message, is_repeated)
+                    output_str += self._plan_cache_set_model_interface_content(message, is_repeated)
         else:
             output_str += "\t\tpass\n"
         return output_str
@@ -594,7 +594,7 @@ class StreetBookPlugin(BaseProtoPlugin):
 
         output_dict: Dict[str, str] = {
             self.ws_data_manager_file_name + f".py": self.ws_data_manager_file_content(file),
-            self.base_strat_cache_file_name + f".py": self.base_strat_cache_file_content(file),
+            self.base_plan_cache_file_name + f".py": self.base_plan_cache_file_content(file),
             self.key_handler_file_name + ".py": self.keys_handler_file_content(file),
             self.base_bartering_cache_file_name + ".py": self.base_bartering_cache_file_content(file)
         }

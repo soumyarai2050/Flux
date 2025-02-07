@@ -182,24 +182,24 @@ message Position {
   required PositionType type = 3;
   // available position size for consumption
   required int64 available_size = 4;
-  // position committed but not consumed (portfolio to strat; day-2: maybe strat to open chore)
+  // position committed but not consumed (contact to plan; day-2: maybe plan to open chore)
   required int64 allocated_size = 5;
-  // strat's nett consumption prior to call of load from source + any external consumption
+  // plan's nett consumption prior to call of load from source + any external consumption
   optional int64 consumed_size = 6 [(FluxFldZeroAsNone) = true];
-  // strat's long consumption prior to call of load from source + any external consumption
+  // plan's long consumption prior to call of load from source + any external consumption
   optional int64 bot_size = 7 [(FluxFldZeroAsNone) = true];
-  // strat's short consumption prior to call of load from source + any external consumption
+  // plan's short consumption prior to call of load from source + any external consumption
   optional int64 sld_size = 8 [(FluxFldZeroAsNone) = true];
-  // internal position consumption in current strat run [excluding any recovery consumptions]
-  optional int64 strat_consumed_size = 9;
+  // internal position consumption in current plan run [excluding any recovery consumptions]
+  optional int64 plan_consumed_size = 9;
   // cost of using this position type
   optional float acquire_cost = 10;
   // un-avoidable charge due to this position type (irrespective of use / no-use)
   optional float incurred_cost = 11;
   // T+1 and onwards recurring daily cost
   optional float carry_cost = 12;
-  // Micro Strategy (Sub Strat within a strat)
-  optional string mstrat = 13 [(FluxFldFilterEnable) = true];
+  // Micro Planegy (Sub Plan within a plan)
+  optional string mplan = 13 [(FluxFldFilterEnable) = true];
   optional int32 priority = 14 [default = 10, (FluxFldHelp) = "default priority: 10, chores to respect specified priority (lower value is higher priority), duplicates allowed"];
   optional float premium_percentage = 15 [default = 2, (FluxFldNumberFormat) = "%"];
   optional float benchmark_rate = 16 [(FluxFldNumberFormat) = "%", (FluxFldHide) = "True", (FluxFldHelp) = "obfr"];
@@ -239,7 +239,7 @@ message Broker {
   optional int32 bkr_priority = 5 [default = 10, (FluxFldHelp) = "default priority 10, embedded position priorities are relative within broker priority level group; chores respect specified priority (lower value is higher priority), duplicates allowed"];
 }
 
-// Don't rename fields - if you must , update loaded_strat_keys abbreviation accordingly
+// Don't rename fields - if you must , update loaded_plan_keys abbreviation accordingly
 message Security {
   option (FluxMsgStringLength) = 128;
 

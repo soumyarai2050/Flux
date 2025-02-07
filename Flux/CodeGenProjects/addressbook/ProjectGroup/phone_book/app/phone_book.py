@@ -7,7 +7,7 @@ from typing import List, Dict
 from threading import Lock
 
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
-    compress_eligible_broker_positions, except_n_log_alert, get_portfolio_limits, create_portfolio_limits,
+    compress_eligible_broker_positions, except_n_log_alert, get_contact_limits, create_contact_limits,
     get_internal_web_client, email_book_service_http_client)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.model_extensions import (
     BrokerUtil, SecPositionUtil)
@@ -52,87 +52,87 @@ def merge_eligible_brokers_by_pos_type(source_brokers: List[BrokerBaseModel],
 
 
 @except_n_log_alert()
-def put_portfolio_limits_eligible_brokers(portfolio_limits: PortfolioLimitsBaseModel,
+def put_contact_limits_eligible_brokers(contact_limits: ContactLimitsBaseModel,
                                           new_eligible_brokers: List[BrokerBaseModel],
                                           dest_broker_dict: Dict[str, BrokerBaseModel], pos_type: PositionType):
-    if portfolio_limits.eligible_brokers is not None:
-        dest_broker_dict = retain_broker_and_position_disable(portfolio_limits.eligible_brokers, dest_broker_dict)
+    if contact_limits.eligible_brokers is not None:
+        dest_broker_dict = retain_broker_and_position_disable(contact_limits.eligible_brokers, dest_broker_dict)
         # merge new and old (new_eligible_brokers are all inside dest_broker_dict)
-        merged_eligible_broker_list = merge_eligible_brokers_by_pos_type(portfolio_limits.eligible_brokers,
+        merged_eligible_broker_list = merge_eligible_brokers_by_pos_type(contact_limits.eligible_brokers,
                                                                          dest_broker_dict, pos_type)
     else:
-        # since current portfolio_limits.eligible_brokers is None
+        # since current contact_limits.eligible_brokers is None
         merged_eligible_broker_list = new_eligible_brokers
 
     compressed_eligible_broker_list = compress_eligible_broker_positions(merged_eligible_broker_list)
-    portfolio_limits_updated: PortfolioLimitsBaseModel = PortfolioLimitsBaseModel.from_kwargs(
-        _id=portfolio_limits.id, max_open_baskets=portfolio_limits.max_open_baskets,
-        max_open_notional_per_side=portfolio_limits.max_open_notional_per_side,
-        max_gross_n_open_notional=portfolio_limits.max_gross_n_open_notional,
-        rolling_max_chore_count=portfolio_limits.rolling_max_chore_count,
-        rolling_max_reject_count=portfolio_limits.rolling_max_reject_count,
+    contact_limits_updated: ContactLimitsBaseModel = ContactLimitsBaseModel.from_kwargs(
+        _id=contact_limits.id, max_open_baskets=contact_limits.max_open_baskets,
+        max_open_notional_per_side=contact_limits.max_open_notional_per_side,
+        max_gross_n_open_notional=contact_limits.max_gross_n_open_notional,
+        rolling_max_chore_count=contact_limits.rolling_max_chore_count,
+        rolling_max_reject_count=contact_limits.rolling_max_reject_count,
         eligible_brokers=compressed_eligible_broker_list)  # new_eligible_brokers are all inside dest_broker_dict
     web_client_internal = get_internal_web_client()
-    web_client_internal.put_portfolio_limits_client(portfolio_limits_updated)
+    web_client_internal.put_contact_limits_client(contact_limits_updated)
 
 
 @except_n_log_alert()
-def create_or_update_portfolio_limits_eligible_brokers(eligible_brokers: List[BrokerBaseModel],
+def create_or_update_contact_limits_eligible_brokers(eligible_brokers: List[BrokerBaseModel],
                                                        dest_broker_dict: Dict[str, BrokerBaseModel],
                                                        pos_type: PositionType):
-    portfolio_limits: PortfolioLimitsBaseModel | None = get_portfolio_limits()
-    if portfolio_limits is None:  # no portfolio limits set yet - create one
-        create_portfolio_limits(eligible_brokers)
+    contact_limits: ContactLimitsBaseModel | None = get_contact_limits()
+    if contact_limits is None:  # no contact limits set yet - create one
+        create_contact_limits(eligible_brokers)
     else:
-        put_portfolio_limits_eligible_brokers(portfolio_limits, eligible_brokers, dest_broker_dict, pos_type)
+        put_contact_limits_eligible_brokers(contact_limits, eligible_brokers, dest_broker_dict, pos_type)
 
 
-def update_portfolio_alert(alert_brief: str, alert_details: str | None = None,
+def update_contact_alert(alert_brief: str, alert_details: str | None = None,
                            impacted_chores: List[ChoreBrief] | None = None,
                            severity: Severity = Severity.Severity_ERROR):
     logging.error(f"{alert_brief};;;{alert_details}")
 
 
-update_portfolio_status_lock: Lock = Lock()
+update_contact_status_lock: Lock = Lock()
 
 
 # deprecated
 @except_n_log_alert()
-def update_strat_alert_by_sec_and_side(sec_id: str, side: Side, alert_brief: str, alert_details: str | None = None,
+def update_plan_alert_by_sec_and_side(sec_id: str, side: Side, alert_brief: str, alert_details: str | None = None,
                                        severity: Severity = Severity.Severity_ERROR):
     pass
 
 
 @except_n_log_alert()
-def block_active_strat_with_restricted_security(sec_id_list: List[str]):
+def block_active_plan_with_restricted_security(sec_id_list: List[str]):
     pass
 
 
-def get_matching_pair_strat_and_sec_id_source(eqt_ticker: str | None, cb_ticker: str | None):
+def get_matching_pair_plan_and_sec_id_source(eqt_ticker: str | None, cb_ticker: str | None):
     sec_id_source: str | None = None
-    matching_pair_strat: PairStratBaseModel | None = None
-    pair_strat_list: List[PairStratBaseModel] = email_book_service_http_client.get_all_pair_strat_client()
-    if pair_strat_list:
-        for pair_strat in pair_strat_list:
+    matching_pair_plan: PairPlanBaseModel | None = None
+    pair_plan_list: List[PairPlanBaseModel] = email_book_service_http_client.get_all_pair_plan_client()
+    if pair_plan_list:
+        for pair_plan in pair_plan_list:
             if cb_ticker is not None and eqt_ticker is not None:
-                if cb_ticker == pair_strat.pair_strat_params.strat_leg1.sec.sec_id and (
-                        eqt_ticker == pair_strat.pair_strat_params.strat_leg2.sec.sec_id):
+                if cb_ticker == pair_plan.pair_plan_params.plan_leg1.sec.sec_id and (
+                        eqt_ticker == pair_plan.pair_plan_params.plan_leg2.sec.sec_id):
                     sec_id_source = "CB-EQT-pair"
-                    matching_pair_strat = pair_strat
+                    matching_pair_plan = pair_plan
                     break
             if cb_ticker is not None:
-                if cb_ticker == pair_strat.pair_strat_params.strat_leg1.sec.sec_id:
+                if cb_ticker == pair_plan.pair_plan_params.plan_leg1.sec.sec_id:
                     sec_id_source = "CB"
-                    matching_pair_strat = pair_strat
+                    matching_pair_plan = pair_plan
                     break
                 else:
                     continue
             elif eqt_ticker is not None:
-                if eqt_ticker == pair_strat.pair_strat_params.strat_leg2.sec.sec_id:
+                if eqt_ticker == pair_plan.pair_plan_params.plan_leg2.sec.sec_id:
                     sec_id_source = "EQT"
-                    matching_pair_strat = pair_strat
+                    matching_pair_plan = pair_plan
                     break
                 else:
                     continue
             # else is not required both were sent None default return will handle this
-    return sec_id_source, matching_pair_strat
+    return sec_id_source, matching_pair_plan

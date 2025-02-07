@@ -106,7 +106,7 @@ def get_chore_of_matching_suffix_chore_id_filter(chore_id_suffix: str, sort: int
     return agg_pipeline
 
 
-def get_strat_brief_from_symbol(security_id: str):
+def get_plan_brief_from_symbol(security_id: str):
     return {"aggregate": [
         {
             "$match": {
@@ -171,8 +171,13 @@ def get_last_n_sec_first_n_last_barter(symbol: str, last_n_sec: float):
         {
             "$group": {
                 "_id": None,
-                "first": {"$first": "$$ROOT"},
-                "last": {"$last": "$$ROOT"}
+                "docs": {"$push": "$$ROOT"}
+            }
+        },
+        {
+            "$project": {
+                "first": {"$arrayElemAt": ["$docs", 0]},
+                "last": {"$arrayElemAt": ["$docs", -1]}
             }
         }
     ]}

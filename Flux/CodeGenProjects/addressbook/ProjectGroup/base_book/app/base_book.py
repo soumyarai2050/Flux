@@ -6,7 +6,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.bartering_link 
 from FluxPythonUtils.scripts.service import Service
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_bartering_data_manager import BaseBarteringDataManager
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_strat_cache import BaseStratCache
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_plan_cache import BasePlanCache
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.chore_check import (
     ChoreControl, initialize_chore_control)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.markets.market import Market, MarketID
@@ -16,7 +16,7 @@ from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_post_book_n_basket_
 from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_basket_book_core_msgspec_model import *
 
 
-BaseStratCacheType = TypeVar('BaseStratCacheType', bound=BaseStratCache)
+BasePlanCacheType = TypeVar('BasePlanCacheType', bound=BasePlanCache)
 BaseBarteringDataManagerType = TypeVar('BaseBarteringDataManagerType', bound=BaseBarteringDataManager)
 
 
@@ -24,10 +24,10 @@ class BaseBook(Service):
     bartering_link: ClassVar[BarteringLinkBase] = get_bartering_link()
     asyncio_loop: asyncio.AbstractEventLoop
 
-    def __init__(self, bartering_data_manager_: BaseBarteringDataManagerType, strat_cache: BaseStratCacheType):
+    def __init__(self, bartering_data_manager_: BaseBarteringDataManagerType, plan_cache: BasePlanCacheType):
         super().__init__()
         self.bartering_data_manager = bartering_data_manager_
-        self.strat_cache = strat_cache
+        self.plan_cache = plan_cache
         self.market = Market(MarketID.IN)
         self.usd_fx = None
         self.internal_new_chore_count: int = 0
@@ -46,16 +46,16 @@ class BaseBook(Service):
         if self.usd_fx:
             return self.usd_fx
         else:
-            if not self.strat_cache.usd_fx_symbol_overview:
-                self.strat_cache.usd_fx_symbol_overview = \
-                    BaseStratCache.fx_symbol_overview_dict[BaseStratCache.usd_fx_symbol]
-            if self.strat_cache.usd_fx_symbol_overview and self.strat_cache.usd_fx_symbol_overview.closing_px and \
-                    (not math.isclose(self.strat_cache.usd_fx_symbol_overview.closing_px, 0)):
-                self.usd_fx = self.strat_cache.usd_fx_symbol_overview.closing_px
+            if not self.plan_cache.usd_fx_symbol_overview:
+                self.plan_cache.usd_fx_symbol_overview = \
+                    BasePlanCache.fx_symbol_overview_dict[BasePlanCache.usd_fx_symbol]
+            if self.plan_cache.usd_fx_symbol_overview and self.plan_cache.usd_fx_symbol_overview.closing_px and \
+                    (not math.isclose(self.plan_cache.usd_fx_symbol_overview.closing_px, 0)):
+                self.usd_fx = self.plan_cache.usd_fx_symbol_overview.closing_px
                 return self.usd_fx
             else:
                 logging.error(f"unable to find fx_symbol_overview for "
-                              f"{BaseStratCache.usd_fx_symbol=};;; {self.strat_cache=}")
+                              f"{BasePlanCache.usd_fx_symbol=};;; {self.plan_cache=}")
                 return None
 
     @classmethod
@@ -95,7 +95,7 @@ class BaseBook(Service):
 
         # block for task to finish [run as coroutine helps enable http call via asyncio, other threads use freed CPU]
         try:
-            # ignore 2nd param: _id_or_err_str - logged in call and not used in strat executor yet
+            # ignore 2nd param: _id_or_err_str - logged in call and not used in plan executor yet
             chore_sent_status, _id_or_err_str = future.result()
             return chore_sent_status, _id_or_err_str
         except Exception as e:
@@ -104,7 +104,7 @@ class BaseBook(Service):
             return False
 
     def process_cxl_request(self, force_cxl_only: bool = False):
-        cancel_chores_and_date_tuple = self.strat_cache.get_cancel_chore(self._cancel_chores_update_date_time)
+        cancel_chores_and_date_tuple = self.plan_cache.get_cancel_chore(self._cancel_chores_update_date_time)
         if cancel_chores_and_date_tuple is not None:
             cancel_chores, self._cancel_chores_update_date_time = cancel_chores_and_date_tuple
             if cancel_chores is not None:

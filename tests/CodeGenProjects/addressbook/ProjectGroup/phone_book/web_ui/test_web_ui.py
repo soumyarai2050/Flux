@@ -9,7 +9,7 @@ from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.web_ui_mod
                                                                                              SearchType)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_msgspec_routes import TopOfBookBaseModel, QuoteOptional
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.email_book_service_http_msgspec_routes import (
-    PairStratBaseModel, StratState, UILayoutBaseModel, WidgetUIDataElementOptional)
+    PairPlanBaseModel, PlanState, UILayoutBaseModel, WidgetUIDataElementOptional)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_client import \
     StreetBookServiceHttpClient
 
@@ -18,94 +18,94 @@ pytestmark = pytest.mark.parametrize("driver_type", [DriverType.CHROME])
 # pytestmark = pytest.mark.parametrize("driver_type", [DriverType.EDGE])
 
 
-def test_create_pair_strat(clean_and_set_limits, driver_type, web_project):
-    # Test the creation of pair_strat and validate it
-    # You may need to interact with the web project to verify that pair_strat is created successfully
+def test_create_pair_plan(clean_and_set_limits, driver_type, web_project):
+    # Test the creation of pair_plan and validate it
+    # You may need to interact with the web project to verify that pair_plan is created successfully
     # For example:
-    #   - Locate the pair_strat widget
+    #   - Locate the pair_plan widget
     #   - Verify relevant information or behavior
     pass
 
 
-def test_update_pair_strat_n_create_n_activate_strat_limits_using_tree_view(clean_and_set_limits, driver_type,
+def test_update_pair_plan_n_create_n_activate_plan_limits_using_tree_view(clean_and_set_limits, driver_type,
                                                                             web_project, driver: WebDriver,
-                                                                            pair_strat_edit: Dict,
-                                                                            pair_strat: Dict, strat_limits: Dict):
+                                                                            pair_plan_edit: Dict,
+                                                                            pair_plan: Dict, plan_limits: Dict):
 
-    pair_strat_params_widget = driver.find_element(By.ID, WidgetName.PairStratParams.value)
-    strat_limits_widget = driver.find_element(By.ID, WidgetName.StratLimits.value)
-    strat_collection_widget = driver.find_element(By.ID, WidgetName.StratCollection.value)
-    click_button_with_name(widget=strat_collection_widget, button_name="Edit")
+    pair_plan_params_widget = driver.find_element(By.ID, WidgetName.PairPlanParams.value)
+    plan_limits_widget = driver.find_element(By.ID, WidgetName.PlanLimits.value)
+    plan_collection_widget = driver.find_element(By.ID, WidgetName.PlanCollection.value)
+    click_button_with_name(widget=plan_collection_widget, button_name="Edit")
 
     fields = {
-        "pair_strat_params.common_premium": pair_strat_edit["pair_strat_params"]["common_premium"],
-        "pair_strat_params.hedge_ratio": pair_strat_edit["pair_strat_params"]["hedge_ratio"]
+        "pair_plan_params.common_premium": pair_plan_edit["pair_plan_params"]["common_premium"],
+        "pair_plan_params.hedge_ratio": pair_plan_edit["pair_plan_params"]["hedge_ratio"]
     }
     for xpath, value in fields.items():
         name = xpath.split('.')[-1]
-        set_tree_input_field(driver=driver, widget=pair_strat_params_widget, xpath=xpath, name=name, value=value)
-    click_save_n_click_confirm_save_btn(driver=driver, widget=strat_collection_widget)
+        set_tree_input_field(driver=driver, widget=pair_plan_params_widget, xpath=xpath, name=name, value=value)
+    click_save_n_click_confirm_save_btn(driver=driver, widget=plan_collection_widget)
 
-    scroll_into_view(driver=driver, element=strat_collection_widget)
-    click_edit_n_switch_layout(driver=driver, widget=strat_limits_widget, layout=Layout.TREE)
-    create_strat_limits_using_tree_view(driver=driver, strat_limits=strat_limits, layout=Layout.TREE)
+    scroll_into_view(driver=driver, element=plan_collection_widget)
+    click_edit_n_switch_layout(driver=driver, widget=plan_limits_widget, layout=Layout.TREE)
+    create_plan_limits_using_tree_view(driver=driver, plan_limits=plan_limits, layout=Layout.TREE)
 
-    click_save_n_click_confirm_save_btn(driver=driver, widget=strat_collection_widget)
-    click_id_fld_inside_strat_collection(strat_collection_widget)
-    activate_strat(widget=strat_collection_widget, driver=driver)
+    click_save_n_click_confirm_save_btn(driver=driver, widget=plan_collection_widget)
+    click_id_fld_inside_plan_collection(plan_collection_widget)
+    activate_plan(widget=plan_collection_widget, driver=driver)
 
-    # validate_strat_limits
-    switch_layout(widget=strat_limits_widget, layout=Layout.TREE)
-    click_button_with_name(widget=strat_collection_widget, button_name="Edit")
-    validate_strat_limits(widget=strat_limits_widget, strat_limits=strat_limits, layout=Layout.TREE)
+    # validate_plan_limits
+    switch_layout(widget=plan_limits_widget, layout=Layout.TREE)
+    click_button_with_name(widget=plan_collection_widget, button_name="Edit")
+    validate_plan_limits(widget=plan_limits_widget, plan_limits=plan_limits, layout=Layout.TREE)
 
-def test_update_strat_limits_n_activate_using_table_view(clean_and_set_limits, driver_type, web_project, driver,
-                                                             pair_strat: Dict, strat_limits: Dict):
-    strat_limits_widget = driver.find_element(By.ID, WidgetName.StratLimits.value)
-    strat_collection_widget = driver.find_element(By.ID, WidgetName.StratCollection.value)
-    click_button_with_name(widget=strat_limits_widget, button_name="Edit")
+def test_update_plan_limits_n_activate_using_table_view(clean_and_set_limits, driver_type, web_project, driver,
+                                                             pair_plan: Dict, plan_limits: Dict):
+    plan_limits_widget = driver.find_element(By.ID, WidgetName.PlanLimits.value)
+    plan_collection_widget = driver.find_element(By.ID, WidgetName.PlanCollection.value)
+    click_button_with_name(widget=plan_limits_widget, button_name="Edit")
 
     fields_to_update = {
-        "max_open_chores_per_side": strat_limits["max_open_chores_per_side"],
-        "max_single_leg_notional": strat_limits["max_single_leg_notional"],
-        "max_open_single_leg_notional": strat_limits["max_open_single_leg_notional"],
-        "max_net_filled_notional": strat_limits["max_net_filled_notional"],
-        "max_concentration": strat_limits["max_concentration"],
-        "min_chore_notional": strat_limits["min_chore_notional"],
-        "limit_up_down_volume_participation_rate": strat_limits["limit_up_down_volume_participation_rate"],
-        "cancel_rate.max_cancel_rate": strat_limits["cancel_rate"]["max_cancel_rate"],
-        "cancel_rate.applicable_period_seconds": strat_limits["cancel_rate"]["applicable_period_seconds"],
-        "cancel_rate.waived_initial_chores": strat_limits["cancel_rate"]["waived_initial_chores"],
-        "cancel_rate.waived_min_rolling_notional": strat_limits["cancel_rate"]["waived_min_rolling_notional"],
-        "cancel_rate.waived_min_rolling_period_seconds": strat_limits["cancel_rate"][
+        "max_open_chores_per_side": plan_limits["max_open_chores_per_side"],
+        "max_single_leg_notional": plan_limits["max_single_leg_notional"],
+        "max_open_single_leg_notional": plan_limits["max_open_single_leg_notional"],
+        "max_net_filled_notional": plan_limits["max_net_filled_notional"],
+        "max_concentration": plan_limits["max_concentration"],
+        "min_chore_notional": plan_limits["min_chore_notional"],
+        "limit_up_down_volume_participation_rate": plan_limits["limit_up_down_volume_participation_rate"],
+        "cancel_rate.max_cancel_rate": plan_limits["cancel_rate"]["max_cancel_rate"],
+        "cancel_rate.applicable_period_seconds": plan_limits["cancel_rate"]["applicable_period_seconds"],
+        "cancel_rate.waived_initial_chores": plan_limits["cancel_rate"]["waived_initial_chores"],
+        "cancel_rate.waived_min_rolling_notional": plan_limits["cancel_rate"]["waived_min_rolling_notional"],
+        "cancel_rate.waived_min_rolling_period_seconds": plan_limits["cancel_rate"][
             "waived_min_rolling_period_seconds"],
-        "market_barter_volume_participation.max_participation_rate": strat_limits["market_barter_volume_participation"]
+        "market_barter_volume_participation.max_participation_rate": plan_limits["market_barter_volume_participation"]
         ["max_participation_rate"],
         "market_barter_volume_participation.applicable_period_seconds":
-            strat_limits["market_barter_volume_participation"]["applicable_period_seconds"],
-        "market_barter_volume_participation.min_allowed_notional": strat_limits["market_barter_volume_participation"][
+            plan_limits["market_barter_volume_participation"]["applicable_period_seconds"],
+        "market_barter_volume_participation.min_allowed_notional": plan_limits["market_barter_volume_participation"][
             "min_allowed_notional"],
-        "market_depth.participation_rate": strat_limits["market_depth"]["participation_rate"],
-        "market_depth.depth_levels": strat_limits["market_depth"]["depth_levels"],
-        "residual_restriction.max_residual": strat_limits["residual_restriction"]["max_residual"],
-        "residual_restriction.residual_mark_seconds": strat_limits["residual_restriction"]["residual_mark_seconds"]
+        "market_depth.participation_rate": plan_limits["market_depth"]["participation_rate"],
+        "market_depth.depth_levels": plan_limits["market_depth"]["depth_levels"],
+        "residual_restriction.max_residual": plan_limits["residual_restriction"]["max_residual"],
+        "residual_restriction.residual_mark_seconds": plan_limits["residual_restriction"]["residual_mark_seconds"]
     }
 
     for xpath, value in fields_to_update.items():
-        set_table_input_field(driver=driver, widget=strat_limits_widget, xpath=xpath, value=str(value))
+        set_table_input_field(driver=driver, widget=plan_limits_widget, xpath=xpath, value=str(value))
 
-    click_save_n_click_confirm_save_btn(driver, strat_limits_widget)
+    click_save_n_click_confirm_save_btn(driver, plan_limits_widget)
 
-    click_id_fld_inside_strat_collection(strat_collection_widget)
-    activate_strat(widget=strat_collection_widget, driver=driver)
-    click_button_with_name(widget=strat_limits_widget, button_name="Edit")
-    validate_strat_limits(widget=strat_limits_widget, strat_limits=strat_limits, layout=Layout.TABLE)
+    click_id_fld_inside_plan_collection(plan_collection_widget)
+    activate_plan(widget=plan_collection_widget, driver=driver)
+    click_button_with_name(widget=plan_limits_widget, button_name="Edit")
+    validate_plan_limits(widget=plan_limits_widget, plan_limits=plan_limits, layout=Layout.TABLE)
 
 
-def test_field_hide_n_show_in_common_key(clean_and_set_limits, driver_type, web_project, driver, pair_strat: Dict):
+def test_field_hide_n_show_in_common_key(clean_and_set_limits, driver_type, web_project, driver, pair_plan: Dict):
     # WidgetType: REPEATED_INDEPENDENT
 
-    widget = driver.find_element(By.ID, WidgetName.PairStratParams.value)
+    widget = driver.find_element(By.ID, WidgetName.PairPlanParams.value)
     switch_layout(widget=widget, layout=Layout.TABLE)
     common_keys_fields: List[str] = get_common_keys_fld_names(widget=widget)
 
@@ -122,7 +122,7 @@ def test_field_hide_n_show_in_common_key(clean_and_set_limits, driver_type, web_
     validate_hide_n_show_in_common_key(widget=widget, hide_n_show_fld=showing_fld, button_state=ButtonState.SHOW)
 
 
-def test_hide_n_show_in_table_layout(clean_and_set_limits, driver_type, web_project, driver, pair_strat: Dict):
+def test_hide_n_show_in_table_layout(clean_and_set_limits, driver_type, web_project, driver, pair_plan: Dict):
     # WidgetType: REPEATED
 
     widget = driver.find_element(By.ID, WidgetName.SymbolSideSnapShot.value)
@@ -146,44 +146,44 @@ def test_hide_n_show_in_table_layout(clean_and_set_limits, driver_type, web_proj
 
 
 
-def test_nested_pair_strat_n_strat_limits(clean_and_set_limits, driver_type, web_project, driver, pair_strat: Dict,
-                                           pair_strat_edit: Dict, strat_limits: Dict):
+def test_nested_pair_plan_n_plan_limits(clean_and_set_limits, driver_type, web_project, driver, pair_plan: Dict,
+                                           pair_plan_edit: Dict, plan_limits: Dict):
 
-    strat_limits_widget = driver.find_element(By.ID, WidgetName.StratLimits.value)
-    strat_collection_widget = driver.find_element(By.ID, WidgetName.StratCollection.value)
-    pair_strat_params_widget = driver.find_element(By.ID, WidgetName.PairStratParams.value)
-    switch_layout(widget=pair_strat_params_widget, layout=Layout.TABLE)
-    click_button_with_name(widget=strat_collection_widget, button_name="Edit")
+    plan_limits_widget = driver.find_element(By.ID, WidgetName.PlanLimits.value)
+    plan_collection_widget = driver.find_element(By.ID, WidgetName.PlanCollection.value)
+    pair_plan_params_widget = driver.find_element(By.ID, WidgetName.PairPlanParams.value)
+    switch_layout(widget=pair_plan_params_widget, layout=Layout.TABLE)
+    click_button_with_name(widget=plan_collection_widget, button_name="Edit")
 
-    pair_strat_td_elements = pair_strat_params_widget.find_elements(By.CSS_SELECTOR, "td[class^='MuiTableCell-root']")
-    # xpath: str = "pair_strat_params.common_premium"
+    pair_plan_td_elements = pair_plan_params_widget.find_elements(By.CSS_SELECTOR, "td[class^='MuiTableCell-root']")
+    # xpath: str = "pair_plan_params.common_premium"
     # double-click in table layout to get nested tree layout
-    double_click(driver=driver, element=pair_strat_td_elements[6])
+    double_click(driver=driver, element=pair_plan_td_elements[6])
 
-    # update value in nested tree layout inside pair strat widget
+    # update value in nested tree layout inside pair plan widget
     nested_tree_dialog = driver.find_element(By.XPATH, "//div[@role='dialog']")
-    for field_name, value in pair_strat_edit["pair_strat_params"].items():
-        xpath = "pair_strat_params." + field_name
+    for field_name, value in pair_plan_edit["pair_plan_params"].items():
+        xpath = "pair_plan_params." + field_name
         set_tree_input_field(driver=driver, widget=nested_tree_dialog, xpath=xpath, name=field_name, value=value)
 
-    save_nested_strat(driver)
+    save_nested_plan(driver)
 
-    # open nested tree layout in strat limit
-    click_button_with_name(widget=strat_limits_widget, button_name="Edit")
-    strat_limit_td_elements = strat_limits_widget.find_elements(By.CSS_SELECTOR, "td[class^='MuiTableCell-root']")
+    # open nested tree layout in plan limit
+    click_button_with_name(widget=plan_limits_widget, button_name="Edit")
+    plan_limit_td_elements = plan_limits_widget.find_elements(By.CSS_SELECTOR, "td[class^='MuiTableCell-root']")
 
     # xpath: str = "max_open_chores_per_side"
-    double_click(driver=driver, element=strat_limit_td_elements[0])
+    double_click(driver=driver, element=plan_limit_td_elements[0])
 
-    create_strat_limits_using_tree_view(driver=driver, strat_limits=strat_limits, layout=Layout.NESTED)
-    save_nested_strat(driver)
+    create_plan_limits_using_tree_view(driver=driver, plan_limits=plan_limits, layout=Layout.NESTED)
+    save_nested_plan(driver)
 
-    double_click(driver=driver, element=strat_limit_td_elements[0])
-    validate_strat_limits(widget=strat_limits_widget, strat_limits=strat_limits, layout=Layout.TREE)
+    double_click(driver=driver, element=plan_limit_td_elements[0])
+    validate_plan_limits(widget=plan_limits_widget, plan_limits=plan_limits, layout=Layout.TREE)
 
 
-def test_demo(clean_and_set_limits, driver_type, web_project, driver, pair_strat: Dict,
-                                           pair_strat_edit: Dict, strat_limits: Dict):
+def test_demo(clean_and_set_limits, driver_type, web_project, driver, pair_plan: Dict,
+                                           pair_plan_edit: Dict, plan_limits: Dict):
     pass
 
 
@@ -208,12 +208,12 @@ def test_widget_type(driver_type, schema_dict):
 
 
 def test_flux_fld_val_max_in_widget(clean_and_set_limits, driver_type, web_project, driver,
-                                    schema_dict: Dict[str, any], pair_strat: Dict):
+                                    schema_dict: Dict[str, any], pair_plan: Dict):
 
     # send the data in str type, and we get the data from the ui by default in str type
 
     # WidgetType: INDEPENDENT
-    # widget: chore limits and portfolio limit
+    # widget: chore limits and contact limit
     set_val_max_input_fld(schema_dict=copy.deepcopy(schema_dict), driver=driver,
                           widget_type=WidgetType.INDEPENDENT,
                           layout=Layout.TABLE, input_type=InputType.MAX_VALID_VALUE,
@@ -254,9 +254,9 @@ def test_flux_fld_val_max_in_widget(clean_and_set_limits, driver_type, web_proje
 
 
 def test_flux_fld_val_min_in_widget(clean_and_set_limits, driver_type, web_project, driver,
-                                    schema_dict: Dict[str, any], pair_strat: Dict):
+                                    schema_dict: Dict[str, any], pair_plan: Dict):
 
-    # widget: chore limits and portfolio limit
+    # widget: chore limits and contact limit
     set_n_validate_val_min_input_fld(
         driver=driver,flux_property=FluxPropertyType.FluxFldValMin,
         widget_type=WidgetType.INDEPENDENT, layout=Layout.TABLE,
@@ -301,7 +301,7 @@ def test_flux_fld_val_min_in_widget(clean_and_set_limits, driver_type, web_proje
 
 
 def test_flux_fld_help_in_widget(clean_and_set_limits, driver_type, web_project, driver,
-                                 schema_dict: Dict[str, any], pair_strat: Dict):
+                                 schema_dict: Dict[str, any], pair_plan: Dict):
 
     # TODO: LAZY sometimes throw StaleElementReferenceException
 
@@ -312,7 +312,7 @@ def test_flux_fld_help_in_widget(clean_and_set_limits, driver_type, web_project,
     # TABLE LAYOUT
     for widget_query in result[1]:
         widget_name = widget_query.widget_name
-        if widget_name in ["strat_limits", "basket_chore"]:
+        if widget_name in ["plan_limits", "basket_chore"]:
             continue
         widget = driver.find_element(By.ID, widget_name)
         scroll_into_view(driver=driver, element=widget)
@@ -375,12 +375,12 @@ def test_flux_fld_help_in_widget(clean_and_set_limits, driver_type, web_project,
 
 
 def test_flux_fld_display_type_in_widget(clean_and_set_limits, driver_type, web_project, driver,
-                                         schema_dict: Dict[str, any], pair_strat: Dict):
+                                         schema_dict: Dict[str, any], pair_plan: Dict):
     result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT, flux_property=FluxPropertyType.FluxFldDisplayType)
     print(result)
     assert result[0]
 
-    # portfolio limits, chore limits and portfolio status
+    # contact limits, chore limits and contact status
     # TABLE LAYOUT
     for widget_query in result[1]:
         field_name_n_xpath: Dict[str, str] = {}
@@ -431,9 +431,9 @@ def test_flux_fld_display_type_in_widget(clean_and_set_limits, driver_type, web_
 
             field_name_n_xpath[field_name] = xpath
 
-            # in strat status widget nested sec id fld is not showing any dropdown list for selecting security
-            # in strat status widget residual_notional is not working
-            if widget_name == "strat_status":
+            # in plan status widget nested sec id fld is not showing any dropdown list for selecting security
+            # in plan status widget residual_notional is not working
+            if widget_name == "plan_status":
                 continue
             # show_nested_fld_in_tree_layout(widget=widget, fld_xpath=xpath)
             set_tree_input_field(driver=driver, widget=widget, xpath=xpath, name=field_name, value=str(value))
@@ -463,7 +463,7 @@ def test_flux_fld_display_type_in_widget(clean_and_set_limits, driver_type, web_
 
 
 def test_flux_fld_number_format_in_widget(clean_and_set_limits, driver_type, web_project, driver,
-                                                      schema_dict: Dict[str, any], pair_strat: Dict):
+                                                      schema_dict: Dict[str, any], pair_plan: Dict):
     # TABLE LAYOUT
     get_n_validate_number_format_from_input_fld(
         schema_dict=copy.deepcopy(schema_dict),
@@ -517,7 +517,7 @@ def test_flux_fld_number_format_in_widget(clean_and_set_limits, driver_type, web
 
 
 def test_flux_flx_display_zero_in_widget(clean_and_set_limits, driver_type, web_project, driver,
-                                         schema_dict: Dict[str, any], pair_strat: Dict):
+                                         schema_dict: Dict[str, any], pair_plan: Dict):
 
     result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.INDEPENDENT, flux_property=FluxPropertyType.FluxFldDisplayZero)
     print(result)
@@ -541,7 +541,7 @@ def test_flux_flx_display_zero_in_widget(clean_and_set_limits, driver_type, web_
 
 
 def test_flux_fld_server_populate_in_widget(clean_and_set_limits, driver_type, web_project, driver,
-                                            schema_dict, pair_strat: Dict):
+                                            schema_dict, pair_plan: Dict):
 
     # TABLE LAYOUT
     get_n_validate_server_populate_fld(driver=driver, schema_dict=copy.deepcopy(schema_dict),
@@ -576,7 +576,7 @@ def test_flux_fld_server_populate_in_widget(clean_and_set_limits, driver_type, w
 
 
 def test_flux_fld_button_in_widget(clean_and_set_limits, driver_type, web_project, driver,
-                                               schema_dict: Dict[str, any], pair_strat: Dict):
+                                               schema_dict: Dict[str, any], pair_plan: Dict):
     result = get_widgets_by_flux_property(copy.deepcopy(schema_dict),
     widget_type=WidgetType.INDEPENDENT,
     flux_property=FluxPropertyType.FluxFldButton)
@@ -604,7 +604,7 @@ def test_flux_fld_button_in_widget(clean_and_set_limits, driver_type, web_projec
 
 
 def test_flux_fld_orm_no_update_in_widget(clean_and_set_limits, driver_type, web_project, driver,
-                                          schema_dict, pair_strat: Dict):
+                                          schema_dict, pair_plan: Dict):
     # TODO: only id fields are present in independent widget that's why skip this as of now
     result = get_widgets_by_flux_property(copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT,
                                           flux_property=FluxPropertyType.FluxFldOrmNoUpdate)
@@ -632,7 +632,7 @@ def test_flux_fld_orm_no_update_in_widget(clean_and_set_limits, driver_type, web
 
 
 def test_flux_fld_comma_separated_in_widget(clean_and_set_limits, driver_type, web_project, driver,
-                                            schema_dict: Dict[str, any], pair_strat: Dict):
+                                            schema_dict: Dict[str, any], pair_plan: Dict):
 
     # TABLE LAYOUT
     set_n_validate_input_value_for_comma_seperated(driver=driver, schema_dict=copy.deepcopy(schema_dict), layout=Layout.TABLE)
@@ -661,7 +661,7 @@ def test_flux_fld_comma_separated_in_widget(clean_and_set_limits, driver_type, w
 
 
 def test_flux_fld_name_color_in_independent_widget(clean_and_set_limits, driver_type, web_project, driver,
-                                                   schema_dict, pair_strat: Dict):
+                                                   schema_dict, pair_plan: Dict):
     # TODO: Need help get_fld_name_colour_in_tree line: 1291
     result = get_widgets_by_flux_property(schema_dict, widget_type=WidgetType.INDEPENDENT, flux_property=FluxPropertyType.FluxFldNameColor)
     print(result)
@@ -710,7 +710,7 @@ def test_flux_fld_name_color_in_independent_widget(clean_and_set_limits, driver_
 
 
 def test_flux_fld_progress_bar_in_widget(clean_and_set_limits, driver_type, web_project, driver,
-                                         schema_dict, pair_strat: Dict):
+                                         schema_dict, pair_plan: Dict):
 
     result = get_widgets_by_flux_property(schema_dict=copy.deepcopy(schema_dict), widget_type=WidgetType.INDEPENDENT,
                                           flux_property=FluxPropertyType.FluxFldProgressBar)
@@ -764,7 +764,7 @@ class TestMultiTab:
         window_handles = driver.window_handles
         driver.switch_to.window(window_handles[switch_tab_no])
 
-    def test_multi_tab_in_independent_widget(self, driver_type, web_project, driver, schema_dict, pair_strat: Dict):
+    def test_multi_tab_in_independent_widget(self, driver_type, web_project, driver, schema_dict, pair_plan: Dict):
         # Open a new tab and switch to it
         driver.execute_script(f"window.open('{self.url}','_blank');")
         self.switch_tab(driver=driver, switch_tab_no=1)
@@ -818,7 +818,7 @@ class TestMultiTab:
         assert unsaved_changes_field_name == "max_basis_points"
         click_okay_btn_inside_unsaved_changes_dialog(driver=driver)
 
-    def test_multi_tab_in_dependent_widget(self, driver_type, web_project, driver, schema_dict, pair_strat: Dict):
+    def test_multi_tab_in_dependent_widget(self, driver_type, web_project, driver, schema_dict, pair_plan: Dict):
         # no_active_local_changes
         # open_2n_tab
         # TABLE LAYOUT
@@ -826,7 +826,7 @@ class TestMultiTab:
         self.switch_tab(driver=driver, switch_tab_no=1)
         time.sleep(Delay.DEFAULT.value)
 
-        widget = driver.find_element(By.ID, "strat_limits")
+        widget = driver.find_element(By.ID, "plan_limits")
         click_edit_n_switch_layout(driver=driver, widget=widget, layout=Layout.TREE)
 
         xpath: str = "max_open_chores_per_side"
@@ -838,7 +838,7 @@ class TestMultiTab:
         time.sleep(Delay.SHORT.value)
         driver.refresh()
         time.sleep(Delay.SHORT.value)
-        widget = driver.find_element(By.ID, "strat_limits")
+        widget = driver.find_element(By.ID, "plan_limits")
         click_button_with_name(widget=widget, button_name="Edit")
         switch_layout(widget=widget, layout=Layout.TREE)
 
@@ -877,7 +877,7 @@ class TestMultiTab:
         # open_1st_tab
         self.switch_tab(driver=driver, switch_tab_no=1)
         time.sleep(Delay.SHORT.value)
-        widget = driver.find_element(By.ID, "strat_limits")
+        widget = driver.find_element(By.ID, "plan_limits")
         # widget.find_element(By.NAME, "Edit").click()
         xpath: str = "max_open_chores_per_side"
         value: str = "2"
@@ -885,7 +885,7 @@ class TestMultiTab:
 
         self.switch_tab(driver=driver, switch_tab_no=1)
         time.sleep(Delay.SHORT.value)
-        widget = driver.find_element(By.ID, "strat_limits")
+        widget = driver.find_element(By.ID, "plan_limits")
 
         xpath: str = "max_open_chores_per_side"
         value: str = "1"
@@ -905,7 +905,7 @@ class TestMultiTab:
         self.switch_tab(driver=driver, switch_tab_no=0)
         time.sleep(Delay.SHORT.value)
 
-    def test_multi_tab_in_repeated_fields(self, driver_type, web_project, driver, schema_dict, pair_strat: Dict):
+    def test_multi_tab_in_repeated_fields(self, driver_type, web_project, driver, schema_dict, pair_plan: Dict):
         # no_active_local_changes
         # open_2n_tab
         # tree_layout
@@ -913,7 +913,7 @@ class TestMultiTab:
         self.switch_tab(driver=driver, switch_tab_no=1)
         time.sleep(Delay.SHORT.value)
 
-        widget = driver.find_element(By.ID, "portfolio_limits")
+        widget = driver.find_element(By.ID, "contact_limits")
         click_button_with_name(widget=widget, button_name="Edit")
 
         switch_layout(widget=widget, layout=Layout.TREE)
@@ -929,7 +929,7 @@ class TestMultiTab:
         # open_1st_tab
         self.switch_tab(driver=driver, switch_tab_no=0)
         time.sleep(Delay.SHORT.value)
-        widget = driver.find_element(By.ID, "portfolio_limits")
+        widget = driver.find_element(By.ID, "contact_limits")
         click_button_with_name(widget=widget, button_name="Edit")
         switch_layout(widget=widget, layout=Layout.TREE)
         widget.find_element(By.XPATH,
@@ -957,7 +957,7 @@ class TestMultiTab:
         set_tree_input_field(driver=driver, widget=widget, xpath=xpath, name=name, value=value)
 
         xpath: str = "eligible_brokers[0].sec_positions[0].security.sec_id"
-        value: str = "EQT_Sec_1"
+        value: str = "Type2_Sec_1"
     
         
         set_autocomplete_field(driver=driver, widget=widget, xpath=xpath, name="sec_id", search_type=SearchType.NAME, value=value)
@@ -992,7 +992,7 @@ class TestMultiTab:
         # tree_layout
         self.switch_tab(driver=driver, switch_tab_no=0)
         time.sleep(Delay.SHORT.value)
-        widget = driver.find_element(By.ID, "portfolio_limits")
+        widget = driver.find_element(By.ID, "contact_limits")
         click_button_with_name(widget=widget, button_name="Edit")
         switch_layout(widget=widget, layout=Layout.TREE)
         xpath: str = "eligible_brokers[0].sec_positions[0].positions[0].available_size"
@@ -1011,7 +1011,7 @@ class TestMultiTab:
         assert unsaved_changes_field_name == "eligible_brokers[0].sec_positions[0].positions[0].available_size"
         click_okay_btn_inside_unsaved_changes_dialog(driver=driver)
 
-        widget = driver.find_element(By.ID, "portfolio_limits")
+        widget = driver.find_element(By.ID, "contact_limits")
         # widget.find_element(By.NAME, "Edit").click()
         xpath: str = "eligible_brokers[0].sec_positions[0].positions[0].available_size"
         value: str = "25"
@@ -1050,7 +1050,7 @@ def test_flux_fld_default_value_in_widget(clean_and_set_limits, web_project, dri
         scroll_into_view(driver=driver, element=widget)
         if WidgetName.BasketChore.value:
             continue
-        if widget_name in ["portfolio_alert", "strat_limits", "strat_status", "strat_alert"]:
+        if widget_name in ["contact_alert", "plan_limits", "plan_status", "plan_alert"]:
             click_button_with_name(widget=widget, button_name="Edit")
         else:
             click_button_with_name(widget=widget, button_name="Create")
@@ -1070,8 +1070,8 @@ def test_flux_fld_default_value_in_widget(clean_and_set_limits, web_project, dri
 
     for widget_query in result[1]:
         widget_name = widget_query.widget_name
-        if widget_name == WidgetName.PairStratParams.value:
-            click_button_with_name(driver.find_element(By.ID, "strat_collection"), button_name="Create")
+        if widget_name == WidgetName.PairPlanParams.value:
+            click_button_with_name(driver.find_element(By.ID, "plan_collection"), button_name="Create")
         widget = driver.find_element(By.ID, widget_name)
         scroll_into_view(driver=driver, element=widget)
         show_hidden_fields_for_layout(driver=driver, widget=widget, layout=Layout.TREE, widget_name=widget_name)
@@ -1137,7 +1137,7 @@ def test_flux_fld_ui_place_holder_in_widget(clean_and_set_limits, driver_type: D
     driver.maximize_window()
     driver.get(get_web_project_url())
     time.sleep(Delay.SHORT.value)
-    email_book_service_native_web_client.delete_portfolio_limits_client(portfolio_limits_id=1)
+    email_book_service_native_web_client.delete_contact_limits_client(contact_limits_id=1)
 
     flux_fld_ui_place_holder_in_widget(schema_dict=schema_dict, driver=driver, widget_type=WidgetType.INDEPENDENT)
 
@@ -1222,7 +1222,7 @@ def test_flux_fld_no_common_key_in_widget(clean_and_set_limits: None, web_projec
         scroll_into_view(driver=driver, element=widget)
         switch_layout(widget=widget, layout=Layout.TABLE)
 
-        if widget_name not in ["strat_limits", "strat_alert"]:
+        if widget_name not in ["plan_limits", "plan_alert"]:
             keys_from_table: List[str] = get_all_keys_from_table(widget)
         else:
             continue
@@ -1246,7 +1246,7 @@ def test_flux_fld_no_common_key_in_widget(clean_and_set_limits: None, web_projec
         reload_widget_open_n_close_setting(driver, widget, widget_name)
         switch_layout(widget=widget, layout=Layout.TABLE)
 
-        if widget_name not in ["strat_limits", "strat_alert"]:
+        if widget_name not in ["plan_limits", "plan_alert"]:
             keys_from_table: List[str] = get_all_keys_from_table(widget)
         else:
             continue
@@ -1353,16 +1353,16 @@ def test_flux_fld_enable_and_disable_override_in_widgets(clean_and_set_limits, w
         if widget_name in ["definitions", "autocomplete", "ui_layout", "widget_ui_data_element"]:
             continue
 
-        loaded_strat_keys: Dict[str, any] | None = widget_schema.get("properties").get("loaded_strat_keys")
-        if loaded_strat_keys is not None:
-            abbreviated: str = loaded_strat_keys.get("abbreviated")
+        loaded_plan_keys: Dict[str, any] | None = widget_schema.get("properties").get("loaded_plan_keys")
+        if loaded_plan_keys is not None:
+            abbreviated: str = loaded_plan_keys.get("abbreviated")
             field_list: list = abbreviated.split(":")
 
             for field_item in field_list:  # Renamed 'field' to 'field_item'
                 if '/' not in field_item:
                     dependent_widget_name: str = field_item.split(".")
-                    if dependent_widget_name[0] == "pair_strat":
-                        dependent_widget.add("pair_strat_params")
+                    if dependent_widget_name[0] == "pair_plan":
+                        dependent_widget.add("pair_plan_params")
                     else:
                         dependent_widget.add(dependent_widget_name[0])
                 # else not required
@@ -1444,9 +1444,9 @@ def test_edit_layout(clean_and_set_limits, web_project, driver, driver_type, sch
             widget_type: WidgetType | None = get_widget_type(widget_schema)
             # currently edit not supports in REPEATED widgets
             if widget_type in [WidgetType.INDEPENDENT, WidgetType.DEPENDENT]:
-                if widget_name == "pair_strat_params":
+                if widget_name == "pair_plan_params":
                     widget: WebElement = driver.find_element(By.ID, widget_name)
-                    click_button_with_name(driver.find_element(By.ID, "strat_collection"), "Edit")
+                    click_button_with_name(driver.find_element(By.ID, "plan_collection"), "Edit")
                 else:
                     widget: WebElement = driver.find_element(By.ID, widget_name)
                     # When the 'Create' button is clicked in System Control,
@@ -1483,7 +1483,7 @@ def test_column_chores(clean_and_set_limits, web_project, driver, driver_type, s
         for field_name, field_properties in widget_schema["properties"].items():
             sequence_number = field_properties["sequence_number"]
 
-            if field_name in ["kill_switch", "strat_state", "executor_event_meta", "event_time", "market_barter_volume", "event_name", "chore", "chore_brief"]:
+            if field_name in ["kill_switch", "plan_state", "executor_event_meta", "event_time", "market_barter_volume", "event_name", "chore", "chore_brief"]:
                 continue
             try:
                 assert field_sequence_value[field_name] == sequence_number
@@ -1510,12 +1510,12 @@ def test_disable_ws_on_edit(clean_and_set_limits, web_project, driver, driver_ty
         top_of_book.last_barter = QuoteOptional()
         top_of_book.last_barter.px = 11
 
-        pair_strat: PairStratBaseModel = email_book_service_native_web_client.get_all_pair_strat_client()[-1]
-        while not pair_strat.is_executor_running:
-            pair_strat = email_book_service_native_web_client.get_all_pair_strat_client()[-1]
+        pair_plan: PairPlanBaseModel = email_book_service_native_web_client.get_all_pair_plan_client()[-1]
+        while not pair_plan.is_executor_running:
+            pair_plan = email_book_service_native_web_client.get_all_pair_plan_client()[-1]
 
-        assert pair_strat.is_executor_running
-        executor_web_client: StreetBookServiceHttpClient = StreetBookServiceHttpClient(pair_strat.host, pair_strat.port)
+        assert pair_plan.is_executor_running
+        executor_web_client: StreetBookServiceHttpClient = StreetBookServiceHttpClient(pair_plan.host, pair_plan.port)
 
         # Patch the top_of_book and get the response
         top_of_book_response = executor_web_client.patch_top_of_book_client(
@@ -1552,24 +1552,24 @@ def test_disable_ws_on_edit(clean_and_set_limits, web_project, driver, driver_ty
         print(f"An error occurred: {e}")
 
 
-def test_strat_load_and_unload(clean_and_set_limits, web_project, driver, driver_type):
-    pair_strat_from_web_client: PairStratBaseModel = (
-        email_book_service_native_web_client.get_all_pair_strat_client())[-1]
+def test_plan_load_and_unload(clean_and_set_limits, web_project, driver, driver_type):
+    pair_plan_from_web_client: PairPlanBaseModel = (
+        email_book_service_native_web_client.get_all_pair_plan_client())[-1]
 
-    strat_state = StratState.StratState_READY
-    pair_strat: PairStratBaseModel = PairStratBaseModel(id=pair_strat_from_web_client.id, strat_state=strat_state)
+    plan_state = PlanState.PlanState_READY
+    pair_plan: PairPlanBaseModel = PairPlanBaseModel(id=pair_plan_from_web_client.id, plan_state=plan_state)
 
-    email_book_service_native_web_client.patch_pair_strat_client(
-        pair_strat.to_dict(by_alias=True, exclude_none=True))
+    email_book_service_native_web_client.patch_pair_plan_client(
+        pair_plan.to_dict(by_alias=True, exclude_none=True))
 
 
-    widget: WebElement = driver.find_element(By.ID, "strat_collection")
-    unload_strat(widget, driver)
-    load_strat(widget)
+    widget: WebElement = driver.find_element(By.ID, "plan_collection")
+    unload_plan(widget, driver)
+    load_plan(widget)
 
-    strat_state = StratState.StratState_SNOOZED
-    pair_strat_from_web_client = email_book_service_native_web_client.get_all_pair_strat_client()[-1]
-    assert strat_state == pair_strat_from_web_client.strat_state
+    plan_state = PlanState.PlanState_SNOOZED
+    pair_plan_from_web_client = email_book_service_native_web_client.get_all_pair_plan_client()[-1]
+    assert plan_state == pair_plan_from_web_client.plan_state
 
 
 def test_download_button_in_widgets(clean_and_set_limits, web_project, driver, driver_type, schema_dict):
@@ -1577,7 +1577,7 @@ def test_download_button_in_widgets(clean_and_set_limits, web_project, driver, d
         download_path: str = "/home/sourav/Downloads"
         file_name_list: List[str] = []
         for widget_name, widget_query in schema_dict.items():
-            if widget_name in ["definitions", "autocomplete", "ui_layout", "widget_ui_data_element", "basket_chore", "pair_strat_params"]:
+            if widget_name in ["definitions", "autocomplete", "ui_layout", "widget_ui_data_element", "basket_chore", "pair_plan_params"]:
                 continue
 
             widget: WebElement = driver.find_element(By.ID, widget_name)

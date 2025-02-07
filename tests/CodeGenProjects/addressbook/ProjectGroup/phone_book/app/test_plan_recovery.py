@@ -14,37 +14,37 @@ frmt_date = datetime.datetime.now().strftime("%Y%m%d")
 
 
 def restart_phone_book():
-    pair_strat_process = subprocess.Popen(["python", "launch_msgspec_fastapi.py"],
+    pair_plan_process = subprocess.Popen(["python", "launch_msgspec_fastapi.py"],
                                           cwd=PAIR_STRAT_ENGINE_DIR / "scripts")
 
 
-def _verify_server_ready_state_in_recovered_strat(strat_state_to_handle: StratState, pair_strat_id: int):
+def _verify_server_ready_state_in_recovered_plan(plan_state_to_handle: PlanState, pair_plan_id: int):
     for _ in range(30):
         # checking server_ready_state of executor
         try:
-            updated_pair_strat = (
-                email_book_service_native_web_client.get_pair_strat_client(pair_strat_id))
-            if strat_state_to_handle != StratState.StratState_SNOOZED:
-                if strat_state_to_handle in [StratState.StratState_ACTIVE, StratState.StratState_PAUSED,
-                                             StratState.StratState_ERROR]:
-                    if updated_pair_strat.server_ready_state == 3:
+            updated_pair_plan = (
+                email_book_service_native_web_client.get_pair_plan_client(pair_plan_id))
+            if plan_state_to_handle != PlanState.PlanState_SNOOZED:
+                if plan_state_to_handle in [PlanState.PlanState_ACTIVE, PlanState.PlanState_PAUSED,
+                                             PlanState.PlanState_ERROR]:
+                    if updated_pair_plan.server_ready_state == 3:
                         break
                 else:
-                    if updated_pair_strat.server_ready_state == 2:
+                    if updated_pair_plan.server_ready_state == 2:
                         break
             else:
-                # if strat_state to check is SNOOZED then after recovery server_ready_state will not get
+                # if plan_state to check is SNOOZED then after recovery server_ready_state will not get
                 # set to more than 1 since it is set only if SNOOZED is converted to READY
-                if updated_pair_strat.server_ready_state == 1:
+                if updated_pair_plan.server_ready_state == 1:
                     break
             time.sleep(1)
         except:  # no handling required: if error occurs retry
             pass
     else:
-        pair_strat = (
-            email_book_service_native_web_client.get_pair_strat_client(pair_strat_id))
-        assert False, f"mismatched server_ready_state state, {strat_state_to_handle=}, {pair_strat=}"
-    return updated_pair_strat
+        pair_plan = (
+            email_book_service_native_web_client.get_pair_plan_client(pair_plan_id))
+        assert False, f"mismatched server_ready_state state, {plan_state_to_handle=}, {pair_plan=}"
+    return updated_pair_plan
 
 
 def _handle_process_kill(port: int):
@@ -61,47 +61,47 @@ def _handle_process_kill(port: int):
         assert False, f"Unexpected: Can't kill process - Can't find any pid from port {port}"
 
 
-def _check_new_executor_has_new_port(old_port: int, pair_strat_id: int):
+def _check_new_executor_has_new_port(old_port: int, pair_plan_id: int):
     for _ in range(10):
-        pair_strat = email_book_service_native_web_client.get_pair_strat_client(pair_strat_id)
-        if pair_strat.port is not None and pair_strat.port != old_port:
-            return pair_strat
+        pair_plan = email_book_service_native_web_client.get_pair_plan_client(pair_plan_id)
+        if pair_plan.port is not None and pair_plan.port != old_port:
+            return pair_plan
         time.sleep(1)
     else:
-        assert False, (f"PairStrat not found with updated port of recovered executor: "
-                       f"pair_strat_id: {pair_strat_id}, old_port: {old_port}")
+        assert False, (f"PairPlan not found with updated port of recovered executor: "
+                       f"pair_plan_id: {pair_plan_id}, old_port: {old_port}")
 
 
 def _test_executor_crash_recovery(
-        buy_symbol, sell_symbol, pair_strat_,
-        expected_strat_limits_, expected_start_status_, symbol_overview_obj_list,
+        buy_symbol, sell_symbol, pair_plan_,
+        expected_plan_limits_, expected_start_status_, symbol_overview_obj_list,
         last_barter_fixture_list, market_depth_basemodel_list,
-        strat_state_to_handle, refresh_sec):
+        plan_state_to_handle, refresh_sec):
     # making limits suitable for this test
-    expected_strat_limits_.max_open_chores_per_side = 10
-    expected_strat_limits_.residual_restriction.max_residual = 105000
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec
+    expected_plan_limits_.max_open_chores_per_side = 10
+    expected_plan_limits_.residual_restriction.max_residual = 105000
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec
     residual_wait_sec = 4 * refresh_sec
 
-    created_pair_strat, executor_web_client = (
-        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
+    created_pair_plan, executor_web_client = (
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
                                            expected_start_status_, symbol_overview_obj_list, last_barter_fixture_list,
                                            market_depth_basemodel_list))
-    print(f"Executor crash test for strat with state: {strat_state_to_handle}, {buy_symbol=}, {sell_symbol=}, {created_pair_strat.id=}")
+    print(f"Executor crash test for plan with state: {plan_state_to_handle}, {buy_symbol=}, {sell_symbol=}, {created_pair_plan.id=}")
 
-    if strat_state_to_handle != StratState.StratState_ACTIVE:
-        update_pair_strat_dict = PairStratBaseModel.from_kwargs(_id=created_pair_strat.id,
-                                                                strat_state=strat_state_to_handle
+    if plan_state_to_handle != PlanState.PlanState_ACTIVE:
+        update_pair_plan_dict = PairPlanBaseModel.from_kwargs(_id=created_pair_plan.id,
+                                                                plan_state=plan_state_to_handle
                                                                 ).to_dict(exclude_none=True)
-        created_pair_strat = email_book_service_native_web_client.patch_pair_strat_client(update_pair_strat_dict)
-        if strat_state_to_handle == StratState.StratState_SNOOZED:
-            # deleting all symbol_overview in strat which needs to check StratState_SNOOZED - now after recovery
-            # strat will not convert to READY
+        created_pair_plan = email_book_service_native_web_client.patch_pair_plan_client(update_pair_plan_dict)
+        if plan_state_to_handle == PlanState.PlanState_SNOOZED:
+            # deleting all symbol_overview in plan which needs to check PlanState_SNOOZED - now after recovery
+            # plan will not convert to READY
             symbol_overview_list = executor_web_client.get_all_symbol_overview_client()
             for symbol_overview in symbol_overview_list:
                 executor_web_client.delete_symbol_overview_client(symbol_overview.id)
 
-    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_strat.id)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_plan.id)
 
     try:
         # updating yaml_configs according to this test
@@ -112,27 +112,27 @@ def _test_executor_crash_recovery(
 
         executor_web_client.barter_simulator_reload_config_query_client()
 
-        if strat_state_to_handle == StratState.StratState_ACTIVE:
+        if plan_state_to_handle == PlanState.PlanState_ACTIVE:
             total_chore_count_for_each_side = 1
             place_sanity_chores_for_executor(
-                buy_symbol, sell_symbol, created_pair_strat, total_chore_count_for_each_side, last_barter_fixture_list,
+                buy_symbol, sell_symbol, created_pair_plan, total_chore_count_for_each_side, last_barter_fixture_list,
                 residual_wait_sec, executor_web_client)
-        port: int = created_pair_strat.port
+        port: int = created_pair_plan.port
         _handle_process_kill(port)      # asserts implicitly
 
         time.sleep(residual_wait_sec)
 
-        _check_new_executor_has_new_port(old_port=port, pair_strat_id=created_pair_strat.id)
+        _check_new_executor_has_new_port(old_port=port, pair_plan_id=created_pair_plan.id)
         time.sleep(residual_wait_sec)
 
-        # checking server_ready_state in recovered_strat
-        updated_pair_strat = _verify_server_ready_state_in_recovered_strat(strat_state_to_handle, created_pair_strat.id)
+        # checking server_ready_state in recovered_plan
+        updated_pair_plan = _verify_server_ready_state_in_recovered_plan(plan_state_to_handle, created_pair_plan.id)
 
         # checking if state stays same as before recovery
-        pair_strat = email_book_service_native_web_client.get_pair_strat_client(created_pair_strat.id)
-        assert pair_strat.strat_state == created_pair_strat.strat_state, \
-            (f"Mismatched: strat_state before crash was {created_pair_strat.strat_state}, but after recovery "
-             f"strat_state is {pair_strat.strat_state}")
+        pair_plan = email_book_service_native_web_client.get_pair_plan_client(created_pair_plan.id)
+        assert pair_plan.plan_state == created_pair_plan.plan_state, \
+            (f"Mismatched: plan_state before crash was {created_pair_plan.plan_state}, but after recovery "
+             f"plan_state is {pair_plan.plan_state}")
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -143,10 +143,10 @@ def _test_executor_crash_recovery(
     finally:
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
-    new_pair_strat = email_book_service_native_web_client.get_pair_strat_client(created_pair_strat.id)
-    if strat_state_to_handle == StratState.StratState_ACTIVE:
+    new_pair_plan = email_book_service_native_web_client.get_pair_plan_client(created_pair_plan.id)
+    if plan_state_to_handle == PlanState.PlanState_ACTIVE:
         new_executor_web_client = StreetBookServiceHttpClient.set_or_get_if_instance_exists(
-            updated_pair_strat.host, updated_pair_strat.port)
+            updated_pair_plan.host, updated_pair_plan.port)
         try:
             time.sleep(10)
             config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -160,11 +160,11 @@ def _test_executor_crash_recovery(
 
             new_executor_web_client.barter_simulator_reload_config_query_client()
 
-            update_market_depth(new_pair_strat.cpp_port)
+            update_market_depth(new_pair_plan.cpp_port)
 
             total_chore_count_for_each_side = 1
             place_sanity_chores_for_executor(
-                buy_symbol, sell_symbol, new_pair_strat, total_chore_count_for_each_side, last_barter_fixture_list,
+                buy_symbol, sell_symbol, new_pair_plan, total_chore_count_for_each_side, last_barter_fixture_list,
                 residual_wait_sec, new_executor_web_client, place_after_recovery=True)
         except AssertionError as e:
             raise AssertionError(e)
@@ -178,58 +178,58 @@ def _test_executor_crash_recovery(
 
 @pytest.mark.recovery
 def test_executor_crash_recovery(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+        expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         last_barter_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture):
-    symbols_n_strat_state_list = []
-    strat_state_list = [StratState.StratState_ACTIVE, StratState.StratState_READY, StratState.StratState_PAUSED,
-                        StratState.StratState_SNOOZED, StratState.StratState_ERROR, StratState.StratState_DONE]
-    # strat_state_list = [StratState.StratState_ERROR]
-    for index, symbol_tuple in enumerate(leg1_leg2_symbol_list[:len(strat_state_list)]):
-        symbols_n_strat_state_list.append((symbol_tuple[0], symbol_tuple[1], strat_state_list[index]))
+    symbols_n_plan_state_list = []
+    plan_state_list = [PlanState.PlanState_ACTIVE, PlanState.PlanState_READY, PlanState.PlanState_PAUSED,
+                        PlanState.PlanState_SNOOZED, PlanState.PlanState_ERROR, PlanState.PlanState_DONE]
+    # plan_state_list = [PlanState.PlanState_ERROR]
+    for index, symbol_tuple in enumerate(leg1_leg2_symbol_list[:len(plan_state_list)]):
+        symbols_n_plan_state_list.append((symbol_tuple[0], symbol_tuple[1], plan_state_list[index]))
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=len(symbols_n_strat_state_list)) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(symbols_n_plan_state_list)) as executor:
         results = [executor.submit(_test_executor_crash_recovery, buy_symbol, sell_symbol,
-                                   deepcopy(pair_strat_),
-                                   deepcopy(expected_strat_limits_), deepcopy(expected_strat_status_),
+                                   deepcopy(pair_plan_),
+                                   deepcopy(expected_plan_limits_), deepcopy(expected_plan_status_),
                                    deepcopy(symbol_overview_obj_list),
                                    deepcopy(last_barter_fixture_list), deepcopy(market_depth_basemodel_list),
-                                   handle_strat_state, refresh_sec_update_fixture)
-                   for buy_symbol, sell_symbol, handle_strat_state in symbols_n_strat_state_list]
+                                   handle_plan_state, refresh_sec_update_fixture)
+                   for buy_symbol, sell_symbol, handle_plan_state in symbols_n_plan_state_list]
 
         for future in concurrent.futures.as_completed(results):
             if future.exception() is not None:
                 raise Exception(future.exception())
 
 
-def _activate_pair_strat_n_place_sanity_chores(
-        buy_symbol, sell_symbol, pair_strat_,
-        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+def _activate_pair_plan_n_place_sanity_chores(
+        buy_symbol, sell_symbol, pair_plan_,
+        expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         last_barter_fixture_list, market_depth_basemodel_list,
-        strat_state_to_handle, refresh_sec, total_chore_count_for_each_side_=1):
+        plan_state_to_handle, refresh_sec, total_chore_count_for_each_side_=1):
     # making limits suitable for this test
-    expected_strat_limits_.max_open_chores_per_side = 10
-    expected_strat_limits_.residual_restriction.max_residual = 105000
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec
+    expected_plan_limits_.max_open_chores_per_side = 10
+    expected_plan_limits_.residual_restriction.max_residual = 105000
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec
     residual_wait_sec = 4 * refresh_sec
 
-    created_pair_strat, executor_web_client = (
-    create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                       expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+    created_pair_plan, executor_web_client = (
+    create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+                                       expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
                                        market_depth_basemodel_list))
 
-    if strat_state_to_handle != StratState.StratState_ACTIVE:
-        created_pair_strat = email_book_service_native_web_client.patch_pair_strat_client(
-            PairStratBaseModel.from_kwargs(_id=created_pair_strat.id,
-                                           strat_state=strat_state_to_handle).to_dict(exclude_none=True))
-        if strat_state_to_handle == StratState.StratState_SNOOZED:
-            # deleting all symbol_overview in strat which needs to check StratState_SNOOZED - now after recovery
-            # strat will not convert to READY
+    if plan_state_to_handle != PlanState.PlanState_ACTIVE:
+        created_pair_plan = email_book_service_native_web_client.patch_pair_plan_client(
+            PairPlanBaseModel.from_kwargs(_id=created_pair_plan.id,
+                                           plan_state=plan_state_to_handle).to_dict(exclude_none=True))
+        if plan_state_to_handle == PlanState.PlanState_SNOOZED:
+            # deleting all symbol_overview in plan which needs to check PlanState_SNOOZED - now after recovery
+            # plan will not convert to READY
             symbol_overview_list = executor_web_client.get_all_symbol_overview_client()
             for symbol_overview in symbol_overview_list:
                 executor_web_client.delete_symbol_overview_client(symbol_overview.id)
 
-    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_strat.id)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_plan.id)
 
     try:
         # updating yaml_configs according to this test
@@ -240,9 +240,9 @@ def _activate_pair_strat_n_place_sanity_chores(
 
         executor_web_client.barter_simulator_reload_config_query_client()
 
-        if strat_state_to_handle == StratState.StratState_ACTIVE:
+        if plan_state_to_handle == PlanState.PlanState_ACTIVE:
             place_sanity_chores_for_executor(
-                buy_symbol, sell_symbol, created_pair_strat, total_chore_count_for_each_side_, last_barter_fixture_list,
+                buy_symbol, sell_symbol, created_pair_plan, total_chore_count_for_each_side_, last_barter_fixture_list,
                 residual_wait_sec, executor_web_client)
     except AssertionError as e_:
         raise AssertionError(e_)
@@ -253,19 +253,19 @@ def _activate_pair_strat_n_place_sanity_chores(
     finally:
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
-    return created_pair_strat, executor_web_client, strat_state_to_handle
+    return created_pair_plan, executor_web_client, plan_state_to_handle
 
 
-def _check_place_chores_post_pair_strat_n_executor_recovery(
-        updated_pair_strat: PairStratBaseModel,
+def _check_place_chores_post_pair_plan_n_executor_recovery(
+        updated_pair_plan: PairPlanBaseModel,
         last_barter_fixture_list, refresh_sec, total_chore_count_for_each_side=2):
     residual_wait_sec = 4 * refresh_sec
-    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(updated_pair_strat.id)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(updated_pair_plan.id)
 
-    buy_symbol = updated_pair_strat.pair_strat_params.strat_leg1.sec.sec_id
-    sell_symbol = updated_pair_strat.pair_strat_params.strat_leg2.sec.sec_id
+    buy_symbol = updated_pair_plan.pair_plan_params.plan_leg1.sec.sec_id
+    sell_symbol = updated_pair_plan.pair_plan_params.plan_leg2.sec.sec_id
     new_executor_web_client = StreetBookServiceHttpClient.set_or_get_if_instance_exists(
-        updated_pair_strat.host, updated_pair_strat.port)
+        updated_pair_plan.host, updated_pair_plan.port)
     try:
         # updating yaml_configs according to this test
         for symbol in config_dict["symbol_configs"]:
@@ -275,10 +275,10 @@ def _check_place_chores_post_pair_strat_n_executor_recovery(
 
         new_executor_web_client.barter_simulator_reload_config_query_client()
 
-        update_market_depth(updated_pair_strat.cpp_port)
+        update_market_depth(updated_pair_plan.cpp_port)
 
         place_sanity_chores_for_executor(
-            buy_symbol, sell_symbol, updated_pair_strat, total_chore_count_for_each_side, last_barter_fixture_list,
+            buy_symbol, sell_symbol, updated_pair_plan, total_chore_count_for_each_side, last_barter_fixture_list,
             residual_wait_sec, new_executor_web_client, place_after_recovery=True)
     except AssertionError as e:
         raise AssertionError(e)
@@ -291,48 +291,48 @@ def _check_place_chores_post_pair_strat_n_executor_recovery(
 
 
 @pytest.mark.recovery
-def test_pair_strat_n_executor_crash_recovery(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+def test_pair_plan_n_executor_crash_recovery(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+        expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         last_barter_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture):
-    pair_strat_n_strat_state_tuple_list: List[Tuple[PairStratBaseModel, StratState]] = []
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    pair_plan_n_plan_state_tuple_list: List[Tuple[PairPlanBaseModel, PlanState]] = []
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
-    symbols_n_strat_state_list = []
-    strat_state_list = [StratState.StratState_ACTIVE, StratState.StratState_READY, StratState.StratState_PAUSED,
-                        StratState.StratState_SNOOZED, StratState.StratState_ERROR, StratState.StratState_DONE]
-    for index, symbol_tuple in enumerate(leg1_leg2_symbol_list[:len(strat_state_list)]):
-        symbols_n_strat_state_list.append((symbol_tuple[0], symbol_tuple[1], strat_state_list[index]))
+    symbols_n_plan_state_list = []
+    plan_state_list = [PlanState.PlanState_ACTIVE, PlanState.PlanState_READY, PlanState.PlanState_PAUSED,
+                        PlanState.PlanState_SNOOZED, PlanState.PlanState_ERROR, PlanState.PlanState_DONE]
+    for index, symbol_tuple in enumerate(leg1_leg2_symbol_list[:len(plan_state_list)]):
+        symbols_n_plan_state_list.append((symbol_tuple[0], symbol_tuple[1], plan_state_list[index]))
 
     total_chore_count_for_each_side_ = 1
-    with concurrent.futures.ThreadPoolExecutor(max_workers=len(symbols_n_strat_state_list)) as executor:
-        results = [executor.submit(_activate_pair_strat_n_place_sanity_chores, buy_symbol, sell_symbol,
-                                   deepcopy(pair_strat_),
-                                   deepcopy(expected_strat_limits_), deepcopy(expected_strat_status_),
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(symbols_n_plan_state_list)) as executor:
+        results = [executor.submit(_activate_pair_plan_n_place_sanity_chores, buy_symbol, sell_symbol,
+                                   deepcopy(pair_plan_),
+                                   deepcopy(expected_plan_limits_), deepcopy(expected_plan_status_),
                                    deepcopy(symbol_overview_obj_list),
                                    deepcopy(last_barter_fixture_list), deepcopy(market_depth_basemodel_list),
-                                   strat_state_to_handle, refresh_sec_update_fixture, total_chore_count_for_each_side_)
-                   for buy_symbol, sell_symbol, strat_state_to_handle in symbols_n_strat_state_list]
+                                   plan_state_to_handle, refresh_sec_update_fixture, total_chore_count_for_each_side_)
+                   for buy_symbol, sell_symbol, plan_state_to_handle in symbols_n_plan_state_list]
 
         for future in concurrent.futures.as_completed(results):
             if future.exception() is not None:
                 raise Exception(future.exception())
 
-            pair_strat, _, strat_state_to_handle = future.result()
-            pair_strat_n_strat_state_tuple_list.append((pair_strat, strat_state_to_handle))
+            pair_plan, _, plan_state_to_handle = future.result()
+            pair_plan_n_plan_state_tuple_list.append((pair_plan, plan_state_to_handle))
 
-    pair_strat_n_strat_state_tuple_list = (
-        _kill_executors_n_phone_book(pair_strat_n_strat_state_tuple_list, residual_wait_sec))
+    pair_plan_n_plan_state_tuple_list = (
+        _kill_executors_n_phone_book(pair_plan_n_plan_state_tuple_list, residual_wait_sec))
 
-    active_pair_strat_id = None
-    for pair_strat, strat_state_to_handle in pair_strat_n_strat_state_tuple_list:
-        if strat_state_to_handle == StratState.StratState_ACTIVE:
-            active_pair_strat_id = pair_strat.id
-    recovered_active_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat_id)
+    active_pair_plan_id = None
+    for pair_plan, plan_state_to_handle in pair_plan_n_plan_state_tuple_list:
+        if plan_state_to_handle == PlanState.PlanState_ACTIVE:
+            active_pair_plan_id = pair_plan.id
+    recovered_active_plan = email_book_service_native_web_client.get_pair_plan_client(active_pair_plan_id)
     total_chore_count_for_each_side = 1
     time.sleep(10)
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-        results = [executor.submit(_check_place_chores_post_pair_strat_n_executor_recovery, recovered_active_strat,
+        results = [executor.submit(_check_place_chores_post_pair_plan_n_executor_recovery, recovered_active_plan,
                                    deepcopy(last_barter_fixture_list), residual_wait_sec,
                                    total_chore_count_for_each_side)]
 
@@ -341,13 +341,13 @@ def test_pair_strat_n_executor_crash_recovery(
                 raise Exception(future.exception())
 
 
-def _kill_executors_n_phone_book(activated_strat_n_strat_state_tuple_list, residual_wait_sec):
+def _kill_executors_n_phone_book(activated_plan_n_plan_state_tuple_list, residual_wait_sec):
     port_list = [email_book_service_native_web_client.port]  # included phone_book port
-    pair_strat_n_strat_state_list = []
+    pair_plan_n_plan_state_list = []
 
-    for activated_strat, strat_state_to_handle in activated_strat_n_strat_state_tuple_list:
-        port_list.append(activated_strat.port)
-        pair_strat_n_strat_state_list.append((activated_strat, strat_state_to_handle))
+    for activated_plan, plan_state_to_handle in activated_plan_n_plan_state_tuple_list:
+        port_list.append(activated_plan.port)
+        pair_plan_n_plan_state_list.append((activated_plan, plan_state_to_handle))
 
     for port in port_list:
         _handle_process_kill(port)  # asserts implicitly
@@ -355,58 +355,58 @@ def _kill_executors_n_phone_book(activated_strat_n_strat_state_tuple_list, resid
     restart_phone_book()
     time.sleep(residual_wait_sec * 2)
 
-    updated_pair_strat_n_strat_state_list: List[Tuple[PairStratBaseModel, StratState]] = []
-    for old_pair_strat_, strat_state_to_handle in pair_strat_n_strat_state_list:
+    updated_pair_plan_n_plan_state_list: List[Tuple[PairPlanBaseModel, PlanState]] = []
+    for old_pair_plan_, plan_state_to_handle in pair_plan_n_plan_state_list:
         for _ in range(20):
-            pair_strat = email_book_service_native_web_client.get_pair_strat_client(old_pair_strat_.id)
-            if pair_strat.port is not None and pair_strat.port != old_pair_strat_.port:
+            pair_plan = email_book_service_native_web_client.get_pair_plan_client(old_pair_plan_.id)
+            if pair_plan.port is not None and pair_plan.port != old_pair_plan_.port:
                 break
             time.sleep(1)
         else:
-            assert False, (f"PairStrat not found with updated port of recovered executor, {old_pair_strat_.port=}, "
-                           f"{old_pair_strat_.id=}")
+            assert False, (f"PairPlan not found with updated port of recovered executor, {old_pair_plan_.port=}, "
+                           f"{old_pair_plan_.id=}")
 
-        # checking server_ready_state in recovered_strat
-        updated_pair_strat = _verify_server_ready_state_in_recovered_strat(strat_state_to_handle, pair_strat.id)
+        # checking server_ready_state in recovered_plan
+        updated_pair_plan = _verify_server_ready_state_in_recovered_plan(plan_state_to_handle, pair_plan.id)
 
-        updated_pair_strat_n_strat_state_list.append((updated_pair_strat, strat_state_to_handle))
+        updated_pair_plan_n_plan_state_list.append((updated_pair_plan, plan_state_to_handle))
     time.sleep(residual_wait_sec)
-    return updated_pair_strat_n_strat_state_list
+    return updated_pair_plan_n_plan_state_list
 
 
-def check_all_cache(pair_strat_n_strat_state_tuple_list: List[Tuple[PairStratBaseModel, StratState]]):
-    for pair_strat, strat_state in pair_strat_n_strat_state_tuple_list:
-        if strat_state not in [StratState.StratState_READY, StratState.StratState_SNOOZED,
-                               StratState.StratState_DONE]:
+def check_all_cache(pair_plan_n_plan_state_tuple_list: List[Tuple[PairPlanBaseModel, PlanState]]):
+    for pair_plan, plan_state in pair_plan_n_plan_state_tuple_list:
+        if plan_state not in [PlanState.PlanState_READY, PlanState.PlanState_SNOOZED,
+                               PlanState.PlanState_DONE]:
 
-            executor_http_client = StreetBookServiceHttpClient.set_or_get_if_instance_exists(pair_strat.host,
-                                                                                                pair_strat.port)
-            # checking strat_status
-            strat_status_list: List[StratStatusBaseModel] = executor_http_client.get_all_strat_status_client()
-            cached_strat_status_list: List[StratStatusBaseModel] = (
-                executor_http_client.get_strat_status_from_cache_query_client())
-            assert strat_status_list == cached_strat_status_list, \
-                ("Mismatched: cached strat status is not same as stored strat status, "
-                 f"cached strat status: {cached_strat_status_list}, "
-                 f"stored strat status: {strat_status_list}")
+            executor_http_client = StreetBookServiceHttpClient.set_or_get_if_instance_exists(pair_plan.host,
+                                                                                                pair_plan.port)
+            # checking plan_status
+            plan_status_list: List[PlanStatusBaseModel] = executor_http_client.get_all_plan_status_client()
+            cached_plan_status_list: List[PlanStatusBaseModel] = (
+                executor_http_client.get_plan_status_from_cache_query_client())
+            assert plan_status_list == cached_plan_status_list, \
+                ("Mismatched: cached plan status is not same as stored plan status, "
+                 f"cached plan status: {cached_plan_status_list}, "
+                 f"stored plan status: {plan_status_list}")
 
-            # checking strat_brief
-            strat_brief_list: List[StratBriefBaseModel] = executor_http_client.get_all_strat_brief_client()
-            cached_strat_brief_list: List[StratBriefBaseModel] = (
-                executor_http_client.get_strat_brief_from_cache_query_client())
-            assert strat_brief_list == cached_strat_brief_list, \
-                ("Mismatched: cached strat_brief is not same as stored strat_brief, "
-                 f"cached strat_brief: {cached_strat_brief_list}, "
-                 f"stored strat_brief: {strat_brief_list}")
+            # checking plan_brief
+            plan_brief_list: List[PlanBriefBaseModel] = executor_http_client.get_all_plan_brief_client()
+            cached_plan_brief_list: List[PlanBriefBaseModel] = (
+                executor_http_client.get_plan_brief_from_cache_query_client())
+            assert plan_brief_list == cached_plan_brief_list, \
+                ("Mismatched: cached plan_brief is not same as stored plan_brief, "
+                 f"cached plan_brief: {cached_plan_brief_list}, "
+                 f"stored plan_brief: {plan_brief_list}")
 
-            # checking strat_limits
-            strat_limits_list: List[StratLimitsBaseModel] = executor_http_client.get_all_strat_limits_client()
-            cached_strat_limits_list: List[StratLimitsBaseModel] = (
-                executor_http_client.get_strat_limits_from_cache_query_client())
-            assert strat_limits_list == cached_strat_limits_list, \
-                ("Mismatched: cached strat_limits is not same as stored strat_limits, "
-                 f"cached strat_limits: {cached_strat_limits_list}, "
-                 f"stored strat_limits: {strat_limits_list}")
+            # checking plan_limits
+            plan_limits_list: List[PlanLimitsBaseModel] = executor_http_client.get_all_plan_limits_client()
+            cached_plan_limits_list: List[PlanLimitsBaseModel] = (
+                executor_http_client.get_plan_limits_from_cache_query_client())
+            assert plan_limits_list == cached_plan_limits_list, \
+                ("Mismatched: cached plan_limits is not same as stored plan_limits, "
+                 f"cached plan_limits: {cached_plan_limits_list}, "
+                 f"stored plan_limits: {plan_limits_list}")
 
             # checking symbol_side_snapshot
             symbol_side_snapshot_list: List[SymbolSideSnapshotBaseModel] = (
@@ -440,107 +440,107 @@ def check_all_cache(pair_strat_n_strat_state_tuple_list: List[Tuple[PairStratBas
 
 
 @pytest.mark.recovery
-def test_recover_active_n_ready_strats_pair_n_active_all_after_recovery(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+def test_recover_active_n_ready_plans_pair_n_active_all_after_recovery(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+        expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         last_barter_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture):
     """
-    Creates 8 strats, activates and places one chore each side, then converts pair of strats
-    to PAUSE, ERROR and READY, then kills pair strat and executors then recovers all and activates all again
-    and places 2 chores each side per strat and kills pair strat and executors again and again recovers and places
-    1 chore each side per strat again
+    Creates 8 plans, activates and places one chore each side, then converts pair of plans
+    to PAUSE, ERROR and READY, then kills pair plan and executors then recovers all and activates all again
+    and places 2 chores each side per plan and kills pair plan and executors again and again recovers and places
+    1 chore each side per plan again
     """
-    pair_strat_n_strat_state_tuple_list: List[Tuple[PairStratBaseModel, StratState]] = []
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    pair_plan_n_plan_state_tuple_list: List[Tuple[PairPlanBaseModel, PlanState]] = []
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
-    symbols_n_strat_state_list = []
+    symbols_n_plan_state_list = []
 
-    # Starting 8 strats - all active and places 1 chore each side
-    strat_state_list = [StratState.StratState_ACTIVE]*6 + [StratState.StratState_READY]*2
-    for index, symbol_tuple in enumerate(leg1_leg2_symbol_list[:len(strat_state_list)]):
-        symbols_n_strat_state_list.append((symbol_tuple[0], symbol_tuple[1], strat_state_list[index]))
+    # Starting 8 plans - all active and places 1 chore each side
+    plan_state_list = [PlanState.PlanState_ACTIVE]*6 + [PlanState.PlanState_READY]*2
+    for index, symbol_tuple in enumerate(leg1_leg2_symbol_list[:len(plan_state_list)]):
+        symbols_n_plan_state_list.append((symbol_tuple[0], symbol_tuple[1], plan_state_list[index]))
 
     total_chore_count_for_each_side_ = 1
-    with concurrent.futures.ThreadPoolExecutor(max_workers=len(symbols_n_strat_state_list)) as executor:
-        results = [executor.submit(_activate_pair_strat_n_place_sanity_chores, buy_symbol, sell_symbol,
-                                   deepcopy(pair_strat_), deepcopy(expected_strat_limits_),
-                                   deepcopy(expected_strat_status_), deepcopy(symbol_overview_obj_list),
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(symbols_n_plan_state_list)) as executor:
+        results = [executor.submit(_activate_pair_plan_n_place_sanity_chores, buy_symbol, sell_symbol,
+                                   deepcopy(pair_plan_), deepcopy(expected_plan_limits_),
+                                   deepcopy(expected_plan_status_), deepcopy(symbol_overview_obj_list),
                                    deepcopy(last_barter_fixture_list), deepcopy(market_depth_basemodel_list),
-                                   strat_state_to_handle, refresh_sec_update_fixture,
+                                   plan_state_to_handle, refresh_sec_update_fixture,
                                    total_chore_count_for_each_side_)
-                   for buy_symbol, sell_symbol, strat_state_to_handle in symbols_n_strat_state_list]
+                   for buy_symbol, sell_symbol, plan_state_to_handle in symbols_n_plan_state_list]
 
         for future in concurrent.futures.as_completed(results):
             if future.exception() is not None:
                 raise Exception(future.exception())
 
-            pair_strat, executor_http_client, strat_state_to_handle = future.result()
-            pair_strat_n_strat_state_tuple_list.append((pair_strat, strat_state_to_handle))
+            pair_plan, executor_http_client, plan_state_to_handle = future.result()
+            pair_plan_n_plan_state_tuple_list.append((pair_plan, plan_state_to_handle))
 
-    active_strat_n_strat_state_tuple_list: List[Tuple[PairStratBaseModel, StratState]] = \
-        [(pair_strat, strat_state) for pair_strat, strat_state in pair_strat_n_strat_state_tuple_list
-         if pair_strat.strat_state != StratState.StratState_READY]
-    pair_strat_n_strat_state_tuple_list = \
-        [(pair_strat, strat_state) for pair_strat, strat_state in pair_strat_n_strat_state_tuple_list
-         if pair_strat.strat_state == StratState.StratState_READY]
+    active_plan_n_plan_state_tuple_list: List[Tuple[PairPlanBaseModel, PlanState]] = \
+        [(pair_plan, plan_state) for pair_plan, plan_state in pair_plan_n_plan_state_tuple_list
+         if pair_plan.plan_state != PlanState.PlanState_READY]
+    pair_plan_n_plan_state_tuple_list = \
+        [(pair_plan, plan_state) for pair_plan, plan_state in pair_plan_n_plan_state_tuple_list
+         if pair_plan.plan_state == PlanState.PlanState_READY]
 
-    # Converting some active strats to PAUSE and ERROR states before killing processes
-    update_strat_state_list = [
-        StratState.StratState_PAUSED, StratState.StratState_PAUSED,
-        StratState.StratState_ERROR, StratState.StratState_ERROR,
-        StratState.StratState_ACTIVE, StratState.StratState_ACTIVE]
-    for index, strat_state_ in enumerate(update_strat_state_list):
-        activate_strat, _ = active_strat_n_strat_state_tuple_list[index]
-        if strat_state_ != StratState.StratState_ACTIVE:
-            email_book_service_native_web_client.patch_pair_strat_client(
-                PairStratBaseModel.from_kwargs(_id=activate_strat.id,
-                                               strat_state=strat_state_).to_dict(exclude_none=True))
-        pair_strat_n_strat_state_tuple_list.append((activate_strat, strat_state_))
+    # Converting some active plans to PAUSE and ERROR states before killing processes
+    update_plan_state_list = [
+        PlanState.PlanState_PAUSED, PlanState.PlanState_PAUSED,
+        PlanState.PlanState_ERROR, PlanState.PlanState_ERROR,
+        PlanState.PlanState_ACTIVE, PlanState.PlanState_ACTIVE]
+    for index, plan_state_ in enumerate(update_plan_state_list):
+        activate_plan, _ = active_plan_n_plan_state_tuple_list[index]
+        if plan_state_ != PlanState.PlanState_ACTIVE:
+            email_book_service_native_web_client.patch_pair_plan_client(
+                PairPlanBaseModel.from_kwargs(_id=activate_plan.id,
+                                               plan_state=plan_state_).to_dict(exclude_none=True))
+        pair_plan_n_plan_state_tuple_list.append((activate_plan, plan_state_))
 
-    pair_strat_n_strat_state_tuple_list = (
-        _kill_executors_n_phone_book(pair_strat_n_strat_state_tuple_list, residual_wait_sec))
+    pair_plan_n_plan_state_tuple_list = (
+        _kill_executors_n_phone_book(pair_plan_n_plan_state_tuple_list, residual_wait_sec))
 
     # checking all cache computes
-    check_all_cache(pair_strat_n_strat_state_tuple_list)
+    check_all_cache(pair_plan_n_plan_state_tuple_list)
 
-    # activating all strats
-    recovered_active_strat_list: List = []
-    activated_pair_strat_n_strat_state_tuple_list = []
-    for pair_strat, strat_state_to_handle in pair_strat_n_strat_state_tuple_list:
-        if strat_state_to_handle != StratState.StratState_ACTIVE:
-            active_pair_strat = email_book_service_native_web_client.patch_pair_strat_client(
-                PairStratBaseModel.from_kwargs(_id=pair_strat.id,
-                                               strat_state=StratState.StratState_ACTIVE).to_dict(exclude_none=True))
-            pair_strat = active_pair_strat
+    # activating all plans
+    recovered_active_plan_list: List = []
+    activated_pair_plan_n_plan_state_tuple_list = []
+    for pair_plan, plan_state_to_handle in pair_plan_n_plan_state_tuple_list:
+        if plan_state_to_handle != PlanState.PlanState_ACTIVE:
+            active_pair_plan = email_book_service_native_web_client.patch_pair_plan_client(
+                PairPlanBaseModel.from_kwargs(_id=pair_plan.id,
+                                               plan_state=PlanState.PlanState_ACTIVE).to_dict(exclude_none=True))
+            pair_plan = active_pair_plan
         # else all are already active
-        recovered_active_strat = email_book_service_native_web_client.get_pair_strat_client(pair_strat.id)
-        recovered_active_strat_list.append(recovered_active_strat)
-        activated_pair_strat_n_strat_state_tuple_list.append((recovered_active_strat, StratState.StratState_ACTIVE))
+        recovered_active_plan = email_book_service_native_web_client.get_pair_plan_client(pair_plan.id)
+        recovered_active_plan_list.append(recovered_active_plan)
+        activated_pair_plan_n_plan_state_tuple_list.append((recovered_active_plan, PlanState.PlanState_ACTIVE))
 
     total_chore_count_for_each_side = 1
     time.sleep(10)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=len(recovered_active_strat_list)) as executor:
-        results = [executor.submit(_check_place_chores_post_pair_strat_n_executor_recovery, recovered_pair_strat,
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(recovered_active_plan_list)) as executor:
+        results = [executor.submit(_check_place_chores_post_pair_plan_n_executor_recovery, recovered_pair_plan,
                                    deepcopy(last_barter_fixture_list), residual_wait_sec,
                                    total_chore_count_for_each_side)
-                   for recovered_pair_strat in recovered_active_strat_list]
+                   for recovered_pair_plan in recovered_active_plan_list]
 
         for future in concurrent.futures.as_completed(results):
             if future.exception() is not None:
                 raise Exception(future.exception())
 
-    pair_strat_n_strat_state_tuple_list = (
-        _kill_executors_n_phone_book(activated_pair_strat_n_strat_state_tuple_list, residual_wait_sec))
+    pair_plan_n_plan_state_tuple_list = (
+        _kill_executors_n_phone_book(activated_pair_plan_n_plan_state_tuple_list, residual_wait_sec))
 
     # checking all cache computes
-    check_all_cache(pair_strat_n_strat_state_tuple_list)
+    check_all_cache(pair_plan_n_plan_state_tuple_list)
 
     time.sleep(10)
-    with concurrent.futures.ThreadPoolExecutor(max_workers=len(pair_strat_n_strat_state_tuple_list)) as executor:
-        results = [executor.submit(_check_place_chores_post_pair_strat_n_executor_recovery, recovered_pair_strat,
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(pair_plan_n_plan_state_tuple_list)) as executor:
+        results = [executor.submit(_check_place_chores_post_pair_plan_n_executor_recovery, recovered_pair_plan,
                                    deepcopy(last_barter_fixture_list), residual_wait_sec,
                                    total_chore_count_for_each_side)
-                   for recovered_pair_strat, _ in pair_strat_n_strat_state_tuple_list]
+                   for recovered_pair_plan, _ in pair_plan_n_plan_state_tuple_list]
 
         for future in concurrent.futures.as_completed(results):
             if future.exception() is not None:
@@ -548,31 +548,31 @@ def test_recover_active_n_ready_strats_pair_n_active_all_after_recovery(
 
 
 @pytest.mark.recovery
-def test_recover_snoozed_n_activate_strat_after_recovery(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+def test_recover_snoozed_n_activate_plan_after_recovery(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+        expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         last_barter_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture):
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
-    stored_pair_strat_basemodel = create_strat(leg1_symbol, leg2_symbol, pair_strat_)
+    stored_pair_plan_basemodel = create_plan(leg1_symbol, leg2_symbol, pair_plan_)
 
-    # killing executor with partial name - port is not allocated for this strat yet
+    # killing executor with partial name - port is not allocated for this plan yet
     os.system(f'kill $(pgrep -f "launch_msgspec_fastapi.py 1 &")')
-    pair_strat_n_strat_state_tuple_list = (
+    pair_plan_n_plan_state_tuple_list = (
         _kill_executors_n_phone_book([], residual_wait_sec))
 
-    active_strat, executor_web_client = move_snoozed_pair_strat_to_ready_n_then_active(
-        stored_pair_strat_basemodel, market_depth_basemodel_list,
-        symbol_overview_obj_list, expected_strat_limits_, expected_strat_status_)
+    active_plan, executor_web_client = move_snoozed_pair_plan_to_ready_n_then_active(
+        stored_pair_plan_basemodel, market_depth_basemodel_list,
+        symbol_overview_obj_list, expected_plan_limits_, expected_plan_status_)
 
     # running Last Barter
-    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_strat.cpp_port)
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_plan.cpp_port)
     print(f"LastBarter created: buy_symbol: {leg1_symbol}, sell_symbol: {leg2_symbol}")
 
-    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_strat.id)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(active_plan.id)
 
     try:
         # updating yaml_configs according to this test
@@ -585,7 +585,7 @@ def test_recover_snoozed_n_activate_strat_after_recovery(
 
         total_chore_count_for_each_side_ = 1
         place_sanity_chores_for_executor(
-            leg1_symbol, leg2_symbol, active_strat, total_chore_count_for_each_side_, last_barter_fixture_list,
+            leg1_symbol, leg2_symbol, active_plan, total_chore_count_for_each_side_, last_barter_fixture_list,
             residual_wait_sec, executor_web_client)
     except AssertionError as e_:
         raise AssertionError(e_)
@@ -597,16 +597,16 @@ def test_recover_snoozed_n_activate_strat_after_recovery(
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
-def _test_post_pair_strat_crash_recovery(updated_pair_strat: PairStratBaseModel, executor_web_client,
+def _test_post_pair_plan_crash_recovery(updated_pair_plan: PairPlanBaseModel, executor_web_client,
                                          last_barter_fixture_list, refresh_sec):
     residual_wait_sec = 4 * refresh_sec
 
-    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(updated_pair_strat.id)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(updated_pair_plan.id)
 
-    buy_symbol = updated_pair_strat.pair_strat_params.strat_leg1.sec.sec_id
-    sell_symbol = updated_pair_strat.pair_strat_params.strat_leg2.sec.sec_id
-    recovered_portfolio_status: PortfolioStatusBaseModel = (
-        email_book_service_native_web_client.get_portfolio_status_client(1))
+    buy_symbol = updated_pair_plan.pair_plan_params.plan_leg1.sec.sec_id
+    sell_symbol = updated_pair_plan.pair_plan_params.plan_leg2.sec.sec_id
+    recovered_contact_status: ContactStatusBaseModel = (
+        email_book_service_native_web_client.get_contact_status_client(1))
 
     try:
         # updating yaml_configs according to this test
@@ -619,25 +619,25 @@ def _test_post_pair_strat_crash_recovery(updated_pair_strat: PairStratBaseModel,
 
         total_chore_count_for_each_side = 2
         place_sanity_chores_for_executor(
-            buy_symbol, sell_symbol, updated_pair_strat, total_chore_count_for_each_side, last_barter_fixture_list,
+            buy_symbol, sell_symbol, updated_pair_plan, total_chore_count_for_each_side, last_barter_fixture_list,
             residual_wait_sec, executor_web_client, place_after_recovery=True)
 
-        new_portfolio_status: PortfolioStatusBaseModel = (
-            email_book_service_native_web_client.get_portfolio_status_client(1))
+        new_contact_status: ContactStatusBaseModel = (
+            email_book_service_native_web_client.get_contact_status_client(1))
 
-        assert recovered_portfolio_status != new_portfolio_status, \
-            ("Unexpected: portfolio must have got updated after pair_strat recover, "
-             f"old_portfolio_status {recovered_portfolio_status}, "
-             f"new_portfolio_status {new_portfolio_status}")
+        assert recovered_contact_status != new_contact_status, \
+            ("Unexpected: contact must have got updated after pair_plan recover, "
+             f"old_contact_status {recovered_contact_status}, "
+             f"new_contact_status {new_contact_status}")
 
-        done_pair_strat = email_book_service_native_web_client.patch_pair_strat_client(
-            PairStratBaseModel.from_kwargs(_id=updated_pair_strat.id,
-                                           strat_state=StratState.StratState_DONE).to_dict(exclude_none=True))
+        done_pair_plan = email_book_service_native_web_client.patch_pair_plan_client(
+            PairPlanBaseModel.from_kwargs(_id=updated_pair_plan.id,
+                                           plan_state=PlanState.PlanState_DONE).to_dict(exclude_none=True))
 
         try:
-            email_book_service_native_web_client.delete_pair_strat_client(done_pair_strat.id)
+            email_book_service_native_web_client.delete_pair_plan_client(done_pair_plan.id)
         except Exception as e:
-            raise Exception(f"PairStrat delete failed, exception: {e}")
+            raise Exception(f"PairPlan delete failed, exception: {e}")
 
         time.sleep(2)
         try:
@@ -646,8 +646,8 @@ def _test_post_pair_strat_crash_recovery(updated_pair_strat: PairStratBaseModel,
             if "Failed to establish a new connection: [Errno 111] Connection refused" not in str(e):
                 raise Exception(f"Expected Exception is connection refused error but got exception: {e}")
         else:
-            assert False, ("Since strat is deleted corresponding executor must also get terminated but "
-                           f"still functioning, port: {updated_pair_strat.port}")
+            assert False, ("Since plan is deleted corresponding executor must also get terminated but "
+                           f"still functioning, port: {updated_pair_plan.port}")
     except AssertionError as e:
         raise AssertionError(e)
     except Exception as e:
@@ -657,72 +657,72 @@ def _test_post_pair_strat_crash_recovery(updated_pair_strat: PairStratBaseModel,
 
 
 @pytest.mark.recovery
-def test_pair_strat_crash_recovery(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+def test_pair_plan_crash_recovery(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+        expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         last_barter_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture):
-    activated_strat_n_executor_http_client_tuple_list: List[Tuple[PairStrat, StreetBookServiceHttpClient]] = []
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    activated_plan_n_executor_http_client_tuple_list: List[Tuple[PairPlan, StreetBookServiceHttpClient]] = []
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
-    symbols_n_strat_state_list = []
-    strat_state_list = [StratState.StratState_ACTIVE, StratState.StratState_READY, StratState.StratState_PAUSED,
-                        StratState.StratState_SNOOZED, StratState.StratState_ERROR, StratState.StratState_DONE]
+    symbols_n_plan_state_list = []
+    plan_state_list = [PlanState.PlanState_ACTIVE, PlanState.PlanState_READY, PlanState.PlanState_PAUSED,
+                        PlanState.PlanState_SNOOZED, PlanState.PlanState_ERROR, PlanState.PlanState_DONE]
 
-    for index, symbol_tuple in enumerate(leg1_leg2_symbol_list[:len(strat_state_list)]):
-        symbols_n_strat_state_list.append((symbol_tuple[0], symbol_tuple[1], strat_state_list[index]))
+    for index, symbol_tuple in enumerate(leg1_leg2_symbol_list[:len(plan_state_list)]):
+        symbols_n_plan_state_list.append((symbol_tuple[0], symbol_tuple[1], plan_state_list[index]))
 
     total_chore_count_for_each_side_ = 1
-    with concurrent.futures.ThreadPoolExecutor(max_workers=len(symbols_n_strat_state_list)) as executor:
-        results = [executor.submit(_activate_pair_strat_n_place_sanity_chores, buy_symbol, sell_symbol,
-                                   deepcopy(pair_strat_), deepcopy(expected_strat_limits_),
-                                   deepcopy(expected_strat_status_), deepcopy(symbol_overview_obj_list),
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(symbols_n_plan_state_list)) as executor:
+        results = [executor.submit(_activate_pair_plan_n_place_sanity_chores, buy_symbol, sell_symbol,
+                                   deepcopy(pair_plan_), deepcopy(expected_plan_limits_),
+                                   deepcopy(expected_plan_status_), deepcopy(symbol_overview_obj_list),
                                    deepcopy(last_barter_fixture_list), deepcopy(market_depth_basemodel_list),
-                                   strat_state_to_handle, refresh_sec_update_fixture,
+                                   plan_state_to_handle, refresh_sec_update_fixture,
                                    total_chore_count_for_each_side_)
-                   for buy_symbol, sell_symbol, strat_state_to_handle in symbols_n_strat_state_list]
+                   for buy_symbol, sell_symbol, plan_state_to_handle in symbols_n_plan_state_list]
 
         for future in concurrent.futures.as_completed(results):
             if future.exception() is not None:
                 raise Exception(future.exception())
 
-            activated_strat_n_executor_http_client_tuple_list.append(future.result())
+            activated_plan_n_executor_http_client_tuple_list.append(future.result())
 
-    pair_strat_n_strat_state_list = []
+    pair_plan_n_plan_state_list = []
 
-    for activated_strat, _, strat_state_to_handle in activated_strat_n_executor_http_client_tuple_list:
-        pair_strat_n_strat_state_list.append((activated_strat, strat_state_to_handle))
+    for activated_plan, _, plan_state_to_handle in activated_plan_n_executor_http_client_tuple_list:
+        pair_plan_n_plan_state_list.append((activated_plan, plan_state_to_handle))
 
-    pair_strat_port: int = email_book_service_native_web_client.port
-    _handle_process_kill(pair_strat_port)  # asserts implicitly
+    pair_plan_port: int = email_book_service_native_web_client.port
+    _handle_process_kill(pair_plan_port)  # asserts implicitly
 
     restart_phone_book()
     time.sleep(residual_wait_sec * 2)
 
-    for old_pair_strat, strat_state_to_handle in pair_strat_n_strat_state_list:
+    for old_pair_plan, plan_state_to_handle in pair_plan_n_plan_state_list:
         for _ in range(20):
-            pair_strat = email_book_service_native_web_client.get_pair_strat_client(old_pair_strat.id)
-            if pair_strat.port is not None and pair_strat.port == old_pair_strat.port:
+            pair_plan = email_book_service_native_web_client.get_pair_plan_client(old_pair_plan.id)
+            if pair_plan.port is not None and pair_plan.port == old_pair_plan.port:
                 break
         else:
-            assert False, f"PairStrat not found with existing port after recovered pair_strat"
+            assert False, f"PairPlan not found with existing port after recovered pair_plan"
 
-        # checking server_ready_state - since strats are converted to specific states after activating and executors
-        # are not killed only phone_book is killed, strats will still have server_ready_state = 3
+        # checking server_ready_state - since plans are converted to specific states after activating and executors
+        # are not killed only phone_book is killed, plans will still have server_ready_state = 3
         expected_server_ready_state = 3
-        assert pair_strat.server_ready_state == expected_server_ready_state, \
-            (f"Mismatched server_ready_state in pair_strat, {expected_server_ready_state=}, "
-             f"received {pair_strat.server_ready_state}")
+        assert pair_plan.server_ready_state == expected_server_ready_state, \
+            (f"Mismatched server_ready_state in pair_plan, {expected_server_ready_state=}, "
+             f"received {pair_plan.server_ready_state}")
 
     time.sleep(residual_wait_sec)
 
-    active_pair_strat_id = None
-    for pair_strat, strat_state_to_handle in pair_strat_n_strat_state_list:
-        if strat_state_to_handle == StratState.StratState_ACTIVE:
-            active_pair_strat_id = pair_strat.id
-    recovered_active_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat_id)
+    active_pair_plan_id = None
+    for pair_plan, plan_state_to_handle in pair_plan_n_plan_state_list:
+        if plan_state_to_handle == PlanState.PlanState_ACTIVE:
+            active_pair_plan_id = pair_plan.id
+    recovered_active_plan = email_book_service_native_web_client.get_pair_plan_client(active_pair_plan_id)
     total_chore_count_for_each_side = 2
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-        results = [executor.submit(_check_place_chores_post_pair_strat_n_executor_recovery, recovered_active_strat,
+        results = [executor.submit(_check_place_chores_post_pair_plan_n_executor_recovery, recovered_active_plan,
                                    deepcopy(last_barter_fixture_list), residual_wait_sec,
                                    total_chore_count_for_each_side)]
 
@@ -731,32 +731,32 @@ def test_pair_strat_crash_recovery(
                 raise Exception(future.exception())
 
 
-# todo: Currently broken - DB updates from log analyzer currently only updates strat_view
+# todo: Currently broken - DB updates from log analyzer currently only updates plan_view
 @pytest.mark.recovery1
-def _test_update_pair_strat_from_pair_strat_log_book(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+def _test_update_pair_plan_from_pair_plan_log_book(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+        expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         market_depth_basemodel_list, last_barter_fixture_list,
         expected_chore_limits_, refresh_sec_update_fixture):
     """
-    INFO: created strat and activates it with low max_single_leg_notional so consumable_notional becomes low and
-    strat_limits.min_chore_notional is made higher than consumable_notional intentionally.
-    After this pair_strat engine process is killed and since executor service is still up, triggers place chore
-    which results in getting rejected as strat is found as Done because of
-    consumable_notional < strat_limits.min_chore_notional and pair_start is tried to be updated as PAUSED but
-    pair_strat engine is down so executor logs this as log to be handled by pair_strat log analyzer once
-    pair_strat is up. pair_strat is restarted and then test checks state must be Done
+    INFO: created plan and activates it with low max_single_leg_notional so consumable_notional becomes low and
+    plan_limits.min_chore_notional is made higher than consumable_notional intentionally.
+    After this pair_plan engine process is killed and since executor service is still up, triggers place chore
+    which results in getting rejected as plan is found as Done because of
+    consumable_notional < plan_limits.min_chore_notional and pair_start is tried to be updated as PAUSED but
+    pair_plan engine is down so executor logs this as log to be handled by pair_plan log analyzer once
+    pair_plan is up. pair_plan is restarted and then test checks state must be Done
     """
 
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
 
-    # create pair_strat
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    # create pair_plan
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    activated_pair_strat, executor_web_client = create_n_activate_strat(
-        leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
+    activated_pair_plan, executor_web_client = create_n_activate_plan(
+        leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_, expected_plan_status_,
         symbol_overview_obj_list, market_depth_basemodel_list)
 
     time.sleep(5)
@@ -764,15 +764,15 @@ def _test_update_pair_strat_from_pair_strat_log_book(
     _handle_process_kill(email_book_service_native_web_client.port)  # asserts implicitly
 
     # updating pair_buy_side_bartering_brief.consumable_notional to be lower than min_tradable_notional
-    strat_brief_ = executor_web_client.get_strat_brief_client(activated_pair_strat.id)
-    strat_brief_.pair_buy_side_bartering_brief.consumable_notional = 10
-    updated_strat_brief = executor_web_client.put_strat_brief_client(strat_brief_)
-    assert updated_strat_brief == strat_brief_, \
-        f"Mismatched strat_brief: expected: {strat_brief_}, updated: {updated_strat_brief}"
+    plan_brief_ = executor_web_client.get_plan_brief_client(activated_pair_plan.id)
+    plan_brief_.pair_buy_side_bartering_brief.consumable_notional = 10
+    updated_plan_brief = executor_web_client.put_plan_brief_client(plan_brief_)
+    assert updated_plan_brief == plan_brief_, \
+        f"Mismatched plan_brief: expected: {plan_brief_}, updated: {updated_plan_brief}"
 
     total_chore_count_for_each_side = 1
     place_sanity_chores_for_executor(
-        leg1_symbol, leg2_symbol, activated_pair_strat, total_chore_count_for_each_side, last_barter_fixture_list,
+        leg1_symbol, leg2_symbol, activated_pair_plan, total_chore_count_for_each_side, last_barter_fixture_list,
         residual_wait_sec, executor_web_client, place_after_recovery=True,
         expect_no_chore=True)
 
@@ -780,21 +780,21 @@ def _test_update_pair_strat_from_pair_strat_log_book(
     restart_phone_book()
     time.sleep(residual_wait_sec * 2)
 
-    updated_pair_strat = email_book_service_native_web_client.get_pair_strat_client(activated_pair_strat.id)
-    assert updated_pair_strat.strat_state == StratState.StratState_PAUSED, \
-        (f"Mismatched: StratState must be PAUSE after update when phone_book was down, "
-         f"found: {updated_pair_strat.strat_state}")
+    updated_pair_plan = email_book_service_native_web_client.get_pair_plan_client(activated_pair_plan.id)
+    assert updated_pair_plan.plan_state == PlanState.PlanState_PAUSED, \
+        (f"Mismatched: PlanState must be PAUSE after update when phone_book was down, "
+         f"found: {updated_pair_plan.plan_state}")
 
 
 def _place_chore_n_kill_executor_n_verify_post_recovery(
-        leg1_symbol, leg2_symbol, activated_pair_strat, last_barter_fixture_list,
+        leg1_symbol, leg2_symbol, activated_pair_plan, last_barter_fixture_list,
         executor_web_client, residual_wait_sec, expected_chore_event, check_fulfilled: bool = False):
     bid_buy_top_market_depth, ask_sell_top_market_depth = (
-        get_buy_bid_n_ask_sell_market_depth(leg1_symbol, leg2_symbol, activated_pair_strat))
+        get_buy_bid_n_ask_sell_market_depth(leg1_symbol, leg2_symbol, activated_pair_plan))
 
-    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, activated_pair_strat.cpp_port)
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, activated_pair_plan.cpp_port)
     time.sleep(1)
-    update_tob_through_market_depth_to_place_buy_chore(activated_pair_strat.cpp_port, bid_buy_top_market_depth,
+    update_tob_through_market_depth_to_place_buy_chore(activated_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                        ask_sell_top_market_depth)
 
     ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(expected_chore_event,
@@ -809,19 +809,19 @@ def _place_chore_n_kill_executor_n_verify_post_recovery(
         assert chore_snapshot.filled_qty == ack_chore_journal.chore.qty, \
             f"Mismatched filled_qty: expected {ack_chore_journal.chore.qty}, received {chore_snapshot.cxled_qty}"
 
-    port: int = activated_pair_strat.port
+    port: int = activated_pair_plan.port
     _handle_process_kill(port)  # asserts implicitly
     time.sleep(residual_wait_sec)
 
-    _check_new_executor_has_new_port(old_port=port, pair_strat_id=activated_pair_strat.id)
+    _check_new_executor_has_new_port(old_port=port, pair_plan_id=activated_pair_plan.id)
     time.sleep(residual_wait_sec)
 
-    # checking server_ready_state in recovered_strat
-    updated_pair_strat = _verify_server_ready_state_in_recovered_strat(StratState.StratState_ACTIVE,
-                                                                       activated_pair_strat.id)
+    # checking server_ready_state in recovered_plan
+    updated_pair_plan = _verify_server_ready_state_in_recovered_plan(PlanState.PlanState_ACTIVE,
+                                                                       activated_pair_plan.id)
 
     new_executor_web_client = StreetBookServiceHttpClient.set_or_get_if_instance_exists(
-        updated_pair_strat.host, updated_pair_strat.port)
+        updated_pair_plan.host, updated_pair_plan.port)
 
     cxl_chore_journal = get_latest_chore_journal_with_event_and_symbol(
         ChoreEventType.OE_CXL_ACK, leg1_symbol, new_executor_web_client,
@@ -830,8 +830,8 @@ def _place_chore_n_kill_executor_n_verify_post_recovery(
 
 
 def test_verify_placed_chores_get_cxled_after_recovery1(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+        expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         last_barter_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture):
     """
     checks if chores that got placed before crash gets cxled after recovery for being residual
@@ -841,16 +841,16 @@ def test_verify_placed_chores_get_cxled_after_recovery1(
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
 
-    # create pair_strat
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    # create pair_plan
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    activated_pair_strat, executor_web_client = create_n_activate_strat(
-        leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
+    activated_pair_plan, executor_web_client = create_n_activate_plan(
+        leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_, expected_plan_status_,
         symbol_overview_obj_list, market_depth_basemodel_list)
 
     time.sleep(5)
-    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(activated_pair_strat.id)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(activated_pair_plan.id)
 
     try:
         # updating yaml_configs according to this test
@@ -862,7 +862,7 @@ def test_verify_placed_chores_get_cxled_after_recovery1(
         executor_web_client.barter_simulator_reload_config_query_client()
 
         ack_chore_journal, new_executor_web_client = _place_chore_n_kill_executor_n_verify_post_recovery(
-            leg1_symbol, leg2_symbol, activated_pair_strat, last_barter_fixture_list,
+            leg1_symbol, leg2_symbol, activated_pair_plan, last_barter_fixture_list,
             executor_web_client, residual_wait_sec, ChoreEventType.OE_ACK)
         chore_snapshot = get_chore_snapshot_from_chore_id(ack_chore_journal.chore.chore_id, new_executor_web_client)
         assert chore_snapshot.chore_status == ChoreStatusType.OE_DOD, \
@@ -882,8 +882,8 @@ def test_verify_placed_chores_get_cxled_after_recovery1(
 
 
 def test_verify_placed_chores_get_cxled_after_recovery2(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+        expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         last_barter_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture):
     """
     checks if chores that got placed before crash gets cxled after recovery for being residual
@@ -893,16 +893,16 @@ def test_verify_placed_chores_get_cxled_after_recovery2(
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
 
-    # create pair_strat
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    # create pair_plan
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    activated_pair_strat, executor_web_client = create_n_activate_strat(
-        leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
+    activated_pair_plan, executor_web_client = create_n_activate_plan(
+        leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_, expected_plan_status_,
         symbol_overview_obj_list, market_depth_basemodel_list)
 
     time.sleep(5)
-    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(activated_pair_strat.id)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(activated_pair_plan.id)
 
     try:
         # updating yaml_configs according to this test
@@ -914,7 +914,7 @@ def test_verify_placed_chores_get_cxled_after_recovery2(
         executor_web_client.barter_simulator_reload_config_query_client()
 
         ack_chore_journal, new_executor_web_client = _place_chore_n_kill_executor_n_verify_post_recovery(
-            leg1_symbol, leg2_symbol, activated_pair_strat, last_barter_fixture_list,
+            leg1_symbol, leg2_symbol, activated_pair_plan, last_barter_fixture_list,
             executor_web_client, residual_wait_sec, ChoreEventType.OE_ACK)
         chore_snapshot = get_chore_snapshot_from_chore_id(ack_chore_journal.chore.chore_id, new_executor_web_client)
         assert chore_snapshot.chore_status == ChoreStatusType.OE_DOD, \
@@ -932,8 +932,8 @@ def test_verify_placed_chores_get_cxled_after_recovery2(
 
 
 def test_verify_placed_chores_get_cxled_after_recovery3(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+        expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         last_barter_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture):
     """
     checks if chores that got placed before crash gets cxled after recovery for being residual
@@ -943,17 +943,17 @@ def test_verify_placed_chores_get_cxled_after_recovery3(
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
 
-    # create pair_strat
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    # create pair_plan
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    activated_pair_strat, executor_web_client = create_n_activate_strat(
-        leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
+    activated_pair_plan, executor_web_client = create_n_activate_plan(
+        leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_, expected_plan_status_,
         symbol_overview_obj_list, market_depth_basemodel_list)
 
     try:
         ack_chore_journal, new_executor_web_client = _place_chore_n_kill_executor_n_verify_post_recovery(
-            leg1_symbol, leg2_symbol, activated_pair_strat, last_barter_fixture_list,
+            leg1_symbol, leg2_symbol, activated_pair_plan, last_barter_fixture_list,
             executor_web_client, residual_wait_sec, ChoreEventType.OE_NEW)
         chore_snapshot = get_chore_snapshot_from_chore_id(ack_chore_journal.chore.chore_id, new_executor_web_client)
         assert chore_snapshot.chore_status == ChoreStatusType.OE_DOD, \
@@ -969,8 +969,8 @@ def test_verify_placed_chores_get_cxled_after_recovery3(
 
 
 def test_verify_placed_chores_get_cxled_after_recovery4(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+        expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         last_barter_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture):
     """
     checks if chores that got placed before crash gets cxled after recovery for being residual
@@ -980,16 +980,16 @@ def test_verify_placed_chores_get_cxled_after_recovery4(
     leg1_symbol = leg1_leg2_symbol_list[0][0]
     leg2_symbol = leg1_leg2_symbol_list[0][1]
 
-    # create pair_strat
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    # create pair_plan
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    activated_pair_strat, executor_web_client = create_n_activate_strat(
-        leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
+    activated_pair_plan, executor_web_client = create_n_activate_plan(
+        leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_, expected_plan_status_,
         symbol_overview_obj_list, market_depth_basemodel_list)
 
     time.sleep(5)
-    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(activated_pair_strat.id)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(activated_pair_plan.id)
 
     try:
         # updating yaml_configs according to this test
@@ -1001,7 +1001,7 @@ def test_verify_placed_chores_get_cxled_after_recovery4(
         executor_web_client.barter_simulator_reload_config_query_client()
 
         ack_chore_journal, new_executor_web_client = _place_chore_n_kill_executor_n_verify_post_recovery(
-            leg1_symbol, leg2_symbol, activated_pair_strat, last_barter_fixture_list,
+            leg1_symbol, leg2_symbol, activated_pair_plan, last_barter_fixture_list,
             executor_web_client, residual_wait_sec, ChoreEventType.OE_ACK, check_fulfilled=True)
         chore_snapshot = get_chore_snapshot_from_chore_id(ack_chore_journal.chore.chore_id, new_executor_web_client)
         assert chore_snapshot.chore_status == ChoreStatusType.OE_FILLED, \
@@ -1018,8 +1018,8 @@ def test_verify_placed_chores_get_cxled_after_recovery4(
 
 @pytest.mark.recovery
 def test_recover_kill_switch_when_bartering_server_has_enabled(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-        expected_strat_limits_, expected_strat_status_,
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+        expected_plan_limits_, expected_plan_status_,
         symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list, refresh_sec_update_fixture):
 
@@ -1036,8 +1036,8 @@ def test_recover_kill_switch_when_bartering_server_has_enabled(
         # updating simulator's configs
         email_book_service_native_web_client.log_simulator_reload_config_query_client()
 
-        pair_strat_port: int = email_book_service_native_web_client.port
-        _handle_process_kill(pair_strat_port)  # asserts implicitly
+        pair_plan_port: int = email_book_service_native_web_client.port
+        _handle_process_kill(pair_plan_port)  # asserts implicitly
 
         restart_phone_book()
         time.sleep(residual_wait_sec * 2)
@@ -1049,8 +1049,8 @@ def test_recover_kill_switch_when_bartering_server_has_enabled(
 
         # validating if bartering_link.trigger_kill_switch got called
         check_str = "Called BarteringLink.BarteringLink.trigger_kill_switch"
-        portfolio_alerts = log_book_web_client.get_all_portfolio_alert_client()
-        for alert in portfolio_alerts:
+        contact_alerts = log_book_web_client.get_all_contact_alert_client()
+        for alert in contact_alerts:
             if re.search(check_str, alert.alert_brief):
                 assert False, \
                     ("BarteringLink.trigger_kill_switch must not have been triggered when kill switch is enabled in"
@@ -1070,8 +1070,8 @@ def test_recover_kill_switch_when_bartering_server_has_enabled(
 
 @pytest.mark.recovery
 def test_recover_kill_switch_when_bartering_server_has_disabled(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-        expected_strat_limits_, expected_strat_status_,
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+        expected_plan_limits_, expected_plan_status_,
         symbol_overview_obj_list, last_barter_fixture_list,
         market_depth_basemodel_list, refresh_sec_update_fixture):
 
@@ -1091,8 +1091,8 @@ def test_recover_kill_switch_when_bartering_server_has_disabled(
         # updating simulator's configs
         email_book_service_native_web_client.log_simulator_reload_config_query_client()
 
-        pair_strat_port: int = email_book_service_native_web_client.port
-        _handle_process_kill(pair_strat_port)  # asserts implicitly
+        pair_plan_port: int = email_book_service_native_web_client.port
+        _handle_process_kill(pair_plan_port)  # asserts implicitly
 
         restart_phone_book()
         time.sleep(residual_wait_sec * 2)
@@ -1103,9 +1103,9 @@ def test_recover_kill_switch_when_bartering_server_has_disabled(
 
         # validating if bartering_link.trigger_kill_switch got called
         check_str = "Called BarteringLink.trigger_kill_switch"
-        alert_fail_message = f"Can't find portfolio alert saying '{check_str}'"
+        alert_fail_message = f"Can't find contact alert saying '{check_str}'"
         time.sleep(5)
-        check_alert_str_in_portfolio_alert(check_str, alert_fail_message)
+        check_alert_str_in_contact_alert(check_str, alert_fail_message)
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -1121,20 +1121,20 @@ def test_recover_kill_switch_when_bartering_server_has_disabled(
 
 @pytest.mark.recovery
 def test_cpp_app_recovery(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_strat_,
-        expected_strat_limits_, expected_strat_status_,
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+        expected_plan_limits_, expected_plan_status_,
         symbol_overview_obj_list, last_barter_fixture_list, max_loop_count_per_side,
         market_depth_basemodel_list, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
     max_loop_count_per_side = 1
 
-    buy_symbol, sell_symbol, created_pair_strat, executor_web_client = (
-        place_sanity_chores(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_, expected_strat_status_,
+    buy_symbol, sell_symbol, created_pair_plan, executor_web_client = (
+        place_sanity_chores(buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_, expected_plan_status_,
                             symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
                             max_loop_count_per_side, refresh_sec_update_fixture))
 
-    log_file_path = str(STRAT_EXECUTOR / "log" / f"street_book_{created_pair_strat.id}_logs_{frmt_date}.log")
+    log_file_path = str(STRAT_EXECUTOR / "log" / f"street_book_{created_pair_plan.id}_logs_{frmt_date}.log")
     test_log = "Log added by test_cpp_app_recovery: ignore it"
     # putting this log line in executor log to use it later in test as a point from which new cpp_app's
     # released semaphore's log will get logged
@@ -1143,7 +1143,7 @@ def test_cpp_app_recovery(
 
     # killing cpp app
     result = subprocess.run(
-        [f'pgrep', '-f', f'mobile_book_executable.*executor_{created_pair_strat.id}_simulate_config'],
+        [f'pgrep', '-f', f'mobile_book_executable.*executor_{created_pair_plan.id}_simulate_config'],
         text=True,  # Capture text output
         stdout=subprocess.PIPE,  # Capture standard output
         stderr=subprocess.PIPE,  # Capture standard error
@@ -1155,12 +1155,12 @@ def test_cpp_app_recovery(
         time.sleep(2)
     else:
         assert False, \
-            (f"Can't find cpp process with strat_id: {created_pair_strat.id} running, "
+            (f"Can't find cpp process with plan_id: {created_pair_plan.id} running, "
              f"process check output: {result.stdout}")
 
     scripts_dir = STRAT_EXECUTOR / "scripts"
     # start file generator
-    start_sh_file_path = scripts_dir / f"start_ps_id_{created_pair_strat.id}_md.sh"
+    start_sh_file_path = scripts_dir / f"start_ps_id_{created_pair_plan.id}_md.sh"
     subprocess.Popen([f"{start_sh_file_path}"])
 
     time.sleep(10)
@@ -1185,5 +1185,5 @@ def test_cpp_app_recovery(
     assert count == 6, \
         f"Mismatched number of times log msg must exists, expected 6, found {count}"
 
-    _check_place_chores_post_pair_strat_n_executor_recovery(
-        created_pair_strat, last_barter_fixture_list, refresh_sec_update_fixture, total_chore_count_for_each_side=2)
+    _check_place_chores_post_pair_plan_n_executor_recovery(
+        created_pair_plan, last_barter_fixture_list, refresh_sec_update_fixture, total_chore_count_for_each_side=2)

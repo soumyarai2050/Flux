@@ -360,7 +360,7 @@
 
 
 //TEST(MD_ManageSubscriptionSymbolsTest, TestSubscriptionSymbols) {
-//    MD_ManageSubscriptionSymbols md("127.0.0.1", "8020", "/phone_book/query-get_ongoing_strats_symbol_n_exch/");
+//    MD_ManageSubscriptionSymbols md("127.0.0.1", "8020", "/phone_book/query-get_ongoing_plans_symbol_n_exch/");
 //    std::vector<std::string> result = md.get();
 //    ASSERT_FALSE(result.empty());
 //}

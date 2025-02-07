@@ -3,16 +3,16 @@ from copy import deepcopy
 
 
 @pytest.fixture()
-def single_strat_single_data():
+def single_plan_single_data():
     payload_dict = [
         {
-            "strat_id": 1,
+            "plan_id": 1,
             "chore_journal": {
                 "_id": 1,
                 "chore": {
-                    "chore_id": "CB_Sec_1-2023-10-26T21:54:59.672447+00:00",
+                    "chore_id": "Type1_Sec_1-2023-10-26T21:54:59.672447+00:00",
                     "security": {
-                        "sec_id": "CB_Sec_1",
+                        "sec_id": "Type1_Sec_1",
                         "sec_id_source": "TICKER"
                     },
                     "side": "BUY",
@@ -22,7 +22,7 @@ def single_strat_single_data():
                     "underlying_account": "bartering_account",
                     "exchange": "bartering_exchange",
                     "text": [
-                        "SIM: Choreing CB_Sec_1/CB_Sec_1, qty 90 and px 100.0"
+                        "SIM: Choreing Type1_Sec_1/Type1_Sec_1, qty 90 and px 100.0"
                     ]
                 },
                 "chore_event_date_time": "2023-10-26T21:54:59.672Z",
@@ -33,9 +33,9 @@ def single_strat_single_data():
                 "_id": 4,
                 "chore_status": "OE_ACKED",
                 "chore_brief": {
-                    "chore_id": "CB_Sec_1-2023-10-26T21:55:04.015464+00:00",
+                    "chore_id": "Type1_Sec_1-2023-10-26T21:55:04.015464+00:00",
                     "security": {
-                        "sec_id": "CB_Sec_1",
+                        "sec_id": "Type1_Sec_1",
                         "sec_id_source": "TICKER"
                     },
                     "side": "BUY",
@@ -45,7 +45,7 @@ def single_strat_single_data():
                     "underlying_account": "bartering_account",
                     "exchange": "bartering_exchange",
                     "text": [
-                        "SIM: Choreing CB_Sec_1/CB_Sec_1, qty 90 and px 100.0"
+                        "SIM: Choreing Type1_Sec_1/Type1_Sec_1, qty 90 and px 100.0"
                     ]
                 },
                 "filled_qty": 45,
@@ -60,11 +60,11 @@ def single_strat_single_data():
                 "last_update_date_time": "2023-10-26T21:55:04.117Z",
                 "last_n_sec_total_qty": None
             },
-            "strat_brief": {
+            "plan_brief": {
                 "_id": 1,
                 "pair_buy_side_bartering_brief": {
                     "security": {
-                        "sec_id": "CB_Sec_1",
+                        "sec_id": "Type1_Sec_1",
                         "sec_id_source": "TICKER"
                     },
                     "side": "BUY",
@@ -84,7 +84,7 @@ def single_strat_single_data():
                 },
                 "pair_sell_side_bartering_brief": {
                     "security": {
-                        "sec_id": "EQT_Sec_1",
+                        "sec_id": "Type2_Sec_1",
                         "sec_id_source": "TICKER"
                     },
                     "side": "SELL",
@@ -110,46 +110,46 @@ def single_strat_single_data():
 
 
 @pytest.fixture()
-def single_strat_multi_data(single_strat_single_data):
+def single_plan_multi_data(single_plan_single_data):
     payload_dict = []
     for index in range(5):
-        payload = deepcopy(single_strat_single_data[0])
+        payload = deepcopy(single_plan_single_data[0])
         payload["chore_journal"]["chore"]["px"] = 100 * (index + 1)
         payload["chore_snapshot"]["chore_brief"]["px"] = 100 * (index + 1)
-        payload["strat_brief"]["pair_buy_side_bartering_brief"]["open_qty"] = 5 * (index + 1)
-        payload["strat_brief"]["pair_sell_side_bartering_brief"]["open_qty"] = 10 * (index + 1)
+        payload["plan_brief"]["pair_buy_side_bartering_brief"]["open_qty"] = 5 * (index + 1)
+        payload["plan_brief"]["pair_sell_side_bartering_brief"]["open_qty"] = 10 * (index + 1)
         payload_dict.append(payload)
 
     return payload_dict
 
 
 @pytest.fixture()
-def multi_strat_single_data(single_strat_single_data):
+def multi_plan_single_data(single_plan_single_data):
     payload_dict = []
     for index in range(5):
-        payload = deepcopy(single_strat_single_data[0])
-        payload["strat_id"] = index+1
+        payload = deepcopy(single_plan_single_data[0])
+        payload["plan_id"] = index+1
         payload["chore_journal"]["chore"]["px"] = 100 * (index+1)
         payload["chore_snapshot"]["chore_brief"]["px"] = 100 * (index+1)
-        payload["strat_brief"]["pair_buy_side_bartering_brief"]["open_qty"] = 5 * (index+1)
-        payload["strat_brief"]["pair_sell_side_bartering_brief"]["open_qty"] = 10 * (index+1)
+        payload["plan_brief"]["pair_buy_side_bartering_brief"]["open_qty"] = 5 * (index+1)
+        payload["plan_brief"]["pair_sell_side_bartering_brief"]["open_qty"] = 10 * (index+1)
         payload_dict.append(payload)
 
     return payload_dict
 
 
 @pytest.fixture()
-def multi_strat_multi_data(single_strat_single_data):
+def multi_plan_multi_data(single_plan_single_data):
     payload_dict = []
     for i in range(5):
         for j in range(5):
-            payload = deepcopy(single_strat_single_data[0])
-            payload["strat_id"] = i+1
-            # payload["strat_id"] = (i*5)+j
+            payload = deepcopy(single_plan_single_data[0])
+            payload["plan_id"] = i+1
+            # payload["plan_id"] = (i*5)+j
             payload["chore_journal"]["chore"]["px"] = 100 * (j+1)
             payload["chore_snapshot"]["chore_brief"]["px"] = 100 * (j+1)
-            payload["strat_brief"]["pair_buy_side_bartering_brief"]["open_qty"] = 5 * (j+1)
-            payload["strat_brief"]["pair_sell_side_bartering_brief"]["open_qty"] = 10 * (j+1)
+            payload["plan_brief"]["pair_buy_side_bartering_brief"]["open_qty"] = 5 * (j+1)
+            payload["plan_brief"]["pair_sell_side_bartering_brief"]["open_qty"] = 10 * (j+1)
             payload_dict.append(payload)
 
     return payload_dict

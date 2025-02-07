@@ -3427,14 +3427,14 @@ function jsonify(obj) {
 export function getServerUrl(widgetSchema, linkedObj, serverReadyStatusFld, requestType='http') {
     if (widgetSchema.connection_details) {
         const connectionDetails = widgetSchema.connection_details;
-        const { host, port, ws_port, project_name } = connectionDetails;
+        const { host, port, project_name } = connectionDetails;
         // set url only if linkedObj running field is set to true for dynamic as well as static
         if (widgetSchema.widget_ui_data_element?.depending_proto_model_name) {
             const requiredStateLvl = widgetSchema.widget_ui_data_element.server_running_status_lvl || 0;
             if (linkedObj && Object.keys(linkedObj).length && _.get(linkedObj, serverReadyStatusFld) >= requiredStateLvl) {
                 if (connectionDetails.dynamic_url) {
                     const hostxpath = host.substring(host.indexOf('.') + 1);
-                    const portFld = requestType === 'http' ? port : ws_port;
+                    const portFld = port;
                     const portxpath = portFld.substring(port.indexOf('.') + 1);
                     const hostVal = _.get(linkedObj, hostxpath);
                     const portVal = _.get(linkedObj, portxpath);

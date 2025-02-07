@@ -129,7 +129,7 @@ class LogBarterSimulator(BarteringLinkBase):
     @classmethod
     async def is_kill_switch_enabled(cls) -> bool:
         logging.info("Called BarteringLink.is_kill_switch_enabled from LogBarterSimulator")
-        is_kill_switch_enabled = cls.portfolio_config_dict.get("is_kill_switch_enabled")
+        is_kill_switch_enabled = cls.contact_config_dict.get("is_kill_switch_enabled")
         if is_kill_switch_enabled is None:
             return False
         else:
@@ -138,7 +138,7 @@ class LogBarterSimulator(BarteringLinkBase):
     @classmethod
     async def trigger_kill_switch(cls) -> bool:
         logging.critical("Called BarteringLink.trigger_kill_switch from LogBarterSimulator")
-        trigger_kill_switch = cls.portfolio_config_dict.get("trigger_kill_switch")
+        trigger_kill_switch = cls.contact_config_dict.get("trigger_kill_switch")
         if trigger_kill_switch is None:
             return True
         else:
@@ -147,7 +147,7 @@ class LogBarterSimulator(BarteringLinkBase):
     @classmethod
     async def revoke_kill_switch_n_resume_bartering(cls) -> bool:
         logging.critical("Called BarteringLink.revoke_kill_switch_n_resume_bartering from LogBarterSimulator")
-        revoke_kill_switch_n_resume_bartering = cls.portfolio_config_dict.get("revoke_kill_switch_n_resume_bartering")
+        revoke_kill_switch_n_resume_bartering = cls.contact_config_dict.get("revoke_kill_switch_n_resume_bartering")
         if revoke_kill_switch_n_resume_bartering is None:
             return True
         else:

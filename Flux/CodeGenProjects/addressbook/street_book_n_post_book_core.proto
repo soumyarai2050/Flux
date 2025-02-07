@@ -30,7 +30,7 @@ message PairSideBarteringBrief{
   optional int64 open_qty = 14 [(FluxFldHelp) = "sum of all open chore qty for this leg: reduce if chore is filled / rejected / cancelled (symbol side snapshot based compute)"];
 }
 
-message StratBrief {
+message PlanBrief {
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
@@ -49,28 +49,28 @@ message StratBrief {
     },
     server_running_status_lvl: 1,
     is_repeated: true,
-    depending_proto_model_name: "PairStrat",
-    depending_proto_model_field_name_for_host: "PairStrat.host",
-    depending_proto_model_field_name_for_port: "PairStrat.port",
+    depending_proto_model_name: "PairPlan",
+    depending_proto_model_field_name_for_host: "PairPlan.host",
+    depending_proto_model_field_name_for_port: "PairPlan.port",
     is_read_only: true
   };
   option (FluxMsgJsonQuery) = {
-      QueryName: "get_strat_brief_from_symbol",
-      AggregateVarName: "get_strat_brief_from_symbol",
+      QueryName: "get_plan_brief_from_symbol",
+      AggregateVarName: "get_plan_brief_from_symbol",
       QueryParams: {
         QueryParamName: "security_id",
         QueryParamDataType: "str"
       }
   };
   option (FluxMsgJsonQuery) = {
-      QueryName: "filtered_notify_strat_brief_update",
+      QueryName: "filtered_notify_plan_brief_update",
       QueryParams: {
         QueryParamName: "side",
         QueryParamDataType: "Side"
       }
   };
   option (FluxMsgJsonQuery) = {
-      QueryName: "get_strat_brief_from_cache"
+      QueryName: "get_plan_brief_from_cache"
   };
   option (FluxMsgCRUDSharedLock) = "residual_compute_shared_lock";
   option (FluxMsgExecutorOptions) = {

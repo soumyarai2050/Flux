@@ -60,8 +60,8 @@ executor_config_yaml_path: PurePath = STRAT_EXECUTOR / "data" / "config.yaml"
 executor_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(executor_config_yaml_path))
 
 STRAT_VIEW_ENGINE_DIR = code_gen_projects_dir_path / "AddressBook" / "ProjectGroup" / "photo_book"
-strat_view_config_yaml_path: PurePath = STRAT_VIEW_ENGINE_DIR / "data" / "config.yaml"
-strat_view_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(strat_view_config_yaml_path))
+plan_view_config_yaml_path: PurePath = STRAT_VIEW_ENGINE_DIR / "data" / "config.yaml"
+plan_view_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(plan_view_config_yaml_path))
 
 BASKET_EXECUTOR_DIR = code_gen_projects_dir_path / "AddressBook" / "ProjectGroup" / "basket_book"
 basket_book_config_yaml_path: PurePath = BASKET_EXECUTOR_DIR / "data" / "config.yaml"
@@ -86,10 +86,10 @@ LOG_ANALYZER_BEANIE_PORT: Final[str] = la_config_yaml_dict.get("main_server_bean
 os.environ["HOST"] = HOST
 os.environ["PAIR_STRAT_BEANIE_PORT"] = PAIR_STRAT_BEANIE_PORT
 
-STRAT_VIEW_CACHE_HOST: Final[str] = strat_view_config_yaml_dict.get("server_host")
-STRAT_VIEW_BEANIE_HOST: Final[str] = strat_view_config_yaml_dict.get("server_host")
-STRAT_VIEW_CACHE_PORT: Final[str] = strat_view_config_yaml_dict.get("main_server_cache_port")
-STRAT_VIEW_BEANIE_PORT: Final[str] = strat_view_config_yaml_dict.get("main_server_beanie_port")
+STRAT_VIEW_CACHE_HOST: Final[str] = plan_view_config_yaml_dict.get("server_host")
+STRAT_VIEW_BEANIE_HOST: Final[str] = plan_view_config_yaml_dict.get("server_host")
+STRAT_VIEW_CACHE_PORT: Final[str] = plan_view_config_yaml_dict.get("main_server_cache_port")
+STRAT_VIEW_BEANIE_PORT: Final[str] = plan_view_config_yaml_dict.get("main_server_beanie_port")
 
 BASKET_EXECUTOR_CACHE_HOST: Final[str] = basket_book_config_yaml_dict.get("server_host")
 BASKET_EXECUTOR_BEANIE_HOST: Final[str] = basket_book_config_yaml_dict.get("server_host")
@@ -131,12 +131,12 @@ def clean_all_collections_ignoring_ui_layout() -> None:
     for db_name in get_mongo_db_list(mongo_server_uri):
         if "log_book" == db_name:
             clean_mongo_collections(mongo_server_uri=mongo_server_uri, database_name=db_name,
-                                    ignore_collections=["UILayout", "PortfolioAlert", "StratAlert",
+                                    ignore_collections=["UILayout", "ContactAlert", "PlanAlert",
                                                         "RawPerformanceData", "ProcessedPerformanceAnalysis"])
         elif "phone_book" == db_name or "post_book" == db_name or "photo_book" == db_name:
             ignore_collections = ["UILayout"]
             if db_name == "phone_book":
-                ignore_collections.append("StratCollection")
+                ignore_collections.append("PlanCollection")
             clean_mongo_collections(mongo_server_uri=mongo_server_uri, database_name=db_name,
                                     ignore_collections=ignore_collections)
         elif "street_book_" in db_name or db_name == "basket_book":
@@ -153,7 +153,7 @@ def drop_all_databases() -> None:
 
 
 def clean_project_logs():
-    # clean all project log file, strat json.lock files, generated md, so scripts and script logs
+    # clean all project log file, plan json.lock files, generated md, so scripts and script logs
     barter_engine_dir: PurePath = code_gen_projects_path / "AddressBook" / "ProjectGroup"
     phone_book_dir: PurePath = barter_engine_dir / "phone_book"
     post_book_dir: PurePath = barter_engine_dir / "post_book"
@@ -184,13 +184,13 @@ def clean_project_logs():
         os.remove(matched_file)
 
 #
-# def run_pair_strat_log_book(executor_n_log_book: 'ExecutorNLogBookManager'):
+# def run_pair_plan_log_book(executor_n_log_book: 'ExecutorNLogBookManager'):
 #     log_book = pexpect.spawn("python phone_book_log_book.py &",
 #                                  cwd=project_app_dir_path)
 #     log_book.timeout = None
 #     log_book.logfile = sys.stdout.buffer
-#     executor_n_log_book.pair_strat_log_book_pid = log_book.pid
-#     print(f"pair_strat_log_book PID: {log_book.pid}")
+#     executor_n_log_book.pair_plan_log_book_pid = log_book.pid
+#     print(f"pair_plan_log_book PID: {log_book.pid}")
 #     log_book.expect("CRITICAL: log analyzer running in simulation mode...")
 #     log_book.interact()
 #
@@ -228,13 +228,13 @@ def clean_project_logs():
 #     def __init__(self):
 #         # p_id(s) are getting populated by their respective thread target functions
 #         self.executor_pid = None
-#         self.pair_strat_log_book_pid = None
+#         self.pair_plan_log_book_pid = None
 #
 #     def __enter__(self):
 #         executor_thread = threading.Thread(target=run_executor, args=(self,))
-#         pair_strat_log_book_thread = threading.Thread(target=run_pair_strat_log_book, args=(self,))
+#         pair_plan_log_book_thread = threading.Thread(target=run_pair_plan_log_book, args=(self,))
 #         executor_thread.start()
-#         pair_strat_log_book_thread.start()
+#         pair_plan_log_book_thread.start()
 #         # delay for executor and log_book to get started and ready
 #         time.sleep(20)
 #         return self
@@ -242,9 +242,9 @@ def clean_project_logs():
 #     def __exit__(self, exc_type, exc_value, exc_traceback):
 #         assert kill_process(self.executor_pid), \
 #             f"Something went wrong while killing barter_executor process, pid: {self.executor_pid}"
-#         assert kill_process(self.pair_strat_log_book_pid), \
-#             f"Something went wrong while killing pair_strat_log_book process, " \
-#             f"pid: {self.pair_strat_log_book_pid}"
+#         assert kill_process(self.pair_plan_log_book_pid), \
+#             f"Something went wrong while killing pair_plan_log_book process, " \
+#             f"pid: {self.pair_plan_log_book_pid}"
 #
 #         # Env var based post test cleaning
 #         clean_env_var = os.environ.get("ENABLE_CLEAN_SLATE")
@@ -299,8 +299,8 @@ def sec_position_fixture(sec_id: str, sec_id_source: SecurityIdSource):
 
 
 def broker_fixture():
-    sec_position_1 = sec_position_fixture("CB_Sec_1", SecurityIdSource.SEDOL)
-    sec_position_2 = sec_position_fixture("EQT_Sec_1.SS", SecurityIdSource.RIC)
+    sec_position_1 = sec_position_fixture("Type1_Sec_1", SecurityIdSource.SEDOL)
+    sec_position_2 = sec_position_fixture("Type2_Sec_1.SS", SecurityIdSource.RIC)
 
     broker_json = {
         "bkr_disable": False,
@@ -341,16 +341,16 @@ def get_both_side_last_barter_px():
     return buy_side_last_barter_px, sell_side_last_barter_px
 
 
-def update_expected_strat_brief_for_buy(expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
+def update_expected_plan_brief_for_buy(expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
                                         expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                         expected_other_leg_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
-                                        expected_strat_limits: StratLimits,
-                                        expected_strat_brief_obj: StratBriefBaseModel,
+                                        expected_plan_limits: PlanLimits,
+                                        expected_plan_brief_obj: PlanBriefBaseModel,
                                         date_time_for_cmp: DateTime, buy_last_barter_px, sell_last_barter_px,
                                         executor_http_client: StreetBookServiceHttpClient,
                                         fill_update_after_dod: bool = False,
                                         hedge_ratio: float = 1.0):
-    max_net_filled_notional = expected_strat_limits.max_net_filled_notional
+    max_net_filled_notional = expected_plan_limits.max_net_filled_notional
 
     symbol_side_snapshot_list = executor_http_client.get_all_symbol_side_snapshot_client()
     all_brk_cxled_qty = 0
@@ -359,72 +359,72 @@ def update_expected_strat_brief_for_buy(expected_chore_snapshot_obj: ChoreSnapsh
             all_brk_cxled_qty += symbol_side_snapshot.total_cxled_qty
 
     if expected_chore_snapshot_obj.chore_status == ChoreStatusType.OE_UNACK:
-        expected_strat_brief_obj.pair_buy_side_bartering_brief.open_qty += expected_chore_snapshot_obj.chore_brief.qty
-        expected_strat_brief_obj.pair_buy_side_bartering_brief.open_notional += (
+        expected_plan_brief_obj.pair_buy_side_bartering_brief.open_qty += expected_chore_snapshot_obj.chore_brief.qty
+        expected_plan_brief_obj.pair_buy_side_bartering_brief.open_notional += (
                 expected_chore_snapshot_obj.chore_brief.qty * get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
-        expected_strat_brief_obj.pair_buy_side_bartering_brief.consumable_open_chores = 4
+        expected_plan_brief_obj.pair_buy_side_bartering_brief.consumable_open_chores = 4
     elif expected_chore_snapshot_obj.chore_status == ChoreStatusType.OE_ACKED:
-        expected_strat_brief_obj.pair_buy_side_bartering_brief.open_qty -= expected_chore_snapshot_obj.last_update_fill_qty
-        expected_strat_brief_obj.pair_buy_side_bartering_brief.open_notional -= (
+        expected_plan_brief_obj.pair_buy_side_bartering_brief.open_qty -= expected_chore_snapshot_obj.last_update_fill_qty
+        expected_plan_brief_obj.pair_buy_side_bartering_brief.open_notional -= (
                 expected_chore_snapshot_obj.last_update_fill_qty * get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
-        expected_strat_brief_obj.pair_buy_side_bartering_brief.consumable_open_chores = 4
+        expected_plan_brief_obj.pair_buy_side_bartering_brief.consumable_open_chores = 4
     elif expected_chore_snapshot_obj.chore_status == ChoreStatusType.OE_DOD:
         # cxl chore
         if not fill_update_after_dod:
             unfilled_qty = expected_chore_snapshot_obj.chore_brief.qty - expected_chore_snapshot_obj.filled_qty
-            expected_strat_brief_obj.pair_buy_side_bartering_brief.open_qty -= unfilled_qty
-            expected_strat_brief_obj.pair_buy_side_bartering_brief.open_notional -= (
+            expected_plan_brief_obj.pair_buy_side_bartering_brief.open_qty -= unfilled_qty
+            expected_plan_brief_obj.pair_buy_side_bartering_brief.open_notional -= (
                     unfilled_qty * get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
-            expected_strat_brief_obj.pair_buy_side_bartering_brief.residual_qty += (
+            expected_plan_brief_obj.pair_buy_side_bartering_brief.residual_qty += (
                     expected_chore_snapshot_obj.chore_brief.qty - expected_chore_snapshot_obj.filled_qty)
-            expected_strat_brief_obj.pair_buy_side_bartering_brief.consumable_open_chores = 5
+            expected_plan_brief_obj.pair_buy_side_bartering_brief.consumable_open_chores = 5
         else:
-            expected_strat_brief_obj.pair_buy_side_bartering_brief.residual_qty -= (
+            expected_plan_brief_obj.pair_buy_side_bartering_brief.residual_qty -= (
                 expected_chore_snapshot_obj.last_update_fill_qty)
-            expected_strat_brief_obj.pair_buy_side_bartering_brief.consumable_open_chores = 5
+            expected_plan_brief_obj.pair_buy_side_bartering_brief.consumable_open_chores = 5
 
-    open_qty = expected_strat_brief_obj.pair_buy_side_bartering_brief.open_qty
-    open_notional = expected_strat_brief_obj.pair_buy_side_bartering_brief.open_notional
-    expected_strat_brief_obj.pair_buy_side_bartering_brief.all_bkr_cxlled_qty = all_brk_cxled_qty
-    expected_strat_brief_obj.pair_buy_side_bartering_brief.consumable_notional = \
-        ((expected_strat_limits.max_single_leg_notional * hedge_ratio) -
+    open_qty = expected_plan_brief_obj.pair_buy_side_bartering_brief.open_qty
+    open_notional = expected_plan_brief_obj.pair_buy_side_bartering_brief.open_notional
+    expected_plan_brief_obj.pair_buy_side_bartering_brief.all_bkr_cxlled_qty = all_brk_cxled_qty
+    expected_plan_brief_obj.pair_buy_side_bartering_brief.consumable_notional = \
+        ((expected_plan_limits.max_single_leg_notional * hedge_ratio) -
          expected_symbol_side_snapshot.total_fill_notional - open_notional)
-    expected_strat_brief_obj.pair_buy_side_bartering_brief.consumable_open_notional = \
-        expected_strat_limits.max_open_single_leg_notional - open_notional
+    expected_plan_brief_obj.pair_buy_side_bartering_brief.consumable_open_notional = \
+        expected_plan_limits.max_open_single_leg_notional - open_notional
     total_security_size: int = \
         static_data.get_security_float_from_ticker(expected_chore_snapshot_obj.chore_brief.security.sec_id)
-    expected_strat_brief_obj.pair_buy_side_bartering_brief.consumable_concentration = \
-        (total_security_size / 100 * expected_strat_limits.max_concentration) - (
+    expected_plan_brief_obj.pair_buy_side_bartering_brief.consumable_concentration = \
+        (total_security_size / 100 * expected_plan_limits.max_concentration) - (
                 open_qty + expected_symbol_side_snapshot.total_filled_qty)
     # covered in separate test, here we supress comparison as val may be not easy to predict in a long-running test
-    expected_strat_brief_obj.pair_buy_side_bartering_brief.participation_period_chore_qty_sum = None
-    expected_strat_brief_obj.pair_buy_side_bartering_brief.consumable_cxl_qty = \
+    expected_plan_brief_obj.pair_buy_side_bartering_brief.participation_period_chore_qty_sum = None
+    expected_plan_brief_obj.pair_buy_side_bartering_brief.consumable_cxl_qty = \
         (((open_qty + expected_symbol_side_snapshot.total_filled_qty +
-           expected_symbol_side_snapshot.total_cxled_qty) / 100) * expected_strat_limits.cancel_rate.max_cancel_rate) - \
+           expected_symbol_side_snapshot.total_cxled_qty) / 100) * expected_plan_limits.cancel_rate.max_cancel_rate) - \
         expected_symbol_side_snapshot.total_cxled_qty
     # covered in separate test, here we supress comparison as val may be not easy to predict in a long-running test
-    expected_strat_brief_obj.pair_buy_side_bartering_brief.indicative_consumable_participation_qty = None
-    sell_side_residual_qty = expected_strat_brief_obj.pair_sell_side_bartering_brief.residual_qty
-    expected_strat_brief_obj.pair_buy_side_bartering_brief.indicative_consumable_residual = \
-        expected_strat_limits.residual_restriction.max_residual - \
-        ((expected_strat_brief_obj.pair_buy_side_bartering_brief.residual_qty *
+    expected_plan_brief_obj.pair_buy_side_bartering_brief.indicative_consumable_participation_qty = None
+    sell_side_residual_qty = expected_plan_brief_obj.pair_sell_side_bartering_brief.residual_qty
+    expected_plan_brief_obj.pair_buy_side_bartering_brief.indicative_consumable_residual = \
+        expected_plan_limits.residual_restriction.max_residual - \
+        ((expected_plan_brief_obj.pair_buy_side_bartering_brief.residual_qty *
           get_px_in_usd(buy_last_barter_px)) - (sell_side_residual_qty * get_px_in_usd(sell_last_barter_px)))
-    expected_strat_brief_obj.pair_buy_side_bartering_brief.last_update_date_time = date_time_for_cmp
-    expected_strat_brief_obj.consumable_nett_filled_notional = (
+    expected_plan_brief_obj.pair_buy_side_bartering_brief.last_update_date_time = date_time_for_cmp
+    expected_plan_brief_obj.consumable_nett_filled_notional = (
             max_net_filled_notional - abs(expected_symbol_side_snapshot.total_fill_notional -
                                           expected_other_leg_symbol_side_snapshot.total_fill_notional))
 
 
-def update_expected_strat_brief_for_sell(expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
+def update_expected_plan_brief_for_sell(expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
                                          expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                          expected_other_leg_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
-                                         expected_strat_limits: StratLimits,
-                                         expected_strat_brief_obj: StratBriefBaseModel,
+                                         expected_plan_limits: PlanLimits,
+                                         expected_plan_brief_obj: PlanBriefBaseModel,
                                          date_time_for_cmp: DateTime, buy_last_barter_px, sell_last_barter_px,
                                          executor_http_client: StreetBookServiceHttpClient,
                                          fill_update_after_dod: bool = False,
                                          hedge_ratio: float = 1.0):
-    max_net_filled_notional = expected_strat_limits.max_net_filled_notional
+    max_net_filled_notional = expected_plan_limits.max_net_filled_notional
 
     symbol_side_snapshot_list = executor_http_client.get_all_symbol_side_snapshot_client()
     all_brk_cxled_qty = 0
@@ -433,110 +433,110 @@ def update_expected_strat_brief_for_sell(expected_chore_snapshot_obj: ChoreSnaps
             all_brk_cxled_qty += symbol_side_snapshot.total_cxled_qty
 
     if expected_chore_snapshot_obj.chore_status == ChoreStatusType.OE_UNACK:
-        expected_strat_brief_obj.pair_sell_side_bartering_brief.open_qty += expected_chore_snapshot_obj.chore_brief.qty
-        expected_strat_brief_obj.pair_sell_side_bartering_brief.open_notional += (
+        expected_plan_brief_obj.pair_sell_side_bartering_brief.open_qty += expected_chore_snapshot_obj.chore_brief.qty
+        expected_plan_brief_obj.pair_sell_side_bartering_brief.open_notional += (
                 expected_chore_snapshot_obj.chore_brief.qty * get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
-        expected_strat_brief_obj.pair_sell_side_bartering_brief.consumable_open_chores = 4
+        expected_plan_brief_obj.pair_sell_side_bartering_brief.consumable_open_chores = 4
     elif expected_chore_snapshot_obj.chore_status == ChoreStatusType.OE_ACKED:
-        expected_strat_brief_obj.pair_sell_side_bartering_brief.open_qty -= expected_chore_snapshot_obj.last_update_fill_qty
-        expected_strat_brief_obj.pair_sell_side_bartering_brief.open_notional -= (
+        expected_plan_brief_obj.pair_sell_side_bartering_brief.open_qty -= expected_chore_snapshot_obj.last_update_fill_qty
+        expected_plan_brief_obj.pair_sell_side_bartering_brief.open_notional -= (
                 expected_chore_snapshot_obj.last_update_fill_qty * get_px_in_usd(
                 expected_chore_snapshot_obj.chore_brief.px))
-        expected_strat_brief_obj.pair_sell_side_bartering_brief.consumable_open_chores = 4
+        expected_plan_brief_obj.pair_sell_side_bartering_brief.consumable_open_chores = 4
     elif expected_chore_snapshot_obj.chore_status == ChoreStatusType.OE_DOD:
         # cxl chore
         if not fill_update_after_dod:
             unfilled_qty = expected_chore_snapshot_obj.chore_brief.qty - expected_chore_snapshot_obj.filled_qty
-            expected_strat_brief_obj.pair_sell_side_bartering_brief.open_qty -= unfilled_qty
-            expected_strat_brief_obj.pair_sell_side_bartering_brief.open_notional -= (
+            expected_plan_brief_obj.pair_sell_side_bartering_brief.open_qty -= unfilled_qty
+            expected_plan_brief_obj.pair_sell_side_bartering_brief.open_notional -= (
                     unfilled_qty * get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
-            expected_strat_brief_obj.pair_sell_side_bartering_brief.residual_qty += (
+            expected_plan_brief_obj.pair_sell_side_bartering_brief.residual_qty += (
                     expected_chore_snapshot_obj.chore_brief.qty - expected_chore_snapshot_obj.filled_qty)
-            expected_strat_brief_obj.pair_sell_side_bartering_brief.consumable_open_chores = 5
+            expected_plan_brief_obj.pair_sell_side_bartering_brief.consumable_open_chores = 5
         else:
-            expected_strat_brief_obj.pair_buy_side_bartering_brief.residual_qty -= (
+            expected_plan_brief_obj.pair_buy_side_bartering_brief.residual_qty -= (
                 expected_chore_snapshot_obj.last_update_fill_qty)
-            expected_strat_brief_obj.pair_buy_side_bartering_brief.consumable_open_chores = 5
-    open_qty = expected_strat_brief_obj.pair_sell_side_bartering_brief.open_qty
-    open_notional = expected_strat_brief_obj.pair_sell_side_bartering_brief.open_notional
-    expected_strat_brief_obj.pair_sell_side_bartering_brief.all_bkr_cxlled_qty = all_brk_cxled_qty
-    expected_strat_brief_obj.pair_sell_side_bartering_brief.consumable_notional = \
-        ((expected_strat_limits.max_single_leg_notional * hedge_ratio) -
+            expected_plan_brief_obj.pair_buy_side_bartering_brief.consumable_open_chores = 5
+    open_qty = expected_plan_brief_obj.pair_sell_side_bartering_brief.open_qty
+    open_notional = expected_plan_brief_obj.pair_sell_side_bartering_brief.open_notional
+    expected_plan_brief_obj.pair_sell_side_bartering_brief.all_bkr_cxlled_qty = all_brk_cxled_qty
+    expected_plan_brief_obj.pair_sell_side_bartering_brief.consumable_notional = \
+        ((expected_plan_limits.max_single_leg_notional * hedge_ratio) -
          expected_symbol_side_snapshot.total_fill_notional - open_notional)
-    expected_strat_brief_obj.pair_sell_side_bartering_brief.consumable_open_notional = \
-        expected_strat_limits.max_open_single_leg_notional - open_notional
+    expected_plan_brief_obj.pair_sell_side_bartering_brief.consumable_open_notional = \
+        expected_plan_limits.max_open_single_leg_notional - open_notional
     total_security_size: int = \
         static_data.get_security_float_from_ticker(expected_chore_snapshot_obj.chore_brief.security.sec_id)
-    expected_strat_brief_obj.pair_sell_side_bartering_brief.consumable_concentration = \
-        (total_security_size / 100 * expected_strat_limits.max_concentration) - (
+    expected_plan_brief_obj.pair_sell_side_bartering_brief.consumable_concentration = \
+        (total_security_size / 100 * expected_plan_limits.max_concentration) - (
                 open_qty + expected_symbol_side_snapshot.total_filled_qty)
     # covered in separate test, here we supress comparison as val may be not easy to predict in a long-running test
-    expected_strat_brief_obj.pair_sell_side_bartering_brief.participation_period_chore_qty_sum = None
-    expected_strat_brief_obj.pair_sell_side_bartering_brief.consumable_cxl_qty = \
+    expected_plan_brief_obj.pair_sell_side_bartering_brief.participation_period_chore_qty_sum = None
+    expected_plan_brief_obj.pair_sell_side_bartering_brief.consumable_cxl_qty = \
         (((open_qty + expected_symbol_side_snapshot.total_filled_qty +
-           expected_symbol_side_snapshot.total_cxled_qty) / 100) * expected_strat_limits.cancel_rate.max_cancel_rate) - \
+           expected_symbol_side_snapshot.total_cxled_qty) / 100) * expected_plan_limits.cancel_rate.max_cancel_rate) - \
         expected_symbol_side_snapshot.total_cxled_qty
     # covered in separate test, here we supress comparison as val may be not easy to predict in a long-running test
-    expected_strat_brief_obj.pair_sell_side_bartering_brief.indicative_consumable_participation_qty = None
-    buy_side_residual_qty = expected_strat_brief_obj.pair_buy_side_bartering_brief.residual_qty
-    expected_strat_brief_obj.pair_sell_side_bartering_brief.indicative_consumable_residual = \
-        expected_strat_limits.residual_restriction.max_residual - \
-        ((expected_strat_brief_obj.pair_sell_side_bartering_brief.residual_qty * get_px_in_usd(sell_last_barter_px)) -
+    expected_plan_brief_obj.pair_sell_side_bartering_brief.indicative_consumable_participation_qty = None
+    buy_side_residual_qty = expected_plan_brief_obj.pair_buy_side_bartering_brief.residual_qty
+    expected_plan_brief_obj.pair_sell_side_bartering_brief.indicative_consumable_residual = \
+        expected_plan_limits.residual_restriction.max_residual - \
+        ((expected_plan_brief_obj.pair_sell_side_bartering_brief.residual_qty * get_px_in_usd(sell_last_barter_px)) -
          (buy_side_residual_qty * get_px_in_usd(buy_last_barter_px)))
-    expected_strat_brief_obj.pair_sell_side_bartering_brief.last_update_date_time = date_time_for_cmp
-    expected_strat_brief_obj.consumable_nett_filled_notional = (
+    expected_plan_brief_obj.pair_sell_side_bartering_brief.last_update_date_time = date_time_for_cmp
+    expected_plan_brief_obj.consumable_nett_filled_notional = (
             max_net_filled_notional - abs(expected_symbol_side_snapshot.total_fill_notional -
                                           expected_other_leg_symbol_side_snapshot.total_fill_notional))
 
 
-def check_strat_view_computes(strat_view_id: int, executor_http_client) -> None:
+def check_plan_view_computes(plan_view_id: int, executor_http_client) -> None:
     start_time = DateTime.utcnow()
     for i in range(60):
-        strat_view = photo_book_web_client.get_strat_view_client(strat_view_id)
-        strat_status_obj = get_strat_status(executor_http_client)
-        strat_limits_obj = get_strat_limits(executor_http_client)
+        plan_view = photo_book_web_client.get_plan_view_client(plan_view_id)
+        plan_status_obj = get_plan_status(executor_http_client)
+        plan_limits_obj = get_plan_limits(executor_http_client)
         both_checks_passed = 0
-        if strat_view.balance_notional == strat_status_obj.balance_notional:
+        if plan_view.balance_notional == plan_status_obj.balance_notional:
             both_checks_passed += 1
-        if strat_view.max_single_leg_notional == strat_limits_obj.max_open_single_leg_notional:
+        if plan_view.max_single_leg_notional == plan_limits_obj.max_open_single_leg_notional:
             both_checks_passed += 1
         if both_checks_passed == 2:
             delta_sec = (DateTime.utcnow() - start_time).total_seconds()
             print(f"RESULT: Took {delta_sec} seconds to match both balance_notional and max_single_leg_notional in "
-                  f"strat view")
+                  f"plan view")
             break
         time.sleep(1)
     else:
-        strat_view = photo_book_web_client.get_strat_view_client(strat_view_id)
-        strat_status_obj = get_strat_status(executor_http_client)
-        strat_limits_obj = get_strat_limits(executor_http_client)
+        plan_view = photo_book_web_client.get_plan_view_client(plan_view_id)
+        plan_status_obj = get_plan_status(executor_http_client)
+        plan_limits_obj = get_plan_limits(executor_http_client)
         delta_sec = (DateTime.utcnow() - start_time).total_seconds()
-        assert strat_view.balance_notional == strat_status_obj.balance_notional, \
-            (f"Mismatched StratView.balance_notional: expected: {strat_status_obj.balance_notional}, "
-             f"received: {strat_view.balance_notional} in {delta_sec} seconds")
-        assert strat_view.max_single_leg_notional == strat_limits_obj.max_open_single_leg_notional, \
-            (f"Mismatched StratView.max_single_leg_notional: expected: {strat_limits_obj.max_open_single_leg_notional}, "
-             f"received: {strat_view.max_single_leg_notional} in {delta_sec} seconds")
+        assert plan_view.balance_notional == plan_status_obj.balance_notional, \
+            (f"Mismatched PlanView.balance_notional: expected: {plan_status_obj.balance_notional}, "
+             f"received: {plan_view.balance_notional} in {delta_sec} seconds")
+        assert plan_view.max_single_leg_notional == plan_limits_obj.max_open_single_leg_notional, \
+            (f"Mismatched PlanView.max_single_leg_notional: expected: {plan_limits_obj.max_open_single_leg_notional}, "
+             f"received: {plan_view.max_single_leg_notional} in {delta_sec} seconds")
 
 
-def get_strat_status(executor_web_client):
-    strat_status_obj_list = executor_web_client.get_all_strat_status_client()
-    if len(strat_status_obj_list) == 1:
-        strat_status_obj = strat_status_obj_list[0]
-        return strat_status_obj
+def get_plan_status(executor_web_client):
+    plan_status_obj_list = executor_web_client.get_all_plan_status_client()
+    if len(plan_status_obj_list) == 1:
+        plan_status_obj = plan_status_obj_list[0]
+        return plan_status_obj
     else:
-        assert False, (f"StratStatus' length must be exactly 1, found {len(strat_status_obj_list)}, "
-                       f"strat_status_list: {strat_status_obj_list}")
+        assert False, (f"PlanStatus' length must be exactly 1, found {len(plan_status_obj_list)}, "
+                       f"plan_status_list: {plan_status_obj_list}")
 
 
-def get_strat_limits(executor_web_client):
-    strat_limits_obj_list = executor_web_client.get_all_strat_limits_client()
-    if len(strat_limits_obj_list) == 1:
-        strat_limits_obj = strat_limits_obj_list[0]
-        return strat_limits_obj
+def get_plan_limits(executor_web_client):
+    plan_limits_obj_list = executor_web_client.get_all_plan_limits_client()
+    if len(plan_limits_obj_list) == 1:
+        plan_limits_obj = plan_limits_obj_list[0]
+        return plan_limits_obj
     else:
-        assert False, (f"StratLimits' length must be exactly 1, found {len(strat_limits_obj_list)}, "
-                       f"strat_limits_list: {strat_limits_obj_list}")
+        assert False, (f"PlanLimits' length must be exactly 1, found {len(plan_limits_obj_list)}, "
+                       f"plan_limits_list: {plan_limits_obj_list}")
 
 
 def check_placed_buy_chore_computes_before_all_sells(loop_count: int,
@@ -545,21 +545,21 @@ def check_placed_buy_chore_computes_before_all_sells(loop_count: int,
                                                      expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
                                                      expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                                      other_leg_expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
-                                                     pair_strat_: PairStratBaseModel,
-                                                     expected_strat_limits: StratLimits,
-                                                     expected_strat_status: StratStatus,
-                                                     expected_strat_brief_obj: StratBriefBaseModel,
+                                                     pair_plan_: PairPlanBaseModel,
+                                                     expected_plan_limits: PlanLimits,
+                                                     expected_plan_status: PlanStatus,
+                                                     expected_plan_brief_obj: PlanBriefBaseModel,
                                                      executor_web_client: StreetBookServiceHttpClient):
     """
-    Checking resulted changes in ChoreJournal, ChoreSnapshot, SymbolSideSnapshot, PairStrat,
-    StratBrief and PortfolioStatus after chore is triggered
+    Checking resulted changes in ChoreJournal, ChoreSnapshot, SymbolSideSnapshot, PairPlan,
+    PlanBrief and ContactStatus after chore is triggered
     """
     chore_journal_obj_list = executor_web_client.get_all_chore_journal_client(-100)
     assert buy_placed_chore_journal in chore_journal_obj_list, \
         f"Couldn't find {buy_placed_chore_journal} in {chore_journal_obj_list}"
 
     buy_last_barter_px, sell_last_barter_px = get_both_side_last_barter_px()
-    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, pair_strat_)
+    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, pair_plan_)
 
     # Checking chore_snapshot
     expected_chore_snapshot_obj.chore_brief.chore_id = expected_chore_id
@@ -602,73 +602,73 @@ def check_placed_buy_chore_computes_before_all_sells(loop_count: int,
 
 
     # Checking start_brief
-    expected_strat_brief_obj.id = pair_strat_.id  # since strat's id is synced with strat_brief
-    update_expected_strat_brief_for_buy(expected_chore_snapshot_obj,
+    expected_plan_brief_obj.id = pair_plan_.id  # since plan's id is synced with plan_brief
+    update_expected_plan_brief_for_buy(expected_chore_snapshot_obj,
                                         expected_symbol_side_snapshot,
                                         other_leg_expected_symbol_side_snapshot,
-                                        expected_strat_limits, expected_strat_brief_obj,
+                                        expected_plan_limits, expected_plan_brief_obj,
                                         buy_placed_chore_journal.chore_event_date_time,
                                         buy_last_barter_px, sell_last_barter_px, executor_web_client)
 
-    print(f"@@@ fetching strat_brief for symbol: {symbol} at {DateTime.utcnow()}")
-    strat_brief = executor_web_client.get_strat_brief_client(pair_strat_.id)
+    print(f"@@@ fetching plan_brief for symbol: {symbol} at {DateTime.utcnow()}")
+    plan_brief = executor_web_client.get_plan_brief_client(pair_plan_.id)
 
-    strat_brief.pair_buy_side_bartering_brief.indicative_consumable_participation_qty = None
-    strat_brief.pair_buy_side_bartering_brief.participation_period_chore_qty_sum = None
-    strat_brief.pair_buy_side_bartering_brief.last_update_date_time = None
-    # Since sell side of strat_brief is not updated till sell cycle
-    expected_strat_brief_obj.pair_sell_side_bartering_brief = strat_brief.pair_sell_side_bartering_brief
-    expected_strat_brief_obj.pair_buy_side_bartering_brief.last_update_date_time = None
-    expected_strat_brief_obj.pair_buy_side_bartering_brief.security.inst_type = buy_inst_type
-    assert expected_strat_brief_obj == strat_brief, \
-        (f"Mismatched strat_brief in placed BUY chore check: "
-         f"expected strat_brief {expected_strat_brief_obj}, received strat_brief {strat_brief}")
+    plan_brief.pair_buy_side_bartering_brief.indicative_consumable_participation_qty = None
+    plan_brief.pair_buy_side_bartering_brief.participation_period_chore_qty_sum = None
+    plan_brief.pair_buy_side_bartering_brief.last_update_date_time = None
+    # Since sell side of plan_brief is not updated till sell cycle
+    expected_plan_brief_obj.pair_sell_side_bartering_brief = plan_brief.pair_sell_side_bartering_brief
+    expected_plan_brief_obj.pair_buy_side_bartering_brief.last_update_date_time = None
+    expected_plan_brief_obj.pair_buy_side_bartering_brief.security.inst_type = buy_inst_type
+    assert expected_plan_brief_obj == plan_brief, \
+        (f"Mismatched plan_brief in placed BUY chore check: "
+         f"expected plan_brief {expected_plan_brief_obj}, received plan_brief {plan_brief}")
 
-    # Checking Strat_Limits
-    strat_limits_obj = get_strat_limits(executor_web_client)
-    expected_strat_limits.id = strat_limits_obj.id
-    expected_strat_limits.eligible_brokers = strat_limits_obj.eligible_brokers
-    expected_strat_limits.strat_limits_update_seq_num = strat_limits_obj.strat_limits_update_seq_num
+    # Checking Plan_Limits
+    plan_limits_obj = get_plan_limits(executor_web_client)
+    expected_plan_limits.id = plan_limits_obj.id
+    expected_plan_limits.eligible_brokers = plan_limits_obj.eligible_brokers
+    expected_plan_limits.plan_limits_update_seq_num = plan_limits_obj.plan_limits_update_seq_num
 
-    assert strat_limits_obj == expected_strat_limits, \
-        f"Mismatched StratLimits: expected: {expected_strat_limits}, received: {strat_limits_obj}"
+    assert plan_limits_obj == expected_plan_limits, \
+        f"Mismatched PlanLimits: expected: {expected_plan_limits}, received: {plan_limits_obj}"
 
-    expected_strat_status.total_buy_qty += expected_chore_snapshot_obj.chore_brief.qty
-    expected_strat_status.total_chore_qty += expected_chore_snapshot_obj.chore_brief.qty
-    expected_strat_status.total_open_buy_qty = expected_chore_snapshot_obj.chore_brief.qty
-    expected_strat_status.total_open_buy_notional = (expected_chore_snapshot_obj.chore_brief.qty *
+    expected_plan_status.total_buy_qty += expected_chore_snapshot_obj.chore_brief.qty
+    expected_plan_status.total_chore_qty += expected_chore_snapshot_obj.chore_brief.qty
+    expected_plan_status.total_open_buy_qty = expected_chore_snapshot_obj.chore_brief.qty
+    expected_plan_status.total_open_buy_notional = (expected_chore_snapshot_obj.chore_brief.qty *
                                                      get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
-    expected_strat_status.avg_open_buy_px = (
-        get_usd_to_local_px_or_notional(expected_strat_status.total_open_buy_notional) /
-        expected_strat_status.total_open_buy_qty)
-    expected_strat_status.total_open_exposure = expected_strat_status.total_open_buy_notional
-    buy_residual_notional = expected_strat_brief_obj.pair_buy_side_bartering_brief.residual_qty * get_px_in_usd(
+    expected_plan_status.avg_open_buy_px = (
+        get_usd_to_local_px_or_notional(expected_plan_status.total_open_buy_notional) /
+        expected_plan_status.total_open_buy_qty)
+    expected_plan_status.total_open_exposure = expected_plan_status.total_open_buy_notional
+    buy_residual_notional = expected_plan_brief_obj.pair_buy_side_bartering_brief.residual_qty * get_px_in_usd(
         buy_last_barter_px)
-    sell_residual_notional = expected_strat_brief_obj.pair_sell_side_bartering_brief.residual_qty * get_px_in_usd(
+    sell_residual_notional = expected_plan_brief_obj.pair_sell_side_bartering_brief.residual_qty * get_px_in_usd(
         sell_last_barter_px)
     residual_notional = abs(buy_residual_notional - sell_residual_notional)
-    security = expected_strat_brief_obj.pair_buy_side_bartering_brief.security if \
+    security = expected_plan_brief_obj.pair_buy_side_bartering_brief.security if \
         buy_residual_notional > sell_residual_notional else \
-        expected_strat_brief_obj.pair_sell_side_bartering_brief.security
-    expected_strat_status.residual = ResidualBaseModel.from_kwargs(security=security,
+        expected_plan_brief_obj.pair_sell_side_bartering_brief.security
+    expected_plan_status.residual = ResidualBaseModel.from_kwargs(security=security,
                                                                    residual_notional=residual_notional)
-    if expected_strat_status.total_fill_buy_notional < expected_strat_status.total_fill_sell_notional:
-        expected_strat_status.balance_notional = \
-            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_buy_notional
+    if expected_plan_status.total_fill_buy_notional < expected_plan_status.total_fill_sell_notional:
+        expected_plan_status.balance_notional = \
+            expected_plan_limits.max_single_leg_notional - expected_plan_status.total_fill_buy_notional
     else:
-        expected_strat_status.balance_notional = \
-            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_sell_notional
+        expected_plan_status.balance_notional = \
+            expected_plan_limits.max_single_leg_notional - expected_plan_status.total_fill_sell_notional
 
-    strat_status_obj = get_strat_status(executor_web_client)
-    expected_strat_status.id = strat_status_obj.id
-    expected_strat_status.last_update_date_time = strat_status_obj.last_update_date_time
-    expected_strat_status.strat_status_update_seq_num = strat_status_obj.strat_status_update_seq_num
-    expected_strat_status.average_premium = strat_status_obj.average_premium
-    assert strat_status_obj == expected_strat_status, \
-        f"Mismatched StratStatus: expected: {expected_strat_status}, received: {strat_status_obj}"
+    plan_status_obj = get_plan_status(executor_web_client)
+    expected_plan_status.id = plan_status_obj.id
+    expected_plan_status.last_update_date_time = plan_status_obj.last_update_date_time
+    expected_plan_status.plan_status_update_seq_num = plan_status_obj.plan_status_update_seq_num
+    expected_plan_status.average_premium = plan_status_obj.average_premium
+    assert plan_status_obj == expected_plan_status, \
+        f"Mismatched PlanStatus: expected: {expected_plan_status}, received: {plan_status_obj}"
 
-    # checking strat_view
-    check_strat_view_computes(pair_strat_.id, executor_web_client)
+    # checking plan_view
+    check_plan_view_computes(pair_plan_.id, executor_web_client)
 
 
 def check_placed_buy_chore_computes_after_sells(loop_count: int, expected_chore_id: str, symbol: str,
@@ -676,21 +676,21 @@ def check_placed_buy_chore_computes_after_sells(loop_count: int, expected_chore_
                                                 expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
                                                 expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                                 other_leg_expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
-                                                expected_pair_strat: PairStratBaseModel,
-                                                expected_strat_limits: StratLimits,
-                                                expected_strat_status: StratStatus,
-                                                expected_strat_brief_obj: StratBriefBaseModel,
+                                                expected_pair_plan: PairPlanBaseModel,
+                                                expected_plan_limits: PlanLimits,
+                                                expected_plan_status: PlanStatus,
+                                                expected_plan_brief_obj: PlanBriefBaseModel,
                                                 executor_web_client: StreetBookServiceHttpClient):
     """
-    Checking resulted changes in ChoreJournal, ChoreSnapshot, SymbolSideSnapshot, PairStrat,
-    StratBrief and PortfolioStatus after chore is triggered
+    Checking resulted changes in ChoreJournal, ChoreSnapshot, SymbolSideSnapshot, PairPlan,
+    PlanBrief and ContactStatus after chore is triggered
     """
     chore_journal_obj_list = executor_web_client.get_all_chore_journal_client(-100)
     assert buy_placed_chore_journal in chore_journal_obj_list, \
         f"Couldn't find {buy_placed_chore_journal} in {chore_journal_obj_list}"
 
     buy_last_barter_px, sell_last_barter_px = get_both_side_last_barter_px()
-    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, expected_pair_strat)
+    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, expected_pair_plan)
 
     # Checking chore_snapshot
     expected_chore_snapshot_obj.chore_brief.chore_id = expected_chore_id
@@ -734,83 +734,83 @@ def check_placed_buy_chore_computes_after_sells(loop_count: int, expected_chore_
                                                                        f"{symbol_side_snapshot_list}"
 
     # Checking start_brief
-    update_expected_strat_brief_for_buy(expected_chore_snapshot_obj, expected_symbol_side_snapshot,
+    update_expected_plan_brief_for_buy(expected_chore_snapshot_obj, expected_symbol_side_snapshot,
                                         other_leg_expected_symbol_side_snapshot,
-                                        expected_strat_limits, expected_strat_brief_obj,
+                                        expected_plan_limits, expected_plan_brief_obj,
                                         buy_placed_chore_journal.chore_event_date_time,
                                         buy_last_barter_px, sell_last_barter_px, executor_web_client,
-                                        hedge_ratio=expected_pair_strat.pair_strat_params.hedge_ratio)
+                                        hedge_ratio=expected_pair_plan.pair_plan_params.hedge_ratio)
 
-    strat_brief_list = executor_web_client.get_strat_brief_from_symbol_query_client(symbol)
-    expected_strat_brief_obj.pair_buy_side_bartering_brief.last_update_date_time = None
-    expected_strat_brief_obj.pair_buy_side_bartering_brief.security.inst_type = buy_inst_type
+    plan_brief_list = executor_web_client.get_plan_brief_from_symbol_query_client(symbol)
+    expected_plan_brief_obj.pair_buy_side_bartering_brief.last_update_date_time = None
+    expected_plan_brief_obj.pair_buy_side_bartering_brief.security.inst_type = buy_inst_type
     # removing id field from received obj list for comparison
-    for strat_brief in strat_brief_list:
-        strat_brief.pair_buy_side_bartering_brief.indicative_consumable_participation_qty = None
-        strat_brief.pair_buy_side_bartering_brief.participation_period_chore_qty_sum = None
-        strat_brief.pair_buy_side_bartering_brief.last_update_date_time = None
-        strat_brief.pair_sell_side_bartering_brief.indicative_consumable_participation_qty = None
-        strat_brief.pair_sell_side_bartering_brief.participation_period_chore_qty_sum = None
-        strat_brief.pair_sell_side_bartering_brief.last_update_date_time = None
-    assert expected_strat_brief_obj in strat_brief_list, \
-        f"Mismatched: {expected_strat_brief_obj} not found in {strat_brief_list}"
+    for plan_brief in plan_brief_list:
+        plan_brief.pair_buy_side_bartering_brief.indicative_consumable_participation_qty = None
+        plan_brief.pair_buy_side_bartering_brief.participation_period_chore_qty_sum = None
+        plan_brief.pair_buy_side_bartering_brief.last_update_date_time = None
+        plan_brief.pair_sell_side_bartering_brief.indicative_consumable_participation_qty = None
+        plan_brief.pair_sell_side_bartering_brief.participation_period_chore_qty_sum = None
+        plan_brief.pair_sell_side_bartering_brief.last_update_date_time = None
+    assert expected_plan_brief_obj in plan_brief_list, \
+        f"Mismatched: {expected_plan_brief_obj} not found in {plan_brief_list}"
 
-    # Checking Strat_Limits
-    strat_limits_obj_list = executor_web_client.get_all_strat_limits_client()
-    if len(strat_limits_obj_list) == 1:
-        strat_limits_obj = strat_limits_obj_list[0]
-        expected_strat_limits.id = strat_limits_obj.id
-        expected_strat_limits.eligible_brokers = strat_limits_obj.eligible_brokers
-        expected_strat_limits.strat_limits_update_seq_num = strat_limits_obj.strat_limits_update_seq_num
+    # Checking Plan_Limits
+    plan_limits_obj_list = executor_web_client.get_all_plan_limits_client()
+    if len(plan_limits_obj_list) == 1:
+        plan_limits_obj = plan_limits_obj_list[0]
+        expected_plan_limits.id = plan_limits_obj.id
+        expected_plan_limits.eligible_brokers = plan_limits_obj.eligible_brokers
+        expected_plan_limits.plan_limits_update_seq_num = plan_limits_obj.plan_limits_update_seq_num
 
-        assert strat_limits_obj == expected_strat_limits, \
-            f"Mismatched StratLimits: expected: {expected_strat_limits}, received: {strat_limits_obj}"
+        assert plan_limits_obj == expected_plan_limits, \
+            f"Mismatched PlanLimits: expected: {expected_plan_limits}, received: {plan_limits_obj}"
     else:
-        assert False, (f"StratLimits' length must be exactly 1, found {len(strat_limits_obj_list)}, "
-                       f"strat_limits_list: {strat_limits_obj_list}")
+        assert False, (f"PlanLimits' length must be exactly 1, found {len(plan_limits_obj_list)}, "
+                       f"plan_limits_list: {plan_limits_obj_list}")
 
-    # Checking strat_status
-    expected_strat_status.total_buy_qty += buy_placed_chore_journal.chore.qty
-    expected_strat_status.total_chore_qty = expected_strat_status.total_buy_qty + expected_strat_status.total_sell_qty
-    expected_strat_status.total_open_buy_qty += buy_placed_chore_journal.chore.qty
-    expected_strat_status.total_open_buy_notional += (get_px_in_usd(buy_placed_chore_journal.chore.px) *
+    # Checking plan_status
+    expected_plan_status.total_buy_qty += buy_placed_chore_journal.chore.qty
+    expected_plan_status.total_chore_qty = expected_plan_status.total_buy_qty + expected_plan_status.total_sell_qty
+    expected_plan_status.total_open_buy_qty += buy_placed_chore_journal.chore.qty
+    expected_plan_status.total_open_buy_notional += (get_px_in_usd(buy_placed_chore_journal.chore.px) *
                                                        buy_placed_chore_journal.chore.qty)
-    expected_strat_status.avg_open_buy_px = (
-            get_usd_to_local_px_or_notional(expected_strat_status.total_open_buy_notional) /
-            expected_strat_status.total_open_buy_qty)
-    expected_strat_status.total_open_exposure = expected_strat_status.total_open_buy_notional
-    buy_residual_notional = expected_strat_brief_obj.pair_buy_side_bartering_brief.residual_qty * get_px_in_usd(
+    expected_plan_status.avg_open_buy_px = (
+            get_usd_to_local_px_or_notional(expected_plan_status.total_open_buy_notional) /
+            expected_plan_status.total_open_buy_qty)
+    expected_plan_status.total_open_exposure = expected_plan_status.total_open_buy_notional
+    buy_residual_notional = expected_plan_brief_obj.pair_buy_side_bartering_brief.residual_qty * get_px_in_usd(
         buy_last_barter_px)
-    sell_residual_notional = expected_strat_brief_obj.pair_sell_side_bartering_brief.residual_qty * get_px_in_usd(
+    sell_residual_notional = expected_plan_brief_obj.pair_sell_side_bartering_brief.residual_qty * get_px_in_usd(
         sell_last_barter_px)
     residual_notional = abs(buy_residual_notional - sell_residual_notional)
-    security = expected_strat_brief_obj.pair_buy_side_bartering_brief.security if \
+    security = expected_plan_brief_obj.pair_buy_side_bartering_brief.security if \
         buy_residual_notional > sell_residual_notional else \
-        expected_strat_brief_obj.pair_sell_side_bartering_brief.security
-    expected_strat_status.residual = ResidualBaseModel.from_kwargs(security=security,
+        expected_plan_brief_obj.pair_sell_side_bartering_brief.security
+    expected_plan_status.residual = ResidualBaseModel.from_kwargs(security=security,
                                                                    residual_notional=residual_notional)
-    if expected_strat_status.total_fill_buy_notional < expected_strat_status.total_fill_sell_notional:
-        expected_strat_status.balance_notional = \
-            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_buy_notional
+    if expected_plan_status.total_fill_buy_notional < expected_plan_status.total_fill_sell_notional:
+        expected_plan_status.balance_notional = \
+            expected_plan_limits.max_single_leg_notional - expected_plan_status.total_fill_buy_notional
     else:
-        expected_strat_status.balance_notional = \
-            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_sell_notional
+        expected_plan_status.balance_notional = \
+            expected_plan_limits.max_single_leg_notional - expected_plan_status.total_fill_sell_notional
 
-    strat_status_obj_list = executor_web_client.get_all_strat_status_client()
-    if len(strat_status_obj_list) == 1:
-        strat_status_obj = strat_status_obj_list[0]
-        expected_strat_status.id = expected_pair_strat.id
-        expected_strat_status.last_update_date_time = strat_status_obj.last_update_date_time
-        expected_strat_status.strat_status_update_seq_num = strat_status_obj.strat_status_update_seq_num
-        expected_strat_status.average_premium = strat_status_obj.average_premium
-        assert strat_status_obj == expected_strat_status, \
-            f"Mismatched StratStatus: expected: {expected_strat_status}, received: {strat_status_obj}"
+    plan_status_obj_list = executor_web_client.get_all_plan_status_client()
+    if len(plan_status_obj_list) == 1:
+        plan_status_obj = plan_status_obj_list[0]
+        expected_plan_status.id = expected_pair_plan.id
+        expected_plan_status.last_update_date_time = plan_status_obj.last_update_date_time
+        expected_plan_status.plan_status_update_seq_num = plan_status_obj.plan_status_update_seq_num
+        expected_plan_status.average_premium = plan_status_obj.average_premium
+        assert plan_status_obj == expected_plan_status, \
+            f"Mismatched PlanStatus: expected: {expected_plan_status}, received: {plan_status_obj}"
     else:
-        assert False, (f"StratStatus' length must be exactly 1, found {len(strat_status_obj_list)}, "
-                       f"strat_status_list: {strat_status_obj_list}")
+        assert False, (f"PlanStatus' length must be exactly 1, found {len(plan_status_obj_list)}, "
+                       f"plan_status_list: {plan_status_obj_list}")
 
-    # checking strat_view
-    check_strat_view_computes(expected_pair_strat.id, executor_web_client)
+    # checking plan_view
+    check_plan_view_computes(expected_pair_plan.id, executor_web_client)
 
 
 def placed_buy_chore_ack_receive(expected_chore_journal: ChoreJournalBaseModel,
@@ -841,14 +841,14 @@ def check_fill_receive_for_placed_buy_chore_before_sells(symbol: str,
                                                          expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
                                                          expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                                          other_leg_expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
-                                                         expected_pair_strat: PairStratBaseModel,
-                                                         expected_strat_limits: StratLimits,
-                                                         expected_strat_status: StratStatus,
-                                                         expected_strat_brief_obj: StratBriefBaseModel,
+                                                         expected_pair_plan: PairPlanBaseModel,
+                                                         expected_plan_limits: PlanLimits,
+                                                         expected_plan_status: PlanStatus,
+                                                         expected_plan_brief_obj: PlanBriefBaseModel,
                                                          executor_web_client: StreetBookServiceHttpClient):
     """
-    Checking resulted changes in ChoreJournal, ChoreSnapshot, SymbolSideSnapshot, PairStrat,
-    StratBrief and PortfolioStatus after fill is received
+    Checking resulted changes in ChoreJournal, ChoreSnapshot, SymbolSideSnapshot, PairPlan,
+    PlanBrief and ContactStatus after fill is received
     """
     fill_journal_obj_list = executor_web_client.get_all_fills_journal_client(-100)
     assert buy_fill_journal in fill_journal_obj_list, f"Couldn't find {buy_fill_journal} in {fill_journal_obj_list}"
@@ -890,73 +890,73 @@ def check_fill_receive_for_placed_buy_chore_before_sells(symbol: str,
         f"Couldn't find {expected_symbol_side_snapshot} in {symbol_side_snapshot_list}"
 
     # Checking start_brief
-    update_expected_strat_brief_for_buy(expected_chore_snapshot_obj,
+    update_expected_plan_brief_for_buy(expected_chore_snapshot_obj,
                                         expected_symbol_side_snapshot,
                                         other_leg_expected_symbol_side_snapshot,
-                                        expected_strat_limits, expected_strat_brief_obj,
+                                        expected_plan_limits, expected_plan_brief_obj,
                                         buy_fill_journal.fill_date_time,
                                         buy_last_barter_px, sell_last_barter_px, executor_web_client)
 
-    strat_brief_list = executor_web_client.get_strat_brief_from_symbol_query_client(symbol)
+    plan_brief_list = executor_web_client.get_plan_brief_from_symbol_query_client(symbol)
     # removing id field from received obj list for comparison
-    for strat_brief in strat_brief_list:
-        strat_brief.pair_buy_side_bartering_brief.indicative_consumable_participation_qty = None
-        strat_brief.pair_buy_side_bartering_brief.participation_period_chore_qty_sum = None
-        strat_brief.pair_buy_side_bartering_brief.last_update_date_time = None
-    expected_strat_brief_obj.pair_buy_side_bartering_brief.last_update_date_time = None
-    assert expected_strat_brief_obj in strat_brief_list, f"Couldn't find {expected_strat_brief_obj} in " \
-                                                         f"{strat_brief_list}"
+    for plan_brief in plan_brief_list:
+        plan_brief.pair_buy_side_bartering_brief.indicative_consumable_participation_qty = None
+        plan_brief.pair_buy_side_bartering_brief.participation_period_chore_qty_sum = None
+        plan_brief.pair_buy_side_bartering_brief.last_update_date_time = None
+    expected_plan_brief_obj.pair_buy_side_bartering_brief.last_update_date_time = None
+    assert expected_plan_brief_obj in plan_brief_list, f"Couldn't find {expected_plan_brief_obj} in " \
+                                                         f"{plan_brief_list}"
 
-    # Checking Strat_Limits
-    strat_limits_obj_list = executor_web_client.get_all_strat_limits_client()
-    if len(strat_limits_obj_list) == 1:
-        strat_limits_obj = strat_limits_obj_list[0]
-        expected_strat_limits.id = strat_limits_obj.id
-        expected_strat_limits.eligible_brokers = strat_limits_obj.eligible_brokers
-        expected_strat_limits.strat_limits_update_seq_num = strat_limits_obj.strat_limits_update_seq_num
-        assert strat_limits_obj == expected_strat_limits, \
-            f"Mismatched StratLimits: expected: {expected_strat_limits}, received: {strat_limits_obj}"
+    # Checking Plan_Limits
+    plan_limits_obj_list = executor_web_client.get_all_plan_limits_client()
+    if len(plan_limits_obj_list) == 1:
+        plan_limits_obj = plan_limits_obj_list[0]
+        expected_plan_limits.id = plan_limits_obj.id
+        expected_plan_limits.eligible_brokers = plan_limits_obj.eligible_brokers
+        expected_plan_limits.plan_limits_update_seq_num = plan_limits_obj.plan_limits_update_seq_num
+        assert plan_limits_obj == expected_plan_limits, \
+            f"Mismatched PlanLimits: expected: {expected_plan_limits}, received: {plan_limits_obj}"
     else:
-        assert False, (f"StratLimits' length must be exactly 1, found {len(strat_limits_obj_list)}, "
-                       f"strat_limits_list: {strat_limits_obj_list}")
+        assert False, (f"PlanLimits' length must be exactly 1, found {len(plan_limits_obj_list)}, "
+                       f"plan_limits_list: {plan_limits_obj_list}")
 
-    expected_strat_status.total_open_buy_qty -= buy_fill_journal.fill_qty
-    expected_strat_status.total_open_buy_notional -= (buy_fill_journal.fill_qty *
+    expected_plan_status.total_open_buy_qty -= buy_fill_journal.fill_qty
+    expected_plan_status.total_open_buy_notional -= (buy_fill_journal.fill_qty *
                                                       get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
-    expected_strat_status.avg_open_buy_px = (
-        get_usd_to_local_px_or_notional(expected_strat_status.total_open_buy_notional) /
-        expected_strat_status.total_open_buy_qty)
-    expected_strat_status.total_open_exposure = expected_strat_status.total_open_buy_notional
-    expected_strat_status.total_fill_buy_qty += buy_fill_journal.fill_qty
-    expected_strat_status.total_fill_buy_notional += (
+    expected_plan_status.avg_open_buy_px = (
+        get_usd_to_local_px_or_notional(expected_plan_status.total_open_buy_notional) /
+        expected_plan_status.total_open_buy_qty)
+    expected_plan_status.total_open_exposure = expected_plan_status.total_open_buy_notional
+    expected_plan_status.total_fill_buy_qty += buy_fill_journal.fill_qty
+    expected_plan_status.total_fill_buy_notional += (
         get_px_in_usd(buy_fill_journal.fill_px) * buy_fill_journal.fill_qty)
-    expected_strat_status.avg_fill_buy_px = (
-        (get_usd_to_local_px_or_notional(expected_strat_status.total_fill_buy_notional) /
-         expected_strat_status.total_fill_buy_qty))
-    expected_strat_status.total_fill_exposure = (expected_strat_status.total_fill_buy_notional -
-                                                 expected_strat_status.total_fill_sell_notional)
-    if expected_strat_status.total_fill_buy_notional < expected_strat_status.total_fill_sell_notional:
-        expected_strat_status.balance_notional = \
-            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_buy_notional
+    expected_plan_status.avg_fill_buy_px = (
+        (get_usd_to_local_px_or_notional(expected_plan_status.total_fill_buy_notional) /
+         expected_plan_status.total_fill_buy_qty))
+    expected_plan_status.total_fill_exposure = (expected_plan_status.total_fill_buy_notional -
+                                                 expected_plan_status.total_fill_sell_notional)
+    if expected_plan_status.total_fill_buy_notional < expected_plan_status.total_fill_sell_notional:
+        expected_plan_status.balance_notional = \
+            expected_plan_limits.max_single_leg_notional - expected_plan_status.total_fill_buy_notional
     else:
-        expected_strat_status.balance_notional = \
-            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_sell_notional
+        expected_plan_status.balance_notional = \
+            expected_plan_limits.max_single_leg_notional - expected_plan_status.total_fill_sell_notional
 
-    strat_status_obj_list = executor_web_client.get_all_strat_status_client()
-    if len(strat_status_obj_list) == 1:
-        strat_status_obj = strat_status_obj_list[0]
-        expected_strat_status.id = strat_status_obj.id
-        expected_strat_status.last_update_date_time = strat_status_obj.last_update_date_time
-        expected_strat_status.strat_status_update_seq_num = strat_status_obj.strat_status_update_seq_num
-        expected_strat_status.average_premium = strat_status_obj.average_premium
-        assert strat_status_obj == expected_strat_status, \
-            f"Mismatched StratStatus: expected: {expected_strat_status}, received: {strat_status_obj}"
+    plan_status_obj_list = executor_web_client.get_all_plan_status_client()
+    if len(plan_status_obj_list) == 1:
+        plan_status_obj = plan_status_obj_list[0]
+        expected_plan_status.id = plan_status_obj.id
+        expected_plan_status.last_update_date_time = plan_status_obj.last_update_date_time
+        expected_plan_status.plan_status_update_seq_num = plan_status_obj.plan_status_update_seq_num
+        expected_plan_status.average_premium = plan_status_obj.average_premium
+        assert plan_status_obj == expected_plan_status, \
+            f"Mismatched PlanStatus: expected: {expected_plan_status}, received: {plan_status_obj}"
     else:
-        assert False, (f"StratStatus' length must be exactly 1, found {len(strat_status_obj_list)}, "
-                       f"strat_status_list: {strat_status_obj_list}")
+        assert False, (f"PlanStatus' length must be exactly 1, found {len(plan_status_obj_list)}, "
+                       f"plan_status_list: {plan_status_obj_list}")
 
-    # checking strat_view
-    check_strat_view_computes(expected_pair_strat.id, executor_web_client)
+    # checking plan_view
+    check_plan_view_computes(expected_pair_plan.id, executor_web_client)
 
 
 def check_cxl_receive_for_placed_buy_chore_before_sells(symbol: str,
@@ -964,14 +964,14 @@ def check_cxl_receive_for_placed_buy_chore_before_sells(symbol: str,
                                                         expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
                                                         expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                                         other_leg_expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
-                                                        expected_pair_strat: PairStratBaseModel,
-                                                        expected_strat_limits: StratLimits,
-                                                        expected_strat_status: StratStatus,
-                                                        expected_strat_brief_obj: StratBriefBaseModel,
+                                                        expected_pair_plan: PairPlanBaseModel,
+                                                        expected_plan_limits: PlanLimits,
+                                                        expected_plan_status: PlanStatus,
+                                                        expected_plan_brief_obj: PlanBriefBaseModel,
                                                         executor_web_client: StreetBookServiceHttpClient,):
     """
-    Checking resulted changes in ChoreJournal, ChoreSnapshot, SymbolSideSnapshot, PairStrat,
-    StratBrief and PortfolioStatus after fill is received
+    Checking resulted changes in ChoreJournal, ChoreSnapshot, SymbolSideSnapshot, PairPlan,
+    PlanBrief and ContactStatus after fill is received
     """
     chore_journal_obj_list = executor_web_client.get_all_chore_journal_client(-100)
     assert buy_cxl_chore_journal in chore_journal_obj_list, f"Couldn't find {buy_cxl_chore_journal} in list " \
@@ -1017,87 +1017,87 @@ def check_cxl_receive_for_placed_buy_chore_before_sells(symbol: str,
         f"Couldn't find {expected_symbol_side_snapshot} in {symbol_side_snapshot_list}"
 
     # Checking start_brief
-    update_expected_strat_brief_for_buy(expected_chore_snapshot_obj,
+    update_expected_plan_brief_for_buy(expected_chore_snapshot_obj,
                                         expected_symbol_side_snapshot,
                                         other_leg_expected_symbol_side_snapshot,
-                                        expected_strat_limits, expected_strat_brief_obj,
+                                        expected_plan_limits, expected_plan_brief_obj,
                                         buy_cxl_chore_journal.chore_event_date_time,
                                         buy_last_barter_px, sell_last_barter_px, executor_web_client)
 
-    strat_brief_list = executor_web_client.get_strat_brief_from_symbol_query_client(symbol)
+    plan_brief_list = executor_web_client.get_plan_brief_from_symbol_query_client(symbol)
     # removing id field from received obj list for comparison
-    for strat_brief in strat_brief_list:
-        strat_brief.pair_buy_side_bartering_brief.indicative_consumable_participation_qty = None
-        strat_brief.pair_buy_side_bartering_brief.participation_period_chore_qty_sum = None
-        strat_brief.pair_buy_side_bartering_brief.last_update_date_time = None
-    expected_strat_brief_obj.pair_buy_side_bartering_brief.last_update_date_time = None
-    assert expected_strat_brief_obj in strat_brief_list, f"Couldn't find {expected_strat_brief_obj} in " \
-                                                         f"{strat_brief_list}"
+    for plan_brief in plan_brief_list:
+        plan_brief.pair_buy_side_bartering_brief.indicative_consumable_participation_qty = None
+        plan_brief.pair_buy_side_bartering_brief.participation_period_chore_qty_sum = None
+        plan_brief.pair_buy_side_bartering_brief.last_update_date_time = None
+    expected_plan_brief_obj.pair_buy_side_bartering_brief.last_update_date_time = None
+    assert expected_plan_brief_obj in plan_brief_list, f"Couldn't find {expected_plan_brief_obj} in " \
+                                                         f"{plan_brief_list}"
 
-    # Checking Strat_Limits
-    strat_limits_obj_list = executor_web_client.get_all_strat_limits_client()
-    if len(strat_limits_obj_list) == 1:
-        strat_limits_obj = strat_limits_obj_list[0]
-        expected_strat_limits.id = strat_limits_obj.id
-        expected_strat_limits.eligible_brokers = strat_limits_obj.eligible_brokers
-        expected_strat_limits.strat_limits_update_seq_num = strat_limits_obj.strat_limits_update_seq_num
-        assert strat_limits_obj == expected_strat_limits, \
-            f"Mismatched StratLimits: expected: {expected_strat_limits}, received: {strat_limits_obj}"
+    # Checking Plan_Limits
+    plan_limits_obj_list = executor_web_client.get_all_plan_limits_client()
+    if len(plan_limits_obj_list) == 1:
+        plan_limits_obj = plan_limits_obj_list[0]
+        expected_plan_limits.id = plan_limits_obj.id
+        expected_plan_limits.eligible_brokers = plan_limits_obj.eligible_brokers
+        expected_plan_limits.plan_limits_update_seq_num = plan_limits_obj.plan_limits_update_seq_num
+        assert plan_limits_obj == expected_plan_limits, \
+            f"Mismatched PlanLimits: expected: {expected_plan_limits}, received: {plan_limits_obj}"
     else:
-        assert False, (f"StratLimits' length must be exactly 1, found {len(strat_limits_obj_list)}, "
-                       f"strat_limits_list: {strat_limits_obj_list}")
+        assert False, (f"PlanLimits' length must be exactly 1, found {len(plan_limits_obj_list)}, "
+                       f"plan_limits_list: {plan_limits_obj_list}")
 
-    expected_strat_status.total_cxl_buy_qty += unfilled_qty
-    expected_strat_status.total_cxl_buy_notional += (unfilled_qty *
+    expected_plan_status.total_cxl_buy_qty += unfilled_qty
+    expected_plan_status.total_cxl_buy_notional += (unfilled_qty *
                                                      get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
-    expected_strat_status.avg_cxl_buy_px = (
-            get_usd_to_local_px_or_notional(expected_strat_status.total_cxl_buy_notional) /
-            expected_strat_status.total_cxl_buy_qty)
-    expected_strat_status.total_open_buy_qty -= unfilled_qty
-    expected_strat_status.total_open_buy_notional -= (
+    expected_plan_status.avg_cxl_buy_px = (
+            get_usd_to_local_px_or_notional(expected_plan_status.total_cxl_buy_notional) /
+            expected_plan_status.total_cxl_buy_qty)
+    expected_plan_status.total_open_buy_qty -= unfilled_qty
+    expected_plan_status.total_open_buy_notional -= (
         get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px) * unfilled_qty)
-    if expected_strat_status.total_open_buy_qty != 0:
-        expected_strat_status.avg_open_buy_px = (
-            get_usd_to_local_px_or_notional(expected_strat_status.total_open_buy_notional) /
-            expected_strat_status.total_open_buy_qty)
+    if expected_plan_status.total_open_buy_qty != 0:
+        expected_plan_status.avg_open_buy_px = (
+            get_usd_to_local_px_or_notional(expected_plan_status.total_open_buy_notional) /
+            expected_plan_status.total_open_buy_qty)
     else:
-        expected_strat_status.avg_open_buy_px = 0
-    expected_strat_status.total_open_exposure = expected_strat_status.total_open_buy_notional
-    expected_strat_status.total_cxl_exposure = (expected_strat_status.total_cxl_buy_notional -
-                                                expected_strat_status.total_cxl_sell_notional)
-    buy_residual_notional = expected_strat_brief_obj.pair_buy_side_bartering_brief.residual_qty * get_px_in_usd(
+        expected_plan_status.avg_open_buy_px = 0
+    expected_plan_status.total_open_exposure = expected_plan_status.total_open_buy_notional
+    expected_plan_status.total_cxl_exposure = (expected_plan_status.total_cxl_buy_notional -
+                                                expected_plan_status.total_cxl_sell_notional)
+    buy_residual_notional = expected_plan_brief_obj.pair_buy_side_bartering_brief.residual_qty * get_px_in_usd(
         buy_last_barter_px)
-    sell_residual_notional = expected_strat_brief_obj.pair_sell_side_bartering_brief.residual_qty * get_px_in_usd(
+    sell_residual_notional = expected_plan_brief_obj.pair_sell_side_bartering_brief.residual_qty * get_px_in_usd(
         sell_last_barter_px)
     residual_notional = abs(buy_residual_notional - sell_residual_notional)
 
-    security = expected_strat_brief_obj.pair_buy_side_bartering_brief.security if \
+    security = expected_plan_brief_obj.pair_buy_side_bartering_brief.security if \
         buy_residual_notional > sell_residual_notional else \
-        expected_strat_brief_obj.pair_sell_side_bartering_brief.security
-    expected_strat_status.residual = ResidualBaseModel.from_kwargs(security=security,
+        expected_plan_brief_obj.pair_sell_side_bartering_brief.security
+    expected_plan_status.residual = ResidualBaseModel.from_kwargs(security=security,
                                                                    residual_notional=residual_notional)
-    if expected_strat_status.total_fill_buy_notional < expected_strat_status.total_fill_sell_notional:
-        expected_strat_status.balance_notional = \
-            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_buy_notional
+    if expected_plan_status.total_fill_buy_notional < expected_plan_status.total_fill_sell_notional:
+        expected_plan_status.balance_notional = \
+            expected_plan_limits.max_single_leg_notional - expected_plan_status.total_fill_buy_notional
     else:
-        expected_strat_status.balance_notional = \
-            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_sell_notional
+        expected_plan_status.balance_notional = \
+            expected_plan_limits.max_single_leg_notional - expected_plan_status.total_fill_sell_notional
 
-    strat_status_obj_list = executor_web_client.get_all_strat_status_client()
-    if len(strat_status_obj_list) == 1:
-        strat_status_obj = strat_status_obj_list[0]
-        expected_strat_status.id = expected_pair_strat.id
-        expected_strat_status.last_update_date_time = strat_status_obj.last_update_date_time
-        expected_strat_status.strat_status_update_seq_num = strat_status_obj.strat_status_update_seq_num
-        expected_strat_status.average_premium = strat_status_obj.average_premium
-        assert strat_status_obj == expected_strat_status, \
-            f"Mismatched StratStatus: expected: {expected_strat_status}, received: {strat_status_obj}"
+    plan_status_obj_list = executor_web_client.get_all_plan_status_client()
+    if len(plan_status_obj_list) == 1:
+        plan_status_obj = plan_status_obj_list[0]
+        expected_plan_status.id = expected_pair_plan.id
+        expected_plan_status.last_update_date_time = plan_status_obj.last_update_date_time
+        expected_plan_status.plan_status_update_seq_num = plan_status_obj.plan_status_update_seq_num
+        expected_plan_status.average_premium = plan_status_obj.average_premium
+        assert plan_status_obj == expected_plan_status, \
+            f"Mismatched PlanStatus: expected: {expected_plan_status}, received: {plan_status_obj}"
     else:
-        assert False, (f"StratStatus' length must be exactly 1, found {len(strat_status_obj_list)}, "
-                       f"strat_status_list: {strat_status_obj_list}")
+        assert False, (f"PlanStatus' length must be exactly 1, found {len(plan_status_obj_list)}, "
+                       f"plan_status_list: {plan_status_obj_list}")
 
-    # checking strat_view
-    check_strat_view_computes(expected_pair_strat.id, executor_web_client)
+    # checking plan_view
+    check_plan_view_computes(expected_pair_plan.id, executor_web_client)
 
 
 def check_cxl_receive_for_placed_sell_chore_before_buy(symbol: str,
@@ -1105,14 +1105,14 @@ def check_cxl_receive_for_placed_sell_chore_before_buy(symbol: str,
                                                        expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
                                                        expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                                        other_leg_expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
-                                                       expected_pair_strat: PairStratBaseModel,
-                                                       expected_strat_limits: StratLimits,
-                                                       expected_strat_status: StratStatus,
-                                                       expected_strat_brief_obj: StratBriefBaseModel,
+                                                       expected_pair_plan: PairPlanBaseModel,
+                                                       expected_plan_limits: PlanLimits,
+                                                       expected_plan_status: PlanStatus,
+                                                       expected_plan_brief_obj: PlanBriefBaseModel,
                                                        executor_web_client: StreetBookServiceHttpClient):
     """
-    Checking resulted changes in ChoreJournal, ChoreSnapshot, SymbolSideSnapshot, PairStrat,
-    StratBrief and PortfolioStatus after fill is received
+    Checking resulted changes in ChoreJournal, ChoreSnapshot, SymbolSideSnapshot, PairPlan,
+    PlanBrief and ContactStatus after fill is received
     """
     chore_journal_obj_list = executor_web_client.get_all_chore_journal_client(-100)
     assert sell_cxl_chore_journal in chore_journal_obj_list, f"Couldn't find {sell_cxl_chore_journal} in list " \
@@ -1158,87 +1158,87 @@ def check_cxl_receive_for_placed_sell_chore_before_buy(symbol: str,
         f"Couldn't find {expected_symbol_side_snapshot} in {symbol_side_snapshot_list}"
 
     # Checking start_brief
-    update_expected_strat_brief_for_sell(expected_chore_snapshot_obj,
+    update_expected_plan_brief_for_sell(expected_chore_snapshot_obj,
                                          expected_symbol_side_snapshot,
                                          other_leg_expected_symbol_side_snapshot,
-                                         expected_strat_limits, expected_strat_brief_obj,
+                                         expected_plan_limits, expected_plan_brief_obj,
                                          sell_cxl_chore_journal.chore_event_date_time,
                                          buy_last_barter_px, sell_last_barter_px, executor_web_client)
 
-    strat_brief_list = executor_web_client.get_strat_brief_from_symbol_query_client(symbol)
+    plan_brief_list = executor_web_client.get_plan_brief_from_symbol_query_client(symbol)
     # removing id field from received obj list for comparison
-    for strat_brief in strat_brief_list:
-        strat_brief.pair_sell_side_bartering_brief.indicative_consumable_participation_qty = None
-        strat_brief.pair_sell_side_bartering_brief.participation_period_chore_qty_sum = None
-        strat_brief.pair_sell_side_bartering_brief.last_update_date_time = None
-    expected_strat_brief_obj.pair_sell_side_bartering_brief.last_update_date_time = None
-    assert expected_strat_brief_obj in strat_brief_list, f"Couldn't find {expected_strat_brief_obj} in " \
-                                                         f"{strat_brief_list}"
+    for plan_brief in plan_brief_list:
+        plan_brief.pair_sell_side_bartering_brief.indicative_consumable_participation_qty = None
+        plan_brief.pair_sell_side_bartering_brief.participation_period_chore_qty_sum = None
+        plan_brief.pair_sell_side_bartering_brief.last_update_date_time = None
+    expected_plan_brief_obj.pair_sell_side_bartering_brief.last_update_date_time = None
+    assert expected_plan_brief_obj in plan_brief_list, f"Couldn't find {expected_plan_brief_obj} in " \
+                                                         f"{plan_brief_list}"
 
-    # Checking Strat_Limits
-    strat_limits_obj_list = executor_web_client.get_all_strat_limits_client()
-    if len(strat_limits_obj_list) == 1:
-        strat_limits_obj = strat_limits_obj_list[0]
-        expected_strat_limits.id = strat_limits_obj.id
-        expected_strat_limits.eligible_brokers = strat_limits_obj.eligible_brokers
-        expected_strat_limits.strat_limits_update_seq_num = strat_limits_obj.strat_limits_update_seq_num
-        assert strat_limits_obj == expected_strat_limits, \
-            f"Mismatched StratLimits: expected: {expected_strat_limits}, received: {strat_limits_obj}"
+    # Checking Plan_Limits
+    plan_limits_obj_list = executor_web_client.get_all_plan_limits_client()
+    if len(plan_limits_obj_list) == 1:
+        plan_limits_obj = plan_limits_obj_list[0]
+        expected_plan_limits.id = plan_limits_obj.id
+        expected_plan_limits.eligible_brokers = plan_limits_obj.eligible_brokers
+        expected_plan_limits.plan_limits_update_seq_num = plan_limits_obj.plan_limits_update_seq_num
+        assert plan_limits_obj == expected_plan_limits, \
+            f"Mismatched PlanLimits: expected: {expected_plan_limits}, received: {plan_limits_obj}"
     else:
-        assert False, (f"StratLimits' length must be exactly 1, found {len(strat_limits_obj_list)}, "
-                       f"strat_limits_list: {strat_limits_obj_list}")
+        assert False, (f"PlanLimits' length must be exactly 1, found {len(plan_limits_obj_list)}, "
+                       f"plan_limits_list: {plan_limits_obj_list}")
 
-    expected_strat_status.total_cxl_sell_qty += unfilled_qty
-    expected_strat_status.total_cxl_sell_notional += (unfilled_qty *
+    expected_plan_status.total_cxl_sell_qty += unfilled_qty
+    expected_plan_status.total_cxl_sell_notional += (unfilled_qty *
                                                       get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
-    expected_strat_status.avg_cxl_sell_px = (
-            get_usd_to_local_px_or_notional(expected_strat_status.total_cxl_sell_notional) /
-            expected_strat_status.total_cxl_sell_qty)
-    expected_strat_status.total_open_sell_qty -= unfilled_qty
-    expected_strat_status.total_open_sell_notional -= (
+    expected_plan_status.avg_cxl_sell_px = (
+            get_usd_to_local_px_or_notional(expected_plan_status.total_cxl_sell_notional) /
+            expected_plan_status.total_cxl_sell_qty)
+    expected_plan_status.total_open_sell_qty -= unfilled_qty
+    expected_plan_status.total_open_sell_notional -= (
         get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px) * unfilled_qty)
-    if expected_strat_status.total_open_sell_qty != 0:
-        expected_strat_status.avg_open_sell_px = (
-            get_usd_to_local_px_or_notional(expected_strat_status.total_open_sell_notional) /
-            expected_strat_status.total_open_sell_qty)
+    if expected_plan_status.total_open_sell_qty != 0:
+        expected_plan_status.avg_open_sell_px = (
+            get_usd_to_local_px_or_notional(expected_plan_status.total_open_sell_notional) /
+            expected_plan_status.total_open_sell_qty)
     else:
-        expected_strat_status.avg_open_sell_px = 0
-    expected_strat_status.total_open_exposure = 0
-    expected_strat_status.total_cxl_exposure = (expected_strat_status.total_cxl_buy_notional -
-                                                expected_strat_status.total_cxl_sell_notional)
-    buy_residual_notional = expected_strat_brief_obj.pair_buy_side_bartering_brief.residual_qty * get_px_in_usd(
+        expected_plan_status.avg_open_sell_px = 0
+    expected_plan_status.total_open_exposure = 0
+    expected_plan_status.total_cxl_exposure = (expected_plan_status.total_cxl_buy_notional -
+                                                expected_plan_status.total_cxl_sell_notional)
+    buy_residual_notional = expected_plan_brief_obj.pair_buy_side_bartering_brief.residual_qty * get_px_in_usd(
         buy_last_barter_px)
-    sell_residual_notional = expected_strat_brief_obj.pair_sell_side_bartering_brief.residual_qty * get_px_in_usd(
+    sell_residual_notional = expected_plan_brief_obj.pair_sell_side_bartering_brief.residual_qty * get_px_in_usd(
         sell_last_barter_px)
     residual_notional = abs(buy_residual_notional - sell_residual_notional)
 
-    security = expected_strat_brief_obj.pair_buy_side_bartering_brief.security if \
+    security = expected_plan_brief_obj.pair_buy_side_bartering_brief.security if \
         buy_residual_notional > sell_residual_notional else \
-        expected_strat_brief_obj.pair_sell_side_bartering_brief.security
-    expected_strat_status.residual = ResidualBaseModel.from_kwargs(security=security,
+        expected_plan_brief_obj.pair_sell_side_bartering_brief.security
+    expected_plan_status.residual = ResidualBaseModel.from_kwargs(security=security,
                                                                    residual_notional=residual_notional)
-    if expected_strat_status.total_fill_buy_notional < expected_strat_status.total_fill_sell_notional:
-        expected_strat_status.balance_notional = \
-            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_buy_notional
+    if expected_plan_status.total_fill_buy_notional < expected_plan_status.total_fill_sell_notional:
+        expected_plan_status.balance_notional = \
+            expected_plan_limits.max_single_leg_notional - expected_plan_status.total_fill_buy_notional
     else:
-        expected_strat_status.balance_notional = \
-            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_sell_notional
+        expected_plan_status.balance_notional = \
+            expected_plan_limits.max_single_leg_notional - expected_plan_status.total_fill_sell_notional
 
-    strat_status_obj_list = executor_web_client.get_all_strat_status_client()
-    if len(strat_status_obj_list) == 1:
-        strat_status_obj = strat_status_obj_list[0]
-        expected_strat_status.id = expected_pair_strat.id
-        expected_strat_status.last_update_date_time = strat_status_obj.last_update_date_time
-        expected_strat_status.strat_status_update_seq_num = strat_status_obj.strat_status_update_seq_num
-        expected_strat_status.average_premium = strat_status_obj.average_premium
-        assert strat_status_obj == expected_strat_status, \
-            f"Mismatched StratStatus: expected: {expected_strat_status}, received: {strat_status_obj}"
+    plan_status_obj_list = executor_web_client.get_all_plan_status_client()
+    if len(plan_status_obj_list) == 1:
+        plan_status_obj = plan_status_obj_list[0]
+        expected_plan_status.id = expected_pair_plan.id
+        expected_plan_status.last_update_date_time = plan_status_obj.last_update_date_time
+        expected_plan_status.plan_status_update_seq_num = plan_status_obj.plan_status_update_seq_num
+        expected_plan_status.average_premium = plan_status_obj.average_premium
+        assert plan_status_obj == expected_plan_status, \
+            f"Mismatched PlanStatus: expected: {expected_plan_status}, received: {plan_status_obj}"
     else:
-        assert False, (f"StratStatus' length must be exactly 1, found {len(strat_status_obj_list)}, "
-                       f"strat_status_list: {strat_status_obj_list}")
+        assert False, (f"PlanStatus' length must be exactly 1, found {len(plan_status_obj_list)}, "
+                       f"plan_status_list: {plan_status_obj_list}")
 
-    # checking strat_view
-    check_strat_view_computes(expected_pair_strat.id, executor_web_client)
+    # checking plan_view
+    check_plan_view_computes(expected_pair_plan.id, executor_web_client)
 
 
 def check_fill_receive_for_placed_buy_chore_after_all_sells(loop_count: int, expected_chore_id: str, symbol: str,
@@ -1246,14 +1246,14 @@ def check_fill_receive_for_placed_buy_chore_after_all_sells(loop_count: int, exp
                                                             expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
                                                             expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                                             other_leg_expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
-                                                            expected_pair_strat: PairStratBaseModel,
-                                                            expected_strat_limits: StratLimits,
-                                                            expected_strat_status: StratStatus,
-                                                            expected_strat_brief_obj: StratBriefBaseModel,
+                                                            expected_pair_plan: PairPlanBaseModel,
+                                                            expected_plan_limits: PlanLimits,
+                                                            expected_plan_status: PlanStatus,
+                                                            expected_plan_brief_obj: PlanBriefBaseModel,
                                                             executor_web_client: StreetBookServiceHttpClient):
     """
-    Checking resulted changes in ChoreJournal, ChoreSnapshot, SymbolSideSnapshot, PairStrat,
-    StratBrief and PortfolioStatus after fill is received
+    Checking resulted changes in ChoreJournal, ChoreSnapshot, SymbolSideSnapshot, PairPlan,
+    PlanBrief and ContactStatus after fill is received
     """
     fill_journal_obj_list = executor_web_client.get_all_fills_journal_client(-100)
     assert buy_fill_journal in fill_journal_obj_list, f"Couldn't find {buy_fill_journal} in {fill_journal_obj_list}"
@@ -1299,74 +1299,74 @@ def check_fill_receive_for_placed_buy_chore_after_all_sells(loop_count: int, exp
         f"Couldn't find {expected_symbol_side_snapshot} in {symbol_side_snapshot_list}"
 
     # Checking start_brief
-    update_expected_strat_brief_for_buy(expected_chore_snapshot_obj, expected_symbol_side_snapshot,
+    update_expected_plan_brief_for_buy(expected_chore_snapshot_obj, expected_symbol_side_snapshot,
                                         other_leg_expected_symbol_side_snapshot,
-                                        expected_strat_limits, expected_strat_brief_obj,
+                                        expected_plan_limits, expected_plan_brief_obj,
                                         buy_fill_journal.fill_date_time,
                                         buy_last_barter_px, sell_last_barter_px, executor_web_client,
-                                        hedge_ratio=expected_pair_strat.pair_strat_params.hedge_ratio)
-    strat_brief_list = executor_web_client.get_strat_brief_from_symbol_query_client(symbol)
-    expected_strat_brief_obj.pair_buy_side_bartering_brief.last_update_date_time = None
-    for strat_brief in strat_brief_list:
-        strat_brief.pair_buy_side_bartering_brief.indicative_consumable_participation_qty = None
-        strat_brief.pair_buy_side_bartering_brief.participation_period_chore_qty_sum = None
-        strat_brief.pair_buy_side_bartering_brief.last_update_date_time = None
-        strat_brief.pair_sell_side_bartering_brief.indicative_consumable_participation_qty = None
-        strat_brief.pair_sell_side_bartering_brief.participation_period_chore_qty_sum = None
-        strat_brief.pair_sell_side_bartering_brief.last_update_date_time = None
-    assert expected_strat_brief_obj in strat_brief_list, \
-        f"Mismatched: Couldn't find {expected_strat_brief_obj} in any strat_brief in {strat_brief_list}"
+                                        hedge_ratio=expected_pair_plan.pair_plan_params.hedge_ratio)
+    plan_brief_list = executor_web_client.get_plan_brief_from_symbol_query_client(symbol)
+    expected_plan_brief_obj.pair_buy_side_bartering_brief.last_update_date_time = None
+    for plan_brief in plan_brief_list:
+        plan_brief.pair_buy_side_bartering_brief.indicative_consumable_participation_qty = None
+        plan_brief.pair_buy_side_bartering_brief.participation_period_chore_qty_sum = None
+        plan_brief.pair_buy_side_bartering_brief.last_update_date_time = None
+        plan_brief.pair_sell_side_bartering_brief.indicative_consumable_participation_qty = None
+        plan_brief.pair_sell_side_bartering_brief.participation_period_chore_qty_sum = None
+        plan_brief.pair_sell_side_bartering_brief.last_update_date_time = None
+    assert expected_plan_brief_obj in plan_brief_list, \
+        f"Mismatched: Couldn't find {expected_plan_brief_obj} in any plan_brief in {plan_brief_list}"
 
-    # Checking Strat_Limits
-    strat_limits_obj_list = executor_web_client.get_all_strat_limits_client()
-    if len(strat_limits_obj_list) == 1:
-        strat_limits_obj = strat_limits_obj_list[0]
-        expected_strat_limits.id = strat_limits_obj.id
-        expected_strat_limits.eligible_brokers = strat_limits_obj.eligible_brokers
-        expected_strat_limits.strat_limits_update_seq_num = strat_limits_obj.strat_limits_update_seq_num
-        assert strat_limits_obj == expected_strat_limits, \
-            f"Mismatched StratLimits: expected: {expected_strat_limits}, received: {strat_limits_obj}"
+    # Checking Plan_Limits
+    plan_limits_obj_list = executor_web_client.get_all_plan_limits_client()
+    if len(plan_limits_obj_list) == 1:
+        plan_limits_obj = plan_limits_obj_list[0]
+        expected_plan_limits.id = plan_limits_obj.id
+        expected_plan_limits.eligible_brokers = plan_limits_obj.eligible_brokers
+        expected_plan_limits.plan_limits_update_seq_num = plan_limits_obj.plan_limits_update_seq_num
+        assert plan_limits_obj == expected_plan_limits, \
+            f"Mismatched PlanLimits: expected: {expected_plan_limits}, received: {plan_limits_obj}"
     else:
-        assert False, (f"StratLimits' length must be exactly 1, found {len(strat_limits_obj_list)}, "
-                       f"strat_limits_list: {strat_limits_obj_list}")
+        assert False, (f"PlanLimits' length must be exactly 1, found {len(plan_limits_obj_list)}, "
+                       f"plan_limits_list: {plan_limits_obj_list}")
 
     # Checking start_status
-    expected_strat_status.total_open_buy_qty -= buy_fill_journal.fill_qty
-    expected_strat_status.total_open_buy_notional -= (buy_fill_journal.fill_qty *
+    expected_plan_status.total_open_buy_qty -= buy_fill_journal.fill_qty
+    expected_plan_status.total_open_buy_notional -= (buy_fill_journal.fill_qty *
                                                        get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
-    expected_strat_status.avg_open_buy_px = (
-            get_usd_to_local_px_or_notional(expected_strat_status.total_open_buy_notional) /
-            expected_strat_status.total_open_buy_qty)
-    expected_strat_status.total_open_exposure = expected_strat_status.total_open_buy_notional
-    expected_strat_status.total_fill_buy_qty += buy_fill_journal.fill_qty
-    expected_strat_status.total_fill_buy_notional += (buy_fill_journal.fill_qty *
+    expected_plan_status.avg_open_buy_px = (
+            get_usd_to_local_px_or_notional(expected_plan_status.total_open_buy_notional) /
+            expected_plan_status.total_open_buy_qty)
+    expected_plan_status.total_open_exposure = expected_plan_status.total_open_buy_notional
+    expected_plan_status.total_fill_buy_qty += buy_fill_journal.fill_qty
+    expected_plan_status.total_fill_buy_notional += (buy_fill_journal.fill_qty *
                                                        get_px_in_usd(buy_fill_journal.fill_px))
-    expected_strat_status.avg_fill_buy_px = (
-            get_usd_to_local_px_or_notional(expected_strat_status.total_fill_buy_notional) /
-            expected_strat_status.total_fill_buy_qty)
-    expected_strat_status.total_fill_exposure = (expected_strat_status.total_fill_buy_notional -
-                                                 expected_strat_status.total_fill_sell_notional)
-    if expected_strat_status.total_fill_buy_notional < expected_strat_status.total_fill_sell_notional:
-        expected_strat_status.balance_notional = \
-            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_buy_notional
+    expected_plan_status.avg_fill_buy_px = (
+            get_usd_to_local_px_or_notional(expected_plan_status.total_fill_buy_notional) /
+            expected_plan_status.total_fill_buy_qty)
+    expected_plan_status.total_fill_exposure = (expected_plan_status.total_fill_buy_notional -
+                                                 expected_plan_status.total_fill_sell_notional)
+    if expected_plan_status.total_fill_buy_notional < expected_plan_status.total_fill_sell_notional:
+        expected_plan_status.balance_notional = \
+            expected_plan_limits.max_single_leg_notional - expected_plan_status.total_fill_buy_notional
     else:
-        expected_strat_status.balance_notional = \
-            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_sell_notional
+        expected_plan_status.balance_notional = \
+            expected_plan_limits.max_single_leg_notional - expected_plan_status.total_fill_sell_notional
 
-    strat_status_obj_list = executor_web_client.get_all_strat_status_client()
-    if len(strat_status_obj_list) == 1:
-        strat_status_obj = strat_status_obj_list[0]
-        expected_strat_status.last_update_date_time = strat_status_obj.last_update_date_time
-        expected_strat_status.strat_status_update_seq_num = strat_status_obj.strat_status_update_seq_num
-        expected_strat_status.average_premium = strat_status_obj.average_premium
-        assert strat_status_obj == expected_strat_status, \
-            f"Mismatched StratStatus: expected: {expected_strat_status}, received: {strat_status_obj}"
+    plan_status_obj_list = executor_web_client.get_all_plan_status_client()
+    if len(plan_status_obj_list) == 1:
+        plan_status_obj = plan_status_obj_list[0]
+        expected_plan_status.last_update_date_time = plan_status_obj.last_update_date_time
+        expected_plan_status.plan_status_update_seq_num = plan_status_obj.plan_status_update_seq_num
+        expected_plan_status.average_premium = plan_status_obj.average_premium
+        assert plan_status_obj == expected_plan_status, \
+            f"Mismatched PlanStatus: expected: {expected_plan_status}, received: {plan_status_obj}"
     else:
-        assert False, (f"StratStatus' length must be exactly 1, found {len(strat_status_obj_list)}, "
-                       f"strat_status_list: {strat_status_obj_list}")
+        assert False, (f"PlanStatus' length must be exactly 1, found {len(plan_status_obj_list)}, "
+                       f"plan_status_list: {plan_status_obj_list}")
 
-    # checking strat_view
-    check_strat_view_computes(expected_pair_strat.id, executor_web_client)
+    # checking plan_view
+    check_plan_view_computes(expected_pair_plan.id, executor_web_client)
 
 
 def check_placed_sell_chore_computes_before_buys(loop_count: int, expected_chore_id: str,
@@ -1374,10 +1374,10 @@ def check_placed_sell_chore_computes_before_buys(loop_count: int, expected_chore
                                                  expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
                                                  expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                                  other_leg_expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
-                                                 pair_strat_: PairStratBaseModel,
-                                                 expected_strat_limits: StratLimits,
-                                                 expected_strat_status: StratStatus,
-                                                 expected_strat_brief_obj: StratBriefBaseModel,
+                                                 pair_plan_: PairPlanBaseModel,
+                                                 expected_plan_limits: PlanLimits,
+                                                 expected_plan_status: PlanStatus,
+                                                 expected_plan_brief_obj: PlanBriefBaseModel,
                                                  executor_web_client: StreetBookServiceHttpClient):
     chore_journal_obj_list = executor_web_client.get_all_chore_journal_client(-100)
 
@@ -1386,7 +1386,7 @@ def check_placed_sell_chore_computes_before_buys(loop_count: int, expected_chore
 
     buy_last_barter_px, sell_last_barter_px = get_both_side_last_barter_px()
     sell_inst_type: InstrumentType = InstrumentType.EQT if (
-            pair_strat_.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.CB
+            pair_plan_.pair_plan_params.plan_leg1.side == Side.BUY) else InstrumentType.CB
 
     # Checking chore_snapshot
     expected_chore_snapshot_obj.chore_brief.chore_id = expected_chore_id
@@ -1424,80 +1424,80 @@ def check_placed_sell_chore_computes_before_buys(loop_count: int, expected_chore
     assert expected_symbol_side_snapshot in symbol_side_snapshot_list, f"Couldn't find {expected_symbol_side_snapshot} "
 
     # Checking start_brief
-    expected_strat_brief_obj.id = pair_strat_.id  # since strat's id is synced with strat_brief
-    update_expected_strat_brief_for_sell(expected_chore_snapshot_obj,
+    expected_plan_brief_obj.id = pair_plan_.id  # since plan's id is synced with plan_brief
+    update_expected_plan_brief_for_sell(expected_chore_snapshot_obj,
                                          expected_symbol_side_snapshot,
                                          other_leg_expected_symbol_side_snapshot,
-                                         expected_strat_limits, expected_strat_brief_obj,
+                                         expected_plan_limits, expected_plan_brief_obj,
                                          sell_placed_chore_journal.chore_event_date_time,
                                          buy_last_barter_px, sell_last_barter_px, executor_web_client)
 
-    print(f"@@@ fetching strat_brief for symbol: {symbol} at {DateTime.utcnow()}")
-    strat_brief = executor_web_client.get_strat_brief_client(pair_strat_.id)
+    print(f"@@@ fetching plan_brief for symbol: {symbol} at {DateTime.utcnow()}")
+    plan_brief = executor_web_client.get_plan_brief_client(pair_plan_.id)
 
-    strat_brief.pair_sell_side_bartering_brief.indicative_consumable_participation_qty = None
-    strat_brief.pair_sell_side_bartering_brief.participation_period_chore_qty_sum = None
-    strat_brief.pair_sell_side_bartering_brief.last_update_date_time = None
-    # Since sell side of strat_brief is not updated till sell cycle
-    expected_strat_brief_obj.pair_buy_side_bartering_brief = strat_brief.pair_buy_side_bartering_brief
-    expected_strat_brief_obj.pair_sell_side_bartering_brief.last_update_date_time = None
-    expected_strat_brief_obj.pair_sell_side_bartering_brief.security.inst_type = sell_inst_type
-    assert expected_strat_brief_obj == strat_brief, \
-        f"Mismatched: expected strat_brief {expected_strat_brief_obj}, received strat_brief {strat_brief}"
+    plan_brief.pair_sell_side_bartering_brief.indicative_consumable_participation_qty = None
+    plan_brief.pair_sell_side_bartering_brief.participation_period_chore_qty_sum = None
+    plan_brief.pair_sell_side_bartering_brief.last_update_date_time = None
+    # Since sell side of plan_brief is not updated till sell cycle
+    expected_plan_brief_obj.pair_buy_side_bartering_brief = plan_brief.pair_buy_side_bartering_brief
+    expected_plan_brief_obj.pair_sell_side_bartering_brief.last_update_date_time = None
+    expected_plan_brief_obj.pair_sell_side_bartering_brief.security.inst_type = sell_inst_type
+    assert expected_plan_brief_obj == plan_brief, \
+        f"Mismatched: expected plan_brief {expected_plan_brief_obj}, received plan_brief {plan_brief}"
 
-    # Checking Strat_Limits
-    strat_limits_obj_list = executor_web_client.get_all_strat_limits_client()
-    if len(strat_limits_obj_list) == 1:
-        strat_limits_obj = strat_limits_obj_list[0]
-        expected_strat_limits.id = strat_limits_obj.id
-        expected_strat_limits.eligible_brokers = strat_limits_obj.eligible_brokers
-        expected_strat_limits.strat_limits_update_seq_num = strat_limits_obj.strat_limits_update_seq_num
-        assert strat_limits_obj == expected_strat_limits, \
-            f"Mismatched StratLimits: expected: {expected_strat_limits}, received: {strat_limits_obj}"
+    # Checking Plan_Limits
+    plan_limits_obj_list = executor_web_client.get_all_plan_limits_client()
+    if len(plan_limits_obj_list) == 1:
+        plan_limits_obj = plan_limits_obj_list[0]
+        expected_plan_limits.id = plan_limits_obj.id
+        expected_plan_limits.eligible_brokers = plan_limits_obj.eligible_brokers
+        expected_plan_limits.plan_limits_update_seq_num = plan_limits_obj.plan_limits_update_seq_num
+        assert plan_limits_obj == expected_plan_limits, \
+            f"Mismatched PlanLimits: expected: {expected_plan_limits}, received: {plan_limits_obj}"
     else:
-        assert False, (f"StratLimits' length must be exactly 1, found {len(strat_limits_obj_list)}, "
-                       f"strat_limits_list: {strat_limits_obj_list}")
-    expected_strat_status.total_sell_qty += expected_chore_snapshot_obj.chore_brief.qty
-    expected_strat_status.total_chore_qty += expected_chore_snapshot_obj.chore_brief.qty
-    expected_strat_status.total_open_sell_qty = expected_chore_snapshot_obj.chore_brief.qty
-    expected_strat_status.total_open_sell_notional = (expected_chore_snapshot_obj.chore_brief.qty *
+        assert False, (f"PlanLimits' length must be exactly 1, found {len(plan_limits_obj_list)}, "
+                       f"plan_limits_list: {plan_limits_obj_list}")
+    expected_plan_status.total_sell_qty += expected_chore_snapshot_obj.chore_brief.qty
+    expected_plan_status.total_chore_qty += expected_chore_snapshot_obj.chore_brief.qty
+    expected_plan_status.total_open_sell_qty = expected_chore_snapshot_obj.chore_brief.qty
+    expected_plan_status.total_open_sell_notional = (expected_chore_snapshot_obj.chore_brief.qty *
                                                       get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
-    expected_strat_status.avg_open_sell_px = (
-            get_usd_to_local_px_or_notional(expected_strat_status.total_open_sell_notional) /
-            expected_strat_status.total_open_sell_qty)
-    expected_strat_status.total_open_exposure = - expected_strat_status.total_open_sell_notional
-    buy_residual_notional = expected_strat_brief_obj.pair_buy_side_bartering_brief.residual_qty * get_px_in_usd(
+    expected_plan_status.avg_open_sell_px = (
+            get_usd_to_local_px_or_notional(expected_plan_status.total_open_sell_notional) /
+            expected_plan_status.total_open_sell_qty)
+    expected_plan_status.total_open_exposure = - expected_plan_status.total_open_sell_notional
+    buy_residual_notional = expected_plan_brief_obj.pair_buy_side_bartering_brief.residual_qty * get_px_in_usd(
         buy_last_barter_px)
-    sell_residual_notional = expected_strat_brief_obj.pair_sell_side_bartering_brief.residual_qty * get_px_in_usd(
+    sell_residual_notional = expected_plan_brief_obj.pair_sell_side_bartering_brief.residual_qty * get_px_in_usd(
         sell_last_barter_px)
     residual_notional = abs(buy_residual_notional - sell_residual_notional)
-    security = expected_strat_brief_obj.pair_sell_side_bartering_brief.security if \
+    security = expected_plan_brief_obj.pair_sell_side_bartering_brief.security if \
         sell_residual_notional > buy_residual_notional else \
-        expected_strat_brief_obj.pair_buy_side_bartering_brief.security
-    expected_strat_status.residual = ResidualBaseModel.from_kwargs(security=security,
+        expected_plan_brief_obj.pair_buy_side_bartering_brief.security
+    expected_plan_status.residual = ResidualBaseModel.from_kwargs(security=security,
                                                                    residual_notional=residual_notional)
-    if expected_strat_status.total_fill_buy_notional < expected_strat_status.total_fill_sell_notional:
-        expected_strat_status.balance_notional = \
-            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_buy_notional
+    if expected_plan_status.total_fill_buy_notional < expected_plan_status.total_fill_sell_notional:
+        expected_plan_status.balance_notional = \
+            expected_plan_limits.max_single_leg_notional - expected_plan_status.total_fill_buy_notional
     else:
-        expected_strat_status.balance_notional = \
-            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_sell_notional
+        expected_plan_status.balance_notional = \
+            expected_plan_limits.max_single_leg_notional - expected_plan_status.total_fill_sell_notional
 
-    strat_status_obj_list = executor_web_client.get_all_strat_status_client()
-    if len(strat_status_obj_list) == 1:
-        strat_status_obj = strat_status_obj_list[0]
-        expected_strat_status.id = strat_status_obj.id
-        expected_strat_status.last_update_date_time = strat_status_obj.last_update_date_time
-        expected_strat_status.strat_status_update_seq_num = strat_status_obj.strat_status_update_seq_num
-        expected_strat_status.average_premium = strat_status_obj.average_premium
-        assert strat_status_obj == expected_strat_status, \
-            f"Mismatched StratStatus: expected: {expected_strat_status}, received: {strat_status_obj}"
+    plan_status_obj_list = executor_web_client.get_all_plan_status_client()
+    if len(plan_status_obj_list) == 1:
+        plan_status_obj = plan_status_obj_list[0]
+        expected_plan_status.id = plan_status_obj.id
+        expected_plan_status.last_update_date_time = plan_status_obj.last_update_date_time
+        expected_plan_status.plan_status_update_seq_num = plan_status_obj.plan_status_update_seq_num
+        expected_plan_status.average_premium = plan_status_obj.average_premium
+        assert plan_status_obj == expected_plan_status, \
+            f"Mismatched PlanStatus: expected: {expected_plan_status}, received: {plan_status_obj}"
     else:
-        assert False, (f"StratStatus' length must be exactly 1, found {len(strat_status_obj_list)}, "
-                       f"strat_status_list: {strat_status_obj_list}")
+        assert False, (f"PlanStatus' length must be exactly 1, found {len(plan_status_obj_list)}, "
+                       f"plan_status_list: {plan_status_obj_list}")
 
-    # checking strat_view
-    check_strat_view_computes(pair_strat_.id, executor_web_client)
+    # checking plan_view
+    check_plan_view_computes(pair_plan_.id, executor_web_client)
 
 
 def check_placed_sell_chore_computes_after_all_buys(loop_count: int, expected_chore_id: str,
@@ -1505,10 +1505,10 @@ def check_placed_sell_chore_computes_after_all_buys(loop_count: int, expected_ch
                                                     expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
                                                     expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                                     other_leg_expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
-                                                    expected_pair_strat: PairStratBaseModel,
-                                                    expected_strat_limits: StratLimits,
-                                                    expected_strat_status: StratStatus,
-                                                    expected_strat_brief_obj: StratBriefBaseModel,
+                                                    expected_pair_plan: PairPlanBaseModel,
+                                                    expected_plan_limits: PlanLimits,
+                                                    expected_plan_status: PlanStatus,
+                                                    expected_plan_brief_obj: PlanBriefBaseModel,
                                                     executor_web_client: StreetBookServiceHttpClient):
     chore_journal_obj_list = executor_web_client.get_all_chore_journal_client(-100)
 
@@ -1517,7 +1517,7 @@ def check_placed_sell_chore_computes_after_all_buys(loop_count: int, expected_ch
 
     buy_last_barter_px, sell_last_barter_px = get_both_side_last_barter_px()
     sell_inst_type: InstrumentType = InstrumentType.EQT if (
-            expected_pair_strat.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.CB
+            expected_pair_plan.pair_plan_params.plan_leg1.side == Side.BUY) else InstrumentType.CB
 
     # Checking chore_snapshot
     expected_chore_snapshot_obj.chore_brief.chore_id = expected_chore_id
@@ -1555,83 +1555,83 @@ def check_placed_sell_chore_computes_after_all_buys(loop_count: int, expected_ch
     assert expected_symbol_side_snapshot in symbol_side_snapshot_list, f"Couldn't find {expected_symbol_side_snapshot} "
 
     # Checking start_brief
-    update_expected_strat_brief_for_sell(expected_chore_snapshot_obj,
+    update_expected_plan_brief_for_sell(expected_chore_snapshot_obj,
                                          expected_symbol_side_snapshot,
                                          other_leg_expected_symbol_side_snapshot,
-                                         expected_strat_limits, expected_strat_brief_obj,
+                                         expected_plan_limits, expected_plan_brief_obj,
                                          sell_placed_chore_journal.chore_event_date_time,
                                          buy_last_barter_px, sell_last_barter_px, executor_web_client,
-                                         hedge_ratio=expected_pair_strat.pair_strat_params.hedge_ratio)
+                                         hedge_ratio=expected_pair_plan.pair_plan_params.hedge_ratio)
 
-    strat_brief_list = executor_web_client.get_strat_brief_from_symbol_query_client(symbol)
-    expected_strat_brief_obj.pair_sell_side_bartering_brief.last_update_date_time = None
-    expected_strat_brief_obj.pair_sell_side_bartering_brief.security.inst_type = sell_inst_type
+    plan_brief_list = executor_web_client.get_plan_brief_from_symbol_query_client(symbol)
+    expected_plan_brief_obj.pair_sell_side_bartering_brief.last_update_date_time = None
+    expected_plan_brief_obj.pair_sell_side_bartering_brief.security.inst_type = sell_inst_type
     # removing id field from received obj list for comparison
-    for strat_brief in strat_brief_list:
-        strat_brief.pair_buy_side_bartering_brief.indicative_consumable_participation_qty = None
-        strat_brief.pair_buy_side_bartering_brief.participation_period_chore_qty_sum = None
-        strat_brief.pair_buy_side_bartering_brief.last_update_date_time = None
-        strat_brief.pair_sell_side_bartering_brief.indicative_consumable_participation_qty = None
-        strat_brief.pair_sell_side_bartering_brief.participation_period_chore_qty_sum = None
-        strat_brief.pair_sell_side_bartering_brief.last_update_date_time = None
-    assert expected_strat_brief_obj in strat_brief_list, \
-        f"Mismatched: {expected_strat_brief_obj} not found in {strat_brief_list}"
+    for plan_brief in plan_brief_list:
+        plan_brief.pair_buy_side_bartering_brief.indicative_consumable_participation_qty = None
+        plan_brief.pair_buy_side_bartering_brief.participation_period_chore_qty_sum = None
+        plan_brief.pair_buy_side_bartering_brief.last_update_date_time = None
+        plan_brief.pair_sell_side_bartering_brief.indicative_consumable_participation_qty = None
+        plan_brief.pair_sell_side_bartering_brief.participation_period_chore_qty_sum = None
+        plan_brief.pair_sell_side_bartering_brief.last_update_date_time = None
+    assert expected_plan_brief_obj in plan_brief_list, \
+        f"Mismatched: {expected_plan_brief_obj} not found in {plan_brief_list}"
 
-    # Checking Strat_Limits
-    strat_limits_obj_list = executor_web_client.get_all_strat_limits_client()
-    if len(strat_limits_obj_list) == 1:
-        strat_limits_obj = strat_limits_obj_list[0]
-        expected_strat_limits.id = strat_limits_obj.id
-        expected_strat_limits.eligible_brokers = strat_limits_obj.eligible_brokers
-        expected_strat_limits.strat_limits_update_seq_num = strat_limits_obj.strat_limits_update_seq_num
-        assert strat_limits_obj == expected_strat_limits, \
-            f"Mismatched StratLimits: expected: {expected_strat_limits}, received: {strat_limits_obj}"
+    # Checking Plan_Limits
+    plan_limits_obj_list = executor_web_client.get_all_plan_limits_client()
+    if len(plan_limits_obj_list) == 1:
+        plan_limits_obj = plan_limits_obj_list[0]
+        expected_plan_limits.id = plan_limits_obj.id
+        expected_plan_limits.eligible_brokers = plan_limits_obj.eligible_brokers
+        expected_plan_limits.plan_limits_update_seq_num = plan_limits_obj.plan_limits_update_seq_num
+        assert plan_limits_obj == expected_plan_limits, \
+            f"Mismatched PlanLimits: expected: {expected_plan_limits}, received: {plan_limits_obj}"
     else:
-        assert False, (f"StratLimits' length must be exactly 1, found {len(strat_limits_obj_list)}, "
-                       f"strat_limits_list: {strat_limits_obj_list}")
+        assert False, (f"PlanLimits' length must be exactly 1, found {len(plan_limits_obj_list)}, "
+                       f"plan_limits_list: {plan_limits_obj_list}")
 
-    # Checking strat_status
-    expected_strat_status.total_sell_qty += sell_placed_chore_journal.chore.qty
-    expected_strat_status.total_chore_qty = expected_strat_status.total_buy_qty + expected_strat_status.total_sell_qty
-    expected_strat_status.total_open_sell_qty += sell_placed_chore_journal.chore.qty
-    expected_strat_status.total_open_sell_notional += (get_px_in_usd(sell_placed_chore_journal.chore.px) *
+    # Checking plan_status
+    expected_plan_status.total_sell_qty += sell_placed_chore_journal.chore.qty
+    expected_plan_status.total_chore_qty = expected_plan_status.total_buy_qty + expected_plan_status.total_sell_qty
+    expected_plan_status.total_open_sell_qty += sell_placed_chore_journal.chore.qty
+    expected_plan_status.total_open_sell_notional += (get_px_in_usd(sell_placed_chore_journal.chore.px) *
                                                        sell_placed_chore_journal.chore.qty)
-    expected_strat_status.avg_open_sell_px = (
-        get_usd_to_local_px_or_notional(expected_strat_status.total_open_sell_notional) /
-        expected_strat_status.total_open_sell_qty)
-    expected_strat_status.total_open_exposure = - expected_strat_status.total_open_sell_notional
-    buy_residual_notional = expected_strat_brief_obj.pair_buy_side_bartering_brief.residual_qty * get_px_in_usd(
+    expected_plan_status.avg_open_sell_px = (
+        get_usd_to_local_px_or_notional(expected_plan_status.total_open_sell_notional) /
+        expected_plan_status.total_open_sell_qty)
+    expected_plan_status.total_open_exposure = - expected_plan_status.total_open_sell_notional
+    buy_residual_notional = expected_plan_brief_obj.pair_buy_side_bartering_brief.residual_qty * get_px_in_usd(
         buy_last_barter_px)
-    sell_residual_notional = expected_strat_brief_obj.pair_sell_side_bartering_brief.residual_qty * get_px_in_usd(
+    sell_residual_notional = expected_plan_brief_obj.pair_sell_side_bartering_brief.residual_qty * get_px_in_usd(
         sell_last_barter_px)
     residual_notional = abs(buy_residual_notional - sell_residual_notional)
-    security = expected_strat_brief_obj.pair_buy_side_bartering_brief.security if \
+    security = expected_plan_brief_obj.pair_buy_side_bartering_brief.security if \
         buy_residual_notional > sell_residual_notional else \
-        expected_strat_brief_obj.pair_sell_side_bartering_brief.security
-    expected_strat_status.residual = ResidualBaseModel.from_kwargs(security=security,
+        expected_plan_brief_obj.pair_sell_side_bartering_brief.security
+    expected_plan_status.residual = ResidualBaseModel.from_kwargs(security=security,
                                                                  residual_notional=residual_notional)
-    if expected_strat_status.total_fill_buy_notional < expected_strat_status.total_fill_sell_notional:
-        expected_strat_status.balance_notional = \
-            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_buy_notional
+    if expected_plan_status.total_fill_buy_notional < expected_plan_status.total_fill_sell_notional:
+        expected_plan_status.balance_notional = \
+            expected_plan_limits.max_single_leg_notional - expected_plan_status.total_fill_buy_notional
     else:
-        expected_strat_status.balance_notional = \
-            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_sell_notional
+        expected_plan_status.balance_notional = \
+            expected_plan_limits.max_single_leg_notional - expected_plan_status.total_fill_sell_notional
 
-    strat_status_obj_list = executor_web_client.get_all_strat_status_client()
-    if len(strat_status_obj_list) == 1:
-        strat_status_obj = strat_status_obj_list[0]
-        expected_strat_status.id = expected_pair_strat.id
-        expected_strat_status.last_update_date_time = strat_status_obj.last_update_date_time
-        expected_strat_status.strat_status_update_seq_num = strat_status_obj.strat_status_update_seq_num
-        expected_strat_status.average_premium = strat_status_obj.average_premium
-        assert strat_status_obj == expected_strat_status, \
-            f"Mismatched StratStatus: expected: {expected_strat_status}, received: {strat_status_obj}"
+    plan_status_obj_list = executor_web_client.get_all_plan_status_client()
+    if len(plan_status_obj_list) == 1:
+        plan_status_obj = plan_status_obj_list[0]
+        expected_plan_status.id = expected_pair_plan.id
+        expected_plan_status.last_update_date_time = plan_status_obj.last_update_date_time
+        expected_plan_status.plan_status_update_seq_num = plan_status_obj.plan_status_update_seq_num
+        expected_plan_status.average_premium = plan_status_obj.average_premium
+        assert plan_status_obj == expected_plan_status, \
+            f"Mismatched PlanStatus: expected: {expected_plan_status}, received: {plan_status_obj}"
     else:
-        assert False, (f"StratStatus' length must be exactly 1, found {len(strat_status_obj_list)}, "
-                       f"strat_status_list: {strat_status_obj_list}")
+        assert False, (f"PlanStatus' length must be exactly 1, found {len(plan_status_obj_list)}, "
+                       f"plan_status_list: {plan_status_obj_list}")
 
-    # checking strat_view
-    check_strat_view_computes(expected_pair_strat.id, executor_web_client)
+    # checking plan_view
+    check_plan_view_computes(expected_pair_plan.id, executor_web_client)
 
 
 def placed_sell_chore_ack_receive(expected_chore_journal: ChoreJournalBaseModel,
@@ -1661,9 +1661,9 @@ def check_fill_receive_for_placed_sell_chore_before_buys(
         symbol: str, sell_fill_journal: FillsJournalBaseModel, expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
         expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
         other_leg_expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
-        expected_pair_strat: PairStratBaseModel,
-        expected_strat_limits: StratLimits, expected_strat_status: StratStatus,
-        expected_strat_brief_obj: StratBriefBaseModel,
+        expected_pair_plan: PairPlanBaseModel,
+        expected_plan_limits: PlanLimits, expected_plan_status: PlanStatus,
+        expected_plan_brief_obj: PlanBriefBaseModel,
         executor_web_client: StreetBookServiceHttpClient):
     fill_journal_obj_list = executor_web_client.get_all_fills_journal_client(-100)
     assert sell_fill_journal in fill_journal_obj_list, f"Couldn't find {sell_fill_journal} in {fill_journal_obj_list}"
@@ -1705,73 +1705,73 @@ def check_fill_receive_for_placed_sell_chore_before_buys(
         f"Couldn't find {expected_symbol_side_snapshot} in {symbol_side_snapshot_list}"
 
     # Checking start_brief
-    update_expected_strat_brief_for_sell(expected_chore_snapshot_obj,
+    update_expected_plan_brief_for_sell(expected_chore_snapshot_obj,
                                          expected_symbol_side_snapshot,
                                          other_leg_expected_symbol_side_snapshot,
-                                         expected_strat_limits, expected_strat_brief_obj,
+                                         expected_plan_limits, expected_plan_brief_obj,
                                          sell_fill_journal.fill_date_time,
                                          buy_last_barter_px, sell_last_barter_px, executor_web_client)
 
-    strat_brief_list = executor_web_client.get_strat_brief_from_symbol_query_client(symbol)
+    plan_brief_list = executor_web_client.get_plan_brief_from_symbol_query_client(symbol)
     # removing id field from received obj list for comparison
-    for strat_brief in strat_brief_list:
-        strat_brief.pair_sell_side_bartering_brief.indicative_consumable_participation_qty = None
-        strat_brief.pair_sell_side_bartering_brief.participation_period_chore_qty_sum = None
-        strat_brief.pair_sell_side_bartering_brief.last_update_date_time = None
-    expected_strat_brief_obj.pair_sell_side_bartering_brief.last_update_date_time = None
-    assert expected_strat_brief_obj in strat_brief_list, f"Couldn't find {expected_strat_brief_obj} in " \
-                                                         f"{strat_brief_list}"
-    # Checking Strat_Limits
-    strat_limits_obj_list = executor_web_client.get_all_strat_limits_client()
-    if len(strat_limits_obj_list) == 1:
-        strat_limits_obj = strat_limits_obj_list[0]
-        expected_strat_limits.id = strat_limits_obj.id
-        expected_strat_limits.eligible_brokers = strat_limits_obj.eligible_brokers
-        expected_strat_limits.strat_limits_update_seq_num = strat_limits_obj.strat_limits_update_seq_num
-        assert strat_limits_obj == expected_strat_limits, \
-            f"Mismatched StratLimits: expected: {expected_strat_limits}, received: {strat_limits_obj}"
+    for plan_brief in plan_brief_list:
+        plan_brief.pair_sell_side_bartering_brief.indicative_consumable_participation_qty = None
+        plan_brief.pair_sell_side_bartering_brief.participation_period_chore_qty_sum = None
+        plan_brief.pair_sell_side_bartering_brief.last_update_date_time = None
+    expected_plan_brief_obj.pair_sell_side_bartering_brief.last_update_date_time = None
+    assert expected_plan_brief_obj in plan_brief_list, f"Couldn't find {expected_plan_brief_obj} in " \
+                                                         f"{plan_brief_list}"
+    # Checking Plan_Limits
+    plan_limits_obj_list = executor_web_client.get_all_plan_limits_client()
+    if len(plan_limits_obj_list) == 1:
+        plan_limits_obj = plan_limits_obj_list[0]
+        expected_plan_limits.id = plan_limits_obj.id
+        expected_plan_limits.eligible_brokers = plan_limits_obj.eligible_brokers
+        expected_plan_limits.plan_limits_update_seq_num = plan_limits_obj.plan_limits_update_seq_num
+        assert plan_limits_obj == expected_plan_limits, \
+            f"Mismatched PlanLimits: expected: {expected_plan_limits}, received: {plan_limits_obj}"
     else:
-        assert False, (f"StratLimits' length must be exactly 1, found {len(strat_limits_obj_list)}, "
-                       f"strat_limits_list: {strat_limits_obj_list}")
+        assert False, (f"PlanLimits' length must be exactly 1, found {len(plan_limits_obj_list)}, "
+                       f"plan_limits_list: {plan_limits_obj_list}")
 
-    # Checking strat_status
-    expected_strat_status.total_open_sell_qty -= sell_fill_journal.fill_qty
-    expected_strat_status.total_open_sell_notional -= (sell_fill_journal.fill_qty *
+    # Checking plan_status
+    expected_plan_status.total_open_sell_qty -= sell_fill_journal.fill_qty
+    expected_plan_status.total_open_sell_notional -= (sell_fill_journal.fill_qty *
                                                        get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
-    expected_strat_status.avg_open_sell_px = (
-            get_usd_to_local_px_or_notional(expected_strat_status.total_open_sell_notional) /
-            expected_strat_status.total_open_sell_qty)
-    expected_strat_status.total_open_exposure = - expected_strat_status.total_open_sell_notional
-    expected_strat_status.total_fill_sell_qty += sell_fill_journal.fill_qty
-    expected_strat_status.total_fill_sell_notional += (
+    expected_plan_status.avg_open_sell_px = (
+            get_usd_to_local_px_or_notional(expected_plan_status.total_open_sell_notional) /
+            expected_plan_status.total_open_sell_qty)
+    expected_plan_status.total_open_exposure = - expected_plan_status.total_open_sell_notional
+    expected_plan_status.total_fill_sell_qty += sell_fill_journal.fill_qty
+    expected_plan_status.total_fill_sell_notional += (
             get_px_in_usd(sell_fill_journal.fill_px) * sell_fill_journal.fill_qty)
-    expected_strat_status.avg_fill_sell_px = (
-        (get_usd_to_local_px_or_notional(expected_strat_status.total_fill_sell_notional) /
-         expected_strat_status.total_fill_sell_qty))
-    expected_strat_status.total_fill_exposure = (expected_strat_status.total_fill_buy_notional -
-                                                 expected_strat_status.total_fill_sell_notional)
-    if expected_strat_status.total_fill_buy_notional < expected_strat_status.total_fill_sell_notional:
-        expected_strat_status.balance_notional = \
-            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_buy_notional
+    expected_plan_status.avg_fill_sell_px = (
+        (get_usd_to_local_px_or_notional(expected_plan_status.total_fill_sell_notional) /
+         expected_plan_status.total_fill_sell_qty))
+    expected_plan_status.total_fill_exposure = (expected_plan_status.total_fill_buy_notional -
+                                                 expected_plan_status.total_fill_sell_notional)
+    if expected_plan_status.total_fill_buy_notional < expected_plan_status.total_fill_sell_notional:
+        expected_plan_status.balance_notional = \
+            expected_plan_limits.max_single_leg_notional - expected_plan_status.total_fill_buy_notional
     else:
-        expected_strat_status.balance_notional = \
-            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_sell_notional
+        expected_plan_status.balance_notional = \
+            expected_plan_limits.max_single_leg_notional - expected_plan_status.total_fill_sell_notional
 
-    strat_status_obj_list = executor_web_client.get_all_strat_status_client()
-    if len(strat_status_obj_list) == 1:
-        strat_status_obj = strat_status_obj_list[0]
-        expected_strat_status.id = strat_status_obj.id
-        expected_strat_status.last_update_date_time = strat_status_obj.last_update_date_time
-        expected_strat_status.strat_status_update_seq_num = strat_status_obj.strat_status_update_seq_num
-        expected_strat_status.average_premium = strat_status_obj.average_premium
-        assert strat_status_obj == expected_strat_status, \
-            f"Mismatched StratStatus: expected: {expected_strat_status}, received: {strat_status_obj}"
+    plan_status_obj_list = executor_web_client.get_all_plan_status_client()
+    if len(plan_status_obj_list) == 1:
+        plan_status_obj = plan_status_obj_list[0]
+        expected_plan_status.id = plan_status_obj.id
+        expected_plan_status.last_update_date_time = plan_status_obj.last_update_date_time
+        expected_plan_status.plan_status_update_seq_num = plan_status_obj.plan_status_update_seq_num
+        expected_plan_status.average_premium = plan_status_obj.average_premium
+        assert plan_status_obj == expected_plan_status, \
+            f"Mismatched PlanStatus: expected: {expected_plan_status}, received: {plan_status_obj}"
     else:
-        assert False, (f"StratStatus' length must be exactly 1, found {len(strat_status_obj_list)}, "
-                       f"strat_status_list: {strat_status_obj_list}")
+        assert False, (f"PlanStatus' length must be exactly 1, found {len(plan_status_obj_list)}, "
+                       f"plan_status_list: {plan_status_obj_list}")
 
-    # checking strat_view
-    check_strat_view_computes(expected_pair_strat.id, executor_web_client)
+    # checking plan_view
+    check_plan_view_computes(expected_pair_plan.id, executor_web_client)
 
 
 def check_fill_receive_for_placed_sell_chore_after_all_buys(
@@ -1779,9 +1779,9 @@ def check_fill_receive_for_placed_sell_chore_after_all_buys(
         symbol: str, sell_fill_journal: FillsJournalBaseModel, expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
         expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
         other_leg_expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
-        expected_pair_strat: PairStratBaseModel,
-        expected_strat_limits: StratLimits, expected_strat_status: StratStatus,
-        expected_strat_brief_obj: StratBriefBaseModel, executor_web_client: StreetBookServiceHttpClient):
+        expected_pair_plan: PairPlanBaseModel,
+        expected_plan_limits: PlanLimits, expected_plan_status: PlanStatus,
+        expected_plan_brief_obj: PlanBriefBaseModel, executor_web_client: StreetBookServiceHttpClient):
     fill_journal_obj_list = executor_web_client.get_all_fills_journal_client(-100)
     assert sell_fill_journal in fill_journal_obj_list, f"Couldn't find {sell_fill_journal} in {fill_journal_obj_list}"
 
@@ -1825,90 +1825,90 @@ def check_fill_receive_for_placed_sell_chore_after_all_buys(
     assert expected_symbol_side_snapshot in symbol_side_snapshot_list, \
         f"Couldn't find {expected_symbol_side_snapshot} in {symbol_side_snapshot_list}"
 
-    # Checking Strat_Limits
-    strat_limits_obj_list = executor_web_client.get_all_strat_limits_client()
-    if len(strat_limits_obj_list) == 1:
-        strat_limits_obj = strat_limits_obj_list[0]
-        expected_strat_limits.id = strat_limits_obj.id
-        expected_strat_limits.eligible_brokers = strat_limits_obj.eligible_brokers
-        expected_strat_limits.strat_limits_update_seq_num = strat_limits_obj.strat_limits_update_seq_num
-        assert strat_limits_obj == expected_strat_limits, \
-            f"Mismatched StratLimits: expected: {expected_strat_limits}, received: {strat_limits_obj}"
+    # Checking Plan_Limits
+    plan_limits_obj_list = executor_web_client.get_all_plan_limits_client()
+    if len(plan_limits_obj_list) == 1:
+        plan_limits_obj = plan_limits_obj_list[0]
+        expected_plan_limits.id = plan_limits_obj.id
+        expected_plan_limits.eligible_brokers = plan_limits_obj.eligible_brokers
+        expected_plan_limits.plan_limits_update_seq_num = plan_limits_obj.plan_limits_update_seq_num
+        assert plan_limits_obj == expected_plan_limits, \
+            f"Mismatched PlanLimits: expected: {expected_plan_limits}, received: {plan_limits_obj}"
     else:
-        assert False, (f"StratLimits' length must be exactly 1, found {len(strat_limits_obj_list)}, "
-                       f"strat_limits_list: {strat_limits_obj_list}")
+        assert False, (f"PlanLimits' length must be exactly 1, found {len(plan_limits_obj_list)}, "
+                       f"plan_limits_list: {plan_limits_obj_list}")
 
     # Checking start_brief
-    update_expected_strat_brief_for_sell(expected_chore_snapshot_obj,
+    update_expected_plan_brief_for_sell(expected_chore_snapshot_obj,
                                          expected_symbol_side_snapshot,
                                          other_leg_expected_symbol_side_snapshot,
-                                         expected_strat_limits, expected_strat_brief_obj,
+                                         expected_plan_limits, expected_plan_brief_obj,
                                          sell_fill_journal.fill_date_time,
                                          buy_last_barter_px, sell_last_barter_px, executor_web_client,
-                                         hedge_ratio=expected_pair_strat.pair_strat_params.hedge_ratio)
+                                         hedge_ratio=expected_pair_plan.pair_plan_params.hedge_ratio)
 
-    strat_brief_list = executor_web_client.get_strat_brief_from_symbol_query_client(symbol)
-    expected_strat_brief_obj.pair_sell_side_bartering_brief.last_update_date_time = None
+    plan_brief_list = executor_web_client.get_plan_brief_from_symbol_query_client(symbol)
+    expected_plan_brief_obj.pair_sell_side_bartering_brief.last_update_date_time = None
     # removing id field from received obj list for comparison
-    for strat_brief in strat_brief_list:
-        # strat_brief.id = None
-        # Since buy side of strat_brief is already checked
-        # strat_brief.pair_buy_side_bartering_brief = expected_strat_brief_obj.pair_buy_side_bartering_brief
-        strat_brief.pair_buy_side_bartering_brief.indicative_consumable_participation_qty = None
-        strat_brief.pair_buy_side_bartering_brief.participation_period_chore_qty_sum = None
-        strat_brief.pair_buy_side_bartering_brief.last_update_date_time = None
-        strat_brief.pair_sell_side_bartering_brief.indicative_consumable_participation_qty = None
-        strat_brief.pair_sell_side_bartering_brief.participation_period_chore_qty_sum = None
-        strat_brief.pair_sell_side_bartering_brief.last_update_date_time = None
-    assert expected_strat_brief_obj in strat_brief_list, \
-        f"Mismatched: Couldn't find {expected_strat_brief_obj} in any strat_brief in {strat_brief_list}"
+    for plan_brief in plan_brief_list:
+        # plan_brief.id = None
+        # Since buy side of plan_brief is already checked
+        # plan_brief.pair_buy_side_bartering_brief = expected_plan_brief_obj.pair_buy_side_bartering_brief
+        plan_brief.pair_buy_side_bartering_brief.indicative_consumable_participation_qty = None
+        plan_brief.pair_buy_side_bartering_brief.participation_period_chore_qty_sum = None
+        plan_brief.pair_buy_side_bartering_brief.last_update_date_time = None
+        plan_brief.pair_sell_side_bartering_brief.indicative_consumable_participation_qty = None
+        plan_brief.pair_sell_side_bartering_brief.participation_period_chore_qty_sum = None
+        plan_brief.pair_sell_side_bartering_brief.last_update_date_time = None
+    assert expected_plan_brief_obj in plan_brief_list, \
+        f"Mismatched: Couldn't find {expected_plan_brief_obj} in any plan_brief in {plan_brief_list}"
 
     # Checking start_status
-    expected_strat_status.total_open_sell_qty -= sell_fill_journal.fill_qty
-    expected_strat_status.total_open_sell_notional -= (sell_fill_journal.fill_qty *
+    expected_plan_status.total_open_sell_qty -= sell_fill_journal.fill_qty
+    expected_plan_status.total_open_sell_notional -= (sell_fill_journal.fill_qty *
                                                        get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
-    expected_strat_status.avg_open_sell_px = (
-        get_usd_to_local_px_or_notional(expected_strat_status.total_open_sell_notional) /
-        expected_strat_status.total_open_sell_qty)
-    expected_strat_status.total_open_exposure = - expected_strat_status.total_open_sell_notional
-    expected_strat_status.total_fill_sell_qty += sell_fill_journal.fill_qty
-    expected_strat_status.total_fill_sell_notional += (sell_fill_journal.fill_qty *
+    expected_plan_status.avg_open_sell_px = (
+        get_usd_to_local_px_or_notional(expected_plan_status.total_open_sell_notional) /
+        expected_plan_status.total_open_sell_qty)
+    expected_plan_status.total_open_exposure = - expected_plan_status.total_open_sell_notional
+    expected_plan_status.total_fill_sell_qty += sell_fill_journal.fill_qty
+    expected_plan_status.total_fill_sell_notional += (sell_fill_journal.fill_qty *
                                                        get_px_in_usd(sell_fill_journal.fill_px))
-    expected_strat_status.avg_fill_sell_px = (
-        get_usd_to_local_px_or_notional(expected_strat_status.total_fill_sell_notional) /
-        expected_strat_status.total_fill_sell_qty)
-    expected_strat_status.total_fill_exposure = (expected_strat_status.total_fill_buy_notional -
-                                                 expected_strat_status.total_fill_sell_notional)
-    if expected_strat_status.total_fill_buy_notional < expected_strat_status.total_fill_sell_notional:
-        expected_strat_status.balance_notional = \
-            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_buy_notional
+    expected_plan_status.avg_fill_sell_px = (
+        get_usd_to_local_px_or_notional(expected_plan_status.total_fill_sell_notional) /
+        expected_plan_status.total_fill_sell_qty)
+    expected_plan_status.total_fill_exposure = (expected_plan_status.total_fill_buy_notional -
+                                                 expected_plan_status.total_fill_sell_notional)
+    if expected_plan_status.total_fill_buy_notional < expected_plan_status.total_fill_sell_notional:
+        expected_plan_status.balance_notional = \
+            expected_plan_limits.max_single_leg_notional - expected_plan_status.total_fill_buy_notional
     else:
-        expected_strat_status.balance_notional = \
-            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_sell_notional
+        expected_plan_status.balance_notional = \
+            expected_plan_limits.max_single_leg_notional - expected_plan_status.total_fill_sell_notional
 
-    strat_status_obj_list = executor_web_client.get_all_strat_status_client()
-    if len(strat_status_obj_list) == 1:
-        strat_status_obj = strat_status_obj_list[0]
-        expected_strat_status.last_update_date_time = strat_status_obj.last_update_date_time
-        expected_strat_status.strat_status_update_seq_num = strat_status_obj.strat_status_update_seq_num
-        expected_strat_status.average_premium = strat_status_obj.average_premium
-        assert strat_status_obj == expected_strat_status, \
-            f"Mismatched StratStatus: expected: {expected_strat_status}, received: {strat_status_obj}"
+    plan_status_obj_list = executor_web_client.get_all_plan_status_client()
+    if len(plan_status_obj_list) == 1:
+        plan_status_obj = plan_status_obj_list[0]
+        expected_plan_status.last_update_date_time = plan_status_obj.last_update_date_time
+        expected_plan_status.plan_status_update_seq_num = plan_status_obj.plan_status_update_seq_num
+        expected_plan_status.average_premium = plan_status_obj.average_premium
+        assert plan_status_obj == expected_plan_status, \
+            f"Mismatched PlanStatus: expected: {expected_plan_status}, received: {plan_status_obj}"
     else:
-        assert False, (f"StratStatus' length must be exactly 1, found {len(strat_status_obj_list)}, "
-                       f"strat_status_list: {strat_status_obj_list}")
+        assert False, (f"PlanStatus' length must be exactly 1, found {len(plan_status_obj_list)}, "
+                       f"plan_status_list: {plan_status_obj_list}")
 
-    # checking strat_view
-    check_strat_view_computes(expected_pair_strat.id, executor_web_client)
+    # checking plan_view
+    check_plan_view_computes(expected_pair_plan.id, executor_web_client)
 
 
 def check_cxl_receive_for_placed_sell_chore_after_all_buys(
         symbol: str, sell_cxl_chore_journal: ChoreJournalBaseModel, expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
         expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
         other_leg_expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
-        expected_pair_strat: PairStratBaseModel,
-        expected_strat_limits: StratLimits, expected_strat_status: StratStatus,
-        expected_strat_brief_obj: StratBriefBaseModel, executor_web_client: StreetBookServiceHttpClient):
+        expected_pair_plan: PairPlanBaseModel,
+        expected_plan_limits: PlanLimits, expected_plan_status: PlanStatus,
+        expected_plan_brief_obj: PlanBriefBaseModel, executor_web_client: StreetBookServiceHttpClient):
     chore_journal_obj_list = executor_web_client.get_all_chore_journal_client(-100)
     assert sell_cxl_chore_journal in chore_journal_obj_list, f"Couldn't find {sell_cxl_chore_journal} in list " \
                                                              f"{chore_journal_obj_list}"
@@ -1952,106 +1952,106 @@ def check_cxl_receive_for_placed_sell_chore_after_all_buys(
     assert expected_symbol_side_snapshot in symbol_side_snapshot_list, \
         f"Couldn't find {expected_symbol_side_snapshot} in {symbol_side_snapshot_list}"
 
-    # Checking Strat_Limits
-    strat_limits_obj_list = executor_web_client.get_all_strat_limits_client()
-    if len(strat_limits_obj_list) == 1:
-        strat_limits_obj = strat_limits_obj_list[0]
-        expected_strat_limits.id = strat_limits_obj.id
-        expected_strat_limits.eligible_brokers = strat_limits_obj.eligible_brokers
-        expected_strat_limits.strat_limits_update_seq_num = strat_limits_obj.strat_limits_update_seq_num
-        assert strat_limits_obj == expected_strat_limits, \
-            f"Mismatched StratLimits: expected: {expected_strat_limits}, received: {strat_limits_obj}"
+    # Checking Plan_Limits
+    plan_limits_obj_list = executor_web_client.get_all_plan_limits_client()
+    if len(plan_limits_obj_list) == 1:
+        plan_limits_obj = plan_limits_obj_list[0]
+        expected_plan_limits.id = plan_limits_obj.id
+        expected_plan_limits.eligible_brokers = plan_limits_obj.eligible_brokers
+        expected_plan_limits.plan_limits_update_seq_num = plan_limits_obj.plan_limits_update_seq_num
+        assert plan_limits_obj == expected_plan_limits, \
+            f"Mismatched PlanLimits: expected: {expected_plan_limits}, received: {plan_limits_obj}"
     else:
-        assert False, (f"StratLimits' length must be exactly 1, found {len(strat_limits_obj_list)}, "
-                       f"strat_limits_list: {strat_limits_obj_list}")
+        assert False, (f"PlanLimits' length must be exactly 1, found {len(plan_limits_obj_list)}, "
+                       f"plan_limits_list: {plan_limits_obj_list}")
 
     # Checking start_brief
-    update_expected_strat_brief_for_sell(expected_chore_snapshot_obj,
+    update_expected_plan_brief_for_sell(expected_chore_snapshot_obj,
                                          expected_symbol_side_snapshot,
                                          other_leg_expected_symbol_side_snapshot,
-                                         expected_strat_limits, expected_strat_brief_obj,
+                                         expected_plan_limits, expected_plan_brief_obj,
                                          sell_cxl_chore_journal.chore_event_date_time,
                                          buy_last_barter_px, sell_last_barter_px, executor_web_client,
-                                         hedge_ratio=expected_pair_strat.pair_strat_params.hedge_ratio)
+                                         hedge_ratio=expected_pair_plan.pair_plan_params.hedge_ratio)
 
-    strat_brief_list = executor_web_client.get_strat_brief_from_symbol_query_client(symbol)
-    expected_strat_brief_obj.pair_sell_side_bartering_brief.last_update_date_time = None
+    plan_brief_list = executor_web_client.get_plan_brief_from_symbol_query_client(symbol)
+    expected_plan_brief_obj.pair_sell_side_bartering_brief.last_update_date_time = None
     # removing id field from received obj list for comparison
-    for strat_brief in strat_brief_list:
-        # strat_brief.id = None
-        # Since buy side of strat_brief is already checked
-        # strat_brief.pair_buy_side_bartering_brief = expected_strat_brief_obj.pair_buy_side_bartering_brief
-        strat_brief.pair_buy_side_bartering_brief.indicative_consumable_participation_qty = None
-        strat_brief.pair_buy_side_bartering_brief.participation_period_chore_qty_sum = None
-        strat_brief.pair_buy_side_bartering_brief.last_update_date_time = None
-        strat_brief.pair_sell_side_bartering_brief.indicative_consumable_participation_qty = None
-        strat_brief.pair_sell_side_bartering_brief.participation_period_chore_qty_sum = None
-        strat_brief.pair_sell_side_bartering_brief.last_update_date_time = None
+    for plan_brief in plan_brief_list:
+        # plan_brief.id = None
+        # Since buy side of plan_brief is already checked
+        # plan_brief.pair_buy_side_bartering_brief = expected_plan_brief_obj.pair_buy_side_bartering_brief
+        plan_brief.pair_buy_side_bartering_brief.indicative_consumable_participation_qty = None
+        plan_brief.pair_buy_side_bartering_brief.participation_period_chore_qty_sum = None
+        plan_brief.pair_buy_side_bartering_brief.last_update_date_time = None
+        plan_brief.pair_sell_side_bartering_brief.indicative_consumable_participation_qty = None
+        plan_brief.pair_sell_side_bartering_brief.participation_period_chore_qty_sum = None
+        plan_brief.pair_sell_side_bartering_brief.last_update_date_time = None
 
-    assert expected_strat_brief_obj in strat_brief_list, \
-        f"Mismatched: Couldn't find {expected_strat_brief_obj} in any strat_brief in {strat_brief_list}"
+    assert expected_plan_brief_obj in plan_brief_list, \
+        f"Mismatched: Couldn't find {expected_plan_brief_obj} in any plan_brief in {plan_brief_list}"
 
-    # Checking strat_status
-    expected_strat_status.total_cxl_sell_qty += unfilled_qty
-    expected_strat_status.total_cxl_sell_notional += (unfilled_qty *
+    # Checking plan_status
+    expected_plan_status.total_cxl_sell_qty += unfilled_qty
+    expected_plan_status.total_cxl_sell_notional += (unfilled_qty *
                                                       get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
-    expected_strat_status.avg_cxl_sell_px = (
-            get_usd_to_local_px_or_notional(expected_strat_status.total_cxl_sell_notional) /
-            expected_strat_status.total_cxl_sell_qty)
-    expected_strat_status.total_open_sell_qty -= unfilled_qty
-    expected_strat_status.total_open_sell_notional -= (
+    expected_plan_status.avg_cxl_sell_px = (
+            get_usd_to_local_px_or_notional(expected_plan_status.total_cxl_sell_notional) /
+            expected_plan_status.total_cxl_sell_qty)
+    expected_plan_status.total_open_sell_qty -= unfilled_qty
+    expected_plan_status.total_open_sell_notional -= (
             get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px) * unfilled_qty)
-    if expected_strat_status.total_open_sell_qty != 0:
-        expected_strat_status.avg_open_sell_px = (
-                get_usd_to_local_px_or_notional(expected_strat_status.total_open_sell_notional) /
-                expected_strat_status.total_open_sell_qty)
+    if expected_plan_status.total_open_sell_qty != 0:
+        expected_plan_status.avg_open_sell_px = (
+                get_usd_to_local_px_or_notional(expected_plan_status.total_open_sell_notional) /
+                expected_plan_status.total_open_sell_qty)
     else:
-        expected_strat_status.avg_open_sell_px = 0
-    expected_strat_status.total_open_exposure = - expected_strat_status.total_open_sell_notional
-    expected_strat_status.total_cxl_exposure = (expected_strat_status.total_cxl_buy_notional -
-                                                expected_strat_status.total_cxl_sell_notional)
-    buy_residual_notional = expected_strat_brief_obj.pair_buy_side_bartering_brief.residual_qty * get_px_in_usd(
+        expected_plan_status.avg_open_sell_px = 0
+    expected_plan_status.total_open_exposure = - expected_plan_status.total_open_sell_notional
+    expected_plan_status.total_cxl_exposure = (expected_plan_status.total_cxl_buy_notional -
+                                                expected_plan_status.total_cxl_sell_notional)
+    buy_residual_notional = expected_plan_brief_obj.pair_buy_side_bartering_brief.residual_qty * get_px_in_usd(
         buy_last_barter_px)
-    sell_residual_notional = expected_strat_brief_obj.pair_sell_side_bartering_brief.residual_qty * get_px_in_usd(
+    sell_residual_notional = expected_plan_brief_obj.pair_sell_side_bartering_brief.residual_qty * get_px_in_usd(
         sell_last_barter_px)
     residual_notional = abs(buy_residual_notional - sell_residual_notional)
 
-    security = expected_strat_brief_obj.pair_buy_side_bartering_brief.security if \
+    security = expected_plan_brief_obj.pair_buy_side_bartering_brief.security if \
         buy_residual_notional > sell_residual_notional else \
-        expected_strat_brief_obj.pair_sell_side_bartering_brief.security
-    expected_strat_status.residual = ResidualBaseModel.from_kwargs(security=security,
+        expected_plan_brief_obj.pair_sell_side_bartering_brief.security
+    expected_plan_status.residual = ResidualBaseModel.from_kwargs(security=security,
                                                                    residual_notional=residual_notional)
-    if expected_strat_status.total_fill_buy_notional < expected_strat_status.total_fill_sell_notional:
-        expected_strat_status.balance_notional = \
-            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_buy_notional
+    if expected_plan_status.total_fill_buy_notional < expected_plan_status.total_fill_sell_notional:
+        expected_plan_status.balance_notional = \
+            expected_plan_limits.max_single_leg_notional - expected_plan_status.total_fill_buy_notional
     else:
-        expected_strat_status.balance_notional = \
-            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_sell_notional
+        expected_plan_status.balance_notional = \
+            expected_plan_limits.max_single_leg_notional - expected_plan_status.total_fill_sell_notional
 
-    strat_status_obj_list = executor_web_client.get_all_strat_status_client()
-    if len(strat_status_obj_list) == 1:
-        strat_status_obj = strat_status_obj_list[0]
-        expected_strat_status.id = expected_pair_strat.id
-        expected_strat_status.last_update_date_time = strat_status_obj.last_update_date_time
-        expected_strat_status.strat_status_update_seq_num = strat_status_obj.strat_status_update_seq_num
-        expected_strat_status.average_premium = strat_status_obj.average_premium
-        assert strat_status_obj == expected_strat_status, \
-            f"Mismatched StratStatus: expected: {expected_strat_status}, received: {strat_status_obj}"
+    plan_status_obj_list = executor_web_client.get_all_plan_status_client()
+    if len(plan_status_obj_list) == 1:
+        plan_status_obj = plan_status_obj_list[0]
+        expected_plan_status.id = expected_pair_plan.id
+        expected_plan_status.last_update_date_time = plan_status_obj.last_update_date_time
+        expected_plan_status.plan_status_update_seq_num = plan_status_obj.plan_status_update_seq_num
+        expected_plan_status.average_premium = plan_status_obj.average_premium
+        assert plan_status_obj == expected_plan_status, \
+            f"Mismatched PlanStatus: expected: {expected_plan_status}, received: {plan_status_obj}"
     else:
-        assert False, (f"StratStatus' length must be exactly 1, found {len(strat_status_obj_list)}, "
-                       f"strat_status_list: {strat_status_obj_list}")
+        assert False, (f"PlanStatus' length must be exactly 1, found {len(plan_status_obj_list)}, "
+                       f"plan_status_list: {plan_status_obj_list}")
 
-    # checking strat_view
-    check_strat_view_computes(expected_pair_strat.id, executor_web_client)
+    # checking plan_view
+    check_plan_view_computes(expected_pair_plan.id, executor_web_client)
 
 
 def check_cxl_receive_for_placed_buy_chore_after_all_sells(
         symbol: str, buy_cxl_chore_journal: ChoreJournalBaseModel, expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
         expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
         other_leg_expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
-        expected_pair_strat: PairStratBaseModel,
-        expected_strat_limits: StratLimits, expected_strat_status: StratStatus,
-        expected_strat_brief_obj: StratBriefBaseModel, executor_web_client: StreetBookServiceHttpClient):
+        expected_pair_plan: PairPlanBaseModel,
+        expected_plan_limits: PlanLimits, expected_plan_status: PlanStatus,
+        expected_plan_brief_obj: PlanBriefBaseModel, executor_web_client: StreetBookServiceHttpClient):
     chore_journal_obj_list = executor_web_client.get_all_chore_journal_client(-100)
     assert buy_cxl_chore_journal in chore_journal_obj_list, f"Couldn't find {buy_cxl_chore_journal} in list " \
                                                             f"{chore_journal_obj_list}"
@@ -2095,94 +2095,94 @@ def check_cxl_receive_for_placed_buy_chore_after_all_sells(
     assert expected_symbol_side_snapshot in symbol_side_snapshot_list, \
         f"Couldn't find {expected_symbol_side_snapshot} in {symbol_side_snapshot_list}"
 
-    # Checking Strat_Limits
-    strat_limits_obj_list = executor_web_client.get_all_strat_limits_client()
-    if len(strat_limits_obj_list) == 1:
-        strat_limits_obj = strat_limits_obj_list[0]
-        expected_strat_limits.id = strat_limits_obj.id
-        expected_strat_limits.eligible_brokers = strat_limits_obj.eligible_brokers
-        expected_strat_limits.strat_limits_update_seq_num = strat_limits_obj.strat_limits_update_seq_num
-        assert strat_limits_obj == expected_strat_limits, \
-            f"Mismatched StratLimits: expected: {expected_strat_limits}, received: {strat_limits_obj}"
+    # Checking Plan_Limits
+    plan_limits_obj_list = executor_web_client.get_all_plan_limits_client()
+    if len(plan_limits_obj_list) == 1:
+        plan_limits_obj = plan_limits_obj_list[0]
+        expected_plan_limits.id = plan_limits_obj.id
+        expected_plan_limits.eligible_brokers = plan_limits_obj.eligible_brokers
+        expected_plan_limits.plan_limits_update_seq_num = plan_limits_obj.plan_limits_update_seq_num
+        assert plan_limits_obj == expected_plan_limits, \
+            f"Mismatched PlanLimits: expected: {expected_plan_limits}, received: {plan_limits_obj}"
     else:
-        assert False, (f"StratLimits' length must be exactly 1, found {len(strat_limits_obj_list)}, "
-                       f"strat_limits_list: {strat_limits_obj_list}")
+        assert False, (f"PlanLimits' length must be exactly 1, found {len(plan_limits_obj_list)}, "
+                       f"plan_limits_list: {plan_limits_obj_list}")
 
     # Checking start_brief
-    update_expected_strat_brief_for_buy(expected_chore_snapshot_obj,
+    update_expected_plan_brief_for_buy(expected_chore_snapshot_obj,
                                         expected_symbol_side_snapshot,
                                         other_leg_expected_symbol_side_snapshot,
-                                        expected_strat_limits, expected_strat_brief_obj,
+                                        expected_plan_limits, expected_plan_brief_obj,
                                         buy_cxl_chore_journal.chore_event_date_time,
                                         buy_last_barter_px, sell_last_barter_px, executor_web_client,
-                                        hedge_ratio=expected_pair_strat.pair_strat_params.hedge_ratio)
+                                        hedge_ratio=expected_pair_plan.pair_plan_params.hedge_ratio)
 
-    strat_brief_list = executor_web_client.get_strat_brief_from_symbol_query_client(symbol)
-    expected_strat_brief_obj.pair_buy_side_bartering_brief.last_update_date_time = None
+    plan_brief_list = executor_web_client.get_plan_brief_from_symbol_query_client(symbol)
+    expected_plan_brief_obj.pair_buy_side_bartering_brief.last_update_date_time = None
     # removing id field from received obj list for comparison
-    for strat_brief in strat_brief_list:
-        strat_brief.pair_buy_side_bartering_brief.indicative_consumable_participation_qty = None
-        strat_brief.pair_buy_side_bartering_brief.participation_period_chore_qty_sum = None
-        strat_brief.pair_buy_side_bartering_brief.last_update_date_time = None
-        strat_brief.pair_sell_side_bartering_brief.indicative_consumable_participation_qty = None
-        strat_brief.pair_sell_side_bartering_brief.participation_period_chore_qty_sum = None
-        strat_brief.pair_sell_side_bartering_brief.last_update_date_time = None
+    for plan_brief in plan_brief_list:
+        plan_brief.pair_buy_side_bartering_brief.indicative_consumable_participation_qty = None
+        plan_brief.pair_buy_side_bartering_brief.participation_period_chore_qty_sum = None
+        plan_brief.pair_buy_side_bartering_brief.last_update_date_time = None
+        plan_brief.pair_sell_side_bartering_brief.indicative_consumable_participation_qty = None
+        plan_brief.pair_sell_side_bartering_brief.participation_period_chore_qty_sum = None
+        plan_brief.pair_sell_side_bartering_brief.last_update_date_time = None
 
-    assert expected_strat_brief_obj in strat_brief_list, \
-        f"Mismatched: Couldn't find {expected_strat_brief_obj} in any strat_brief in {strat_brief_list}"
+    assert expected_plan_brief_obj in plan_brief_list, \
+        f"Mismatched: Couldn't find {expected_plan_brief_obj} in any plan_brief in {plan_brief_list}"
 
-    # Checking strat_status
-    expected_strat_status.total_cxl_buy_qty += unfilled_qty
-    expected_strat_status.total_cxl_buy_notional += (unfilled_qty *
+    # Checking plan_status
+    expected_plan_status.total_cxl_buy_qty += unfilled_qty
+    expected_plan_status.total_cxl_buy_notional += (unfilled_qty *
                                                       get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
-    expected_strat_status.avg_cxl_buy_px = (
-            get_usd_to_local_px_or_notional(expected_strat_status.total_cxl_buy_notional) /
-            expected_strat_status.total_cxl_buy_qty)
-    expected_strat_status.total_open_buy_qty -= unfilled_qty
-    expected_strat_status.total_open_buy_notional -= (
+    expected_plan_status.avg_cxl_buy_px = (
+            get_usd_to_local_px_or_notional(expected_plan_status.total_cxl_buy_notional) /
+            expected_plan_status.total_cxl_buy_qty)
+    expected_plan_status.total_open_buy_qty -= unfilled_qty
+    expected_plan_status.total_open_buy_notional -= (
             get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px) * unfilled_qty)
-    if expected_strat_status.total_open_buy_qty != 0:
-        expected_strat_status.avg_open_buy_px = (
-                get_usd_to_local_px_or_notional(expected_strat_status.total_open_buy_notional) /
-                expected_strat_status.total_open_buy_qty)
+    if expected_plan_status.total_open_buy_qty != 0:
+        expected_plan_status.avg_open_buy_px = (
+                get_usd_to_local_px_or_notional(expected_plan_status.total_open_buy_notional) /
+                expected_plan_status.total_open_buy_qty)
     else:
-        expected_strat_status.avg_open_buy_px = 0
-    expected_strat_status.total_open_exposure = 0
-    expected_strat_status.total_cxl_exposure = (expected_strat_status.total_cxl_buy_notional -
-                                                expected_strat_status.total_cxl_sell_notional)
-    buy_residual_notional = expected_strat_brief_obj.pair_buy_side_bartering_brief.residual_qty * get_px_in_usd(
+        expected_plan_status.avg_open_buy_px = 0
+    expected_plan_status.total_open_exposure = 0
+    expected_plan_status.total_cxl_exposure = (expected_plan_status.total_cxl_buy_notional -
+                                                expected_plan_status.total_cxl_sell_notional)
+    buy_residual_notional = expected_plan_brief_obj.pair_buy_side_bartering_brief.residual_qty * get_px_in_usd(
         buy_last_barter_px)
-    sell_residual_notional = expected_strat_brief_obj.pair_sell_side_bartering_brief.residual_qty * get_px_in_usd(
+    sell_residual_notional = expected_plan_brief_obj.pair_sell_side_bartering_brief.residual_qty * get_px_in_usd(
         sell_last_barter_px)
     residual_notional = abs(buy_residual_notional - sell_residual_notional)
 
-    security = expected_strat_brief_obj.pair_buy_side_bartering_brief.security if \
+    security = expected_plan_brief_obj.pair_buy_side_bartering_brief.security if \
         buy_residual_notional > sell_residual_notional else \
-        expected_strat_brief_obj.pair_sell_side_bartering_brief.security
-    expected_strat_status.residual = ResidualBaseModel.from_kwargs(security=security,
+        expected_plan_brief_obj.pair_sell_side_bartering_brief.security
+    expected_plan_status.residual = ResidualBaseModel.from_kwargs(security=security,
                                                                    residual_notional=residual_notional)
-    if expected_strat_status.total_fill_buy_notional < expected_strat_status.total_fill_sell_notional:
-        expected_strat_status.balance_notional = \
-            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_buy_notional
+    if expected_plan_status.total_fill_buy_notional < expected_plan_status.total_fill_sell_notional:
+        expected_plan_status.balance_notional = \
+            expected_plan_limits.max_single_leg_notional - expected_plan_status.total_fill_buy_notional
     else:
-        expected_strat_status.balance_notional = \
-            expected_strat_limits.max_single_leg_notional - expected_strat_status.total_fill_sell_notional
+        expected_plan_status.balance_notional = \
+            expected_plan_limits.max_single_leg_notional - expected_plan_status.total_fill_sell_notional
 
-    strat_status_obj_list = executor_web_client.get_all_strat_status_client()
-    if len(strat_status_obj_list) == 1:
-        strat_status_obj = strat_status_obj_list[0]
-        expected_strat_status.id = expected_pair_strat.id
-        expected_strat_status.last_update_date_time = strat_status_obj.last_update_date_time
-        expected_strat_status.strat_status_update_seq_num = strat_status_obj.strat_status_update_seq_num
-        expected_strat_status.average_premium = strat_status_obj.average_premium
-        assert strat_status_obj == expected_strat_status, \
-            f"Mismatched StratStatus: expected: {expected_strat_status}, received: {strat_status_obj}"
+    plan_status_obj_list = executor_web_client.get_all_plan_status_client()
+    if len(plan_status_obj_list) == 1:
+        plan_status_obj = plan_status_obj_list[0]
+        expected_plan_status.id = expected_pair_plan.id
+        expected_plan_status.last_update_date_time = plan_status_obj.last_update_date_time
+        expected_plan_status.plan_status_update_seq_num = plan_status_obj.plan_status_update_seq_num
+        expected_plan_status.average_premium = plan_status_obj.average_premium
+        assert plan_status_obj == expected_plan_status, \
+            f"Mismatched PlanStatus: expected: {expected_plan_status}, received: {plan_status_obj}"
     else:
-        assert False, (f"StratStatus' length must be exactly 1, found {len(strat_status_obj_list)}, "
-                       f"strat_status_list: {strat_status_obj_list}")
+        assert False, (f"PlanStatus' length must be exactly 1, found {len(plan_status_obj_list)}, "
+                       f"plan_status_list: {plan_status_obj_list}")
 
-    # checking strat_view
-    check_strat_view_computes(expected_pair_strat.id, executor_web_client)
+    # checking plan_view
+    check_plan_view_computes(expected_pair_plan.id, executor_web_client)
 
 
 class TopOfBookSide(StrEnum):
@@ -2371,7 +2371,7 @@ def run_last_barter(leg1_symbol: str, leg2_symbol: str, last_barter_json_list: L
 def symbol_overview_list() -> List[SymbolOverviewBaseModel]:
     symbol_overview_obj_list: List[SymbolOverviewBaseModel] = []
 
-    symbols = ["CB_Sec_1", "EQT_Sec_1"]  # Add more symbols if needed
+    symbols = ["Type1_Sec_1", "Type2_Sec_1"]  # Add more symbols if needed
 
     id: int = 1
     for symbol in symbols:
@@ -2400,66 +2400,66 @@ def symbol_overview_list() -> List[SymbolOverviewBaseModel]:
     return symbol_overview_obj_list
 
 
-def create_strat(leg1_symbol, leg2_symbol, expected_pair_strat_obj, leg1_side=None, leg2_side=None,
+def create_plan(leg1_symbol, leg2_symbol, expected_pair_plan_obj, leg1_side=None, leg2_side=None,
                  keep_default_hedge_ratio: bool | None = False):
-    expected_pair_strat_obj.pair_strat_params.strat_leg1.sec.sec_id = leg1_symbol
+    expected_pair_plan_obj.pair_plan_params.plan_leg1.sec.sec_id = leg1_symbol
     if leg1_side is None:
-        expected_pair_strat_obj.pair_strat_params.strat_leg1.side = Side.BUY
+        expected_pair_plan_obj.pair_plan_params.plan_leg1.side = Side.BUY
     else:
-        expected_pair_strat_obj.pair_strat_params.strat_leg1.side = leg1_side
-    expected_pair_strat_obj.pair_strat_params.strat_leg2.sec.sec_id = leg2_symbol
+        expected_pair_plan_obj.pair_plan_params.plan_leg1.side = leg1_side
+    expected_pair_plan_obj.pair_plan_params.plan_leg2.sec.sec_id = leg2_symbol
     if leg2_side is None:
-        expected_pair_strat_obj.pair_strat_params.strat_leg2.side = Side.SELL
+        expected_pair_plan_obj.pair_plan_params.plan_leg2.side = Side.SELL
     else:
-        expected_pair_strat_obj.pair_strat_params.strat_leg2.side = leg2_side
-    expected_pair_strat_obj.strat_state = StratState.StratState_SNOOZED
+        expected_pair_plan_obj.pair_plan_params.plan_leg2.side = leg2_side
+    expected_pair_plan_obj.plan_state = PlanState.PlanState_SNOOZED
 
     if not keep_default_hedge_ratio:
         # putting random hedge ratio
-        expected_pair_strat_obj.pair_strat_params.hedge_ratio = round(random.uniform(1, 2), 2)
+        expected_pair_plan_obj.pair_plan_params.hedge_ratio = round(random.uniform(1, 2), 2)
 
-    stored_pair_strat_basemodel = \
-        email_book_service_native_web_client.create_pair_strat_client(expected_pair_strat_obj)
-    assert expected_pair_strat_obj.frequency == stored_pair_strat_basemodel.frequency, \
-        f"Mismatch pair_strat_basemodel.frequency: expected {expected_pair_strat_obj.frequency}, " \
-        f"received {stored_pair_strat_basemodel.frequency}"
-    assert expected_pair_strat_obj.pair_strat_params == stored_pair_strat_basemodel.pair_strat_params, \
-        f"Mismatch pair_strat_obj.pair_strat_params: expected {expected_pair_strat_obj.pair_strat_params}, " \
-        f"received {stored_pair_strat_basemodel.pair_strat_params}"
-    assert stored_pair_strat_basemodel.pair_strat_params_update_seq_num == 0, \
-        f"Mismatch pair_strat.pair_strat_params_update_seq_num: expected 0 received " \
-        f"{stored_pair_strat_basemodel.pair_strat_params_update_seq_num}"
-    assert expected_pair_strat_obj.strat_state == stored_pair_strat_basemodel.strat_state, \
-        f"Mismatch pair_strat_base_model.strat_state: expected {expected_pair_strat_obj.strat_state}, " \
-        f"received {stored_pair_strat_basemodel.strat_state}"
-    print(f"{leg1_symbol} - strat created, {stored_pair_strat_basemodel}")
-    return stored_pair_strat_basemodel
+    stored_pair_plan_basemodel = \
+        email_book_service_native_web_client.create_pair_plan_client(expected_pair_plan_obj)
+    assert expected_pair_plan_obj.frequency == stored_pair_plan_basemodel.frequency, \
+        f"Mismatch pair_plan_basemodel.frequency: expected {expected_pair_plan_obj.frequency}, " \
+        f"received {stored_pair_plan_basemodel.frequency}"
+    assert expected_pair_plan_obj.pair_plan_params == stored_pair_plan_basemodel.pair_plan_params, \
+        f"Mismatch pair_plan_obj.pair_plan_params: expected {expected_pair_plan_obj.pair_plan_params}, " \
+        f"received {stored_pair_plan_basemodel.pair_plan_params}"
+    assert stored_pair_plan_basemodel.pair_plan_params_update_seq_num == 0, \
+        f"Mismatch pair_plan.pair_plan_params_update_seq_num: expected 0 received " \
+        f"{stored_pair_plan_basemodel.pair_plan_params_update_seq_num}"
+    assert expected_pair_plan_obj.plan_state == stored_pair_plan_basemodel.plan_state, \
+        f"Mismatch pair_plan_base_model.plan_state: expected {expected_pair_plan_obj.plan_state}, " \
+        f"received {stored_pair_plan_basemodel.plan_state}"
+    print(f"{leg1_symbol} - plan created, {stored_pair_plan_basemodel}")
+    return stored_pair_plan_basemodel
 
 
-def assert_server_ready_state(pair_strat_id: int, expected_server_ready_state: int):
-    pair_strat_obj = email_book_service_native_web_client.get_pair_strat_client(pair_strat_id)
-    assert pair_strat_obj.server_ready_state == expected_server_ready_state, \
+def assert_server_ready_state(pair_plan_id: int, expected_server_ready_state: int):
+    pair_plan_obj = email_book_service_native_web_client.get_pair_plan_client(pair_plan_id)
+    assert pair_plan_obj.server_ready_state == expected_server_ready_state, \
         (f"server_ready_state must be {expected_server_ready_state}, "
-         f"found {pair_strat_obj.server_ready_state}, pair_strat: {pair_strat_obj}")
-    return pair_strat_obj
+         f"found {pair_plan_obj.server_ready_state}, pair_plan: {pair_plan_obj}")
+    return pair_plan_obj
 
 
-def move_snoozed_pair_strat_to_ready_n_then_active(
-        stored_pair_strat_basemodel, market_depth_basemodel_list,
-        symbol_overview_obj_list, expected_strat_limits, expected_strat_status, only_make_ready: bool = False):
-    if stored_pair_strat_basemodel.pair_strat_params.strat_leg1.side == Side.BUY:
-        buy_symbol = stored_pair_strat_basemodel.pair_strat_params.strat_leg1.sec.sec_id
-        sell_symbol = stored_pair_strat_basemodel.pair_strat_params.strat_leg2.sec.sec_id
+def move_snoozed_pair_plan_to_ready_n_then_active(
+        stored_pair_plan_basemodel, market_depth_basemodel_list,
+        symbol_overview_obj_list, expected_plan_limits, expected_plan_status, only_make_ready: bool = False):
+    if stored_pair_plan_basemodel.pair_plan_params.plan_leg1.side == Side.BUY:
+        buy_symbol = stored_pair_plan_basemodel.pair_plan_params.plan_leg1.sec.sec_id
+        sell_symbol = stored_pair_plan_basemodel.pair_plan_params.plan_leg2.sec.sec_id
     else:
-        buy_symbol = stored_pair_strat_basemodel.pair_strat_params.strat_leg2.sec.sec_id
-        sell_symbol = stored_pair_strat_basemodel.pair_strat_params.strat_leg1.sec.sec_id
+        buy_symbol = stored_pair_plan_basemodel.pair_plan_params.plan_leg2.sec.sec_id
+        sell_symbol = stored_pair_plan_basemodel.pair_plan_params.plan_leg1.sec.sec_id
 
     for _ in range(60):
         # checking server_ready_state of executor
         try:
-            updated_pair_strat = (
-                email_book_service_native_web_client.get_pair_strat_client(stored_pair_strat_basemodel.id))
-            if updated_pair_strat.server_ready_state == 1:
+            updated_pair_plan = (
+                email_book_service_native_web_client.get_pair_plan_client(stored_pair_plan_basemodel.id))
+            if updated_pair_plan.server_ready_state == 1:
                 break
             time.sleep(1)
         except Exception as e:
@@ -2467,32 +2467,32 @@ def move_snoozed_pair_strat_to_ready_n_then_active(
     else:
         assert False, (f"server_ready_state must be 1, "
                        f"buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}, "
-                       f"{stored_pair_strat_basemodel=}")
+                       f"{stored_pair_plan_basemodel=}")
 
-    assert updated_pair_strat.port is not None, (
-        "Once pair_strat is partially running it also must contain executor port, updated object has "
-        f"port field as None, updated pair_strat: {updated_pair_strat}")
+    assert updated_pair_plan.port is not None, (
+        "Once pair_plan is partially running it also must contain executor port, updated object has "
+        f"port field as None, updated pair_plan: {updated_pair_plan}")
 
     executor_web_client = StreetBookServiceHttpClient.set_or_get_if_instance_exists(
-        updated_pair_strat.host, updated_pair_strat.port)
+        updated_pair_plan.host, updated_pair_plan.port)
 
     test_config = YAMLConfigurationManager.load_yaml_configurations(str(test_config_file_path))
     run_gdb_terminal = test_config.get("run_gdb_terminal")
     if run_gdb_terminal:
         for _ in range(10):
-            pid: int = get_pid_from_port(updated_pair_strat.port)
+            pid: int = get_pid_from_port(updated_pair_plan.port)
             if pid is not None:
-                show_msg = (f"Terminal for strat_id: {updated_pair_strat.id} and "
+                show_msg = (f"Terminal for plan_id: {updated_pair_plan.id} and "
                             f"symbol-side for leg_1: {buy_symbol}-BUY and leg_2: {sell_symbol}-SELL")
                 run_gbd_terminal_with_pid(pid, show_msg)
-                print(f"Started GDB for strat_id: {updated_pair_strat.id} and pid: {pid}")
+                print(f"Started GDB for plan_id: {updated_pair_plan.id} and pid: {pid}")
                 break
             else:
                 print("get_pid_from_port return None instead of pid")
             time.sleep(2)
         else:
-            assert False, (f"Unexpected: Can't strat gdb terminal - "
-                           f"Can't find any pid from port {updated_pair_strat.port}")
+            assert False, (f"Unexpected: Can't plan gdb terminal - "
+                           f"Can't find any pid from port {updated_pair_plan.port}")
 
     time.sleep(5)
     # running symbol_overview
@@ -2501,197 +2501,194 @@ def move_snoozed_pair_strat_to_ready_n_then_active(
 
     wait_time = 20
     executor_check_loop_counts = 3
-    strat_status = None
-    updated_strat_limits = None
+    plan_status = None
+    updated_plan_limits = None
     for _ in range(executor_check_loop_counts):
         time.sleep(wait_time)
-        strat_limits_list = executor_web_client.get_all_strat_limits_client()
+        plan_limits_list = executor_web_client.get_all_plan_limits_client()
 
-        is_strat_limits_present = False
-        is_strat_status_present = False
+        is_plan_limits_present = False
+        is_plan_status_present = False
 
-        if len(strat_limits_list) == 1:
-            strat_limits = strat_limits_list[0]
-            expected_strat_limits.id = strat_limits.id
-            expected_strat_limits.eligible_brokers = strat_limits.eligible_brokers
+        if len(plan_limits_list) == 1:
+            plan_limits = plan_limits_list[0]
+            expected_plan_limits.id = plan_limits.id
+            expected_plan_limits.eligible_brokers = plan_limits.eligible_brokers
 
-            updated_strat_limits = executor_web_client.put_strat_limits_client(expected_strat_limits)
-            expected_strat_limits.strat_limits_update_seq_num = updated_strat_limits.strat_limits_update_seq_num
-            assert updated_strat_limits == expected_strat_limits, \
-                (f"Mismatched StratLimits: expected strat_limits: {expected_strat_limits}, updated "
-                 f"strat_limits: {updated_strat_limits}")
+            updated_plan_limits = executor_web_client.put_plan_limits_client(expected_plan_limits)
+            expected_plan_limits.plan_limits_update_seq_num = updated_plan_limits.plan_limits_update_seq_num
+            assert updated_plan_limits == expected_plan_limits, \
+                (f"Mismatched PlanLimits: expected plan_limits: {expected_plan_limits}, updated "
+                 f"plan_limits: {updated_plan_limits}")
 
-            is_strat_limits_present = True
-            print(f"StratLimits updated for this test, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
-
-        else:
-            if len(strat_limits_list) > 1:
-                assert False, (f"StratLimits must exactly one in executor, found {len(strat_limits_list)}, "
-                               f"strat_limits_list: {strat_limits_list}")
-
-        strat_status_list = executor_web_client.get_all_strat_status_client()
-        if len(strat_status_list) == 1:
-            strat_status = strat_status_list[0]
-            expected_strat_status.id = strat_status.id
-            expected_strat_status.balance_notional = expected_strat_limits.max_single_leg_notional
-            expected_strat_status.strat_status_update_seq_num = strat_status.strat_status_update_seq_num
-            expected_strat_status.last_update_date_time = strat_status.last_update_date_time
-            assert strat_status == expected_strat_status, \
-                (f"StratStatus Mismatched: expected strat_status {expected_strat_status}, "
-                 f"received strat_status: {strat_status}")
-            is_strat_status_present = True
-            print(f"StratStatus found in ready state, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
+            is_plan_limits_present = True
+            print(f"PlanLimits updated for this test, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
         else:
-            if len(strat_status_list) > 1:
-                assert False, (f"StratStatus must exactly one in executor, found {len(strat_status_list)}, "
-                               f"strat_status_list: {strat_status_list}")
+            if len(plan_limits_list) > 1:
+                assert False, (f"PlanLimits must exactly one in executor, found {len(plan_limits_list)}, "
+                               f"plan_limits_list: {plan_limits_list}")
 
-        if is_strat_status_present and is_strat_limits_present:
+        plan_status_list = executor_web_client.get_all_plan_status_client()
+        if len(plan_status_list) == 1:
+            plan_status = plan_status_list[0]
+            expected_plan_status.id = plan_status.id
+            expected_plan_status.balance_notional = expected_plan_limits.max_single_leg_notional
+            expected_plan_status.plan_status_update_seq_num = plan_status.plan_status_update_seq_num
+            expected_plan_status.last_update_date_time = plan_status.last_update_date_time
+            assert plan_status == expected_plan_status, \
+                (f"PlanStatus Mismatched: expected plan_status {expected_plan_status}, "
+                 f"received plan_status: {plan_status}")
+            is_plan_status_present = True
+            print(f"PlanStatus found in ready state, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
+
+        else:
+            if len(plan_status_list) > 1:
+                assert False, (f"PlanStatus must exactly one in executor, found {len(plan_status_list)}, "
+                               f"plan_status_list: {plan_status_list}")
+
+        if is_plan_status_present and is_plan_limits_present:
             break
     else:
-        strat_status_list = executor_web_client.get_all_strat_status_client()
-        strat_limits_list = executor_web_client.get_all_strat_limits_client()
-        assert False, ("Could not find created strat_status or strat_limits in newly started executor, took "
+        plan_status_list = executor_web_client.get_all_plan_status_client()
+        plan_limits_list = executor_web_client.get_all_plan_limits_client()
+        assert False, ("Could not find created plan_status or plan_limits in newly started executor, took "
                        f"{executor_check_loop_counts} loops of {wait_time} sec each, "
-                       f"buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}, {strat_status_list = }, "
-                       f"{strat_limits_list = }")
+                       f"buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}, {plan_status_list = }, "
+                       f"{plan_limits_list = }")
 
-    # checking strat_view values
+    # checking plan_view values
     start_time = DateTime.utcnow()
     for _ in range(60):
-        strat_view = photo_book_web_client.get_strat_view_client(updated_pair_strat.id)
-        strat_status_obj = get_strat_status(executor_web_client)
-        strat_limits_obj = get_strat_limits(executor_web_client)
+        plan_view = photo_book_web_client.get_plan_view_client(updated_pair_plan.id)
+        plan_status_obj = get_plan_status(executor_web_client)
+        plan_limits_obj = get_plan_limits(executor_web_client)
         max_single_leg_notional_passed = False
         balance_notional_passed = False
-        if strat_view.max_single_leg_notional == strat_limits_obj.max_single_leg_notional:
+        if plan_view.max_single_leg_notional == plan_limits_obj.max_single_leg_notional:
             max_single_leg_notional_passed = True
-        if strat_view.balance_notional == strat_status_obj.balance_notional:
+        if plan_view.balance_notional == plan_status_obj.balance_notional:
             balance_notional_passed = True
 
         if max_single_leg_notional_passed and balance_notional_passed:
-            print(f"IMPORTANT: strat_view initial update took {(DateTime.utcnow()-start_time).total_seconds()} secs "
+            print(f"IMPORTANT: plan_view initial update took {(DateTime.utcnow()-start_time).total_seconds()} secs "
                   f"to be passed in this test")
             break
         time.sleep(1)
     else:
-        strat_view = photo_book_web_client.get_strat_view_client(updated_pair_strat.id)
-        strat_status_obj = get_strat_status(executor_web_client)
-        strat_limits_obj = get_strat_limits(executor_web_client)
-        assert strat_view.max_single_leg_notional == strat_limits_obj.max_single_leg_notional, \
-            (f"Mismatched max_single_leg_notional in strat_view: expected: {strat_limits_obj.max_single_leg_notional}, "
-             f"received: {strat_view.max_single_leg_notional} even after "
+        plan_view = photo_book_web_client.get_plan_view_client(updated_pair_plan.id)
+        plan_status_obj = get_plan_status(executor_web_client)
+        plan_limits_obj = get_plan_limits(executor_web_client)
+        assert plan_view.max_single_leg_notional == plan_limits_obj.max_single_leg_notional, \
+            (f"Mismatched max_single_leg_notional in plan_view: expected: {plan_limits_obj.max_single_leg_notional}, "
+             f"received: {plan_view.max_single_leg_notional} even after "
              f"{(DateTime.utcnow()-start_time).total_seconds()} secs")
-        assert strat_view.balance_notional == strat_status_obj.balance_notional, \
-            (f"Mismatched balance_notional in strat_view: expected: {strat_status_obj.balance_notional}, "
-             f"received: {strat_view.balance_notional} even after "
+        assert plan_view.balance_notional == plan_status_obj.balance_notional, \
+            (f"Mismatched balance_notional in plan_view: expected: {plan_status_obj.balance_notional}, "
+             f"received: {plan_view.balance_notional} even after "
              f"{(DateTime.utcnow()-start_time).total_seconds()} secs")
 
     # checking is_running_state of executor
-    updated_pair_strat = assert_server_ready_state(stored_pair_strat_basemodel.id, expected_server_ready_state=2)
+    updated_pair_plan = assert_server_ready_state(stored_pair_plan_basemodel.id, expected_server_ready_state=2)
     print(f"server_ready_state is 2, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
-    assert updated_pair_strat.cpp_port is not None, (
-        "Once pair_strat is running it also must contain cpp_port, updated object has "
-        f"port field as None, updated pair_strat: {updated_pair_strat}")
-    assert updated_pair_strat.cpp_ws_port is not None, (
-        "Once pair_strat is running it also must contain cpp_ws_port, updated object has "
-        f"port field as None, updated pair_strat: {updated_pair_strat}")
-    assert updated_pair_strat.strat_state == StratState.StratState_READY, \
-        (f"StratState Mismatched, expected StratState: {StratState.StratState_READY}, "
-         f"received pair_strat's strat_state: {updated_pair_strat.strat_state}")
-    print(f"StratStatus updated to READY state, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
+    assert updated_pair_plan.cpp_port is not None, (
+        "Once pair_plan is running it also must contain cpp_port, updated object has "
+        f"port field as None, updated pair_plan: {updated_pair_plan}")
+    assert updated_pair_plan.plan_state == PlanState.PlanState_READY, \
+        (f"PlanState Mismatched, expected PlanState: {PlanState.PlanState_READY}, "
+         f"received pair_plan's plan_state: {updated_pair_plan.plan_state}")
+    print(f"PlanStatus updated to READY state, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
     if only_make_ready:
-        return updated_pair_strat, executor_web_client
+        return updated_pair_plan, executor_web_client
 
-    # activating strat
-    pair_strat = PairStratBaseModel.from_kwargs(_id=stored_pair_strat_basemodel.id,
-                                                strat_state=StratState.StratState_ACTIVE)
-    activated_pair_strat = email_book_service_native_web_client.patch_pair_strat_client(pair_strat.to_dict(exclude_none=True))
-    assert activated_pair_strat.strat_state == StratState.StratState_ACTIVE, \
-        (f"StratState Mismatched, expected StratState: {StratState.StratState_ACTIVE}, "
-         f"received pair_strat's strat_state: {activated_pair_strat.strat_state}")
-    print(f"StratStatus updated to Active state, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
+    # activating plan
+    pair_plan = PairPlanBaseModel.from_kwargs(_id=stored_pair_plan_basemodel.id,
+                                                plan_state=PlanState.PlanState_ACTIVE)
+    activated_pair_plan = email_book_service_native_web_client.patch_pair_plan_client(pair_plan.to_dict(exclude_none=True))
+    assert activated_pair_plan.plan_state == PlanState.PlanState_ACTIVE, \
+        (f"PlanState Mismatched, expected PlanState: {PlanState.PlanState_ACTIVE}, "
+         f"received pair_plan's plan_state: {activated_pair_plan.plan_state}")
+    print(f"PlanStatus updated to Active state, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
     time.sleep(10)
-    assert_server_ready_state(stored_pair_strat_basemodel.id, expected_server_ready_state=3)
+    assert_server_ready_state(stored_pair_plan_basemodel.id, expected_server_ready_state=3)
     print(f"server_ready_state is 3, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
     # creating market_depth
-    create_market_depth(buy_symbol, sell_symbol, market_depth_basemodel_list, activated_pair_strat.cpp_port)
+    create_market_depth(buy_symbol, sell_symbol, market_depth_basemodel_list, activated_pair_plan.cpp_port)
     print(f"market_depth created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
-    return activated_pair_strat, executor_web_client
+    return activated_pair_plan, executor_web_client
 
 
-def create_n_activate_strat(leg1_symbol: str, leg2_symbol: str,
-                            expected_pair_strat_obj: PairStratBaseModel,
-                            expected_strat_limits: StratLimits,
-                            expected_strat_status: StratStatus,
+def create_n_activate_plan(leg1_symbol: str, leg2_symbol: str,
+                            expected_pair_plan_obj: PairPlanBaseModel,
+                            expected_plan_limits: PlanLimits,
+                            expected_plan_status: PlanStatus,
                             symbol_overview_obj_list: List[SymbolOverviewBaseModel],
                             market_depth_basemodel_list: List[MarketDepthBaseModel],
                             leg1_side: Side | None = None, leg2_side: Side | None = None,
                             keep_default_hedge_ratio: bool | None = False
-                            ) -> Tuple[PairStratBaseModel, StreetBookServiceHttpClient]:
-    stored_pair_strat_basemodel = create_strat(leg1_symbol, leg2_symbol, expected_pair_strat_obj,
+                            ) -> Tuple[PairPlanBaseModel, StreetBookServiceHttpClient]:
+    stored_pair_plan_basemodel = create_plan(leg1_symbol, leg2_symbol, expected_pair_plan_obj,
                                                leg1_side, leg2_side, keep_default_hedge_ratio)
 
-    return move_snoozed_pair_strat_to_ready_n_then_active(stored_pair_strat_basemodel, market_depth_basemodel_list,
+    return move_snoozed_pair_plan_to_ready_n_then_active(stored_pair_plan_basemodel, market_depth_basemodel_list,
                                                           symbol_overview_obj_list,
-                                                          expected_strat_limits, expected_strat_status)
+                                                          expected_plan_limits, expected_plan_status)
 
 
-def manage_strat_creation_and_activation(leg1_symbol: str, leg2_symbol: str,
-                                         expected_pair_strat_obj: PairStratBaseModel,
-                                         expected_strat_limits: StratLimits, expected_strat_status: StratStatus,
+def manage_plan_creation_and_activation(leg1_symbol: str, leg2_symbol: str,
+                                         expected_pair_plan_obj: PairPlanBaseModel,
+                                         expected_plan_limits: PlanLimits, expected_plan_status: PlanStatus,
                                          symbol_overview_obj_list: List[SymbolOverviewBaseModel],
                                          top_of_book_json_list: List[Dict],
                                          market_depth_basemodel_list: List[MarketDepthBaseModel],
-                                         strat_state: StratState,
+                                         plan_state: PlanState,
                                          leg1_side: Side | None = None,
                                          leg2_side: Side | None = None
-                                         ) -> Tuple[PairStratBaseModel, StreetBookServiceHttpClient]:
-    expected_pair_strat_obj.pair_strat_params.strat_leg1.sec.sec_id = leg1_symbol
+                                         ) -> Tuple[PairPlanBaseModel, StreetBookServiceHttpClient]:
+    expected_pair_plan_obj.pair_plan_params.plan_leg1.sec.sec_id = leg1_symbol
     if leg1_side is None:
-        expected_pair_strat_obj.pair_strat_params.strat_leg1.side = Side.BUY
+        expected_pair_plan_obj.pair_plan_params.plan_leg1.side = Side.BUY
     else:
-        expected_pair_strat_obj.pair_strat_params.strat_leg1.side = leg1_side
-    expected_pair_strat_obj.pair_strat_params.strat_leg2.sec.sec_id = leg2_symbol
+        expected_pair_plan_obj.pair_plan_params.plan_leg1.side = leg1_side
+    expected_pair_plan_obj.pair_plan_params.plan_leg2.sec.sec_id = leg2_symbol
     if leg2_side is None:
-        expected_pair_strat_obj.pair_strat_params.strat_leg2.side = Side.SELL
+        expected_pair_plan_obj.pair_plan_params.plan_leg2.side = Side.SELL
     else:
-        expected_pair_strat_obj.pair_strat_params.strat_leg2.side = leg2_side
-    expected_pair_strat_obj.strat_state = StratState.StratState_SNOOZED
-    stored_pair_strat_basemodel = \
-        email_book_service_native_web_client.create_pair_strat_client(expected_pair_strat_obj)
-    assert expected_pair_strat_obj.frequency == stored_pair_strat_basemodel.frequency, \
-        f"Mismatch pair_strat_basemodel.frequency: expected {expected_pair_strat_obj.frequency}, " \
-        f"received {stored_pair_strat_basemodel.frequency}"
-    assert expected_pair_strat_obj.pair_strat_params == stored_pair_strat_basemodel.pair_strat_params, \
-        f"Mismatch pair_strat_obj.pair_strat_params: expected {expected_pair_strat_obj.pair_strat_params}, " \
-        f"received {stored_pair_strat_basemodel.pair_strat_params}"
-    assert stored_pair_strat_basemodel.pair_strat_params_update_seq_num == 0, \
-        f"Mismatch pair_strat.pair_strat_params_update_seq_num: expected 0 received " \
-        f"{stored_pair_strat_basemodel.pair_strat_params_update_seq_num}"
-    assert expected_pair_strat_obj.strat_state == stored_pair_strat_basemodel.strat_state, \
-        f"Mismatch pair_strat_base_model.strat_state: expected {expected_pair_strat_obj.strat_state}, " \
-        f"received {stored_pair_strat_basemodel.strat_state}"
-    print(f"{leg1_symbol} - strat created, {stored_pair_strat_basemodel}")
+        expected_pair_plan_obj.pair_plan_params.plan_leg2.side = leg2_side
+    expected_pair_plan_obj.plan_state = PlanState.PlanState_SNOOZED
+    stored_pair_plan_basemodel = \
+        email_book_service_native_web_client.create_pair_plan_client(expected_pair_plan_obj)
+    assert expected_pair_plan_obj.frequency == stored_pair_plan_basemodel.frequency, \
+        f"Mismatch pair_plan_basemodel.frequency: expected {expected_pair_plan_obj.frequency}, " \
+        f"received {stored_pair_plan_basemodel.frequency}"
+    assert expected_pair_plan_obj.pair_plan_params == stored_pair_plan_basemodel.pair_plan_params, \
+        f"Mismatch pair_plan_obj.pair_plan_params: expected {expected_pair_plan_obj.pair_plan_params}, " \
+        f"received {stored_pair_plan_basemodel.pair_plan_params}"
+    assert stored_pair_plan_basemodel.pair_plan_params_update_seq_num == 0, \
+        f"Mismatch pair_plan.pair_plan_params_update_seq_num: expected 0 received " \
+        f"{stored_pair_plan_basemodel.pair_plan_params_update_seq_num}"
+    assert expected_pair_plan_obj.plan_state == stored_pair_plan_basemodel.plan_state, \
+        f"Mismatch pair_plan_base_model.plan_state: expected {expected_pair_plan_obj.plan_state}, " \
+        f"received {stored_pair_plan_basemodel.plan_state}"
+    print(f"{leg1_symbol} - plan created, {stored_pair_plan_basemodel}")
 
-    if stored_pair_strat_basemodel.pair_strat_params.strat_leg1.side == Side.BUY:
-        buy_symbol = stored_pair_strat_basemodel.pair_strat_params.strat_leg1.sec.sec_id
-        sell_symbol = stored_pair_strat_basemodel.pair_strat_params.strat_leg2.sec.sec_id
+    if stored_pair_plan_basemodel.pair_plan_params.plan_leg1.side == Side.BUY:
+        buy_symbol = stored_pair_plan_basemodel.pair_plan_params.plan_leg1.sec.sec_id
+        sell_symbol = stored_pair_plan_basemodel.pair_plan_params.plan_leg2.sec.sec_id
     else:
-        buy_symbol = stored_pair_strat_basemodel.pair_strat_params.strat_leg2.sec.sec_id
-        sell_symbol = stored_pair_strat_basemodel.pair_strat_params.strat_leg1.sec.sec_id
+        buy_symbol = stored_pair_plan_basemodel.pair_plan_params.plan_leg2.sec.sec_id
+        sell_symbol = stored_pair_plan_basemodel.pair_plan_params.plan_leg1.sec.sec_id
 
     for _ in range(60):
         # checking server_ready_state of executor
         try:
-            updated_pair_strat = (
-                email_book_service_native_web_client.get_pair_strat_client(stored_pair_strat_basemodel.id))
-            if updated_pair_strat.server_ready_state == 1:
+            updated_pair_plan = (
+                email_book_service_native_web_client.get_pair_plan_client(stored_pair_plan_basemodel.id))
+            if updated_pair_plan.server_ready_state == 1:
                 break
             time.sleep(1)
         except Exception as e:
@@ -2700,23 +2697,23 @@ def manage_strat_creation_and_activation(leg1_symbol: str, leg2_symbol: str,
         assert False, (f"server_ready_state state must be 1, "
                        f"buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
-    assert updated_pair_strat.port is not None, (
-        "Once pair_strat is partially running it also must contain port, updated object has port field as None, "
-        f"updated pair_strat: {updated_pair_strat}")
+    assert updated_pair_plan.port is not None, (
+        "Once pair_plan is partially running it also must contain port, updated object has port field as None, "
+        f"updated pair_plan: {updated_pair_plan}")
 
     executor_web_client = StreetBookServiceHttpClient.set_or_get_if_instance_exists(
-        updated_pair_strat.host, updated_pair_strat.port)
+        updated_pair_plan.host, updated_pair_plan.port)
 
     # creating market_depth
-    create_market_depth(buy_symbol, sell_symbol, market_depth_basemodel_list, updated_pair_strat.cpp_port)
+    create_market_depth(buy_symbol, sell_symbol, market_depth_basemodel_list, updated_pair_plan.cpp_port)
     print(f"market_depth created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
     # running symbol_overview
     run_symbol_overview(buy_symbol, sell_symbol, symbol_overview_obj_list, executor_web_client)
     print(f"SymbolOverview created, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
-    create_tob(stored_pair_strat_basemodel.pair_strat_params.strat_leg1.sec.sec_id,
-               stored_pair_strat_basemodel.pair_strat_params.strat_leg2.sec.sec_id,
+    create_tob(stored_pair_plan_basemodel.pair_plan_params.plan_leg1.sec.sec_id,
+               stored_pair_plan_basemodel.pair_plan_params.plan_leg2.sec.sec_id,
                top_of_book_json_list, executor_web_client)
     print(f"TOB created, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
@@ -2724,102 +2721,102 @@ def manage_strat_creation_and_activation(leg1_symbol: str, leg2_symbol: str,
     executor_check_loop_counts = 3
     for _ in range(executor_check_loop_counts):
         time.sleep(wait_time)
-        strat_limits_list = executor_web_client.get_all_strat_limits_client()
+        plan_limits_list = executor_web_client.get_all_plan_limits_client()
 
-        is_strat_limits_present = False
-        is_strat_status_present = False
+        is_plan_limits_present = False
+        is_plan_status_present = False
 
-        if len(strat_limits_list) == 1:
-            strat_limits = strat_limits_list[0]
-            expected_strat_limits.id = strat_limits.id
-            expected_strat_limits.eligible_brokers = strat_limits.eligible_brokers
+        if len(plan_limits_list) == 1:
+            plan_limits = plan_limits_list[0]
+            expected_plan_limits.id = plan_limits.id
+            expected_plan_limits.eligible_brokers = plan_limits.eligible_brokers
 
-            updated_strat_limits = executor_web_client.put_strat_limits_client(expected_strat_limits)
-            expected_strat_limits.strat_limits_update_seq_num = updated_strat_limits.strat_limits_update_seq_num
-            assert updated_strat_limits == expected_strat_limits, \
-                (f"Mismatched StratLimits: expected strat_limits: {expected_strat_limits}, updated "
-                 f"strat_limits: {updated_strat_limits}")
+            updated_plan_limits = executor_web_client.put_plan_limits_client(expected_plan_limits)
+            expected_plan_limits.plan_limits_update_seq_num = updated_plan_limits.plan_limits_update_seq_num
+            assert updated_plan_limits == expected_plan_limits, \
+                (f"Mismatched PlanLimits: expected plan_limits: {expected_plan_limits}, updated "
+                 f"plan_limits: {updated_plan_limits}")
 
-            is_strat_limits_present = True
-            print(f"StratLimits updated for this test, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
-
-        else:
-            if len(strat_limits_list) > 1:
-                assert False, (f"StratLimits must exactly one in executor, found {len(strat_limits_list)}, "
-                               f"strat_limits_list: {strat_limits_list}")
-
-        strat_status_list = executor_web_client.get_all_strat_status_client()
-        if len(strat_status_list) == 1:
-            strat_status = strat_status_list[0]
-            expected_strat_status.id = strat_status.id
-            expected_strat_status.strat_status_update_seq_num = strat_status.strat_status_update_seq_num
-            expected_strat_status.last_update_date_time = strat_status.last_update_date_time
-            assert strat_status == expected_strat_status, \
-                (f"StratStatus Mismatched: expected strat_status {expected_strat_status}, "
-                 f"received strat_status: {strat_status}")
-            is_strat_status_present = True
-            print(f"StratStatus found in ready state, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
+            is_plan_limits_present = True
+            print(f"PlanLimits updated for this test, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
         else:
-            if len(strat_status_list) > 1:
-                assert False, (f"StratStatus must exactly one in executor, found {len(strat_status_list)}, "
-                               f"strat_status_list: {strat_status_list}")
+            if len(plan_limits_list) > 1:
+                assert False, (f"PlanLimits must exactly one in executor, found {len(plan_limits_list)}, "
+                               f"plan_limits_list: {plan_limits_list}")
 
-        if is_strat_status_present and is_strat_limits_present:
+        plan_status_list = executor_web_client.get_all_plan_status_client()
+        if len(plan_status_list) == 1:
+            plan_status = plan_status_list[0]
+            expected_plan_status.id = plan_status.id
+            expected_plan_status.plan_status_update_seq_num = plan_status.plan_status_update_seq_num
+            expected_plan_status.last_update_date_time = plan_status.last_update_date_time
+            assert plan_status == expected_plan_status, \
+                (f"PlanStatus Mismatched: expected plan_status {expected_plan_status}, "
+                 f"received plan_status: {plan_status}")
+            is_plan_status_present = True
+            print(f"PlanStatus found in ready state, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
+
+        else:
+            if len(plan_status_list) > 1:
+                assert False, (f"PlanStatus must exactly one in executor, found {len(plan_status_list)}, "
+                               f"plan_status_list: {plan_status_list}")
+
+        if is_plan_status_present and is_plan_limits_present:
             break
     else:
-        assert False, ("Could not find created strat_status or strat_limits in newly started executor, took "
+        assert False, ("Could not find created plan_status or plan_limits in newly started executor, took "
                        f"{executor_check_loop_counts} loops of {wait_time} sec each, "
                        f"buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
     # checking is_running_state of executor
-    assert_server_ready_state(stored_pair_strat_basemodel.id, expected_server_ready_state=2)
+    assert_server_ready_state(stored_pair_plan_basemodel.id, expected_server_ready_state=2)
     print(f"server_ready_state is 2, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
-    assert updated_pair_strat.strat_state == StratState.StratState_READY, \
-        (f"StratState Mismatched, expected StratState: {StratState.StratState_READY}, "
-         f"received pair_strat's strat_state: {updated_pair_strat.strat_state}")
-    print(f"StratStatus updated to READY state, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
+    assert updated_pair_plan.plan_state == PlanState.PlanState_READY, \
+        (f"PlanState Mismatched, expected PlanState: {PlanState.PlanState_READY}, "
+         f"received pair_plan's plan_state: {updated_pair_plan.plan_state}")
+    print(f"PlanStatus updated to READY state, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
-    # activating strat
-    pair_strat = PairStratBaseModel.from_kwargs(_id=stored_pair_strat_basemodel.id, strat_state=strat_state)
-    activated_pair_strat = email_book_service_native_web_client.patch_pair_strat_client(pair_strat.to_dict(exclude_none=True))
-    assert activated_pair_strat.strat_state == strat_state, \
-        (f"StratState Mismatched, expected StratState: {StratState.StratState_ACTIVE}, "
-         f"received pair_strat's strat_state: {activated_pair_strat.strat_state}")
-    print(f"StratStatus updated to Active state, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
+    # activating plan
+    pair_plan = PairPlanBaseModel.from_kwargs(_id=stored_pair_plan_basemodel.id, plan_state=plan_state)
+    activated_pair_plan = email_book_service_native_web_client.patch_pair_plan_client(pair_plan.to_dict(exclude_none=True))
+    assert activated_pair_plan.plan_state == plan_state, \
+        (f"PlanState Mismatched, expected PlanState: {PlanState.PlanState_ACTIVE}, "
+         f"received pair_plan's plan_state: {activated_pair_plan.plan_state}")
+    print(f"PlanStatus updated to Active state, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
-    return activated_pair_strat, executor_web_client
+    return activated_pair_plan, executor_web_client
 
 
-# @@@ deprecated: strat_collection is now handled by pair_strat override itself
-# def create_if_not_exists_and_validate_strat_collection(pair_strat_: PairStratBaseModel):
-#     strat_collection_obj_list = email_book_service_native_web_client.get_all_strat_collection_client()
+# @@@ deprecated: plan_collection is now handled by pair_plan override itself
+# def create_if_not_exists_and_validate_plan_collection(pair_plan_: PairPlanBaseModel):
+#     plan_collection_obj_list = email_book_service_native_web_client.get_all_plan_collection_client()
 #
-#     strat_key = f"{pair_strat_.pair_strat_params.strat_leg2.sec.sec_id}-" \
-#                 f"{pair_strat_.pair_strat_params.strat_leg1.sec.sec_id}-" \
-#                 f"{pair_strat_.pair_strat_params.strat_leg1.side}-{pair_strat_.id}"
-#     if len(strat_collection_obj_list) == 0:
-#         strat_collection_basemodel = StratCollectionBaseModel(**{
+#     plan_key = f"{pair_plan_.pair_plan_params.plan_leg2.sec.sec_id}-" \
+#                 f"{pair_plan_.pair_plan_params.plan_leg1.sec.sec_id}-" \
+#                 f"{pair_plan_.pair_plan_params.plan_leg1.side}-{pair_plan_.id}"
+#     if len(plan_collection_obj_list) == 0:
+#         plan_collection_basemodel = PlanCollectionBaseModel(**{
 #             "_id": 1,
-#             "loaded_strat_keys": [
-#                 strat_key
+#             "loaded_plan_keys": [
+#                 plan_key
 #             ],
-#             "buffered_strat_keys": []
+#             "buffered_plan_keys": []
 #         })
-#         created_strat_collection = \
-#             email_book_service_native_web_client.create_strat_collection_client(strat_collection_basemodel)
+#         created_plan_collection = \
+#             email_book_service_native_web_client.create_plan_collection_client(plan_collection_basemodel)
 #
-#         assert created_strat_collection == strat_collection_basemodel, \
-#             f"Mismatch strat_collection: expected {strat_collection_basemodel} received {created_strat_collection}"
+#         assert created_plan_collection == plan_collection_basemodel, \
+#             f"Mismatch plan_collection: expected {plan_collection_basemodel} received {created_plan_collection}"
 #
 #     else:
-#         strat_collection_obj = strat_collection_obj_list[0]
-#         strat_collection_obj.loaded_strat_keys.append(strat_key)
-#         updated_strat_collection_obj = \
-#             email_book_service_native_web_client.put_strat_collection_client(jsonable_encoder(strat_collection_obj, by_alias=True, exclude_none=True))
+#         plan_collection_obj = plan_collection_obj_list[0]
+#         plan_collection_obj.loaded_plan_keys.append(plan_key)
+#         updated_plan_collection_obj = \
+#             email_book_service_native_web_client.put_plan_collection_client(jsonable_encoder(plan_collection_obj, by_alias=True, exclude_none=True))
 #
-#         assert updated_strat_collection_obj == strat_collection_obj, \
-#             f"Mismatch strat_collection: expected {strat_collection_obj} received {updated_strat_collection_obj}"
+#         assert updated_plan_collection_obj == plan_collection_obj, \
+#             f"Mismatch plan_collection: expected {plan_collection_obj} received {updated_plan_collection_obj}"
 
 
 def run_symbol_overview(buy_symbol: str, sell_symbol: str,
@@ -2894,23 +2891,23 @@ def wait_for_get_new_chore_placed_from_tob(wait_stop_px: int | float, symbol_to_
 
 
 def clean_log_book_alerts():
-    # removing all strat_alerts
-    log_book_web_client.delete_all_strat_alert_client()
+    # removing all plan_alerts
+    log_book_web_client.delete_all_plan_alert_client()
 
-    portfolio_alert_list = log_book_web_client.get_all_portfolio_alert_client()
-    for alert in portfolio_alert_list:
+    contact_alert_list = log_book_web_client.get_all_contact_alert_client()
+    for alert in contact_alert_list:
         if "Log analyzer running in simulation mode" not in alert.alert_brief:
-            log_book_web_client.delete_portfolio_alert_client(alert.id)
+            log_book_web_client.delete_contact_alert_client(alert.id)
 
 
-def renew_strat_collection():
-    strat_collection_list: List[StratCollectionBaseModel] = (
-        email_book_service_native_web_client.get_all_strat_collection_client())
-    if strat_collection_list:
-        strat_collection = strat_collection_list[0]
-        strat_collection.loaded_strat_keys.clear()
-        strat_collection.buffered_strat_keys.clear()
-        email_book_service_native_web_client.put_strat_collection_client(strat_collection)
+def renew_plan_collection():
+    plan_collection_list: List[PlanCollectionBaseModel] = (
+        email_book_service_native_web_client.get_all_plan_collection_client())
+    if plan_collection_list:
+        plan_collection = plan_collection_list[0]
+        plan_collection.loaded_plan_keys.clear()
+        plan_collection.buffered_plan_keys.clear()
+        email_book_service_native_web_client.put_plan_collection_client(plan_collection)
 
 
 def handle_tail_executor_terminate_n_clear_cache_for_log_file(log_file_path: str):
@@ -2926,11 +2923,11 @@ def handle_tail_executor_terminate_n_clear_cache_for_log_file(log_file_path: str
     # else not required: if file doesn't exist then no tail executor must be running
 
 
-def kill_tail_executor_for_strat_id(pair_strat_id: int):
+def kill_tail_executor_for_plan_id(pair_plan_id: int):
     datetime_str = datetime.datetime.now().strftime("%Y%m%d")
-    log_simulator_log_file = str(STRAT_EXECUTOR / "log" / f"log_simulator_{pair_strat_id}_logs_{datetime_str}.log")
+    log_simulator_log_file = str(STRAT_EXECUTOR / "log" / f"log_simulator_{pair_plan_id}_logs_{datetime_str}.log")
     street_book_log_file = str(STRAT_EXECUTOR / "log" /
-                                  f"street_book_{pair_strat_id}_logs_{datetime_str}.log")
+                                  f"street_book_{pair_plan_id}_logs_{datetime_str}.log")
 
     for log_file_path in [log_simulator_log_file, street_book_log_file]:
         handle_tail_executor_terminate_n_clear_cache_for_log_file(log_file_path)
@@ -2941,9 +2938,9 @@ def clean_executors_and_today_activated_symbol_side_lock_file():
     intraday_bartering_chores_file = str(STRAT_EXECUTOR / "data" / f"intraday_bartering_chores_{datetime_str}.csv")
     if os.path.exists(intraday_bartering_chores_file):
         os.remove(intraday_bartering_chores_file)
-    existing_pair_strat = email_book_service_native_web_client.get_all_pair_strat_client()
-    for pair_strat in existing_pair_strat:
-        photo_book_web_client.patch_strat_view_client({'_id': pair_strat.id, 'unload_strat': True})
+    existing_pair_plan = email_book_service_native_web_client.get_all_pair_plan_client()
+    for pair_plan in existing_pair_plan:
+        photo_book_web_client.patch_plan_view_client({'_id': pair_plan.id, 'unload_plan': True})
         time.sleep(1)
 
     wait_time_sec = 60
@@ -2951,33 +2948,50 @@ def clean_executors_and_today_activated_symbol_side_lock_file():
     while True:
         try:
             time.sleep(2)
-            strat_collection_list = email_book_service_native_web_client.get_all_strat_collection_client()
-            strat_collection = strat_collection_list[0]
-            if not strat_collection.loaded_strat_keys:
+            plan_collection_list = email_book_service_native_web_client.get_all_plan_collection_client()
+            plan_collection = plan_collection_list[0]
+            if not plan_collection.loaded_plan_keys:
                 break
             else:
-                if time_consumed := (DateTime.utcnow() - start_time).total_seconds() > wait_time_sec:
-                    raise Exception(f"Strat Collection found having loaded strats even after retries till "
+                if (time_consumed := (DateTime.utcnow() - start_time).total_seconds()) > wait_time_sec:
+                    raise Exception(f"Plan Collection found having loaded plans even after retries till "
                                     f"{time_consumed} secs - all must have got unloaded")
                 else:
                     continue
         except ClientError as e:
-            if time_consumed := (DateTime.utcnow() - start_time).total_seconds() > wait_time_sec:
-                raise Exception(f"Client error while retrying get_all_strat_collection_client till "
+            if (time_consumed := (DateTime.utcnow() - start_time).total_seconds()) > wait_time_sec:
+                raise Exception(f"Client error while retrying get_all_plan_collection_client till "
                                 f"{time_consumed} secs, exception:{e}")
             else:
                 continue
 
-    # deleting all strats if all unloaded
-    for pair_strat in existing_pair_strat:
+    # checking plan_view is updated back to default state
+    wait_time_sec = 30
+    start_time = DateTime.utcnow()
+    while True:
+        if (time_consumed := (DateTime.utcnow() - start_time).total_seconds()) < wait_time_sec:
+            plan_view_list = photo_book_web_client.get_all_plan_view_client()
+            for plan_view in plan_view_list:
+                if plan_view.unload_plan:
+                    break
+            else:
+                # check is done if all plan_view are found with Severity.Severity_UNSPECIFIED
+                break
+            time.sleep(2)
+        else:
+            raise Exception(f"Some PlanView objects found having unload_plan still True "
+                            f"after {time_consumed} secs, started check: {start_time}")
+
+    # deleting all plans if all unloaded
+    for pair_plan in existing_pair_plan:
         # removing today_activated_symbol_side_lock_file
         admin_control_obj: AdminControlBaseModel = (
             AdminControlBaseModel.from_kwargs(command_type=CommandType.CLEAR_STRAT,
                                               datetime=DateTime.utcnow()))
         email_book_service_native_web_client.create_admin_control_client(admin_control_obj)
-        kill_tail_executor_for_strat_id(pair_strat.id)
+        kill_tail_executor_for_plan_id(pair_plan.id)
         time.sleep(1)
-        email_book_service_native_web_client.delete_pair_strat_client(pair_strat.id)
+        email_book_service_native_web_client.delete_pair_plan_client(pair_plan.id)
 
         time.sleep(1)
 
@@ -2988,24 +3002,24 @@ def clean_basket_book():
         basket_book_web_client.delete_basket_chore_client(basket_chore.id)
 
 
-def set_n_verify_limits(expected_chore_limits_obj, expected_portfolio_limits_obj):
+def set_n_verify_limits(expected_chore_limits_obj, expected_contact_limits_obj):
     created_chore_limits_obj = (
         email_book_service_native_web_client.create_chore_limits_client(expected_chore_limits_obj))
     assert created_chore_limits_obj == expected_chore_limits_obj, \
         f"Mismatch chore_limits: expected {expected_chore_limits_obj} received {created_chore_limits_obj}"
 
-    created_portfolio_limits_obj = \
-        email_book_service_native_web_client.create_portfolio_limits_client(expected_portfolio_limits_obj)
-    # assert created_portfolio_limits_obj == expected_portfolio_limits_obj, \
-    #     f"Mismatch portfolio_limits: expected {expected_portfolio_limits_obj} received {created_portfolio_limits_obj}"
+    created_contact_limits_obj = \
+        email_book_service_native_web_client.create_contact_limits_client(expected_contact_limits_obj)
+    # assert created_contact_limits_obj == expected_contact_limits_obj, \
+    #     f"Mismatch contact_limits: expected {expected_contact_limits_obj} received {created_contact_limits_obj}"
 
 
-def create_n_verify_portfolio_status(portfolio_status_obj: PortfolioStatusBaseModel):
-    portfolio_status_obj.id = 1
-    created_portfolio_status = (
-        email_book_service_native_web_client.create_portfolio_status_client(portfolio_status_obj))
-    assert created_portfolio_status == portfolio_status_obj, \
-        f"Mismatch portfolio_status: expected {portfolio_status_obj}, received {created_portfolio_status}"
+def create_n_verify_contact_status(contact_status_obj: ContactStatusBaseModel):
+    contact_status_obj.id = 1
+    created_contact_status = (
+        email_book_service_native_web_client.create_contact_status_client(contact_status_obj))
+    assert created_contact_status == contact_status_obj, \
+        f"Mismatch contact_status: expected {contact_status_obj}, received {created_contact_status}"
 
 
 def create_n_verify_system_control(system_control: SystemControlBaseModel):
@@ -3013,13 +3027,13 @@ def create_n_verify_system_control(system_control: SystemControlBaseModel):
     created_system_control = (
         email_book_service_native_web_client.create_system_control_client(system_control))
     assert created_system_control == system_control, \
-        f"Mismatch portfolio_status: expected {system_control}, received {created_system_control}"
+        f"Mismatch contact_status: expected {system_control}, received {created_system_control}"
 
 
-def verify_portfolio_status(expected_portfolio_status: PortfolioStatusBaseModel):
-    portfolio_status_list = email_book_service_native_web_client.get_all_portfolio_status_client()
-    assert expected_portfolio_status in portfolio_status_list, f"Couldn't find {expected_portfolio_status} in " \
-                                                               f"{portfolio_status_list}"
+def verify_contact_status(expected_contact_status: ContactStatusBaseModel):
+    contact_status_list = email_book_service_native_web_client.get_all_contact_status_client()
+    assert expected_contact_status in contact_status_list, f"Couldn't find {expected_contact_status} in " \
+                                                               f"{contact_status_list}"
 
 
 def get_latest_chore_journal_with_event_and_symbol(expected_chore_event, expected_symbol,
@@ -3159,76 +3173,76 @@ def place_new_chore(sec_id: str, side: Side, px: float, qty: int,
     return created_new_chore_obj
 
 
-def create_pre_chore_test_requirements(leg1_symbol: str, leg2_symbol: str, pair_strat_: PairStratBaseModel,
-                                       expected_strat_limits_: StratLimits, expected_start_status_: StratStatus,
+def create_pre_chore_test_requirements(leg1_symbol: str, leg2_symbol: str, pair_plan_: PairPlanBaseModel,
+                                       expected_plan_limits_: PlanLimits, expected_start_status_: PlanStatus,
                                        symbol_overview_obj_list: List[SymbolOverviewBaseModel],
                                        last_barter_fixture_list: List[Dict],
                                        market_depth_basemodel_list: List[MarketDepthBaseModel],
                                        leg1_side: Side | None = None, leg2_side: Side | None = None,
-                                       strat_mode: StratMode | None = None,
-                                       keep_default_hedge_ratio: bool | None = False) -> Tuple[PairStratBaseModel,
+                                       plan_mode: PlanMode | None = None,
+                                       keep_default_hedge_ratio: bool | None = False) -> Tuple[PairPlanBaseModel,
                                                                                      StreetBookServiceHttpClient]:
     print(f"Test started, leg1_symbol: {leg1_symbol}, leg2_symbol: {leg2_symbol}")
 
-    # Creating Strat
+    # Creating Plan
 
-    if strat_mode is None:
-        strat_mode = StratMode.StratMode_Normal
-    pair_strat_.pair_strat_params.strat_mode = strat_mode
-    active_pair_strat, executor_web_client = create_n_activate_strat(
-        leg1_symbol, leg2_symbol, copy.deepcopy(pair_strat_), copy.deepcopy(expected_strat_limits_),
+    if plan_mode is None:
+        plan_mode = PlanMode.PlanMode_Normal
+    pair_plan_.pair_plan_params.plan_mode = plan_mode
+    active_pair_plan, executor_web_client = create_n_activate_plan(
+        leg1_symbol, leg2_symbol, copy.deepcopy(pair_plan_), copy.deepcopy(expected_plan_limits_),
         copy.deepcopy(expected_start_status_), symbol_overview_obj_list,
         market_depth_basemodel_list, leg1_side, leg2_side, keep_default_hedge_ratio=keep_default_hedge_ratio)
-    if active_pair_strat.pair_strat_params.strat_leg1.side == Side.BUY:
-        buy_symbol = active_pair_strat.pair_strat_params.strat_leg1.sec.sec_id
-        sell_symbol = active_pair_strat.pair_strat_params.strat_leg2.sec.sec_id
+    if active_pair_plan.pair_plan_params.plan_leg1.side == Side.BUY:
+        buy_symbol = active_pair_plan.pair_plan_params.plan_leg1.sec.sec_id
+        sell_symbol = active_pair_plan.pair_plan_params.plan_leg2.sec.sec_id
     else:
-        buy_symbol = active_pair_strat.pair_strat_params.strat_leg2.sec.sec_id
-        sell_symbol = active_pair_strat.pair_strat_params.strat_leg1.sec.sec_id
-    print(f"strat created, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
+        buy_symbol = active_pair_plan.pair_plan_params.plan_leg2.sec.sec_id
+        sell_symbol = active_pair_plan.pair_plan_params.plan_leg1.sec.sec_id
+    print(f"plan created, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
     # running Last Barter
-    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
     print(f"LastBarter created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
-    return active_pair_strat, executor_web_client
+    return active_pair_plan, executor_web_client
 
 
 def create_pre_chore_test_requirements_for_log_book(leg1_symbol: str, leg2_symbol: str,
-                                                        pair_strat_: PairStratBaseModel,
-                                                        expected_strat_limits_: StratLimits,
-                                                        expected_start_status_: StratStatus,
+                                                        pair_plan_: PairPlanBaseModel,
+                                                        expected_plan_limits_: PlanLimits,
+                                                        expected_start_status_: PlanStatus,
                                                         symbol_overview_obj_list: List[SymbolOverviewBaseModel],
                                                         last_barter_fixture_list: List[Dict],
                                                         market_depth_basemodel_list: List[MarketDepthBaseModel],
-                                                        top_of_book_json_list: List[Dict], strat_state: StratState,
+                                                        top_of_book_json_list: List[Dict], plan_state: PlanState,
                                                         leg1_side: Side | None = None,
                                                         leg2_side: Side | None = None,
-                                                        strat_mode: StratMode | None = None) -> Tuple[PairStratBaseModel, StreetBookServiceHttpClient]:
+                                                        plan_mode: PlanMode | None = None) -> Tuple[PairPlanBaseModel, StreetBookServiceHttpClient]:
     print(f"Test started, leg1_symbol: {leg1_symbol}, leg2_symbol: {leg2_symbol}")
 
-    # Creating Strat
+    # Creating Plan
 
-    if strat_mode is None:
-        strat_mode = StratMode.StratMode_Normal
-    pair_strat_.pair_strat_params.strat_mode = strat_mode
-    active_pair_strat, executor_web_client = manage_strat_creation_and_activation(
-        leg1_symbol, leg2_symbol, copy.deepcopy(pair_strat_), copy.deepcopy(expected_strat_limits_),
+    if plan_mode is None:
+        plan_mode = PlanMode.PlanMode_Normal
+    pair_plan_.pair_plan_params.plan_mode = plan_mode
+    active_pair_plan, executor_web_client = manage_plan_creation_and_activation(
+        leg1_symbol, leg2_symbol, copy.deepcopy(pair_plan_), copy.deepcopy(expected_plan_limits_),
         copy.deepcopy(expected_start_status_), symbol_overview_obj_list, top_of_book_json_list,
-        market_depth_basemodel_list, strat_state, leg1_side, leg2_side)
-    if active_pair_strat.pair_strat_params.strat_leg1.side == Side.BUY:
-        buy_symbol = active_pair_strat.pair_strat_params.strat_leg1.sec.sec_id
-        sell_symbol = active_pair_strat.pair_strat_params.strat_leg2.sec.sec_id
+        market_depth_basemodel_list, plan_state, leg1_side, leg2_side)
+    if active_pair_plan.pair_plan_params.plan_leg1.side == Side.BUY:
+        buy_symbol = active_pair_plan.pair_plan_params.plan_leg1.sec.sec_id
+        sell_symbol = active_pair_plan.pair_plan_params.plan_leg2.sec.sec_id
     else:
-        buy_symbol = active_pair_strat.pair_strat_params.strat_leg2.sec.sec_id
-        sell_symbol = active_pair_strat.pair_strat_params.strat_leg1.sec.sec_id
-    print(f"strat created, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
+        buy_symbol = active_pair_plan.pair_plan_params.plan_leg2.sec.sec_id
+        sell_symbol = active_pair_plan.pair_plan_params.plan_leg1.sec.sec_id
+    print(f"plan created, buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
     # running Last Barter
-    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+    run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
     print(f"LastBarter created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
-    return active_pair_strat, executor_web_client
+    return active_pair_plan, executor_web_client
 
 
 def fx_symbol_overview_obj() -> FxSymbolOverviewBaseModel:
@@ -3428,11 +3442,11 @@ def update_tob_through_market_depth_to_place_sell_chore(cpp_port : int,
 
 def get_buy_bid_n_ask_sell_market_depth(
         buy_symbol: str, sell_symbol: str,
-        pair_strat_: PairStratBaseModel) -> Tuple[MarketDepthBaseModel | None, MarketDepthBaseModel | None]:
+        pair_plan_: PairPlanBaseModel) -> Tuple[MarketDepthBaseModel | None, MarketDepthBaseModel | None]:
 
     bid_buy_top_market_depth = None
     ask_sell_top_market_depth = None
-    stored_market_depth = cpp_get_all_market_depth_client(pair_strat_.cpp_port)
+    stored_market_depth = cpp_get_all_market_depth_client(pair_plan_.cpp_port)
     for market_depth in stored_market_depth:
         if market_depth.symbol == buy_symbol and market_depth.position == 0 and market_depth.side == TickType.BID:
             bid_buy_top_market_depth = market_depth
@@ -3453,23 +3467,23 @@ def handle_test_buy_sell_chore(buy_symbol: str, sell_symbol: str, total_loop_cou
                                expected_buy_chore_snapshot_: ChoreSnapshotBaseModel,
                                expected_sell_chore_snapshot_: ChoreSnapshotBaseModel,
                                expected_symbol_side_snapshot_: List[SymbolSideSnapshotBaseModel],
-                               pair_strat_: PairStratBaseModel, expected_strat_limits_: StratLimits,
-                               expected_start_status_: StratStatus, expected_strat_brief_: StratBriefBaseModel,
+                               pair_plan_: PairPlanBaseModel, expected_plan_limits_: PlanLimits,
+                               expected_start_status_: PlanStatus, expected_plan_brief_: PlanBriefBaseModel,
                                last_barter_fixture_list: List[Dict],
                                symbol_overview_obj_list: List[SymbolOverviewBaseModel],
                                market_depth_basemodel_list: List[MarketDepthBaseModel],
                                is_non_systematic_run: bool = False) -> Tuple[float, float, float, float]:
 
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec
     residual_test_wait = 4 * refresh_sec
 
-    active_pair_strat, executor_web_client = (
-        move_snoozed_pair_strat_to_ready_n_then_active(pair_strat_, market_depth_basemodel_list,
-                                                       symbol_overview_obj_list, expected_strat_limits_,
+    active_pair_plan, executor_web_client = (
+        move_snoozed_pair_plan_to_ready_n_then_active(pair_plan_, market_depth_basemodel_list,
+                                                       symbol_overview_obj_list, expected_plan_limits_,
                                                        expected_start_status_))
-    print(f"Activated Strat: {active_pair_strat}")
+    print(f"Activated Plan: {active_pair_plan}")
 
-    strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional = 0, 0, 0, 0
+    plan_buy_notional, plan_sell_notional, plan_buy_fill_notional, plan_sell_fill_notional = 0, 0, 0, 0
     buy_tob_last_update_date_time_tracker: DateTime | None = None
     sell_tob_last_update_date_time_tracker: DateTime | None = None
     chore_id = None
@@ -3479,16 +3493,16 @@ def handle_test_buy_sell_chore(buy_symbol: str, sell_symbol: str, total_loop_cou
     expected_buy_symbol_side_snapshot.security.sec_id = buy_symbol
     expected_sell_symbol_side_snapshot = copy.deepcopy(expected_symbol_side_snapshot_[1])
     expected_sell_symbol_side_snapshot.security.sec_id = sell_symbol
-    expected_strat_brief_obj = copy.deepcopy(expected_strat_brief_)
-    expected_strat_brief_obj.pair_buy_side_bartering_brief.security.sec_id = buy_symbol
-    expected_strat_brief_obj.pair_sell_side_bartering_brief.security.sec_id = sell_symbol
-    expected_strat_status = copy.deepcopy(expected_start_status_)
+    expected_plan_brief_obj = copy.deepcopy(expected_plan_brief_)
+    expected_plan_brief_obj.pair_buy_side_bartering_brief.security.sec_id = buy_symbol
+    expected_plan_brief_obj.pair_sell_side_bartering_brief.security.sec_id = sell_symbol
+    expected_plan_status = copy.deepcopy(expected_start_status_)
 
     bid_buy_top_market_depth, ask_sell_top_market_depth = (
-        get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_strat))
+        get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_plan))
 
-    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_strat)
-    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_strat)
+    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_plan)
+    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_plan)
 
     for loop_count in range(1, total_loop_count + 1):
         start_time = DateTime.utcnow()
@@ -3500,13 +3514,13 @@ def handle_test_buy_sell_chore(buy_symbol: str, sell_symbol: str, total_loop_cou
         expected_buy_chore_snapshot.chore_brief.bartering_security.inst_type = None
 
         # running last barter once more before sell side
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
         print(f"LastBarters created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
         if not is_non_systematic_run:
             # Updating TopOfBook by updating 0th position market depth (this triggers expected buy chore)
             time.sleep(1)
-            update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
+            update_tob_through_market_depth_to_place_buy_chore(active_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                                ask_sell_top_market_depth)
 
             # Waiting for tob to trigger place chore
@@ -3538,9 +3552,9 @@ def handle_test_buy_sell_chore(buy_symbol: str, sell_symbol: str, total_loop_cou
                                                          placed_chore_journal, expected_buy_chore_snapshot,
                                                          expected_buy_symbol_side_snapshot,
                                                          expected_sell_symbol_side_snapshot,
-                                                         active_pair_strat,
-                                                         expected_strat_limits_, expected_strat_status,
-                                                         expected_strat_brief_obj, executor_web_client)
+                                                         active_pair_plan,
+                                                         expected_plan_limits_, expected_plan_status,
+                                                         expected_plan_brief_obj, executor_web_client)
         print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed chore of chore_id {chore_id}")
 
         executor_web_client.barter_simulator_process_chore_ack_query_client(
@@ -3574,9 +3588,9 @@ def handle_test_buy_sell_chore(buy_symbol: str, sell_symbol: str, total_loop_cou
                                                              expected_buy_chore_snapshot,
                                                              expected_buy_symbol_side_snapshot,
                                                              expected_sell_symbol_side_snapshot,
-                                                             active_pair_strat,
-                                                             expected_strat_limits_, expected_strat_status,
-                                                             expected_strat_brief_obj, executor_web_client)
+                                                             active_pair_plan,
+                                                             expected_plan_limits_, expected_plan_status,
+                                                             expected_plan_brief_obj, executor_web_client)
         print(
             f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed chore FILL of chore_id {chore_id}")
 
@@ -3593,12 +3607,12 @@ def handle_test_buy_sell_chore(buy_symbol: str, sell_symbol: str, total_loop_cou
                                                             expected_buy_chore_snapshot,
                                                             expected_buy_symbol_side_snapshot,
                                                             expected_sell_symbol_side_snapshot,
-                                                            active_pair_strat,
-                                                            expected_strat_limits_, expected_strat_status,
-                                                            expected_strat_brief_obj, executor_web_client)
+                                                            active_pair_plan,
+                                                            expected_plan_limits_, expected_plan_status,
+                                                            expected_plan_brief_obj, executor_web_client)
 
-        strat_buy_notional += expected_buy_chore_snapshot.fill_notional
-        strat_buy_fill_notional += expected_buy_chore_snapshot.fill_notional
+        plan_buy_notional += expected_buy_chore_snapshot.fill_notional
+        plan_buy_fill_notional += expected_buy_chore_snapshot.fill_notional
 
     chore_id = None
     cxl_chore_id = None
@@ -3611,15 +3625,15 @@ def handle_test_buy_sell_chore(buy_symbol: str, sell_symbol: str, total_loop_cou
         expected_sell_chore_snapshot.chore_brief.bartering_security.inst_type = None
 
         # running last barter once more before sell side
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
         print(f"LastBarters created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
         if not is_non_systematic_run:
             # required to make buy side tob latest so that when top update reaches in test place chore function in
             # executor both side are new last_update_date_time
-            run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], active_pair_strat.cpp_port)
+            run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], active_pair_plan.cpp_port)
             # Updating TopOfBook by updating 0th position market depth (this triggers expected buy chore)
-            update_tob_through_market_depth_to_place_sell_chore(active_pair_strat.cpp_port, ask_sell_top_market_depth,
+            update_tob_through_market_depth_to_place_sell_chore(active_pair_plan.cpp_port, ask_sell_top_market_depth,
                                                                 bid_buy_top_market_depth)
 
             # Waiting for tob to trigger place chore
@@ -3648,9 +3662,9 @@ def handle_test_buy_sell_chore(buy_symbol: str, sell_symbol: str, total_loop_cou
                                                         sell_symbol, placed_chore_journal, expected_sell_chore_snapshot,
                                                         expected_sell_symbol_side_snapshot,
                                                         expected_buy_symbol_side_snapshot,
-                                                        active_pair_strat,
-                                                        expected_strat_limits_, expected_strat_status,
-                                                        expected_strat_brief_obj, executor_web_client)
+                                                        active_pair_plan,
+                                                        expected_plan_limits_, expected_plan_status,
+                                                        expected_plan_brief_obj, executor_web_client)
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Checked sell placed chore of chore_id {chore_id}")
 
         executor_web_client.barter_simulator_process_chore_ack_query_client(
@@ -3685,8 +3699,8 @@ def handle_test_buy_sell_chore(buy_symbol: str, sell_symbol: str, total_loop_cou
                                                                 placed_fill_journal_obj, expected_sell_chore_snapshot,
                                                                 expected_sell_symbol_side_snapshot,
                                                                 expected_buy_symbol_side_snapshot,
-                                                                active_pair_strat, expected_strat_limits_,
-                                                                expected_strat_status, expected_strat_brief_obj,
+                                                                active_pair_plan, expected_plan_limits_,
+                                                                expected_plan_status, expected_plan_brief_obj,
                                                                 executor_web_client)
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Checked sell placed chore FILL")
 
@@ -3703,13 +3717,13 @@ def handle_test_buy_sell_chore(buy_symbol: str, sell_symbol: str, total_loop_cou
                                                                cxl_chore_journal, expected_sell_chore_snapshot,
                                                                expected_sell_symbol_side_snapshot,
                                                                expected_buy_symbol_side_snapshot,
-                                                               active_pair_strat, expected_strat_limits_,
-                                                               expected_strat_status, expected_strat_brief_obj,
+                                                               active_pair_plan, expected_plan_limits_,
+                                                               expected_plan_status, expected_plan_brief_obj,
                                                                executor_web_client)
 
-        strat_sell_notional += expected_sell_chore_snapshot.fill_notional
-        strat_sell_fill_notional += expected_sell_chore_snapshot.fill_notional
-    return strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional
+        plan_sell_notional += expected_sell_chore_snapshot.fill_notional
+        plan_sell_fill_notional += expected_sell_chore_snapshot.fill_notional
+    return plan_buy_notional, plan_sell_notional, plan_buy_fill_notional, plan_sell_fill_notional
 
 
 def handle_test_sell_buy_chore(leg1_symbol: str, leg2_symbol: str, total_loop_count: int,
@@ -3719,41 +3733,41 @@ def handle_test_sell_buy_chore(leg1_symbol: str, leg2_symbol: str, total_loop_co
                                expected_buy_chore_snapshot_: ChoreSnapshotBaseModel,
                                expected_sell_chore_snapshot_: ChoreSnapshotBaseModel,
                                expected_symbol_side_snapshot_: List[SymbolSideSnapshotBaseModel],
-                               pair_strat_: PairStratBaseModel, expected_strat_limits_: StratLimits,
-                               expected_start_status_: StratStatus, expected_strat_brief_: StratBriefBaseModel,
+                               pair_plan_: PairPlanBaseModel, expected_plan_limits_: PlanLimits,
+                               expected_start_status_: PlanStatus, expected_plan_brief_: PlanBriefBaseModel,
                                last_barter_fixture_list: List[Dict],
                                symbol_overview_obj_list: List[SymbolOverviewBaseModel],
                                market_depth_basemodel_list: List[MarketDepthBaseModel],
                                is_non_systematic_run: bool = False):
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec
     residual_test_wait = 4 * refresh_sec
-    active_pair_strat, executor_web_client = (
-        move_snoozed_pair_strat_to_ready_n_then_active(pair_strat_, market_depth_basemodel_list,
-                                                       symbol_overview_obj_list, expected_strat_limits_,
+    active_pair_plan, executor_web_client = (
+        move_snoozed_pair_plan_to_ready_n_then_active(pair_plan_, market_depth_basemodel_list,
+                                                       symbol_overview_obj_list, expected_plan_limits_,
                                                        expected_start_status_))
-    print(f"Activated Strat: {active_pair_strat}")
-    buy_symbol = active_pair_strat.pair_strat_params.strat_leg2.sec.sec_id
-    sell_symbol = active_pair_strat.pair_strat_params.strat_leg1.sec.sec_id
+    print(f"Activated Plan: {active_pair_plan}")
+    buy_symbol = active_pair_plan.pair_plan_params.plan_leg2.sec.sec_id
+    sell_symbol = active_pair_plan.pair_plan_params.plan_leg1.sec.sec_id
 
-    strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional = 0, 0, 0, 0
+    plan_buy_notional, plan_sell_notional, plan_buy_fill_notional, plan_sell_fill_notional = 0, 0, 0, 0
     buy_tob_last_update_date_time_tracker: DateTime | None = None
     sell_tob_last_update_date_time_tracker: DateTime | None = None
     chore_id = None
     cxl_chore_id = None
     expected_sell_symbol_side_snapshot = copy.deepcopy(expected_symbol_side_snapshot_[1])
     expected_sell_symbol_side_snapshot.security.sec_id = sell_symbol
-    expected_strat_brief_obj = copy.deepcopy(expected_strat_brief_)
-    expected_strat_brief_obj.pair_buy_side_bartering_brief.security.sec_id = buy_symbol
-    expected_strat_brief_obj.pair_sell_side_bartering_brief.security.sec_id = sell_symbol
+    expected_plan_brief_obj = copy.deepcopy(expected_plan_brief_)
+    expected_plan_brief_obj.pair_buy_side_bartering_brief.security.sec_id = buy_symbol
+    expected_plan_brief_obj.pair_sell_side_bartering_brief.security.sec_id = sell_symbol
     expected_buy_symbol_side_snapshot = copy.deepcopy(expected_symbol_side_snapshot_[0])
     expected_buy_symbol_side_snapshot.security.sec_id = buy_symbol
-    expected_strat_status = copy.deepcopy(expected_start_status_)
+    expected_plan_status = copy.deepcopy(expected_start_status_)
 
-    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_strat)
-    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_strat)
+    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_plan)
+    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_plan)
 
     bid_buy_top_market_depth, ask_sell_top_market_depth = (
-        get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_strat))
+        get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_plan))
 
     for loop_count in range(1, total_loop_count + 1):
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Loop started")
@@ -3764,13 +3778,13 @@ def handle_test_sell_buy_chore(leg1_symbol: str, leg2_symbol: str, total_loop_co
         expected_sell_chore_snapshot.chore_brief.bartering_security.inst_type = None
 
         # running last barter once more before sell side
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
         print(f"LastBarters created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
         # required to make buy side tob latest so that when top update reaches both side are new last_update_date_time
-        run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], active_pair_plan.cpp_port)
         # Updating TopOfBook by updating 0th position market depth (this triggers expected buy chore)
-        update_tob_through_market_depth_to_place_sell_chore(active_pair_strat.cpp_port, ask_sell_top_market_depth,
+        update_tob_through_market_depth_to_place_sell_chore(active_pair_plan.cpp_port, ask_sell_top_market_depth,
                                                             bid_buy_top_market_depth)
 
         if not is_non_systematic_run:
@@ -3801,9 +3815,9 @@ def handle_test_sell_buy_chore(leg1_symbol: str, leg2_symbol: str, total_loop_co
                                                      sell_symbol, placed_chore_journal, expected_sell_chore_snapshot,
                                                      expected_sell_symbol_side_snapshot,
                                                      expected_buy_symbol_side_snapshot,
-                                                     active_pair_strat,
-                                                     expected_strat_limits_, expected_strat_status,
-                                                     expected_strat_brief_obj, executor_web_client)
+                                                     active_pair_plan,
+                                                     expected_plan_limits_, expected_plan_status,
+                                                     expected_plan_brief_obj, executor_web_client)
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Checked sell placed chore of chore_id {chore_id}")
 
         executor_web_client.barter_simulator_process_chore_ack_query_client(
@@ -3832,8 +3846,8 @@ def handle_test_sell_buy_chore(leg1_symbol: str, leg2_symbol: str, total_loop_co
         check_fill_receive_for_placed_sell_chore_before_buys(
             sell_symbol, placed_fill_journal_obj,
             expected_sell_chore_snapshot, expected_sell_symbol_side_snapshot,
-            expected_buy_symbol_side_snapshot, active_pair_strat,
-            expected_strat_limits_, expected_strat_status, expected_strat_brief_obj, executor_web_client)
+            expected_buy_symbol_side_snapshot, active_pair_plan,
+            expected_plan_limits_, expected_plan_status, expected_plan_brief_obj, executor_web_client)
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Checked sell placed chore FILL")
 
         # Sleeping to let the chore get cxlled
@@ -3849,12 +3863,12 @@ def handle_test_sell_buy_chore(leg1_symbol: str, leg2_symbol: str, total_loop_co
                                                            expected_sell_chore_snapshot,
                                                            expected_sell_symbol_side_snapshot,
                                                            expected_buy_symbol_side_snapshot,
-                                                           active_pair_strat,
-                                                           expected_strat_limits_, expected_strat_status,
-                                                           expected_strat_brief_obj, executor_web_client)
+                                                           active_pair_plan,
+                                                           expected_plan_limits_, expected_plan_status,
+                                                           expected_plan_brief_obj, executor_web_client)
 
-        strat_sell_notional += expected_sell_chore_snapshot.fill_notional
-        strat_sell_fill_notional += expected_sell_chore_snapshot.fill_notional
+        plan_sell_notional += expected_sell_chore_snapshot.fill_notional
+        plan_sell_fill_notional += expected_sell_chore_snapshot.fill_notional
 
     chore_id = None
     cxl_chore_id = None
@@ -3868,12 +3882,12 @@ def handle_test_sell_buy_chore(leg1_symbol: str, leg2_symbol: str, total_loop_co
         expected_buy_chore_snapshot.chore_brief.bartering_security.inst_type = None
 
         # running last barter once more before sell side
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
         print(f"LastBarters created: buy_symbol: {leg1_symbol}, sell_symbol: {sell_symbol}")
 
         # Updating TopOfBook by updating 0th position market depth (this triggers expected buy chore)
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(active_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
 
         if not is_non_systematic_run:
@@ -3905,9 +3919,9 @@ def handle_test_sell_buy_chore(leg1_symbol: str, leg2_symbol: str, total_loop_co
         check_placed_buy_chore_computes_after_sells(loop_count, chore_id, buy_symbol,
                                                     placed_chore_journal, expected_buy_chore_snapshot,
                                                     expected_buy_symbol_side_snapshot,
-                                                    expected_sell_symbol_side_snapshot, active_pair_strat,
-                                                    expected_strat_limits_, expected_strat_status,
-                                                    expected_strat_brief_obj, executor_web_client)
+                                                    expected_sell_symbol_side_snapshot, active_pair_plan,
+                                                    expected_plan_limits_, expected_plan_status,
+                                                    expected_plan_brief_obj, executor_web_client)
         print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed chore of chore_id {chore_id}")
 
         executor_web_client.barter_simulator_process_chore_ack_query_client(
@@ -3938,8 +3952,8 @@ def handle_test_sell_buy_chore(leg1_symbol: str, leg2_symbol: str, total_loop_co
                                                                 expected_buy_chore_snapshot,
                                                                 expected_buy_symbol_side_snapshot,
                                                                 expected_sell_symbol_side_snapshot,
-                                                                active_pair_strat, expected_strat_limits_,
-                                                                expected_strat_status, expected_strat_brief_obj,
+                                                                active_pair_plan, expected_plan_limits_,
+                                                                expected_plan_status, expected_plan_brief_obj,
                                                                 executor_web_client)
         print(
             f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed chore FILL of chore_id {chore_id}")
@@ -3957,21 +3971,21 @@ def handle_test_sell_buy_chore(leg1_symbol: str, leg2_symbol: str, total_loop_co
                                                                cxl_chore_journal, expected_buy_chore_snapshot,
                                                                expected_buy_symbol_side_snapshot,
                                                                expected_sell_symbol_side_snapshot,
-                                                               active_pair_strat, expected_strat_limits_,
-                                                               expected_strat_status, expected_strat_brief_obj,
+                                                               active_pair_plan, expected_plan_limits_,
+                                                               expected_plan_status, expected_plan_brief_obj,
                                                                executor_web_client)
 
-        strat_buy_notional += expected_buy_chore_snapshot.fill_notional
-        strat_buy_fill_notional += expected_buy_chore_snapshot.fill_notional
-    return strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional
+        plan_buy_notional += expected_buy_chore_snapshot.fill_notional
+        plan_buy_fill_notional += expected_buy_chore_snapshot.fill_notional
+    return plan_buy_notional, plan_sell_notional, plan_buy_fill_notional, plan_sell_fill_notional
 
 
-def get_pair_strat_from_symbol(symbol: str):
-    pair_strat_obj_list = email_book_service_native_web_client.get_all_pair_strat_client()
-    for pair_strat_obj in pair_strat_obj_list:
-        if pair_strat_obj.pair_strat_params.strat_leg1.sec.sec_id == symbol or \
-                pair_strat_obj.pair_strat_params.strat_leg2.sec.sec_id == symbol:
-            return pair_strat_obj
+def get_pair_plan_from_symbol(symbol: str):
+    pair_plan_obj_list = email_book_service_native_web_client.get_all_pair_plan_client()
+    for pair_plan_obj in pair_plan_obj_list:
+        if pair_plan_obj.pair_plan_params.plan_leg1.sec.sec_id == symbol or \
+                pair_plan_obj.pair_plan_params.plan_leg2.sec.sec_id == symbol:
+            return pair_plan_obj
 
 
 def get_chore_snapshot_from_chore_id(chore_id, executor_web_client: StreetBookServiceHttpClient
@@ -4020,15 +4034,15 @@ def verify_rej_chores(check_ack_to_reject_chores: bool, last_chore_id: int | Non
     return last_chore_id
 
 
-def handle_rej_chore_test(buy_symbol, sell_symbol, created_pair_strat, expected_strat_limits_,
+def handle_rej_chore_test(buy_symbol, sell_symbol, created_pair_plan, expected_plan_limits_,
                           last_barter_fixture_list, max_loop_count_per_side,
                           check_ack_to_reject_chores: bool, executor_web_client: StreetBookServiceHttpClient,
                           config_dict, residual_wait_secs):
     # explicitly setting waived_initial_chores to 10 for this test case
-    expected_strat_limits_.cancel_rate.waived_initial_chores = 10
+    expected_plan_limits_.cancel_rate.waived_initial_chores = 10
 
     bid_buy_top_market_depth, ask_sell_top_market_depth = (
-        get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, created_pair_strat))
+        get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, created_pair_plan))
 
     # buy fills check
     continues_chore_count, continues_special_chore_count = get_continuous_chore_configs(buy_symbol, config_dict)
@@ -4038,9 +4052,9 @@ def handle_rej_chore_test(buy_symbol, sell_symbol, created_pair_strat, expected_
     last_id = None
     buy_rej_last_id = None
     for loop_count in range(1, max_loop_count_per_side + 1):
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_plan.cpp_port)
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(created_pair_strat.cpp_port, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(created_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
         time.sleep(2)  # delay for chore to get placed
 
@@ -4067,7 +4081,7 @@ def handle_rej_chore_test(buy_symbol, sell_symbol, created_pair_strat, expected_
         if check_chore_event in [ChoreEventType.OE_BRK_REJ, ChoreEventType.OE_EXH_REJ]:
             buy_rej_last_id = last_id
 
-    if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_strat"):
+    if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
         time.sleep(residual_wait_secs)  # to start sell after buy is completely done
 
     # sell fills check
@@ -4077,10 +4091,10 @@ def handle_rej_chore_test(buy_symbol, sell_symbol, created_pair_strat, expected_
     sell_chore_count = 0
     sell_special_chore_count = 0
     for loop_count in range(1, max_loop_count_per_side + 1):
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_plan.cpp_port)
         # required to make buy side tob latest
-        run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], created_pair_strat.cpp_port)
-        update_tob_through_market_depth_to_place_sell_chore(created_pair_strat.cpp_port, ask_sell_top_market_depth,
+        run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], created_pair_plan.cpp_port)
+        update_tob_through_market_depth_to_place_sell_chore(created_pair_plan.cpp_port, ask_sell_top_market_depth,
                                                             bid_buy_top_market_depth)
         time.sleep(2)  # delay for chore to get placed
 
@@ -4138,7 +4152,7 @@ def verify_cxl_rej(last_cxl_chore_id: str | None, last_cxl_rej_chore_id: str | N
     return last_cxl_chore_id, last_cxl_rej_chore_id
 
 
-def create_fills_for_underlying_account_test(buy_symbol: str, sell_symbol: str, active_pair_strat: PairStratBaseModel,
+def create_fills_for_underlying_account_test(buy_symbol: str, sell_symbol: str, active_pair_plan: PairPlanBaseModel,
                                              tob_last_update_date_time_tracker: DateTime | None,
                                              chore_id: str | None, underlying_account_prefix: str, side: Side,
                                              executor_web_client: StreetBookServiceHttpClient,
@@ -4146,18 +4160,18 @@ def create_fills_for_underlying_account_test(buy_symbol: str, sell_symbol: str, 
                                              ask_sell_top_market_depth: MarketDepthBaseModel,
                                              last_barter_fixture_list: List[Dict]):
     loop_count = 1
-    run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+    run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
     if side == Side.BUY:
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(active_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
         symbol = buy_symbol
         wait_stop_px = 100
     else:
         # required to make buy side tob latest
-        run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], active_pair_plan.cpp_port)
 
-        update_tob_through_market_depth_to_place_sell_chore(active_pair_strat.cpp_port, ask_sell_top_market_depth,
+        update_tob_through_market_depth_to_place_sell_chore(active_pair_plan.cpp_port, ask_sell_top_market_depth,
                                                             bid_buy_top_market_depth)
         symbol = sell_symbol
         wait_stop_px = 120
@@ -4240,10 +4254,10 @@ def handle_unsolicited_cxl_for_sides(symbol: str, last_id: str, last_cxl_ack_id:
     return last_id, last_cxl_ack_id, chore_count, cxl_count
 
 
-def handle_unsolicited_cxl(buy_symbol, sell_symbol, active_pair_strat, last_barter_fixture_list, max_loop_count_per_side,
+def handle_unsolicited_cxl(buy_symbol, sell_symbol, active_pair_plan, last_barter_fixture_list, max_loop_count_per_side,
                            executor_web_client: StreetBookServiceHttpClient, config_dict, residual_wait_sec):
     bid_buy_top_market_depth, ask_sell_top_market_depth = (
-        get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_strat))
+        get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_plan))
 
     # buy fills check
     continues_chore_count, continues_special_chore_count = get_continuous_chore_configs(buy_symbol, config_dict)
@@ -4252,9 +4266,9 @@ def handle_unsolicited_cxl(buy_symbol, sell_symbol, active_pair_strat, last_bart
     last_id = None
     last_cxl_ack_id = None
     for loop_count in range(1, max_loop_count_per_side + 1):
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(active_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
         time.sleep(2)  # delay for chore to get placed
 
@@ -4264,7 +4278,7 @@ def handle_unsolicited_cxl(buy_symbol, sell_symbol, active_pair_strat, last_bart
                                              buy_cxl_chore_count, continues_special_chore_count,
                                              executor_web_client)
 
-    if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_strat"):
+    if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
         time.sleep(residual_wait_sec)   # to start sell after buy is completely done
 
     # sell fills check
@@ -4274,11 +4288,11 @@ def handle_unsolicited_cxl(buy_symbol, sell_symbol, active_pair_strat, last_bart
     last_id = None
     last_cxl_ack_id = None
     for loop_count in range(1, max_loop_count_per_side + 1):
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
         # required to make buy side tob latest
-        run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], active_pair_plan.cpp_port)
 
-        update_tob_through_market_depth_to_place_sell_chore(active_pair_strat.cpp_port, ask_sell_top_market_depth,
+        update_tob_through_market_depth_to_place_sell_chore(active_pair_plan.cpp_port, ask_sell_top_market_depth,
                                                             bid_buy_top_market_depth)
         time.sleep(2)  # delay for chore to get placed
 
@@ -4316,10 +4330,10 @@ def handle_partial_ack_checks(symbol: str, new_chore_id: str, acked_chore_id: st
     return new_chore_id, acked_chore_id, partial_ack_qty
 
 
-def underlying_pre_requisites_for_limit_test(buy_sell_symbol_list, pair_strat_, expected_strat_limits_,
+def underlying_pre_requisites_for_limit_test(buy_sell_symbol_list, pair_plan_, expected_plan_limits_,
                                              expected_start_status_, symbol_overview_obj_list,
                                              last_barter_fixture_list, market_depth_basemodel_list,
-                                             strat_mode: StratMode | None = None,
+                                             plan_mode: PlanMode | None = None,
                                              leg1_side: Side | None = None, leg2_side: Side | None = None):
     leg1_symbol = buy_sell_symbol_list[0][0]
     leg2_symbol = buy_sell_symbol_list[0][1]
@@ -4329,57 +4343,56 @@ def underlying_pre_requisites_for_limit_test(buy_sell_symbol_list, pair_strat_, 
         buy_symbol = leg2_symbol
         sell_symbol = leg1_symbol
 
-    activated_strat, executor_http_client = (
-        create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
+    activated_plan, executor_http_client = (
+        create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_,
                                            expected_start_status_, symbol_overview_obj_list, last_barter_fixture_list,
-                                           market_depth_basemodel_list, strat_mode=strat_mode,
+                                           market_depth_basemodel_list, plan_mode=plan_mode,
                                            leg1_side=leg1_side, leg2_side=leg2_side))
 
     # buy test
-    run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, activated_strat.cpp_port)
+    run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, activated_plan.cpp_port)
     loop_count = 1
-    return leg1_symbol, leg2_symbol, activated_strat, executor_http_client
+    return leg1_symbol, leg2_symbol, activated_plan, executor_http_client
 
 
-def check_alert_str_in_portfolio_alert(check_str: str, assert_fail_msg: str):
-    portfolio_alerts = log_book_web_client.get_all_portfolio_alert_client()
-    for alert in portfolio_alerts:
+def check_alert_str_in_contact_alert(check_str: str, assert_fail_msg: str):
+    contact_alerts = log_book_web_client.get_all_contact_alert_client()
+    for alert in contact_alerts:
         if re.search(check_str, alert.alert_brief):
             return alert
     else:
-        print(f"Can't find {check_str=!r} in {portfolio_alerts=}")
+        print(f"Can't find {check_str=!r} in {contact_alerts=}")
         assert False, assert_fail_msg
 
 
-def check_alert_str_in_strat_alerts_n_portfolio_alerts(activated_pair_strat_id: int, check_str: str,
+def check_alert_str_in_plan_alerts_n_contact_alerts(activated_pair_plan_id: int, check_str: str,
                                                        assert_fail_msg: str):
-    # Checking alert in strat_alert
-    strat_alerts = log_book_web_client.filtered_strat_alert_by_strat_id_query_client(activated_pair_strat_id)
-    for alert in strat_alerts:
+    # Checking alert in plan_alert
+    plan_alerts = log_book_web_client.filtered_plan_alert_by_plan_id_query_client(activated_pair_plan_id)
+    for alert in plan_alerts:
         if re.search(check_str, alert.alert_brief):
             return alert
     else:
-        # Checking alert in portfolio_alert if reason failed to add in strat_alert
-        print(f"Can't find {check_str=!r} in {strat_alerts=}")
-        return check_alert_str_in_portfolio_alert(check_str, assert_fail_msg)
+        # Checking alert in contact_alert if reason failed to add in plan_alert
+        print(f"Can't find {check_str=!r} in {plan_alerts=}")
+        return check_alert_str_in_contact_alert(check_str, assert_fail_msg)
 
 
-def get_inst_type(side: Side, pair_strat: PairStratBaseModel):
-    leg1_inst_type: InstrumentType = InstrumentType.CB if (
-            pair_strat.pair_strat_params.strat_leg1.side == Side.BUY) else InstrumentType.EQT
-    leg2_inst_type: InstrumentType = InstrumentType.EQT if leg1_inst_type == InstrumentType.CB else InstrumentType.CB
-
-    inst_type: InstrumentType = leg1_inst_type if pair_strat.pair_strat_params.strat_leg1.side == side else leg2_inst_type
+def get_inst_type(side: Side, pair_plan: PairPlanBaseModel):
+    buy_inst_type: InstrumentType = InstrumentType.CB if (
+            pair_plan.pair_plan_params.plan_leg1.side == Side.BUY) else InstrumentType.EQT
+    sell_inst_type: InstrumentType = InstrumentType.EQT if buy_inst_type == InstrumentType.CB else InstrumentType.CB
+    inst_type: InstrumentType = buy_inst_type if side == Side.BUY else sell_inst_type
     return inst_type
 
 
 def handle_place_chore_and_check_str_in_alert_for_executor_limits(symbol: str, side: Side, px: float, qty: int,
                                                                   check_str: str, assert_fail_msg: str,
-                                                                  active_pair_strat: PairStratBaseModel,
+                                                                  active_pair_plan: PairPlanBaseModel,
                                                                   executor_web_client: StreetBookServiceHttpClient,
                                                                   last_chore_id: str | None = None):
-    activated_pair_strat_id = active_pair_strat.id
-    inst_type: InstrumentType = get_inst_type(side, active_pair_strat)
+    activated_pair_plan_id = active_pair_plan.id
+    inst_type: InstrumentType = get_inst_type(side, active_pair_plan)
     # placing new non-systematic new_chore
     place_new_chore(symbol, side, px, qty, executor_web_client, inst_type)
     print(f"symbol: {symbol}, Created new_chore obj")
@@ -4389,27 +4402,27 @@ def handle_place_chore_and_check_str_in_alert_for_executor_limits(symbol: str, s
                                                                        expect_no_chore=True,
                                                                        last_chore_id=last_chore_id)
     time.sleep(5)
-    return check_alert_str_in_strat_alerts_n_portfolio_alerts(activated_pair_strat_id, check_str, assert_fail_msg)
+    return check_alert_str_in_plan_alerts_n_contact_alerts(activated_pair_plan_id, check_str, assert_fail_msg)
 
 
-def handle_test_for_strat_pause_on_less_consumable_cxl_qty_without_fill(buy_symbol, sell_symbol, active_pair_strat,
+def handle_test_for_plan_pause_on_less_consumable_cxl_qty_without_fill(buy_symbol, sell_symbol, active_pair_plan,
                                                                         last_barter_fixture_list, side: Side,
                                                                         executor_web_client:
                                                                         StreetBookServiceHttpClient,
                                                                         last_cxl_chore_id=None):
 
-    active_pair_strat_id = active_pair_strat.id
-    inst_type: InstrumentType = get_inst_type(side, active_pair_strat)
+    active_pair_plan_id = active_pair_plan.id
+    inst_type: InstrumentType = get_inst_type(side, active_pair_plan)
 
     # buy test
-    run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+    run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
     check_symbol = buy_symbol if side == Side.BUY else sell_symbol
 
     px = 100
     qty = 90
     check_str = f"Consumable cxl qty can't be < 0, currently is .* for symbol {check_symbol}"
-    assert_fail_message = f"Could not find any alert with {check_str=!r} in strat or portfolio alerts"
+    assert_fail_message = f"Could not find any alert with {check_str=!r} in plan or contact alerts"
     # placing new non-systematic new_chore
     place_new_chore(check_symbol, side, px, qty, executor_web_client, inst_type)
     print(f"symbol: {check_symbol}, Created new_chore obj")
@@ -4419,24 +4432,24 @@ def handle_test_for_strat_pause_on_less_consumable_cxl_qty_without_fill(buy_symb
                                                                         executor_web_client,
                                                                         last_chore_id=last_cxl_chore_id)
     time.sleep(5)
-    check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat_id, check_str, assert_fail_message)
+    check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan_id, check_str, assert_fail_message)
 
-    # checking strat pause
-    pair_strat = email_book_service_native_web_client.get_pair_strat_client(active_pair_strat_id)
-    assert pair_strat.strat_state == StratState.StratState_PAUSED, \
-        f"Mismatched strat state, expected: PAUSED, found {pair_strat.strat_state}"
+    # checking plan pause
+    pair_plan = email_book_service_native_web_client.get_pair_plan_client(active_pair_plan_id)
+    assert pair_plan.plan_state == PlanState.PlanState_PAUSED, \
+        f"Mismatched plan state, expected: PAUSED, found {pair_plan.plan_state}"
 
 
-def handle_test_for_strat_pause_on_less_consumable_cxl_qty_with_fill(
-        buy_symbol, sell_symbol, active_pair_strat, last_barter_fixture_list,
+def handle_test_for_plan_pause_on_less_consumable_cxl_qty_with_fill(
+        buy_symbol, sell_symbol, active_pair_plan, last_barter_fixture_list,
         side, executor_web_client: StreetBookServiceHttpClient,
         last_cxl_chore_id=None):
 
-    active_pair_strat_id = active_pair_strat.id
-    inst_type: InstrumentType = get_inst_type(side, active_pair_strat)
+    active_pair_plan_id = active_pair_plan.id
+    inst_type: InstrumentType = get_inst_type(side, active_pair_plan)
 
     # buy test
-    run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+    run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
 
     check_symbol = buy_symbol if side == Side.BUY else sell_symbol
 
@@ -4455,7 +4468,7 @@ def handle_test_for_strat_pause_on_less_consumable_cxl_qty_with_fill(
                                                                        last_chore_id=last_cxl_chore_id)
 
     time.sleep(5)
-    check_alert_str_in_strat_alerts_n_portfolio_alerts(active_pair_strat_id, check_str, assert_fail_message)
+    check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan_id, check_str, assert_fail_message)
 
 
 def get_symbol_configs(symbol: str, config_dict: Dict) -> Dict | None:
@@ -4497,21 +4510,21 @@ def get_partial_allowed_fill_qty(check_symbol: str, config_dict: Dict, qty: int)
 
 def underlying_handle_simulated_partial_fills_test(loop_count, check_symbol, buy_symbol,
                                                    sell_symbol, last_barter_fixture_list,
-                                                   last_chore_id, config_dict, active_pair_strat,
+                                                   last_chore_id, config_dict, active_pair_plan,
                                                    executor_web_client: StreetBookServiceHttpClient):
     bid_buy_top_market_depth, ask_sell_top_market_depth = (
-        get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_strat))
+        get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_plan))
 
-    run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+    run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
     if check_symbol == buy_symbol:
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(active_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
     else:
         # required to make buy side tob latest
-        run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], active_pair_plan.cpp_port)
 
-        update_tob_through_market_depth_to_place_sell_chore(active_pair_strat.cpp_port, ask_sell_top_market_depth,
+        update_tob_through_market_depth_to_place_sell_chore(active_pair_plan.cpp_port, ask_sell_top_market_depth,
                                                             bid_buy_top_market_depth)
 
     chore_ack_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
@@ -4530,14 +4543,14 @@ def underlying_handle_simulated_partial_fills_test(loop_count, check_symbol, buy
 
 
 def underlying_handle_simulated_multi_partial_fills_test(loop_count, check_symbol, buy_symbol,
-                                                         sell_symbol, active_pair_strat, last_barter_fixture_list,
+                                                         sell_symbol, active_pair_plan, last_barter_fixture_list,
                                                          last_chore_id,
                                                          executor_web_client: StreetBookServiceHttpClient,
                                                          config_dict, fill_id: str | None = None):
-    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_strat)
-    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_strat)
+    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_plan)
+    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_plan)
 
-    run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+    run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
     if check_symbol == buy_symbol:
         px = 100
         qty = 90
@@ -4575,8 +4588,8 @@ def underlying_handle_simulated_multi_partial_fills_test(loop_count, check_symbo
     return last_chore_id, partial_filled_qty
 
 
-def strat_done_after_exhausted_consumable_notional(
-        leg_1_symbol, leg_2_symbol, pair_strat_, expected_strat_limits_,
+def plan_done_after_exhausted_consumable_notional(
+        leg_1_symbol, leg_2_symbol, pair_plan_, expected_plan_limits_,
         expected_start_status_, symbol_overview_obj_list, last_barter_fixture_list, market_depth_basemodel_list,
         refresh_sec, side_to_check: Side, leg_1_side: Side | None = None, leg_2_side: Side | None = None):
 
@@ -4584,10 +4597,10 @@ def strat_done_after_exhausted_consumable_notional(
         leg_1_side = Side.BUY
         leg_2_side = Side.SELL
 
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec
     residual_wait_sec = 4 * refresh_sec
-    created_pair_strat, executor_http_client = (
-        create_pre_chore_test_requirements(leg_1_symbol, leg_2_symbol, pair_strat_, expected_strat_limits_,
+    created_pair_plan, executor_http_client = (
+        create_pre_chore_test_requirements(leg_1_symbol, leg_2_symbol, pair_plan_, expected_plan_limits_,
                                            expected_start_status_, symbol_overview_obj_list, last_barter_fixture_list,
                                            market_depth_basemodel_list, leg1_side=leg_1_side,
                                            leg2_side=leg_2_side))
@@ -4603,7 +4616,7 @@ def strat_done_after_exhausted_consumable_notional(
         buy_inst_type = InstrumentType.EQT
         sell_inst_type = InstrumentType.CB
 
-    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_strat.id)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_plan.id)
 
     try:
         # updating yaml_configs according to this test
@@ -4616,7 +4629,7 @@ def strat_done_after_exhausted_consumable_notional(
         executor_http_client.barter_simulator_reload_config_query_client()
 
         # Positive Check
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_plan.cpp_port)
         if side_to_check == Side.BUY:
             px = 98
             qty = 90
@@ -4639,10 +4652,10 @@ def strat_done_after_exhausted_consumable_notional(
 
         # Negative Check
         # Next placed chore must not get placed, instead it should find consumable_notional as exhausted for further
-        # chores and should come out of executor run and must set strat_state to StratState_DONE
+        # chores and should come out of executor run and must set plan_state to PlanState_DONE
 
         # buy fills check
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_plan.cpp_port)
         if side_to_check == Side.BUY:
             px = 98
             qty = 90
@@ -4656,9 +4669,9 @@ def strat_done_after_exhausted_consumable_notional(
             get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW, check_symbol, executor_http_client,
                                                            last_chore_id=ack_chore_journal.chore.chore_id,
                                                            expect_no_chore=True, assert_code=3))
-        pair_strat = email_book_service_native_web_client.get_pair_strat_client(created_pair_strat.id)
-        assert pair_strat.strat_state == StratState.StratState_PAUSED, (
-            f"Mismatched strat_state, expected {StratState.StratState_PAUSED}, received {pair_strat.strat_state}")
+        pair_plan = email_book_service_native_web_client.get_pair_plan_client(created_pair_plan.id)
+        assert pair_plan.plan_state == PlanState.PlanState_PAUSED, (
+            f"Mismatched plan_state, expected {PlanState.PlanState_PAUSED}, received {pair_plan.plan_state}")
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -4707,21 +4720,21 @@ def handle_test_buy_sell_pair_chore(buy_symbol: str, sell_symbol: str, total_loo
                                     expected_buy_chore_snapshot_: ChoreSnapshotBaseModel,
                                     expected_sell_chore_snapshot_: ChoreSnapshotBaseModel,
                                     expected_symbol_side_snapshot_: List[SymbolSideSnapshotBaseModel],
-                                    pair_strat_: PairStratBaseModel, expected_strat_limits_: StratLimits,
-                                    expected_start_status_: StratStatus, expected_strat_brief_: StratBriefBaseModel,
+                                    pair_plan_: PairPlanBaseModel, expected_plan_limits_: PlanLimits,
+                                    expected_start_status_: PlanStatus, expected_plan_brief_: PlanBriefBaseModel,
                                     last_barter_fixture_list: List[Dict],
                                     symbol_overview_obj_list: List[SymbolOverviewBaseModel],
                                     market_depth_basemodel_list: List[MarketDepthBaseModel],
                                     is_non_systematic_run: bool = False):
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec
     residual_test_wait = 4 * refresh_sec
-    active_pair_strat, executor_web_client = (
-        move_snoozed_pair_strat_to_ready_n_then_active(pair_strat_, market_depth_basemodel_list,
-                                                       symbol_overview_obj_list, expected_strat_limits_,
+    active_pair_plan, executor_web_client = (
+        move_snoozed_pair_plan_to_ready_n_then_active(pair_plan_, market_depth_basemodel_list,
+                                                       symbol_overview_obj_list, expected_plan_limits_,
                                                        expected_start_status_))
-    print(f"Created Strat: {active_pair_strat}")
+    print(f"Created Plan: {active_pair_plan}")
 
-    strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional = 0, 0, 0, 0
+    plan_buy_notional, plan_sell_notional, plan_buy_fill_notional, plan_sell_fill_notional = 0, 0, 0, 0
     buy_tob_last_update_date_time_tracker: DateTime | None = None
     sell_tob_last_update_date_time_tracker: DateTime | None = None
     chore_id = None
@@ -4730,16 +4743,16 @@ def handle_test_buy_sell_pair_chore(buy_symbol: str, sell_symbol: str, total_loo
     expected_buy_symbol_side_snapshot.security.sec_id = buy_symbol
     expected_sell_symbol_side_snapshot = copy.deepcopy(expected_symbol_side_snapshot_[1])
     expected_sell_symbol_side_snapshot.security.sec_id = sell_symbol
-    expected_strat_status = copy.deepcopy(expected_start_status_)
-    expected_strat_brief_obj = copy.deepcopy(expected_strat_brief_)
-    expected_strat_brief_obj.pair_buy_side_bartering_brief.security.sec_id = buy_symbol
-    expected_strat_brief_obj.pair_sell_side_bartering_brief.security.sec_id = sell_symbol
+    expected_plan_status = copy.deepcopy(expected_start_status_)
+    expected_plan_brief_obj = copy.deepcopy(expected_plan_brief_)
+    expected_plan_brief_obj.pair_buy_side_bartering_brief.security.sec_id = buy_symbol
+    expected_plan_brief_obj.pair_sell_side_bartering_brief.security.sec_id = sell_symbol
 
     bid_buy_top_market_depth, ask_sell_top_market_depth = (
-        get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_strat))
+        get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_plan))
 
-    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_strat)
-    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_strat)
+    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_plan)
+    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_plan)
 
     for loop_count in range(1, total_loop_count + 1):
         start_time = DateTime.utcnow()
@@ -4751,13 +4764,13 @@ def handle_test_buy_sell_pair_chore(buy_symbol: str, sell_symbol: str, total_loo
         expected_buy_chore_snapshot.chore_brief.bartering_security.inst_type = None
 
         # running last barter once more before sell side
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
         print(f"LastBarters created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
         if not is_non_systematic_run:
             # Updating TopOfBook by updating 0th position market depth (this triggers expected buy chore)
             time.sleep(1)
-            update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
+            update_tob_through_market_depth_to_place_buy_chore(active_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                                ask_sell_top_market_depth)
 
             # Waiting for tob to trigger place chore
@@ -4790,9 +4803,9 @@ def handle_test_buy_sell_pair_chore(buy_symbol: str, sell_symbol: str, total_loo
             placed_chore_journal, expected_buy_chore_snapshot,
             expected_buy_symbol_side_snapshot,
             expected_sell_symbol_side_snapshot,
-            active_pair_strat,
-            expected_strat_limits_, expected_strat_status,
-            expected_strat_brief_obj, executor_web_client)
+            active_pair_plan,
+            expected_plan_limits_, expected_plan_status,
+            expected_plan_brief_obj, executor_web_client)
         print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed chore of chore_id {chore_id}")
 
         executor_web_client.barter_simulator_process_chore_ack_query_client(
@@ -4826,9 +4839,9 @@ def handle_test_buy_sell_pair_chore(buy_symbol: str, sell_symbol: str, total_loo
             buy_symbol, placed_fill_journal_obj,
             expected_buy_chore_snapshot, expected_buy_symbol_side_snapshot,
             expected_sell_symbol_side_snapshot,
-            active_pair_strat,
-            expected_strat_limits_, expected_strat_status,
-            expected_strat_brief_obj,
+            active_pair_plan,
+            expected_plan_limits_, expected_plan_status,
+            expected_plan_brief_obj,
             executor_web_client)
         print(
             f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed chore FILL of chore_id {chore_id}")
@@ -4846,12 +4859,12 @@ def handle_test_buy_sell_pair_chore(buy_symbol: str, sell_symbol: str, total_loo
                                                             expected_buy_chore_snapshot,
                                                             expected_buy_symbol_side_snapshot,
                                                             expected_sell_symbol_side_snapshot,
-                                                            active_pair_strat,
-                                                            expected_strat_limits_, expected_strat_status,
-                                                            expected_strat_brief_obj, executor_web_client)
+                                                            active_pair_plan,
+                                                            expected_plan_limits_, expected_plan_status,
+                                                            expected_plan_brief_obj, executor_web_client)
 
-        strat_buy_notional += expected_buy_chore_snapshot.fill_notional
-        strat_buy_fill_notional += expected_buy_chore_snapshot.fill_notional
+        plan_buy_notional += expected_buy_chore_snapshot.fill_notional
+        plan_buy_fill_notional += expected_buy_chore_snapshot.fill_notional
 
         # handle sell chore
         chore_id = None
@@ -4865,15 +4878,15 @@ def handle_test_buy_sell_pair_chore(buy_symbol: str, sell_symbol: str, total_loo
         expected_sell_chore_snapshot.chore_brief.bartering_security.inst_type = None
 
         # running last barter once more before sell side
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
         print(f"LastBarters created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
         if not is_non_systematic_run:
             # required to make buy side tob latest so that when top update reaches in test place chore function in
             # executor both side are new last_update_date_time
-            run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], active_pair_strat.cpp_port)
+            run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], active_pair_plan.cpp_port)
             # Updating TopOfBook by updating 0th position market depth (this triggers expected buy chore)
-            update_tob_through_market_depth_to_place_sell_chore(active_pair_strat.cpp_port, ask_sell_top_market_depth,
+            update_tob_through_market_depth_to_place_sell_chore(active_pair_plan.cpp_port, ask_sell_top_market_depth,
                                                                 bid_buy_top_market_depth)
 
             # Waiting for tob to trigger place chore
@@ -4900,9 +4913,9 @@ def handle_test_buy_sell_pair_chore(buy_symbol: str, sell_symbol: str, total_loo
         # Checking placed chore computations
         check_placed_sell_chore_computes_after_all_buys(
             loop_count, chore_id, sell_symbol, placed_chore_journal, expected_sell_chore_snapshot,
-            expected_sell_symbol_side_snapshot, expected_buy_symbol_side_snapshot, active_pair_strat,
-            expected_strat_limits_, expected_strat_status,
-            expected_strat_brief_obj, executor_web_client)
+            expected_sell_symbol_side_snapshot, expected_buy_symbol_side_snapshot, active_pair_plan,
+            expected_plan_limits_, expected_plan_status,
+            expected_plan_brief_obj, executor_web_client)
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Checked sell placed chore of chore_id {chore_id}")
 
         executor_web_client.barter_simulator_process_chore_ack_query_client(
@@ -4934,8 +4947,8 @@ def handle_test_buy_sell_pair_chore(buy_symbol: str, sell_symbol: str, total_loo
         check_fill_receive_for_placed_sell_chore_after_all_buys(
             loop_count, chore_id, sell_symbol, placed_fill_journal_obj,
             expected_sell_chore_snapshot, expected_sell_symbol_side_snapshot,
-            expected_buy_symbol_side_snapshot, active_pair_strat, expected_strat_limits_,
-            expected_strat_status, expected_strat_brief_obj, executor_web_client)
+            expected_buy_symbol_side_snapshot, active_pair_plan, expected_plan_limits_,
+            expected_plan_status, expected_plan_brief_obj, executor_web_client)
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Checked sell placed chore FILL")
 
         # Sleeping to let the chore get cxlled
@@ -4951,13 +4964,13 @@ def handle_test_buy_sell_pair_chore(buy_symbol: str, sell_symbol: str, total_loo
                                                                cxl_chore_journal, expected_sell_chore_snapshot,
                                                                expected_sell_symbol_side_snapshot,
                                                                expected_buy_symbol_side_snapshot,
-                                                               active_pair_strat, expected_strat_limits_,
-                                                               expected_strat_status, expected_strat_brief_obj,
+                                                               active_pair_plan, expected_plan_limits_,
+                                                               expected_plan_status, expected_plan_brief_obj,
                                                                executor_web_client)
 
-        strat_sell_notional += expected_sell_chore_snapshot.fill_notional
-        strat_sell_fill_notional += expected_sell_chore_snapshot.fill_notional
-    return strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional
+        plan_sell_notional += expected_sell_chore_snapshot.fill_notional
+        plan_sell_fill_notional += expected_sell_chore_snapshot.fill_notional
+    return plan_buy_notional, plan_sell_notional, plan_buy_fill_notional, plan_sell_fill_notional
 
 
 def handle_test_sell_buy_pair_chore(leg1_symbol: str, leg2_symbol: str, total_loop_count: int,
@@ -4967,41 +4980,41 @@ def handle_test_sell_buy_pair_chore(leg1_symbol: str, leg2_symbol: str, total_lo
                                     expected_buy_chore_snapshot_: ChoreSnapshotBaseModel,
                                     expected_sell_chore_snapshot_: ChoreSnapshotBaseModel,
                                     expected_symbol_side_snapshot_: List[SymbolSideSnapshotBaseModel],
-                                    pair_strat_: PairStratBaseModel, expected_strat_limits_: StratLimits,
-                                    expected_start_status_: StratStatus, expected_strat_brief_: StratBriefBaseModel,
+                                    pair_plan_: PairPlanBaseModel, expected_plan_limits_: PlanLimits,
+                                    expected_start_status_: PlanStatus, expected_plan_brief_: PlanBriefBaseModel,
                                     last_barter_fixture_list: List[Dict],
                                     symbol_overview_obj_list: List[SymbolOverviewBaseModel],
                                     market_depth_basemodel_list: List[MarketDepthBaseModel],
                                     is_non_systematic_run: bool = False):
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec
     residual_test_wait = 4 * refresh_sec
-    active_pair_strat, executor_web_client = (
-        move_snoozed_pair_strat_to_ready_n_then_active(pair_strat_, market_depth_basemodel_list,
-                                                       symbol_overview_obj_list, expected_strat_limits_,
+    active_pair_plan, executor_web_client = (
+        move_snoozed_pair_plan_to_ready_n_then_active(pair_plan_, market_depth_basemodel_list,
+                                                       symbol_overview_obj_list, expected_plan_limits_,
                                                        expected_start_status_))
-    print(f"Created Strat: {active_pair_strat}")
-    buy_symbol = active_pair_strat.pair_strat_params.strat_leg2.sec.sec_id
-    sell_symbol = active_pair_strat.pair_strat_params.strat_leg1.sec.sec_id
+    print(f"Created Plan: {active_pair_plan}")
+    buy_symbol = active_pair_plan.pair_plan_params.plan_leg2.sec.sec_id
+    sell_symbol = active_pair_plan.pair_plan_params.plan_leg1.sec.sec_id
 
-    strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional = 0, 0, 0, 0
+    plan_buy_notional, plan_sell_notional, plan_buy_fill_notional, plan_sell_fill_notional = 0, 0, 0, 0
     buy_tob_last_update_date_time_tracker: DateTime | None = None
     sell_tob_last_update_date_time_tracker: DateTime | None = None
     chore_id = None
     sell_cxl_chore_id = None
     expected_sell_symbol_side_snapshot = copy.deepcopy(expected_symbol_side_snapshot_[1])
     expected_sell_symbol_side_snapshot.security.sec_id = sell_symbol
-    expected_strat_status = copy.deepcopy(expected_start_status_)
-    expected_strat_brief_obj = copy.deepcopy(expected_strat_brief_)
-    expected_strat_brief_obj.pair_buy_side_bartering_brief.security.sec_id = buy_symbol
-    expected_strat_brief_obj.pair_sell_side_bartering_brief.security.sec_id = sell_symbol
+    expected_plan_status = copy.deepcopy(expected_start_status_)
+    expected_plan_brief_obj = copy.deepcopy(expected_plan_brief_)
+    expected_plan_brief_obj.pair_buy_side_bartering_brief.security.sec_id = buy_symbol
+    expected_plan_brief_obj.pair_sell_side_bartering_brief.security.sec_id = sell_symbol
     expected_buy_symbol_side_snapshot = copy.deepcopy(expected_symbol_side_snapshot_[0])
     expected_buy_symbol_side_snapshot.security.sec_id = buy_symbol
 
     bid_buy_top_market_depth, ask_sell_top_market_depth = (
-        get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_strat))
+        get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_plan))
 
-    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_strat)
-    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_strat)
+    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_plan)
+    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_plan)
 
     for loop_count in range(1, total_loop_count + 1):
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Loop started")
@@ -5012,15 +5025,15 @@ def handle_test_sell_buy_pair_chore(leg1_symbol: str, leg2_symbol: str, total_lo
         expected_sell_chore_snapshot.chore_brief.bartering_security.inst_type = None
 
         # running last barter once more before sell side
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
         print(f"LastBarters created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
         if not is_non_systematic_run:
             # required to make buy side tob latest so that when top update reaches in test place chore function in
             # executor both side are new last_update_date_time
-            run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], active_pair_strat.cpp_port)
+            run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], active_pair_plan.cpp_port)
             # Updating TopOfBook by updating 0th position market depth (this triggers expected buy chore)
-            update_tob_through_market_depth_to_place_sell_chore(active_pair_strat.cpp_port, ask_sell_top_market_depth,
+            update_tob_through_market_depth_to_place_sell_chore(active_pair_plan.cpp_port, ask_sell_top_market_depth,
                                                                 bid_buy_top_market_depth)
 
             # Waiting for tob to trigger place chore
@@ -5048,9 +5061,9 @@ def handle_test_sell_buy_pair_chore(leg1_symbol: str, leg2_symbol: str, total_lo
         check_placed_sell_chore_computes_before_buys(loop_count, chore_id, sell_symbol,
                                                      placed_chore_journal, expected_sell_chore_snapshot,
                                                      expected_sell_symbol_side_snapshot,
-                                                     expected_buy_symbol_side_snapshot, active_pair_strat,
-                                                     expected_strat_limits_, expected_strat_status,
-                                                     expected_strat_brief_obj, executor_web_client)
+                                                     expected_buy_symbol_side_snapshot, active_pair_plan,
+                                                     expected_plan_limits_, expected_plan_status,
+                                                     expected_plan_brief_obj, executor_web_client)
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Checked sell placed chore of chore_id {chore_id}")
 
         executor_web_client.barter_simulator_process_chore_ack_query_client(
@@ -5079,8 +5092,8 @@ def handle_test_sell_buy_pair_chore(leg1_symbol: str, leg2_symbol: str, total_lo
         check_fill_receive_for_placed_sell_chore_before_buys(
             sell_symbol, placed_fill_journal_obj,
             expected_sell_chore_snapshot, expected_sell_symbol_side_snapshot,
-            expected_buy_symbol_side_snapshot, active_pair_strat,
-            expected_strat_limits_, expected_strat_status, expected_strat_brief_obj,
+            expected_buy_symbol_side_snapshot, active_pair_plan,
+            expected_plan_limits_, expected_plan_status, expected_plan_brief_obj,
             executor_web_client)
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Checked sell placed chore FILL")
 
@@ -5097,12 +5110,12 @@ def handle_test_sell_buy_pair_chore(leg1_symbol: str, leg2_symbol: str, total_lo
                                                            cxl_chore_journal, expected_sell_chore_snapshot,
                                                            expected_sell_symbol_side_snapshot,
                                                            expected_buy_symbol_side_snapshot,
-                                                           active_pair_strat, expected_strat_limits_,
-                                                           expected_strat_status, expected_strat_brief_obj,
+                                                           active_pair_plan, expected_plan_limits_,
+                                                           expected_plan_status, expected_plan_brief_obj,
                                                            executor_web_client)
 
-        strat_sell_notional += expected_sell_chore_snapshot.fill_notional
-        strat_sell_fill_notional += expected_sell_chore_snapshot.fill_notional
+        plan_sell_notional += expected_sell_chore_snapshot.fill_notional
+        plan_sell_fill_notional += expected_sell_chore_snapshot.fill_notional
 
         chore_id = None
         buy_cxl_chore_id = None
@@ -5119,13 +5132,13 @@ def handle_test_sell_buy_pair_chore(leg1_symbol: str, leg2_symbol: str, total_lo
         current_itr_expected_buy_chore_journal_.chore.security.sec_id = buy_symbol
 
         # running last barter once more before sell side
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
         print(f"LastBarters created: buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}")
 
         if not is_non_systematic_run:
             # Updating TopOfBook by updating 0th position market depth (this triggers expected buy chore)
             time.sleep(1)
-            update_tob_through_market_depth_to_place_buy_chore(active_pair_strat.cpp_port, bid_buy_top_market_depth,
+            update_tob_through_market_depth_to_place_buy_chore(active_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                                ask_sell_top_market_depth)
 
             # Waiting for tob to trigger place chore
@@ -5156,9 +5169,9 @@ def handle_test_sell_buy_pair_chore(leg1_symbol: str, leg2_symbol: str, total_lo
         check_placed_buy_chore_computes_after_sells(loop_count, chore_id, buy_symbol,
                                                     placed_chore_journal, expected_buy_chore_snapshot,
                                                     expected_buy_symbol_side_snapshot,
-                                                    expected_sell_symbol_side_snapshot, active_pair_strat,
-                                                    expected_strat_limits_, expected_strat_status,
-                                                    expected_strat_brief_obj, executor_web_client)
+                                                    expected_sell_symbol_side_snapshot, active_pair_plan,
+                                                    expected_plan_limits_, expected_plan_status,
+                                                    expected_plan_brief_obj, executor_web_client)
         print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed chore of chore_id {chore_id}")
 
         executor_web_client.barter_simulator_process_chore_ack_query_client(
@@ -5192,9 +5205,9 @@ def handle_test_sell_buy_pair_chore(leg1_symbol: str, leg2_symbol: str, total_lo
                                                                 buy_symbol, placed_fill_journal_obj,
                                                                 expected_buy_chore_snapshot,
                                                                 expected_buy_symbol_side_snapshot,
-                                                                expected_sell_symbol_side_snapshot, active_pair_strat,
-                                                                expected_strat_limits_, expected_strat_status,
-                                                                expected_strat_brief_obj, executor_web_client)
+                                                                expected_sell_symbol_side_snapshot, active_pair_plan,
+                                                                expected_plan_limits_, expected_plan_status,
+                                                                expected_plan_brief_obj, executor_web_client)
         print(
             f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed chore FILL of chore_id {chore_id}")
 
@@ -5211,13 +5224,13 @@ def handle_test_sell_buy_pair_chore(leg1_symbol: str, leg2_symbol: str, total_lo
                                                                cxl_chore_journal, expected_buy_chore_snapshot,
                                                                expected_buy_symbol_side_snapshot,
                                                                expected_sell_symbol_side_snapshot,
-                                                               active_pair_strat, expected_strat_limits_,
-                                                               expected_strat_status, expected_strat_brief_obj,
+                                                               active_pair_plan, expected_plan_limits_,
+                                                               expected_plan_status, expected_plan_brief_obj,
                                                                executor_web_client)
 
-        strat_buy_notional += expected_buy_chore_snapshot.fill_notional
-        strat_buy_fill_notional += expected_buy_chore_snapshot.fill_notional
-    return strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional
+        plan_buy_notional += expected_buy_chore_snapshot.fill_notional
+        plan_buy_fill_notional += expected_buy_chore_snapshot.fill_notional
+    return plan_buy_notional, plan_sell_notional, plan_buy_fill_notional, plan_sell_fill_notional
 
 
 def handle_test_buy_sell_n_sell_buy_pair_chore(
@@ -5228,41 +5241,41 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
         expected_buy_chore_snapshot_: ChoreSnapshotBaseModel,
         expected_sell_chore_snapshot_: ChoreSnapshotBaseModel,
         expected_symbol_side_snapshot_: List[SymbolSideSnapshotBaseModel],
-        pair_strat_list: List[PairStratBaseModel], expected_strat_limits_list: List[StratLimits],
-        expected_start_status_: StratStatus, expected_strat_brief_: StratBriefBaseModel,
+        pair_plan_list: List[PairPlanBaseModel], expected_plan_limits_list: List[PlanLimits],
+        expected_start_status_: PlanStatus, expected_plan_brief_: PlanBriefBaseModel,
         last_barter_fixture_list: List[Dict],
         symbol_overview_obj_list: List[SymbolOverviewBaseModel],
         market_depth_basemodel_list: List[MarketDepthBaseModel],
         is_non_systematic_run: bool = False):
     residual_test_wait = 4 * refresh_sec
 
-    active_pair_strat_list = []
+    active_pair_plan_list = []
     executor_web_client_list = []
-    for idx, pair_strat_ in enumerate(pair_strat_list):
-        expected_strat_limits_list[idx].residual_restriction.residual_mark_seconds = 2 * refresh_sec
-        active_pair_strat, executor_web_client = (
-            move_snoozed_pair_strat_to_ready_n_then_active(pair_strat_, market_depth_basemodel_list,
-                                                           symbol_overview_obj_list, expected_strat_limits_list[idx],
+    for idx, pair_plan_ in enumerate(pair_plan_list):
+        expected_plan_limits_list[idx].residual_restriction.residual_mark_seconds = 2 * refresh_sec
+        active_pair_plan, executor_web_client = (
+            move_snoozed_pair_plan_to_ready_n_then_active(pair_plan_, market_depth_basemodel_list,
+                                                           symbol_overview_obj_list, expected_plan_limits_list[idx],
                                                            expected_start_status_))
-        active_pair_strat_list.append(active_pair_strat)
+        active_pair_plan_list.append(active_pair_plan)
         executor_web_client_list.append(executor_web_client)
-        print(f"Created Strat: {active_pair_strat}")
+        print(f"Created Plan: {active_pair_plan}")
 
-    active_pair_strat1 = active_pair_strat_list[0]
-    expected_strat_limits1 = expected_strat_limits_list[0]
-    buy_symbol1 = active_pair_strat_list[0].pair_strat_params.strat_leg1.sec.sec_id
-    sell_symbol1 = active_pair_strat_list[0].pair_strat_params.strat_leg2.sec.sec_id
-    buy1_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_strat_list[0])
-    sell1_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_strat_list[0])
+    active_pair_plan1 = active_pair_plan_list[0]
+    expected_plan_limits1 = expected_plan_limits_list[0]
+    buy_symbol1 = active_pair_plan_list[0].pair_plan_params.plan_leg1.sec.sec_id
+    sell_symbol1 = active_pair_plan_list[0].pair_plan_params.plan_leg2.sec.sec_id
+    buy1_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_plan_list[0])
+    sell1_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_plan_list[0])
 
-    active_pair_strat2 = active_pair_strat_list[1]
-    expected_strat_limits2 = expected_strat_limits_list[1]
-    buy_symbol2 = active_pair_strat_list[1].pair_strat_params.strat_leg2.sec.sec_id
-    sell_symbol2 = active_pair_strat_list[1].pair_strat_params.strat_leg1.sec.sec_id
-    buy2_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_strat_list[1])
-    sell2_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_strat_list[1])
+    active_pair_plan2 = active_pair_plan_list[1]
+    expected_plan_limits2 = expected_plan_limits_list[1]
+    buy_symbol2 = active_pair_plan_list[1].pair_plan_params.plan_leg2.sec.sec_id
+    sell_symbol2 = active_pair_plan_list[1].pair_plan_params.plan_leg1.sec.sec_id
+    buy2_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_plan_list[1])
+    sell2_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_plan_list[1])
 
-    strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional = 0, 0, 0, 0
+    plan_buy_notional, plan_sell_notional, plan_buy_fill_notional, plan_sell_fill_notional = 0, 0, 0, 0
     buy_tob_last_update_date_time_tracker1: DateTime | None = None
     buy_tob_last_update_date_time_tracker2: DateTime | None = None
     sell_tob_last_update_date_time_tracker1: DateTime | None = None
@@ -5283,26 +5296,26 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
     expected_sell_symbol_side_snapshot1.security.sec_id = sell_symbol1
     expected_sell_symbol_side_snapshot2 = copy.deepcopy(expected_symbol_side_snapshot_[1])
     expected_sell_symbol_side_snapshot2.security.sec_id = sell_symbol2
-    expected_strat_status1 = copy.deepcopy(expected_start_status_)
-    expected_strat_status2 = copy.deepcopy(expected_start_status_)
-    expected_strat_brief_obj1 = copy.deepcopy(expected_strat_brief_)
-    expected_strat_brief_obj1.pair_buy_side_bartering_brief.security.sec_id = buy_symbol1
-    expected_strat_brief_obj1.pair_sell_side_bartering_brief.security.sec_id = sell_symbol1
-    expected_strat_brief_obj2 = copy.deepcopy(expected_strat_brief_)
-    expected_strat_brief_obj2.pair_buy_side_bartering_brief.security.sec_id = buy_symbol2
-    expected_strat_brief_obj2.pair_sell_side_bartering_brief.security.sec_id = sell_symbol2
+    expected_plan_status1 = copy.deepcopy(expected_start_status_)
+    expected_plan_status2 = copy.deepcopy(expected_start_status_)
+    expected_plan_brief_obj1 = copy.deepcopy(expected_plan_brief_)
+    expected_plan_brief_obj1.pair_buy_side_bartering_brief.security.sec_id = buy_symbol1
+    expected_plan_brief_obj1.pair_sell_side_bartering_brief.security.sec_id = sell_symbol1
+    expected_plan_brief_obj2 = copy.deepcopy(expected_plan_brief_)
+    expected_plan_brief_obj2.pair_buy_side_bartering_brief.security.sec_id = buy_symbol2
+    expected_plan_brief_obj2.pair_sell_side_bartering_brief.security.sec_id = sell_symbol2
 
     bid_buy_top_market_depth1, ask_sell_top_market_depth1 = (
-        get_buy_bid_n_ask_sell_market_depth(buy_symbol1, sell_symbol1, active_pair_strat1))
+        get_buy_bid_n_ask_sell_market_depth(buy_symbol1, sell_symbol1, active_pair_plan1))
     executor_web_client1 = executor_web_client_list[0]
 
     bid_buy_top_market_depth2, ask_sell_top_market_depth2 = (
-        get_buy_bid_n_ask_sell_market_depth(buy_symbol2, sell_symbol2, active_pair_strat2))
+        get_buy_bid_n_ask_sell_market_depth(buy_symbol2, sell_symbol2, active_pair_plan2))
     executor_web_client2 = executor_web_client_list[1]
 
     for loop_count in range(1, total_loop_count + 1):
 
-        # first handling strat with BUY-SELL pair
+        # first handling plan with BUY-SELL pair
         start_time = DateTime.utcnow()
         print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol1}, Loop started at {start_time}")
         expected_buy_chore_snapshot1 = copy.deepcopy(expected_buy_chore_snapshot_)
@@ -5312,13 +5325,13 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
         expected_buy_chore_snapshot1.chore_brief.bartering_security.inst_type = None
 
         # running last barter once more before sell side
-        run_last_barter(buy_symbol1, sell_symbol1, last_barter_fixture_list, active_pair_strat1.cpp_port)
+        run_last_barter(buy_symbol1, sell_symbol1, last_barter_fixture_list, active_pair_plan1.cpp_port)
         print(f"LastBarters created: buy_symbol: {buy_symbol1}, sell_symbol: {sell_symbol1}")
 
         if not is_non_systematic_run:
             # Updating TopOfBook by updating 0th position market depth (this triggers expected buy chore)
             time.sleep(1)
-            update_tob_through_market_depth_to_place_buy_chore(active_pair_strat1.cpp_port,
+            update_tob_through_market_depth_to_place_buy_chore(active_pair_plan1.cpp_port,
                                                                bid_buy_top_market_depth1,
                                                                ask_sell_top_market_depth1)
 
@@ -5352,9 +5365,9 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
             placed_chore_journal, expected_buy_chore_snapshot1,
             expected_buy_symbol_side_snapshot1,
             expected_sell_symbol_side_snapshot1,
-            active_pair_strat1,
-            expected_strat_limits1, expected_strat_status1,
-            expected_strat_brief_obj1, executor_web_client1)
+            active_pair_plan1,
+            expected_plan_limits1, expected_plan_status1,
+            expected_plan_brief_obj1, executor_web_client1)
         print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol1}, Checked buy placed chore of chore_id {buy_chore_id1}")
 
         executor_web_client1.barter_simulator_process_chore_ack_query_client(
@@ -5388,9 +5401,9 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
             buy_symbol1, placed_fill_journal_obj,
             expected_buy_chore_snapshot1, expected_buy_symbol_side_snapshot1,
             expected_sell_symbol_side_snapshot1,
-            active_pair_strat1,
-            expected_strat_limits1, expected_strat_status1,
-            expected_strat_brief_obj1,
+            active_pair_plan1,
+            expected_plan_limits1, expected_plan_status1,
+            expected_plan_brief_obj1,
             executor_web_client1)
         print(
             f"Loop count: {loop_count}, buy_symbol: {buy_symbol1}, Checked buy placed chore FILL of chore_id {buy_chore_id1}")
@@ -5408,12 +5421,12 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
                                                             expected_buy_chore_snapshot1,
                                                             expected_buy_symbol_side_snapshot1,
                                                             expected_sell_symbol_side_snapshot1,
-                                                            active_pair_strat1,
-                                                            expected_strat_limits1, expected_strat_status1,
-                                                            expected_strat_brief_obj1, executor_web_client1)
+                                                            active_pair_plan1,
+                                                            expected_plan_limits1, expected_plan_status1,
+                                                            expected_plan_brief_obj1, executor_web_client1)
 
-        strat_buy_notional += expected_buy_chore_snapshot1.fill_notional
-        strat_buy_fill_notional += expected_buy_chore_snapshot1.fill_notional
+        plan_buy_notional += expected_buy_chore_snapshot1.fill_notional
+        plan_buy_fill_notional += expected_buy_chore_snapshot1.fill_notional
 
         # handle sell chore
         chore_id = None
@@ -5427,15 +5440,15 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
         expected_sell_chore_snapshot1.chore_brief.bartering_security.inst_type = None
 
         # running last barter once more before sell side
-        run_last_barter(buy_symbol1, sell_symbol1, last_barter_fixture_list, active_pair_strat1.cpp_port)
+        run_last_barter(buy_symbol1, sell_symbol1, last_barter_fixture_list, active_pair_plan1.cpp_port)
         print(f"LastBarters created: buy_symbol: {buy_symbol1}, sell_symbol: {sell_symbol1}")
 
         if not is_non_systematic_run:
             # required to make buy side tob latest so that when top update reaches in test place chore function in
             # executor both side are new last_update_date_time
-            run_last_barter(buy_symbol1, sell_symbol1, [last_barter_fixture_list[0]], active_pair_strat1.cpp_port)
+            run_last_barter(buy_symbol1, sell_symbol1, [last_barter_fixture_list[0]], active_pair_plan1.cpp_port)
             # Updating TopOfBook by updating 0th position market depth (this triggers expected buy chore)
-            update_tob_through_market_depth_to_place_sell_chore(active_pair_strat1.cpp_port,
+            update_tob_through_market_depth_to_place_sell_chore(active_pair_plan1.cpp_port,
                                                                 ask_sell_top_market_depth1,
                                                                 bid_buy_top_market_depth1)
 
@@ -5463,9 +5476,9 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
         # Checking placed chore computations
         check_placed_sell_chore_computes_after_all_buys(
             loop_count, sell_chore_id1, sell_symbol1, placed_chore_journal, expected_sell_chore_snapshot1,
-            expected_sell_symbol_side_snapshot1, expected_buy_symbol_side_snapshot1, active_pair_strat1,
-            expected_strat_limits1, expected_strat_status1,
-            expected_strat_brief_obj1, executor_web_client1)
+            expected_sell_symbol_side_snapshot1, expected_buy_symbol_side_snapshot1, active_pair_plan1,
+            expected_plan_limits1, expected_plan_status1,
+            expected_plan_brief_obj1, executor_web_client1)
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol1}, Checked sell placed chore of chore_id {sell_chore_id1}")
 
         executor_web_client1.barter_simulator_process_chore_ack_query_client(
@@ -5497,8 +5510,8 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
         check_fill_receive_for_placed_sell_chore_after_all_buys(
             loop_count, sell_chore_id1, sell_symbol1, placed_fill_journal_obj,
             expected_sell_chore_snapshot1, expected_sell_symbol_side_snapshot1,
-            expected_buy_symbol_side_snapshot1, active_pair_strat1, expected_strat_limits1,
-            expected_strat_status1, expected_strat_brief_obj1, executor_web_client1)
+            expected_buy_symbol_side_snapshot1, active_pair_plan1, expected_plan_limits1,
+            expected_plan_status1, expected_plan_brief_obj1, executor_web_client1)
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol1}, Checked sell placed chore FILL")
 
         # Sleeping to let the chore get cxlled
@@ -5514,15 +5527,15 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
                                                                cxl_chore_journal, expected_sell_chore_snapshot1,
                                                                expected_sell_symbol_side_snapshot1,
                                                                expected_buy_symbol_side_snapshot1,
-                                                               active_pair_strat1, expected_strat_limits1,
-                                                               expected_strat_status1, expected_strat_brief_obj1,
+                                                               active_pair_plan1, expected_plan_limits1,
+                                                               expected_plan_status1, expected_plan_brief_obj1,
                                                                executor_web_client1)
 
-        strat_sell_notional += expected_sell_chore_snapshot1.fill_notional
-        strat_sell_fill_notional += expected_sell_chore_snapshot1.fill_notional
+        plan_sell_notional += expected_sell_chore_snapshot1.fill_notional
+        plan_sell_fill_notional += expected_sell_chore_snapshot1.fill_notional
 
         ################################################################################################################
-        # Now handling SELL-BUY strat's chore
+        # Now handling SELL-BUY plan's chore
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol2}, Loop started")
         expected_sell_chore_snapshot2 = copy.deepcopy(expected_sell_chore_snapshot_)
         expected_sell_chore_snapshot2.chore_brief.security.sec_id = sell_symbol2
@@ -5531,15 +5544,15 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
         expected_sell_chore_snapshot2.chore_brief.bartering_security.inst_type = None
         
         # running last barter once more before sell side
-        run_last_barter(buy_symbol2, sell_symbol2, last_barter_fixture_list, active_pair_strat2.cpp_port)
+        run_last_barter(buy_symbol2, sell_symbol2, last_barter_fixture_list, active_pair_plan2.cpp_port)
         print(f"LastBarters created: buy_symbol: {buy_symbol2}, sell_symbol: {sell_symbol2}")
 
         if not is_non_systematic_run:
             # required to make buy side tob latest so that when top update reaches in test place chore function in
             # executor both side are new last_update_date_time
-            run_last_barter(buy_symbol2, sell_symbol2, [last_barter_fixture_list[0]], active_pair_strat2.cpp_port)
+            run_last_barter(buy_symbol2, sell_symbol2, [last_barter_fixture_list[0]], active_pair_plan2.cpp_port)
             # Updating TopOfBook by updating 0th position market depth (this triggers expected buy chore)
-            update_tob_through_market_depth_to_place_sell_chore(active_pair_strat2.cpp_port,
+            update_tob_through_market_depth_to_place_sell_chore(active_pair_plan2.cpp_port,
                                                                 ask_sell_top_market_depth2,
                                                                 bid_buy_top_market_depth2)
 
@@ -5569,9 +5582,9 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
         check_placed_sell_chore_computes_before_buys(loop_count, sell_chore_id2, sell_symbol2,
                                                      placed_chore_journal, expected_sell_chore_snapshot2,
                                                      expected_sell_symbol_side_snapshot2,
-                                                     expected_buy_symbol_side_snapshot2, active_pair_strat2,
-                                                     expected_strat_limits2, expected_strat_status2,
-                                                     expected_strat_brief_obj2, executor_web_client2)
+                                                     expected_buy_symbol_side_snapshot2, active_pair_plan2,
+                                                     expected_plan_limits2, expected_plan_status2,
+                                                     expected_plan_brief_obj2, executor_web_client2)
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol2}, Checked sell placed chore of chore_id {sell_chore_id2}")
 
         executor_web_client2.barter_simulator_process_chore_ack_query_client(
@@ -5600,8 +5613,8 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
         check_fill_receive_for_placed_sell_chore_before_buys(
             sell_symbol2, placed_fill_journal_obj,
             expected_sell_chore_snapshot2, expected_sell_symbol_side_snapshot2,
-            expected_buy_symbol_side_snapshot2, active_pair_strat2,
-            expected_strat_limits2, expected_strat_status2, expected_strat_brief_obj2,
+            expected_buy_symbol_side_snapshot2, active_pair_plan2,
+            expected_plan_limits2, expected_plan_status2, expected_plan_brief_obj2,
             executor_web_client2)
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol2}, Checked sell placed chore FILL")
 
@@ -5618,12 +5631,12 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
                                                            cxl_chore_journal, expected_sell_chore_snapshot2,
                                                            expected_sell_symbol_side_snapshot2,
                                                            expected_buy_symbol_side_snapshot2,
-                                                           active_pair_strat2, expected_strat_limits2,
-                                                           expected_strat_status2, expected_strat_brief_obj2,
+                                                           active_pair_plan2, expected_plan_limits2,
+                                                           expected_plan_status2, expected_plan_brief_obj2,
                                                            executor_web_client2)
 
-        strat_sell_notional += expected_sell_chore_snapshot2.fill_notional
-        strat_sell_fill_notional += expected_sell_chore_snapshot2.fill_notional
+        plan_sell_notional += expected_sell_chore_snapshot2.fill_notional
+        plan_sell_fill_notional += expected_sell_chore_snapshot2.fill_notional
 
         start_time = DateTime.utcnow()
         print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol2}, Loop started at {start_time}")
@@ -5639,13 +5652,13 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
         current_itr_expected_buy_chore_journal_.chore.security.sec_id = buy_symbol2
 
         # running last barter once more before sell side
-        run_last_barter(buy_symbol2, sell_symbol2, last_barter_fixture_list, active_pair_strat2.cpp_port)
+        run_last_barter(buy_symbol2, sell_symbol2, last_barter_fixture_list, active_pair_plan2.cpp_port)
         print(f"LastBarters created: buy_symbol: {buy_symbol2}, sell_symbol: {sell_symbol2}")
 
         if not is_non_systematic_run:
             # Updating TopOfBook by updating 0th position market depth (this triggers expected buy chore)
             time.sleep(1)
-            update_tob_through_market_depth_to_place_buy_chore(active_pair_strat2.cpp_port,
+            update_tob_through_market_depth_to_place_buy_chore(active_pair_plan2.cpp_port,
                                                                bid_buy_top_market_depth2,
                                                                ask_sell_top_market_depth2)
 
@@ -5677,9 +5690,9 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
         check_placed_buy_chore_computes_after_sells(loop_count, buy_chore_id2, buy_symbol2,
                                                     placed_chore_journal, expected_buy_chore_snapshot2,
                                                     expected_buy_symbol_side_snapshot2,
-                                                    expected_sell_symbol_side_snapshot2, active_pair_strat2,
-                                                    expected_strat_limits2, expected_strat_status2,
-                                                    expected_strat_brief_obj2, executor_web_client2)
+                                                    expected_sell_symbol_side_snapshot2, active_pair_plan2,
+                                                    expected_plan_limits2, expected_plan_status2,
+                                                    expected_plan_brief_obj2, executor_web_client2)
         print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol2}, Checked buy placed chore of chore_id {buy_chore_id2}")
 
         executor_web_client2.barter_simulator_process_chore_ack_query_client(
@@ -5713,9 +5726,9 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
                                                                 buy_symbol2, placed_fill_journal_obj,
                                                                 expected_buy_chore_snapshot2,
                                                                 expected_buy_symbol_side_snapshot2,
-                                                                expected_sell_symbol_side_snapshot2, active_pair_strat2,
-                                                                expected_strat_limits2, expected_strat_status2,
-                                                                expected_strat_brief_obj2, executor_web_client2)
+                                                                expected_sell_symbol_side_snapshot2, active_pair_plan2,
+                                                                expected_plan_limits2, expected_plan_status2,
+                                                                expected_plan_brief_obj2, executor_web_client2)
         print(
             f"Loop count: {loop_count}, buy_symbol: {buy_symbol2}, Checked buy placed chore FILL of chore_id {chore_id}")
 
@@ -5732,20 +5745,20 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
                                                                cxl_chore_journal, expected_buy_chore_snapshot2,
                                                                expected_buy_symbol_side_snapshot2,
                                                                expected_sell_symbol_side_snapshot2,
-                                                               active_pair_strat2, expected_strat_limits2,
-                                                               expected_strat_status2, expected_strat_brief_obj2,
+                                                               active_pair_plan2, expected_plan_limits2,
+                                                               expected_plan_status2, expected_plan_brief_obj2,
                                                                executor_web_client2)
 
-        strat_buy_notional += expected_buy_chore_snapshot2.fill_notional
-        strat_buy_fill_notional += expected_buy_chore_snapshot2.fill_notional
+        plan_buy_notional += expected_buy_chore_snapshot2.fill_notional
+        plan_buy_fill_notional += expected_buy_chore_snapshot2.fill_notional
 
-        # Any additional compute post each strat's single chore comes here ...
+        # Any additional compute post each plan's single chore comes here ...
 
-    return strat_buy_notional, strat_sell_notional, strat_buy_fill_notional, strat_sell_fill_notional
+    return plan_buy_notional, plan_sell_notional, plan_buy_fill_notional, plan_sell_fill_notional
 
 
 def place_sanity_chores_for_executor(
-        buy_symbol: str, sell_symbol: str, created_pair_strat,
+        buy_symbol: str, sell_symbol: str, created_pair_plan,
         total_chore_count_for_each_side, last_barter_fixture_list,
         residual_wait_sec, executor_web_client, place_after_recovery: bool = False,
         expect_no_chore: bool = False):
@@ -5762,12 +5775,12 @@ def place_sanity_chores_for_executor(
                     buy_ack_chore_id = chore_journal.chore.chore_id
 
     bid_buy_top_market_depth, ask_sell_top_market_depth = (
-        get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, created_pair_strat))
+        get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, created_pair_plan))
 
     for loop_count in range(total_chore_count_for_each_side):
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_plan.cpp_port)
         time.sleep(1)
-        update_tob_through_market_depth_to_place_buy_chore(created_pair_strat.cpp_port, bid_buy_top_market_depth,
+        update_tob_through_market_depth_to_place_buy_chore(created_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
 
         ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
@@ -5776,17 +5789,17 @@ def place_sanity_chores_for_executor(
                                                                            expect_no_chore=expect_no_chore)
         buy_ack_chore_id = ack_chore_journal.chore.chore_id
 
-        if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_strat"):
+        if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
             time.sleep(residual_wait_sec)  # wait to make this open chore residual
 
     # Placing sell chores
     sell_ack_chore_id = None
     for loop_count in range(total_chore_count_for_each_side):
-        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_plan.cpp_port)
         # required to make buy side tob latest
-        run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], created_pair_strat.cpp_port)
+        run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], created_pair_plan.cpp_port)
 
-        update_tob_through_market_depth_to_place_sell_chore(created_pair_strat.cpp_port, ask_sell_top_market_depth,
+        update_tob_through_market_depth_to_place_sell_chore(created_pair_plan.cpp_port, ask_sell_top_market_depth,
                                                             bid_buy_top_market_depth)
 
         ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
@@ -5795,7 +5808,7 @@ def place_sanity_chores_for_executor(
                                                                            expect_no_chore=expect_no_chore)
         sell_ack_chore_id = ack_chore_journal.chore.chore_id
 
-        if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_strat"):
+        if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
             time.sleep(residual_wait_sec)  # wait to make this open chore residual
 
 
@@ -5815,21 +5828,21 @@ def debug_callable_handler(debug_max_wait_sec: int | None, test_callable: Callab
                 raise assert_err
 
 
-def place_sanity_chores(buy_symbol, sell_symbol, pair_strat_,
-                        expected_strat_limits_, expected_strat_status_, symbol_overview_obj_list,
+def place_sanity_chores(buy_symbol, sell_symbol, pair_plan_,
+                        expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
                         last_barter_fixture_list, market_depth_basemodel_list,
                         max_loop_count_per_side, refresh_sec_update_fixture):
-    expected_strat_limits_.max_open_chores_per_side = 10
-    expected_strat_limits_.residual_restriction.max_residual = 111360
-    expected_strat_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
+    expected_plan_limits_.max_open_chores_per_side = 10
+    expected_plan_limits_.residual_restriction.max_residual = 111360
+    expected_plan_limits_.residual_restriction.residual_mark_seconds = 2 * refresh_sec_update_fixture
     residual_wait_sec = 4 * refresh_sec_update_fixture
 
-    created_pair_strat, executor_web_client = (
-        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+    created_pair_plan, executor_web_client = (
+        create_pre_chore_test_requirements(buy_symbol, sell_symbol, pair_plan_, expected_plan_limits_,
+                                           expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
                                            market_depth_basemodel_list))
 
-    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_strat.id)
+    config_file_path, config_dict, config_dict_str = get_config_file_path_n_config_dict(created_pair_plan.id)
 
     try:
         # updating yaml_configs according to this test
@@ -5843,33 +5856,33 @@ def place_sanity_chores(buy_symbol, sell_symbol, pair_strat_,
         total_chore_count_for_each_side = max_loop_count_per_side
 
         bid_buy_top_market_depth, ask_sell_top_market_depth = (
-            get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, created_pair_strat))
+            get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, created_pair_plan))
 
         # Placing buy chores
         buy_ack_chore_id = None
         for loop_count in range(total_chore_count_for_each_side):
-            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_plan.cpp_port)
 
             time.sleep(1)
-            update_tob_through_market_depth_to_place_buy_chore(created_pair_strat.cpp_port, bid_buy_top_market_depth,
+            update_tob_through_market_depth_to_place_buy_chore(created_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                                ask_sell_top_market_depth)
             ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
                                                                                buy_symbol, executor_web_client,
                                                                                last_chore_id=buy_ack_chore_id)
             buy_ack_chore_id = ack_chore_journal.chore.chore_id
 
-            if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_strat"):
+            if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
                 # Sleeping to let the chore get cxled
                 time.sleep(residual_wait_sec)
 
         # Placing sell chores
         sell_ack_chore_id = None
         for loop_count in range(total_chore_count_for_each_side):
-            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_strat.cpp_port)
+            run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_plan.cpp_port)
             # required to make buy side tob latest
-            run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], created_pair_strat.cpp_port)
+            run_last_barter(buy_symbol, sell_symbol, [last_barter_fixture_list[0]], created_pair_plan.cpp_port)
 
-            update_tob_through_market_depth_to_place_sell_chore(created_pair_strat.cpp_port, ask_sell_top_market_depth,
+            update_tob_through_market_depth_to_place_sell_chore(created_pair_plan.cpp_port, ask_sell_top_market_depth,
                                                                 bid_buy_top_market_depth)
 
             ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
@@ -5877,10 +5890,10 @@ def place_sanity_chores(buy_symbol, sell_symbol, pair_strat_,
                                                                                last_chore_id=sell_ack_chore_id)
             sell_ack_chore_id = ack_chore_journal.chore.chore_id
 
-            if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_strat"):
+            if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
                 # Sleeping to let the chore get cxled
                 time.sleep(residual_wait_sec)
-        return buy_symbol, sell_symbol, created_pair_strat, executor_web_client
+        return buy_symbol, sell_symbol, created_pair_plan, executor_web_client
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -5892,23 +5905,23 @@ def place_sanity_chores(buy_symbol, sell_symbol, pair_strat_,
         YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
-def handle_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-                                       expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+def handle_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_,
+                                       expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
                                        market_depth_basemodel_list, leg1_side=Side.BUY, leg2_side=Side.SELL,
                                        get_config_data=True):
-    active_pair_strat, executor_http_client = (
-        create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, expected_strat_limits_,
-                                           expected_strat_status_, symbol_overview_obj_list, last_barter_fixture_list,
+    active_pair_plan, executor_http_client = (
+        create_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_plan_, expected_plan_limits_,
+                                           expected_plan_status_, symbol_overview_obj_list, last_barter_fixture_list,
                                            market_depth_basemodel_list, leg1_side=leg1_side, leg2_side=leg2_side))
 
-    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_strat)
-    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_strat)
+    buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_plan)
+    sell_inst_type: InstrumentType = get_inst_type(Side.SELL, active_pair_plan)
 
     config_file_path: str | None
     config_dict: Dict | None
     config_dict_str: str | None
     if get_config_data:
-        config_file_path = str(STRAT_EXECUTOR / "data" / f"executor_{active_pair_strat.id}_simulate_config.yaml")
+        config_file_path = str(STRAT_EXECUTOR / "data" / f"executor_{active_pair_plan.id}_simulate_config.yaml")
         config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
         config_dict_str = YAMLConfigurationManager.load_yaml_configurations(config_file_path, load_as_str=True)
     else:
@@ -5916,12 +5929,12 @@ def handle_pre_chore_test_requirements(leg1_symbol, leg2_symbol, pair_strat_, ex
         config_dict = None
         config_dict_str = None
 
-    return (active_pair_strat, executor_http_client, buy_inst_type, sell_inst_type,
+    return (active_pair_plan, executor_http_client, buy_inst_type, sell_inst_type,
             config_file_path, config_dict, config_dict_str)
 
 
-def get_config_file_path_n_config_dict(strat_id: int):
-    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{strat_id}_simulate_config.yaml"
+def get_config_file_path_n_config_dict(plan_id: int):
+    config_file_path = STRAT_EXECUTOR / "data" / f"executor_{plan_id}_simulate_config.yaml"
     config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(str(config_file_path))
     config_dict_str = YAMLConfigurationManager.load_yaml_configurations(str(config_file_path), load_as_str=True)
     return config_file_path, config_dict, config_dict_str

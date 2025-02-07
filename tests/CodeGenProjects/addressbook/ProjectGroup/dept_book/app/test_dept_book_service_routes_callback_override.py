@@ -17,11 +17,11 @@ def test_sanity_underlying_time_series(dash_, dash_filter_, bar_data_):
     # create all dashes
     for index in range(1000):
         dash_obj: DashBaseModel = DashBaseModel(**dash_)
-        dash_obj.rt_dash.leg1.sec.sec_id = f"CB_Sec_{index + 1}"
+        dash_obj.rt_dash.leg1.sec.sec_id = f"Type1_Sec_{index + 1}"
         stored_leg1_vwap = dash_obj.rt_dash.leg1.vwap
         dash_obj.rt_dash.leg1.vwap = stored_leg1_vwap + random.randint(0, 30)
         dash_obj.rt_dash.leg1.vwap_change = (dash_obj.rt_dash.leg1.vwap - stored_leg1_vwap) * 100 / stored_leg1_vwap
-        dash_obj.rt_dash.leg2.sec.sec_id = f"EQT_Sec_{index + 1}"
+        dash_obj.rt_dash.leg2.sec.sec_id = f"Type2_Sec_{index + 1}"
         stored_leg2_vwap = dash_obj.rt_dash.leg2.vwap
         dash_obj.rt_dash.leg2.vwap = stored_leg2_vwap + random.randint(0, 10) / 10
         dash_obj.rt_dash.leg2.vwap_change = (dash_obj.rt_dash.leg2.vwap - stored_leg2_vwap) * 100 / stored_leg2_vwap

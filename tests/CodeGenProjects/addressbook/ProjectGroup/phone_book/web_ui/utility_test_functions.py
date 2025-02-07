@@ -13,7 +13,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.support import expected_conditions as EC  # noqa
 
-from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.conftest import expected_pair_strat
+from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.conftest import expected_pair_plan
 # project import
 from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.web_ui_models import *
 from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import *
@@ -68,84 +68,84 @@ def get_web_project_url():
     return web_project_url
 
 
-def create_pair_strat(driver: WebDriver, pair_strat: Dict[str, any], expected_pair_strat) -> None:
-    strat_collection_widget = driver.find_element(By.ID, "strat_collection")
-    scroll_into_view(driver=driver, element=strat_collection_widget)
-    click_button_with_name(widget=strat_collection_widget, button_name="Create")
+def create_pair_plan(driver: WebDriver, pair_plan: Dict[str, any], expected_pair_plan) -> None:
+    plan_collection_widget = driver.find_element(By.ID, "plan_collection")
+    scroll_into_view(driver=driver, element=plan_collection_widget)
+    click_button_with_name(widget=plan_collection_widget, button_name="Create")
 
-    widget = driver.find_element(By.ID, "pair_strat_params")
+    widget = driver.find_element(By.ID, "pair_plan_params")
 
-    # select strat_leg1.sec.sec_id
+    # select plan_leg1.sec.sec_id
     # xpath: str = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT,
     #                                        widget_name=widget_name, field_name=field_name)
     # TODO: GET XPATH FROM THE METHOD
-    xpath = "pair_strat_params.strat_leg1.sec.sec_id"
-    value = pair_strat["pair_strat_params"]["strat_leg1"]["sec"]["sec_id"]
+    xpath = "pair_plan_params.plan_leg1.sec.sec_id"
+    value = pair_plan["pair_plan_params"]["plan_leg1"]["sec"]["sec_id"]
     name = "sec_id"
     autocomplete_attribute_value= f"{value}-option-0"
     set_autocomplete_field(driver=driver, widget=widget, xpath=xpath, name=name, search_type=SearchType.ID,
                            value=value)
 
-    # select strat_leg1.side
-    xpath = "pair_strat_params.strat_leg1.side"
-    value = pair_strat["pair_strat_params"]["strat_leg1"]["side"]
+    # select plan_leg1.side
+    xpath = "pair_plan_params.plan_leg1.side"
+    value = pair_plan["pair_plan_params"]["plan_leg1"]["side"]
     name = "side"
     set_dropdown_field(widget=widget, xpath=xpath, name=name, value=value)
 
-    xpath = "pair_strat_params.strat_leg2"
+    xpath = "pair_plan_params.plan_leg2"
     show_nested_fld_in_tree_layout(widget=widget, driver=driver)
 
-    # select strat_leg2.sec.sec_id
-    xpath = "pair_strat_params.strat_leg2.sec.sec_id"
-    value = pair_strat["pair_strat_params"]["strat_leg2"]["sec"]["sec_id"]
+    # select plan_leg2.sec.sec_id
+    xpath = "pair_plan_params.plan_leg2.sec.sec_id"
+    value = pair_plan["pair_plan_params"]["plan_leg2"]["sec"]["sec_id"]
     name = "sec_id"
     # autocomplete_attribute_value = f"{value}-option-0"
     set_autocomplete_field(driver=driver, widget=widget, xpath=xpath, name=name, search_type=SearchType.ID,
                            value=value)
 
-    strat_status_widget = driver.find_element(By.ID, "strat_status")
-    scroll_into_view(driver=driver, element=strat_status_widget)
+    plan_status_widget = driver.find_element(By.ID, "plan_status")
+    scroll_into_view(driver=driver, element=plan_status_widget)
 
-    # select pair_strat_params.common_premium
-    xpath = "pair_strat_params.common_premium"
-    value = pair_strat["pair_strat_params"]["common_premium"]
+    # select pair_plan_params.common_premium
+    xpath = "pair_plan_params.common_premium"
+    value = pair_plan["pair_plan_params"]["common_premium"]
     name = "common_premium"
     set_tree_input_field(driver=driver, widget=widget, xpath=xpath, name=name, value=value)
 
-    click_save_n_click_confirm_save_btn(driver, strat_collection_widget)
+    click_save_n_click_confirm_save_btn(driver, plan_collection_widget)
     time.sleep(Delay.SHORT.value)
-    click_id_fld_inside_strat_collection(strat_collection_widget)
-    validate_pair_strat_params(widget=widget, pair_strat=pair_strat, layout=Layout.TREE, expected_pair_strat=expected_pair_strat)
+    click_id_fld_inside_plan_collection(plan_collection_widget)
+    validate_pair_plan_params(widget=widget, pair_plan=pair_plan, layout=Layout.TREE, expected_pair_plan=expected_pair_plan)
 
     host: str = "127.0.0.1"
     port: int = 8020
     email_book_service_http_client = EmailBookServiceHttpClient(host, port)
-    pair_strat_list: List[PairStratBaseModel] = email_book_service_http_client.get_all_pair_strat_client()
-    pair_strat: PairStratBaseModel = pair_strat_list[-1]
+    pair_plan_list: List[PairPlanBaseModel] = email_book_service_http_client.get_all_pair_plan_client()
+    pair_plan: PairPlanBaseModel = pair_plan_list[-1]
 
-    while not pair_strat.is_partially_running:
-        pair_strat_list = email_book_service_http_client.get_all_pair_strat_client()
-        pair_strat = pair_strat_list[-1]
+    while not pair_plan.is_partially_running:
+        pair_plan_list = email_book_service_http_client.get_all_pair_plan_client()
+        pair_plan = pair_plan_list[-1]
         time.sleep(Delay.DEFAULT.value)
 
-    assert pair_strat.is_partially_running
+    assert pair_plan.is_partially_running
 
-    executor_web_client = StreetBookServiceHttpClient(pair_strat.host, pair_strat.port)
+    executor_web_client = StreetBookServiceHttpClient(pair_plan.host, pair_plan.port)
     symbol_overview_obj_list: List[SymbolOverviewBaseModel] = symbol_overview_list()
     for symbol_overview in symbol_overview_obj_list:
         executor_web_client.create_symbol_overview_client(symbol_overview)
 
-    while not pair_strat.is_executor_running:
-        pair_strat_list = email_book_service_http_client.get_all_pair_strat_client()
-        pair_strat = pair_strat_list[-1]
+    while not pair_plan.is_executor_running:
+        pair_plan_list = email_book_service_http_client.get_all_pair_plan_client()
+        pair_plan = pair_plan_list[-1]
         time.sleep(Delay.DEFAULT.value)
 
-    assert pair_strat.is_executor_running
-    # fetch strat limits and strat status from executor client by pair strat id
-    # strat_limits: StratLimitsBaseModel = executor_web_client.get_strat_limits_client(pair_strat.id)
-    # strat_status: StratStatusBaseModel = executor_web_client.get_strat_status_client(pair_strat.id)
-    override_strat_limit(executor_web_client)
-    # TODO LAZY: strat limits, strat status and strat alert is present in ui
+    assert pair_plan.is_executor_running
+    # fetch plan limits and plan status from executor client by pair plan id
+    # plan_limits: PlanLimitsBaseModel = executor_web_client.get_plan_limits_client(pair_plan.id)
+    # plan_status: PlanStatusBaseModel = executor_web_client.get_plan_status_client(pair_plan.id)
+    override_plan_limit(executor_web_client)
+    # TODO LAZY: plan limits, plan status and plan alert is present in ui
     time.sleep(Delay.MEDIUM.value)
 
 
@@ -169,8 +169,8 @@ def verify_supported_search_type(search_type: SearchType = SearchType.NAME) -> b
         return True
 
 
-def click_id_fld_inside_strat_collection(widget: WebElement):
-    # TODO LAZY: in pair strat widget not showing the created pair strat fields after saving, we have to click inside strat collection widget
+def click_id_fld_inside_plan_collection(widget: WebElement):
+    # TODO LAZY: in pair plan widget not showing the created pair plan fields after saving, we have to click inside plan collection widget
     # widget.find_element(By.XPATH, get_table_input_field_xpath("_id")).click()
     xpath = get_table_input_field_xpath("total_fill_sell_notional")
     widget.find_element(By.XPATH, xpath).click()
@@ -397,23 +397,23 @@ def generate_xpath_from_fixture(data_dict: Dict[str, any], base_path: str = "") 
     return xpaths
 
 
-def validate_pair_strat_params(widget: WebElement, pair_strat: Dict[str, any], layout: Layout,
-                               expected_pair_strat: Dict[str, any]) -> None:
-    xpaths = generate_xpath_from_fixture(pair_strat)
+def validate_pair_plan_params(widget: WebElement, pair_plan: Dict[str, any], layout: Layout,
+                               expected_pair_plan: Dict[str, any]) -> None:
+    xpaths = generate_xpath_from_fixture(pair_plan)
 
     for xpath in xpaths:
         xpath_element = get_xpath_element_for_layout(widget=widget, xpath=xpath, layout=layout)
         created_value = get_value_frm_input_fld_with_input_tag(xpath_element, layout)
 
         # Get the expected value based on the current xpath
-        expected_value = expected_pair_strat.get(xpath)
+        expected_value = expected_pair_plan.get(xpath)
 
         # Assert that the created value matches the expected value
         assert created_value == str(expected_value), \
             f"Mismatch in value for {xpath}: expected {expected_value}, but got {created_value}"
 
 
-def update_max_value_field_strat_limits(widget: WebElement, xpath: str, name: str, input_value: int) -> None:
+def update_max_value_field_plan_limits(widget: WebElement, xpath: str, name: str, input_value: int) -> None:
     input_div_xpath: str = get_tree_input_field_xpath(xpath=xpath)
     div_xpath = widget.find_element(By.XPATH, input_div_xpath)
     input_element = div_xpath.find_element(By.ID, name)
@@ -423,33 +423,33 @@ def update_max_value_field_strat_limits(widget: WebElement, xpath: str, name: st
     input_element.send_keys(input_value)
 
 
-def create_strat_limits_using_tree_view(driver: WebDriver, strat_limits: Dict, layout: Layout) -> None:
-    strat_limit_widget = driver.find_element(By.ID, "strat_limits")
+def create_plan_limits_using_tree_view(driver: WebDriver, plan_limits: Dict, layout: Layout) -> None:
+    plan_limit_widget = driver.find_element(By.ID, "plan_limits")
 
     fields_xpath_n_value = {
-        "max_open_chores_per_side": strat_limits["max_open_chores_per_side"],
-        "max_single_leg_notional": strat_limits["max_single_leg_notional"],
-        "max_open_single_leg_notional": strat_limits["max_open_single_leg_notional"],
-        "max_net_filled_notional": strat_limits["max_net_filled_notional"],
-        "max_concentration": strat_limits["max_concentration"],
-        "min_chore_notional": strat_limits["min_chore_notional"],
-        "limit_up_down_volume_participation_rate": strat_limits["limit_up_down_volume_participation_rate"],
-        "cancel_rate.max_cancel_rate": strat_limits["cancel_rate"]["max_cancel_rate"],
-        "cancel_rate.applicable_period_seconds": strat_limits["cancel_rate"]["applicable_period_seconds"],
-        "cancel_rate.waived_initial_chores": strat_limits["cancel_rate"]["waived_initial_chores"],
-        "cancel_rate.waived_min_rolling_notional": strat_limits["cancel_rate"]["waived_min_rolling_notional"],
-        "cancel_rate.waived_min_rolling_period_seconds": strat_limits["cancel_rate"][
+        "max_open_chores_per_side": plan_limits["max_open_chores_per_side"],
+        "max_single_leg_notional": plan_limits["max_single_leg_notional"],
+        "max_open_single_leg_notional": plan_limits["max_open_single_leg_notional"],
+        "max_net_filled_notional": plan_limits["max_net_filled_notional"],
+        "max_concentration": plan_limits["max_concentration"],
+        "min_chore_notional": plan_limits["min_chore_notional"],
+        "limit_up_down_volume_participation_rate": plan_limits["limit_up_down_volume_participation_rate"],
+        "cancel_rate.max_cancel_rate": plan_limits["cancel_rate"]["max_cancel_rate"],
+        "cancel_rate.applicable_period_seconds": plan_limits["cancel_rate"]["applicable_period_seconds"],
+        "cancel_rate.waived_initial_chores": plan_limits["cancel_rate"]["waived_initial_chores"],
+        "cancel_rate.waived_min_rolling_notional": plan_limits["cancel_rate"]["waived_min_rolling_notional"],
+        "cancel_rate.waived_min_rolling_period_seconds": plan_limits["cancel_rate"][
             "waived_min_rolling_period_seconds"],
-        "market_barter_volume_participation.max_participation_rate": strat_limits["market_barter_volume_participation"][
+        "market_barter_volume_participation.max_participation_rate": plan_limits["market_barter_volume_participation"][
             "max_participation_rate"],
         "market_barter_volume_participation.applicable_period_seconds":
-            strat_limits["market_barter_volume_participation"]["applicable_period_seconds"],
-        "market_barter_volume_participation.min_allowed_notional": strat_limits["market_barter_volume_participation"][
+            plan_limits["market_barter_volume_participation"]["applicable_period_seconds"],
+        "market_barter_volume_participation.min_allowed_notional": plan_limits["market_barter_volume_participation"][
             "min_allowed_notional"],
-        "market_depth.participation_rate": strat_limits["market_depth"]["participation_rate"],
-        "market_depth.depth_levels": strat_limits["market_depth"]["depth_levels"],
-        "residual_restriction.max_residual": strat_limits["residual_restriction"]["max_residual"],
-        "residual_restriction.residual_mark_seconds": strat_limits["residual_restriction"]["residual_mark_seconds"],
+        "market_depth.participation_rate": plan_limits["market_depth"]["participation_rate"],
+        "market_depth.depth_levels": plan_limits["market_depth"]["depth_levels"],
+        "residual_restriction.max_residual": plan_limits["residual_restriction"]["max_residual"],
+        "residual_restriction.residual_mark_seconds": plan_limits["residual_restriction"]["residual_mark_seconds"],
     }
 
     for xpath, value in fields_xpath_n_value.items():
@@ -457,14 +457,14 @@ def create_strat_limits_using_tree_view(driver: WebDriver, strat_limits: Dict, l
             nested_tree_dialog = driver.find_element(By.XPATH, "//div[@role='dialog']")
             field_element = nested_tree_dialog.find_element(By.ID, "residual_mark_seconds")
         else:
-            field_element = strat_limit_widget.find_element(By.ID, "residual_mark_seconds")
+            field_element = plan_limit_widget.find_element(By.ID, "residual_mark_seconds")
         if layout != Layout.NESTED:
             scroll_into_view(driver=driver, element=field_element)
         name = xpath.split('.')[-1]
-        set_tree_input_field(driver= driver, widget=strat_limit_widget, xpath=xpath, name=name, value=value)
+        set_tree_input_field(driver= driver, widget=plan_limit_widget, xpath=xpath, name=name, value=value)
 
 
-def validate_strat_limits(widget: WebElement, strat_limits: Dict, layout: Layout) -> None:
+def validate_plan_limits(widget: WebElement, plan_limits: Dict, layout: Layout) -> None:
     fields_to_validate = {
         "max_open_chores_per_side": ["max_open_chores_per_side"],
         "max_single_leg_notional": ["max_single_leg_notional"],
@@ -491,16 +491,16 @@ def validate_strat_limits(widget: WebElement, strat_limits: Dict, layout: Layout
     }
 
     for xpath, keys in fields_to_validate.items():
-        created_strat_value = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
-        if "," in created_strat_value:
-            created_strat_value = created_strat_value.replace(",", "")
-        expected_value = strat_limits
+        created_plan_value = get_value_from_input_field(widget=widget, xpath=xpath, layout=layout)
+        if "," in created_plan_value:
+            created_plan_value = created_plan_value.replace(",", "")
+        expected_value = plan_limits
         for key in keys:
             expected_value = expected_value[key]
             if "notional" in key:
-                expected_value = created_strat_value
-        assert created_strat_value == str(
-            expected_value), f"Assertion failed for {xpath}: expected_value {expected_value}, got {created_strat_value}"
+                expected_value = created_plan_value
+        assert created_plan_value == str(
+            expected_value), f"Assertion failed for {xpath}: expected_value {expected_value}, got {created_plan_value}"
 
 
 def get_value_from_input_field(widget: WebElement, xpath: str, layout: Layout) -> str:
@@ -674,7 +674,7 @@ def get_xpath_from_field_name(schema_dict: Dict[str, any], widget_type: WidgetTy
 
 
 
-def override_default_limits(chore_limits: ChoreLimitsBaseModel, portfolio_limits: PortfolioLimitsBaseModel) -> None:
+def override_default_limits(chore_limits: ChoreLimitsBaseModel, contact_limits: ContactLimitsBaseModel) -> None:
     updated_chore_limits: ChoreLimitsBaseModel = ChoreLimitsBaseModel(id=chore_limits.id, max_basis_points=150,
                                                                       max_px_deviation=2,
                                                                       max_px_levels=0, max_chore_qty=0,
@@ -685,26 +685,26 @@ def override_default_limits(chore_limits: ChoreLimitsBaseModel, portfolio_limits
     email_book_service_native_web_client.patch_chore_limits_client(jsonable_encoder(
         updated_chore_limits.to_dict(by_alias=True, exclude_none=True)))
 
-    updated_portfolio_limits: PortfolioLimitsBaseModel = \
-        PortfolioLimitsBaseModel(id=portfolio_limits.id, max_open_baskets=200)
-    email_book_service_native_web_client.patch_portfolio_limits_client(jsonable_encoder(
-        updated_portfolio_limits.to_dict(by_alias=True, exclude_none=True)))
+    updated_contact_limits: ContactLimitsBaseModel = \
+        ContactLimitsBaseModel(id=contact_limits.id, max_open_baskets=200)
+    email_book_service_native_web_client.patch_contact_limits_client(jsonable_encoder(
+        updated_contact_limits.to_dict(by_alias=True, exclude_none=True)))
 
 
-def override_strat_limit(street_book_service_http_client: StreetBookServiceHttpClient) -> None:
-    strat_limit_list: List[StratLimitsBaseModel] = street_book_service_http_client.get_all_strat_limits_client()
+def override_plan_limit(street_book_service_http_client: StreetBookServiceHttpClient) -> None:
+    plan_limit_list: List[PlanLimitsBaseModel] = street_book_service_http_client.get_all_plan_limits_client()
 
-    for strat_limit in strat_limit_list:
+    for plan_limit in plan_limit_list:
         cancel_rate: CancelRateOptional = CancelRateOptional(max_cancel_rate=20)
         market_barter_volume_participation: MarketBarterVolumeParticipationOptional = \
             MarketBarterVolumeParticipationOptional(max_participation_rate=20)
-        updated_strat_limit: StratLimitsBaseModel = \
-            StratLimitsBaseModel(id=strat_limit.id, cancel_rate=cancel_rate,
+        updated_plan_limit: PlanLimitsBaseModel = \
+            PlanLimitsBaseModel(id=plan_limit.id, cancel_rate=cancel_rate,
                                  market_barter_volume_participation=market_barter_volume_participation)
 
-        updated_strat_limit.min_chore_notional = 1000
-        street_book_service_http_client.patch_strat_limits_client(jsonable_encoder(
-            updated_strat_limit.to_dict(by_alias=True, exclude_none=True)))
+        updated_plan_limit.min_chore_notional = 1000
+        street_book_service_http_client.patch_plan_limits_client(jsonable_encoder(
+            updated_plan_limit.to_dict(by_alias=True, exclude_none=True)))
 
 
 def switch_layout(widget: WebElement, layout: Layout) -> None:
@@ -725,7 +725,7 @@ def switch_layout(widget: WebElement, layout: Layout) -> None:
         print(f"failed to switch to layout: {layout};;; exception: {e}")
 
 
-def activate_strat(widget: WebElement, driver: WebDriver) -> None:
+def activate_plan(widget: WebElement, driver: WebDriver) -> None:
     css_selector = get_css_selector_with_partial_class_name("MuiTableContainer-root")
     tr_element = widget.find_element(By.CSS_SELECTOR, css_selector)
 
@@ -740,16 +740,16 @@ def activate_strat(widget: WebElement, driver: WebDriver) -> None:
         time.sleep(Delay.SHORT.value)
         click_confirm_save(driver=driver)
 
-        # Verify if the strat is in active state
+        # Verify if the plan is in active state
         css_selector = get_css_selector_with_partial_class_name("MuiTableContainer-root")
         tr_element = widget.find_element(By.CSS_SELECTOR, css_selector)
 
         activate_btn_element = tr_element.find_elements(By.TAG_NAME, "td")
         btn_caption = activate_btn_element[5].find_element(By.TAG_NAME, "button").text
-        assert btn_caption == "Pause", "Failed to activate strat."
+        assert btn_caption == "Pause", "Failed to activate plan."
 
     elif btn_caption in ["ERROR", "Pause"]:
-        print(f"Strat is in {btn_caption} state. Cannot activate.")
+        print(f"Plan is in {btn_caption} state. Cannot activate.")
 
 
 def click_confirm_save(driver: WebDriver) -> None:
@@ -866,7 +866,7 @@ def click_edit_btn(driver: WebDriver, widget: WebElement):
     try:
         click_button_with_name(widget=widget, button_name="Edit")
     except NoSuchElementException:
-        click_button_with_name(driver.find_element(By.ID, WidgetName.StratCollection.value), button_name="Edit")
+        click_button_with_name(driver.find_element(By.ID, WidgetName.PlanCollection.value), button_name="Edit")
     except Exception as e:
         print(f"edit btn not found inside {widget}: {e}")
 
@@ -973,8 +973,8 @@ def get_num_format_element_for_layout(widget: WebElement, xpath: str, layout: La
 
 
 def scroll_into_widget_with_widget_name(widget: WebElement, driver: WebDriver, widget_name: str):
-    if widget_name == WidgetName.PairStratParams.value:
-        scroll_into_view(driver, driver.find_element(By.ID, WidgetName.StratCollection.value))
+    if widget_name == WidgetName.PairPlanParams.value:
+        scroll_into_view(driver, driver.find_element(By.ID, WidgetName.PlanCollection.value))
     else:
         scroll_into_view(driver, widget)
 
@@ -1088,7 +1088,7 @@ def validate_comma_separated_values(driver: WebDriver, widget: WebElement, layou
 
 
     elif layout == Layout.TREE:
-        if widget_name in ["strat_status", "portfolio_status"]:
+        if widget_name in ["plan_status", "contact_status"]:
             click_confirm_save(driver)
             time.sleep(Delay.SHORT.value)
         switch_layout(widget=widget, layout=Layout.TREE)
@@ -1179,7 +1179,7 @@ def get_common_keys_fld_names(widget) -> List[str]:
     for item in common_key_items:
         fld_name_element = item.find_element(By.TAG_NAME, "span")
         fld_name = fld_name_element.text.split(":")[0].split("[")[0]
-        if fld_name == "strat_leg1" or fld_name == "strat_leg2":
+        if fld_name == "plan_leg1" or fld_name == "plan_leg2":
             fld_name = fld_name.replace(fld_name, f"{fld_name}.side")
         if " " in fld_name:
             fld_name = fld_name.replace(" ", "_")
@@ -1351,8 +1351,8 @@ def get_replaced_common_keys(common_keys_fields: List) -> List[str]:
     list_of_common_keys = []
     for common_key in common_keys_fields:
         list_of_common_keys.append(common_key.replace("common premium", "common_premium")
-                                   .replace("hedge ratio", "hedge_ratio").replace("strat mode", "strat_mode").
-                                   replace("strat type", "strat_type"))
+                                   .replace("hedge ratio", "hedge_ratio").replace("plan mode", "plan_mode").
+                                   replace("plan type", "plan_type"))
     return list_of_common_keys
 
 
@@ -1369,10 +1369,10 @@ def get_table_headers(widget: WebElement) -> List[str]:
     return table_headers
 
 
-def save_nested_strat(driver: WebDriver):
+def save_nested_plan(driver: WebDriver):
     nested_tree_dialog = driver.find_element(By.XPATH, "//div[@role='dialog']")
-    save_strat = nested_tree_dialog.find_element(By.NAME, "Save")
-    save_strat.click()
+    save_plan = nested_tree_dialog.find_element(By.NAME, "Save")
+    save_plan.click()
 
 def get_nested_tree_layout_dialog_xpath(attribute_value: str):
     return f"//div[@role='{attribute_value}']"
@@ -1396,7 +1396,7 @@ def create_tob_md_ld_fj_os_oj(driver: WebDriver, top_of_book_fixture: List,
                               fills_journal_basemodel_fixture: List[FillsJournalBaseModel],
                               chore_snapshot_basemodel_fixture: List[ChoreSnapshotBaseModel],
                               chore_journal_basemodel_fixture: List[ChoreJournalBaseModel],
-                              strat_limits_fixture: StratLimitsBaseModel) -> None:
+                              plan_limits_fixture: PlanLimitsBaseModel) -> None:
     """
 
     Function for creating top_of_book, market_depth, last_barter,
@@ -1408,23 +1408,23 @@ def create_tob_md_ld_fj_os_oj(driver: WebDriver, top_of_book_fixture: List,
 
     :return: None
     """
-    widget_name: str = WidgetName.StratCollection.value
+    widget_name: str = WidgetName.PlanCollection.value
     widget: WebElement = driver.find_element(By.ID, widget_name)
-    activate_strat(widget, driver)
+    activate_plan(widget, driver)
     time.sleep(Delay.SHORT.value)
 
-    pair_strat_list: List[PairStratBaseModel] = email_book_service_native_web_client.get_all_pair_strat_client()
-    pair_strat: PairStratBaseModel = pair_strat_list[-1]
+    pair_plan_list: List[PairPlanBaseModel] = email_book_service_native_web_client.get_all_pair_plan_client()
+    pair_plan: PairPlanBaseModel = pair_plan_list[-1]
 
-    while not pair_strat.is_executor_running:
-        pair_strat_list: List[PairStratBaseModel] = email_book_service_native_web_client.get_all_pair_strat_client()
-        pair_strat: PairStratBaseModel = pair_strat_list[-1]
+    while not pair_plan.is_executor_running:
+        pair_plan_list: List[PairPlanBaseModel] = email_book_service_native_web_client.get_all_pair_plan_client()
+        pair_plan: PairPlanBaseModel = pair_plan_list[-1]
         time.sleep(Delay.SHORT.value)
-    assert pair_strat.is_executor_running
+    assert pair_plan.is_executor_running
 
     # top of book
-    executor_web_client = StreetBookServiceHttpClient(pair_strat.host, pair_strat.port)
-    created_top_of_book_list = create_tob("CB_Sec_1", "EQT_Sec_1", top_of_book_fixture, executor_web_client)
+    executor_web_client = StreetBookServiceHttpClient(pair_plan.host, pair_plan.port)
+    created_top_of_book_list = create_tob("Type1_Sec_1", "Type2_Sec_1", top_of_book_fixture, executor_web_client)
 
     # assert created_top_of_book_list == top_of_book_fixture, f"Top of book mismatch: Expected {top_of_book_fixture}, but got {created_top_of_book_list}"
 
@@ -1433,9 +1433,9 @@ def create_tob_md_ld_fj_os_oj(driver: WebDriver, top_of_book_fixture: List,
         market_depth_basemodel_fixture)
     assert created_market_depth_list == market_depth_basemodel_fixture, f"MarketDepth mismatch: Expected {market_depth_basemodel_fixture}, but got {created_market_depth_list}"
 
-   # # Strat Limits
-   #  created_strat_limits_list: StratLimitsBaseModel = executor_web_client.create_strat_limits_client(strat_limits_fixture)
-   #  assert created_strat_limits_list == strat_limits_fixture, f"Expected{strat_limits_fixture}, but got {created_strat_limits_list}"
+   # # Plan Limits
+   #  created_plan_limits_list: PlanLimitsBaseModel = executor_web_client.create_plan_limits_client(plan_limits_fixture)
+   #  assert created_plan_limits_list == plan_limits_fixture, f"Expected{plan_limits_fixture}, but got {created_plan_limits_list}"
 
     # Last Barter
     created_last_barter_list: List[LastBarterBaseModel] = executor_web_client.create_all_last_barter_client(
@@ -1475,17 +1475,17 @@ def delete_tob_md_ld_fj_os_oj() -> None:
 
         :return: None
     """
-    pair_strat_list: List[PairStratBaseModel] = email_book_service_native_web_client.get_all_pair_strat_client()
+    pair_plan_list: List[PairPlanBaseModel] = email_book_service_native_web_client.get_all_pair_plan_client()
 
-    for pair_strat in pair_strat_list:
-        if not pair_strat.is_executor_running:
-            err_str_ = ("strat exists but is not running, can't delete top_of_book, market_depth, last_barter, "
+    for pair_plan in pair_plan_list:
+        if not pair_plan.is_executor_running:
+            err_str_ = ("plan exists but is not running, can't delete top_of_book, market_depth, last_barter, "
                         "fills_journal, chore_snapshot, chore_journal when not running, delete it manually")
             logging.error(err_str_)
             raise Exception(err_str_)
-        assert pair_strat.is_executor_running
+        assert pair_plan.is_executor_running
 
-        executor_web_client = StreetBookServiceHttpClient(pair_strat.host, pair_strat.port)
+        executor_web_client = StreetBookServiceHttpClient(pair_plan.host, pair_plan.port)
 
         for _ in range(1, 3):
             assert executor_web_client.delete_top_of_book_client(top_of_book_id=_, return_obj_copy=False)
@@ -1517,8 +1517,8 @@ def click_button_with_name(widget: WebElement, button_name: str):
 
 
 def click_save_with_widget_name(driver: WebDriver, widget: WebElement, widget_name: str):
-    if widget_name in [WidgetName.PairStratParams.value]:
-        widget = driver.find_element(By.ID, WidgetName.StratCollection.value)
+    if widget_name in [WidgetName.PairPlanParams.value]:
+        widget = driver.find_element(By.ID, WidgetName.PlanCollection.value)
     click_button_with_name(widget, "Save")
 
 
@@ -1534,10 +1534,10 @@ def refresh_page_n_default_delay(driver: WebDriver):
 
 def delete_ol_pl_ps_client(driver: WebDriver):
     # chore_limits_obj = ChoreLimitsBaseModel(id=55, max_px_deviation=44)
-    # email_book_service_native_web_client.delete_pair_strat_client(pair_strat_id=1)
+    # email_book_service_native_web_client.delete_pair_plan_client(pair_plan_id=1)
     email_book_service_native_web_client.delete_chore_limits_client(chore_limits_id=1)
-    email_book_service_native_web_client.delete_portfolio_limits_client(portfolio_limits_id=1)
-    email_book_service_native_web_client.delete_portfolio_status_client(portfolio_status_id=1)
+    email_book_service_native_web_client.delete_contact_limits_client(contact_limits_id=1)
+    email_book_service_native_web_client.delete_contact_status_client(contact_status_id=1)
     refresh_page_n_default_delay(driver)
 
 
@@ -1663,7 +1663,7 @@ def get_n_validate_flux_fld_sequence_number_in_widget(schema_dict, driver: WebDr
 
         for field_query in widget_query.fields:
             field_name = field_query.field_name
-            if field_name == "kill_switch" or field_name == "strat_state":
+            if field_name == "kill_switch" or field_name == "plan_state":
                 continue
             i += 1
             sequence_number += 1
@@ -1671,8 +1671,8 @@ def get_n_validate_flux_fld_sequence_number_in_widget(schema_dict, driver: WebDr
                 field_sequence_value_element: WebElement = widget.find_element(
                     By.XPATH, f'//*[@id="{widget_name}_table_settings"]/div[3]/li[{i}]/div[1]')
             else:
-                if widget_name == "pair_strat_params":
-                    widget_name = "pair_strat"
+                if widget_name == "pair_plan_params":
+                    widget_name = "pair_plan"
                 field_sequence_value_element: WebElement = widget.find_element(
                     By.XPATH, f'//*[@id="definitions.{widget_name}_table_settings"]/div[3]/li[{i}]/div[1]')
             field_sequence_value: int = int(get_select_box_value(field_sequence_value_element))
@@ -1698,8 +1698,8 @@ def flux_fld_ui_place_holder_in_widget(schema_dict, driver: WebDriver, widget_ty
         if widget_name in ["basket_chore"]:
             continue
 
-        if widget_name == "pair_strat_params":
-            click_button_with_name(driver.find_element(By.ID, "strat_collection"), button_name="Create")
+        if widget_name == "pair_plan_params":
+            click_button_with_name(driver.find_element(By.ID, "plan_collection"), button_name="Create")
         else:
             click_button_with_name(widget=widget, button_name="Create")
         show_nested_fld_in_tree_layout(widget=widget, driver=driver)
@@ -1726,9 +1726,9 @@ def get_element_text_list_from_filter_popup(driver: WebDriver) -> List[str]:
 def flux_fld_title_in_widgets(result: List[WidgetQuery], widget_type: WidgetType, driver: WebDriver) -> None:
     for widget_query in result:
         widget_name: str = widget_query.widget_name
-        # fixme: `portfolio_status` and `strat_alert` is not been created
-        #  (`strat_status`: most of the field is not present )
-        if widget_name in ["portfolio_status", "strat_alert", "strat_status", "system_control", "basket_chore",
+        # fixme: `contact_status` and `plan_alert` is not been created
+        #  (`plan_status`: most of the field is not present )
+        if widget_name in ["contact_status", "plan_alert", "plan_status", "system_control", "basket_chore",
                            "chore_limits"]:
             continue
         widget: WebElement = driver.find_element(By.ID, widget_name)
@@ -1859,7 +1859,7 @@ def validate_val_max_fields_in_widget(driver: WebDriver, widget: WebElement, wid
     expand_all_nested_fld_name_frm_review_changes_dialog(driver=driver)
     object_keys: List[str] = get_object_keys_from_dialog_box(widget=widget)
     for field_name, xpath in xpath_n_field_names.items():
-        if widget_name == WidgetName.StratLimits.value and input_type == InputType.INVALID_VALUE:
+        if widget_name == WidgetName.PlanLimits.value and input_type == InputType.INVALID_VALUE:
             assert xpath in object_keys, f"Field '{field_name}' was expected but is missing in {object_keys} inside widget:- {widget_name}. (XPath used: {xpath})"
         else:
             assert field_name in object_keys, f"Field '{field_name}' was expected but is missing in {object_keys} inside widget:-{widget_name}. (XPath used: {xpath})"
@@ -2092,32 +2092,32 @@ def load_layout(driver: WebDriver, layout_name: str) -> None:
 def click_unload_btn(widget: WebElement):
     css_selector = get_css_selector_of_dynamic_class_name_with_initial_class_name("MuiTableContainer-root")
     table_row = widget.find_element(By.CSS_SELECTOR, css_selector)
-    xpath = get_xpath_with_attribute(tag_name="button", attribute_name="value", attribute_value="Unload Strat")
+    xpath = get_xpath_with_attribute(tag_name="button", attribute_name="value", attribute_value="Unload Plan")
     unload_btn = table_row.find_element(By.XPATH, xpath)
     click_element_n_short_delay(unload_btn)
 
 
-def click_n_get_input_element_of_buffer_strat_keys_in_strat_collection(widget: WebElement) -> WebElement:
-    container_element = get_buffer_strat_dropdown_container_element(widget)
+def click_n_get_input_element_of_buffer_plan_keys_in_plan_collection(widget: WebElement) -> WebElement:
+    container_element = get_buffer_plan_dropdown_container_element(widget)
     input_element = container_element.find_element(By.TAG_NAME, "input")
     click_element_n_short_delay(input_element)
     return input_element
 
 
-def load_strat(widget: WebElement):
-    select_buffer_strat_key_from_dropdown(widget)
-    container_element = get_buffer_strat_dropdown_container_element(widget)
+def load_plan(widget: WebElement):
+    select_buffer_plan_key_from_dropdown(widget)
+    container_element = get_buffer_plan_dropdown_container_element(widget)
     container_elements = container_element.find_elements(By.TAG_NAME, "button")
     click_element_n_short_delay(container_elements[1])
 
 
-def select_buffer_strat_key_from_dropdown(widget: WebElement):
-    input_element = click_n_get_input_element_of_buffer_strat_keys_in_strat_collection(widget)
+def select_buffer_plan_key_from_dropdown(widget: WebElement):
+    input_element = click_n_get_input_element_of_buffer_plan_keys_in_plan_collection(widget)
     input_element.send_keys(Keys.ARROW_DOWN + Keys.ENTER)
     time.sleep(Delay.SHORT.value)
 
 
-def get_buffer_strat_dropdown_container_element(widget: WebElement) -> WebElement:
+def get_buffer_plan_dropdown_container_element(widget: WebElement) -> WebElement:
     css_selector = get_css_selector_of_dynamic_class_name_with_initial_class_name(
         "AbbreviatedFilterWidget_dropdown_container")
     container_element = widget.find_element(By.CSS_SELECTOR, css_selector)
@@ -2128,7 +2128,7 @@ def get_xpath_with_attribute(tag_name: str, attribute_name: str, attribute_value
     return f"//{tag_name}[@{attribute_name}='{attribute_value}']"
 
 
-def unload_strat(widget: WebElement, driver: WebDriver):
+def unload_plan(widget: WebElement, driver: WebDriver):
     click_unload_btn(widget)
     click_confirm_save(driver)
 
@@ -2379,7 +2379,7 @@ def set_n_validate_input_value_for_comma_seperated(driver: WebDriver, schema_dic
             widget = driver.find_element(By.ID, widget_name)
             scroll_into_view(driver=driver, element=widget)
             click_button_with_name(widget=widget, button_name="Edit")
-            if widget_name == "strat_status":
+            if widget_name == "plan_status":
                 continue
             if widget_name == "chore_limits" and layout == Layout.TABLE:
                 switch_layout(widget=widget, layout=Layout.TABLE)
@@ -2392,7 +2392,7 @@ def set_n_validate_input_value_for_comma_seperated(driver: WebDriver, schema_dic
             for field_query in widget_query.fields:
                 xpath: str
                 field_name: str = field_query.field_name
-                # in strat status widget residual notional and balance notional fld disabled in table layout only
+                # in plan status widget residual notional and balance notional fld disabled in table layout only
                 if (field_name == "residual_notional" or field_name == "balance_notional") and layout == Layout.TABLE:
                     continue
                 val_min, val_max = get_val_min_n_val_max_of_fld(field_query)
@@ -2422,7 +2422,7 @@ def get_n_validate_number_format_from_input_fld(schema_dict: Dict[str, any], wid
             # chore limits widget has hidden layout btn
             widget_name = widget_query.widget_name
             if widget_name in [WidgetName.BasketChore.value, WidgetName.SymbolOverview.value,
-                               WidgetName.StratBrief.value,
+                               WidgetName.PlanBrief.value,
                                WidgetName.SymbolSideSnapShot.value, WidgetName.ChoreLimits.value]:
                 continue
             widget: WebElement = driver.find_element(By.ID, widget_name)
@@ -2458,7 +2458,7 @@ def get_n_validate_fld_fld_display_type(schema_dict: Dict[str, any], widget_type
                                           flux_property=flux_property)
     print(result)
     assert result[0]
-    # portfolio limits, chore limits and portfolio status
+    # contact limits, chore limits and contact status
     # TABLE LAYOUT
 
     field_name: str = ""
@@ -2476,7 +2476,7 @@ def get_n_validate_fld_fld_display_type(schema_dict: Dict[str, any], widget_type
                                                    widget_name=widget_name, field_name=field_name)
             field_name_list.append(field_name)
 
-            # in strat status residual notional fld is disabled
+            # in plan status residual notional fld is disabled
             set_table_input_field(driver=driver, widget=widget, xpath=xpath, value=str(value))
         validate_flux_fld_display_type_in_widget(driver=driver, widget=widget, field_name_n_xpath=field_name,
                                                  layout=Layout.TABLE)
@@ -2488,7 +2488,7 @@ def get_n_validate_fld_fld_display_type(schema_dict: Dict[str, any], widget_type
     #     scroll_into_view(driver=driver, element=widget)
     #     click_button_with_name(widget=widget, button_name="Edit")
     #     switch_layout(widget=widget, layout=Layout.TREE)
-    #     # if widget_name == "strat_status":
+    #     # if widget_name == "plan_status":
     #     #     show_nested_fld_in_tree_layout(widget=widget)
     #     for field_query in widget_query.fields:
     #         field_name: str = field_query.field_name
@@ -2498,8 +2498,8 @@ def get_n_validate_fld_fld_display_type(schema_dict: Dict[str, any], widget_type
     #         xpath: str = get_xpath_from_field_name(schema_dict, widget_type=WidgetType.INDEPENDENT,
     #                                                widget_name=widget_name, field_name=field_name)
     #         set_tree_input_field(widget=widget, xpath=xpath, name=field_name, value=str(value))
-    #     # in strat status widget nested sec id fld is not showing any dropdown list for selecting security
-    #     # in strat status widget residual_notional is not working
+    #     # in plan status widget nested sec id fld is not showing any dropdown list for selecting security
+    #     # in plan status widget residual_notional is not working
     #     validate_flux_fld_display_type_in_widget(driver=driver, widget=widget, field_name=field_name, layout=Layout.TREE)
     #
 
@@ -2546,7 +2546,7 @@ def get_n_validate_fld_fld_elaborate_title(schema_dict, driver: WebDriver, widge
         show_hidden_fields_in_table_layout(driver, widget, widget_name, layout=Layout.TABLE)
         for field_query in widget_query.fields:
             field_name: str = field_query.field_name
-            # not showing in pair strat common keys(company)
+            # not showing in pair plan common keys(company)
             # not showing the fld in tob(in table header) widget after creating from executor(premium, px)
             if field_name in ["company", "premium", "px"]:
                 continue
@@ -2599,9 +2599,9 @@ def get_n_validate_fld_btn(schema_dict, driver: WebDriver, widget_type: WidgetTy
         for field_query in widget_query.fields:
             unpressed_schema_caption: str = field_query.properties['button']['unpressed_caption']
             pressed_schema_caption: str = field_query.properties['button']['pressed_caption']
-            if widget_name in ["system_control", "basket_chore", "portfolio_alert", "strat_alert"]:
+            if widget_name in ["system_control", "basket_chore", "contact_alert", "plan_alert"]:
                 continue
-            if widget_name == "strat_limits":
+            if widget_name == "plan_limits":
                 click_button_with_name(widget=widget, button_name="Edit")
 
             unpressed_ui_txt = get_btn_caption(widget, index_no)

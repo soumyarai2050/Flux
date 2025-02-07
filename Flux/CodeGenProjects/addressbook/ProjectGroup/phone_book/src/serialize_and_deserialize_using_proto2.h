@@ -13,7 +13,7 @@
 #include <google/protobuf/util/json_util.h>
 #include <google/protobuf/message.h>
 #include "email_book_service.pb.h"
-#include "strat_core.pb.h"
+#include "plan_core.pb.h"
 
 class SerializeAndDeserializeProto2 {
 

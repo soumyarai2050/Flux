@@ -70,6 +70,7 @@ namespace FluxCppCore {
                         "Error while inserting data to collection: {}, _id: {} document: {};;; error reason: {}",
                         get_root_model_name(), new_generated_id, bsoncxx::to_json(bson_doc.view()), qe.what()
                     );
+                    LOG_ERROR_IMPL(GetCppAppLogger(), err_msg);
                 }
                 new_generated_id = -1;
             }
@@ -96,7 +97,7 @@ namespace FluxCppCore {
                 if (MarketDataObjectToJson::object_to_json(root_model_obj, json_obj)) {
                     LOG_ERROR_IMPL(GetCppAppLogger(), "Error while inserting data to collection: {}, _id: {} document: {}, "
                                                   "existing document: {};;; error reason: {}", get_root_model_name(),
-                                                  r_new_generated_id_out, bsoncxx::to_json(bson_doc.view()),
+                                                  r_new_generated_id_out, bsoncxx::to_json(r_bson_doc.view()),
                                                   boost::json::serialize(json_obj), qe.what());
                     r_new_generated_id_out = -1;
                 }
@@ -539,17 +540,22 @@ namespace FluxCppCore {
 
         int32_t get_max_id_from_collection() {
             int32_t max_id = 0;
-            auto sort_doc = bsoncxx::builder::stream::document{} << "_id" << -1 << bsoncxx::builder::stream::finalize;
-            mongocxx::options::find opts{};
-            opts.sort(sort_doc.view());
-            opts.limit(1); // Limit to only fetch one document
-            auto client = m_sp_mongo_db_->get_pool_client();
-            mongocxx::database db = (*client)[m_sp_mongo_db_->m_mongo_db_name_];
-            auto m_mongo_db_collection_ = db[get_root_model_name()];
-            auto cursor = m_mongo_db_collection_.find({}, opts);
-            for (auto&& doc : cursor) {
-                // Get the ID of the last document
-                 max_id = doc["_id"].get_int32().value;
+            try {
+                auto sort_doc = bsoncxx::builder::stream::document{} << "_id" << -1 << bsoncxx::builder::stream::finalize;
+                mongocxx::options::find opts{};
+                opts.sort(sort_doc.view());
+                opts.limit(1); // Limit to only fetch one document
+                auto client = m_sp_mongo_db_->get_pool_client();
+                mongocxx::database db = (*client)[m_sp_mongo_db_->m_mongo_db_name_];
+                auto m_mongo_db_collection_ = db[get_root_model_name()];
+                auto cursor = m_mongo_db_collection_.find({}, opts);
+                for (auto&& doc : cursor) {
+                    // Get the ID of the last document
+                    max_id = doc["_id"].get_int32().value;
+                }
+            } catch (const std::exception& e) {
+                LOG_ERROR_IMPL(GetCppAppLogger(), "Error fetching max ID from collection: {};;; error: {}",
+                    get_root_model_name(), e.what());
             }
             return max_id;
         }

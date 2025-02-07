@@ -26,7 +26,7 @@ def is_post_book_service_up(ignore_error: bool = False) -> bool:
         return True
     except Exception as _e:
         if not ignore_error:
-            logging.exception("is_portfolio_manager_service_up test failed - tried "
+            logging.exception("is_contact_manager_service_up test failed - tried "
                               f"get_all_ui_layout_client;;; exception: {_e}", exc_info=True)
         # else not required - silently ignore error is true
         return False

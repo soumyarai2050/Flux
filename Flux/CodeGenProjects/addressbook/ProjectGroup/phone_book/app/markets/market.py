@@ -27,7 +27,7 @@ class Market:
 
         self.market_config_dict: Dict[any, any] = config_yaml_dict["market"]  # NOQA
 
-        # controls invocation of Test Strat Code vs Actual Strat COde
+        # controls invocation of Test Plan Code vs Actual Plan COde
         self.is_sanity_test_run: bool = is_sanity_test_run if (
             is_sanity_test_run := self.market_config_dict.get("is_sanity_test_run")) else False
 

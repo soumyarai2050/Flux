@@ -199,7 +199,7 @@ class CppJsonToObjectPlugin(BaseProtoPlugin):
                                     output.append(f'{tab}try {{')
                                     output.append(f'{tab}\t{name_lower}_json["{fld_name}"].if_double() ? '
                                                   f'r_{name_lower}.{fld_name}_ = {name_lower}_json["{fld_name}"'
-                                                  f'].get_double() : r_{name_lower}.px_ = {name_lower}_json["{fld_name}'
+                                                  f'].get_double() : r_{name_lower}.{fld_name}_ = {name_lower}_json["{fld_name}'
                                                   f'"].get_int64();')
                                     output.append(f'{tab}}} catch (std::exception& e) {{')
                                     output.append(f'{tab}\tthrow std::invalid_argument(std::format("Error processing `{fld_name}`: {{}}", e.what()));')

@@ -34,11 +34,11 @@ cache_override_type: "bare"
 raw_performance_data_processor_loop_wait: 2  # sec
 
 log_level: "debug"  # log lvl in int or basic log lvl name
-allow_multiple_unfilled_chore_pairs_per_strat: False
+allow_multiple_unfilled_chore_pairs_per_plan: False
 total_barter_qty_by_aggregated_window_first_n_lst_barters: True
 inst_id: "SIM"  # instance id for simulator
 
-pause_fulfill_post_chore_dod: False   # if true pauses strat which gets chore update to make any chore_snapshot fully filled post chore is DOD
+pause_fulfill_post_chore_dod: False   # if true pauses plan which gets chore update to make any chore_snapshot fully filled post chore is DOD
 max_spread_in_bips: 50
 
 # market depth lvl map

@@ -28,8 +28,8 @@ MsgspecType = TypeVar('MsgspecType', bound=msgspec.Struct)
 class ContainerObject(msgspec.Struct, kw_only=True):
     chore_journals: List[ChoreJournal]
     chore_snapshots: List[ChoreSnapshot]
-    strat_brief: StratBrief | None = None
-    portfolio_status_updates: List[PortfolioStatusUpdatesContainer]
+    plan_brief: PlanBrief | None = None
+    contact_status_updates: List[ContactStatusUpdatesContainer]
 
 
 class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallback):
@@ -38,9 +38,9 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
     underlying_create_all_chore_snapshot_http: Callable[..., Any] | None = None
     underlying_update_all_chore_snapshot_http: Callable[..., Any] | None = None
     underlying_create_all_chore_journal_http: Callable[..., Any] | None = None
-    underlying_read_strat_brief_http: Callable[..., Any] | None = None
-    underlying_create_strat_brief_http: Callable[..., Any] | None = None
-    underlying_update_strat_brief_http: Callable[..., Any] | None = None
+    underlying_read_plan_brief_http: Callable[..., Any] | None = None
+    underlying_create_plan_brief_http: Callable[..., Any] | None = None
+    underlying_update_plan_brief_http: Callable[..., Any] | None = None
     underlying_get_last_n_sec_chores_by_events_query_http: Callable[..., Any] | None = None
 
     @classmethod
@@ -48,17 +48,17 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
         from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.generated.FastApi.post_book_service_http_routes_imports import (
             underlying_read_chore_journal_http, underlying_read_chore_snapshot_http,
             underlying_create_all_chore_snapshot_http, underlying_update_all_chore_snapshot_http,
-            underlying_create_all_chore_journal_http, underlying_read_strat_brief_http,
-            underlying_create_strat_brief_http, underlying_update_strat_brief_http,
+            underlying_create_all_chore_journal_http, underlying_read_plan_brief_http,
+            underlying_create_plan_brief_http, underlying_update_plan_brief_http,
             underlying_get_last_n_sec_chores_by_events_query_http)
         cls.underlying_read_chore_journal_http = underlying_read_chore_journal_http
         cls.underlying_read_chore_snapshot_http = underlying_read_chore_snapshot_http
         cls.underlying_create_all_chore_snapshot_http = underlying_create_all_chore_snapshot_http
         cls.underlying_update_all_chore_snapshot_http = underlying_update_all_chore_snapshot_http
         cls.underlying_create_all_chore_journal_http = underlying_create_all_chore_journal_http
-        cls.underlying_read_strat_brief_http = underlying_read_strat_brief_http
-        cls.underlying_create_strat_brief_http = underlying_create_strat_brief_http
-        cls.underlying_update_strat_brief_http = underlying_update_strat_brief_http
+        cls.underlying_read_plan_brief_http = underlying_read_plan_brief_http
+        cls.underlying_create_plan_brief_http = underlying_create_plan_brief_http
+        cls.underlying_update_plan_brief_http = underlying_update_plan_brief_http
         cls.underlying_get_last_n_sec_chores_by_events_query_http = underlying_get_last_n_sec_chores_by_events_query_http
 
     def __init__(self):
@@ -75,18 +75,18 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
         self.service_ready = False
         if self.min_refresh_interval is None:
             self.min_refresh_interval = 30
-        self.portfolio_limit_check_queue: Queue = Queue()
-        self.update_portfolio_status_queue: Queue = Queue()
+        self.contact_limit_check_queue: Queue = Queue()
+        self.update_contact_status_queue: Queue = Queue()
         self.container_model: MsgspecType = ContainerObject
         self.chore_id_to_chore_snapshot_cache_dict: Dict[str, ChoreSnapshot] = {}
         self.chore_id_to_open_chore_snapshot_cache_dict: Dict[str, ChoreSnapshot] = {}
-        self.strat_id_to_strat_brief_cache_dict: Dict[int, StratBrief] = {}
+        self.plan_id_to_plan_brief_cache_dict: Dict[int, PlanBrief] = {}
 
     @except_n_log_alert()
     def _app_launch_pre_thread_func(self):
         """
-        sleep wait till engine is up, then create portfolio limits if required
-        TODO LAZY: we should invoke _apply_checks_n_alert on all active pair strats at startup/re-start
+        sleep wait till engine is up, then create contact limits if required
+        TODO LAZY: we should invoke _apply_checks_n_alert on all active pair plans at startup/re-start
         """
 
         error_prefix = "_app_launch_pre_thread_func: "
@@ -101,13 +101,13 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
                 # validate essential services are up, if so, set service ready state to true
                 if self.service_up:
                     if not self.service_ready:
-                        # Updating chore_snapshot cache and strat_brief cache
+                        # Updating chore_snapshot cache and plan_brief cache
                         self.load_existing_chore_snapshot()
-                        self.load_existing_strat_brief()
+                        self.load_existing_plan_brief()
 
-                        # Running portfolio_limit_check_queue_handler
-                        Thread(target=self.portfolio_limit_check_queue_handler, daemon=True).start()
-                        Thread(target=self._update_portfolio_status_n_check_portfolio_limits, daemon=True).start()
+                        # Running contact_limit_check_queue_handler
+                        Thread(target=self.contact_limit_check_queue_handler, daemon=True).start()
+                        Thread(target=self._update_contact_status_n_check_contact_limits, daemon=True).start()
                         self.service_ready = True
                         # print is just to manually check if this server is ready - useful when we run
                         # multiple servers and before running any test we want to make sure servers are up
@@ -204,33 +204,33 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
             raise HTTPException(detail=err_str_, status_code=503)
         return updated_chore_snapshot_obj_json
 
-    async def create_strat_brief_pre(self, strat_brief_obj: StratBrief):
+    async def create_plan_brief_pre(self, plan_brief_obj: PlanBrief):
         if not self.service_ready:
             # raise service unavailable 503 exception, let the caller retry
-            err_str_ = "create_strat_brief_pre not ready - service is not initialized yet"
+            err_str_ = "create_plan_brief_pre not ready - service is not initialized yet"
             logging.error(err_str_)
             raise HTTPException(detail=err_str_, status_code=503)
 
-    async def update_strat_brief_pre(self, updated_strat_brief_obj: StratBrief):
+    async def update_plan_brief_pre(self, updated_plan_brief_obj: PlanBrief):
         if not self.service_ready:
             # raise service unavailable 503 exception, let the caller retry
-            err_str_ = "update_strat_brief_pre not ready - service is not initialized yet"
+            err_str_ = "update_plan_brief_pre not ready - service is not initialized yet"
             logging.error(err_str_)
             raise HTTPException(detail=err_str_, status_code=503)
-        return updated_strat_brief_obj
+        return updated_plan_brief_obj
 
-    async def partial_update_strat_brief_pre(self, stored_strat_brief_obj: StratBrief,
-                                             updated_strat_brief_obj_json: Dict):
+    async def partial_update_plan_brief_pre(self, stored_plan_brief_obj: PlanBrief,
+                                             updated_plan_brief_obj_json: Dict):
         if not self.service_ready:
             # raise service unavailable 503 exception, let the caller retry
-            err_str_ = "partial_update_strat_brief_pre not ready - service is not initialized yet"
+            err_str_ = "partial_update_plan_brief_pre not ready - service is not initialized yet"
             logging.error(err_str_)
             raise HTTPException(detail=err_str_, status_code=503)
-        return updated_strat_brief_obj_json
+        return updated_plan_brief_obj_json
 
-    async def check_portfolio_limits_query_pre(self, check_portfolio_limits_class_type: Type[CheckPortfolioLimits],
+    async def check_contact_limits_query_pre(self, check_contact_limits_class_type: Type[CheckContactLimits],
                                                payload_dict: Dict[str, Any]):
-        self.portfolio_limit_check_queue.put(payload_dict)
+        self.contact_limit_check_queue.put(payload_dict)
         return []
 
     def load_existing_chore_snapshot(self):
@@ -271,25 +271,25 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
             # updating open_chore_snapshots
             self._update_open_chore_snapshot_cache(chore_snapshot)
 
-    def load_existing_strat_brief(self):
+    def load_existing_plan_brief(self):
         run_coro = (
-            PostBookServiceRoutesCallbackBaseNativeOverride.underlying_read_strat_brief_http())
+            PostBookServiceRoutesCallbackBaseNativeOverride.underlying_read_plan_brief_http())
         future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
 
         # block for task to finish
         try:
-            strat_brief_list: List[StratBrief] = future.result()
+            plan_brief_list: List[PlanBrief] = future.result()
         except Exception as e:
-            logging.exception(f"underlying_read_strat_brief_http failed - ignoring cache load of strat_brief "
+            logging.exception(f"underlying_read_plan_brief_http failed - ignoring cache load of plan_brief "
                               f"from db, exception: {e}")
             return None
 
         # Setting cache data member
-        self._load_existing_strat_brief(strat_brief_list)
+        self._load_existing_plan_brief(plan_brief_list)
 
-    def _load_existing_strat_brief(self, strat_brief_list: List[StratBrief]):
-        for strat_brief in strat_brief_list:
-            self.strat_id_to_strat_brief_cache_dict[strat_brief.id] = strat_brief
+    def _load_existing_plan_brief(self, plan_brief_list: List[PlanBrief]):
+        for plan_brief in plan_brief_list:
+            self.plan_id_to_plan_brief_cache_dict[plan_brief.id] = plan_brief
 
     async def create_or_update_chore_snapshot(self, chore_snapshot_list: List[ChoreSnapshot]):
         async with ChoreSnapshot.reentrant_lock:
@@ -339,36 +339,36 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
 
         return chore_snapshot
 
-    def _get_strat_brief_from_payload(self, payload_dict: Dict[str, Any]):
-        strat_brief: StratBrief | None = None
-        if (strat_brief_dict := payload_dict.get("strat_brief")) is not None:
-            # _id override for strat brief is not required since it will have same id as
-            # it's respective executor strat_id, so it will be unique here too
-            strat_brief = StratBrief.from_dict(strat_brief_dict)
-        return strat_brief
+    def _get_plan_brief_from_payload(self, payload_dict: Dict[str, Any]):
+        plan_brief: PlanBrief | None = None
+        if (plan_brief_dict := payload_dict.get("plan_brief")) is not None:
+            # _id override for plan brief is not required since it will have same id as
+            # it's respective executor plan_id, so it will be unique here too
+            plan_brief = PlanBrief.from_dict(plan_brief_dict)
+        return plan_brief
 
-    def _get_portfolio_status_updates_from_payload(self, payload_dict: Dict[str, Any]):
-        portfolio_status_updates: PortfolioStatusUpdatesContainer | None = None
-        if (portfolio_status_updates_dict := payload_dict.get("portfolio_status_updates")) is not None:
-            portfolio_status_updates = PortfolioStatusUpdatesContainer.from_dict(portfolio_status_updates_dict)
-        return portfolio_status_updates
+    def _get_contact_status_updates_from_payload(self, payload_dict: Dict[str, Any]):
+        contact_status_updates: ContactStatusUpdatesContainer | None = None
+        if (contact_status_updates_dict := payload_dict.get("contact_status_updates")) is not None:
+            contact_status_updates = ContactStatusUpdatesContainer.from_dict(contact_status_updates_dict)
+        return contact_status_updates
 
-    def update_strat_id_list_n_dict_from_payload(self, strat_id_list: List[int],
-                                                 strat_id_to_container_obj_dict: Dict[int, ContainerObject],
+    def update_plan_id_list_n_dict_from_payload(self, plan_id_list: List[int],
+                                                 plan_id_to_container_obj_dict: Dict[int, ContainerObject],
                                                  payload_dict: Dict[str, Any]):
         """
-        updates strat_id_to_container_obj_dict param - returns None
+        updates plan_id_to_container_obj_dict param - returns None
         """
-        strat_id = payload_dict.get("strat_id")
-        if strat_id is None:
-            logging.error("Payload doesn't contain strat_id, might be a bug at queue updater, "
+        plan_id = payload_dict.get("plan_id")
+        if plan_id is None:
+            logging.error("Payload doesn't contain plan_id, might be a bug at queue updater, "
                           f"ignoring this update, payload_received in queue: {payload_dict}")
             return None
 
         added_id: bool = False
-        if strat_id not in strat_id_list:
+        if plan_id not in plan_id_list:
             added_id = True
-            strat_id_list.append(strat_id)
+            plan_id_list.append(plan_id)
 
         chore_journal: ChoreJournal | None = self._get_chore_journal_from_payload(payload_dict)
 
@@ -377,37 +377,37 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
             logging.error("Payload doesn't contain chore_snapshot, might be a bug at queue updater, "
                           f"ignoring this update, payload_received in queue: {payload_dict}")
 
-            # rollback strat_id_list if id was added in this call
+            # rollback plan_id_list if id was added in this call
             if added_id:
-                strat_id_list.remove(strat_id)
+                plan_id_list.remove(plan_id)
             return None
 
-        strat_brief: StratBrief | None = self._get_strat_brief_from_payload(payload_dict)
-        portfolio_status_updates: PortfolioStatusUpdatesContainer | None = (
-            self._get_portfolio_status_updates_from_payload(payload_dict))
+        plan_brief: PlanBrief | None = self._get_plan_brief_from_payload(payload_dict)
+        contact_status_updates: ContactStatusUpdatesContainer | None = (
+            self._get_contact_status_updates_from_payload(payload_dict))
 
-        container_obj: ContainerObject = strat_id_to_container_obj_dict.get(strat_id)
+        container_obj: ContainerObject = plan_id_to_container_obj_dict.get(plan_id)
         if container_obj is not None:
             if chore_journal is not None:
                 container_obj.chore_journals.append(chore_journal)
             container_obj.chore_snapshots.append(chore_snapshot)
-            if strat_brief is not None:
-                container_obj.strat_brief = strat_brief
-            if portfolio_status_updates is not None:
-                container_obj.portfolio_status_updates.append(portfolio_status_updates)
+            if plan_brief is not None:
+                container_obj.plan_brief = plan_brief
+            if contact_status_updates is not None:
+                container_obj.contact_status_updates.append(contact_status_updates)
         else:
             chore_journal_list = []
-            portfolio_status_updates_list = []
+            contact_status_updates_list = []
             if chore_journal is not None:
                 chore_journal_list.append(chore_journal)
-            if portfolio_status_updates is not None:
-                portfolio_status_updates_list.append(portfolio_status_updates)
+            if contact_status_updates is not None:
+                contact_status_updates_list.append(contact_status_updates)
             container_obj = self.container_model(chore_journals=chore_journal_list,
                                                  chore_snapshots=[chore_snapshot],
-                                                 strat_brief=strat_brief,
-                                                 portfolio_status_updates=portfolio_status_updates_list)
+                                                 plan_brief=plan_brief,
+                                                 contact_status_updates=contact_status_updates_list)
 
-            strat_id_to_container_obj_dict[strat_id] = container_obj
+            plan_id_to_container_obj_dict[plan_id] = container_obj
         return None
 
     def add_chore_journals(self, chore_journal_list: List[ChoreJournal]):
@@ -422,19 +422,19 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
             logging.exception(f"underlying_create_all_chore_journal_http failed "
                               f"with exception: {e}")
 
-    async def create_or_update_strat_brief(self, strat_brief: StratBrief):
-        async with StratBrief.reentrant_lock:
-            if strat_brief.id not in self.strat_id_to_strat_brief_cache_dict:
-                await PostBookServiceRoutesCallbackBaseNativeOverride.underlying_create_strat_brief_http(
-                    strat_brief)
+    async def create_or_update_plan_brief(self, plan_brief: PlanBrief):
+        async with PlanBrief.reentrant_lock:
+            if plan_brief.id not in self.plan_id_to_plan_brief_cache_dict:
+                await PostBookServiceRoutesCallbackBaseNativeOverride.underlying_create_plan_brief_http(
+                    plan_brief)
             else:
-                await PostBookServiceRoutesCallbackBaseNativeOverride.underlying_update_strat_brief_http(
-                    strat_brief)
-            self.strat_id_to_strat_brief_cache_dict[strat_brief.id] = strat_brief
+                await PostBookServiceRoutesCallbackBaseNativeOverride.underlying_update_plan_brief_http(
+                    plan_brief)
+            self.plan_id_to_plan_brief_cache_dict[plan_brief.id] = plan_brief
 
     def update_db(self, chore_journal_list: List[ChoreJournal],
                   chore_snapshot_list: List[ChoreSnapshot],
-                  strat_brief: StratBrief):
+                  plan_brief: PlanBrief):
         # creating chore_journals
         if chore_journal_list:
             self.add_chore_journals(chore_journal_list)
@@ -454,35 +454,35 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
                 logging.exception(f"create_or_update_chore_snapshot failed "
                                   f"with exception: {e}")
 
-        # creating or updating strat_brief
-        if strat_brief is not None:
-            run_coro = self.create_or_update_strat_brief(strat_brief)
+        # creating or updating plan_brief
+        if plan_brief is not None:
+            run_coro = self.create_or_update_plan_brief(plan_brief)
             future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
 
             # block for task to finish
             try:
                 future.result()
             except Exception as e:
-                logging.exception(f"create_or_update_strat_brief failed "
+                logging.exception(f"create_or_update_plan_brief failed "
                                   f"with exception: {e}")
 
     def check_max_open_baskets(self, max_open_baskets: int, open_chore_count: int) -> bool:
-        pause_all_strats = False
+        pause_all_plans = False
 
         if max_open_baskets - open_chore_count < 0:
-            # this is kept < (less than) and not <= (less than equal) intentionally - this avoids all strat
-            # pause on consumable value which is exact same as limit, above limit all strat pause is called
+            # this is kept < (less than) and not <= (less than equal) intentionally - this avoids all plan
+            # pause on consumable value which is exact same as limit, above limit all plan pause is called
 
             # @@@ below error log is used in specific test case for string matching - if changed here
             # needs to be changed in test also
             logging.critical(
                 f"max_open_baskets breached, allowed {max_open_baskets=}, current {open_chore_count=} - "
-                f"initiating all strat pause")
-            pause_all_strats = True
-        return pause_all_strats
+                f"initiating all plan pause")
+            pause_all_plans = True
+        return pause_all_plans
 
     async def check_rolling_max_chore_count(self, rolling_chore_count_period_seconds: int, max_rolling_tx_count: int):
-        pause_all_strats = False
+        pause_all_plans = False
 
         chore_count_updated_chore_journals: List[ChoreJournal] = (
             await PostBookServiceRoutesCallbackBaseNativeOverride.
@@ -505,12 +505,12 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
             logging.critical(f"rolling_max_chore_count breached: "
                              f"{chore_count_updated_chore_journals[0].current_period_chore_count} "
                              f"chores in past {rolling_chore_count_period_seconds} secs, allowed chores within this "
-                             f"period is {max_rolling_tx_count}, initiating all strat pause")
-            pause_all_strats = True
-        return pause_all_strats
+                             f"period is {max_rolling_tx_count}, initiating all plan pause")
+            pause_all_plans = True
+        return pause_all_plans
 
     async def check_rolling_max_rej_count(self, rolling_rej_count_period_seconds: int, max_rolling_tx_count: int):
-        pause_all_strats = False
+        pause_all_plans = False
 
         chore_count_updated_chore_journals: List[ChoreJournal] = (
             await PostBookServiceRoutesCallbackBaseNativeOverride.
@@ -534,97 +534,97 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
                              f"{chore_count_updated_chore_journals[0].current_period_chore_count} "
                              f"rejections in past {rolling_rej_count_period_seconds} secs, "
                              f"allowed rejections within this period is {max_rolling_tx_count}"
-                             f"- initiating all strat pause")
-            pause_all_strats = True
-        return pause_all_strats
+                             f"- initiating all plan pause")
+            pause_all_plans = True
+        return pause_all_plans
 
-    async def check_all_portfolio_limits(self) -> bool:
-        portfolio_limits = email_book_service_http_client.get_portfolio_limits_client(portfolio_limits_id=1)
-        portfolio_status = email_book_service_http_client.get_portfolio_status_client(portfolio_status_id=1)
+    async def check_all_contact_limits(self) -> bool:
+        contact_limits = email_book_service_http_client.get_contact_limits_client(contact_limits_id=1)
+        contact_status = email_book_service_http_client.get_contact_status_client(contact_status_id=1)
 
-        pause_all_strats = False
+        pause_all_plans = False
 
-        # Checking portfolio_limits.max_open_baskets
-        if portfolio_status.open_chores is not None:
-            max_open_baskets_breached = self.check_max_open_baskets(portfolio_limits.max_open_baskets,
-                                                                    portfolio_status.open_chores)
+        # Checking contact_limits.max_open_baskets
+        if contact_status.open_chores is not None:
+            max_open_baskets_breached = self.check_max_open_baskets(contact_limits.max_open_baskets,
+                                                                    contact_status.open_chores)
             if max_open_baskets_breached:
-                pause_all_strats = True
+                pause_all_plans = True
         # else not required: considering None as no open chore is present
 
         # block for task to finish
         total_buy_open_notional = 0
         total_sell_open_notional = 0
-        async with StratBrief.reentrant_lock:
-            for strat_brief in self.strat_id_to_strat_brief_cache_dict.values():
+        async with PlanBrief.reentrant_lock:
+            for plan_brief in self.plan_id_to_plan_brief_cache_dict.values():
                 # Buy side check
-                total_buy_open_notional += strat_brief.pair_buy_side_bartering_brief.open_notional
+                total_buy_open_notional += plan_brief.pair_buy_side_bartering_brief.open_notional
                 # Sell side check
-                total_sell_open_notional += strat_brief.pair_sell_side_bartering_brief.open_notional
+                total_sell_open_notional += plan_brief.pair_sell_side_bartering_brief.open_notional
 
-        if portfolio_limits.max_open_notional_per_side < total_buy_open_notional:
+        if contact_limits.max_open_notional_per_side < total_buy_open_notional:
             # @@@ below error log is used in specific test case for string matching - if changed here
             # needs to be changed in test also
             logging.critical(f"max_open_notional_per_side breached for BUY side, "
-                             f"allowed max_open_notional_per_side: {portfolio_limits.max_open_notional_per_side}, "
+                             f"allowed max_open_notional_per_side: {contact_limits.max_open_notional_per_side}, "
                              f"current {total_buy_open_notional=}"
-                             f" - initiating all strat pause")
-            pause_all_strats = True
+                             f" - initiating all plan pause")
+            pause_all_plans = True
 
-        if portfolio_limits.max_open_notional_per_side < total_sell_open_notional:
+        if contact_limits.max_open_notional_per_side < total_sell_open_notional:
             # @@@ below error log is used in specific test case for string matching - if changed here
             # needs to be changed in test also
             logging.critical(f"max_open_notional_per_side breached for SELL side, "
-                             f"allowed max_open_notional_per_side: {portfolio_limits.max_open_notional_per_side}, "
+                             f"allowed max_open_notional_per_side: {contact_limits.max_open_notional_per_side}, "
                              f"current {total_sell_open_notional=}"
-                             f" - initiating all strat pause")
-            pause_all_strats = True
+                             f" - initiating all plan pause")
+            pause_all_plans = True
 
-        # Checking portfolio_limits.max_gross_n_open_notional
+        # Checking contact_limits.max_gross_n_open_notional
         total_open_notional = total_buy_open_notional + total_sell_open_notional
-        total_gross_n_open_notional = (total_open_notional + portfolio_status.overall_buy_fill_notional +
-                                       portfolio_status.overall_sell_fill_notional)
-        if portfolio_limits.max_gross_n_open_notional < total_gross_n_open_notional:
+        total_gross_n_open_notional = (total_open_notional + contact_status.overall_buy_fill_notional +
+                                       contact_status.overall_sell_fill_notional)
+        if contact_limits.max_gross_n_open_notional < total_gross_n_open_notional:
             # @@@ below error log is used in specific test case for string matching - if changed here
             # needs to be changed in test also
             logging.critical(f"max_gross_n_open_notional breached, "
-                             f"allowed {portfolio_limits.max_gross_n_open_notional=}, "
+                             f"allowed {contact_limits.max_gross_n_open_notional=}, "
                              f"current {total_gross_n_open_notional=}"
-                             f" - initiating all strat pause")
-            pause_all_strats = True
+                             f" - initiating all plan pause")
+            pause_all_plans = True
 
-        # Checking portfolio_limits.rolling_max_chore_count
+        # Checking contact_limits.rolling_max_chore_count
         rolling_max_chore_count_breached: bool = await self.check_rolling_max_chore_count(
-            portfolio_limits.rolling_max_chore_count.rolling_tx_count_period_seconds,
-            portfolio_limits.rolling_max_chore_count.max_rolling_tx_count)
+            contact_limits.rolling_max_chore_count.rolling_tx_count_period_seconds,
+            contact_limits.rolling_max_chore_count.max_rolling_tx_count)
         if rolling_max_chore_count_breached:
-            pause_all_strats = True  # any failure logged in check_rolling_max_chore_count
+            pause_all_plans = True  # any failure logged in check_rolling_max_chore_count
 
-        # checking portfolio_limits.rolling_max_reject_count
+        # checking contact_limits.rolling_max_reject_count
         rolling_max_rej_count_breached: bool = await self.check_rolling_max_rej_count(
-            portfolio_limits.rolling_max_reject_count.rolling_tx_count_period_seconds,
-            portfolio_limits.rolling_max_reject_count.max_rolling_tx_count)
+            contact_limits.rolling_max_reject_count.rolling_tx_count_period_seconds,
+            contact_limits.rolling_max_reject_count.max_rolling_tx_count)
         if rolling_max_rej_count_breached:
-            pause_all_strats = True  # any failure logged in check_rolling_max_rej_count
-        return pause_all_strats
+            pause_all_plans = True  # any failure logged in check_rolling_max_rej_count
+        return pause_all_plans
 
-    def _portfolio_limit_check_queue_handler(self, strat_id_list: List[int],
-                                             strat_id_to_container_obj_dict: Dict[int, ContainerObject]):
+    def _contact_limit_check_queue_handler(self, plan_id_list: List[int],
+                                             plan_id_to_container_obj_dict: Dict[int, ContainerObject]):
         """post pickup form queue - data [list] is now in dict/list"""
-        for strat_id in strat_id_list:
-            container_object = strat_id_to_container_obj_dict.get(strat_id)
+        for plan_id in plan_id_list:
+            container_object = plan_id_to_container_obj_dict.get(plan_id)
             chore_journal_list = container_object.chore_journals
             chore_snapshot_list = container_object.chore_snapshots
-            strat_brief = container_object.strat_brief
-            portfolio_status_updates_list = container_object.portfolio_status_updates
+            plan_brief = container_object.plan_brief
+            contact_status_updates_list = container_object.contact_status_updates
 
             # Updating db
-            self.update_db(chore_journal_list, chore_snapshot_list, strat_brief)
+            self.update_db(chore_journal_list, chore_snapshot_list, plan_brief)
 
-            # updating update_portfolio_status_queue - handler gets data and constantly tries
+            # updating update_contact_status_queue - handler gets data and constantly tries
             #                                          to update until gets success
-            for portfolio_status_updates in portfolio_status_updates_list:
-                self.update_portfolio_status_queue.put(portfolio_status_updates)
+            for contact_status_updates in contact_status_updates_list:
+                self.update_contact_status_queue.put(contact_status_updates)
 
     @staticmethod
     def check_connection_or_service_not_ready_error(exception: Exception) -> bool:
@@ -643,19 +643,19 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
             return False
         return True
 
-    def _update_portfolio_status_vals(self, buy_notional_update, sell_notional_update, buy_fill_notional_update,
-                                      sell_fill_notional_update, portfolio_status_updates):
-        if portfolio_status_updates.buy_notional_update:
-            buy_notional_update += portfolio_status_updates.buy_notional_update
-        if portfolio_status_updates.sell_notional_update:
-            sell_notional_update += portfolio_status_updates.sell_notional_update
-        if portfolio_status_updates.buy_fill_notional_update:
-            buy_fill_notional_update += portfolio_status_updates.buy_fill_notional_update
-        if portfolio_status_updates.sell_fill_notional_update:
-            sell_fill_notional_update += portfolio_status_updates.sell_fill_notional_update
+    def _update_contact_status_vals(self, buy_notional_update, sell_notional_update, buy_fill_notional_update,
+                                      sell_fill_notional_update, contact_status_updates):
+        if contact_status_updates.buy_notional_update:
+            buy_notional_update += contact_status_updates.buy_notional_update
+        if contact_status_updates.sell_notional_update:
+            sell_notional_update += contact_status_updates.sell_notional_update
+        if contact_status_updates.buy_fill_notional_update:
+            buy_fill_notional_update += contact_status_updates.buy_fill_notional_update
+        if contact_status_updates.sell_fill_notional_update:
+            sell_fill_notional_update += contact_status_updates.sell_fill_notional_update
         return buy_notional_update, sell_notional_update, buy_fill_notional_update, sell_fill_notional_update
 
-    def _update_portfolio_status_n_check_portfolio_limits(self):
+    def _update_contact_status_n_check_contact_limits(self):
         while 1:
             buy_notional_update = 0
             sell_notional_update = 0
@@ -663,23 +663,23 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
             sell_fill_notional_update = 0
 
             counter = 0
-            portfolio_status_updates: PortfolioStatusUpdatesContainer = self.update_portfolio_status_queue.get()
+            contact_status_updates: ContactStatusUpdatesContainer = self.update_contact_status_queue.get()
             buy_notional_update, sell_notional_update, buy_fill_notional_update, sell_fill_notional_update = (
-                self._update_portfolio_status_vals(buy_notional_update, sell_notional_update, buy_fill_notional_update,
-                                                   sell_fill_notional_update, portfolio_status_updates))
+                self._update_contact_status_vals(buy_notional_update, sell_notional_update, buy_fill_notional_update,
+                                                   sell_fill_notional_update, contact_status_updates))
             counter += 1
 
-            while not self.update_portfolio_status_queue.empty():
-                portfolio_status_updates: PortfolioStatusUpdatesContainer = self.update_portfolio_status_queue.get()
+            while not self.update_contact_status_queue.empty():
+                contact_status_updates: ContactStatusUpdatesContainer = self.update_contact_status_queue.get()
                 buy_notional_update, sell_notional_update, buy_fill_notional_update, sell_fill_notional_update = (
-                    self._update_portfolio_status_vals(buy_notional_update, sell_notional_update,
+                    self._update_contact_status_vals(buy_notional_update, sell_notional_update,
                                                        buy_fill_notional_update, sell_fill_notional_update,
-                                                       portfolio_status_updates))
+                                                       contact_status_updates))
                 counter += 1
 
             while 1:
                 try:
-                    email_book_service_http_client.update_portfolio_status_by_chore_or_fill_data_query_client(
+                    email_book_service_http_client.update_contact_status_by_chore_or_fill_data_query_client(
                         overall_buy_notional=buy_notional_update,
                         overall_sell_notional=sell_notional_update,
                         overall_buy_fill_notional=buy_fill_notional_update,
@@ -689,100 +689,100 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
                     res = self.check_connection_or_service_not_ready_error(e)  # True if connection or service up error
                     if not res:
                         logging.exception(
-                            f"update_portfolio_status_by_chore_or_fill_data_query_client failed with exception: {e}")
+                            f"update_contact_status_by_chore_or_fill_data_query_client failed with exception: {e}")
                         break
                     else:
-                        logging.info("Retrying update_portfolio_status_by_chore_or_fill_data_query_client in 1 sec")
+                        logging.info("Retrying update_contact_status_by_chore_or_fill_data_query_client in 1 sec")
                         time.sleep(1)
                 else:
                     break
 
             while 1:
-                # Checking Portfolio limits and Pausing ALL Strats if limit found breached
-                run_coro = self.check_all_portfolio_limits()
+                # Checking Contact limits and Pausing ALL Plans if limit found breached
+                run_coro = self.check_all_contact_limits()
                 future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
 
                 # block for task to finish
                 try:
-                    pause_all_strats: bool = future.result()
+                    pause_all_plans: bool = future.result()
                 except Exception as e:
                     res = self.check_connection_or_service_not_ready_error(e)  # True if connection or service up error
                     if not res:
-                        logging.exception(f"check_all_portfolio_limits failed, exception: {e}")
+                        logging.exception(f"check_all_contact_limits failed, exception: {e}")
                         return None
                     else:
-                        logging.info("Retrying check_all_portfolio_limits in 1 sec")
+                        logging.info("Retrying check_all_contact_limits in 1 sec")
                         time.sleep(1)
                 else:
                     break
-            if pause_all_strats:
+            if pause_all_plans:
                 while 1:
                     try:
-                        email_book_service_http_client.pause_all_active_strats_query_client()
+                        email_book_service_http_client.pause_all_active_plans_query_client()
                     except Exception as e:
                         # True if connection or service up error
                         res = self.check_connection_or_service_not_ready_error(e)
                         if not res:
                             logging.exception(
-                                f"pause_all_active_strats_query_client failed with exception {e}")
+                                f"pause_all_active_plans_query_client failed with exception {e}")
                             break
                         else:
-                            logging.info("Retrying pause_all_active_strats_query_client in 1 sec")
+                            logging.info("Retrying pause_all_active_plans_query_client in 1 sec")
                             time.sleep(1)
                     else:
                         break
 
-    async def is_portfolio_limits_breached_query_pre(
-            self, is_portfolio_limits_breached_class_type: Type[IsPortfolioLimitsBreached]):
+    async def is_contact_limits_breached_query_pre(
+            self, is_contact_limits_breached_class_type: Type[IsContactLimitsBreached]):
         """
         :return: returns empty list if exception occurs
         """
         try:
-            pause_all_strats = await self.check_all_portfolio_limits()
+            pause_all_plans = await self.check_all_contact_limits()
         except Exception as e:
             # True if connection or service up error
             res = self.check_connection_or_service_not_ready_error(e)
             if res:
                 logging.exception("phone_book seems down, returning empty list from "
-                                  "is_portfolio_limits_breached_query_pre")
+                                  "is_contact_limits_breached_query_pre")
                 return []
         else:
-            return [IsPortfolioLimitsBreached(is_portfolio_limits_breached=pause_all_strats)]
+            return [IsContactLimitsBreached(is_contact_limits_breached=pause_all_plans)]
 
-    def portfolio_limit_check_queue_handler(self):
+    def contact_limit_check_queue_handler(self):
         post_book_queue_update_limit = config_yaml_dict.get("post_book_queue_update_limit")
         while 1:
-            strat_id_list: List[int] = []
-            strat_id_to_container_obj_dict: Dict[int, ContainerObject] = {}
+            plan_id_list: List[int] = []
+            plan_id_to_container_obj_dict: Dict[int, ContainerObject] = {}
             update_counter = 0
-            payload_dict: Dict[str, Any] = self.portfolio_limit_check_queue.get()  # blocking call
-            self.update_strat_id_list_n_dict_from_payload(strat_id_list,
-                                                          strat_id_to_container_obj_dict, payload_dict)
+            payload_dict: Dict[str, Any] = self.contact_limit_check_queue.get()  # blocking call
+            self.update_plan_id_list_n_dict_from_payload(plan_id_list,
+                                                          plan_id_to_container_obj_dict, payload_dict)
             update_counter += 1
 
-            while not self.portfolio_limit_check_queue.empty():
-                payload_dict: Dict[str, Any] = self.portfolio_limit_check_queue.get()
-                self.update_strat_id_list_n_dict_from_payload(strat_id_list, strat_id_to_container_obj_dict,
+            while not self.contact_limit_check_queue.empty():
+                payload_dict: Dict[str, Any] = self.contact_limit_check_queue.get()
+                self.update_plan_id_list_n_dict_from_payload(plan_id_list, plan_id_to_container_obj_dict,
                                                               payload_dict)
                 update_counter += 1
                 if post_book_queue_update_limit and update_counter >= post_book_queue_update_limit:
                     break
 
-            # Does db operations and checks portfolio_limits and raises all-strat pause if any limit breaches
-            self._portfolio_limit_check_queue_handler(strat_id_list, strat_id_to_container_obj_dict)
+            # Does db operations and checks contact_limits and raises all-plan pause if any limit breaches
+            self._contact_limit_check_queue_handler(plan_id_list, plan_id_to_container_obj_dict)
 
     async def reload_cache_query_pre(self, reload_cache_class_type: Type[ReloadCache]):
         # clearing cache dict
         self.chore_id_to_chore_snapshot_cache_dict.clear()
         self.chore_id_to_open_chore_snapshot_cache_dict.clear()
-        self.strat_id_to_strat_brief_cache_dict.clear()
+        self.plan_id_to_plan_brief_cache_dict.clear()
 
         chore_snapshot_list: List[ChoreSnapshot] = \
             await PostBookServiceRoutesCallbackBaseNativeOverride.underlying_read_chore_snapshot_http()
         self._load_existing_chore_snapshot(chore_snapshot_list)
 
-        strat_brief_list: List[StratBrief] = \
-            await PostBookServiceRoutesCallbackBaseNativeOverride.underlying_read_strat_brief_http()
-        self._load_existing_strat_brief(strat_brief_list)
+        plan_brief_list: List[PlanBrief] = \
+            await PostBookServiceRoutesCallbackBaseNativeOverride.underlying_read_plan_brief_http()
+        self._load_existing_plan_brief(plan_brief_list)
 
         return []

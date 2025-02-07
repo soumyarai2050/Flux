@@ -5,7 +5,7 @@ import logging
 # project imports
 from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
-    config_yaml_dict as pair_strat_config_yaml_dict)
+    config_yaml_dict as pair_plan_config_yaml_dict)
 
 EXECUTOR_PROJECT_DIR = PurePath(__file__).parent.parent
 EXECUTOR_PROJECT_DATA_DIR = EXECUTOR_PROJECT_DIR / 'data'

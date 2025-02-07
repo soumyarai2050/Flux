@@ -24,17 +24,17 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     is_service_up, get_symbol_side_key, config_yaml_dict, config_yaml_path,
     YAMLConfigurationManager, street_book_config_yaml_dict, ps_port, CURRENT_PROJECT_DIR,
-    CURRENT_PROJECT_SCRIPTS_DIR, create_md_shell_script, MDShellEnvData, ps_host, get_new_portfolio_status,
-    get_new_portfolio_limits, get_new_chore_limits, CURRENT_PROJECT_DATA_DIR, is_ongoing_strat,
-    get_strat_key_from_pair_strat, get_id_from_strat_key, get_new_strat_view_obj,
+    CURRENT_PROJECT_SCRIPTS_DIR, create_md_shell_script, MDShellEnvData, ps_host, get_new_contact_status,
+    get_new_contact_limits, get_new_chore_limits, CURRENT_PROJECT_DATA_DIR, is_ongoing_plan,
+    get_plan_key_from_pair_plan, get_id_from_plan_key, get_new_plan_view_obj,
     get_reset_log_book_cache_wrapper_pattern,
-    pair_strat_client_call_log_str, UpdateType,
-    get_matching_strat_from_symbol_n_side)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import get_pair_strat_log_key, get_pair_strat_dict_log_key, pair_strat_id_key
+    pair_plan_client_call_log_str, UpdateType,
+    get_matching_plan_from_symbol_n_side)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import get_pair_plan_log_key, get_pair_plan_dict_log_key, pair_plan_id_key
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.aggregate import (
-    get_ongoing_pair_strat_filter, get_all_pair_strat_from_symbol_n_side, get_ongoing_or_all_pair_strats_by_sec_id)
+    get_ongoing_pair_plan_filter, get_all_pair_plan_from_symbol_n_side, get_ongoing_or_all_pair_plans_by_sec_id)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.ORMModel.photo_book_service_model_imports import (
-    StratViewBaseModel)
+    PlanViewBaseModel)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_client import (
     StreetBookServiceHttpClient)
 from FluxPythonUtils.scripts.service import Service
@@ -50,37 +50,37 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data im
 
 
 class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookServiceRoutesCallback):
-    underlying_read_portfolio_status_http: Callable[..., Any] | None = None
-    underlying_read_portfolio_status_http_json_dict: Callable[..., Any] | None = None
-    underlying_create_portfolio_status_http: Callable[..., Any] | None = None
+    underlying_read_contact_status_http: Callable[..., Any] | None = None
+    underlying_read_contact_status_http_json_dict: Callable[..., Any] | None = None
+    underlying_create_contact_status_http: Callable[..., Any] | None = None
     underlying_read_chore_limits_http: Callable[..., Any] | None = None
     underlying_read_chore_limits_http_json_dict: Callable[..., Any] | None = None
     underlying_create_chore_limits_http: Callable[..., Any] | None = None
-    underlying_read_portfolio_limits_http_json_dict: Callable[..., Any] | None = None
-    underlying_create_portfolio_limits_http: Callable[..., Any] | None = None
-    underlying_read_pair_strat_http: Callable[..., Any] | None = None
-    underlying_read_pair_strat_http_json_dict: Callable[..., Any] | None = None
-    underlying_read_portfolio_status_by_id_http: Callable[..., Any] | None = None
-    underlying_update_portfolio_status_http: Callable[..., Any] | None = None
-    underlying_read_strat_collection_http: Callable[..., Any] | None = None
-    underlying_read_strat_collection_http_json_dict: Callable[..., Any] | None = None
-    underlying_create_strat_collection_http: Callable[..., Any] | None = None
-    underlying_update_strat_collection_http: Callable[..., Any] | None = None
-    underlying_partial_update_pair_strat_http: Callable[..., Any] | None = None
-    underlying_partial_update_pair_strat_http_json_dict: Callable[..., Any] | None = None
-    underlying_update_pair_strat_to_non_running_state_query_http: Callable[..., Any] | None = None
-    underlying_read_pair_strat_by_id_http: Callable[..., Any] | None = None
-    underlying_partial_update_all_pair_strat_http: Callable[..., Any] | None = None
-    underlying_read_strat_collection_by_id_http: Callable[..., Any] | None = None
-    underlying_read_strat_collection_by_id_http_json_dict: Callable[..., Any] | None = None
+    underlying_read_contact_limits_http_json_dict: Callable[..., Any] | None = None
+    underlying_create_contact_limits_http: Callable[..., Any] | None = None
+    underlying_read_pair_plan_http: Callable[..., Any] | None = None
+    underlying_read_pair_plan_http_json_dict: Callable[..., Any] | None = None
+    underlying_read_contact_status_by_id_http: Callable[..., Any] | None = None
+    underlying_update_contact_status_http: Callable[..., Any] | None = None
+    underlying_read_plan_collection_http: Callable[..., Any] | None = None
+    underlying_read_plan_collection_http_json_dict: Callable[..., Any] | None = None
+    underlying_create_plan_collection_http: Callable[..., Any] | None = None
+    underlying_update_plan_collection_http: Callable[..., Any] | None = None
+    underlying_partial_update_pair_plan_http: Callable[..., Any] | None = None
+    underlying_partial_update_pair_plan_http_json_dict: Callable[..., Any] | None = None
+    underlying_update_pair_plan_to_non_running_state_query_http: Callable[..., Any] | None = None
+    underlying_read_pair_plan_by_id_http: Callable[..., Any] | None = None
+    underlying_partial_update_all_pair_plan_http: Callable[..., Any] | None = None
+    underlying_read_plan_collection_by_id_http: Callable[..., Any] | None = None
+    underlying_read_plan_collection_by_id_http_json_dict: Callable[..., Any] | None = None
     underlying_read_system_control_by_id_http: Callable[..., Any] | None = None
     underlying_read_system_control_by_id_http_json_dict: Callable[..., Any] | None = None
     underlying_partial_update_system_control_http: Callable[..., Any] | None = None
     underlying_read_system_control_http: Callable[..., Any] | None = None
     underlying_read_system_control_http_json_dict: Callable[..., Any] | None = None
     underlying_create_system_control_http: Callable[..., Any] | None = None
-    underlying_read_portfolio_limits_http: Callable[..., Any] | None = None
-    underlying_read_portfolio_limits_by_id_http: Callable[..., Any] | None = None
+    underlying_read_contact_limits_http: Callable[..., Any] | None = None
+    underlying_read_contact_limits_by_id_http: Callable[..., Any] | None = None
 
     Fx_SO_FilePath = CURRENT_PROJECT_SCRIPTS_DIR / f"fx_so.sh"
     RecoveredKillSwitchUpdate: bool = False
@@ -88,54 +88,54 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
     @classmethod
     def initialize_underlying_http_routes(cls):
         from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.email_book_service_http_routes_imports import (
-            underlying_read_portfolio_status_http, underlying_create_portfolio_status_http,
+            underlying_read_contact_status_http, underlying_create_contact_status_http,
             underlying_read_chore_limits_http, underlying_create_chore_limits_http,
-            underlying_create_portfolio_limits_http,
-            underlying_read_pair_strat_http, underlying_read_portfolio_status_by_id_http,
-            underlying_update_portfolio_status_http, underlying_read_strat_collection_http,
-            underlying_create_strat_collection_http, underlying_update_strat_collection_http,
-            underlying_partial_update_pair_strat_http, underlying_update_pair_strat_to_non_running_state_query_http,
-            underlying_read_pair_strat_by_id_http, underlying_partial_update_all_pair_strat_http,
-            underlying_read_strat_collection_by_id_http, underlying_read_portfolio_limits_http,
+            underlying_create_contact_limits_http,
+            underlying_read_pair_plan_http, underlying_read_contact_status_by_id_http,
+            underlying_update_contact_status_http, underlying_read_plan_collection_http,
+            underlying_create_plan_collection_http, underlying_update_plan_collection_http,
+            underlying_partial_update_pair_plan_http, underlying_update_pair_plan_to_non_running_state_query_http,
+            underlying_read_pair_plan_by_id_http, underlying_partial_update_all_pair_plan_http,
+            underlying_read_plan_collection_by_id_http, underlying_read_contact_limits_http,
             underlying_read_system_control_by_id_http, underlying_partial_update_system_control_http,
             underlying_read_system_control_http, underlying_create_system_control_http,
-            underlying_read_portfolio_status_http_json_dict, underlying_read_system_control_http_json_dict,
-            underlying_read_chore_limits_http_json_dict, underlying_read_portfolio_limits_http_json_dict,
-            underlying_read_strat_collection_http_json_dict, underlying_read_system_control_by_id_http_json_dict,
-            underlying_read_pair_strat_http_json_dict, underlying_partial_update_pair_strat_http_json_dict,
-            underlying_read_strat_collection_by_id_http_json_dict, underlying_read_portfolio_limits_by_id_http)
-        cls.underlying_read_portfolio_status_http = underlying_read_portfolio_status_http
-        cls.underlying_read_portfolio_status_http_json_dict = underlying_read_portfolio_status_http_json_dict
-        cls.underlying_create_portfolio_status_http = underlying_create_portfolio_status_http
+            underlying_read_contact_status_http_json_dict, underlying_read_system_control_http_json_dict,
+            underlying_read_chore_limits_http_json_dict, underlying_read_contact_limits_http_json_dict,
+            underlying_read_plan_collection_http_json_dict, underlying_read_system_control_by_id_http_json_dict,
+            underlying_read_pair_plan_http_json_dict, underlying_partial_update_pair_plan_http_json_dict,
+            underlying_read_plan_collection_by_id_http_json_dict, underlying_read_contact_limits_by_id_http)
+        cls.underlying_read_contact_status_http = underlying_read_contact_status_http
+        cls.underlying_read_contact_status_http_json_dict = underlying_read_contact_status_http_json_dict
+        cls.underlying_create_contact_status_http = underlying_create_contact_status_http
         cls.underlying_read_chore_limits_http = underlying_read_chore_limits_http
         cls.underlying_read_chore_limits_http_json_dict = underlying_read_chore_limits_http_json_dict
         cls.underlying_create_chore_limits_http = underlying_create_chore_limits_http
-        cls.underlying_read_portfolio_limits_http_json_dict = underlying_read_portfolio_limits_http_json_dict
-        cls.underlying_create_portfolio_limits_http = underlying_create_portfolio_limits_http
-        cls.underlying_read_pair_strat_http = underlying_read_pair_strat_http
-        cls.underlying_read_pair_strat_http_json_dict = underlying_read_pair_strat_http_json_dict
-        cls.underlying_read_portfolio_status_by_id_http = underlying_read_portfolio_status_by_id_http
-        cls.underlying_update_portfolio_status_http = underlying_update_portfolio_status_http
-        cls.underlying_read_strat_collection_http = underlying_read_strat_collection_http
-        cls.underlying_read_strat_collection_http_json_dict = underlying_read_strat_collection_http_json_dict
-        cls.underlying_create_strat_collection_http = underlying_create_strat_collection_http
-        cls.underlying_update_strat_collection_http = underlying_update_strat_collection_http
-        cls.underlying_partial_update_pair_strat_http = underlying_partial_update_pair_strat_http
-        cls.underlying_partial_update_pair_strat_http_json_dict = underlying_partial_update_pair_strat_http_json_dict
-        cls.underlying_update_pair_strat_to_non_running_state_query_http = (
-            underlying_update_pair_strat_to_non_running_state_query_http)
-        cls.underlying_read_pair_strat_by_id_http = underlying_read_pair_strat_by_id_http
-        cls.underlying_partial_update_all_pair_strat_http = underlying_partial_update_all_pair_strat_http
-        cls.underlying_read_strat_collection_by_id_http = underlying_read_strat_collection_by_id_http
-        cls.underlying_read_strat_collection_by_id_http_json_dict = underlying_read_strat_collection_by_id_http_json_dict
+        cls.underlying_read_contact_limits_http_json_dict = underlying_read_contact_limits_http_json_dict
+        cls.underlying_create_contact_limits_http = underlying_create_contact_limits_http
+        cls.underlying_read_pair_plan_http = underlying_read_pair_plan_http
+        cls.underlying_read_pair_plan_http_json_dict = underlying_read_pair_plan_http_json_dict
+        cls.underlying_read_contact_status_by_id_http = underlying_read_contact_status_by_id_http
+        cls.underlying_update_contact_status_http = underlying_update_contact_status_http
+        cls.underlying_read_plan_collection_http = underlying_read_plan_collection_http
+        cls.underlying_read_plan_collection_http_json_dict = underlying_read_plan_collection_http_json_dict
+        cls.underlying_create_plan_collection_http = underlying_create_plan_collection_http
+        cls.underlying_update_plan_collection_http = underlying_update_plan_collection_http
+        cls.underlying_partial_update_pair_plan_http = underlying_partial_update_pair_plan_http
+        cls.underlying_partial_update_pair_plan_http_json_dict = underlying_partial_update_pair_plan_http_json_dict
+        cls.underlying_update_pair_plan_to_non_running_state_query_http = (
+            underlying_update_pair_plan_to_non_running_state_query_http)
+        cls.underlying_read_pair_plan_by_id_http = underlying_read_pair_plan_by_id_http
+        cls.underlying_partial_update_all_pair_plan_http = underlying_partial_update_all_pair_plan_http
+        cls.underlying_read_plan_collection_by_id_http = underlying_read_plan_collection_by_id_http
+        cls.underlying_read_plan_collection_by_id_http_json_dict = underlying_read_plan_collection_by_id_http_json_dict
         cls.underlying_read_system_control_by_id_http = underlying_read_system_control_by_id_http
         cls.underlying_read_system_control_by_id_http_json_dict = underlying_read_system_control_by_id_http_json_dict
         cls.underlying_partial_update_system_control_http = underlying_partial_update_system_control_http
         cls.underlying_read_system_control_http = underlying_read_system_control_http
         cls.underlying_read_system_control_http_json_dict = underlying_read_system_control_http_json_dict
         cls.underlying_create_system_control_http = underlying_create_system_control_http
-        cls.underlying_read_portfolio_limits_http = underlying_read_portfolio_limits_http
-        cls.underlying_read_portfolio_limits_by_id_http = underlying_read_portfolio_limits_by_id_http
+        cls.underlying_read_contact_limits_http = underlying_read_contact_limits_http
+        cls.underlying_read_contact_limits_by_id_http = underlying_read_contact_limits_by_id_http
 
     def __init__(self):
         self.asyncio_loop = None
@@ -146,7 +146,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
         self.usd_fx_symbol: Final[str] = "USD|SGD"
         self.fx_symbol_overview_dict: Dict[str, FxSymbolOverviewBaseModel | None] = {"USD|SGD": None}
         self.usd_fx: float | None = None
-        self.pair_strat_id_to_executor_process_id_dict: Dict[int, int] = {}
+        self.pair_plan_id_to_executor_process_id_dict: Dict[int, int] = {}
         self.port_to_executor_http_client_dict: Dict[int, StreetBookServiceHttpClient] = {}
 
         self.config_yaml_dict = config_yaml_dict
@@ -164,15 +164,15 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
         super().__init__()
 
     @staticmethod
-    async def _check_n_create_portfolio_status():
-        async with PortfolioStatus.reentrant_lock:
-            portfolio_status_dict_list: List[Dict] = (
+    async def _check_n_create_contact_status():
+        async with ContactStatus.reentrant_lock:
+            contact_status_dict_list: List[Dict] = (
                 await EmailBookServiceRoutesCallbackBaseNativeOverride.
-                underlying_read_portfolio_status_http_json_dict())
-            if 0 == len(portfolio_status_dict_list):  # no portfolio status set yet, create one
-                portfolio_status: PortfolioStatus = get_new_portfolio_status()
-                await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_create_portfolio_status_http(
-                      portfolio_status, return_obj_copy=False)
+                underlying_read_contact_status_http_json_dict())
+            if 0 == len(contact_status_dict_list):  # no contact status set yet, create one
+                contact_status: ContactStatus = get_new_contact_status()
+                await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_create_contact_status_http(
+                      contact_status, return_obj_copy=False)
 
     @staticmethod
     async def _check_n_create_system_control():
@@ -196,55 +196,55 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
                     chore_limits, return_obj_copy=False)
 
     @staticmethod
-    async def _check_n_create_portfolio_limits():
-        async with PortfolioLimits.reentrant_lock:
-            portfolio_limits_list: List[Dict] = (
-                await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_portfolio_limits_http_json_dict())
-            if 0 == len(portfolio_limits_list):  # no portfolio_limits set yet, create one
-                portfolio_limits = get_new_portfolio_limits()
-                await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_create_portfolio_limits_http(
-                    portfolio_limits, return_obj_copy=False)
+    async def _check_n_create_contact_limits():
+        async with ContactLimits.reentrant_lock:
+            contact_limits_list: List[Dict] = (
+                await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_contact_limits_http_json_dict())
+            if 0 == len(contact_limits_list):  # no contact_limits set yet, create one
+                contact_limits = get_new_contact_limits()
+                await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_create_contact_limits_http(
+                    contact_limits, return_obj_copy=False)
 
     @staticmethod
-    async def _check_n_create_strat_collection():
-        async with StratCollection.reentrant_lock:
-            strat_collection_list: List[Dict] = (
+    async def _check_n_create_plan_collection():
+        async with PlanCollection.reentrant_lock:
+            plan_collection_list: List[Dict] = (
                 await EmailBookServiceRoutesCallbackBaseNativeOverride.
-                underlying_read_strat_collection_http_json_dict())
-            if len(strat_collection_list) == 0:
-                created_strat_collection = StratCollection.from_kwargs(_id=1, loaded_strat_keys=[],
-                                                                       buffered_strat_keys=[])
-                await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_create_strat_collection_http(
-                    created_strat_collection, return_obj_copy=False)
+                underlying_read_plan_collection_http_json_dict())
+            if len(plan_collection_list) == 0:
+                created_plan_collection = PlanCollection.from_kwargs(_id=1, loaded_plan_keys=[],
+                                                                       buffered_plan_keys=[])
+                await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_create_plan_collection_http(
+                    created_plan_collection, return_obj_copy=False)
 
     @staticmethod
     async def _check_and_create_start_up_models() -> bool:
         try:
-            await EmailBookServiceRoutesCallbackBaseNativeOverride._check_n_create_portfolio_status()
+            await EmailBookServiceRoutesCallbackBaseNativeOverride._check_n_create_contact_status()
             await EmailBookServiceRoutesCallbackBaseNativeOverride._check_n_create_system_control()
             await EmailBookServiceRoutesCallbackBaseNativeOverride._check_n_create_chore_limits()
-            await EmailBookServiceRoutesCallbackBaseNativeOverride._check_n_create_portfolio_limits()
-            await EmailBookServiceRoutesCallbackBaseNativeOverride._check_n_create_strat_collection()
+            await EmailBookServiceRoutesCallbackBaseNativeOverride._check_n_create_contact_limits()
+            await EmailBookServiceRoutesCallbackBaseNativeOverride._check_n_create_plan_collection()
         except Exception as e:
             logging.exception(f"_check_and_create_start_up_models failed, exception: {e}")
             return False
         else:
             return True
 
-    def _block_active_strat_with_restricted_security(self):
+    def _block_active_plan_with_restricted_security(self):
         pass
 
     def static_data_periodic_refresh(self):
         # for now only security restrictions are supported in refresh of static data
         # TODO LAZY: we may have to segregate static_data periodic_refresh and refresh when more is supported
         if self.static_data.refresh():
-            self._block_active_strat_with_restricted_security()
+            self._block_active_plan_with_restricted_security()
 
     @except_n_log_alert()
     def _app_launch_pre_thread_func(self):
         """
-        sleep wait till engine is up, then create portfolio limits if required
-        TODO LAZY: we should invoke _apply_checks_n_alert on all active pair strats at startup/re-start
+        sleep wait till engine is up, then create contact limits if required
+        TODO LAZY: we should invoke _apply_checks_n_alert on all active pair plans at startup/re-start
         """
 
         error_prefix = "_app_launch_pre_thread_func: "
@@ -265,7 +265,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
                         self.service_ready = True
                         self.recover_kill_switch_state()
                         self.recover_existing_executors()
-                        self._block_active_strat_with_restricted_security()
+                        self._block_active_plan_with_restricted_security()
                         self.service_ready = True
                         # print is just to manually check if this server is ready - useful when we run
                         # multiple servers and before running any test we want to make sure servers are up
@@ -287,7 +287,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
                                 self.service_up = future.result()
                                 should_sleep = False
                             except Exception as e:
-                                err_str_ = (f"_check_and_create_portfolio_status_and_chore_n_portfolio_limits "
+                                err_str_ = (f"_check_and_create_contact_status_and_chore_n_contact_limits "
                                             f"failed with exception: {e}")
                                 logging.exception(err_str_)
                                 raise Exception(err_str_)
@@ -350,57 +350,57 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
             logging.exception(f"async_run_crashed_executors failed with exception: {e}")
 
     async def async_run_crashed_executors(self) -> None:
-        pending_strats: List[PairStrat]
-        pending_strats_id_list: List[int] = []
+        pending_plans: List[PairPlan]
+        pending_plans_id_list: List[int] = []
 
-        if self.pair_strat_id_to_executor_process_id_dict:
-            pending_strats = await self._async_check_running_executors(self.pair_strat_id_to_executor_process_id_dict)
+        if self.pair_plan_id_to_executor_process_id_dict:
+            pending_plans = await self._async_check_running_executors(self.pair_plan_id_to_executor_process_id_dict)
 
-            for strat in pending_strats:
-                pending_strats_id_list.append(strat.id)
+            for plan in pending_plans:
+                pending_plans_id_list.append(plan.id)
 
-            for pair_strat_id in pending_strats_id_list:
-                del self.pair_strat_id_to_executor_process_id_dict[pair_strat_id]
+            for pair_plan_id in pending_plans_id_list:
+                del self.pair_plan_id_to_executor_process_id_dict[pair_plan_id]
 
-            if pending_strats:
-                await self._async_start_executor_server_by_task_submit(pending_strats, is_crash_recovery=True)
+            if pending_plans:
+                await self._async_start_executor_server_by_task_submit(pending_plans, is_crash_recovery=True)
 
-    async def get_crashed_pair_strats(self, pair_strat_id, executor_process_id) -> PairStrat:
-        pair_strat: PairStrat | None = None
+    async def get_crashed_pair_plans(self, pair_plan_id, executor_process_id) -> PairPlan:
+        pair_plan: PairPlan | None = None
         if not is_process_running(executor_process_id):
-            logging.info(f"process for {pair_strat_id=} and {executor_process_id=} found killed, "
+            logging.info(f"process for {pair_plan_id=} and {executor_process_id=} found killed, "
                          f"restarting again ...")
 
-            pair_strat: PairStrat = (
+            pair_plan: PairPlan = (
                 await EmailBookServiceRoutesCallbackBaseNativeOverride.
-                underlying_read_pair_strat_by_id_http(pair_strat_id))
+                underlying_read_pair_plan_by_id_http(pair_plan_id))
 
-            # making strat state non-running - required for UI to know it is not running anymore and
+            # making plan state non-running - required for UI to know it is not running anymore and
             # avoid connections
-            if pair_strat.server_ready_state > 0 or pair_strat.port is not None:
-                # If pair strat already exists and executor already have run before
+            if pair_plan.server_ready_state > 0 or pair_plan.port is not None:
+                # If pair plan already exists and executor already have run before
                 await (EmailBookServiceRoutesCallbackBaseNativeOverride.
-                       underlying_update_pair_strat_to_non_running_state_query_http(pair_strat.id))
-            # else not required: if it is newly created pair strat then already values are False
+                       underlying_update_pair_plan_to_non_running_state_query_http(pair_plan.id))
+            # else not required: if it is newly created pair plan then already values are False
 
-        return pair_strat
+        return pair_plan
 
-    async def _async_check_running_executors(self, pair_strat_id_to_executor_process_id_dict: Dict[int, int]) -> List[PairStrat]:
+    async def _async_check_running_executors(self, pair_plan_id_to_executor_process_id_dict: Dict[int, int]) -> List[PairPlan]:
         tasks: List = []
-        pair_strat_list: List[PairStrat] = []
-        for pair_strat_id, executor_process_id in pair_strat_id_to_executor_process_id_dict.items():
-            task = asyncio.create_task(self.get_crashed_pair_strats(pair_strat_id, executor_process_id), name=str(pair_strat_id))
+        pair_plan_list: List[PairPlan] = []
+        for pair_plan_id, executor_process_id in pair_plan_id_to_executor_process_id_dict.items():
+            task = asyncio.create_task(self.get_crashed_pair_plans(pair_plan_id, executor_process_id), name=str(pair_plan_id))
             tasks.append(task)
 
         if tasks:
-            pair_strat_list = await submit_task_with_first_completed_wait(tasks)
-        return pair_strat_list
+            pair_plan_list = await submit_task_with_first_completed_wait(tasks)
+        return pair_plan_list
 
-    async def _async_start_executor_server_by_task_submit(self, pending_strats: List[PairStrat],
+    async def _async_start_executor_server_by_task_submit(self, pending_plans: List[PairPlan],
                                                           is_crash_recovery: bool | None = False):
         tasks: List = []
-        for idx, pending_strat in enumerate(pending_strats):
-            task = asyncio.create_task(self._start_executor_server(pending_strat, is_crash_recovery), name=str(idx))
+        for idx, pending_plan in enumerate(pending_plans):
+            task = asyncio.create_task(self._start_executor_server(pending_plan, is_crash_recovery), name=str(idx))
             tasks.append(task)
 
         await submit_task_with_first_completed_wait(tasks)
@@ -456,45 +456,45 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
         subprocess.Popen([f"{run_fx_symbol_overview_file_path}"])
 
     async def async_recover_existing_executors(self) -> None:
-        existing_pair_strats: List[PairStrat] = \
-            await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_pair_strat_http()
-        strat_collection_list: List[Dict] =  \
-            await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_strat_collection_http_json_dict()
+        existing_pair_plans: List[PairPlan] = \
+            await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_pair_plan_http()
+        plan_collection_list: List[Dict] =  \
+            await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_plan_collection_http_json_dict()
 
-        if strat_collection_list:
-            if len(strat_collection_list) == 1:
-                strat_collection = strat_collection_list[0]
-                loaded_strat_keys: List[str] = strat_collection.get("loaded_strat_keys")
+        if plan_collection_list:
+            if len(plan_collection_list) == 1:
+                plan_collection = plan_collection_list[0]
+                loaded_plan_keys: List[str] = plan_collection.get("loaded_plan_keys")
 
-                loaded_pair_strat_id_list: List[int] = []
-                if loaded_strat_keys is not None:
-                    for loaded_strat_key in loaded_strat_keys:
-                        loaded_pair_strat_id_list.append(get_id_from_strat_key(loaded_strat_key))
+                loaded_pair_plan_id_list: List[int] = []
+                if loaded_plan_keys is not None:
+                    for loaded_plan_key in loaded_plan_keys:
+                        loaded_pair_plan_id_list.append(get_id_from_plan_key(loaded_plan_key))
 
-                crashed_strats: List[PairStrat] = []
-                for pair_strat in existing_pair_strats:
-                    if pair_strat.id in loaded_pair_strat_id_list:
-                        if pair_strat.port is not None:
+                crashed_plans: List[PairPlan] = []
+                for pair_plan in existing_pair_plans:
+                    if pair_plan.id in loaded_pair_plan_id_list:
+                        if pair_plan.port is not None:
                             # setting cache for executor client
-                            self._update_port_to_executor_http_client_dict_from_updated_pair_strat(pair_strat.host,
-                                                                                                   pair_strat.port)
+                            self._update_port_to_executor_http_client_dict_from_updated_pair_plan(pair_plan.host,
+                                                                                                   pair_plan.port)
 
-                            street_book_http_client = self.port_to_executor_http_client_dict.get(pair_strat.port)
+                            street_book_http_client = self.port_to_executor_http_client_dict.get(pair_plan.port)
                             try:
                                 # Checking if get-request works
                                 street_book_http_client.get_all_ui_layout_client()
                             except requests.exceptions.Timeout:
                                 # If timeout error occurs it is most probably that executor server got hung/stuck
                                 # logging and killing this executor
-                                logging.exception(f"Found executor with port: {pair_strat.port} in hung state, killing "
-                                                  f"the executor process;;; pair_strat: {pair_strat}")
-                                pid = get_pid_from_port(pair_strat.port)
+                                logging.exception(f"Found executor with port: {pair_plan.port} in hung state, killing "
+                                                  f"the executor process;;; pair_plan: {pair_plan}")
+                                pid = get_pid_from_port(pair_plan.port)
                                 os.kill(pid, signal.SIGKILL)
 
-                                # Updating pair_strat
-                                pair_strat_json = {
-                                    "_id": pair_strat.id,
-                                    "strat_state": StratState.StratState_ERROR,
+                                # Updating pair_plan
+                                pair_plan_json = {
+                                    "_id": pair_plan.id,
+                                    "plan_state": PlanState.PlanState_ERROR,
                                     "server_ready_state": 0,
                                     "port": None,
                                     "cpp_port": None,
@@ -502,46 +502,46 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
                                 }
 
                                 await (EmailBookServiceRoutesCallbackBaseNativeOverride.
-                                       underlying_partial_update_pair_strat_http(pair_strat_json, return_obj_copy=False))
+                                       underlying_partial_update_pair_plan_http(pair_plan_json, return_obj_copy=False))
 
                             except Exception as e:
                                 if "Failed to establish a new connection: [Errno 111] Connection refused" in str(e):
-                                    logging.error(f"PairStrat found to have port set to {pair_strat.port} but executor "
+                                    logging.error(f"PairPlan found to have port set to {pair_plan.port} but executor "
                                                   f"server is down, recovering executor for "
-                                                  f"{pair_strat.id=};;; {pair_strat=}")
-                                    crashed_strats.append(pair_strat)
+                                                  f"{pair_plan.id=};;; {pair_plan=}")
+                                    crashed_plans.append(pair_plan)
                                     await (EmailBookServiceRoutesCallbackBaseNativeOverride.
-                                           underlying_update_pair_strat_to_non_running_state_query_http(pair_strat.id))
+                                           underlying_update_pair_plan_to_non_running_state_query_http(pair_plan.id))
                                 elif ("The Web Server may be down, too busy, or experiencing other problems preventing "
                                       "it from responding to requests" in str(e) and "status_code: 503" in str(e)):
-                                    pid = get_pid_from_port(pair_strat.port)
+                                    pid = get_pid_from_port(pair_plan.port)
                                     if pid is not None:
                                         os.kill(pid, signal.SIGKILL)
-                                    crashed_strats.append(pair_strat)
+                                    crashed_plans.append(pair_plan)
                                     await (EmailBookServiceRoutesCallbackBaseNativeOverride.
-                                           underlying_update_pair_strat_to_non_running_state_query_http(pair_strat.id))
+                                           underlying_update_pair_plan_to_non_running_state_query_http(pair_plan.id))
                                 else:
                                     logging.exception("Something went wrong while checking is_service_up of executor "
-                                                      f"with port: {pair_strat.port} in pair_strat strat_up recovery "
+                                                      f"with port: {pair_plan.port} in pair_plan plan_up recovery "
                                                       f"check - force kill this executor if is running, "
-                                                      f"exception: {e};;; {pair_strat=}")
+                                                      f"exception: {e};;; {pair_plan=}")
                             else:
                                 # If executor server is still up and is in healthy state - Finding and adding
-                                # process_id to pair_strat_id_to_executor_process_dicts
-                                pid = get_pid_from_port(pair_strat.port)
-                                self.pair_strat_id_to_executor_process_id_dict[pair_strat.id] = pid
+                                # process_id to pair_plan_id_to_executor_process_dicts
+                                pid = get_pid_from_port(pair_plan.port)
+                                self.pair_plan_id_to_executor_process_id_dict[pair_plan.id] = pid
                         else:
-                            crashed_strats.append(pair_strat)
-                    # else not required: avoiding if pair_strat is not in loaded_strats
+                            crashed_plans.append(pair_plan)
+                    # else not required: avoiding if pair_plan is not in loaded_plans
 
                 # Restart crashed executors
-                if crashed_strats:
-                    await self._async_start_executor_server_by_task_submit(crashed_strats, is_crash_recovery=True)
+                if crashed_plans:
+                    await self._async_start_executor_server_by_task_submit(crashed_plans, is_crash_recovery=True)
             else:
-                err_str_ = "Unexpected: Found more than 1 strat_collection objects - Ignoring any executor recovery"
+                err_str_ = "Unexpected: Found more than 1 plan_collection objects - Ignoring any executor recovery"
                 logging.error(err_str_)
         else:
-            err_str_ = "No strat_collection model exists yet - no executor to recover"
+            err_str_ = "No plan_collection model exists yet - no executor to recover"
             logging.debug(err_str_)
 
     def recover_existing_executors(self) -> None:
@@ -601,178 +601,178 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
 
     # Example: Soft API Query Interfaces
 
-    async def update_portfolio_status_by_chore_or_fill_data_query_pre(
-            self, portfolio_status_class_type: Type[PortfolioStatus], overall_buy_notional: float | None = None,
+    async def update_contact_status_by_chore_or_fill_data_query_pre(
+            self, contact_status_class_type: Type[ContactStatus], overall_buy_notional: float | None = None,
             overall_sell_notional: float | None = None, overall_buy_fill_notional: float | None = None,
             overall_sell_fill_notional: float | None = None, open_chore_count: int | None = None):
-        async with PortfolioStatus.reentrant_lock:
-            portfolio_status: PortfolioStatus = (
-                await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_portfolio_status_by_id_http(
+        async with ContactStatus.reentrant_lock:
+            contact_status: ContactStatus = (
+                await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_contact_status_by_id_http(
                     1))
 
             if overall_buy_notional is not None:
-                if portfolio_status.overall_buy_notional is None:
-                    portfolio_status.overall_buy_notional = 0
-                portfolio_status.overall_buy_notional += overall_buy_notional
+                if contact_status.overall_buy_notional is None:
+                    contact_status.overall_buy_notional = 0
+                contact_status.overall_buy_notional += overall_buy_notional
             if overall_sell_notional is not None:
-                if portfolio_status.overall_sell_notional is None:
-                    portfolio_status.overall_sell_notional = 0
-                portfolio_status.overall_sell_notional += overall_sell_notional
+                if contact_status.overall_sell_notional is None:
+                    contact_status.overall_sell_notional = 0
+                contact_status.overall_sell_notional += overall_sell_notional
             if overall_buy_fill_notional is not None:
-                if portfolio_status.overall_buy_fill_notional is None:
-                    portfolio_status.overall_buy_fill_notional = 0
-                portfolio_status.overall_buy_fill_notional += overall_buy_fill_notional
+                if contact_status.overall_buy_fill_notional is None:
+                    contact_status.overall_buy_fill_notional = 0
+                contact_status.overall_buy_fill_notional += overall_buy_fill_notional
             if overall_sell_fill_notional is not None:
-                if portfolio_status.overall_sell_fill_notional is None:
-                    portfolio_status.overall_sell_fill_notional = 0
-                portfolio_status.overall_sell_fill_notional += overall_sell_fill_notional
+                if contact_status.overall_sell_fill_notional is None:
+                    contact_status.overall_sell_fill_notional = 0
+                contact_status.overall_sell_fill_notional += overall_sell_fill_notional
             if open_chore_count is not None:
-                portfolio_status.open_chores = open_chore_count
+                contact_status.open_chores = open_chore_count
 
-            await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_update_portfolio_status_http(
-                portfolio_status, return_obj_copy=False)
+            await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_update_contact_status_http(
+                contact_status, return_obj_copy=False)
 
         return []
 
     # Code-generated
-    async def get_pair_strat_sec_filter_json_query_pre(self, pair_strat_class_type: Type[PairStrat], security_id: str):
-        return await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_pair_strat_http(
-            get_ongoing_pair_strat_filter(security_id), self.get_generic_read_route())
+    async def get_pair_plan_sec_filter_json_query_pre(self, pair_plan_class_type: Type[PairPlan], security_id: str):
+        return await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_pair_plan_http(
+            get_ongoing_pair_plan_filter(security_id), self.get_generic_read_route())
 
-    def _set_derived_side(self, pair_strat_obj: PairStrat):
+    def _set_derived_side(self, pair_plan_obj: PairPlan):
         raise_error = False
-        if pair_strat_obj.pair_strat_params.strat_leg2.side is None or \
-                pair_strat_obj.pair_strat_params.strat_leg2.side == Side.SIDE_UNSPECIFIED:
-            if pair_strat_obj.pair_strat_params.strat_leg1.side == Side.BUY:
-                pair_strat_obj.pair_strat_params.strat_leg2.side = Side.SELL
-            elif pair_strat_obj.pair_strat_params.strat_leg1.side == Side.SELL:
-                pair_strat_obj.pair_strat_params.strat_leg2.side = Side.BUY
+        if pair_plan_obj.pair_plan_params.plan_leg2.side is None or \
+                pair_plan_obj.pair_plan_params.plan_leg2.side == Side.SIDE_UNSPECIFIED:
+            if pair_plan_obj.pair_plan_params.plan_leg1.side == Side.BUY:
+                pair_plan_obj.pair_plan_params.plan_leg2.side = Side.SELL
+            elif pair_plan_obj.pair_plan_params.plan_leg1.side == Side.SELL:
+                pair_plan_obj.pair_plan_params.plan_leg2.side = Side.BUY
             else:
                 raise_error = True
-        elif pair_strat_obj.pair_strat_params.strat_leg1.side is None:
+        elif pair_plan_obj.pair_plan_params.plan_leg1.side is None:
             raise_error = True
         # else not required, all good
         if raise_error:
-            # handles pair_strat_obj.pair_strat_params.strat_leg1.side == None and all other unsupported values
+            # handles pair_plan_obj.pair_plan_params.plan_leg1.side == None and all other unsupported values
             raise Exception(f"error: _set_derived_side called with unsupported side combo on legs, leg1: "
-                            f"{pair_strat_obj.pair_strat_params.strat_leg1.side} leg2: "
-                            f"{pair_strat_obj.pair_strat_params.strat_leg2.side} in pair strat: {pair_strat_obj}")
+                            f"{pair_plan_obj.pair_plan_params.plan_leg1.side} leg2: "
+                            f"{pair_plan_obj.pair_plan_params.plan_leg2.side} in pair plan: {pair_plan_obj}")
 
-    def _set_derived_exchange(self, pair_strat_obj: PairStrat):
+    def _set_derived_exchange(self, pair_plan_obj: PairPlan):
         unsupported_sec_id_source: bool = False
-        strat_leg1: StratLeg = pair_strat_obj.pair_strat_params.strat_leg1
-        strat_leg2: StratLeg = pair_strat_obj.pair_strat_params.strat_leg2
-        if strat_leg1.sec.sec_id_source == SecurityIdSource.TICKER:
-            strat_leg1.exch_id = self.static_data.get_exchange_from_ticker(strat_leg1.sec.sec_id)
+        plan_leg1: PlanLeg = pair_plan_obj.pair_plan_params.plan_leg1
+        plan_leg2: PlanLeg = pair_plan_obj.pair_plan_params.plan_leg2
+        if plan_leg1.sec.sec_id_source == SecurityIdSource.TICKER:
+            plan_leg1.exch_id = self.static_data.get_exchange_from_ticker(plan_leg1.sec.sec_id)
         else:
             unsupported_sec_id_source = True
-        if strat_leg2.sec.sec_id_source == SecurityIdSource.TICKER:
-            strat_leg2.exch_id = self.static_data.get_exchange_from_ticker(strat_leg2.sec.sec_id)
+        if plan_leg2.sec.sec_id_source == SecurityIdSource.TICKER:
+            plan_leg2.exch_id = self.static_data.get_exchange_from_ticker(plan_leg2.sec.sec_id)
         else:
             unsupported_sec_id_source = True
         if unsupported_sec_id_source:
             raise Exception(f"error: _set_derived_exchange called with unsupported sec_id_source param, supported: "
-                            f"SecurityIdSource.TICKER, {strat_leg1.sec.sec_id_source=}, {strat_leg2.sec.sec_id_source=}"
-                            f";;;{pair_strat_obj=}")
+                            f"SecurityIdSource.TICKER, {plan_leg1.sec.sec_id_source=}, {plan_leg2.sec.sec_id_source=}"
+                            f";;;{pair_plan_obj=}")
 
-    async def get_dismiss_filter_portfolio_limit_brokers_query_pre(
-            self, dismiss_filter_portfolio_limit_broker_class_type: Type[DismissFilterPortfolioLimitBroker],
+    async def get_dismiss_filter_contact_limit_brokers_query_pre(
+            self, dismiss_filter_contact_limit_broker_class_type: Type[DismissFilterContactLimitBroker],
             security_id1: str, security_id2: str):
         ric1, ric2 = self.static_data.get_connect_n_qfii_rics_from_ticker(security_id1)
         ric3, ric4 = self.static_data.get_connect_n_qfii_rics_from_ticker(security_id2)
         sedol = self.static_data.get_sedol_from_ticker(security_id1)
-        # get security name from : pair_strat_params.strat_legs and then redact pattern
+        # get security name from : pair_plan_params.plan_legs and then redact pattern
         # security.sec_id (a pattern in positions) where there is a value match
         dismiss_filter_agg_pipeline = {'redact': [("security.sec_id", ric1, ric2, ric3, ric4, sedol)]}
-        filtered_portfolio_limits: List[PortfolioLimits] = \
-            await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_portfolio_limits_http(
+        filtered_contact_limits: List[ContactLimits] = \
+            await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_contact_limits_http(
                 dismiss_filter_agg_pipeline, self.get_generic_read_route())
-        if len(filtered_portfolio_limits) == 1:
-            if filtered_portfolio_limits[0].eligible_brokers is not None:
+        if len(filtered_contact_limits) == 1:
+            if filtered_contact_limits[0].eligible_brokers is not None:
                 eligible_brokers = [eligible_broker for eligible_broker in
-                                    filtered_portfolio_limits[0].eligible_brokers if
+                                    filtered_contact_limits[0].eligible_brokers if
                                     eligible_broker.sec_positions]
-                return_obj = DismissFilterPortfolioLimitBroker(brokers=eligible_brokers)
+                return_obj = DismissFilterContactLimitBroker(brokers=eligible_brokers)
                 return [return_obj]
-        elif len(filtered_portfolio_limits) > 1:
-            err_str_ = f"filtered_portfolio_limits expected: 1, found: " \
-                       f"{str(len(filtered_portfolio_limits))}, for filter: " \
-                       f"{dismiss_filter_agg_pipeline}, filtered_portfolio_limits: " \
-                       f"{filtered_portfolio_limits}; use SWAGGER UI to check / fix and re-try "
+        elif len(filtered_contact_limits) > 1:
+            err_str_ = f"filtered_contact_limits expected: 1, found: " \
+                       f"{str(len(filtered_contact_limits))}, for filter: " \
+                       f"{dismiss_filter_agg_pipeline}, filtered_contact_limits: " \
+                       f"{filtered_contact_limits}; use SWAGGER UI to check / fix and re-try "
             logging.error(err_str_)
             raise HTTPException(status_code=500, detail=err_str_)
         else:
-            err_str_ = (f"No filtered_portfolio_limits found for symbols of leg1 and leg2: {security_id1} and "
+            err_str_ = (f"No filtered_contact_limits found for symbols of leg1 and leg2: {security_id1} and "
                         f"{security_id2}")
             logging.warning(err_str_)
             raise HTTPException(status_code=500, detail=err_str_)
 
-    def create_strat_view_for_strat(self, pair_strat: PairStrat):
-        new_strat_view = get_new_strat_view_obj(pair_strat.id)
-        photo_book_service_http_client.create_strat_view_client(new_strat_view)
+    def create_plan_view_for_plan(self, pair_plan: PairPlan):
+        new_plan_view = get_new_plan_view_obj(pair_plan.id)
+        photo_book_service_http_client.create_plan_view_client(new_plan_view)
 
     @except_n_log_alert()
-    async def create_pair_strat_pre(self, pair_strat_obj: PairStrat):
+    async def create_pair_plan_pre(self, pair_plan_obj: PairPlan):
         if not self.service_ready:
             # raise service unavailable 503 exception, let the caller retry
-            err_str_ = f"create_pair_strat_pre not ready - service is not initialized yet, " \
-                       f"pair_strat_key: {get_pair_strat_log_key(pair_strat_obj)};;; {pair_strat_obj=}"
+            err_str_ = f"create_pair_plan_pre not ready - service is not initialized yet, " \
+                       f"pair_plan_key: {get_pair_plan_log_key(pair_plan_obj)};;; {pair_plan_obj=}"
             logging.error(err_str_)
             raise HTTPException(status_code=503, detail=err_str_)
-        if (pair_strat_obj.pair_strat_params.mstrat is None and
-                pair_strat_obj.pair_strat_params.strat_type == StratType.Premium):
-            pair_strat_obj.pair_strat_params.mstrat = "Mstrat_1"
-        strat_leg1_sec_id: str = pair_strat_obj.pair_strat_params.strat_leg1.sec.sec_id
-        strat_leg2_sec_id: str | None = None
-        # expectation: if strat leg2 is not provided, set it from static data
-        if pair_strat_obj.pair_strat_params.strat_leg2 is None:
-            strat_leg2_sec_id = self.static_data.get_underlying_eqt_ticker_from_cb_ticker(strat_leg1_sec_id)
-            if strat_leg2_sec_id is None:
-                raise Exception(f"error: underlying eqt ticker not found for cb_ticker: {strat_leg1_sec_id};;;"
-                                f"{pair_strat_obj=}")
-            strat_leg2_sec: Security = Security(sec_id=strat_leg2_sec_id, sec_id_source=SecurityIdSource.TICKER,
+        if (pair_plan_obj.pair_plan_params.mplan is None and
+                pair_plan_obj.pair_plan_params.plan_type == PlanType.Premium):
+            pair_plan_obj.pair_plan_params.mplan = "Mplan_1"
+        plan_leg1_sec_id: str = pair_plan_obj.pair_plan_params.plan_leg1.sec.sec_id
+        plan_leg2_sec_id: str | None = None
+        # expectation: if plan leg2 is not provided, set it from static data
+        if pair_plan_obj.pair_plan_params.plan_leg2 is None:
+            plan_leg2_sec_id = self.static_data.get_underlying_eqt_ticker_from_cb_ticker(plan_leg1_sec_id)
+            if plan_leg2_sec_id is None:
+                raise Exception(f"error: underlying eqt ticker not found for cb_ticker: {plan_leg1_sec_id};;;"
+                                f"{pair_plan_obj=}")
+            plan_leg2_sec: Security = Security(sec_id=plan_leg2_sec_id, sec_id_source=SecurityIdSource.TICKER,
                                                 inst_type=InstrumentType.EQT)
-            pair_strat_obj.pair_strat_params.strat_leg2 = StratLeg(sec=strat_leg2_sec)
+            pair_plan_obj.pair_plan_params.plan_leg2 = PlanLeg(sec=plan_leg2_sec)
         else:
-            strat_leg2_sec_id = pair_strat_obj.pair_strat_params.strat_leg2.sec.sec_id
+            plan_leg2_sec_id = pair_plan_obj.pair_plan_params.plan_leg2.sec.sec_id
 
-        if (pair_strat_obj.pair_strat_params.strat_leg1.sec.inst_type is None or
-                pair_strat_obj.pair_strat_params.strat_leg1.sec.inst_type == InstrumentType.INSTRUMENT_TYPE_UNSPECIFIED):
-            pair_strat_obj.pair_strat_params.strat_leg1.sec.inst_type = InstrumentType.CB
-        if (pair_strat_obj.pair_strat_params.strat_leg2.sec.inst_type is None or
-                pair_strat_obj.pair_strat_params.strat_leg2.sec.inst_type == InstrumentType.INSTRUMENT_TYPE_UNSPECIFIED):
-            pair_strat_obj.pair_strat_params.strat_leg2.sec.inst_type = InstrumentType.EQT
+        if (pair_plan_obj.pair_plan_params.plan_leg1.sec.inst_type is None or
+                pair_plan_obj.pair_plan_params.plan_leg1.sec.inst_type == InstrumentType.INSTRUMENT_TYPE_UNSPECIFIED):
+            pair_plan_obj.pair_plan_params.plan_leg1.sec.inst_type = InstrumentType.CB
+        if (pair_plan_obj.pair_plan_params.plan_leg2.sec.inst_type is None or
+                pair_plan_obj.pair_plan_params.plan_leg2.sec.inst_type == InstrumentType.INSTRUMENT_TYPE_UNSPECIFIED):
+            pair_plan_obj.pair_plan_params.plan_leg2.sec.inst_type = InstrumentType.EQT
 
-        self._set_derived_side(pair_strat_obj)
-        self._set_derived_exchange(pair_strat_obj)
-        pair_strat_obj.frequency = 1
-        pair_strat_obj.pair_strat_params_update_seq_num = 0
-        pair_strat_obj.last_active_date_time = DateTime.utcnow()
+        self._set_derived_side(pair_plan_obj)
+        self._set_derived_exchange(pair_plan_obj)
+        pair_plan_obj.frequency = 1
+        pair_plan_obj.pair_plan_params_update_seq_num = 0
+        pair_plan_obj.last_active_date_time = DateTime.utcnow()
 
-        pair_strat_obj.host = street_book_config_yaml_dict.get("server_host")
-        pair_strat_obj.server_ready_state = 0
+        pair_plan_obj.host = street_book_config_yaml_dict.get("server_host")
+        pair_plan_obj.server_ready_state = 0
 
-        # creating strat_view object for this start
-        self.create_strat_view_for_strat(pair_strat_obj)
+        # creating plan_view object for this start
+        self.create_plan_view_for_plan(pair_plan_obj)
 
         # @@@ Warning: Below handling of state collection is handled from ui also - see where can code be remove
         # to avoid duplicate
-        async with StratCollection.reentrant_lock:
-            strat_collection_obj: StratCollection = (
+        async with PlanCollection.reentrant_lock:
+            plan_collection_obj: PlanCollection = (
                 await EmailBookServiceRoutesCallbackBaseNativeOverride.
-                underlying_read_strat_collection_by_id_http(1))
-            strat_key = get_strat_key_from_pair_strat(pair_strat_obj)
-            strat_collection_obj.loaded_strat_keys.append(strat_key)
-            await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_update_strat_collection_http(
-                strat_collection_obj, return_obj_copy=False)
+                underlying_read_plan_collection_by_id_http(1))
+            plan_key = get_plan_key_from_pair_plan(pair_plan_obj)
+            plan_collection_obj.loaded_plan_keys.append(plan_key)
+            await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_update_plan_collection_http(
+                plan_collection_obj, return_obj_copy=False)
 
-        # starting executor server for current pair strat
-        await self._start_executor_server(pair_strat_obj)
-        # if fail - log error is fine - strat not active
-        self._apply_fallback_route_check(pair_strat_obj, raise_exception=False, update_fallback_route=True)
-        self._apply_restricted_security_check(strat_leg1_sec_id, pair_strat_obj.pair_strat_params.strat_leg1.side,
+        # starting executor server for current pair plan
+        await self._start_executor_server(pair_plan_obj)
+        # if fail - log error is fine - plan not active
+        self._apply_fallback_route_check(pair_plan_obj, raise_exception=False, update_fallback_route=True)
+        self._apply_restricted_security_check(plan_leg1_sec_id, pair_plan_obj.pair_plan_params.plan_leg1.side,
                                               raise_exception=False)
-        self._apply_restricted_security_check(strat_leg2_sec_id, pair_strat_obj.pair_strat_params.strat_leg2.side,
+        self._apply_restricted_security_check(plan_leg2_sec_id, pair_plan_obj.pair_plan_params.plan_leg2.side,
                                               raise_exception=False)
 
     def _apply_restricted_security_check(self, sec_id: str, side: Side, raise_exception: bool = True):
@@ -798,15 +798,15 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
             else:
                 logging.error(err_str_)
 
-    def _create_fallback_routes(self, strat_collection_obj: StratCollection):
+    def _create_fallback_routes(self, plan_collection_obj: PlanCollection):
         pass
 
-    def _apply_fallback_route_check(self, pair_strat: PairStrat, raise_exception: bool,
+    def _apply_fallback_route_check(self, pair_plan: PairPlan, raise_exception: bool,
                                     update_fallback_route: bool = False):
-        if pair_strat.pair_strat_params.strat_leg2.fallback_route != BrokerRoute.BR_CONNECT:
-            return  # for now the check only applies if strat_leg2 fallback_route is BrokerRoute.BR_CONNECT
-        sec_id: str = pair_strat.pair_strat_params.strat_leg2.sec.sec_id
-        side: Side = pair_strat.pair_strat_params.strat_leg2.side
+        if pair_plan.pair_plan_params.plan_leg2.fallback_route != BrokerRoute.BR_CONNECT:
+            return  # for now the check only applies if plan_leg2 fallback_route is BrokerRoute.BR_CONNECT
+        sec_id: str = pair_plan.pair_plan_params.plan_leg2.sec.sec_id
+        side: Side = pair_plan.pair_plan_params.plan_leg2.side
         if self.static_data is None:
             err_str_ = (f"unable to conduct connect security check static data not available yet, symbol_side_key: "
                         f"{get_symbol_side_key([(sec_id, side)])}")
@@ -817,7 +817,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
         elif self.static_data.is_cn_connect_restricted(sec_id, "B" if side == Side.BUY or side == Side.BTC else "S"):
             # connect security check is the only fallback_route check for now
             if update_fallback_route:
-                pair_strat.pair_strat_params.strat_leg2.fallback_route = BrokerRoute.BR_QFII
+                pair_plan.pair_plan_params.plan_leg2.fallback_route = BrokerRoute.BR_QFII
                 logging.warning(f"fallback route updated from BR_CONNECT to BR_QFII for {sec_id=};;;symbol_side_key: "
                                 f"{get_symbol_side_key([(sec_id, side)])}")
             else:
@@ -829,429 +829,429 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
                     logging.error(err_str_)
 
     @staticmethod
-    def are_similar_strats(strat1: PairStrat, strat2: PairStrat):
-        strat1_leg1: StratLeg = strat1.pair_strat_params.strat_leg1
-        strat1_leg2: StratLeg = strat1.pair_strat_params.strat_leg2
-        strat2_leg1: StratLeg = strat2.pair_strat_params.strat_leg1
-        strat2_leg2: StratLeg = strat2.pair_strat_params.strat_leg2
+    def are_similar_plans(plan1: PairPlan, plan2: PairPlan):
+        plan1_leg1: PlanLeg = plan1.pair_plan_params.plan_leg1
+        plan1_leg2: PlanLeg = plan1.pair_plan_params.plan_leg2
+        plan2_leg1: PlanLeg = plan2.pair_plan_params.plan_leg1
+        plan2_leg2: PlanLeg = plan2.pair_plan_params.plan_leg2
 
-        if (strat1_leg1.sec.sec_id == strat2_leg1.sec.sec_id and strat1_leg1.side == strat2_leg1.side and
-                strat1_leg2.sec.sec_id == strat2_leg2.sec.sec_id and strat1_leg2.side == strat2_leg2.side and
-                strat1.id != strat2.id):
+        if (plan1_leg1.sec.sec_id == plan2_leg1.sec.sec_id and plan1_leg1.side == plan2_leg1.side and
+                plan1_leg2.sec.sec_id == plan2_leg2.sec.sec_id and plan1_leg2.side == plan2_leg2.side and
+                plan1.id != plan2.id):
             return True
         return False
 
-    async def _apply_activate_checks_n_log_error(self, pair_strat: PairStrat):
+    async def _apply_activate_checks_n_log_error(self, pair_plan: PairPlan):
         """
-        implement any strat management checks here (create / update strats)
+        implement any plan management checks here (create / update plans)
         """
         leg1_side: Side
         leg2_side: Side
-        leg1_symbol, leg1_side = (pair_strat.pair_strat_params.strat_leg1.sec.sec_id,
-                                  pair_strat.pair_strat_params.strat_leg1.side)
-        leg2_symbol, leg2_side = (pair_strat.pair_strat_params.strat_leg2.sec.sec_id,
-                                  pair_strat.pair_strat_params.strat_leg2.side)
+        leg1_symbol, leg1_side = (pair_plan.pair_plan_params.plan_leg1.sec.sec_id,
+                                  pair_plan.pair_plan_params.plan_leg1.side)
+        leg2_symbol, leg2_side = (pair_plan.pair_plan_params.plan_leg2.sec.sec_id,
+                                  pair_plan.pair_plan_params.plan_leg2.side)
         self._apply_restricted_security_check(leg1_symbol, leg1_side)
         self._apply_restricted_security_check(leg2_symbol, leg2_side)
 
-        ongoing_pair_strats: List[PairStrat] | None = await (
-            get_matching_strat_from_symbol_n_side(leg1_symbol, leg1_side, no_ongoing_ok=True))
-        # First Checking if any ongoing strat exists with same symbol_side pairs in same legs of param pair_strat,
-        # that means if one strat is ongoing with s1-sd1 and s2-sd2 symbol-side pair legs then param pair_strat
+        ongoing_pair_plans: List[PairPlan] | None = await (
+            get_matching_plan_from_symbol_n_side(leg1_symbol, leg1_side, no_ongoing_ok=True))
+        # First Checking if any ongoing plan exists with same symbol_side pairs in same legs of param pair_plan,
+        # that means if one plan is ongoing with s1-sd1 and s2-sd2 symbol-side pair legs then param pair_plan
         # must not have same symbol-side pair legs else HTTP exception is raised
 
-        if ongoing_pair_strats:
-            if len(ongoing_pair_strats) == 1:
-                ongoing_pair_strat = ongoing_pair_strats[0]
-                # raising exception only if ongoing pair_strat's leg1's symbol-side are same as
-                # param pair_strat's leg1's symbol-side and same for leg2
-                if self.are_similar_strats(ongoing_pair_strat, pair_strat):
-                    err_str_ = (f"Ongoing strat already exists with same symbol-side pair legs - can't activate this "
-                                f"strat till other strat is ongoing;;; {ongoing_pair_strat=}")
+        if ongoing_pair_plans:
+            if len(ongoing_pair_plans) == 1:
+                ongoing_pair_plan = ongoing_pair_plans[0]
+                # raising exception only if ongoing pair_plan's leg1's symbol-side are same as
+                # param pair_plan's leg1's symbol-side and same for leg2
+                if self.are_similar_plans(ongoing_pair_plan, pair_plan):
+                    err_str_ = (f"Ongoing plan already exists with same symbol-side pair legs - can't activate this "
+                                f"plan till other plan is ongoing;;; {ongoing_pair_plan=}")
                     logging.error(err_str_)
                     raise HTTPException(status_code=400, detail=err_str_)
-                # else not required, this is opposite side strat, let continue for further activation checks
-            elif len(ongoing_pair_strats) == 2:
-                ongoing_pair_strat1, ongoing_pair_strat2 = ongoing_pair_strats
-                if not (self.are_similar_strats(ongoing_pair_strat1, pair_strat) or
-                        self.are_similar_strats(ongoing_pair_strat2, pair_strat)):
-                    err_str_ = (f"can't activate this strat, none of {len(ongoing_pair_strats)} more ongoing strats "
-                                f"are similar;;;{ongoing_pair_strats=}")
+                # else not required, this is opposite side plan, let continue for further activation checks
+            elif len(ongoing_pair_plans) == 2:
+                ongoing_pair_plan1, ongoing_pair_plan2 = ongoing_pair_plans
+                if not (self.are_similar_plans(ongoing_pair_plan1, pair_plan) or
+                        self.are_similar_plans(ongoing_pair_plan2, pair_plan)):
+                    err_str_ = (f"can't activate this plan, none of {len(ongoing_pair_plans)} more ongoing plans "
+                                f"are similar;;;{ongoing_pair_plans=}")
                     logging.error(err_str_)
                     raise HTTPException(status_code=400, detail=err_str_)
                 # else all good - let the activation through
             else:
-                err_str_ = (f"can't activate this strat, {len(ongoing_pair_strats)} more ongoing strats found;;;"
-                            f"{ongoing_pair_strats=}")
+                err_str_ = (f"can't activate this plan, {len(ongoing_pair_plans)} more ongoing plans found;;;"
+                            f"{ongoing_pair_plans=}")
                 logging.error(err_str_)
                 raise HTTPException(status_code=400, detail=err_str_)
-        # else not required, no ongoing pair strat - let the strat activation check pass
+        # else not required, no ongoing pair plan - let the plan activation check pass
 
-        # Checking if any strat exists with opp symbol and side of param pair_strat that activated today,
-        # for instance if s1-sd1 and s2-sd2 are symbol-side pairs in param pair_strat's legs then checking there must
-        # not be any strat activated today with s1-sd2 and s2-sd1 symbol-side pair legs, if it is found then this
-        # strat can't be activated unless strat symbols are all opposite side tradable
-        first_matched_strat_lock_file_path_list: List[str] = []
+        # Checking if any plan exists with opp symbol and side of param pair_plan that activated today,
+        # for instance if s1-sd1 and s2-sd2 are symbol-side pairs in param pair_plan's legs then checking there must
+        # not be any plan activated today with s1-sd2 and s2-sd1 symbol-side pair legs, if it is found then this
+        # plan can't be activated unless plan symbols are all opposite side tradable
+        first_matched_plan_lock_file_path_list: List[str] = []
         if not self.static_data.is_opposite_side_tradable(leg1_symbol):
-            first_matched_strat_lock_file_path_list = (
+            first_matched_plan_lock_file_path_list = (
                 glob.glob(str(CURRENT_PROJECT_DATA_DIR /
                           f"{leg1_symbol}_{leg2_side}_*_{DateTime.date(DateTime.utcnow())}.json.lock")))
 
-        second_matched_strat_lock_file_path_list: List[str] = []
+        second_matched_plan_lock_file_path_list: List[str] = []
         if not self.static_data.is_opposite_side_tradable(leg2_symbol):
-            second_matched_strat_lock_file_path_list = (
+            second_matched_plan_lock_file_path_list = (
                 glob.glob(str(CURRENT_PROJECT_DATA_DIR /
                               f"{leg2_symbol}_{leg1_side}_*_{DateTime.date(DateTime.utcnow())}.json.lock")))
 
-        # checking both legs - If first_matched_strat_lock_file_path_list and second_matched_strat_lock_file_path_list
-        # have file names having same pair_strat_id with today's date along with required symbol-side pair
-        for matched_strat_file_path in first_matched_strat_lock_file_path_list:
-            suffix_pattern = matched_strat_file_path[(matched_strat_file_path.index(leg2_side) + len(leg2_side)):]
-            for sec_matched_strat_lock_file_path in second_matched_strat_lock_file_path_list:
-                if sec_matched_strat_lock_file_path.endswith(suffix_pattern):
-                    err_str_ = ("Found strat activated today with symbols of this strat being used in opposite sides"
-                                " - can't activate this strat today")
+        # checking both legs - If first_matched_plan_lock_file_path_list and second_matched_plan_lock_file_path_list
+        # have file names having same pair_plan_id with today's date along with required symbol-side pair
+        for matched_plan_file_path in first_matched_plan_lock_file_path_list:
+            suffix_pattern = matched_plan_file_path[(matched_plan_file_path.index(leg2_side) + len(leg2_side)):]
+            for sec_matched_plan_lock_file_path in second_matched_plan_lock_file_path_list:
+                if sec_matched_plan_lock_file_path.endswith(suffix_pattern):
+                    err_str_ = ("Found plan activated today with symbols of this plan being used in opposite sides"
+                                " - can't activate this plan today")
                     logging.error(err_str_)
                     raise HTTPException(status_code=400, detail=err_str_)
 
-    def get_lock_file_names_from_pair_strat(self, pair_strat: PairStrat) -> Tuple[PurePath | None, PurePath | None]:
-        leg1_sec_id: str = pair_strat.pair_strat_params.strat_leg1.sec.sec_id
+    def get_lock_file_names_from_pair_plan(self, pair_plan: PairPlan) -> Tuple[PurePath | None, PurePath | None]:
+        leg1_sec_id: str = pair_plan.pair_plan_params.plan_leg1.sec.sec_id
         leg1_lock_file_path: str | None = None
         if not self.static_data.is_opposite_side_tradable(leg1_sec_id):
             leg1_lock_file_path = (CURRENT_PROJECT_DATA_DIR / f"{leg1_sec_id}_"
-                                                              f"{pair_strat.pair_strat_params.strat_leg1.side.value}_"
-                                                              f"{pair_strat.id}_{DateTime.date(DateTime.utcnow())}"
+                                                              f"{pair_plan.pair_plan_params.plan_leg1.side.value}_"
+                                                              f"{pair_plan.id}_{DateTime.date(DateTime.utcnow())}"
                                                               f".json.lock")
 
-        leg2_sec_id: str = pair_strat.pair_strat_params.strat_leg2.sec.sec_id
+        leg2_sec_id: str = pair_plan.pair_plan_params.plan_leg2.sec.sec_id
         leg2_lock_file_path: str | None = None
         if not self.static_data.is_opposite_side_tradable(leg2_sec_id):
             leg2_lock_file_path = (CURRENT_PROJECT_DATA_DIR / f"{leg2_sec_id}_"
-                                                              f"{pair_strat.pair_strat_params.strat_leg2.side.value}_"
-                                                              f"{pair_strat.id}_{DateTime.date(DateTime.utcnow())}"
+                                                              f"{pair_plan.pair_plan_params.plan_leg2.side.value}_"
+                                                              f"{pair_plan.id}_{DateTime.date(DateTime.utcnow())}"
                                                               f".json.lock")
         return leg1_lock_file_path, leg2_lock_file_path
 
-    async def _update_pair_strat_pre(self, stored_pair_strat_obj: PairStrat,
-                                     updated_pair_strat_obj: PairStrat) -> bool | None:
+    async def _update_pair_plan_pre(self, stored_pair_plan_obj: PairPlan,
+                                     updated_pair_plan_obj: PairPlan) -> bool | None:
         """
         Return true if check passed false otherwise
         """
         check_passed = True
-        if stored_pair_strat_obj.strat_state != StratState.StratState_ACTIVE and \
-                updated_pair_strat_obj.strat_state == StratState.StratState_ACTIVE:
-            await self._apply_activate_checks_n_log_error(stored_pair_strat_obj)  # raises HTTPException internally
-            if stored_pair_strat_obj.strat_state == StratState.StratState_READY:
+        if stored_pair_plan_obj.plan_state != PlanState.PlanState_ACTIVE and \
+                updated_pair_plan_obj.plan_state == PlanState.PlanState_ACTIVE:
+            await self._apply_activate_checks_n_log_error(stored_pair_plan_obj)  # raises HTTPException internally
+            if stored_pair_plan_obj.plan_state == PlanState.PlanState_READY:
                 leg1_lock_file_path, leg2_lock_file_path = (
-                    self.get_lock_file_names_from_pair_strat(updated_pair_strat_obj))
+                    self.get_lock_file_names_from_pair_plan(updated_pair_plan_obj))
                 if leg1_lock_file_path:
                     with open(leg1_lock_file_path, "w") as fl:  # creating empty file
                         pass
                 if leg2_lock_file_path:
                     with open(leg2_lock_file_path, "w") as fl:  # creating empty file
                         pass
-            # else not required: create strat lock file only if moving the strat state from
-            # StratState_READY to StratState_ACTIVE
-        if updated_pair_strat_obj.strat_state == StratState.StratState_DONE:
+            # else not required: create plan lock file only if moving the plan state from
+            # PlanState_READY to PlanState_ACTIVE
+        if updated_pair_plan_obj.plan_state == PlanState.PlanState_DONE:
             # warning and above log level is required
-            logging.warning(f"ResetLogBookCache;;;pair_strat_log_key: "
+            logging.warning(f"ResetLogBookCache;;;pair_plan_log_key: "
                             f"{get_reset_log_book_cache_wrapper_pattern()}"
-                            f"{get_pair_strat_log_key(updated_pair_strat_obj)}"
+                            f"{get_pair_plan_log_key(updated_pair_plan_obj)}"
                             f"{get_reset_log_book_cache_wrapper_pattern()}")
-        if updated_pair_strat_obj.strat_state != StratState.StratState_ACTIVE:
-            # if fail - log error is fine - strat not active - check does not fail due to this
-            self._apply_fallback_route_check(updated_pair_strat_obj, raise_exception=False)
+        if updated_pair_plan_obj.plan_state != PlanState.PlanState_ACTIVE:
+            # if fail - log error is fine - plan not active - check does not fail due to this
+            self._apply_fallback_route_check(updated_pair_plan_obj, raise_exception=False)
         else:
-            # updated_pair_strat_obj.strat_state is StratState.StratState_ACTIVE, if fail - raise exception
-            self._apply_fallback_route_check(updated_pair_strat_obj, raise_exception=True)
+            # updated_pair_plan_obj.plan_state is PlanState.PlanState_ACTIVE, if fail - raise exception
+            self._apply_fallback_route_check(updated_pair_plan_obj, raise_exception=True)
         return check_passed
 
-    def _update_port_to_executor_http_client_dict_from_updated_pair_strat(self, host: str, port: int):
+    def _update_port_to_executor_http_client_dict_from_updated_pair_plan(self, host: str, port: int):
         if port is not None and port not in self.port_to_executor_http_client_dict:
             self.port_to_executor_http_client_dict[port] = (
                 StreetBookServiceHttpClient.set_or_get_if_instance_exists(host, port))
 
-    async def update_pair_strat_pre(self, stored_pair_strat_obj: PairStrat, updated_pair_strat_obj: PairStrat):
+    async def update_pair_plan_pre(self, stored_pair_plan_obj: PairPlan, updated_pair_plan_obj: PairPlan):
         if not self.service_ready:
             # raise service unavailable 503 exception, let the caller retry
             # @@@ IMPORTANT: below error string is used to catch this specific exception, please update
             # all catch handling too if error msg is changed
-            err_str_ = "update_pair_strat_pre not ready - service is not initialized yet, " \
-                       f"pair_strat_key: {get_pair_strat_log_key(updated_pair_strat_obj)}"
+            err_str_ = "update_pair_plan_pre not ready - service is not initialized yet, " \
+                       f"pair_plan_key: {get_pair_plan_log_key(updated_pair_plan_obj)}"
             logging.error(err_str_)
             raise HTTPException(status_code=503, detail=err_str_)
 
-        if updated_pair_strat_obj.frequency is None:
-            updated_pair_strat_obj.frequency = 0
-        updated_pair_strat_obj.frequency += 1
+        if updated_pair_plan_obj.frequency is None:
+            updated_pair_plan_obj.frequency = 0
+        updated_pair_plan_obj.frequency += 1
 
-        if updated_pair_strat_obj.pair_strat_params_update_seq_num is None:
-            updated_pair_strat_obj.pair_strat_params_update_seq_num = 0
-        updated_pair_strat_obj.pair_strat_params_update_seq_num += 1
-        updated_pair_strat_obj.last_active_date_time = DateTime.utcnow()
+        if updated_pair_plan_obj.pair_plan_params_update_seq_num is None:
+            updated_pair_plan_obj.pair_plan_params_update_seq_num = 0
+        updated_pair_plan_obj.pair_plan_params_update_seq_num += 1
+        updated_pair_plan_obj.last_active_date_time = DateTime.utcnow()
 
-        res = await self._update_pair_strat_pre(stored_pair_strat_obj, updated_pair_strat_obj)
+        res = await self._update_pair_plan_pre(stored_pair_plan_obj, updated_pair_plan_obj)
         if not res:
-            sec_id: str = stored_pair_strat_obj.pair_strat_params.strat_leg1.sec.sec_id
-            side: Side = stored_pair_strat_obj.pair_strat_params.strat_leg1.side
-            logging.debug(f"Alerts updated by _update_pair_strat_pre, symbol_side_key: "
-                          f"{get_symbol_side_key([(sec_id, side)])};;;{updated_pair_strat_obj=}")
+            sec_id: str = stored_pair_plan_obj.pair_plan_params.plan_leg1.sec.sec_id
+            side: Side = stored_pair_plan_obj.pair_plan_params.plan_leg1.side
+            logging.debug(f"Alerts updated by _update_pair_plan_pre, symbol_side_key: "
+                          f"{get_symbol_side_key([(sec_id, side)])};;;{updated_pair_plan_obj=}")
 
         # updating port_to_executor_http_client_dict with this port if not present
-        self._update_port_to_executor_http_client_dict_from_updated_pair_strat(updated_pair_strat_obj.host,
-                                                                               updated_pair_strat_obj.port)
+        self._update_port_to_executor_http_client_dict_from_updated_pair_plan(updated_pair_plan_obj.host,
+                                                                               updated_pair_plan_obj.port)
 
-        return updated_pair_strat_obj
+        return updated_pair_plan_obj
 
-    async def _partial_update_pair_strat(self, stored_pair_strat_obj_dict: Dict, updated_pair_strat_obj_dict: Dict):
-        stored_pair_strat_obj = PairStrat.from_dict(stored_pair_strat_obj_dict)
-        updated_pair_strat_obj_dict["frequency"] = stored_pair_strat_obj.frequency + 1
+    async def _partial_update_pair_plan(self, stored_pair_plan_obj_dict: Dict, updated_pair_plan_obj_dict: Dict):
+        stored_pair_plan_obj = PairPlan.from_dict(stored_pair_plan_obj_dict)
+        updated_pair_plan_obj_dict["frequency"] = stored_pair_plan_obj.frequency + 1
 
-        if updated_pair_strat_obj_dict.get("pair_strat_params") is not None:
-            if stored_pair_strat_obj.pair_strat_params_update_seq_num is None:
-                stored_pair_strat_obj.pair_strat_params_update_seq_num = 0
-            updated_pair_strat_obj_dict["pair_strat_params_update_seq_num"] = \
-                stored_pair_strat_obj.pair_strat_params_update_seq_num + 1
+        if updated_pair_plan_obj_dict.get("pair_plan_params") is not None:
+            if stored_pair_plan_obj.pair_plan_params_update_seq_num is None:
+                stored_pair_plan_obj.pair_plan_params_update_seq_num = 0
+            updated_pair_plan_obj_dict["pair_plan_params_update_seq_num"] = \
+                stored_pair_plan_obj.pair_plan_params_update_seq_num + 1
 
-        updated_pair_strat_obj_dict["last_active_date_time"] = DateTime.utcnow()
+        updated_pair_plan_obj_dict["last_active_date_time"] = DateTime.utcnow()
 
-        updated_strat_obj_dict = compare_n_patch_dict(copy.deepcopy(stored_pair_strat_obj.to_dict()),
-                                                      updated_pair_strat_obj_dict)
-        updated_pair_strat_obj = PairStrat.from_dict(updated_strat_obj_dict)
-        res = await self._update_pair_strat_pre(stored_pair_strat_obj, updated_pair_strat_obj)
+        updated_plan_obj_dict = compare_n_patch_dict(copy.deepcopy(stored_pair_plan_obj.to_dict()),
+                                                      updated_pair_plan_obj_dict)
+        updated_pair_plan_obj = PairPlan.from_dict(updated_plan_obj_dict)
+        res = await self._update_pair_plan_pre(stored_pair_plan_obj, updated_pair_plan_obj)
         if not res:
-            sec_id: str = stored_pair_strat_obj.pair_strat_params.strat_leg1.sec.sec_id
-            side: Side = stored_pair_strat_obj.pair_strat_params.strat_leg1.side
-            logging.debug(f"Alerts updated by _update_pair_strat_pre, symbol_side_key: "
-                          f"{get_symbol_side_key([(sec_id, side)])};;;{updated_pair_strat_obj=}")
-        updated_pair_strat_obj_dict = updated_pair_strat_obj.to_dict()
+            sec_id: str = stored_pair_plan_obj.pair_plan_params.plan_leg1.sec.sec_id
+            side: Side = stored_pair_plan_obj.pair_plan_params.plan_leg1.side
+            logging.debug(f"Alerts updated by _update_pair_plan_pre, symbol_side_key: "
+                          f"{get_symbol_side_key([(sec_id, side)])};;;{updated_pair_plan_obj=}")
+        updated_pair_plan_obj_dict = updated_pair_plan_obj.to_dict()
 
         # updating port_to_executor_http_client_dict with this port if not present
-        host = updated_pair_strat_obj_dict.get("host")
-        port = updated_pair_strat_obj_dict.get("port")
-        self._update_port_to_executor_http_client_dict_from_updated_pair_strat(host, port)
-        return updated_pair_strat_obj_dict
+        host = updated_pair_plan_obj_dict.get("host")
+        port = updated_pair_plan_obj_dict.get("port")
+        self._update_port_to_executor_http_client_dict_from_updated_pair_plan(host, port)
+        return updated_pair_plan_obj_dict
 
-    async def partial_update_pair_strat_pre(self, stored_pair_strat_obj_json: Dict[str, Any],
-                                            updated_pair_strat_obj_json: Dict[str, Any]):
+    async def partial_update_pair_plan_pre(self, stored_pair_plan_obj_json: Dict[str, Any],
+                                            updated_pair_plan_obj_json: Dict[str, Any]):
         if not self.service_ready:
             # raise service unavailable 503 exception, let the caller retry
             # @@@ IMPORTANT: below error string is used to catch this specific exception, please update
             # all catch handling too if error msg is changed
-            err_str_ = "partial_update_pair_strat_pre not ready - service is not initialized yet, " \
-                       f"pair_strat: {stored_pair_strat_obj_json}"
+            err_str_ = "partial_update_pair_plan_pre not ready - service is not initialized yet, " \
+                       f"pair_plan: {stored_pair_plan_obj_json}"
             logging.error(err_str_)
             raise HTTPException(status_code=503, detail=err_str_)
 
-        updated_pair_strat_obj_dict = \
-            await self._partial_update_pair_strat(stored_pair_strat_obj_json, updated_pair_strat_obj_json)
-        return updated_pair_strat_obj_dict
+        updated_pair_plan_obj_dict = \
+            await self._partial_update_pair_plan(stored_pair_plan_obj_json, updated_pair_plan_obj_json)
+        return updated_pair_plan_obj_dict
 
-    async def partial_update_all_pair_strat_pre(self, stored_pair_strat_dict_list: List[Dict[str, Any]],
-                                                updated_pair_strat_dict_list: List[Dict[str, Any]]):
+    async def partial_update_all_pair_plan_pre(self, stored_pair_plan_dict_list: List[Dict[str, Any]],
+                                                updated_pair_plan_dict_list: List[Dict[str, Any]]):
         if not self.service_ready:
             # raise service unavailable 503 exception, let the caller retry
             # @@@ IMPORTANT: below error string is used to catch this specific exception, please update
             # all catch handling too if error msg is changed
-            err_str_ = "partial_update_pair_strat_pre not ready - service is not initialized yet, "
+            err_str_ = "partial_update_pair_plan_pre not ready - service is not initialized yet, "
             logging.error(err_str_)
             raise HTTPException(status_code=503, detail=err_str_)
         tasks: List = []
-        for idx, updated_pair_strat_obj_json in enumerate(updated_pair_strat_dict_list):
-            task = asyncio.create_task(self._partial_update_pair_strat(stored_pair_strat_dict_list[idx],
-                                                                       updated_pair_strat_obj_json),
-                                       name=str(f"{stored_pair_strat_dict_list[idx].get('_id')}"))
+        for idx, updated_pair_plan_obj_json in enumerate(updated_pair_plan_dict_list):
+            task = asyncio.create_task(self._partial_update_pair_plan(stored_pair_plan_dict_list[idx],
+                                                                       updated_pair_plan_obj_json),
+                                       name=str(f"{stored_pair_plan_dict_list[idx].get('_id')}"))
             tasks.append(task)
-        updated_pair_strat_obj_json_list = await submit_task_with_first_completed_wait(tasks)
-        return updated_pair_strat_obj_json_list
+        updated_pair_plan_obj_json_list = await submit_task_with_first_completed_wait(tasks)
+        return updated_pair_plan_obj_json_list
 
-    def check_n_disable_non_mstrat_positions(self, stored_pair_strat_obj_or_dict: Dict | PairStrat,
-                                             updated_pair_strat_obj_or_dict: Dict | PairStrat):
+    def check_n_disable_non_mplan_positions(self, stored_pair_plan_obj_or_dict: Dict | PairPlan,
+                                             updated_pair_plan_obj_or_dict: Dict | PairPlan):
         pass
 
-    def _update_pair_strat_post(self, stored_pair_strat_obj: PairStrat, updated_pair_strat_obj: PairStrat):
-        if stored_pair_strat_obj.strat_state != updated_pair_strat_obj.strat_state:
-            logging.warning(f"Strat state changed from {stored_pair_strat_obj.strat_state.value} to "
-                            f"{updated_pair_strat_obj.strat_state.value};;;pair_strat_log_key: "
-                            f"{get_pair_strat_log_key(updated_pair_strat_obj)}")
-        self.check_n_disable_non_mstrat_positions(stored_pair_strat_obj, updated_pair_strat_obj)
+    def _update_pair_plan_post(self, stored_pair_plan_obj: PairPlan, updated_pair_plan_obj: PairPlan):
+        if stored_pair_plan_obj.plan_state != updated_pair_plan_obj.plan_state:
+            logging.warning(f"Plan state changed from {stored_pair_plan_obj.plan_state.value} to "
+                            f"{updated_pair_plan_obj.plan_state.value};;;pair_plan_log_key: "
+                            f"{get_pair_plan_log_key(updated_pair_plan_obj)}")
+        self.check_n_disable_non_mplan_positions(stored_pair_plan_obj, updated_pair_plan_obj)
 
-    def _partial_update_pair_strat_post(self, stored_pair_strat_obj_dict: Dict, updated_pair_strat_obj_dict: Dict):
-        stored_strat_state = stored_pair_strat_obj_dict.get("strat_state")
-        updated_strat_state = updated_pair_strat_obj_dict.get("strat_state")
-        if stored_strat_state != updated_strat_state:
-            logging.warning(f"Strat state changed from {stored_strat_state} to "
-                            f"{updated_strat_state};;;pair_strat_log_key: "
-                            f"{get_pair_strat_dict_log_key(updated_pair_strat_obj_dict)}")
-        self.check_n_disable_non_mstrat_positions(stored_pair_strat_obj_dict, updated_pair_strat_obj_dict)
+    def _partial_update_pair_plan_post(self, stored_pair_plan_obj_dict: Dict, updated_pair_plan_obj_dict: Dict):
+        stored_plan_state = stored_pair_plan_obj_dict.get("plan_state")
+        updated_plan_state = updated_pair_plan_obj_dict.get("plan_state")
+        if stored_plan_state != updated_plan_state:
+            logging.warning(f"Plan state changed from {stored_plan_state} to "
+                            f"{updated_plan_state};;;pair_plan_log_key: "
+                            f"{get_pair_plan_dict_log_key(updated_pair_plan_obj_dict)}")
+        self.check_n_disable_non_mplan_positions(stored_pair_plan_obj_dict, updated_pair_plan_obj_dict)
 
-    async def update_pair_strat_post(self, stored_pair_strat_obj: PairStrat, updated_pair_strat_obj: PairStrat):
-        self._update_pair_strat_post(stored_pair_strat_obj, updated_pair_strat_obj)
+    async def update_pair_plan_post(self, stored_pair_plan_obj: PairPlan, updated_pair_plan_obj: PairPlan):
+        self._update_pair_plan_post(stored_pair_plan_obj, updated_pair_plan_obj)
 
-    async def partial_update_pair_strat_post(self, stored_pair_strat_obj_dict: Dict,
-                                             updated_pair_strat_obj_dict: Dict):
-        self._partial_update_pair_strat_post(stored_pair_strat_obj_dict, updated_pair_strat_obj_dict)
+    async def partial_update_pair_plan_post(self, stored_pair_plan_obj_dict: Dict,
+                                             updated_pair_plan_obj_dict: Dict):
+        self._partial_update_pair_plan_post(stored_pair_plan_obj_dict, updated_pair_plan_obj_dict)
 
-    async def partial_update_all_pair_strat_post(self, stored_pair_strat_obj_dict_list: List[Dict],
-                                                 updated_pair_strat_obj_dict_list: List[Dict]):
-        stored_pair_strat_obj_dict: Dict
-        for idx, stored_pair_strat_obj_dict in enumerate(stored_pair_strat_obj_dict_list):
-            updated_pair_strat_obj_dict: Dict[str, Any] = updated_pair_strat_obj_dict_list[idx]
-            self._partial_update_pair_strat_post(stored_pair_strat_obj_dict, updated_pair_strat_obj_dict)
+    async def partial_update_all_pair_plan_post(self, stored_pair_plan_obj_dict_list: List[Dict],
+                                                 updated_pair_plan_obj_dict_list: List[Dict]):
+        stored_pair_plan_obj_dict: Dict
+        for idx, stored_pair_plan_obj_dict in enumerate(stored_pair_plan_obj_dict_list):
+            updated_pair_plan_obj_dict: Dict[str, Any] = updated_pair_plan_obj_dict_list[idx]
+            self._partial_update_pair_plan_post(stored_pair_plan_obj_dict, updated_pair_plan_obj_dict)
 
-    async def pause_all_active_strats_query_pre(self, pair_strat_class_type: Type[PairStrat]):
-        async with PairStrat.reentrant_lock:
-            pair_strat_list: List[Dict] = (
-                await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_pair_strat_http_json_dict())
+    async def pause_all_active_plans_query_pre(self, pair_plan_class_type: Type[PairPlan]):
+        async with PairPlan.reentrant_lock:
+            pair_plan_list: List[Dict] = (
+                await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_pair_plan_http_json_dict())
 
-            updated_pair_strats_list: List[Dict] = []
-            for pair_strat_ in pair_strat_list:
+            updated_pair_plans_list: List[Dict] = []
+            for pair_plan_ in pair_plan_list:
 
-                # Putting strat to pause if strat is active
-                strat_state = pair_strat_.get("strat_state")
-                _id = pair_strat_.get("_id")
-                if strat_state == StratState.StratState_ACTIVE:
-                    update_pair_strat = {"_id": _id, "strat_state": StratState.StratState_PAUSED}
-                    updated_pair_strats_list.append(update_pair_strat)
+                # Putting plan to pause if plan is active
+                plan_state = pair_plan_.get("plan_state")
+                _id = pair_plan_.get("_id")
+                if plan_state == PlanState.PlanState_ACTIVE:
+                    update_pair_plan = {"_id": _id, "plan_state": PlanState.PlanState_PAUSED}
+                    updated_pair_plans_list.append(update_pair_plan)
 
-            if updated_pair_strats_list:
-                logging.warning("Pausing all strats")
+            if updated_pair_plans_list:
+                logging.warning("Pausing all plans")
                 (await EmailBookServiceRoutesCallbackBaseNativeOverride.
-                 underlying_partial_update_all_pair_strat_http(updated_pair_strats_list, return_obj_copy=False))
+                 underlying_partial_update_all_pair_plan_http(updated_pair_plans_list, return_obj_copy=False))
         return []
 
-    async def update_pair_strat_to_non_running_state_query_pre(self, pair_strat_class_type: Type[PairStrat],
-                                                               pair_strat_id: int):
-        pair_strat_json = {
-            "_id": pair_strat_id,
+    async def update_pair_plan_to_non_running_state_query_pre(self, pair_plan_class_type: Type[PairPlan],
+                                                               pair_plan_id: int):
+        pair_plan_json = {
+            "_id": pair_plan_id,
             "server_ready_state": 0,
             "port": None,
             "cpp_port": None,
             "cpp_ws_port": None
         }
 
-        update_pair_strat = \
+        update_pair_plan = \
             await (EmailBookServiceRoutesCallbackBaseNativeOverride.
-                   underlying_partial_update_pair_strat_http(pair_strat_json))
-        return [update_pair_strat]
+                   underlying_partial_update_pair_plan_http(pair_plan_json))
+        return [update_pair_plan]
 
-    async def _start_executor_server(self, pair_strat: PairStrat, is_crash_recovery: bool | None = None) -> None:
+    async def _start_executor_server(self, pair_plan: PairPlan, is_crash_recovery: bool | None = None) -> None:
         code_gen_projects_dir = PurePath(__file__).parent.parent.parent
         # executor_path = code_gen_projects_dir / "street_book" / "scripts" / 'launch_beanie_fastapi.py'
         executor_path = code_gen_projects_dir / "street_book" / "scripts" / 'launch_msgspec_fastapi.py'
         if is_crash_recovery:
             # 1 is sent to indicate it is recovery restart
-            executor = subprocess.Popen(['python', str(executor_path), f'{pair_strat.id}', "1", '&'])
+            executor = subprocess.Popen(['python', str(executor_path), f'{pair_plan.id}', "1", '&'])
         else:
-            executor = subprocess.Popen(['python', str(executor_path), f'{pair_strat.id}', '&'])
+            executor = subprocess.Popen(['python', str(executor_path), f'{pair_plan.id}', '&'])
 
-        logging.info(f"Launched strat executor for {pair_strat.id=};;;{executor_path=}")
-        self.pair_strat_id_to_executor_process_id_dict[pair_strat.id] = executor.pid
+        logging.info(f"Launched plan executor for {pair_plan.id=};;;{executor_path=}")
+        self.pair_plan_id_to_executor_process_id_dict[pair_plan.id] = executor.pid
 
-    def _close_executor_server(self, pair_strat_id: int) -> None:
-        process_id = self.pair_strat_id_to_executor_process_id_dict.get(pair_strat_id)
+    def _close_executor_server(self, pair_plan_id: int) -> None:
+        process_id = self.pair_plan_id_to_executor_process_id_dict.get(pair_plan_id)
         # process.terminate()
         os.kill(process_id, signal.SIGINT)
 
-        del self.pair_strat_id_to_executor_process_id_dict[pair_strat_id]
+        del self.pair_plan_id_to_executor_process_id_dict[pair_plan_id]
 
-    async def get_ongoing_strats_symbol_n_exch_query_pre(self,
-                                                         ongoing_strat_symbols_class_type: Type[
-                                                             OngoingStratsSymbolNExchange]):
+    async def get_ongoing_plans_symbol_n_exch_query_pre(self,
+                                                         ongoing_plan_symbols_class_type: Type[
+                                                             OngoingPlansSymbolNExchange]):
 
-        pair_strat_list: List[PairStrat] = \
-            await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_pair_strat_http(
-                get_ongoing_pair_strat_filter(), self.get_generic_read_route())
+        pair_plan_list: List[PairPlan] = \
+            await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_pair_plan_http(
+                get_ongoing_pair_plan_filter(), self.get_generic_read_route())
         ongoing_symbol_n_exch_set: Set[str] = set()
-        ongoing_strat_symbols_n_exchange = OngoingStratsSymbolNExchange(symbol_n_exchange=[])
+        ongoing_plan_symbols_n_exchange = OngoingPlansSymbolNExchange(symbol_n_exchange=[])
 
         before_len: int = 0
-        for pair_strat in pair_strat_list:
-            leg1_symbol = pair_strat.pair_strat_params.strat_leg1.sec.sec_id
-            leg1_exch = pair_strat.pair_strat_params.strat_leg1.exch_id
-            leg2_symbol = pair_strat.pair_strat_params.strat_leg2.sec.sec_id
-            leg2_exch = pair_strat.pair_strat_params.strat_leg2.exch_id
+        for pair_plan in pair_plan_list:
+            leg1_symbol = pair_plan.pair_plan_params.plan_leg1.sec.sec_id
+            leg1_exch = pair_plan.pair_plan_params.plan_leg1.exch_id
+            leg2_symbol = pair_plan.pair_plan_params.plan_leg2.sec.sec_id
+            leg2_exch = pair_plan.pair_plan_params.plan_leg2.exch_id
             leg1_symbol_n_exch = SymbolNExchange.from_kwargs(symbol=leg1_symbol, exchange=leg1_exch)
             leg2_symbol_n_exch = SymbolNExchange.from_kwargs(symbol=leg2_symbol, exchange=leg2_exch)
 
             ongoing_symbol_n_exch_set.add(f"{leg1_symbol}_{leg1_exch}")
             if len(ongoing_symbol_n_exch_set) == before_len + 1:
-                ongoing_strat_symbols_n_exchange.symbol_n_exchange.append(leg1_symbol_n_exch)
+                ongoing_plan_symbols_n_exchange.symbol_n_exchange.append(leg1_symbol_n_exch)
                 before_len += 1
 
             ongoing_symbol_n_exch_set.add(f"{leg2_symbol}_{leg2_exch}")
             if len(ongoing_symbol_n_exch_set) == before_len + 1:
-                ongoing_strat_symbols_n_exchange.symbol_n_exchange.append(leg2_symbol_n_exch)
+                ongoing_plan_symbols_n_exchange.symbol_n_exchange.append(leg2_symbol_n_exch)
                 before_len += 1
-        return [ongoing_strat_symbols_n_exchange]
+        return [ongoing_plan_symbols_n_exchange]
 
-    def _drop_executor_db_for_deleting_pair_strat(self, mongo_server_uri: str, pair_strat_id: int,
+    def _drop_executor_db_for_deleting_pair_plan(self, mongo_server_uri: str, pair_plan_id: int,
                                                   sec_id: str, side: Side):
         mongo_client = MongoClient(mongo_server_uri)
-        db_name: str = f"street_book_{pair_strat_id}"
+        db_name: str = f"street_book_{pair_plan_id}"
 
         if db_name in mongo_client.list_database_names():
             mongo_client.drop_database(db_name)
         else:
             err_str_ = (f"Unexpected: {db_name=} not found in mongo_client for uri: "
-                        f"{mongo_server_uri} being used by current strat, "
+                        f"{mongo_server_uri} being used by current plan, "
                         f"symbol_side_key: {get_symbol_side_key([(sec_id, side)])}")
             logging.error(err_str_)
             raise HTTPException(status_code=500, detail=err_str_)
 
-    async def delete_pair_strat_pre(self, pair_strat_id: int):
-        pair_strat_to_be_deleted = \
+    async def delete_pair_plan_pre(self, pair_plan_id: int):
+        pair_plan_to_be_deleted = \
             await (EmailBookServiceRoutesCallbackBaseNativeOverride.
-                   underlying_read_pair_strat_by_id_http(pair_strat_id))
+                   underlying_read_pair_plan_by_id_http(pair_plan_id))
 
-        port: int = pair_strat_to_be_deleted.port
-        sec_id = pair_strat_to_be_deleted.pair_strat_params.strat_leg1.sec.sec_id
-        side = pair_strat_to_be_deleted.pair_strat_params.strat_leg1.side
+        port: int = pair_plan_to_be_deleted.port
+        sec_id = pair_plan_to_be_deleted.pair_plan_params.plan_leg1.sec.sec_id
+        side = pair_plan_to_be_deleted.pair_plan_params.plan_leg1.side
 
-        strat_key = get_strat_key_from_pair_strat(pair_strat_to_be_deleted)
-        strat_collection_dict: Dict = await (EmailBookServiceRoutesCallbackBaseNativeOverride.
-                                        underlying_read_strat_collection_by_id_http_json_dict(1))
+        plan_key = get_plan_key_from_pair_plan(pair_plan_to_be_deleted)
+        plan_collection_dict: Dict = await (EmailBookServiceRoutesCallbackBaseNativeOverride.
+                                        underlying_read_plan_collection_by_id_http_json_dict(1))
 
-        loaded_strat_keys = strat_collection_dict.get("loaded_strat_keys")
-        buffered_strat_keys = strat_collection_dict.get("buffered_strat_keys")
+        loaded_plan_keys = plan_collection_dict.get("loaded_plan_keys")
+        buffered_plan_keys = plan_collection_dict.get("buffered_plan_keys")
 
-        if loaded_strat_keys is not None and strat_key in loaded_strat_keys:
-            if pair_strat_to_be_deleted.port is not None:
-                strat_web_client: StreetBookServiceHttpClient = (
-                    StreetBookServiceHttpClient.set_or_get_if_instance_exists(pair_strat_to_be_deleted.host,
-                                                                                 pair_strat_to_be_deleted.port))
+        if loaded_plan_keys is not None and plan_key in loaded_plan_keys:
+            if pair_plan_to_be_deleted.port is not None:
+                plan_web_client: StreetBookServiceHttpClient = (
+                    StreetBookServiceHttpClient.set_or_get_if_instance_exists(pair_plan_to_be_deleted.host,
+                                                                                 pair_plan_to_be_deleted.port))
             else:
-                err_str_ = f"pair_strat object has no port;;; {pair_strat_to_be_deleted=}"
+                err_str_ = f"pair_plan object has no port;;; {pair_plan_to_be_deleted=}"
                 logging.error(err_str_)
                 raise HTTPException(detail=err_str_, status_code=500)
 
-            if strat_web_client is None:
-                err_str_ = ("Can't find any web_client present in server cache dict for ongoing strat of "
-                            f"{port=}, ignoring this strat delete, likely bug in server cache dict handling, "
+            if plan_web_client is None:
+                err_str_ = ("Can't find any web_client present in server cache dict for ongoing plan of "
+                            f"{port=}, ignoring this plan delete, likely bug in server cache dict handling, "
                             f"symbol_side_key: {get_symbol_side_key([(sec_id, side)])};;; "
-                            f"{pair_strat_to_be_deleted=}")
+                            f"{pair_plan_to_be_deleted=}")
                 logging.error(err_str_)
                 raise HTTPException(status_code=500, detail=err_str_)
 
-            if is_ongoing_strat(pair_strat_to_be_deleted):
-                err_str_ = ("This strat is ongoing: Deletion of ongoing strat is not supported, "
-                            "ignoring this strat delete, try again once it is"
+            if is_ongoing_plan(pair_plan_to_be_deleted):
+                err_str_ = ("This plan is ongoing: Deletion of ongoing plan is not supported, "
+                            "ignoring this plan delete, try again once it is"
                             f"not ongoing, symbol_side_key: {get_symbol_side_key([(sec_id, side)])}")
                 logging.error(err_str_)
                 raise HTTPException(status_code=500, detail=err_str_)
 
             # removing and updating relative models
             try:
-                strat_web_client.put_strat_to_snooze_query_client()
+                plan_web_client.put_plan_to_snooze_query_client()
             except Exception as e:
-                err_str_ = ("Some error occurred in executor while setting strat to SNOOZED state, ignoring "
-                            f"delete of this strat, symbol_side_key: {get_symbol_side_key([(sec_id, side)])}, "
-                            f"exception: {e}, ;;; {pair_strat_to_be_deleted=}")
+                err_str_ = ("Some error occurred in executor while setting plan to SNOOZED state, ignoring "
+                            f"delete of this plan, symbol_side_key: {get_symbol_side_key([(sec_id, side)])}, "
+                            f"exception: {e}, ;;; {pair_plan_to_be_deleted=}")
                 logging.error(err_str_)
                 raise HTTPException(status_code=500, detail=err_str_)
-            self._close_executor_server(pair_strat_to_be_deleted.id)  # closing executor
+            self._close_executor_server(pair_plan_to_be_deleted.id)  # closing executor
 
-            # Dropping database for this strat
+            # Dropping database for this plan
             code_gen_projects_dir = PurePath(__file__).parent.parent.parent
             executor_config_file_path = (code_gen_projects_dir / "street_book" /
                                          "data" / f"config.yaml")
@@ -1260,311 +1260,308 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
                     YAMLConfigurationManager.load_yaml_configurations(str(executor_config_file_path)))
                 mongo_server_uri = server_config_yaml_dict.get("mongo_server")
                 if mongo_server_uri is not None:
-                    self._drop_executor_db_for_deleting_pair_strat(mongo_server_uri, pair_strat_to_be_deleted.id,
+                    self._drop_executor_db_for_deleting_pair_plan(mongo_server_uri, pair_plan_to_be_deleted.id,
                                                                    sec_id, side)
                 else:
                     err_str_ = (f"key 'mongo_server' missing in street_book/data/config.yaml, ignoring this"
-                                f"strat delete, symbol_side_key: {get_symbol_side_key([(sec_id, side)])}")
+                                f"plan delete, symbol_side_key: {get_symbol_side_key([(sec_id, side)])}")
                     logging.error(err_str_)
                     raise HTTPException(detail=err_str_, status_code=400)
             else:
                 err_str_ = (f"Config file for {port=} missing, must exists since executor is running from this"
-                            f"config, ignoring this strat delete, symbol_side_key: "
+                            f"config, ignoring this plan delete, symbol_side_key: "
                             f"{get_symbol_side_key([(sec_id, side)])}")
                 logging.error(err_str_)
                 raise HTTPException(detail=err_str_, status_code=400)
 
-            # Removing strat_key from loaded strat keys
-            async with StratCollection.reentrant_lock:
-                strat_key = get_strat_key_from_pair_strat(pair_strat_to_be_deleted)
+            # Removing plan_key from loaded plan keys
+            async with PlanCollection.reentrant_lock:
+                plan_key = get_plan_key_from_pair_plan(pair_plan_to_be_deleted)
                 obj_id = 1
-                strat_collection: StratCollection = (
+                plan_collection: PlanCollection = (
                     await EmailBookServiceRoutesCallbackBaseNativeOverride.
-                    underlying_read_strat_collection_by_id_http(obj_id))
+                    underlying_read_plan_collection_by_id_http(obj_id))
 
-                loaded_strat_keys = strat_collection.loaded_strat_keys
-                if loaded_strat_keys is not None:
+                loaded_plan_keys = plan_collection.loaded_plan_keys
+                if loaded_plan_keys is not None:
                     try:
-                        loaded_strat_keys.remove(strat_key)
+                        loaded_plan_keys.remove(plan_key)
                     except ValueError as val_err:
                         if "x not in list" in str(val_err):
-                            logging.error(f"Unexpected: Can't find {strat_key=} in strat_collection's loaded"
-                                          f"keys while deleting strat;;; {strat_collection=}")
+                            logging.error(f"Unexpected: Can't find {plan_key=} in plan_collection's loaded"
+                                          f"keys while deleting plan;;; {plan_collection=}")
                         else:
-                            logging.error(f"Something unexpected happened while removing {strat_key=} from "
-                                          f"loaded strat_keys in strat_collection - ignoring this strat_key removal;;; "
-                                          f"{strat_collection=}")
+                            logging.error(f"Something unexpected happened while removing {plan_key=} from "
+                                          f"loaded plan_keys in plan_collection - ignoring this plan_key removal;;; "
+                                          f"{plan_collection=}")
                         return
                 else:
-                    logging.error(f"Unexpected: Can't find {strat_key=} in strat_collection's loaded"
-                                  f"keys while deleting strat - loaded_strat_keys found None;;; {strat_collection}")
+                    logging.error(f"Unexpected: Can't find {plan_key=} in plan_collection's loaded"
+                                  f"keys while deleting plan - loaded_plan_keys found None;;; {plan_collection}")
                     return
 
-                await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_update_strat_collection_http(
-                    strat_collection, return_obj_copy=False)
+                await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_update_plan_collection_http(
+                    plan_collection, return_obj_copy=False)
 
-            # Removing StratView for this strat
-            photo_book_service_http_client.delete_strat_view_client(pair_strat_to_be_deleted.id)
+            # Removing PlanView for this plan
+            photo_book_service_http_client.delete_plan_view_client(pair_plan_to_be_deleted.id)
 
-            logging.warning(f"ResetLogBookCache;;;pair_strat_log_key: "
+            logging.warning(f"ResetLogBookCache;;;pair_plan_log_key: "
                             f"{get_reset_log_book_cache_wrapper_pattern()}"
-                            f"{get_pair_strat_log_key(pair_strat_to_be_deleted)}"
+                            f"{get_pair_plan_log_key(pair_plan_to_be_deleted)}"
                             f"{get_reset_log_book_cache_wrapper_pattern()}")
-        elif buffered_strat_keys is not None and strat_key in buffered_strat_keys:
-            # Removing strat_key from buffered strat keys
-            async with StratCollection.reentrant_lock:
-                strat_key = get_strat_key_from_pair_strat(pair_strat_to_be_deleted)
+        elif buffered_plan_keys is not None and plan_key in buffered_plan_keys:
+            # Removing plan_key from buffered plan keys
+            async with PlanCollection.reentrant_lock:
+                plan_key = get_plan_key_from_pair_plan(pair_plan_to_be_deleted)
                 obj_id = 1
-                strat_collection: StratCollection = (
+                plan_collection: PlanCollection = (
                     await EmailBookServiceRoutesCallbackBaseNativeOverride.
-                    underlying_read_strat_collection_by_id_http(obj_id))
+                    underlying_read_plan_collection_by_id_http(obj_id))
 
                 try:
-                    strat_collection.buffered_strat_keys.remove(strat_key)
+                    plan_collection.buffered_plan_keys.remove(plan_key)
                 except ValueError as val_err:
                     if "x not in list" in str(val_err):
-                        logging.error(f"Unexpected: Can't find {strat_key=} in strat_collection's buffered"
-                                      f"keys while deleting strat;;; {strat_collection=}")
+                        logging.error(f"Unexpected: Can't find {plan_key=} in plan_collection's buffered"
+                                      f"keys while deleting plan;;; {plan_collection=}")
                     else:
-                        logging.error(f"Something unexpected happened while removing {strat_key=} from "
-                                      f"loaded strat_keys in strat_collection - ignoring this strat_key removal;;; "
-                                      f"{strat_collection=}")
+                        logging.error(f"Something unexpected happened while removing {plan_key=} from "
+                                      f"loaded plan_keys in plan_collection - ignoring this plan_key removal;;; "
+                                      f"{plan_collection=}")
                     return
 
-                await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_update_strat_collection_http(
-                    strat_collection, return_obj_copy=False)
+                await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_update_plan_collection_http(
+                    plan_collection, return_obj_copy=False)
 
-            # Removing StratView for this strat
-            photo_book_service_http_client.delete_strat_view_client(pair_strat_to_be_deleted)
+            # Removing PlanView for this plan
+            photo_book_service_http_client.delete_plan_view_client(pair_plan_to_be_deleted.id)
 
-            # removing log key cache value form pair_strat_id_key cache
-            pair_strat_id_key.pop(pair_strat_to_be_deleted.id, None)
+            # removing log key cache value form pair_plan_id_key cache
+            pair_plan_id_key.pop(pair_plan_to_be_deleted.id, None)
 
         else:
-            err_str_ = ("Unexpected: Strat is not found in loaded or buffer list, ignoring this strat delete, "
+            err_str_ = ("Unexpected: Plan is not found in loaded or buffer list, ignoring this plan delete, "
                         f"symbol_side_key: {get_symbol_side_key([(sec_id, side)])}")
             logging.error(err_str_)
             raise HTTPException(detail=err_str_, status_code=400)
 
-    async def unload_pair_strats(self, stored_strat_collection_obj: StratCollection,
-                                 updated_strat_collection_obj: StratCollection) -> None:
-        updated_strat_collection_loaded_strat_keys_frozenset = frozenset(updated_strat_collection_obj.loaded_strat_keys)
-        stored_strat_collection_loaded_strat_keys_frozenset = frozenset(stored_strat_collection_obj.loaded_strat_keys)
+    async def unload_pair_plans(self, stored_plan_collection_obj: PlanCollection,
+                                 updated_plan_collection_obj: PlanCollection) -> None:
+        updated_plan_collection_loaded_plan_keys_frozenset = frozenset(updated_plan_collection_obj.loaded_plan_keys)
+        stored_plan_collection_loaded_plan_keys_frozenset = frozenset(stored_plan_collection_obj.loaded_plan_keys)
         # existing items in stored loaded frozenset but not in the updated stored frozen set need to move to done state
-        unloaded_strat_keys_frozenset = stored_strat_collection_loaded_strat_keys_frozenset.difference(
-            updated_strat_collection_loaded_strat_keys_frozenset)
-        if len(unloaded_strat_keys_frozenset) != 0:
-            unloaded_strat_key: str
-            for unloaded_strat_key in unloaded_strat_keys_frozenset:
-                if unloaded_strat_key in updated_strat_collection_obj.buffered_strat_keys:  # unloaded not deleted
-                    pair_strat_id: int = get_id_from_strat_key(unloaded_strat_key)
-                    pair_strat = \
+        unloaded_plan_keys_frozenset = stored_plan_collection_loaded_plan_keys_frozenset.difference(
+            updated_plan_collection_loaded_plan_keys_frozenset)
+        if len(unloaded_plan_keys_frozenset) != 0:
+            unloaded_plan_key: str
+            for unloaded_plan_key in unloaded_plan_keys_frozenset:
+                if unloaded_plan_key in updated_plan_collection_obj.buffered_plan_keys:  # unloaded not deleted
+                    pair_plan_id: int = get_id_from_plan_key(unloaded_plan_key)
+                    pair_plan = \
                         await (EmailBookServiceRoutesCallbackBaseNativeOverride.
-                               underlying_read_pair_strat_by_id_http(pair_strat_id))
-                    if pair_strat.port is not None:
+                               underlying_read_pair_plan_by_id_http(pair_plan_id))
+                    if pair_plan.port is not None:
                         street_book_web_client: StreetBookServiceHttpClient = (
-                            self.port_to_executor_http_client_dict.get(pair_strat.port))
+                            self.port_to_executor_http_client_dict.get(pair_plan.port))
                     else:
-                        err_str_ = (f"pair_strat object has no port while unloading - "
-                                    f"ignoring this strat unload;;; {pair_strat=}")
+                        err_str_ = (f"pair_plan object has no port while unloading - "
+                                    f"ignoring this plan unload;;; {pair_plan=}")
                         logging.error(err_str_)
                         raise HTTPException(detail=err_str_, status_code=400)
 
                     if street_book_web_client is None:
-                        err_str_ = ("Can't find any web_client present in server cache dict for ongoing strat of "
-                                    f"{pair_strat.port=}, ignoring this strat unload,"
-                                    f"likely bug in server cache dict handling;;; {pair_strat=}")
+                        err_str_ = ("Can't find any web_client present in server cache dict for ongoing plan of "
+                                    f"{pair_plan.port=}, ignoring this plan unload,"
+                                    f"likely bug in server cache dict handling;;; {pair_plan=}")
                         logging.error(err_str_)
                         raise HTTPException(status_code=400, detail=err_str_)
 
-                    if is_ongoing_strat(pair_strat):
-                        error_str = f"unloading an ongoing pair strat key: {unloaded_strat_key} is not supported, " \
-                                    f"current {pair_strat.strat_state=}, " \
-                                    f"pair_strat_key: {get_pair_strat_log_key(pair_strat)};;; {pair_strat=}"
+                    if is_ongoing_plan(pair_plan):
+                        error_str = f"unloading an ongoing pair plan key: {unloaded_plan_key} is not supported, " \
+                                    f"current {pair_plan.plan_state=}, " \
+                                    f"pair_plan_key: {get_pair_plan_log_key(pair_plan)};;; {pair_plan=}"
                         logging.error(error_str)
                         raise HTTPException(status_code=400, detail=error_str)
-                    elif pair_strat.strat_state in [StratState.StratState_DONE, StratState.StratState_READY,
-                                                    StratState.StratState_SNOOZED]:
+                    elif pair_plan.plan_state in [PlanState.PlanState_DONE, PlanState.PlanState_READY,
+                                                    PlanState.PlanState_SNOOZED]:
                         # removing and updating relative models
                         try:
-                            street_book_web_client.put_strat_to_snooze_query_client()
-                            logging.info(f"Strat set to Snooze state, {unloaded_strat_key=};;; {pair_strat=}")
+                            street_book_web_client.put_plan_to_snooze_query_client()
+                            logging.info(f"Plan set to Snooze state, {unloaded_plan_key=};;; {pair_plan=}")
                         except Exception as e:
                             err_str_ = (
-                                "Some error occurred in executor while setting strat to SNOOZED state, ignoring "
-                                f"unload of this strat, pair_strat_key: {get_pair_strat_log_key(pair_strat)}, ;;;"
-                                f"{pair_strat=}")
+                                "Some error occurred in executor while setting plan to SNOOZED state, ignoring "
+                                f"unload of this plan, pair_plan_key: {get_pair_plan_log_key(pair_plan)}, ;;;"
+                                f"{pair_plan=}")
                             logging.error(err_str_)
                             raise HTTPException(status_code=500, detail=err_str_)
 
-                        pair_strat_json = {
-                            "_id": pair_strat_id,
-                            "strat_state": StratState.StratState_SNOOZED
+                        pair_plan_json = {
+                            "_id": pair_plan_id,
+                            "plan_state": PlanState.PlanState_SNOOZED
                         }
-                        pair_strat_obj = (
+                        pair_plan_obj = (
                             await EmailBookServiceRoutesCallbackBaseNativeOverride.
-                            underlying_partial_update_pair_strat_http(pair_strat_json))
+                            underlying_partial_update_pair_plan_http(pair_plan_json))
 
-                        self._close_executor_server(pair_strat.id)    # closing executor
+                        self._close_executor_server(pair_plan.id)    # closing executor
                     else:
-                        err_str_ = (f"Unloading strat with strat_state: {pair_strat.strat_state} is not supported,"
-                                    f"try unloading when start is READY or DONE, pair_strat_key: "
-                                    f"{get_pair_strat_log_key(pair_strat)};;; {pair_strat=}")
+                        err_str_ = (f"Unloading plan with plan_state: {pair_plan.plan_state} is not supported,"
+                                    f"try unloading when start is READY or DONE, pair_plan_key: "
+                                    f"{get_pair_plan_log_key(pair_plan)};;; {pair_plan=}")
                         logging.error(err_str_)
                         raise Exception(err_str_)
 
-                    logging.warning(f"ResetLogBookCache;;;pair_strat_log_key: "
+                    logging.warning(f"ResetLogBookCache;;;pair_plan_log_key: "
                                     f"{get_reset_log_book_cache_wrapper_pattern()}"
-                                    f"{get_pair_strat_log_key(pair_strat_obj)}"
+                                    f"{get_pair_plan_log_key(pair_plan_obj)}"
                                     f"{get_reset_log_book_cache_wrapper_pattern()}")
-                    # clear strat view cache data for pair strat on unload
-                    log_str = pair_strat_client_call_log_str(
-                        StratViewBaseModel, photo_book_service_http_client.patch_all_strat_view_client,
-                        UpdateType.SNAPSHOT_TYPE,
-                        _id=pair_strat.id, average_premium=0, market_premium=0, strat_alert_count=0,
-                        balance_notional=0, max_single_leg_notional=0,
-                        total_fill_buy_notional=0, total_fill_sell_notional=0,
-                        strat_alert_aggregated_severity=Severity.Severity_UNSPECIFIED.value)
-                    logging.db(log_str)
                 # else: deleted not unloaded - nothing to do , DB will remove entry
 
-    async def reload_pair_strats(self, stored_strat_collection_obj: StratCollection,
-                                 updated_strat_collection_obj: StratCollection) -> None:
-        updated_strat_collection_buffered_strat_keys_frozenset = frozenset(
-            updated_strat_collection_obj.buffered_strat_keys)
-        stored_strat_collection_buffered_strat_keys_frozenset = frozenset(
-            stored_strat_collection_obj.buffered_strat_keys)
+    async def reload_pair_plans(self, stored_plan_collection_obj: PlanCollection,
+                                 updated_plan_collection_obj: PlanCollection) -> None:
+        updated_plan_collection_buffered_plan_keys_frozenset = frozenset(
+            updated_plan_collection_obj.buffered_plan_keys)
+        stored_plan_collection_buffered_plan_keys_frozenset = frozenset(
+            stored_plan_collection_obj.buffered_plan_keys)
         # existing items in stored buffered frozenset but not in the updated stored frozen set need to
         # move to ready state
-        reloaded_strat_keys_frozenset = stored_strat_collection_buffered_strat_keys_frozenset.difference(
-            updated_strat_collection_buffered_strat_keys_frozenset)
-        if len(reloaded_strat_keys_frozenset) != 0:
-            logging.debug(f"found {len(reloaded_strat_keys_frozenset)} to load from buffered;;;"
-                          f"{reloaded_strat_keys_frozenset=}")
-            reloaded_strat_key: str
-            for reloaded_strat_key in reloaded_strat_keys_frozenset:
-                if reloaded_strat_key in updated_strat_collection_obj.loaded_strat_keys:  # loaded not deleted
-                    pair_strat_id: int = get_id_from_strat_key(reloaded_strat_key)
-                    pair_strat = \
-                        await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_pair_strat_by_id_http(
-                            pair_strat_id)
+        reloaded_plan_keys_frozenset = stored_plan_collection_buffered_plan_keys_frozenset.difference(
+            updated_plan_collection_buffered_plan_keys_frozenset)
+        if len(reloaded_plan_keys_frozenset) != 0:
+            logging.debug(f"found {len(reloaded_plan_keys_frozenset)} to load from buffered;;;"
+                          f"{reloaded_plan_keys_frozenset=}")
+            reloaded_plan_key: str
+            for reloaded_plan_key in reloaded_plan_keys_frozenset:
+                if reloaded_plan_key in updated_plan_collection_obj.loaded_plan_keys:  # loaded not deleted
+                    pair_plan_id: int = get_id_from_plan_key(reloaded_plan_key)
+                    pair_plan = \
+                        await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_pair_plan_by_id_http(
+                            pair_plan_id)
 
-                    # unload_strat should be False if reached here (reload case)
-                    log_str = pair_strat_client_call_log_str(
-                        StratViewBaseModel, photo_book_service_http_client.patch_all_strat_view_client,
-                        UpdateType.SNAPSHOT_TYPE, _id=pair_strat.id, unload_strat=False, recycle_strat=False)
+                    # clear plan view cache data for pair plan on unload
+                    # unload_plan should be False if reached here (reload case)
+                    log_str = pair_plan_client_call_log_str(
+                        PlanViewBaseModel, photo_book_service_http_client.patch_all_plan_view_client,
+                        UpdateType.SNAPSHOT_TYPE,
+                        _id=pair_plan.id, average_premium=0, market_premium=0, plan_alert_count=0,
+                        balance_notional=0, max_single_leg_notional=0,
+                        total_fill_buy_notional=0, total_fill_sell_notional=0,
+                        plan_alert_aggregated_severity=Severity.Severity_UNSPECIFIED.value,
+                        unload_plan=False, recycle_plan=False)
                     logging.db(log_str)
 
                     # starting snoozed server
-                    await self._start_executor_server(pair_strat)
+                    await self._start_executor_server(pair_plan)
 
                 # else: deleted not loaded - nothing to do , DB will remove entry
 
-    async def update_strat_collection_pre(self, updated_strat_collection_obj: StratCollection):
-        stored_strat_collection_obj = \
+    async def update_plan_collection_pre(self, updated_plan_collection_obj: PlanCollection):
+        stored_plan_collection_obj = \
             await (EmailBookServiceRoutesCallbackBaseNativeOverride.
-                   underlying_read_strat_collection_by_id_http(updated_strat_collection_obj.id))
+                   underlying_read_plan_collection_by_id_http(updated_plan_collection_obj.id))
 
         if not self.service_ready:
             # raise service unavailable 503 exception, let the caller retry
-            err_str_ = "update_strat_collection_pre not ready - service is not initialized yet"
+            err_str_ = "update_plan_collection_pre not ready - service is not initialized yet"
             logging.error(err_str_)
             raise HTTPException(status_code=503, detail=err_str_)
-        # handling unloading pair_strats
-        await self.unload_pair_strats(stored_strat_collection_obj, updated_strat_collection_obj)
+        # handling unloading pair_plans
+        await self.unload_pair_plans(stored_plan_collection_obj, updated_plan_collection_obj)
 
-        # handling reloading pair_strat
-        await self.reload_pair_strats(stored_strat_collection_obj, updated_strat_collection_obj)
+        # handling reloading pair_plan
+        await self.reload_pair_plans(stored_plan_collection_obj, updated_plan_collection_obj)
 
-        return updated_strat_collection_obj
+        return updated_plan_collection_obj
 
-    async def get_strat_collection(self) -> StratCollection:
-        strat_collections = (
-            await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_strat_collection_http())
+    async def get_plan_collection(self) -> PlanCollection:
+        plan_collections = (
+            await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_plan_collection_http())
 
-        if len(strat_collections) != 1:
-            err_str_ = (f"Unexpected: multiple strat collection obj found, expected 1;;;"
-                        f"{strat_collections=}")
+        if len(plan_collections) != 1:
+            err_str_ = (f"Unexpected: multiple plan collection obj found, expected 1;;;"
+                        f"{plan_collections=}")
             logging.error(err_str_)
             raise HTTPException(detail=err_str_, status_code=400)
 
-        strat_collection = strat_collections[0]
-        return strat_collection
+        plan_collection = plan_collections[0]
+        return plan_collection
 
-    async def unload_strat_from_strat_id_query_pre(
-            self, strat_collection_class_type: Type[StratCollection], strat_id: int):
-        async with StratCollection.reentrant_lock:
+    async def unload_plan_from_plan_id_query_pre(
+            self, plan_collection_class_type: Type[PlanCollection], plan_id: int):
+        async with PlanCollection.reentrant_lock:
 
-            pair_strat = await (
-                EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_pair_strat_by_id_http(strat_id))
-            strat_key = get_strat_key_from_pair_strat(pair_strat)
+            pair_plan = await (
+                EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_pair_plan_by_id_http(plan_id))
+            plan_key = get_plan_key_from_pair_plan(pair_plan)
 
-            strat_collection = await self.get_strat_collection()
-            for loaded_strat_key in strat_collection.loaded_strat_keys:
-                if loaded_strat_key == strat_key:
-                    # strat found to unload
-                    strat_collection.loaded_strat_keys.remove(strat_key)
-                    strat_collection.buffered_strat_keys.insert(0, strat_key)
-                    await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_update_strat_collection_http(
-                        strat_collection)
+            plan_collection = await self.get_plan_collection()
+            for loaded_plan_key in plan_collection.loaded_plan_keys:
+                if loaded_plan_key == plan_key:
+                    # plan found to unload
+                    plan_collection.loaded_plan_keys.remove(plan_key)
+                    plan_collection.buffered_plan_keys.insert(0, plan_key)
+                    await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_update_plan_collection_http(
+                        plan_collection)
                     break
             else:
-                err_str_ = f"No loaded strat found with {strat_id=} in strat_collection;;;{strat_collection=}"
+                err_str_ = f"No loaded plan found with {plan_id=} in plan_collection;;;{plan_collection=}"
                 logging.error(err_str_)
                 raise HTTPException(detail=err_str_, status_code=400)
         return []
 
-    async def reload_strat_from_strat_id_query_pre(
-            self, strat_collection_class_type: Type[StratCollection], strat_id: int):
-        async with StratCollection.reentrant_lock:
-            strat_collection = await self.get_strat_collection()
-            pair_strat = await (
-                EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_pair_strat_by_id_http(strat_id))
-            strat_key = get_strat_key_from_pair_strat(pair_strat)
+    async def reload_plan_from_plan_id_query_pre(
+            self, plan_collection_class_type: Type[PlanCollection], plan_id: int):
+        async with PlanCollection.reentrant_lock:
+            plan_collection = await self.get_plan_collection()
+            pair_plan = await (
+                EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_pair_plan_by_id_http(plan_id))
+            plan_key = get_plan_key_from_pair_plan(pair_plan)
 
-            for loaded_strat_key in strat_collection.buffered_strat_keys:
-                if loaded_strat_key == strat_key:
-                    # strat found to unload
-                    strat_collection.buffered_strat_keys.remove(strat_key)
-                    strat_collection.loaded_strat_keys.append(strat_key)
-                    await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_update_strat_collection_http(
-                        strat_collection)
+            for loaded_plan_key in plan_collection.buffered_plan_keys:
+                if loaded_plan_key == plan_key:
+                    # plan found to unload
+                    plan_collection.buffered_plan_keys.remove(plan_key)
+                    plan_collection.loaded_plan_keys.append(plan_key)
+                    await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_update_plan_collection_http(
+                        plan_collection)
                     break
             else:
-                err_str_ = f"No buffered strat found with {strat_id=} in strat_collection;;;{strat_collection=}"
+                err_str_ = f"No buffered plan found with {plan_id=} in plan_collection;;;{plan_collection=}"
                 logging.error(err_str_)
                 raise HTTPException(detail=err_str_, status_code=400)
         return []
 
-    async def get_ongoing_or_single_exact_non_ongoing_pair_strat_from_symbol_side_query_pre(
-            self, pair_strat_class_type: Type[PairStrat], sec_id: str, side: Side):
+    async def get_ongoing_or_single_exact_non_ongoing_pair_plan_from_symbol_side_query_pre(
+            self, pair_plan_class_type: Type[PairPlan], sec_id: str, side: Side):
         """
-        checks if ongoing strat is found with sec_id and side in any leg from all strats, else returns
-        pair_strat if non-ongoing but single match is found with sec_id and side in any leg else returns None
+        checks if ongoing plan is found with sec_id and side in any leg from all plans, else returns
+        pair_plan if non-ongoing but single match is found with sec_id and side in any leg else returns None
         """
-        read_pair_strat_filter = get_ongoing_or_all_pair_strats_by_sec_id(sec_id, side)
-        pair_strats: List[Dict] = await (EmailBookServiceRoutesCallbackBaseNativeOverride.
-                                         underlying_read_pair_strat_http_json_dict(read_pair_strat_filter))
-        if len(pair_strats) == 1:
-            # if single match is found then either it is ongoing from multiple same matched strats or it is single
-            # non-ongoing strat - both are accepted
-            return pair_strats
-        # else not required: returns None if found multiple matching symbol-side non-ongoing strats
+        read_pair_plan_filter = get_ongoing_or_all_pair_plans_by_sec_id(sec_id, side)
+        pair_plans: List[Dict] = await (EmailBookServiceRoutesCallbackBaseNativeOverride.
+                                         underlying_read_pair_plan_http_json_dict(read_pair_plan_filter))
+        if len(pair_plans) == 1:
+            # if single match is found then either it is ongoing from multiple same matched plans or it is single
+            # non-ongoing plan - both are accepted
+            return pair_plans
+        # else not required: returns None if found multiple matching symbol-side non-ongoing plans
         return []
 
-    async def get_all_pair_strats_from_symbol_side_query_pre(self, pair_strat_class_type: Type[PairStrat],
+    async def get_all_pair_plans_from_symbol_side_query_pre(self, pair_plan_class_type: Type[PairPlan],
                                                              sec_id: str, side: Side):
         return await (EmailBookServiceRoutesCallbackBaseNativeOverride.
-                      underlying_read_pair_strat_http(get_all_pair_strat_from_symbol_n_side(sec_id, side)))
+                      underlying_read_pair_plan_http(get_all_pair_plan_from_symbol_n_side(sec_id, side)))
 
     async def create_admin_control_pre(self, admin_control_obj: AdminControl):
         match admin_control_obj.command_type:
             case CommandType.CLEAR_STRAT:
-                pair_strat_list: List[PairStrat] = (
-                    await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_pair_strat_http())
-                for pair_strat_ in pair_strat_list:
+                pair_plan_list: List[PairPlan] = (
+                    await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_pair_plan_http())
+                for pair_plan_ in pair_plan_list:
                     leg1_lock_file_path, leg2_lock_file_path = (
-                        self.get_lock_file_names_from_pair_strat(pair_strat_))
+                        self.get_lock_file_names_from_pair_plan(pair_plan_))
                     if leg1_lock_file_path and os.path.exists(leg1_lock_file_path):
                         os.remove(leg1_lock_file_path)
                     if leg2_lock_file_path and os.path.exists(leg2_lock_file_path):
@@ -1577,61 +1574,61 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
             case other_:
                 logging.error(f"create_admin_control_pre failed. unrecognized command_type: {other_}")
 
-    async def create_portfolio_limits_pre(self, portfolio_limits_obj: PortfolioLimits):
-        portfolio_limits_obj.eligible_brokers_update_count = 0
+    async def create_contact_limits_pre(self, contact_limits_obj: ContactLimits):
+        contact_limits_obj.eligible_brokers_update_count = 0
 
-    async def update_portfolio_limits_pre(self, updated_portfolio_limits_obj: PortfolioLimits):
-        if updated_portfolio_limits_obj.eligible_brokers:
-            stored_portfolio_limits_obj = (
-                await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_portfolio_limits_by_id_http(
-                    updated_portfolio_limits_obj.id))
-            updated_portfolio_limits_obj.eligible_brokers_update_count = (
-                    stored_portfolio_limits_obj.eligible_brokers_update_count + 1)
-        return updated_portfolio_limits_obj
+    async def update_contact_limits_pre(self, updated_contact_limits_obj: ContactLimits):
+        if updated_contact_limits_obj.eligible_brokers:
+            stored_contact_limits_obj = (
+                await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_contact_limits_by_id_http(
+                    updated_contact_limits_obj.id))
+            updated_contact_limits_obj.eligible_brokers_update_count = (
+                    stored_contact_limits_obj.eligible_brokers_update_count + 1)
+        return updated_contact_limits_obj
 
-    async def partial_update_portfolio_limits_pre(self, stored_portfolio_limits_obj_json: Dict[str, Any],
-                                                  updated_portfolio_limits_obj_json: Dict[str, Any]):
-        if updated_portfolio_limits_obj_json.get("eligible_brokers") is not None:
-            stored_eligible_brokers_update_count = stored_portfolio_limits_obj_json.get("eligible_brokers_update_count")
+    async def partial_update_contact_limits_pre(self, stored_contact_limits_obj_json: Dict[str, Any],
+                                                  updated_contact_limits_obj_json: Dict[str, Any]):
+        if updated_contact_limits_obj_json.get("eligible_brokers") is not None:
+            stored_eligible_brokers_update_count = stored_contact_limits_obj_json.get("eligible_brokers_update_count")
             if stored_eligible_brokers_update_count is None:
                 stored_eligible_brokers_update_count = 0
-            updated_portfolio_limits_obj_json["eligible_brokers_update_count"] = (
+            updated_contact_limits_obj_json["eligible_brokers_update_count"] = (
                     stored_eligible_brokers_update_count + 1)
-        return updated_portfolio_limits_obj_json
+        return updated_contact_limits_obj_json
 
-    async def filtered_notify_pair_strat_update_query_ws_pre(self):
-        return filter_ws_pair_strat
+    async def filtered_notify_pair_plan_update_query_ws_pre(self):
+        return filter_ws_pair_plan
 
     async def _update_system_control_post(
             self, stored_system_control_json: Dict | SystemControl,
             updated_system_control_json_or_obj: Dict | SystemControl):
         if isinstance(stored_system_control_json, dict):
-            stored_pause_all_strats = stored_system_control_json.get("pause_all_strats")
-            stored_load_buffer_strats = stored_system_control_json.get("load_buffer_strats")
+            stored_pause_all_plans = stored_system_control_json.get("pause_all_plans")
+            stored_load_buffer_plans = stored_system_control_json.get("load_buffer_plans")
             stored_cxl_baskets = stored_system_control_json.get("cxl_baskets")
         else:
-            stored_pause_all_strats = stored_system_control_json.pause_all_strats
-            stored_load_buffer_strats = stored_system_control_json.load_buffer_strats
+            stored_pause_all_plans = stored_system_control_json.pause_all_plans
+            stored_load_buffer_plans = stored_system_control_json.load_buffer_plans
             stored_cxl_baskets = stored_system_control_json.cxl_baskets
 
         if isinstance(updated_system_control_json_or_obj, dict):
-            updated_pause_all_strats = updated_system_control_json_or_obj.get("pause_all_strats")
-            updated_load_buffer_strats = updated_system_control_json_or_obj.get("load_buffer_strats")
+            updated_pause_all_plans = updated_system_control_json_or_obj.get("pause_all_plans")
+            updated_load_buffer_plans = updated_system_control_json_or_obj.get("load_buffer_plans")
             updated_cxl_baskets = updated_system_control_json_or_obj.get("cxl_baskets")
         else:
-            updated_pause_all_strats = updated_system_control_json_or_obj.pause_all_strats
-            updated_load_buffer_strats = updated_system_control_json_or_obj.load_buffer_strats
+            updated_pause_all_plans = updated_system_control_json_or_obj.pause_all_plans
+            updated_load_buffer_plans = updated_system_control_json_or_obj.load_buffer_plans
             updated_cxl_baskets = updated_system_control_json_or_obj.cxl_baskets
-        if not stored_pause_all_strats and updated_pause_all_strats:
-            script_path: str = str(CURRENT_PROJECT_DIR / "pyscripts" / "pause_all_active_strats.py")
+        if not stored_pause_all_plans and updated_pause_all_plans:
+            script_path: str = str(CURRENT_PROJECT_DIR / "pyscripts" / "pause_all_active_plans.py")
             cmd: List[str] = ["python", script_path, "&"]
             launcher: subprocess.Popen = subprocess.Popen(cmd)
-            logging.warning(f"Triggered pause_all_strat event at {DateTime.utcnow()};;;{cmd=}, {launcher=}")
-        if not stored_load_buffer_strats and updated_load_buffer_strats:
-            script_path: str = str(CURRENT_PROJECT_DIR / "pyscripts" / "load_all_buffer_strats.py")
+            logging.warning(f"Triggered pause_all_plan event at {DateTime.utcnow()};;;{cmd=}, {launcher=}")
+        if not stored_load_buffer_plans and updated_load_buffer_plans:
+            script_path: str = str(CURRENT_PROJECT_DIR / "pyscripts" / "load_all_buffer_plans.py")
             cmd: List[str] = ["python", script_path, "&"]
             launcher: subprocess.Popen = subprocess.Popen(cmd)
-            logging.warning(f"Triggered load_buffer_strats event at {DateTime.utcnow()};;;{cmd=}, {launcher=}")
+            logging.warning(f"Triggered load_buffer_plans event at {DateTime.utcnow()};;;{cmd=}, {launcher=}")
         if not stored_cxl_baskets and updated_cxl_baskets:
             script_path: str = str(CURRENT_PROJECT_DIR / "pyscripts" / "cancel_all_basket_chores.py")
             cmd: List[str] = ["python", script_path, "&"]
@@ -1668,7 +1665,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
 
     async def log_simulator_reload_config_query_pre(
             self, log_simulator_reload_config_class_type: Type[LogSimulatorReloadConfig]):
-        self.bartering_link.reload_portfolio_configs()
+        self.bartering_link.reload_contact_configs()
         return []
 
     async def partial_update_system_control_pre(self, stored_system_control_obj_json: Dict[str, Any],
@@ -1752,51 +1749,51 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
                                        "updated_sample_model_dict_list, must be different;;; "
                                        f"{stored_sample_model_dict_list=}, {updated_sample_model_dict_list=}")
 
-    async def register_pair_strat_for_recovery_query_pre(self, pair_strat_class_type: Type[PairStrat],
-                                                         pair_strat_id: int):
-        if not pair_strat_id:
-            err_str_ = f"register_pair_strat_for_recovery failed, {pair_strat_id=} found None, expected int"
+    async def register_pair_plan_for_recovery_query_pre(self, pair_plan_class_type: Type[PairPlan],
+                                                         pair_plan_id: int):
+        if not pair_plan_id:
+            err_str_ = f"register_pair_plan_for_recovery failed, {pair_plan_id=} found None, expected int"
             logging.error(err_str_)
             raise HTTPException(status_code=400, detail=err_str_)
-        # else not received - received pair_strat_id
+        # else not received - received pair_plan_id
 
-        if self.pair_strat_id_to_executor_process_id_dict.get(pair_strat_id) is not None:
-            err_str_ = f"register_pair_strat_for_recovery failed, {pair_strat_id=} already registered for recovery"
+        if self.pair_plan_id_to_executor_process_id_dict.get(pair_plan_id) is not None:
+            err_str_ = f"register_pair_plan_for_recovery failed, {pair_plan_id=} already registered for recovery"
             logging.error(err_str_)
             raise HTTPException(status_code=400, detail=err_str_)
 
-        # check for valid pair_strat_id and register if present in loaded list
+        # check for valid pair_plan_id and register if present in loaded list
         try:
-            pair_strat_obj: PairStrat = await (EmailBookServiceRoutesCallbackBaseNativeOverride.
-                                               underlying_read_pair_strat_by_id_http(pair_strat_id))
-            strat_key: str = get_strat_key_from_pair_strat(pair_strat_obj)
-            strat_collection_obj: StratCollection = await (EmailBookServiceRoutesCallbackBaseNativeOverride.
-                                                           underlying_read_strat_collection_by_id_http(1))
-            if strat_key not in strat_collection_obj.loaded_strat_keys:
-                err_str_ = (f"register_pair_strat_for_recovery_failed, {pair_strat_id=} not found in loaded strats;;;"
-                            f"{pair_strat_obj=}, {strat_collection_obj=}")
+            pair_plan_obj: PairPlan = await (EmailBookServiceRoutesCallbackBaseNativeOverride.
+                                               underlying_read_pair_plan_by_id_http(pair_plan_id))
+            plan_key: str = get_plan_key_from_pair_plan(pair_plan_obj)
+            plan_collection_obj: PlanCollection = await (EmailBookServiceRoutesCallbackBaseNativeOverride.
+                                                           underlying_read_plan_collection_by_id_http(1))
+            if plan_key not in plan_collection_obj.loaded_plan_keys:
+                err_str_ = (f"register_pair_plan_for_recovery_failed, {pair_plan_id=} not found in loaded plans;;;"
+                            f"{pair_plan_obj=}, {plan_collection_obj=}")
                 logging.error(err_str_)
                 raise HTTPException(status_code=400, detail=err_str_)
-            # else - valid pair strat id and not monitored
+            # else - valid pair plan id and not monitored
 
-            # register pair strat
-            self.pair_strat_id_to_executor_process_id_dict[pair_strat_id] = None
-            return [pair_strat_obj]
+            # register pair plan
+            self.pair_plan_id_to_executor_process_id_dict[pair_plan_id] = None
+            return [pair_plan_obj]
         except Exception as exp:
-            err_str_ = f"register_pair_strat_for_recovery failed, exception: {exp}"
+            err_str_ = f"register_pair_plan_for_recovery failed, exception: {exp}"
             logging.exception(err_str_)
             raise HTTPException(status_code=400, detail=err_str_)
 
 
-def filter_ws_pair_strat(pair_strat_obj_json: Dict, **kwargs):
+def filter_ws_pair_plan(pair_plan_obj_json: Dict, **kwargs):
     symbols = kwargs.get("symbols")
-    pair_strat_params = pair_strat_obj_json.get("pair_strat_params")
-    if pair_strat_params is not None:
-        strat_leg1 = pair_strat_params.get("strat_leg1")
-        strat_leg2 = pair_strat_params.get("strat_leg2")
-        if strat_leg1 is not None and strat_leg2 is not None:
-            security1 = strat_leg1.get("sec")
-            security2 = strat_leg2.get("sec")
+    pair_plan_params = pair_plan_obj_json.get("pair_plan_params")
+    if pair_plan_params is not None:
+        plan_leg1 = pair_plan_params.get("plan_leg1")
+        plan_leg2 = pair_plan_params.get("plan_leg2")
+        if plan_leg1 is not None and plan_leg2 is not None:
+            security1 = plan_leg1.get("sec")
+            security2 = plan_leg2.get("sec")
             if security1 is not None and security2 is not None:
                 sec1_id = security1.get("sec_id")
                 sec2_id = security2.get("sec_id")

@@ -18,7 +18,7 @@ import polars as pl
 
 # project imports
 from FluxPythonUtils.scripts.utility_functions import (
-    log_n_except, http_response_as_class_type, HTTPRequestType, ClientError, http_response_as_df)
+    log_n_except, http_response_as_class_type, HTTPRequestType, ClientError, http_response_as_df, http_response_as_json)
 from FluxPythonUtils.scripts.model_base_utils import MsgspecBaseModel
 
 
@@ -278,8 +278,8 @@ def generic_http_delete_client(url: str, query_param: Any, return_copy_obj: bool
             url = f"{url}/{query_param}"
     # else not required: When used for queries like get last date query, as there is no query_param in case of query
     response: requests.Response = requests.delete(url, params={"return_obj_copy": return_copy_obj})
-    response_json = response.json()
-    return response_json
+    expected_status_code = 200
+    return http_response_as_json(url, response, expected_status_code, HTTPRequestType.DELETE)
 
 
 @log_n_except
@@ -288,15 +288,15 @@ def generic_http_delete_by_id_list_client(url: str, delete_id_list: List[Any], m
     delete_id_list_json = generic_encoder(delete_id_list, model_type.enc_hook, by_alias=True)
     response: requests.Response = requests.delete(url, json=delete_id_list_json,
                                                   params={"return_obj_copy": return_copy_obj})
-    response_json = response.json()
-    return response_json
+    expected_status_code = 200
+    return http_response_as_json(url, response, expected_status_code, HTTPRequestType.DELETE)
 
 
 @log_n_except
 def generic_http_delete_all_client(url: str, return_copy_obj: bool | None = True):
     response: requests.Response = requests.delete(url, params={"return_obj_copy": return_copy_obj})
-    response_json = response.json()
-    return response_json
+    expected_status_code = 200
+    return http_response_as_json(url, response, expected_status_code, HTTPRequestType.DELETE)
 
 
 async def generic_ws_get_all_client(url: str, model_type: Type[MsgspecModel],

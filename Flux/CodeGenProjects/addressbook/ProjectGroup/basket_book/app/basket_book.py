@@ -25,8 +25,8 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_ser
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book import BaseBook
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.symbol_cache import (
     SymbolCache)
-# below import is required to symbol_cache to work - SymbolCacheContainer must import from base_strat_cache
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_strat_cache import SymbolCacheContainer
+# below import is required to symbol_cache to work - SymbolCacheContainer must import from base_plan_cache
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_plan_cache import SymbolCacheContainer
 
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.generated.ORMModel.basket_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_post_book_n_basket_book_core_msgspec_model import *
@@ -78,7 +78,7 @@ class BasketBook(BaseBook):
         basket_book: BasketBook = BasketBook(basket_bartering_data_manager_, basket_cache)
         street_book_thread = Thread(target=basket_book.run, daemon=True).start()
         # block_bartering_symbol_side_events: Dict[str, Tuple[Side, str]]
-        # sedol_symbols, ric_symbols, block_bartering_symbol_side_events, mstrat = basket_book.get_subscription_data()
+        # sedol_symbols, ric_symbols, block_bartering_symbol_side_events, mplan = basket_book.get_subscription_data()
         # listener_sedol_key = [f'{sedol_symbol}-' for sedol_symbol in sedol_symbols]
         # listener_ric_key = [f'{ric_symbol}-' for ric_symbol in ric_symbols]
         # listener_id = f"{listener_sedol_key}-{listener_ric_key}-{os.getpid()}"
@@ -86,7 +86,7 @@ class BasketBook(BaseBook):
         # basket_book.bartering_link.subscribe(listener_id, BasketBook.asyncio_loop, ric_filters=ric_symbols,
         #                                       sedol_filters=sedol_symbols,
         #                                       block_bartering_symbol_side_events=block_bartering_symbol_side_events,
-        #                                       mstrat=mstrat)
+        #                                       mplan=mplan)
         # trigger executor md start [ name to use tickers ]
 
         return basket_book, street_book_thread
@@ -180,7 +180,7 @@ class BasketBook(BaseBook):
             new_chore_obj.security.sec_id_source = SecurityIdSource.TICKER
 
         # block this new chore processing if any prior unack chore exist [user may resubmit another chore later]
-        if self.strat_cache.check_unack(system_symbol, side):
+        if self.plan_cache.check_unack(system_symbol, side):
             err_str_ = (f"past chore on smybol_side: {get_symbol_side_key([(system_symbol, side)])} is in unack state, "
                         f"dropping chore with {px=}, {qty=}, for {new_chore_obj.chore_id};;;{new_chore_obj=}")
             new_chore_obj.text = err_str_
@@ -297,7 +297,7 @@ class BasketBook(BaseBook):
     def get_meta(self, ticker: str, side: Side) -> Tuple[Dict[str, Side], Dict[str, Side], Dict[str, str]]:
         # helps prevent reverse bartering on intraday positions where security level constraints exists
         meta_no_executed_tradable_symbol_replenishing_side_dict: Dict[str, Side] = {}
-        # current strat bartering symbol and side dict - helps block intraday non recovery position updates
+        # current plan bartering symbol and side dict - helps block intraday non recovery position updates
         meta_bartering_symbol_side_dict: Dict[str, Side] = {}
         meta_symbols_n_sec_id_source_dict: Dict[str, str] = {}  # stores symbol and symbol type [RIC, SEDOL, etc.]
 
@@ -334,12 +334,12 @@ class BasketBook(BaseBook):
         (meta_no_executed_tradable_symbol_replenishing_side_dict, meta_bartering_symbol_side_dict,
          meta_symbols_n_sec_id_source_dict) = self.get_meta(system_symbol, side)
 
-        dismiss_filter_portfolio_limit_broker_obj_list = (
-            email_book_service_http_client.get_dismiss_filter_portfolio_limit_brokers_query_client(
+        dismiss_filter_contact_limit_broker_obj_list = (
+            email_book_service_http_client.get_dismiss_filter_contact_limit_brokers_query_client(
                 system_symbol, system_symbol))
         eligible_brokers: List[BrokerBaseModel] = []
-        if dismiss_filter_portfolio_limit_broker_obj_list:
-            eligible_brokers = dismiss_filter_portfolio_limit_broker_obj_list[0].brokers
+        if dismiss_filter_contact_limit_broker_obj_list:
+            eligible_brokers = dismiss_filter_contact_limit_broker_obj_list[0].brokers
 
         sod_n_intraday_pos_dict: Dict[str, Dict[str, List[Position]]] | None = None
         if hasattr(self.bartering_link, "load_positions_by_symbols_dict"):
@@ -405,14 +405,14 @@ class BasketBook(BaseBook):
                     kwargs["algo_expire"] = new_chore_obj.deactivate_dt
                 if new_chore_obj.pov is not None:
                     kwargs["algo_mxpv"] = new_chore_obj.pov
-                if new_chore_obj.mstrat is not None:
-                    kwargs["mstrat"] = new_chore_obj.mstrat
+                if new_chore_obj.mplan is not None:
+                    kwargs["mplan"] = new_chore_obj.mplan
 
         kwargs["sync_check"] = True
 
         client_ord_id: str = self.get_client_chore_id()
         # set unack for subsequent chores - this symbol to be blocked until this chore goes through
-        self.strat_cache.set_unack(True, new_chore_obj.security.sec_id, new_chore_obj.side)
+        self.plan_cache.set_unack(True, new_chore_obj.security.sec_id, new_chore_obj.side)
         res: bool
         res, ret_id_or_err_desc = BasketBook.bartering_link_place_new_chore(new_chore_obj.px, new_chore_obj.qty,
                                                                               new_chore_obj.side, bartering_symbol,
@@ -420,7 +420,7 @@ class BasketBook(BaseBook):
                                                                               account, exchange, client_ord_id,
                                                                               **kwargs)
         # reset unack for subsequent chores to go through - this chore did fail to go through
-        self.strat_cache.set_unack(False, new_chore_obj.security.sec_id, new_chore_obj.side)
+        self.plan_cache.set_unack(False, new_chore_obj.security.sec_id, new_chore_obj.side)
 
         if res:
             new_chore_obj.chore_submit_state = ChoreSubmitType.ORDER_SUBMIT_DONE
@@ -714,11 +714,11 @@ class BasketBook(BaseBook):
         if chore_limits_tuple:
             chore_limits, _ = chore_limits_tuple
             if chore_limits is None:
-                logging.error(f"Can't proceed: chore_limits/strat_limit not found for bartering_cache: "
-                              f"{self.bartering_data_manager.bartering_cache}; {self.strat_cache=}")
+                logging.error(f"Can't proceed: chore_limits/plan_limit not found for bartering_cache: "
+                              f"{self.bartering_data_manager.bartering_cache}; {self.plan_cache=}")
                 return
         else:
-            logging.error(f"chore_limits_tuple not found for strat: {self.strat_cache}, can't proceed")
+            logging.error(f"chore_limits_tuple not found for plan: {self.plan_cache}, can't proceed")
             return
 
         is_algo: Final[bool] = True
@@ -810,7 +810,7 @@ class BasketBook(BaseBook):
                                             amend_as_new_ord = NewChore(
                                                 security=chore.security, side=chore.side, px=generated_px, usd_px=usd_px,
                                                 qty=remaining_qty, lot_size=chore.lot_size, force_bkr=chore.force_bkr,
-                                                mstrat=chore.mstrat, chore_submit_state=ChoreSubmitType.ORDER_SUBMIT_FAILED,
+                                                mplan=chore.mplan, chore_submit_state=ChoreSubmitType.ORDER_SUBMIT_FAILED,
                                                 algo=chore.algo, pov=chore.pov, activate_dt=chore.activate_dt,
                                                 deactivate_dt=chore.deactivate_dt,
                                                 ord_entry_time=pendulum.DateTime.utcnow())

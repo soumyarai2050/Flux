@@ -25,59 +25,59 @@ def static_data_(cb_eqt_security_records_):
 @pytest.fixture()
 def pair_securities_with_sides_():
     yield {
-        "security1": {"sec_id": "CB_Sec_1", "sec_id_source": "TICKER", "inst_type": "CB"}, "side1": "BUY",
-        "security2": {"sec_id": "EQT_Sec_1", "sec_id_source": "TICKER", "inst_type": "EQT"}, "side2": "SELL"
+        "security1": {"sec_id": "Type1_Sec_1", "sec_id_source": "TICKER", "inst_type": "CB"}, "side1": "BUY",
+        "security2": {"sec_id": "Type2_Sec_1", "sec_id_source": "TICKER", "inst_type": "EQT"}, "side2": "SELL"
     }
 
 
 @pytest.fixture()
 def leg1_leg2_symbol_list():
     return [
-        ("CB_Sec_1", "EQT_Sec_1"),
-        ("CB_Sec_2", "EQT_Sec_2"),
-        ("CB_Sec_3", "EQT_Sec_3"),
-        ("CB_Sec_4", "EQT_Sec_4"),
-        ("CB_Sec_5", "EQT_Sec_5"),
-        ("CB_Sec_6", "EQT_Sec_6"),
-        ("CB_Sec_7", "EQT_Sec_7"),
-        ("CB_Sec_8", "EQT_Sec_8"),
-        ("CB_Sec_9", "EQT_Sec_9"),
-        ("CB_Sec_10", "EQT_Sec_10"),
-        ("CB_Sec_11", "EQT_Sec_11"),
-        ("CB_Sec_12", "EQT_Sec_12"),
-        ("CB_Sec_13", "EQT_Sec_13"),
-        ("CB_Sec_14", "EQT_Sec_14"),
-        ("CB_Sec_15", "EQT_Sec_15"),
-        ("CB_Sec_16", "EQT_Sec_16"),
-        ("CB_Sec_17", "EQT_Sec_17"),
-        ("CB_Sec_18", "EQT_Sec_18"),
-        ("CB_Sec_19", "EQT_Sec_19"),
-        ("CB_Sec_20", "EQT_Sec_20"),
-        ("CB_Sec_21", "EQT_Sec_21"),
-        ("CB_Sec_22", "EQT_Sec_22"),
-        ("CB_Sec_23", "EQT_Sec_23"),
-        ("CB_Sec_24", "EQT_Sec_24"),
-        ("CB_Sec_25", "EQT_Sec_25"),
-        ("CB_Sec_26", "EQT_Sec_26"),
-        ("CB_Sec_27", "EQT_Sec_27"),
-        ("CB_Sec_28", "EQT_Sec_28"),
-        ("CB_Sec_29", "EQT_Sec_29"),
-        ("CB_Sec_30", "EQT_Sec_30"),
-        ("CB_Sec_31", "EQT_Sec_31"),
-        ("CB_Sec_32", "EQT_Sec_32"),
-        ("CB_Sec_33", "EQT_Sec_33"),
-        ("CB_Sec_34", "EQT_Sec_34"),
-        ("CB_Sec_35", "EQT_Sec_35"),
-        ("CB_Sec_36", "EQT_Sec_36"),
-        ("CB_Sec_37", "EQT_Sec_37"),
-        ("CB_Sec_38", "EQT_Sec_38"),
-        ("CB_Sec_39", "EQT_Sec_39"),
-        ("CB_Sec_40", "EQT_Sec_40")
+        ("Type1_Sec_1", "Type2_Sec_1"),
+        ("Type1_Sec_2", "Type2_Sec_2"),
+        ("Type1_Sec_3", "Type2_Sec_3"),
+        ("Type1_Sec_4", "Type2_Sec_4"),
+        ("Type1_Sec_5", "Type2_Sec_5"),
+        ("Type1_Sec_6", "Type2_Sec_6"),
+        ("Type1_Sec_7", "Type2_Sec_7"),
+        ("Type1_Sec_8", "Type2_Sec_8"),
+        ("Type1_Sec_9", "Type2_Sec_9"),
+        ("Type1_Sec_10", "Type2_Sec_10"),
+        ("Type1_Sec_11", "Type2_Sec_11"),
+        ("Type1_Sec_12", "Type2_Sec_12"),
+        ("Type1_Sec_13", "Type2_Sec_13"),
+        ("Type1_Sec_14", "Type2_Sec_14"),
+        ("Type1_Sec_15", "Type2_Sec_15"),
+        ("Type1_Sec_16", "Type2_Sec_16"),
+        ("Type1_Sec_17", "Type2_Sec_17"),
+        ("Type1_Sec_18", "Type2_Sec_18"),
+        ("Type1_Sec_19", "Type2_Sec_19"),
+        ("Type1_Sec_20", "Type2_Sec_20"),
+        ("Type1_Sec_21", "Type2_Sec_21"),
+        ("Type1_Sec_22", "Type2_Sec_22"),
+        ("Type1_Sec_23", "Type2_Sec_23"),
+        ("Type1_Sec_24", "Type2_Sec_24"),
+        ("Type1_Sec_25", "Type2_Sec_25"),
+        ("Type1_Sec_26", "Type2_Sec_26"),
+        ("Type1_Sec_27", "Type2_Sec_27"),
+        ("Type1_Sec_28", "Type2_Sec_28"),
+        ("Type1_Sec_29", "Type2_Sec_29"),
+        ("Type1_Sec_30", "Type2_Sec_30"),
+        ("Type1_Sec_31", "Type2_Sec_31"),
+        ("Type1_Sec_32", "Type2_Sec_32"),
+        ("Type1_Sec_33", "Type2_Sec_33"),
+        ("Type1_Sec_34", "Type2_Sec_34"),
+        ("Type1_Sec_35", "Type2_Sec_35"),
+        ("Type1_Sec_36", "Type2_Sec_36"),
+        ("Type1_Sec_37", "Type2_Sec_37"),
+        ("Type1_Sec_38", "Type2_Sec_38"),
+        ("Type1_Sec_39", "Type2_Sec_39"),
+        ("Type1_Sec_40", "Type2_Sec_40")
     ]
 
 
 @pytest.fixture
-def clean_and_set_limits(expected_chore_limits_, expected_portfolio_limits_, expected_portfolio_status_,
+def clean_and_set_limits(expected_chore_limits_, expected_contact_limits_, expected_contact_status_,
                          expected_system_control_):
     # deleting existing executors
     clean_executors_and_today_activated_symbol_side_lock_file()
@@ -89,17 +89,17 @@ def clean_and_set_limits(expected_chore_limits_, expected_portfolio_limits_, exp
     clean_all_collections_ignoring_ui_layout()
     clear_cache_in_model()
 
-    # updating portfolio_alert
+    # updating contact_alert
     clean_log_book_alerts()
 
-    # updating strat_collection
-    renew_strat_collection()
+    # updating plan_collection
+    renew_plan_collection()
 
     # setting limits
-    set_n_verify_limits(expected_chore_limits_, expected_portfolio_limits_)
+    set_n_verify_limits(expected_chore_limits_, expected_contact_limits_)
 
-    # creating portfolio_status
-    create_n_verify_portfolio_status(copy.deepcopy(expected_portfolio_status_))
+    # creating contact_status
+    create_n_verify_contact_status(copy.deepcopy(expected_contact_status_))
 
     # creating kill switch
     create_n_verify_system_control(expected_system_control_)
@@ -119,7 +119,7 @@ def market_depth_basemodel_list(request):
     input_data = []
     position_lvl = getattr(request, "param", 5)
 
-    for symbol in ["CB_Sec_1", "EQT_Sec_1"]:
+    for symbol in ["Type1_Sec_1", "Type2_Sec_1"]:
         for side, px, qty, dev in [("BID", 99.0, 90, -1), ("ASK", 121.0, 70, 1)]:
             for pos in range(position_lvl):
                 qty = qty+20 if pos == position_lvl-1 else (qty + 10 if pos % 2 != 0 else qty-20)
@@ -144,7 +144,7 @@ def market_depth_basemodel_list(request):
 @pytest.fixture()
 def symbol_overview_obj_list():
     symbol_overview_obj_list = []
-    for symbol in ["CB_Sec_1", "EQT_Sec_1"]:
+    for symbol in ["Type1_Sec_1", "Type2_Sec_1"]:
         symbol_overview_obj_list.append(
             SymbolOverviewBaseModel.from_dict({
               "symbol": symbol,
@@ -163,21 +163,21 @@ def symbol_overview_obj_list():
 
 
 @pytest.fixture()
-def pair_strat_(pair_securities_with_sides_):
-    yield PairStratBaseModel.from_dict({
+def pair_plan_(pair_securities_with_sides_):
+    yield PairPlanBaseModel.from_dict({
         "last_active_date_time": get_utc_date_time(),
         "frequency": 1,
-        "pair_strat_params": PairStratParamsBaseModel.from_dict({
-            "strat_mode": StratMode.StratMode_Normal,
-            "strat_type": StratType.Premium,
-            "strat_leg1": StratLegBaseModel.from_dict({
+        "pair_plan_params": PairPlanParamsBaseModel.from_dict({
+            "plan_mode": PlanMode.PlanMode_Normal,
+            "plan_type": PlanType.Premium,
+            "plan_leg1": PlanLegBaseModel.from_dict({
               "exch_id": "NYSE",
               "sec": pair_securities_with_sides_["security1"],
               "side": pair_securities_with_sides_["side1"],
               "fallback_broker": "ZERODHA",
               "fallback_route": "BR_QFII"
             }),
-            "strat_leg2": StratLegBaseModel.from_dict({
+            "plan_leg2": PlanLegBaseModel.from_dict({
               "exch_id": "NYSE",
               "sec": pair_securities_with_sides_["security2"],
               "side": pair_securities_with_sides_["side2"],
@@ -187,16 +187,16 @@ def pair_strat_(pair_securities_with_sides_):
             "exch_response_max_seconds": 5,
             "common_premium": 40,
             "hedge_ratio": 1,
-            "mstrat": "Mstrat_1"
+            "mplan": "Mplan_1"
         }),
-        "pair_strat_params_update_seq_num": 0,
+        "pair_plan_params_update_seq_num": 0,
         "market_premium": 0
     })
 
 
 @pytest.fixture()
-def expected_strat_limits_():
-    yield StratLimitsBaseModel.from_dict({
+def expected_plan_limits_():
+    yield PlanLimitsBaseModel.from_dict({
       "max_open_chores_per_side": 5,
       "max_single_leg_notional": 300000,
       "max_open_single_leg_notional": 300000,
@@ -222,7 +222,7 @@ def expected_strat_limits_():
         "residual_mark_seconds": 10
       },
       "eligible_brokers": [],
-      "strat_limits_update_seq_num": 0,
+      "plan_limits_update_seq_num": 0,
       "min_chore_notional": 100,
       "min_chore_notional_allowance": 1000,
       "eqt_sod_disable": False
@@ -238,19 +238,19 @@ def expected_chore_limits_():
 
 
 @pytest.fixture()
-def expected_portfolio_limits_(expected_brokers_):
+def expected_contact_limits_(expected_brokers_):
     rolling_max_chore_count = RollingMaxChoreCountBaseModel.from_kwargs(max_rolling_tx_count=15,
                                                                         rolling_tx_count_period_seconds=2)
     rolling_max_reject_count = RollingMaxChoreCountBaseModel.from_kwargs(max_rolling_tx_count=15,
                                                                          rolling_tx_count_period_seconds=2)
 
-    portfolio_limits_obj = (
-        PortfolioLimitsBaseModel.from_kwargs(_id=1, max_open_baskets=20, max_open_notional_per_side=2_000_000,
+    contact_limits_obj = (
+        ContactLimitsBaseModel.from_kwargs(_id=1, max_open_baskets=20, max_open_notional_per_side=2_000_000,
                                              max_gross_n_open_notional=2_400_000,
                                              rolling_max_chore_count=rolling_max_chore_count,
                                              rolling_max_reject_count=rolling_max_reject_count,
                                              eligible_brokers=expected_brokers_, eligible_brokers_update_count=0))
-    return portfolio_limits_obj
+    return contact_limits_obj
 
 
 @pytest.fixture()
@@ -289,8 +289,8 @@ def expected_brokers_(leg1_leg2_symbol_list) -> List[BrokerBaseModel]:
 
 
 @pytest.fixture()
-def expected_portfolio_status_():
-    yield PortfolioStatusBaseModel.from_dict({
+def expected_contact_status_():
+    yield ContactStatusBaseModel.from_dict({
         "_id": 1,
         "overall_buy_notional": 0,
         "overall_sell_notional": 0,
@@ -302,13 +302,13 @@ def expected_portfolio_status_():
 
 @pytest.fixture()
 def expected_system_control_():
-    yield SystemControlBaseModel.from_kwargs(_id=1, kill_switch=False, pause_all_strats=False,
-                                             load_buffer_strats=False, cxl_baskets=False)
+    yield SystemControlBaseModel.from_kwargs(_id=1, kill_switch=False, pause_all_plans=False,
+                                             load_buffer_plans=False, cxl_baskets=False)
 
 
 @pytest.fixture()
-def expected_strat_status_(pair_securities_with_sides_):
-    yield StratStatusBaseModel.from_dict({
+def expected_plan_status_(pair_securities_with_sides_):
+    yield PlanStatusBaseModel.from_dict({
       "total_buy_qty": 0,
       "total_sell_qty": 0,
       "total_chore_qty": 0,
@@ -335,5 +335,5 @@ def expected_strat_status_(pair_securities_with_sides_):
       "total_cxl_exposure": 0,
       "average_premium": 0,
       "balance_notional": 300000,
-      "strat_status_update_seq_num": 0
+      "plan_status_update_seq_num": 0
     })

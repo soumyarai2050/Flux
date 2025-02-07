@@ -20,21 +20,21 @@ from sqlalchemy.testing.plugin.plugin_base import logging
 from filelock import FileLock
 
 # project imports
-# below import is required to symbol_cache to work - SymbolCacheContainer must import from base_strat_cache
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_strat_cache import SymbolCacheContainer, SymbolCache
+# below import is required to symbol_cache to work - SymbolCacheContainer must import from base_plan_cache
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_plan_cache import SymbolCacheContainer, SymbolCache
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_routes_callback_imports import (
     StreetBookServiceRoutesCallback)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book_service_helper import (
     get_symbol_side_key, get_symbol_side_snapshot_log_key, all_service_up_check,
     email_book_service_http_client, get_consumable_participation_qty,
-    get_strat_brief_log_key, get_new_strat_limits, get_new_strat_status,
+    get_plan_brief_log_key, get_new_plan_limits, get_new_plan_status,
     log_book_service_http_client, post_book_service_http_client, get_default_max_notional,
     get_default_max_open_single_leg_notional, get_default_max_net_filled_notional,
     get_simulator_config_file_path)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.executor_config_loader import ( EXECUTOR_PROJECT_DIR,
     host, EXECUTOR_PROJECT_DATA_DIR, executor_config_yaml_dict, main_config_yaml_path, EXECUTOR_PROJECT_SCRIPTS_DIR)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book_helper import OTHER_TERMINAL_STATES, \
-    NON_FILLED_TERMINAL_STATES, get_pair_strat_id_from_cmd_argv
+    NON_FILLED_TERMINAL_STATES, get_pair_plan_id_from_cmd_argv
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     compute_max_single_leg_notional, get_premium)
 from FluxPythonUtils.scripts.utility_functions import (
@@ -45,25 +45,25 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data im
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.service_state import ServiceState
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
-    create_md_shell_script, MDShellEnvData, is_ongoing_strat, guaranteed_call_pair_strat_client,
-    pair_strat_client_call_log_str, UpdateType, CURRENT_PROJECT_DIR as PAIR_STRAT_ENGINE_DIR)
+    create_md_shell_script, MDShellEnvData, is_ongoing_plan, guaranteed_call_pair_plan_client,
+    pair_plan_client_call_log_str, UpdateType, CURRENT_PROJECT_DIR as PAIR_STRAT_ENGINE_DIR)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.barter_simulator import (
     BarterSimulator, BarteringLinkBase)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.log_barter_simulator import LogBarterSimulator
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.strat_cache import StratCache
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.plan_cache import PlanCache
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.StreetBook.email_book_service_key_handler import (
     EmailBookServiceKeyHandler)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_client import (
     StreetBookServiceHttpClient)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.aggregate import (
-    get_chore_total_sum_of_last_n_sec, get_symbol_side_snapshot_from_symbol_side, get_strat_brief_from_symbol,
+    get_chore_total_sum_of_last_n_sec, get_symbol_side_snapshot_from_symbol_side, get_plan_brief_from_symbol,
     get_open_chore_snapshots_for_symbol, get_symbol_overview_from_symbol, get_last_n_sec_total_barter_qty,
     get_market_depths, get_last_n_sec_first_n_last_barter)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.generated.ORMModel.post_book_service_model_imports import (
-    PortfolioStatusUpdatesContainer)
+    ContactStatusUpdatesContainer)
 from FluxPythonUtils.scripts.ws_reader import WSReader
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.ORMModel.photo_book_service_model_imports import (
-    StratViewBaseModel)
+    PlanViewBaseModel)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_helper import (
     photo_book_service_http_client)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book import (
@@ -104,8 +104,8 @@ class FirstLastBarterCont(MsgspecBaseModel):
             return get_epoch_from_pandas_timestamp(obj)
 
 
-def get_pair_strat_id_n_recovery_info_from_cmd_argv():
-    pair_strat_id = get_pair_strat_id_from_cmd_argv()
+def get_pair_plan_id_n_recovery_info_from_cmd_argv():
+    pair_plan_id = get_pair_plan_id_from_cmd_argv()
 
     is_crash_recovery: bool = False
     if len(sys.argv) == 4:
@@ -117,9 +117,9 @@ def get_pair_strat_id_n_recovery_info_from_cmd_argv():
             logging.error(err_str_)
             raise Exception(err_str_)
     try:
-        return parse_to_int(pair_strat_id), is_crash_recovery
+        return parse_to_int(pair_plan_id), is_crash_recovery
     except ValueError as e:
-        err_str_ = (f"Provided cmd argument pair_strat_id is not valid type, "
+        err_str_ = (f"Provided cmd argument pair_plan_id is not valid type, "
                     f"must be numeric, exception: {e}")
         logging.error(err_str_)
         raise Exception(err_str_)
@@ -128,38 +128,38 @@ def get_pair_strat_id_n_recovery_info_from_cmd_argv():
 class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCallbackBaseNativeOverride,
                                                            StreetBookServiceRoutesCallback):
     KeyHandler: Type[StreetBookServiceKeyHandler] = StreetBookServiceKeyHandler
-    underlying_read_strat_brief_http: Callable[..., Any] | None = None
+    underlying_read_plan_brief_http: Callable[..., Any] | None = None
     underlying_get_symbol_overview_from_symbol_query_http: Callable[..., Any] | None = None
-    underlying_create_strat_limits_http: Callable[..., Any] | None = None
-    underlying_delete_strat_limits_http: Callable[..., Any] | None = None
-    underlying_create_strat_status_http: Callable[..., Any] | None = None
-    underlying_update_strat_status_http: Callable[..., Any] | None = None
+    underlying_create_plan_limits_http: Callable[..., Any] | None = None
+    underlying_delete_plan_limits_http: Callable[..., Any] | None = None
+    underlying_create_plan_status_http: Callable[..., Any] | None = None
+    underlying_update_plan_status_http: Callable[..., Any] | None = None
     underlying_get_executor_check_snapshot_query_http: Callable[..., Any] | None = None
-    underlying_create_strat_brief_http: Callable[..., Any] | None = None
+    underlying_create_plan_brief_http: Callable[..., Any] | None = None
     underlying_read_symbol_side_snapshot_http: Callable[..., Any] | None = None
     underlying_create_symbol_side_snapshot_http: Callable[..., Any] | None = None
     underlying_partial_update_symbol_overview_http: Callable[..., Any] | None = None
-    underlying_read_strat_limits_by_id_http: Callable[..., Any] | None = None
+    underlying_read_plan_limits_by_id_http: Callable[..., Any] | None = None
     underlying_read_symbol_overview_http: Callable[..., Any] | None = None
     underlying_get_top_of_book_from_symbol_query_http: Callable[..., Any] | None = None
     underlying_read_chore_snapshot_http: Callable[..., Any] | None = None
     underlying_get_last_n_sec_total_barter_qty_query_http: Callable[..., Any] | None = None
     underlying_partial_update_symbol_side_snapshot_http: Callable[..., Any] | None = None
     underlying_partial_update_cancel_chore_http: Callable[..., Any] | None = None
-    underlying_partial_update_strat_status_http: Callable[..., Any] | None = None
+    underlying_partial_update_plan_status_http: Callable[..., Any] | None = None
     underlying_get_open_chore_count_query_http: Callable[..., Any] | None = None
-    underlying_partial_update_strat_brief_http: Callable[..., Any] | None = None
+    underlying_partial_update_plan_brief_http: Callable[..., Any] | None = None
     underlying_delete_symbol_side_snapshot_http: Callable[..., Any] | None = None
     underlying_read_last_barter_http: Callable[..., Any] | None = None
-    underlying_is_strat_ongoing_query_http: Callable[..., Any] | None = None
-    underlying_delete_strat_brief_http: Callable[..., Any] | None = None
+    underlying_is_plan_ongoing_query_http: Callable[..., Any] | None = None
+    underlying_delete_plan_brief_http: Callable[..., Any] | None = None
     underlying_create_cancel_chore_http: Callable[..., Any] | None = None
     underlying_read_market_depth_http: Callable[..., Any] | None = None
-    underlying_read_strat_status_http: Callable[..., Any] | None = None
-    underlying_read_strat_status_by_id_http: Callable[..., Any] | None = None
+    underlying_read_plan_status_http: Callable[..., Any] | None = None
+    underlying_read_plan_status_by_id_http: Callable[..., Any] | None = None
     underlying_read_cancel_chore_http: Callable[..., Any] | None = None
-    underlying_read_strat_limits_http: Callable[..., Any] | None = None
-    underlying_delete_strat_status_http: Callable[..., Any] | None = None
+    underlying_read_plan_limits_http: Callable[..., Any] | None = None
+    underlying_delete_plan_status_http: Callable[..., Any] | None = None
     underlying_barter_simulator_place_cxl_chore_query_http: Callable[..., Any] | None = None
     underlying_create_chore_journal_http: Callable[..., Any] | None = None
     underlying_create_fills_journal_http: Callable[..., Any] | None = None
@@ -167,45 +167,45 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
     @classmethod
     def initialize_underlying_http_routes(cls):
         from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes_imports import (
-            underlying_read_strat_brief_http, underlying_get_symbol_overview_from_symbol_query_http,
+            underlying_read_plan_brief_http, underlying_get_symbol_overview_from_symbol_query_http,
             residual_compute_shared_lock, journal_shared_lock,
-            underlying_create_strat_limits_http, underlying_delete_strat_limits_http,
-            underlying_create_strat_status_http, underlying_update_strat_status_http,
-            underlying_get_executor_check_snapshot_query_http, underlying_create_strat_brief_http,
+            underlying_create_plan_limits_http, underlying_delete_plan_limits_http,
+            underlying_create_plan_status_http, underlying_update_plan_status_http,
+            underlying_get_executor_check_snapshot_query_http, underlying_create_plan_brief_http,
             underlying_read_symbol_side_snapshot_http, underlying_create_symbol_side_snapshot_http,
-            underlying_partial_update_symbol_overview_http, underlying_read_strat_limits_by_id_http,
+            underlying_partial_update_symbol_overview_http, underlying_read_plan_limits_by_id_http,
             underlying_read_symbol_overview_http, underlying_create_cancel_chore_http,
             underlying_read_top_of_book_http, underlying_get_top_of_book_from_symbol_query_http,
             underlying_read_chore_snapshot_http, underlying_read_chore_journal_http,
             underlying_get_last_n_sec_total_barter_qty_query_http, underlying_partial_update_cancel_chore_http,
             get_underlying_account_cumulative_fill_qty_query_http, underlying_create_chore_snapshot_http,
             underlying_update_chore_snapshot_http, underlying_partial_update_symbol_side_snapshot_http,
-            underlying_partial_update_strat_status_http, underlying_get_open_chore_count_query_http,
-            underlying_partial_update_strat_brief_http, underlying_delete_symbol_side_snapshot_http,
+            underlying_partial_update_plan_status_http, underlying_get_open_chore_count_query_http,
+            underlying_partial_update_plan_brief_http, underlying_delete_symbol_side_snapshot_http,
             underlying_read_fills_journal_http,
             underlying_read_last_barter_http, underlying_create_chore_journal_http,
-            underlying_delete_strat_brief_http, underlying_read_market_depth_http, underlying_read_strat_status_http,
-            underlying_read_strat_status_by_id_http, underlying_read_cancel_chore_http,
-            underlying_read_strat_limits_http, underlying_delete_strat_status_http,
+            underlying_delete_plan_brief_http, underlying_read_market_depth_http, underlying_read_plan_status_http,
+            underlying_read_plan_status_by_id_http, underlying_read_cancel_chore_http,
+            underlying_read_plan_limits_http, underlying_delete_plan_status_http,
             underlying_barter_simulator_place_cxl_chore_query_http, underlying_create_fills_journal_http,
             underlying_read_symbol_overview_by_id_http,
             underlying_get_symbol_side_underlying_account_cumulative_fill_qty_query_http)
 
         cls.residual_compute_shared_lock = residual_compute_shared_lock
         cls.journal_shared_lock = journal_shared_lock
-        cls.underlying_read_strat_brief_http = underlying_read_strat_brief_http
+        cls.underlying_read_plan_brief_http = underlying_read_plan_brief_http
         cls.underlying_get_symbol_overview_from_symbol_query_http = (
             underlying_get_symbol_overview_from_symbol_query_http)
-        cls.underlying_create_strat_limits_http = underlying_create_strat_limits_http
-        cls.underlying_delete_strat_limits_http = underlying_delete_strat_limits_http
-        cls.underlying_create_strat_status_http = underlying_create_strat_status_http
-        cls.underlying_update_strat_status_http = underlying_update_strat_status_http
+        cls.underlying_create_plan_limits_http = underlying_create_plan_limits_http
+        cls.underlying_delete_plan_limits_http = underlying_delete_plan_limits_http
+        cls.underlying_create_plan_status_http = underlying_create_plan_status_http
+        cls.underlying_update_plan_status_http = underlying_update_plan_status_http
         cls.underlying_get_executor_check_snapshot_query_http = underlying_get_executor_check_snapshot_query_http
-        cls.underlying_create_strat_brief_http = underlying_create_strat_brief_http
+        cls.underlying_create_plan_brief_http = underlying_create_plan_brief_http
         cls.underlying_read_symbol_side_snapshot_http = underlying_read_symbol_side_snapshot_http
         cls.underlying_create_symbol_side_snapshot_http = underlying_create_symbol_side_snapshot_http
         cls.underlying_partial_update_symbol_overview_http = underlying_partial_update_symbol_overview_http
-        cls.underlying_read_strat_limits_by_id_http = underlying_read_strat_limits_by_id_http
+        cls.underlying_read_plan_limits_by_id_http = underlying_read_plan_limits_by_id_http
         cls.underlying_read_symbol_overview_http = underlying_read_symbol_overview_http
         cls.underlying_read_symbol_overview_by_id_http = underlying_read_symbol_overview_by_id_http
         cls.underlying_read_top_of_book_http = underlying_read_top_of_book_http
@@ -219,39 +219,39 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         cls.underlying_update_chore_snapshot_http = underlying_update_chore_snapshot_http
         cls.underlying_partial_update_symbol_side_snapshot_http = underlying_partial_update_symbol_side_snapshot_http
         cls.underlying_partial_update_cancel_chore_http = underlying_partial_update_cancel_chore_http
-        cls.underlying_partial_update_strat_status_http = underlying_partial_update_strat_status_http
+        cls.underlying_partial_update_plan_status_http = underlying_partial_update_plan_status_http
         cls.underlying_get_open_chore_count_query_http = underlying_get_open_chore_count_query_http
-        cls.underlying_partial_update_strat_brief_http = underlying_partial_update_strat_brief_http
+        cls.underlying_partial_update_plan_brief_http = underlying_partial_update_plan_brief_http
         cls.underlying_delete_symbol_side_snapshot_http = underlying_delete_symbol_side_snapshot_http
         cls.underlying_get_symbol_side_underlying_account_cumulative_fill_qty_query_http = (
             underlying_get_symbol_side_underlying_account_cumulative_fill_qty_query_http)
         cls.underlying_read_fills_journal_http = underlying_read_fills_journal_http
         cls.underlying_read_last_barter_http = underlying_read_last_barter_http
-        cls.underlying_delete_strat_brief_http = underlying_delete_strat_brief_http
+        cls.underlying_delete_plan_brief_http = underlying_delete_plan_brief_http
         cls.underlying_create_cancel_chore_http = underlying_create_cancel_chore_http
         cls.underlying_read_market_depth_http = underlying_read_market_depth_http
-        cls.underlying_read_strat_status_http = underlying_read_strat_status_http
-        cls.underlying_read_strat_status_by_id_http = underlying_read_strat_status_by_id_http
+        cls.underlying_read_plan_status_http = underlying_read_plan_status_http
+        cls.underlying_read_plan_status_by_id_http = underlying_read_plan_status_by_id_http
         cls.underlying_read_cancel_chore_http = underlying_read_cancel_chore_http
-        cls.underlying_read_strat_limits_http = underlying_read_strat_limits_http
-        cls.underlying_delete_strat_status_http = underlying_delete_strat_status_http
+        cls.underlying_read_plan_limits_http = underlying_read_plan_limits_http
+        cls.underlying_delete_plan_status_http = underlying_delete_plan_status_http
         cls.underlying_barter_simulator_place_cxl_chore_query_http = (
             underlying_barter_simulator_place_cxl_chore_query_http)
         cls.underlying_create_chore_journal_http = underlying_create_chore_journal_http
         cls.underlying_create_fills_journal_http = underlying_create_fills_journal_http
 
     def __init__(self):
-        pair_strat_id, is_crash_recovery = get_pair_strat_id_n_recovery_info_from_cmd_argv()
-        self.pair_strat_id = pair_strat_id
+        pair_plan_id, is_crash_recovery = get_pair_plan_id_n_recovery_info_from_cmd_argv()
+        self.pair_plan_id = pair_plan_id
         self.is_crash_recovery = is_crash_recovery
-        super().__init__()      # super init needs pair_strat_id in set_log_simulator_file_name_n_path
+        super().__init__()      # super init needs pair_plan_id in set_log_simulator_file_name_n_path
         self.orig_intra_day_bot: int | None = None
         self.orig_intra_day_sld: int | None = None
         # since this init is called before db_init
-        self.db_name: str = f"street_book_{self.pair_strat_id}"
+        self.db_name: str = f"street_book_{self.pair_plan_id}"
         os.environ["DB_NAME"] = self.db_name
-        self.strat_leg_1: StratLeg | None = None  # will be set by once all_service_up test passes
-        self.strat_leg_2: StratLeg | None = None  # will be set by once all_service_up test passes
+        self.plan_leg_1: PlanLeg | None = None  # will be set by once all_service_up test passes
+        self.plan_leg_2: PlanLeg | None = None  # will be set by once all_service_up test passes
         self.leg1_symbol_cache: SymbolCache | None = None  # will be set by once all_service_up test passes
         self.leg2_symbol_cache: SymbolCache | None = None  # will be set by once all_service_up test passes
         # restricted variable: don't overuse this will be extended to multi-currency support
@@ -272,14 +272,13 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         self.ports_cache_file_path: PurePath | None = EXECUTOR_PROJECT_DATA_DIR / "ports_cache_file.txt"
         self.ports_cache_lock_file_path: PurePath | None = EXECUTOR_PROJECT_DATA_DIR / "ports_cache_lock_file.txt.lock"
         self.cpp_port: int | None = None
-        self.cpp_ws_port: int | None = None
 
     def set_log_simulator_file_name_n_path(self):
-        self.simulate_config_yaml_file_path = (get_simulator_config_file_path(self.pair_strat_id))
+        self.simulate_config_yaml_file_path = (get_simulator_config_file_path(self.pair_plan_id))
         self.log_dir_path = PurePath(__file__).parent.parent / "log"
-        self.log_simulator_file_name = f"log_simulator_{self.pair_strat_id}_logs_{self.datetime_fmt_str}.log"
+        self.log_simulator_file_name = f"log_simulator_{self.pair_plan_id}_logs_{self.datetime_fmt_str}.log"
         self.log_simulator_file_path = (PurePath(__file__).parent.parent / "log" /
-                                        f"log_simulator_{self.pair_strat_id}_logs_{self.datetime_fmt_str}.log")
+                                        f"log_simulator_{self.pair_plan_id}_logs_{self.datetime_fmt_str}.log")
 
     @property
     def derived_class_type(self):
@@ -289,20 +288,20 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
     # Start-Up Methods
     ##################
 
-    def get_pair_strat_loaded_strat_cache(self, pair_strat):
-        key_leg_1, key_leg_2 = EmailBookServiceKeyHandler.get_key_from_pair_strat(pair_strat)
-        strat_cache: StratCache = StratCache.guaranteed_get_by_key(key_leg_1, key_leg_2)
-        with strat_cache.re_ent_lock:
-            strat_cache.set_pair_strat(pair_strat)
-        return strat_cache
+    def get_pair_plan_loaded_plan_cache(self, pair_plan):
+        key_leg_1, key_leg_2 = EmailBookServiceKeyHandler.get_key_from_pair_plan(pair_plan)
+        plan_cache: PlanCache = PlanCache.guaranteed_get_by_key(key_leg_1, key_leg_2)
+        with plan_cache.re_ent_lock:
+            plan_cache.set_pair_plan(pair_plan)
+        return plan_cache
 
     @except_n_log_alert()
     def _app_launch_pre_thread_func(self):
         """
-        sleep wait till engine is up, then create portfolio limits if required
-        TODO LAZY: we should invoke _apply_checks_n_alert on all active pair strats at startup/re-start
+        sleep wait till engine is up, then create contact limits if required
+        TODO LAZY: we should invoke _apply_checks_n_alert on all active pair plans at startup/re-start
         """
-        strat_key: str | None = None
+        plan_key: str | None = None
         service_up_no_warn_retry: int = 5
         try:
             error_prefix = "_app_launch_pre_thread_func: "
@@ -311,8 +310,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             symbol_overview_for_symbol_exists: bool = False
             should_sleep: bool = False
             while True:
-                if self.strat_cache and not strat_key:
-                    strat_key = self.strat_cache.get_key()
+                if self.plan_cache and not plan_key:
+                    plan_key = self.plan_cache.get_key()
                 if should_sleep:
                     time.sleep(self.min_refresh_interval)
                 service_up_flag_env_var = os.environ.get(f"street_book_{self.port}")
@@ -325,18 +324,18 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                             self.bartering_data_manager is not None):
                         if not self.service_ready:
                             self.service_ready = True
-                            # creating required models for this strat
+                            # creating required models for this plan
                             try:
-                                if not self._check_n_create_related_models_for_strat():  # throws if SO close px missing
+                                if not self._check_n_create_related_models_for_plan():  # throws if SO close px missing
                                     self.service_ready = False
                                 else:
-                                    logging.debug(f"Service Marked Ready for: {strat_key}")
+                                    logging.debug(f"Service Marked Ready for: {plan_key}")
                             except Exception as exp:
-                                logging.exception(f"_check_n_create_related_models_for_strat failed with {exp=}; making"
+                                logging.exception(f"_check_n_create_related_models_for_plan failed with {exp=}; making"
                                                   f" self.service_ready=False")
                                 self.service_ready = False
                     else:
-                        warn: str = (f"strat executor service is not up yet for {strat_key};;;{self.all_services_up=}, "
+                        warn: str = (f"plan executor service is not up yet for {plan_key};;;{self.all_services_up=}, "
                                      f"{static_data_service_state.ready=}, {self.usd_fx=}, "
                                      f"{symbol_overview_for_symbol_exists=}, {self.bartering_data_manager=}")
                         if service_up_no_warn_retry <= 0:
@@ -349,14 +348,14 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                             if all_service_up_check(self.web_client):
                                 # starting bartering_data_manager and street_book
                                 try:
-                                    pair_strat = email_book_service_http_client.get_pair_strat_client(
-                                        self.pair_strat_id)
+                                    pair_plan = email_book_service_http_client.get_pair_plan_client(
+                                        self.pair_plan_id)
                                 except Exception as exp:
-                                    logging.exception(f"get_pair_strat_client failed for {strat_key};;; {exp=}")
+                                    logging.exception(f"get_pair_plan_client failed for {plan_key};;; {exp=}")
                                     continue
 
-                                self.strat_leg_1 = pair_strat.pair_strat_params.strat_leg1
-                                self.strat_leg_2 = pair_strat.pair_strat_params.strat_leg2
+                                self.plan_leg_1 = pair_plan.pair_plan_params.plan_leg1
+                                self.plan_leg_2 = pair_plan.pair_plan_params.plan_leg2
 
                                 # creating config file for this server run if not exists
                                 code_gen_projects_dir = PurePath(__file__).parent.parent.parent.parent
@@ -370,40 +369,40 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                 LogBarterSimulator.executor_port = self.port
                                 BarteringLinkBase.reload_executor_configs()
 
-                                # setting partial_run to True and assigning port to pair_strat
-                                pair_strat.port = self.port
-                                pair_strat.server_ready_state = 1   # indicates to ui - executor server has started
+                                # setting partial_run to True and assigning port to pair_plan
+                                pair_plan.port = self.port
+                                pair_plan.server_ready_state = 1   # indicates to ui - executor server has started
 
                                 try:
-                                    updated_pair_strat = email_book_service_http_client.put_pair_strat_client(pair_strat)
+                                    updated_pair_plan = email_book_service_http_client.put_pair_plan_client(pair_plan)
                                 except Exception as exp:
-                                    logging.exception(f"put_pair_strat_client failed for {strat_key};;;"
-                                                      f"{exp=}, {pair_strat=}")
+                                    logging.exception(f"put_pair_plan_client failed for {plan_key};;;"
+                                                      f"{exp=}, {pair_plan=}")
                                     continue
                                 else:
                                     self.leg1_symbol_cache = (
-                                        SymbolCacheContainer.add_symbol_cache_for_symbol(self.strat_leg_1.sec.sec_id))
+                                        SymbolCacheContainer.add_symbol_cache_for_symbol(self.plan_leg_1.sec.sec_id))
                                     self.leg2_symbol_cache = (
-                                        SymbolCacheContainer.add_symbol_cache_for_symbol(self.strat_leg_2.sec.sec_id))
+                                        SymbolCacheContainer.add_symbol_cache_for_symbol(self.plan_leg_2.sec.sec_id))
 
-                                    logging.info(f"Creating bartering_data_manager for {strat_key=}")
-                                    self.strat_cache: StratCache = self.get_pair_strat_loaded_strat_cache(
-                                        updated_pair_strat)
+                                    logging.info(f"Creating bartering_data_manager for {plan_key=}")
+                                    self.plan_cache: PlanCache = self.get_pair_plan_loaded_plan_cache(
+                                        updated_pair_plan)
                                     # Setting asyncio_loop for StreetBook
                                     StreetBook.asyncio_loop = self.asyncio_loop
                                     BarteringDataManager.asyncio_loop = self.asyncio_loop
                                     self.bartering_data_manager = BarteringDataManager(StreetBook.executor_trigger,
-                                                                                   self.strat_cache)
-                                    logging.debug(f"Created bartering_data_manager for {strat_key=};;;{pair_strat=}")
-                                logging.debug(f"Marked pair_strat.server_ready_state to 1 for {strat_key=}")
+                                                                                   self.plan_cache)
+                                    logging.debug(f"Created bartering_data_manager for {plan_key=};;;{pair_plan=}")
+                                logging.debug(f"Marked pair_plan.server_ready_state to 1 for {plan_key=}")
 
                                 self.all_services_up = True
-                                logging.debug(f"Marked all_services_up True for {strat_key=}")
+                                logging.debug(f"Marked all_services_up True for {plan_key=}")
                                 should_sleep = False
                             else:
                                 should_sleep = True
                         except Exception as exp:
-                            logging.error(f"unexpected: all_service_up_check threw exception for {strat_key=}, "
+                            logging.error(f"unexpected: all_service_up_check threw exception for {plan_key=}, "
                                           f"we'll retry periodically in: {self.min_refresh_interval} seconds"
                                           f";;;{exp=}", exc_info=True)
                     else:
@@ -412,10 +411,10 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                         if self.usd_fx is None:
                             try:
                                 if not self.update_fx_symbol_overview_dict_from_http():
-                                    logging.error(f"Can't find any symbol_overview with {StratCache.usd_fx_symbol=};"
-                                                  f"for {strat_key=}, retrying in next periodic cycle")
+                                    logging.error(f"Can't find any symbol_overview with {PlanCache.usd_fx_symbol=};"
+                                                  f"for {plan_key=}, retrying in next periodic cycle")
                             except Exception as exp:
-                                logging.exception(f"update_fx_symbol_overview_dict_from_http failed for {strat_key=} "
+                                logging.exception(f"update_fx_symbol_overview_dict_from_http failed for {plan_key=} "
                                                   f"with exception: {exp=}")
 
                         # service loop: manage all sub-services within their private try-catch to allow high level
@@ -425,16 +424,16 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                 self.static_data = SecurityRecordManager.get_loaded_instance(from_cache=True)
                                 if self.static_data is not None:
                                     # creating and running so_shell script
-                                    pair_strat = self.strat_cache.get_pair_strat_obj()
-                                    self.create_n_run_so_shell_script(pair_strat)
+                                    pair_plan = self.plan_cache.get_pair_plan_obj()
+                                    self.create_n_run_so_shell_script(pair_plan)
                                     static_data_service_state.ready = True
                                     logging.debug(
-                                        f"Marked static_data_service_state.ready True for {strat_key=}")
+                                        f"Marked static_data_service_state.ready True for {plan_key=}")
                                     # we just got static data - no need to sleep - force no sleep
                                     should_sleep = False
                                 else:
                                     raise Exception(
-                                        f"self.static_data did init to None for {strat_key=}, unexpected!!")
+                                        f"self.static_data did init to None for {plan_key=}, unexpected!!")
                             except Exception as exp:
                                 static_data_service_state.handle_exception(exp)
                         else:
@@ -462,11 +461,11 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                     symbol_overview_list = future.result()
                                 except Exception as e:
                                     logging.exception(f"underlying_read_symbol_overview_http "
-                                                      f"failed for {strat_key=} with exception: {e}")
+                                                      f"failed for {plan_key=} with exception: {e}")
                                 else:
                                     for symbol_overview in symbol_overview_list:
                                         # updating symbol_cache
-                                        self.strat_cache.handle_set_symbol_overview_in_symbol_cache(symbol_overview)
+                                        self.plan_cache.handle_set_symbol_overview_in_symbol_cache(symbol_overview)
 
                                 leg1_symbol_overview = self.leg1_symbol_cache.so
                                 leg2_symbol_overview = self.leg2_symbol_cache.so
@@ -485,7 +484,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
 
                         if self.service_ready:
                             try:
-                                # Gets all open chores, updates residuals and raises pause to strat if req
+                                # Gets all open chores, updates residuals and raises pause to plan if req
                                 run_coro = self.cxl_expired_open_chores()
                                 future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
 
@@ -493,11 +492,11 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                 try:
                                     future.result()
                                 except Exception as exp:
-                                    logging.exception(f"cxl_expired_open_chores failed for {strat_key=} with "
+                                    logging.exception(f"cxl_expired_open_chores failed for {plan_key=} with "
                                                       f"{exp=}")
 
                             except Exception as exp:
-                                logging.exception(f"periodic open chore check failed for {strat_key=}, periodic chore "
+                                logging.exception(f"periodic open chore check failed for {plan_key=}, periodic chore "
                                                   f"state checks will not be honored and retried in next periodic cycle"
                                                   f";;;{exp=}")
 
@@ -505,7 +504,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                     self.bartering_data_manager.street_book_thread.is_alive():
                                 self.bartering_data_manager.street_book_thread.join(timeout=20)
                                 logging.warning(f"street_book_thread is not alive anymore - returning from "
-                                                f"_app_launch_pre_thread_func for {strat_key=} executor {self.port=}")
+                                                f"_app_launch_pre_thread_func for {plan_key=} executor {self.port=}")
                                 return
 
                         # Updating data-members synced with config file update
@@ -518,11 +517,11 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                 else:
                     should_sleep = True
         except Exception as e:
-            error_str = (f"unexpected! _app_launch_pre_thread_func caught outer exception: {e}, for {strat_key=}; "
+            error_str = (f"unexpected! _app_launch_pre_thread_func caught outer exception: {e}, for {plan_key=}; "
                          f"executor {self.port=}, thread going down;;;")
             logging.exception(error_str)
         finally:
-            logging.warning(f"_app_launch_pre_thread_func, thread going down, for {strat_key=} executor "
+            logging.warning(f"_app_launch_pre_thread_func, thread going down, for {plan_key=} executor "
                             f"{self.port=}")
 
     def get_free_port_for_md(self) -> int:
@@ -533,7 +532,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                 with open(self.ports_cache_file_path, "r") as f:
                     ports = f.readlines()
                     if str(port_) + '\n' in ports:      # each port is string with '\n' at the end in ports list
-                        continue    # finding port again if port already used in some other strat
+                        continue    # finding port again if port already used in some other plan
                     # else not required: all good - new port found
 
                 with open(self.ports_cache_file_path, "a") as f:
@@ -545,24 +544,23 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                     f.write(str(port_) + "\n")
                     return port_
 
-    def update_simulate_config_yaml(self, pair_strat: PairStrat):
+    def update_simulate_config_yaml(self, pair_plan: PairPlan):
         if not self.updated_simulator_config_file:
             mongo_server = executor_config_yaml_dict.get("mongo_server")
 
             simulate_config_yaml_file_data = YAMLConfigurationManager.load_yaml_configurations(
                 self.simulate_config_yaml_file_path, load_as_str=True)
             with FileLock(self.ports_cache_lock_file_path):
-                self.cpp_ws_port = self.get_free_port_for_md()
                 self.cpp_port = self.get_free_port_for_md()
             simulate_config_yaml_file_data += "\n\n"
-            simulate_config_yaml_file_data += f"leg_1_symbol: {self.strat_leg_1.sec.sec_id}\n"
-            simulate_config_yaml_file_data += f"leg_1_feed_code: {self.strat_leg_1.exch_id}\n"
-            simulate_config_yaml_file_data += f"leg_2_symbol: {self.strat_leg_2.sec.sec_id}\n"
-            simulate_config_yaml_file_data += f"leg_2_feed_code: {self.strat_leg_2.exch_id}\n\n"
+            simulate_config_yaml_file_data += f"leg_1_symbol: {self.plan_leg_1.sec.sec_id}\n"
+            simulate_config_yaml_file_data += f"leg_1_feed_code: {self.plan_leg_1.exch_id}\n"
+            simulate_config_yaml_file_data += f"leg_2_symbol: {self.plan_leg_2.sec.sec_id}\n"
+            simulate_config_yaml_file_data += f"leg_2_feed_code: {self.plan_leg_2.exch_id}\n\n"
             simulate_config_yaml_file_data += f"mongo_server: {mongo_server}\n"
             simulate_config_yaml_file_data += f"http_ip: 127.0.0.1\n"
             simulate_config_yaml_file_data += f"swagger_ui_json_path: {str(self.mobile_book_swagger_ui_json_path)}\n"
-            simulate_config_yaml_file_data += f"market_depth_level: {self.exch_to_market_depth_lvl_dict.get(self.strat_leg_1.exch_id)}\n"
+            simulate_config_yaml_file_data += f"market_depth_level: {self.exch_to_market_depth_lvl_dict.get(self.plan_leg_1.exch_id)}\n"
             simulate_config_yaml_file_data += f"db_name: {self.db_name}\n\n"
 
             # Note: Publish policy
@@ -571,7 +569,6 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             # 2: Post(cpp starts new thread and returns control back immediately,
             #    operation on which it is set is handled by the different thread)
             if not executor_config_yaml_dict.get("avoid_cpp_ws_update"):
-                simulate_config_yaml_file_data += f"cpp_ws_port: {self.cpp_ws_port}\n"
                 simulate_config_yaml_file_data += f"cpp_http_port: {self.cpp_port}\n"
                 simulate_config_yaml_file_data += f"market_depth_ws_update_publish_policy: 2\n"
                 simulate_config_yaml_file_data += f"top_of_book_ws_update_publish_policy: 2\n"
@@ -601,8 +598,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             BarteringLinkBase.reload_executor_configs()
 
             # Setting MobileBookCache instances for this symbol pair
-            pair_strat.cpp_ws_port = self.cpp_ws_port
-            pair_strat.cpp_port = self.cpp_port
+            pair_plan.cpp_port = self.cpp_port
 
             self.updated_simulator_config_file = True   # setting it true avoid updating config file again
 
@@ -631,27 +627,27 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
     def app_launch_post(self):
         logging.debug(f"Triggered server launch post override for executor {self.port=}")
 
-        # making pair_strat server_ready_state field to 0
+        # making pair_plan server_ready_state field to 0
         try:
-            # email_book_service_http_client.update_pair_strat_to_non_running_state_query_client(self.pair_strat_id)
-            guaranteed_call_pair_strat_client(
-                None, email_book_service_http_client.update_pair_strat_to_non_running_state_query_client,
-                pair_strat_id=self.pair_strat_id)
+            # email_book_service_http_client.update_pair_plan_to_non_running_state_query_client(self.pair_plan_id)
+            guaranteed_call_pair_plan_client(
+                None, email_book_service_http_client.update_pair_plan_to_non_running_state_query_client,
+                pair_plan_id=self.pair_plan_id)
         except Exception as e:
-            if ('{"detail":"Id not Found: PairStrat ' + f'{self.pair_strat_id}' + '"}') in str(e):
-                err_str_ = ("error occurred since pair_strat object got deleted, therefore can't update "
+            if ('{"detail":"Id not Found: PairPlan ' + f'{self.pair_plan_id}' + '"}') in str(e):
+                err_str_ = ("error occurred since pair_plan object got deleted, therefore can't update "
                             "is_running_state, symbol_side_key: "
-                            f"{get_symbol_side_key([(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side)])}")
+                            f"{get_symbol_side_key([(self.plan_leg_1.sec.sec_id, self.plan_leg_1.side)])}")
                 logging.debug(err_str_)
             else:
-                logging.exception(f"Some error occurred while updating is_running state of {self.pair_strat_id=} "
+                logging.exception(f"Some error occurred while updating is_running state of {self.pair_plan_id=} "
                                   f"while shutting executor server, symbol_side_key: "
-                                  f"{get_symbol_side_key([(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side)])}, "
+                                  f"{get_symbol_side_key([(self.plan_leg_1.sec.sec_id, self.plan_leg_1.side)])}, "
                                   f"{e=}")
         finally:
             # removing md scripts
             try:
-                so_file_path = EXECUTOR_PROJECT_SCRIPTS_DIR / f"ps_id_{self.pair_strat_id}_so.sh"
+                so_file_path = EXECUTOR_PROJECT_SCRIPTS_DIR / f"ps_id_{self.pair_plan_id}_so.sh"
                 if os.path.exists(so_file_path):
                     os.remove(so_file_path)
             except Exception as e:
@@ -660,38 +656,38 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
 
 
     @staticmethod
-    def create_n_run_so_shell_script(pair_strat):
+    def create_n_run_so_shell_script(pair_plan):
         # creating run_symbol_overview.sh file
-        run_symbol_overview_file_path = EXECUTOR_PROJECT_SCRIPTS_DIR / f"ps_id_{pair_strat.id}_so.sh"
+        run_symbol_overview_file_path = EXECUTOR_PROJECT_SCRIPTS_DIR / f"ps_id_{pair_plan.id}_so.sh"
 
         subscription_data = \
             [
-                (pair_strat.pair_strat_params.strat_leg1.sec.sec_id,
-                 str(pair_strat.pair_strat_params.strat_leg1.sec.sec_id_source)),
-                (pair_strat.pair_strat_params.strat_leg2.sec.sec_id,
-                 str(pair_strat.pair_strat_params.strat_leg2.sec.sec_id_source))
+                (pair_plan.pair_plan_params.plan_leg1.sec.sec_id,
+                 str(pair_plan.pair_plan_params.plan_leg1.sec.sec_id_source)),
+                (pair_plan.pair_plan_params.plan_leg2.sec.sec_id,
+                 str(pair_plan.pair_plan_params.plan_leg2.sec.sec_id_source))
             ]
         db_name = os.environ["DB_NAME"]
-        exch_code = "SS" if pair_strat.pair_strat_params.strat_leg1.exch_id == "SSE" else "SZ"
+        exch_code = "SS" if pair_plan.pair_plan_params.plan_leg1.exch_id == "SSE" else "SZ"
 
         md_shell_env_data: MDShellEnvData = (
-            MDShellEnvData(subscription_data=subscription_data, host=pair_strat.host,
-                           port=pair_strat.port, db_name=db_name, exch_code=exch_code,
+            MDShellEnvData(subscription_data=subscription_data, host=pair_plan.host,
+                           port=pair_plan.port, db_name=db_name, exch_code=exch_code,
                            project_name="street_book"))
 
         create_md_shell_script(md_shell_env_data, run_symbol_overview_file_path, "SO",
-                               instance_id=str(pair_strat.id))
+                               instance_id=str(pair_plan.id))
         os.chmod(run_symbol_overview_file_path, stat.S_IRWXU)
         subprocess.Popen([f"{run_symbol_overview_file_path}"])
 
-    async def _compute_n_update_max_notionals(self, stored_strat_limits_obj: StratLimits,
-                                              updated_strat_limits_obj: StratLimits,
-                                              stored_strat_status_obj: StratStatus) -> bool:
+    async def _compute_n_update_max_notionals(self, stored_plan_limits_obj: PlanLimits,
+                                              updated_plan_limits_obj: PlanLimits,
+                                              stored_plan_status_obj: PlanStatus) -> bool:
         ret_val = False
-        symbol: str = self.strat_leg_1.sec.sec_id
-        side: Side = self.strat_leg_1.side
-        cb_symbol: str = self.strat_leg_1.sec.sec_id
-        eqt_symbol: str = self.strat_leg_2.sec.sec_id
+        symbol: str = self.plan_leg_1.sec.sec_id
+        side: Side = self.plan_leg_1.side
+        cb_symbol: str = self.plan_leg_1.sec.sec_id
+        eqt_symbol: str = self.plan_leg_2.sec.sec_id
         cb_close_px: float | None = None
         eqt_close_px: float | None = None
         symbol_overview_list: List[SymbolOverview] = \
@@ -705,11 +701,11 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         # send None for self.orig_intra_day_bot/sld to force re-compute intraday based on current bot/sld snapshot
         # 1st time at process start self.orig_intra_day_bot/sld is None to force compute
         computed_max_single_leg_notional, self.orig_intra_day_bot, self.orig_intra_day_sld = \
-            compute_max_single_leg_notional(self.static_data, updated_strat_limits_obj.eligible_brokers, cb_symbol,
+            compute_max_single_leg_notional(self.static_data, updated_plan_limits_obj.eligible_brokers, cb_symbol,
                                             eqt_symbol, side, self.usd_fx, cb_close_px, eqt_close_px,
                                             self.orig_intra_day_bot, self.orig_intra_day_sld)
-        if math.isclose(computed_max_single_leg_notional, updated_strat_limits_obj.max_single_leg_notional) and \
-                math.isclose(computed_max_single_leg_notional, stored_strat_limits_obj.max_single_leg_notional):
+        if math.isclose(computed_max_single_leg_notional, updated_plan_limits_obj.max_single_leg_notional) and \
+                math.isclose(computed_max_single_leg_notional, stored_plan_limits_obj.max_single_leg_notional):
             return False  # no action as no change
         if get_default_max_notional() < computed_max_single_leg_notional:
             # not allowed to go above default max CB Notional
@@ -719,65 +715,65 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                             f"{get_symbol_side_key([(symbol, side)])}")
             computed_max_single_leg_notional = get_default_max_notional()
 
-        acquired_notional: float = (stored_strat_limits_obj.max_single_leg_notional -
-                                    stored_strat_status_obj.balance_notional)
+        acquired_notional: float = (stored_plan_limits_obj.max_single_leg_notional -
+                                    stored_plan_status_obj.balance_notional)
         # check for user assigned max_single_leg_notional
-        if not math.isclose(stored_strat_limits_obj.max_single_leg_notional,
-                            updated_strat_limits_obj.max_single_leg_notional):
-            if computed_max_single_leg_notional > updated_strat_limits_obj.max_single_leg_notional:
-                computed_max_single_leg_notional = updated_strat_limits_obj.max_single_leg_notional
+        if not math.isclose(stored_plan_limits_obj.max_single_leg_notional,
+                            updated_plan_limits_obj.max_single_leg_notional):
+            if computed_max_single_leg_notional > updated_plan_limits_obj.max_single_leg_notional:
+                computed_max_single_leg_notional = updated_plan_limits_obj.max_single_leg_notional
             else:
                 logging.warning(
-                    f"blocked assignment of UI input CB notional: {updated_strat_limits_obj.max_single_leg_notional:,}"
+                    f"blocked assignment of UI input CB notional: {updated_plan_limits_obj.max_single_leg_notional:,}"
                     f" as it breaches available computed max_single_leg_notional: {computed_max_single_leg_notional:,},"
                     f" setting to computed_max_single_leg_notional instead, symbol_side_key: "
                     f"{get_symbol_side_key([(symbol, side)])}")
 
         # warn if computed max cb notional > .5% current max cb notional [else not an alert-worthy change: log info]
-        if (computed_max_single_leg_notional > updated_strat_limits_obj.max_single_leg_notional and
-                 not math.isclose(computed_max_single_leg_notional, updated_strat_limits_obj.max_single_leg_notional)):
+        if (computed_max_single_leg_notional > updated_plan_limits_obj.max_single_leg_notional and
+                 not math.isclose(computed_max_single_leg_notional, updated_plan_limits_obj.max_single_leg_notional)):
             warn_str_: str = (f"increased computed max_single_leg_notional to: {computed_max_single_leg_notional:,}, "
                               f"note: this exceeds older max_single_leg_notional: "
-                              f"{updated_strat_limits_obj.max_single_leg_notional:,}, for symbol_side: "
+                              f"{updated_plan_limits_obj.max_single_leg_notional:,}, for symbol_side: "
                               f"{get_symbol_side_key([(symbol, side)])}")
-            if (abs(computed_max_single_leg_notional - updated_strat_limits_obj.max_open_single_leg_notional) >
-                    (0.005 * updated_strat_limits_obj.max_single_leg_notional)):
+            if (abs(computed_max_single_leg_notional - updated_plan_limits_obj.max_open_single_leg_notional) >
+                    (0.005 * updated_plan_limits_obj.max_single_leg_notional)):
                 logging.warning(warn_str_)
             else:
                 logging.info(warn_str_)
 
         balance_notional: float = computed_max_single_leg_notional - acquired_notional
-        updated_strat_status_obj = StratStatusOptional(id=stored_strat_status_obj.id, balance_notional=balance_notional)
-        # collect pair_strat_tuple before marking it done (for today) - update strat status balance notional
-        pair_strat_tuple = self.strat_cache.get_pair_strat()
-        await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_partial_update_strat_status_http(
-            updated_strat_status_obj.to_json_dict(excclude_none=True))
+        updated_plan_status_obj = PlanStatusOptional(id=stored_plan_status_obj.id, balance_notional=balance_notional)
+        # collect pair_plan_tuple before marking it done (for today) - update plan status balance notional
+        pair_plan_tuple = self.plan_cache.get_pair_plan()
+        await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_partial_update_plan_status_http(
+            updated_plan_status_obj.to_json_dict(excclude_none=True))
         if balance_notional < 0 or math.isclose(balance_notional, 0):
-            if pair_strat_tuple is not None:
-                pair_strat, _ = pair_strat_tuple
-                if is_ongoing_strat(pair_strat):
-                    updated_pair_strat_obj: PairStratBaseModel = \
-                        PairStratBaseModel(id=pair_strat.id, strat_state=StratState.StratState_PAUSED)
-                    email_book_service_http_client.patch_pair_strat_client(
-                        updated_pair_strat_obj.to_json_dict(exclude_none=True))
-                    logging.critical(f"pausing strat! new computed {balance_notional=} found <= 0; "
+            if pair_plan_tuple is not None:
+                pair_plan, _ = pair_plan_tuple
+                if is_ongoing_plan(pair_plan):
+                    updated_pair_plan_obj: PairPlanBaseModel = \
+                        PairPlanBaseModel(id=pair_plan.id, plan_state=PlanState.PlanState_PAUSED)
+                    email_book_service_http_client.patch_pair_plan_client(
+                        updated_pair_plan_obj.to_json_dict(exclude_none=True))
+                    logging.critical(f"pausing plan! new computed {balance_notional=} found <= 0; "
                                      f"as current {acquired_notional=:,} >= new "
                                      f"{computed_max_single_leg_notional=:,};;;old balance_notional: "
-                                     f"{stored_strat_status_obj.balance_notional:,} old max_single_leg_notional: "
-                                     f"{stored_strat_limits_obj.max_single_leg_notional:,} "
+                                     f"{stored_plan_status_obj.balance_notional:,} old max_single_leg_notional: "
+                                     f"{stored_plan_limits_obj.max_single_leg_notional:,} "
                                      f"for symbol-side: {get_symbol_side_key([(symbol, side)])}")
-                # else not required - not an ongoing strat
+                # else not required - not an ongoing plan
             else:
-                err_str_ = ("Unexpected: Can't find pair_strat object in strat_cache - can't update "
-                            "strat_state to StratState_PAUSED")
+                err_str_ = ("Unexpected: Can't find pair_plan object in plan_cache - can't update "
+                            "plan_state to PlanState_PAUSED")
                 logging.error(err_str_)
 
         # now update max_single_leg_notional
-        if not math.isclose(computed_max_single_leg_notional, stored_strat_limits_obj.max_single_leg_notional):
-            updated_strat_limits_obj.max_single_leg_notional = computed_max_single_leg_notional
+        if not math.isclose(computed_max_single_leg_notional, stored_plan_limits_obj.max_single_leg_notional):
+            updated_plan_limits_obj.max_single_leg_notional = computed_max_single_leg_notional
             ret_val = True
         else:
-            updated_strat_limits_obj.max_single_leg_notional = stored_strat_limits_obj.max_single_leg_notional
+            updated_plan_limits_obj.max_single_leg_notional = stored_plan_limits_obj.max_single_leg_notional
 
         # max_open_single_leg_notional
         computed_max_open_single_leg_notional = computed_max_single_leg_notional
@@ -790,13 +786,13 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             computed_max_open_single_leg_notional = get_default_max_open_single_leg_notional()
 
         # check for user assigned max_open_single_leg_notional
-        if not math.isclose(stored_strat_limits_obj.max_open_single_leg_notional,
-                            updated_strat_limits_obj.max_open_single_leg_notional):
-            if computed_max_open_single_leg_notional > updated_strat_limits_obj.max_open_single_leg_notional:
-                computed_max_open_single_leg_notional = updated_strat_limits_obj.max_open_single_leg_notional
+        if not math.isclose(stored_plan_limits_obj.max_open_single_leg_notional,
+                            updated_plan_limits_obj.max_open_single_leg_notional):
+            if computed_max_open_single_leg_notional > updated_plan_limits_obj.max_open_single_leg_notional:
+                computed_max_open_single_leg_notional = updated_plan_limits_obj.max_open_single_leg_notional
             else:
                 logging.warning(
-                    f"blocked assignment of user desired {updated_strat_limits_obj.max_open_single_leg_notional=:,.0f}"
+                    f"blocked assignment of user desired {updated_plan_limits_obj.max_open_single_leg_notional=:,.0f}"
                     f" as it breaches available {computed_max_open_single_leg_notional=:,}, setting to "
                     f"computed_max_open_single_leg_notional instead, "
                     f"symbol_side_key: {get_symbol_side_key([(symbol, side)])}")
@@ -812,27 +808,27 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             computed_max_net_filled_notional = get_default_max_net_filled_notional()
 
         # check for user assigned max_net_filled_notional
-        if not math.isclose(stored_strat_limits_obj.max_net_filled_notional,
-                            updated_strat_limits_obj.max_net_filled_notional):
-            if computed_max_net_filled_notional > updated_strat_limits_obj.max_net_filled_notional:
-                computed_max_net_filled_notional = updated_strat_limits_obj.max_net_filled_notional
+        if not math.isclose(stored_plan_limits_obj.max_net_filled_notional,
+                            updated_plan_limits_obj.max_net_filled_notional):
+            if computed_max_net_filled_notional > updated_plan_limits_obj.max_net_filled_notional:
+                computed_max_net_filled_notional = updated_plan_limits_obj.max_net_filled_notional
             else:
                 logging.warning(
-                    f"blocked assignment of user desired {updated_strat_limits_obj.max_net_filled_notional=:,}"
+                    f"blocked assignment of user desired {updated_plan_limits_obj.max_net_filled_notional=:,}"
                     f" as it breaches available {computed_max_net_filled_notional=:,}, setting to "
                     f"computed_max_net_filled_notional instead, "
                     f"symbol_side_key: {get_symbol_side_key([(symbol, side)])}")
 
         # now update max_open_single_leg_notional and max_net_filled_notional
-        updated_strat_limits_obj.max_open_single_leg_notional = computed_max_open_single_leg_notional
-        updated_strat_limits_obj.max_net_filled_notional = computed_max_net_filled_notional
+        updated_plan_limits_obj.max_open_single_leg_notional = computed_max_open_single_leg_notional
+        updated_plan_limits_obj.max_net_filled_notional = computed_max_net_filled_notional
         return ret_val
 
-    def _compute_n_set_max_notionals(self, strat_limits_obj: StratLimits) -> None:
-        symbol: str = self.strat_leg_1.sec.sec_id
-        side: Side = self.strat_leg_1.side
-        cb_symbol: str = self.strat_leg_1.sec.sec_id
-        eqt_symbol: str = self.strat_leg_2.sec.sec_id
+    def _compute_n_set_max_notionals(self, plan_limits_obj: PlanLimits) -> None:
+        symbol: str = self.plan_leg_1.sec.sec_id
+        side: Side = self.plan_leg_1.side
+        cb_symbol: str = self.plan_leg_1.sec.sec_id
+        eqt_symbol: str = self.plan_leg_2.sec.sec_id
         cb_close_px: float | None = None
         eqt_close_px: float | None = None
         existing_symbol_overviews: List[SymbolOverview] = []
@@ -852,10 +848,10 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                 eqt_close_px = symbol_overview.closing_px
         # send None instead of self.orig_intra_day_sum to force re-compute intraday [1st time its None to force compute]
         computed_max_single_leg_notional, self.orig_intra_day_bot, self.orig_intra_day_sld = (
-            compute_max_single_leg_notional(self.static_data, strat_limits_obj.eligible_brokers, cb_symbol, eqt_symbol,
+            compute_max_single_leg_notional(self.static_data, plan_limits_obj.eligible_brokers, cb_symbol, eqt_symbol,
                                             side, self.usd_fx, cb_close_px, eqt_close_px, self.orig_intra_day_bot,
                                             self.orig_intra_day_sld))
-        if math.isclose(computed_max_single_leg_notional, strat_limits_obj.max_single_leg_notional):
+        if math.isclose(computed_max_single_leg_notional, plan_limits_obj.max_single_leg_notional):
             return  # no action as no change
         if get_default_max_notional() < computed_max_single_leg_notional:
             # not allowed to go above default max CB Notional
@@ -865,11 +861,11 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                             f"{get_symbol_side_key([(symbol, side)])}")
             computed_max_single_leg_notional = get_default_max_notional()
         # for both if/else computed_max_single_leg_notional is now good to replace max_single_leg_notional
-        strat_limits_obj.max_single_leg_notional = computed_max_single_leg_notional
-        if computed_max_single_leg_notional < strat_limits_obj.max_open_single_leg_notional:
-            strat_limits_obj.max_open_single_leg_notional = computed_max_single_leg_notional
-        if computed_max_single_leg_notional < strat_limits_obj.max_net_filled_notional:
-            strat_limits_obj.max_net_filled_notional = computed_max_single_leg_notional
+        plan_limits_obj.max_single_leg_notional = computed_max_single_leg_notional
+        if computed_max_single_leg_notional < plan_limits_obj.max_open_single_leg_notional:
+            plan_limits_obj.max_open_single_leg_notional = computed_max_single_leg_notional
+        if computed_max_single_leg_notional < plan_limits_obj.max_net_filled_notional:
+            plan_limits_obj.max_net_filled_notional = computed_max_single_leg_notional
 
     def _apply_restricted_security_check_n_alert(self, sec_id: str) -> bool:
         # restricted security check
@@ -877,163 +873,163 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         if self.static_data is None:
             logging.error(f"unable to conduct restricted security check static data not available yet, "
                           f"symbol_side_key: "
-                          f"{get_symbol_side_key([(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side)])}")
+                          f"{get_symbol_side_key([(self.plan_leg_1.sec.sec_id, self.plan_leg_1.side)])}")
             check_passed = False
         elif self.static_data.is_restricted(sec_id):
             logging.error(f"restricted security check failed: {sec_id}, symbol_side_key: "
-                          f"{get_symbol_side_key([(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side)])}")
+                          f"{get_symbol_side_key([(self.plan_leg_1.sec.sec_id, self.plan_leg_1.side)])}")
             check_passed = False
         return check_passed
 
-    async def _compute_n_update_average_premium(self, strat_status_obj: StratStatus):
+    async def _compute_n_update_average_premium(self, plan_status_obj: PlanStatus):
         conv_px: float | None = None
         symbol_overview_list: List[SymbolOverview] = await (
             StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_read_symbol_overview_http())
         for symbol_overview in symbol_overview_list:
-            if symbol_overview.symbol == self.strat_leg_1.sec.sec_id:
+            if symbol_overview.symbol == self.plan_leg_1.sec.sec_id:
                 conv_px = symbol_overview.conv_px
                 break
         if conv_px is None:
             logging.error(f"no conv_px price found for symbol_side_key: "
-                          f"{get_symbol_side_key([(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side)])}")
+                          f"{get_symbol_side_key([(self.plan_leg_1.sec.sec_id, self.plan_leg_1.side)])}")
         average_premium: float
-        cb_px: float = strat_status_obj.avg_fill_buy_px if (
-                self.strat_leg_1.side == Side.BUY) else strat_status_obj.avg_fill_sell_px
-        eqt_px: float = strat_status_obj.avg_fill_buy_px if (
-                self.strat_leg_1.side == Side.SELL) else strat_status_obj.avg_fill_sell_px
+        cb_px: float = plan_status_obj.avg_fill_buy_px if (
+                self.plan_leg_1.side == Side.BUY) else plan_status_obj.avg_fill_sell_px
+        eqt_px: float = plan_status_obj.avg_fill_buy_px if (
+                self.plan_leg_1.side == Side.SELL) else plan_status_obj.avg_fill_sell_px
         if (conv_px is None or cb_px is None or eqt_px is None or math.isclose(conv_px, 0) or
                 math.isclose(cb_px, 0) or math.isclose(eqt_px, 0)):
             average_premium = 0
         else:
             average_premium = get_premium(conv_px, eqt_px, cb_px)
-        strat_status_obj.average_premium = average_premium
+        plan_status_obj.average_premium = average_premium
 
-    def _check_n_create_default_strat_limits(self):
+    def _check_n_create_default_plan_limits(self):
         run_coro = (
             StreetBookServiceRoutesCallbackBaseNativeOverride.
-            underlying_read_strat_limits_http())
+            underlying_read_plan_limits_http())
         future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
 
         # block for task to finish
         try:
-            strat_limits_list = future.result()
+            plan_limits_list = future.result()
         except Exception as e:
             logging.exception(f"underlying_read_symbol_overview_http "
                               f"failed with exception: {e}")
         else:
 
-            if not strat_limits_list:
+            if not plan_limits_list:
                 eligible_brokers: List[Broker] | None = None
                 try:
-                    dismiss_filter_portfolio_limit_broker_obj_list = (
-                        email_book_service_http_client.get_dismiss_filter_portfolio_limit_brokers_query_client(
-                            self.strat_leg_1.sec.sec_id, self.strat_leg_2.sec.sec_id))
-                    if dismiss_filter_portfolio_limit_broker_obj_list:
-                        eligible_brokers = dismiss_filter_portfolio_limit_broker_obj_list[0].brokers
+                    dismiss_filter_contact_limit_broker_obj_list = (
+                        email_book_service_http_client.get_dismiss_filter_contact_limit_brokers_query_client(
+                            self.plan_leg_1.sec.sec_id, self.plan_leg_2.sec.sec_id))
+                    if dismiss_filter_contact_limit_broker_obj_list:
+                        eligible_brokers = dismiss_filter_contact_limit_broker_obj_list[0].brokers
                     else:
-                        err_str_ = ("Http Query get_dismiss_filter_portfolio_limit_brokers_query returned empty list, "
-                                    "expected dismiss_filter_portfolio_limit_broker_obj_list obj with brokers list")
+                        err_str_ = ("Http Query get_dismiss_filter_contact_limit_brokers_query returned empty list, "
+                                    "expected dismiss_filter_contact_limit_broker_obj_list obj with brokers list")
                         logging.error(err_str_)
                 except Exception as e:
-                    err_str_ = (f"Exception occurred while fetching filtered broker from portfolio_status - "
-                                f"will retry strat_limits create: exception: {e}")
+                    err_str_ = (f"Exception occurred while fetching filtered broker from contact_status - "
+                                f"will retry plan_limits create: exception: {e}")
                     logging.error(err_str_)
                     return
 
-                strat_limits = get_new_strat_limits(eligible_brokers)
-                strat_limits.id = self.pair_strat_id  # syncing id with pair_strat which triggered this server
-                self._compute_n_set_max_notionals(strat_limits)
+                plan_limits = get_new_plan_limits(eligible_brokers)
+                plan_limits.id = self.pair_plan_id  # syncing id with pair_plan which triggered this server
+                self._compute_n_set_max_notionals(plan_limits)
 
-                run_coro = StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_create_strat_limits_http(
-                    strat_limits)
+                run_coro = StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_create_plan_limits_http(
+                    plan_limits)
                 future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
 
                 # block for task to finish
                 try:
-                    created_strat_limits: StratLimits = future.result()
+                    created_plan_limits: PlanLimits = future.result()
                 except Exception as e:
-                    logging.exception(f"underlying_create_strat_limits_http failed, ignoring create strat_limits, "
+                    logging.exception(f"underlying_create_plan_limits_http failed, ignoring create plan_limits, "
                                       f"exception: {e}")
                     return
 
-                logging.debug(f"Created strat_limits with {strat_limits.id=};;;{strat_limits=}")
+                logging.debug(f"Created plan_limits with {plan_limits.id=};;;{plan_limits=}")
 
-                return created_strat_limits
+                return created_plan_limits
             else:
-                if len(strat_limits_list) > 1:
-                    err_str_: str = ("Unexpected: Found multiple StratLimits in single executor - ignoring "
-                                     "strat_cache update for strat_limits - symbol_side_key: "
-                                     f"{get_symbol_side_key([(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side)])};;; "
-                                     f"strat_limits_list: {strat_limits_list}")
+                if len(plan_limits_list) > 1:
+                    err_str_: str = ("Unexpected: Found multiple PlanLimits in single executor - ignoring "
+                                     "plan_cache update for plan_limits - symbol_side_key: "
+                                     f"{get_symbol_side_key([(self.plan_leg_1.sec.sec_id, self.plan_leg_1.side)])};;; "
+                                     f"plan_limits_list: {plan_limits_list}")
                     logging.error(err_str_)
                 else:
-                    self.bartering_data_manager.handle_strat_limits_get_all_ws(strat_limits_list[0])
-                return strat_limits_list[0]
+                    self.bartering_data_manager.handle_plan_limits_get_all_ws(plan_limits_list[0])
+                return plan_limits_list[0]
 
-    async def _check_n_remove_strat_limits(self):
-        strat_limits_tuple = self.strat_cache.get_strat_limits()
+    async def _check_n_remove_plan_limits(self):
+        plan_limits_tuple = self.plan_cache.get_plan_limits()
 
-        if strat_limits_tuple is not None:
-            strat_limits, _ = strat_limits_tuple
-            await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_delete_strat_limits_http(
-                strat_limits.id)
-        # ignore if strat_limits doesn't exist - happens when strat is in SNOOZED at the time of this call
+        if plan_limits_tuple is not None:
+            plan_limits, _ = plan_limits_tuple
+            await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_delete_plan_limits_http(
+                plan_limits.id)
+        # ignore if plan_limits doesn't exist - happens when plan is in SNOOZED at the time of this call
 
-    def _check_n_create_or_update_strat_status(self, strat_limits: StratLimits):
+    def _check_n_create_or_update_plan_status(self, plan_limits: PlanLimits):
         run_coro = (
             StreetBookServiceRoutesCallbackBaseNativeOverride.
-            underlying_read_strat_status_http())
+            underlying_read_plan_status_http())
         future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
 
         # block for task to finish
         try:
-            strat_status_list = future.result()
+            plan_status_list = future.result()
         except Exception as e:
             logging.exception(f"underlying_read_symbol_overview_http "
                               f"failed with exception: {e}")
         else:
-            if not strat_status_list:  # When strat is newly created or reloaded after unloading from collection
-                strat_status = get_new_strat_status(strat_limits)
-                strat_status.id = self.pair_strat_id  # syncing id with pair_strat which triggered this server
+            if not plan_status_list:  # When plan is newly created or reloaded after unloading from collection
+                plan_status = get_new_plan_status(plan_limits)
+                plan_status.id = self.pair_plan_id  # syncing id with pair_plan which triggered this server
 
                 run_coro = (
-                    StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_create_strat_status_http(
-                        strat_status))
+                    StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_create_plan_status_http(
+                        plan_status))
                 future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
 
                 # block for task to finish
                 try:
-                    created_strat_status: StratStatus = future.result()
+                    created_plan_status: PlanStatus = future.result()
                 except Exception as e:
-                    logging.exception(f"underlying_create_strat_status_http failed: ignoring create strat_status, "
+                    logging.exception(f"underlying_create_plan_status_http failed: ignoring create plan_status, "
                                       f"exception: {e}")
                     return
 
-                logging.debug(f"Created {strat_status = }")
-                return created_strat_status
-            else:  # When strat is restarted
-                if len(strat_status_list) > 1:
+                logging.debug(f"Created {plan_status = }")
+                return created_plan_status
+            else:  # When plan is restarted
+                if len(plan_status_list) > 1:
                     err_str_: str = (
-                        "Unexpected: Found multiple StratStatus in single executor - ignoring strat_cache update"
-                        f"for strat_status - symbol_side_key: "
-                        f"{get_symbol_side_key([(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side)])};;; "
-                        f"strat_status_list: {strat_status_list}")
+                        "Unexpected: Found multiple PlanStatus in single executor - ignoring plan_cache update"
+                        f"for plan_status - symbol_side_key: "
+                        f"{get_symbol_side_key([(self.plan_leg_1.sec.sec_id, self.plan_leg_1.side)])};;; "
+                        f"plan_status_list: {plan_status_list}")
                     logging.error(err_str_)
                 else:
-                    self.bartering_data_manager.handle_strat_status_get_all_ws(strat_status_list[0])
-                return strat_status_list[0]
+                    self.bartering_data_manager.handle_plan_status_get_all_ws(plan_status_list[0])
+                return plan_status_list[0]
 
-    async def _check_n_remove_strat_status(self):
-        async with StratStatus.reentrant_lock:
-            strat_status_tuple = self.strat_cache.get_strat_status()
+    async def _check_n_remove_plan_status(self):
+        async with PlanStatus.reentrant_lock:
+            plan_status_tuple = self.plan_cache.get_plan_status()
 
-            if strat_status_tuple:
-                strat_status, _ = strat_status_tuple
-                await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_delete_strat_status_http(
-                    strat_status.id)
-            # ignore if strat_limits doesn't exist - happens when strat is in SNOOZED at the time of this call
+            if plan_status_tuple:
+                plan_status, _ = plan_status_tuple
+                await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_delete_plan_status_http(
+                    plan_status.id)
+            # ignore if plan_limits doesn't exist - happens when plan is in SNOOZED at the time of this call
 
-    def get_consumable_concentration_from_source(self, symbol: str, strat_limits: StratLimits):
+    def get_consumable_concentration_from_source(self, symbol: str, plan_limits: PlanLimits):
         security_float: float | None = self.static_data.get_security_float_from_ticker(symbol)
         if security_float is None or security_float <= 0:
             logging.error(f"concentration check will fail for {symbol}, invalid security float found in static data: "
@@ -1041,23 +1037,23 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             consumable_concentration = 0
         else:
             consumable_concentration = \
-                int((security_float / 100) * strat_limits.max_concentration)
+                int((security_float / 100) * plan_limits.max_concentration)
         return consumable_concentration
 
-    async def _check_n_create_strat_brief_for_active_pair_strat(self, strat_limits: StratLimits, hedge_ratio: float):
-        symbol = self.strat_leg_1.sec.sec_id
-        side = self.strat_leg_1.side
-        strat_brief_tuple = self.strat_cache.get_strat_brief()
+    async def _check_n_create_plan_brief_for_active_pair_plan(self, plan_limits: PlanLimits, hedge_ratio: float):
+        symbol = self.plan_leg_1.sec.sec_id
+        side = self.plan_leg_1.side
+        plan_brief_tuple = self.plan_cache.get_plan_brief()
 
-        if strat_brief_tuple is not None:
-            # all fine if strat_brief already exists: happens in some crash recovery
+        if plan_brief_tuple is not None:
+            # all fine if plan_brief already exists: happens in some crash recovery
             return
         else:
-            # If no strat_brief exists for this symbol
-            consumable_open_chores = strat_limits.max_open_chores_per_side
-            leg1_consumable_notional = strat_limits.max_single_leg_notional
-            leg2_consumable_notional = strat_limits.max_single_leg_notional * hedge_ratio
-            leg_consumable_open_notional = strat_limits.max_open_single_leg_notional
+            # If no plan_brief exists for this symbol
+            consumable_open_chores = plan_limits.max_open_chores_per_side
+            leg1_consumable_notional = plan_limits.max_single_leg_notional
+            leg2_consumable_notional = plan_limits.max_single_leg_notional * hedge_ratio
+            leg_consumable_open_notional = plan_limits.max_open_single_leg_notional
 
         residual_qty = 0
         all_bkr_cxlled_qty = 0
@@ -1067,13 +1063,13 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         buy_side_bartering_brief: PairSideBarteringBrief | None = None
         sell_side_bartering_brief: PairSideBarteringBrief | None = None
 
-        for sec, side in [(self.strat_leg_1.sec, self.strat_leg_1.side), (self.strat_leg_2.sec, self.strat_leg_2.side)]:
+        for sec, side in [(self.plan_leg_1.sec, self.plan_leg_1.side), (self.plan_leg_2.sec, self.plan_leg_2.side)]:
             symbol = sec.sec_id
-            consumable_concentration = self.get_consumable_concentration_from_source(symbol, strat_limits)
+            consumable_concentration = self.get_consumable_concentration_from_source(symbol, plan_limits)
 
             participation_period_chore_qty_sum = 0
             consumable_cxl_qty = 0
-            applicable_period_second = strat_limits.market_barter_volume_participation.applicable_period_seconds
+            applicable_period_second = plan_limits.market_barter_volume_participation.applicable_period_seconds
             executor_check_snapshot_list = \
                 await (StreetBookServiceRoutesCallbackBaseNativeOverride.
                        underlying_get_executor_check_snapshot_query_http(symbol, side,
@@ -1082,15 +1078,15 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                 indicative_consumable_participation_qty = \
                     get_consumable_participation_qty(
                         executor_check_snapshot_list,
-                        strat_limits.market_barter_volume_participation.max_participation_rate)
+                        plan_limits.market_barter_volume_participation.max_participation_rate)
             else:
                 logging.error("Received unexpected length of executor_check_snapshot_list from query "
                               f"{len(executor_check_snapshot_list)}, expected 1, symbol_side_key: "
                               f"{get_symbol_side_key([(symbol, side)])}, likely bug in "
                               f"get_executor_check_snapshot_query pre implementation")
                 indicative_consumable_participation_qty = 0
-            indicative_consumable_residual = strat_limits.residual_restriction.max_residual
-            consumable_notional = leg1_consumable_notional if symbol == self.strat_leg_1.sec.sec_id else \
+            indicative_consumable_residual = plan_limits.residual_restriction.max_residual
+            consumable_notional = leg1_consumable_notional if symbol == self.plan_leg_1.sec.sec_id else \
                 leg2_consumable_notional
             sec_pair_side_bartering_brief_obj = \
                 PairSideBarteringBrief(security=sec,
@@ -1118,28 +1114,28 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                 else:
                     logging.error(f"expected sell_side_bartering_brief to be None, found: {sell_side_bartering_brief}")
 
-        strat_brief_obj: StratBrief = StratBrief(id=strat_limits.id,
+        plan_brief_obj: PlanBrief = PlanBrief(id=plan_limits.id,
                                                  pair_buy_side_bartering_brief=buy_side_bartering_brief,
                                                  pair_sell_side_bartering_brief=sell_side_bartering_brief,
-                                                 consumable_nett_filled_notional=strat_limits.max_net_filled_notional)
-        created_underlying_strat_brief = \
-            await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_create_strat_brief_http(
-                strat_brief_obj)
-        logging.debug(f"Created strat brief in post call of update strat_status to active of "
-                      f"key: {get_symbol_side_key([(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side)])};;; "
-                      f"{strat_limits=}, {created_underlying_strat_brief=}")
+                                                 consumable_nett_filled_notional=plan_limits.max_net_filled_notional)
+        created_underlying_plan_brief = \
+            await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_create_plan_brief_http(
+                plan_brief_obj)
+        logging.debug(f"Created plan brief in post call of update plan_status to active of "
+                      f"key: {get_symbol_side_key([(self.plan_leg_1.sec.sec_id, self.plan_leg_1.side)])};;; "
+                      f"{plan_limits=}, {created_underlying_plan_brief=}")
 
-    async def _check_n_create_symbol_snapshot_for_active_pair_strat(self):
+    async def _check_n_create_symbol_snapshot_for_active_pair_plan(self):
         # before running this server
         pair_symbol_side_list = [
-            (self.strat_leg_1.sec, self.strat_leg_1.side),
-            (self.strat_leg_2.sec, self.strat_leg_2.side)
+            (self.plan_leg_1.sec, self.plan_leg_1.side),
+            (self.plan_leg_2.sec, self.plan_leg_2.side)
         ]
 
         for security, side in pair_symbol_side_list:
             if security is not None and side is not None:
 
-                symbol_side_snapshots_tuple = self.strat_cache.get_symbol_side_snapshot_from_symbol(security.sec_id)
+                symbol_side_snapshots_tuple = self.plan_cache.get_symbol_side_snapshot_from_symbol(security.sec_id)
 
                 if symbol_side_snapshots_tuple is None:
                     symbol_side_snapshot_obj = SymbolSideSnapshot(id=SymbolSideSnapshot.next_id(),
@@ -1165,13 +1161,13 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                               f"{self.port = }, likely populated by phone_book before launching this server, "
                               f"{security = }, {side = }")
 
-    async def _check_n_force_publish_symbol_overview_for_active_strat(self) -> None:
+    async def _check_n_force_publish_symbol_overview_for_active_plan(self) -> None:
 
-        symbols_list = [self.strat_leg_1.sec.sec_id, self.strat_leg_2.sec.sec_id]
+        symbols_list = [self.plan_leg_1.sec.sec_id, self.plan_leg_2.sec.sec_id]
 
         async with SymbolOverview.reentrant_lock:
             for symbol in symbols_list:
-                symbol_overview_obj_tuple = self.strat_cache.get_symbol_overview_from_symbol(symbol)
+                symbol_overview_obj_tuple = self.plan_cache.get_symbol_overview_from_symbol(symbol)
 
                 if symbol_overview_obj_tuple is not None:
                     symbol_overview_obj, _ = symbol_overview_obj_tuple
@@ -1181,50 +1177,50 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                underlying_partial_update_symbol_overview_http(updated_symbol_overview))
                     # else not required: happens in some crash recovery
 
-    def _check_n_create_related_models_for_strat(self) -> bool:
-        strat_limits = self._check_n_create_default_strat_limits()
-        if strat_limits is not None:
-            strat_status = self._check_n_create_or_update_strat_status(strat_limits)
+    def _check_n_create_related_models_for_plan(self) -> bool:
+        plan_limits = self._check_n_create_default_plan_limits()
+        if plan_limits is not None:
+            plan_status = self._check_n_create_or_update_plan_status(plan_limits)
 
-            if strat_status is not None:
-                pair_strat_tuple = self.strat_cache.get_pair_strat()
-                if pair_strat_tuple is not None:
-                    pair_strat, _ = pair_strat_tuple
-                    if pair_strat.server_ready_state < 2:
-                        pair_strat.server_ready_state = 2   # indicates to ui that executor server is ready
+            if plan_status is not None:
+                pair_plan_tuple = self.plan_cache.get_pair_plan()
+                if pair_plan_tuple is not None:
+                    pair_plan, _ = pair_plan_tuple
+                    if pair_plan.server_ready_state < 2:
+                        pair_plan.server_ready_state = 2   # indicates to ui that executor server is ready
 
-                        self.update_simulate_config_yaml(pair_strat)
+                        self.update_simulate_config_yaml(pair_plan)
 
-                        strat_state = None
-                        if pair_strat.strat_state == StratState.StratState_SNOOZED:
-                            pair_strat.strat_state = StratState.StratState_READY
-                            # strat_state = StratState.StratState_READY
-                        # else not required: If it's not startup for reload or new strat creation then avoid
+                        plan_state = None
+                        if pair_plan.plan_state == PlanState.PlanState_SNOOZED:
+                            pair_plan.plan_state = PlanState.PlanState_READY
+                            # plan_state = PlanState.PlanState_READY
+                        # else not required: If it's not startup for reload or new plan creation then avoid
 
-                        # setting pair_strat's legs' company name
-                        pair_strat.pair_strat_params.strat_leg1.company = self.leg1_symbol_cache.so.company
-                        pair_strat.pair_strat_params.strat_leg2.company = self.leg2_symbol_cache.so.company
+                        # setting pair_plan's legs' company name
+                        pair_plan.pair_plan_params.plan_leg1.company = self.leg1_symbol_cache.so.company
+                        pair_plan.pair_plan_params.plan_leg2.company = self.leg2_symbol_cache.so.company
 
                         try:
-                            email_book_service_http_client.put_pair_strat_client(pair_strat)
-                            logging.debug(f"pair_strat's server_ready_state set to 2, {pair_strat=}")
+                            email_book_service_http_client.put_pair_plan_client(pair_plan)
+                            logging.debug(f"pair_plan's server_ready_state set to 2, {pair_plan=}")
                             return True
                         except Exception as e:
-                            logging.exception("patch_pair_strat_client failed while setting server_ready_state "
+                            logging.exception("patch_pair_plan_client failed while setting server_ready_state "
                                               f"to 2, retrying in next startup refresh: exception: {e}")
                     # else not required: not updating if already server_ready_state == 2
                 else:
-                    err_str_ = ("Unexpected: Can't find pair_strat object in strat_cache - "
+                    err_str_ = ("Unexpected: Can't find pair_plan object in plan_cache - "
                                 "retrying in next startup refresh")
                     logging.error(err_str_)
         return False
 
-    async def load_strat_cache(self):
-        # updating strat_brief
-        strat_brief_list: List[StratBrief] = \
-            await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_read_strat_brief_http()
-        for strat_brief in strat_brief_list:
-            self.bartering_data_manager.handle_strat_brief_get_all_ws(strat_brief)
+    async def load_plan_cache(self):
+        # updating plan_brief
+        plan_brief_list: List[PlanBrief] = \
+            await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_read_plan_brief_http()
+        for plan_brief in plan_brief_list:
+            self.bartering_data_manager.handle_plan_brief_get_all_ws(plan_brief)
 
         if self.is_crash_recovery:
 
@@ -1254,51 +1250,51 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
 
     def get_hedge_ratio(self) -> float | None:
         """
-        assumes await self.load_strat_cache() is invoked prior to this call (only once at startup)
-        Returns: hedge ratio from pair strat or 1
+        assumes await self.load_plan_cache() is invoked prior to this call (only once at startup)
+        Returns: hedge ratio from pair plan or 1
         """
-        pair_strat: PairStratBaseModel | PairStrat | None = self.strat_cache.get_pair_strat_obj()
-        if not pair_strat:
-            err_str_ = (f"Can't find any pair_strat in cache to create related models for active strat, "
+        pair_plan: PairPlanBaseModel | PairPlan | None = self.plan_cache.get_pair_plan_obj()
+        if not pair_plan:
+            err_str_ = (f"Can't find any pair_plan in cache to create related models for active plan, "
                         f"ignoring model creations, symbol_side_key: "
-                        f"{get_symbol_side_key([(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side)])}")
+                        f"{get_symbol_side_key([(self.plan_leg_1.sec.sec_id, self.plan_leg_1.side)])}")
             logging.error(err_str_)
             return
         hedge_ratio = 1
-        if pair_strat.pair_strat_params:
-            hedge_ratio = pair_strat.pair_strat_params.hedge_ratio
+        if pair_plan.pair_plan_params:
+            hedge_ratio = pair_plan.pair_plan_params.hedge_ratio
             if not hedge_ratio:
-                logging.warning(f"hedge_ratio not found in pair_strat.pair_strat_params, defaulting to 1 for: "
-                                f"{get_symbol_side_key([(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side)])};;;"
-                                f"pair_strat.pair_strat_params: {pair_strat.pair_strat_params}")
+                logging.warning(f"hedge_ratio not found in pair_plan.pair_plan_params, defaulting to 1 for: "
+                                f"{get_symbol_side_key([(self.plan_leg_1.sec.sec_id, self.plan_leg_1.side)])};;;"
+                                f"pair_plan.pair_plan_params: {pair_plan.pair_plan_params}")
                 hedge_ratio = 1
         return hedge_ratio
 
-    async def _create_related_models_for_active_strat(self) -> None:
-        # updating strat_cache
-        await self.load_strat_cache()
+    async def _create_related_models_for_active_plan(self) -> None:
+        # updating plan_cache
+        await self.load_plan_cache()
         hedge_ratio: float = self.get_hedge_ratio()
-        strat_limits_tuple = self.strat_cache.get_strat_limits()
+        plan_limits_tuple = self.plan_cache.get_plan_limits()
 
-        if strat_limits_tuple is not None:
-            strat_limits, _ = strat_limits_tuple
+        if plan_limits_tuple is not None:
+            plan_limits, _ = plan_limits_tuple
 
-            # creating strat_brief for both leg securities
-            await self._check_n_create_strat_brief_for_active_pair_strat(strat_limits, hedge_ratio)
+            # creating plan_brief for both leg securities
+            await self._check_n_create_plan_brief_for_active_pair_plan(plan_limits, hedge_ratio)
             # creating symbol_side_snapshot for both leg securities if not already exists
-            await self._check_n_create_symbol_snapshot_for_active_pair_strat()
+            await self._check_n_create_symbol_snapshot_for_active_pair_plan()
             # changing symbol_overview force_publish to True if exists
-            await self._check_n_force_publish_symbol_overview_for_active_strat()
+            await self._check_n_force_publish_symbol_overview_for_active_plan()
         else:
             err_str_ = (
-                "Can't find any strat_limits in cache to create related models for active strat, "
+                "Can't find any plan_limits in cache to create related models for active plan, "
                 "ignoring model creations, symbol_side_key: "
-                f"{get_symbol_side_key([(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side)])}")
+                f"{get_symbol_side_key([(self.plan_leg_1.sec.sec_id, self.plan_leg_1.side)])}")
             logging.error(err_str_)
             return
 
-        logging.info(f"Updated Strat to active: "
-                     f"{get_symbol_side_key([(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side)])}")
+        logging.info(f"Updated Plan to active: "
+                     f"{get_symbol_side_key([(self.plan_leg_1.sec.sec_id, self.plan_leg_1.side)])}")
 
     async def read_all_ui_layout_pre(self):
         await self.read_all_ui_layout_pre_handler()
@@ -1306,68 +1302,68 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
     ############################
     # Limit Check update methods
     ############################
-    def check_consumable_cxl_qty(self, updated_strat_status: StratStatusBaseModel, strat_limits: StratLimits,
+    def check_consumable_cxl_qty(self, updated_plan_status: PlanStatusBaseModel, plan_limits: PlanLimits,
                                  symbol_side_snapshot_: SymbolSideSnapshot,
                                  single_side_bartering_brief: PairSideBarteringBrief, side: Side):
         if single_side_bartering_brief.all_bkr_cxlled_qty > 0:
             if (consumable_cxl_qty := single_side_bartering_brief.consumable_cxl_qty) < 0:
                 err_str_ = (f"Consumable cxl qty can't be < 0, currently is {consumable_cxl_qty} "
                             f"for symbol {single_side_bartering_brief.security.sec_id} and side {side} - pausing "
-                            f"this strat")
+                            f"this plan")
                 alert_brief: str = err_str_
-                alert_details: str = f"{updated_strat_status=}, {strat_limits=}, {symbol_side_snapshot_=}"
+                alert_details: str = f"{updated_plan_status=}, {plan_limits=}, {symbol_side_snapshot_=}"
                 logging.critical(f"{alert_brief}, symbol_side_snapshot_key: "
                                  f"{get_symbol_side_snapshot_log_key(symbol_side_snapshot_)};;;{alert_details}")
-                return False  # check failed - caller should pause strat
+                return False  # check failed - caller should pause plan
             # else not required: if consumable_cxl_qty is allowed then ignore
         # else not required: if there is not even a single chore of {side} then consumable_cxl_qty will
         # become 0 in that case too, so ignore if all_bkr_cxlled_qty is 0
         return True  # check passed
 
-    async def _pause_strat_if_limits_breached(self, updated_strat_status: StratStatusBaseModel,
-                                              strat_limits: StratLimits, strat_brief_: StratBrief,
+    async def _pause_plan_if_limits_breached(self, updated_plan_status: PlanStatusBaseModel,
+                                              plan_limits: PlanLimits, plan_brief_: PlanBrief,
                                               symbol_side_snapshot_: SymbolSideSnapshot, is_cxl: bool = False):
-        pause_strat: bool = False
-        if (residual_notional := updated_strat_status.residual.residual_notional) is not None:
-            if residual_notional > (max_residual := strat_limits.residual_restriction.max_residual):
+        pause_plan: bool = False
+        if (residual_notional := updated_plan_status.residual.residual_notional) is not None:
+            if residual_notional > (max_residual := plan_limits.residual_restriction.max_residual):
                 alert_brief: str = (f"{residual_notional=} > {max_residual=} - "
-                                    f"pausing this strat")
-                alert_details: str = f"{updated_strat_status=}, {strat_limits=}"
+                                    f"pausing this plan")
+                alert_details: str = f"{updated_plan_status=}, {plan_limits=}"
                 logging.critical(f"{alert_brief}, symbol_side_snapshot_key: "
                                  f"{get_symbol_side_snapshot_log_key(symbol_side_snapshot_)};;; {alert_details}")
-                pause_strat = True
+                pause_plan = True
             # else not required: if residual is in control then nothing to do
 
-        if not pause_strat and is_cxl and (
-                symbol_side_snapshot_.chore_count > strat_limits.cancel_rate.waived_initial_chores):
+        if not pause_plan and is_cxl and (
+                symbol_side_snapshot_.chore_count > plan_limits.cancel_rate.waived_initial_chores):
             symbol = symbol_side_snapshot_.security.sec_id
             side = symbol_side_snapshot_.side
             min_notional_condition_met: bool = False
-            if (strat_limits.cancel_rate.waived_min_rolling_period_seconds and
-                    strat_limits.cancel_rate.waived_min_rolling_notional and
-                    strat_limits.cancel_rate.waived_min_rolling_notional > 0):
+            if (plan_limits.cancel_rate.waived_min_rolling_period_seconds and
+                    plan_limits.cancel_rate.waived_min_rolling_notional and
+                    plan_limits.cancel_rate.waived_min_rolling_notional > 0):
                 last_n_sec_chore_qty = await self.get_last_n_sec_chore_qty(
-                    symbol, side, strat_limits.cancel_rate.waived_min_rolling_period_seconds)
-                logging.debug(f"_update_strat_status_from_fill_journal: {last_n_sec_chore_qty=}, {symbol=}, {side=}")
+                    symbol, side, plan_limits.cancel_rate.waived_min_rolling_period_seconds)
+                logging.debug(f"_update_plan_status_from_fill_journal: {last_n_sec_chore_qty=}, {symbol=}, {side=}")
                 if (last_n_sec_chore_qty * self.get_usd_px(symbol_side_snapshot_.avg_px, symbol) >
-                        strat_limits.cancel_rate.waived_min_rolling_notional):
+                        plan_limits.cancel_rate.waived_min_rolling_notional):
                     min_notional_condition_met = True
             else:
                 min_notional_condition_met = True  # min notional condition not imposed
             if min_notional_condition_met:
                 if symbol_side_snapshot_.side == Side.BUY:
-                    pause_strat = not (self.check_consumable_cxl_qty(updated_strat_status, strat_limits,
+                    pause_plan = not (self.check_consumable_cxl_qty(updated_plan_status, plan_limits,
                                                                      symbol_side_snapshot_,
-                                                                     strat_brief_.pair_buy_side_bartering_brief,
+                                                                     plan_brief_.pair_buy_side_bartering_brief,
                                                                      Side.BUY))
                 else:
-                    pause_strat = not (self.check_consumable_cxl_qty(updated_strat_status, strat_limits,
+                    pause_plan = not (self.check_consumable_cxl_qty(updated_plan_status, plan_limits,
                                                                      symbol_side_snapshot_,
-                                                                     strat_brief_.pair_sell_side_bartering_brief,
+                                                                     plan_brief_.pair_sell_side_bartering_brief,
                                                                      Side.SELL))
-        # else not required: no further pause_strat eval needed
-        if pause_strat:
-            self.pause_strat()
+        # else not required: no further pause_plan eval needed
+        if pause_plan:
+            self.pause_plan()
 
     ####################################
     # Get specific Data handling Methods
@@ -1380,30 +1376,30 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                 (other_leg_tob_obj.last_barter.px, other_leg_tob_obj.symbol))
 
     def get_cached_top_of_book_from_symbol(self, symbol: str):
-        if self.strat_leg_1.sec.sec_id == symbol:
+        if self.plan_leg_1.sec.sec_id == symbol:
             return self.leg1_symbol_cache.top_of_book
         else:
             return self.leg2_symbol_cache.top_of_book
 
-    def __get_residual_obj(self, side: Side, strat_brief: StratBrief) -> Residual | None:
+    def __get_residual_obj(self, side: Side, plan_brief: PlanBrief) -> Residual | None:
         if side == Side.BUY:
-            residual_qty = strat_brief.pair_buy_side_bartering_brief.residual_qty
-            other_leg_residual_qty = strat_brief.pair_sell_side_bartering_brief.residual_qty
+            residual_qty = plan_brief.pair_buy_side_bartering_brief.residual_qty
+            other_leg_residual_qty = plan_brief.pair_sell_side_bartering_brief.residual_qty
             top_of_book_obj = \
-                self.get_cached_top_of_book_from_symbol(strat_brief.pair_buy_side_bartering_brief.security.sec_id)
+                self.get_cached_top_of_book_from_symbol(plan_brief.pair_buy_side_bartering_brief.security.sec_id)
             other_leg_top_of_book = \
-                self.get_cached_top_of_book_from_symbol(strat_brief.pair_sell_side_bartering_brief.security.sec_id)
+                self.get_cached_top_of_book_from_symbol(plan_brief.pair_sell_side_bartering_brief.security.sec_id)
         else:
-            residual_qty = strat_brief.pair_sell_side_bartering_brief.residual_qty
-            other_leg_residual_qty = strat_brief.pair_buy_side_bartering_brief.residual_qty
+            residual_qty = plan_brief.pair_sell_side_bartering_brief.residual_qty
+            other_leg_residual_qty = plan_brief.pair_buy_side_bartering_brief.residual_qty
             top_of_book_obj = \
-                self.get_cached_top_of_book_from_symbol(strat_brief.pair_sell_side_bartering_brief.security.sec_id)
+                self.get_cached_top_of_book_from_symbol(plan_brief.pair_sell_side_bartering_brief.security.sec_id)
             other_leg_top_of_book = \
-                self.get_cached_top_of_book_from_symbol(strat_brief.pair_buy_side_bartering_brief.security.sec_id)
+                self.get_cached_top_of_book_from_symbol(plan_brief.pair_buy_side_bartering_brief.security.sec_id)
 
         if top_of_book_obj is None or other_leg_top_of_book is None:
             logging.error(f"Received both leg's TOBs as {top_of_book_obj} and {other_leg_top_of_book}, "
-                          f"strat_brief_key: {get_strat_brief_log_key(strat_brief)}")
+                          f"plan_brief_key: {get_plan_brief_log_key(plan_brief)}")
             return None
 
         # since unit value is used make function
@@ -1420,15 +1416,15 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                                top_of_book_obj.symbol)) > \
                     (other_leg_residual_qty * self.get_usd_px(other_leg_top_of_book.last_barter.px,
                                                               other_leg_top_of_book.symbol)):
-                residual_security = strat_brief.pair_buy_side_bartering_brief.security
+                residual_security = plan_brief.pair_buy_side_bartering_brief.security
             else:
-                residual_security = strat_brief.pair_sell_side_bartering_brief.security
+                residual_security = plan_brief.pair_sell_side_bartering_brief.security
         else:
             if (residual_qty * top_of_book_obj.last_barter.px) > \
                     (other_leg_residual_qty * other_leg_top_of_book.last_barter.px):
-                residual_security = strat_brief.pair_sell_side_bartering_brief.security
+                residual_security = plan_brief.pair_sell_side_bartering_brief.security
             else:
-                residual_security = strat_brief.pair_buy_side_bartering_brief.security
+                residual_security = plan_brief.pair_buy_side_bartering_brief.security
 
         if residual_notional > 0:
             updated_residual = Residual(security=residual_security, residual_notional=residual_notional)
@@ -1440,12 +1436,12 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
     async def get_last_n_sec_chore_qty(self, symbol: str, side: Side, last_n_sec: int) -> int | None:
         last_n_sec_chore_qty: int | None = None
         if last_n_sec == 0:
-            symbol_side_snapshots_tuple = self.strat_cache.get_symbol_side_snapshot_from_symbol(symbol)
+            symbol_side_snapshots_tuple = self.plan_cache.get_symbol_side_snapshot_from_symbol(symbol)
             if symbol_side_snapshots_tuple is not None:
                 symbol_side_snapshot, _ = symbol_side_snapshots_tuple
                 last_n_sec_chore_qty = symbol_side_snapshot.total_qty
             else:
-                err_str_ = f"Received symbol_side_snapshots_tuple as None from strat_cache, symbol_side_key: " \
+                err_str_ = f"Received symbol_side_snapshots_tuple as None from plan_cache, symbol_side_key: " \
                            f"{get_symbol_side_key([(symbol, side)])}"
                 logging.exception(err_str_)
         else:
@@ -1465,14 +1461,14 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         return last_n_sec_chore_qty
 
     async def get_last_n_sec_barter_qty(self, symbol: str, side: Side) -> int | None:
-        strat_limits_tuple = self.strat_cache.get_strat_limits()
+        plan_limits_tuple = self.plan_cache.get_plan_limits()
 
         last_n_sec_barter_qty: int | None = None
-        if strat_limits_tuple is not None:
-            strat_limits, _ = strat_limits_tuple
+        if plan_limits_tuple is not None:
+            plan_limits, _ = plan_limits_tuple
 
-            if strat_limits is not None:
-                applicable_period_seconds = strat_limits.market_barter_volume_participation.applicable_period_seconds
+            if plan_limits is not None:
+                applicable_period_seconds = plan_limits.market_barter_volume_participation.applicable_period_seconds
                 last_n_sec_market_barter_vol_obj_list = \
                     await (StreetBookServiceRoutesCallbackBaseNativeOverride.
                            underlying_get_last_n_sec_total_barter_qty_query_http(symbol, applicable_period_seconds))
@@ -1487,14 +1483,14 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                   f"get_last_n_sec_total_barter_qty_query pre impl")
         else:
             err_str_ = (
-                "Can't find any strat_limits in cache to get last_n_sec barter qty, "
+                "Can't find any plan_limits in cache to get last_n_sec barter qty, "
                 "ignoring model creations, symbol_side_key: "
-                f"{get_symbol_side_key([(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side)])}")
+                f"{get_symbol_side_key([(self.plan_leg_1.sec.sec_id, self.plan_leg_1.side)])}")
             logging.error(err_str_)
         return last_n_sec_barter_qty
 
     ######################################
-    # Strat lvl models update pre handling
+    # Plan lvl models update pre handling
     ######################################
 
     async def create_admin_control_pre(self, admin_control_obj: AdminControl):
@@ -1507,102 +1503,102 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             case other_:
                 logging.error(f"create_admin_control_pre failed. unrecognized command_type: {other_}")
 
-    async def _update_strat_limits_pre(self, stored_strat_limits_obj: StratLimits,
-                                       updated_strat_limits_obj: StratLimits):
-        stored_strat_status_obj: StratStatus = await (
-            StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_read_strat_status_by_id_http(
-                stored_strat_limits_obj.id))
-        await self._compute_n_update_max_notionals(stored_strat_limits_obj, updated_strat_limits_obj,
-                                                   stored_strat_status_obj)
+    async def _update_plan_limits_pre(self, stored_plan_limits_obj: PlanLimits,
+                                       updated_plan_limits_obj: PlanLimits):
+        stored_plan_status_obj: PlanStatus = await (
+            StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_read_plan_status_by_id_http(
+                stored_plan_limits_obj.id))
+        await self._compute_n_update_max_notionals(stored_plan_limits_obj, updated_plan_limits_obj,
+                                                   stored_plan_status_obj)
 
-    async def update_strat_limits_pre(self, stored_strat_limits_obj: StratLimits,
-                                      updated_strat_limits_obj: StratLimits):
+    async def update_plan_limits_pre(self, stored_plan_limits_obj: PlanLimits,
+                                      updated_plan_limits_obj: PlanLimits):
         if not self.service_ready:
             # raise service unavailable 503 exception, let the caller retry
-            err_str_ = "update_strat_limits_pre not ready - service is not initialized yet, " \
-                       f"symbol_side_key: {get_symbol_side_key([(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side)])}"
+            err_str_ = "update_plan_limits_pre not ready - service is not initialized yet, " \
+                       f"symbol_side_key: {get_symbol_side_key([(self.plan_leg_1.sec.sec_id, self.plan_leg_1.side)])}"
             logging.error(err_str_)
             raise HTTPException(status_code=503, detail=err_str_)
 
-        await self._update_strat_limits_pre(stored_strat_limits_obj, updated_strat_limits_obj)
-        if updated_strat_limits_obj.strat_limits_update_seq_num is None:
-            updated_strat_limits_obj.strat_limits_update_seq_num = 0
-        updated_strat_limits_obj.strat_limits_update_seq_num += 1
-        return updated_strat_limits_obj
+        await self._update_plan_limits_pre(stored_plan_limits_obj, updated_plan_limits_obj)
+        if updated_plan_limits_obj.plan_limits_update_seq_num is None:
+            updated_plan_limits_obj.plan_limits_update_seq_num = 0
+        updated_plan_limits_obj.plan_limits_update_seq_num += 1
+        return updated_plan_limits_obj
 
-    async def partial_update_strat_limits_pre(self, stored_strat_limits_dict: Dict,
-                                              updated_strat_limits_obj_json: Dict):
+    async def partial_update_plan_limits_pre(self, stored_plan_limits_dict: Dict,
+                                              updated_plan_limits_obj_json: Dict):
         if not self.service_ready:
             # raise service unavailable 503 exception, let the caller retry
-            err_str_ = "update_strat_limits_pre not ready - service is not initialized yet, " \
-                       f"symbol_side_key: {get_symbol_side_key([(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side)])}"
+            err_str_ = "update_plan_limits_pre not ready - service is not initialized yet, " \
+                       f"symbol_side_key: {get_symbol_side_key([(self.plan_leg_1.sec.sec_id, self.plan_leg_1.side)])}"
             logging.error(err_str_)
             raise HTTPException(status_code=503, detail=err_str_)
 
         original_eligible_brokers = []
-        if (eligible_brokers := updated_strat_limits_obj_json.get("eligible_brokers")) is not None:
+        if (eligible_brokers := updated_plan_limits_obj_json.get("eligible_brokers")) is not None:
             original_eligible_brokers = copy.deepcopy(eligible_brokers)
 
         updated_obj_dict = compare_n_patch_dict(
-            copy.deepcopy(stored_strat_limits_dict), updated_strat_limits_obj_json)
-        stored_strat_limits_obj = StratLimitsOptional.from_dict(stored_strat_limits_dict)
-        updated_strat_limits_obj = StratLimitsOptional.from_dict(updated_obj_dict)
-        await self._update_strat_limits_pre(stored_strat_limits_obj, updated_strat_limits_obj)
-        updated_strat_limits_obj_json = updated_strat_limits_obj.to_dict(exclude_none=True)
-        updated_strat_limits_obj_json["eligible_brokers"] = original_eligible_brokers
+            copy.deepcopy(stored_plan_limits_dict), updated_plan_limits_obj_json)
+        stored_plan_limits_obj = PlanLimitsOptional.from_dict(stored_plan_limits_dict)
+        updated_plan_limits_obj = PlanLimitsOptional.from_dict(updated_obj_dict)
+        await self._update_plan_limits_pre(stored_plan_limits_obj, updated_plan_limits_obj)
+        updated_plan_limits_obj_json = updated_plan_limits_obj.to_dict(exclude_none=True)
+        updated_plan_limits_obj_json["eligible_brokers"] = original_eligible_brokers
 
-        if stored_strat_limits_obj.strat_limits_update_seq_num is None:
-            stored_strat_limits_obj.strat_limits_update_seq_num = 0
-        updated_strat_limits_obj_json[
-            "strat_limits_update_seq_num"] = stored_strat_limits_obj.strat_limits_update_seq_num + 1
-        return updated_strat_limits_obj_json
+        if stored_plan_limits_obj.plan_limits_update_seq_num is None:
+            stored_plan_limits_obj.plan_limits_update_seq_num = 0
+        updated_plan_limits_obj_json[
+            "plan_limits_update_seq_num"] = stored_plan_limits_obj.plan_limits_update_seq_num + 1
+        return updated_plan_limits_obj_json
 
-    async def _update_strat_status_pre(self, updated_strat_status_obj: StratStatus):
-        await self._compute_n_update_average_premium(updated_strat_status_obj)
+    async def _update_plan_status_pre(self, updated_plan_status_obj: PlanStatus):
+        await self._compute_n_update_average_premium(updated_plan_status_obj)
 
-    async def update_strat_status_pre(self, updated_strat_status_obj: StratStatus):
+    async def update_plan_status_pre(self, updated_plan_status_obj: PlanStatus):
         if not self.service_ready:
             # raise service unavailable 503 exception, let the caller retry
-            err_str_ = "update_strat_status_pre not ready - service is not initialized yet, " \
-                       f"symbol_side_key: {get_symbol_side_key([(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side)])}"
+            err_str_ = "update_plan_status_pre not ready - service is not initialized yet, " \
+                       f"symbol_side_key: {get_symbol_side_key([(self.plan_leg_1.sec.sec_id, self.plan_leg_1.side)])}"
             logging.error(err_str_)
             raise HTTPException(status_code=503, detail=err_str_)
-        await self._update_strat_status_pre(updated_strat_status_obj)
+        await self._update_plan_status_pre(updated_plan_status_obj)
 
-        if updated_strat_status_obj.strat_status_update_seq_num is None:
-            updated_strat_status_obj.strat_status_update_seq_num = 0
-        updated_strat_status_obj.strat_status_update_seq_num += 1
-        updated_strat_status_obj.last_update_date_time = DateTime.utcnow()
+        if updated_plan_status_obj.plan_status_update_seq_num is None:
+            updated_plan_status_obj.plan_status_update_seq_num = 0
+        updated_plan_status_obj.plan_status_update_seq_num += 1
+        updated_plan_status_obj.last_update_date_time = DateTime.utcnow()
 
-        return updated_strat_status_obj
+        return updated_plan_status_obj
 
-    async def handle_strat_activate_query_pre(self, handle_strat_activate_class_type: Type[HandleStratActivate]):
-        await self._create_related_models_for_active_strat()
+    async def handle_plan_activate_query_pre(self, handle_plan_activate_class_type: Type[HandlePlanActivate]):
+        await self._create_related_models_for_active_plan()
         return []
 
-    async def partial_update_strat_status_pre(self, stored_strat_status_obj_json: Dict[str, Any],
-                                              updated_strat_status_obj_json: Dict[str, Any]):
+    async def partial_update_plan_status_pre(self, stored_plan_status_obj_json: Dict[str, Any],
+                                              updated_plan_status_obj_json: Dict[str, Any]):
         if not self.service_ready:
             # raise service unavailable 503 exception, let the caller retry
-            err_str_ = "update_strat_status_pre not ready - service is not initialized yet, " \
-                       f"symbol_side_key: {get_symbol_side_key([(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side)])}"
+            err_str_ = "update_plan_status_pre not ready - service is not initialized yet, " \
+                       f"symbol_side_key: {get_symbol_side_key([(self.plan_leg_1.sec.sec_id, self.plan_leg_1.side)])}"
             logging.error(err_str_)
             raise HTTPException(status_code=503, detail=err_str_)
 
-        updated_obj_dict = compare_n_patch_dict(copy.deepcopy(stored_strat_status_obj_json),
-                                                         updated_strat_status_obj_json)
-        updated_strat_status_obj = StratStatus.from_dict(updated_obj_dict)
-        await self._update_strat_status_pre(updated_strat_status_obj)
-        updated_strat_status_obj_json = updated_strat_status_obj.to_dict(exclude_none=True)
+        updated_obj_dict = compare_n_patch_dict(copy.deepcopy(stored_plan_status_obj_json),
+                                                         updated_plan_status_obj_json)
+        updated_plan_status_obj = PlanStatus.from_dict(updated_obj_dict)
+        await self._update_plan_status_pre(updated_plan_status_obj)
+        updated_plan_status_obj_json = updated_plan_status_obj.to_dict(exclude_none=True)
 
-        strat_status_update_seq_num = stored_strat_status_obj_json.get("strat_status_update_seq_num")
-        if strat_status_update_seq_num is None:
-            strat_status_update_seq_num = 0
-        updated_strat_status_obj_json[
-            "strat_status_update_seq_num"] = strat_status_update_seq_num + 1
-        updated_strat_status_obj_json["last_update_date_time"] = DateTime.utcnow()
+        plan_status_update_seq_num = stored_plan_status_obj_json.get("plan_status_update_seq_num")
+        if plan_status_update_seq_num is None:
+            plan_status_update_seq_num = 0
+        updated_plan_status_obj_json[
+            "plan_status_update_seq_num"] = plan_status_update_seq_num + 1
+        updated_plan_status_obj_json["last_update_date_time"] = DateTime.utcnow()
 
-        return updated_strat_status_obj_json
+        return updated_plan_status_obj_json
 
     ##############################
     # Chore Journal Update Methods
@@ -1612,7 +1608,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         await self.handle_create_chore_journal_pre(chore_journal_obj)
 
     async def create_chore_journal_post(self, chore_journal_obj: ChoreJournal):
-        # updating bartering_data_manager's strat_cache
+        # updating bartering_data_manager's plan_cache
         self.bartering_data_manager.handle_chore_journal_get_all_ws(chore_journal_obj)
 
         async with StreetBookServiceRoutesCallbackBaseNativeOverride.journal_shared_lock:
@@ -1620,10 +1616,10 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             is_cxl_after_cxl: bool = False
             if res is not None:
                 if len(res) == 3:
-                    chore_snapshot, strat_brief, portfolio_status_updates = res
-                    # Updating and checking portfolio_limits in portfolio_manager
-                    post_book_service_http_client.check_portfolio_limits_query_client(
-                        self.pair_strat_id, chore_journal_obj, chore_snapshot, strat_brief, portfolio_status_updates)
+                    chore_snapshot, plan_brief, contact_status_updates = res
+                    # Updating and checking contact_limits in contact_manager
+                    post_book_service_http_client.check_contact_limits_query_client(
+                        self.pair_plan_id, chore_journal_obj, chore_snapshot, plan_brief, contact_status_updates)
                 elif len(res) == 1:
                     is_cxl_after_cxl = res[0]
                     if not is_cxl_after_cxl:
@@ -1636,7 +1632,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                 logging.error(f"_update_chore_snapshot_from_chore_journal failed for key: "
                               f"{StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_journal_log_key(chore_journal_obj)};;;{chore_journal_obj=}")
             # signifies some unexpected exception occurred so complete update was not done,
-            # therefore avoiding portfolio_limit checks too
+            # therefore avoiding contact_limit checks too
 
     async def create_chore_snapshot_pre(self, chore_snapshot_obj: ChoreSnapshot):
         await self.handle_create_chore_snapshot_pre(chore_snapshot_obj)
@@ -1652,19 +1648,19 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             symbol_side_snapshot = await self._create_update_symbol_side_snapshot_from_chore_journal(
                 chore_journal_obj, chore_snapshot)
             if symbol_side_snapshot is not None:
-                updated_strat_brief = (
-                    await self._update_strat_brief_from_chore_or_fill(chore_journal_obj, chore_snapshot,
+                updated_plan_brief = (
+                    await self._update_plan_brief_from_chore_or_fill(chore_journal_obj, chore_snapshot,
                                                                       symbol_side_snapshot))
-                if updated_strat_brief is not None:
-                    await self._update_strat_status_from_chore_journal(
-                        chore_journal_obj, chore_snapshot, symbol_side_snapshot, updated_strat_brief)
-                # else not required: if updated_strat_brief is None then it means some error occurred in
-                # _update_strat_brief_from_chore which would have got added to alert already
-                portfolio_status_updates: PortfolioStatusUpdatesContainer | None = (
-                    await self._update_portfolio_status_from_chore_journal(
+                if updated_plan_brief is not None:
+                    await self._update_plan_status_from_chore_journal(
+                        chore_journal_obj, chore_snapshot, symbol_side_snapshot, updated_plan_brief)
+                # else not required: if updated_plan_brief is None then it means some error occurred in
+                # _update_plan_brief_from_chore which would have got added to alert already
+                contact_status_updates: ContactStatusUpdatesContainer | None = (
+                    await self._update_contact_status_from_chore_journal(
                         chore_journal_obj, chore_snapshot))
 
-                return chore_snapshot, updated_strat_brief, portfolio_status_updates
+                return chore_snapshot, updated_plan_brief, contact_status_updates
 
             # else not required: if symbol_side_snapshot is None then it means some error occurred in
             # _create_update_symbol_side_snapshot_from_chore_journal which would have got added to
@@ -1679,27 +1675,27 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             await self._create_update_symbol_side_snapshot_from_chore_journal(chore_journal_obj,
                                                                               chore_snapshot)
         if symbol_side_snapshot is not None:
-            updated_strat_brief = (
-                await self._update_strat_brief_from_chore_or_fill(chore_journal_obj,
+            updated_plan_brief = (
+                await self._update_plan_brief_from_chore_or_fill(chore_journal_obj,
                                                                   chore_snapshot,
                                                                   symbol_side_snapshot))
-            if updated_strat_brief is not None:
-                await self._update_strat_status_from_chore_journal(
+            if updated_plan_brief is not None:
+                await self._update_plan_status_from_chore_journal(
                     chore_journal_obj, chore_snapshot, symbol_side_snapshot,
-                    updated_strat_brief)
-            # else not required: if updated_strat_brief is None then it means some error occurred in
-            # _update_strat_brief_from_chore which would have got added to alert already
-            portfolio_status_updates: PortfolioStatusUpdatesContainer = (
-                await self._update_portfolio_status_from_chore_journal(
+                    updated_plan_brief)
+            # else not required: if updated_plan_brief is None then it means some error occurred in
+            # _update_plan_brief_from_chore which would have got added to alert already
+            contact_status_updates: ContactStatusUpdatesContainer = (
+                await self._update_contact_status_from_chore_journal(
                     chore_journal_obj, chore_snapshot))
-            return chore_snapshot, updated_strat_brief, portfolio_status_updates
+            return chore_snapshot, updated_plan_brief, contact_status_updates
         return None, None, None
 
     def update_chore_snapshot_pre_checks(self) -> bool:
-        pair_strat = self.strat_cache.get_pair_strat_obj()
+        pair_plan = self.plan_cache.get_pair_plan_obj()
 
-        if not is_ongoing_strat(pair_strat):
-            # avoiding any update if strat is non-ongoing
+        if not is_ongoing_plan(pair_plan):
+            # avoiding any update if plan is non-ongoing
             return False
         return True
 
@@ -1709,19 +1705,19 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             await self._create_update_symbol_side_snapshot_from_chore_journal(chore_journal_obj,
                                                                               chore_snapshot)
         if symbol_side_snapshot is not None:
-            updated_strat_brief = await self._update_strat_brief_from_chore_or_fill(chore_journal_obj,
+            updated_plan_brief = await self._update_plan_brief_from_chore_or_fill(chore_journal_obj,
                                                                                     chore_snapshot,
                                                                                     symbol_side_snapshot)
-            if updated_strat_brief is not None:
-                await self._update_strat_status_from_chore_journal(chore_journal_obj, chore_snapshot,
-                                                                   symbol_side_snapshot, updated_strat_brief)
-            # else not required: if updated_strat_brief is None then it means some error occurred in
-            # _update_strat_brief_from_chore which would have got added to alert already
-            portfolio_status_updates: PortfolioStatusUpdatesContainer | None = (
-                await self._update_portfolio_status_from_chore_journal(
+            if updated_plan_brief is not None:
+                await self._update_plan_status_from_chore_journal(chore_journal_obj, chore_snapshot,
+                                                                   symbol_side_snapshot, updated_plan_brief)
+            # else not required: if updated_plan_brief is None then it means some error occurred in
+            # _update_plan_brief_from_chore which would have got added to alert already
+            contact_status_updates: ContactStatusUpdatesContainer | None = (
+                await self._update_contact_status_from_chore_journal(
                     chore_journal_obj, chore_snapshot))
 
-            return chore_snapshot, updated_strat_brief, portfolio_status_updates
+            return chore_snapshot, updated_plan_brief, contact_status_updates
         # else not require_create_update_symbol_side_snapshot_from_chore_journald: if symbol_side_snapshot
         # is None then it means some error occurred in _create_update_symbol_side_snapshot_from_chore_journal
         # which would have got added to alert already
@@ -1744,19 +1740,19 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             await self._create_update_symbol_side_snapshot_from_chore_journal(chore_journal_obj,
                                                                               chore_snapshot)
         if symbol_side_snapshot is not None:
-            updated_strat_brief = (
-                await self._update_strat_brief_from_chore_or_fill(chore_journal_obj, chore_snapshot,
+            updated_plan_brief = (
+                await self._update_plan_brief_from_chore_or_fill(chore_journal_obj, chore_snapshot,
                                                                   symbol_side_snapshot))
-            if updated_strat_brief is not None:
-                await self._update_strat_status_from_chore_journal(
-                    chore_journal_obj, chore_snapshot, symbol_side_snapshot, updated_strat_brief)
-            # else not required: if updated_strat_brief is None then it means some error occurred in
-            # _update_strat_brief_from_chore which would have got added to alert already
-            portfolio_status_updates: PortfolioStatusUpdatesContainer = (
-                await self._update_portfolio_status_from_chore_journal(
+            if updated_plan_brief is not None:
+                await self._update_plan_status_from_chore_journal(
+                    chore_journal_obj, chore_snapshot, symbol_side_snapshot, updated_plan_brief)
+            # else not required: if updated_plan_brief is None then it means some error occurred in
+            # _update_plan_brief_from_chore which would have got added to alert already
+            contact_status_updates: ContactStatusUpdatesContainer = (
+                await self._update_contact_status_from_chore_journal(
                     chore_journal_obj, chore_snapshot))
 
-            return chore_snapshot, updated_strat_brief, portfolio_status_updates
+            return chore_snapshot, updated_plan_brief, contact_status_updates
         # else not require_create_update_symbol_side_snapshot_from_chore_journald:
         # if symbol_side_snapshot is None then it means some error occurred in
         # _create_update_symbol_side_snapshot_from_chore_journal which would have
@@ -1768,18 +1764,18 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             await self._create_update_symbol_side_snapshot_from_chore_journal(chore_journal_obj,
                                                                               chore_snapshot)
         if symbol_side_snapshot is not None:
-            updated_strat_brief = (
-                await self._update_strat_brief_from_chore_or_fill(chore_journal_obj, chore_snapshot,
+            updated_plan_brief = (
+                await self._update_plan_brief_from_chore_or_fill(chore_journal_obj, chore_snapshot,
                                                                   symbol_side_snapshot))
-            if updated_strat_brief is not None:
-                await self._update_strat_status_from_chore_journal(
-                    chore_journal_obj, chore_snapshot, symbol_side_snapshot, updated_strat_brief)
-            # else not required: if updated_strat_brief is None then it means some error occurred in
-            # _update_strat_brief_from_chore which would have got added to alert already
-            portfolio_status_updates: PortfolioStatusUpdatesContainer = (
-                await self._update_portfolio_status_from_chore_journal(
+            if updated_plan_brief is not None:
+                await self._update_plan_status_from_chore_journal(
+                    chore_journal_obj, chore_snapshot, symbol_side_snapshot, updated_plan_brief)
+            # else not required: if updated_plan_brief is None then it means some error occurred in
+            # _update_plan_brief_from_chore which would have got added to alert already
+            contact_status_updates: ContactStatusUpdatesContainer = (
+                await self._update_contact_status_from_chore_journal(
                     chore_journal_obj, chore_snapshot))
-            return chore_snapshot, updated_strat_brief, portfolio_status_updates
+            return chore_snapshot, updated_plan_brief, contact_status_updates
         # else not require_create_update_symbol_side_snapshot_from_chore_journald:
         # if symbol_side_snapshot is None then it means some error occurred in
         # _create_update_symbol_side_snapshot_from_chore_journal which would have
@@ -1896,7 +1892,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             self, chore_journal: ChoreJournal, chore_snapshot_obj: ChoreSnapshot) -> SymbolSideSnapshot | None:
         async with SymbolSideSnapshot.reentrant_lock:
             symbol_side_snapshot_objs = (
-                self.strat_cache.get_symbol_side_snapshot_from_symbol(chore_journal.chore.security.sec_id))
+                self.plan_cache.get_symbol_side_snapshot_from_symbol(chore_journal.chore.security.sec_id))
 
             # If no symbol_side_snapshot for symbol-side of received chore_journal
             if symbol_side_snapshot_objs is None:
@@ -2068,7 +2064,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                         updated_symbol_side_snapshot_obj.last_update_date_time = chore_journal.chore_event_date_time
 
                     case other_:
-                        err_str_ = f"Unsupported StratEventType for symbol_side_snapshot update {other_} " \
+                        err_str_ = f"Unsupported PlanEventType for symbol_side_snapshot update {other_} " \
                                    f"{StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_journal_log_key(chore_journal)}"
                         logging.error(err_str_)
                         return
@@ -2079,75 +2075,75 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                            underlying_partial_update_symbol_side_snapshot_http(updated_symbol_side_snapshot_obj_dict))
                 return updated_symbol_side_snapshot_obj
 
-    def _handle_cxl_qty_in_strat_status_buy_side(
-            self, update_strat_status_obj: StratStatus, chore_snapshot: ChoreSnapshot,
+    def _handle_cxl_qty_in_plan_status_buy_side(
+            self, update_plan_status_obj: PlanStatus, chore_snapshot: ChoreSnapshot,
             chore_journal_obj: ChoreJournal, cxled_qty: int):
-        update_strat_status_obj.total_open_buy_qty -= cxled_qty
-        update_strat_status_obj.total_open_buy_notional -= \
+        update_plan_status_obj.total_open_buy_qty -= cxled_qty
+        update_plan_status_obj.total_open_buy_notional -= \
             (cxled_qty * self.get_usd_px(chore_snapshot.chore_brief.px,
                                          chore_snapshot.chore_brief.security.sec_id))
-        update_strat_status_obj.total_cxl_buy_qty += int(cxled_qty)
-        update_strat_status_obj.total_cxl_buy_notional += \
+        update_plan_status_obj.total_cxl_buy_qty += int(cxled_qty)
+        update_plan_status_obj.total_cxl_buy_notional += \
             cxled_qty * self.get_usd_px(chore_snapshot.chore_brief.px,
                                         chore_snapshot.chore_brief.security.sec_id)
-        update_strat_status_obj.avg_cxl_buy_px = (
-            (self.get_local_px_or_notional(update_strat_status_obj.total_cxl_buy_notional,
-                                           chore_journal_obj.chore.security.sec_id) / update_strat_status_obj.total_cxl_buy_qty)
-            if update_strat_status_obj.total_cxl_buy_qty != 0 else 0)
-        update_strat_status_obj.total_cxl_exposure = \
-            update_strat_status_obj.total_cxl_buy_notional - \
-            update_strat_status_obj.total_cxl_sell_notional
+        update_plan_status_obj.avg_cxl_buy_px = (
+            (self.get_local_px_or_notional(update_plan_status_obj.total_cxl_buy_notional,
+                                           chore_journal_obj.chore.security.sec_id) / update_plan_status_obj.total_cxl_buy_qty)
+            if update_plan_status_obj.total_cxl_buy_qty != 0 else 0)
+        update_plan_status_obj.total_cxl_exposure = \
+            update_plan_status_obj.total_cxl_buy_notional - \
+            update_plan_status_obj.total_cxl_sell_notional
 
-    def _handle_cxl_qty_in_strat_status_sell_side(
-            self, update_strat_status_obj: StratStatus, chore_snapshot: ChoreSnapshot,
+    def _handle_cxl_qty_in_plan_status_sell_side(
+            self, update_plan_status_obj: PlanStatus, chore_snapshot: ChoreSnapshot,
             chore_journal_obj: ChoreJournal, cxled_qty: int):
-        update_strat_status_obj.total_open_sell_qty -= cxled_qty
-        update_strat_status_obj.total_open_sell_notional -= \
+        update_plan_status_obj.total_open_sell_qty -= cxled_qty
+        update_plan_status_obj.total_open_sell_notional -= \
             (cxled_qty * self.get_usd_px(chore_snapshot.chore_brief.px,
                                          chore_snapshot.chore_brief.security.sec_id))
-        update_strat_status_obj.total_cxl_sell_qty += int(cxled_qty)
-        update_strat_status_obj.total_cxl_sell_notional += \
+        update_plan_status_obj.total_cxl_sell_qty += int(cxled_qty)
+        update_plan_status_obj.total_cxl_sell_notional += \
             cxled_qty * self.get_usd_px(chore_snapshot.chore_brief.px,
                                         chore_snapshot.chore_brief.security.sec_id)
-        update_strat_status_obj.avg_cxl_sell_px = (
-            (self.get_local_px_or_notional(update_strat_status_obj.total_cxl_sell_notional,
-                                           chore_journal_obj.chore.security.sec_id) / update_strat_status_obj.total_cxl_sell_qty)
-            if update_strat_status_obj.total_cxl_sell_qty != 0 else 0)
-        update_strat_status_obj.total_cxl_exposure = \
-            update_strat_status_obj.total_cxl_buy_notional - \
-            update_strat_status_obj.total_cxl_sell_notional
+        update_plan_status_obj.avg_cxl_sell_px = (
+            (self.get_local_px_or_notional(update_plan_status_obj.total_cxl_sell_notional,
+                                           chore_journal_obj.chore.security.sec_id) / update_plan_status_obj.total_cxl_sell_qty)
+            if update_plan_status_obj.total_cxl_sell_qty != 0 else 0)
+        update_plan_status_obj.total_cxl_exposure = \
+            update_plan_status_obj.total_cxl_buy_notional - \
+            update_plan_status_obj.total_cxl_sell_notional
 
-    async def _update_strat_status_from_chore_journal(self, chore_journal_obj: ChoreJournal,
+    async def _update_plan_status_from_chore_journal(self, chore_journal_obj: ChoreJournal,
                                                       chore_snapshot: ChoreSnapshot,
                                                       symbol_side_snapshot: SymbolSideSnapshot,
-                                                      strat_brief: StratBrief):
-        strat_limits_tuple = self.strat_cache.get_strat_limits()
+                                                      plan_brief: PlanBrief):
+        plan_limits_tuple = self.plan_cache.get_plan_limits()
 
-        async with StratStatus.reentrant_lock:
-            strat_status_tuple = self.strat_cache.get_strat_status()
+        async with PlanStatus.reentrant_lock:
+            plan_status_tuple = self.plan_cache.get_plan_status()
 
-            if strat_limits_tuple is not None and strat_status_tuple is not None:
-                strat_limits, _ = strat_limits_tuple
-                update_strat_status_obj, _ = strat_status_tuple
+            if plan_limits_tuple is not None and plan_status_tuple is not None:
+                plan_limits, _ = plan_limits_tuple
+                update_plan_status_obj, _ = plan_status_tuple
                 match chore_journal_obj.chore.side:
                     case Side.BUY:
                         match chore_journal_obj.chore_event:
                             case ChoreEventType.OE_NEW:
-                                update_strat_status_obj.total_buy_qty += int(chore_journal_obj.chore.qty)
-                                update_strat_status_obj.total_open_buy_qty += int(chore_journal_obj.chore.qty)
-                                update_strat_status_obj.total_open_buy_notional += \
+                                update_plan_status_obj.total_buy_qty += int(chore_journal_obj.chore.qty)
+                                update_plan_status_obj.total_open_buy_qty += int(chore_journal_obj.chore.qty)
+                                update_plan_status_obj.total_open_buy_notional += \
                                     chore_journal_obj.chore.qty * self.get_usd_px(chore_snapshot.chore_brief.px,
                                                                                   chore_snapshot.chore_brief.security.sec_id)
                             case (ChoreEventType.OE_CXL_ACK | ChoreEventType.OE_UNSOL_CXL | ChoreEventType.OE_INT_REJ |
                                   ChoreEventType.OE_BRK_REJ | ChoreEventType.OE_EXH_REJ):
                                 total_buy_unfilled_qty = self.get_residual_qty_post_chore_dod(chore_snapshot)
-                                self._handle_cxl_qty_in_strat_status_buy_side(
-                                    update_strat_status_obj, chore_snapshot,
+                                self._handle_cxl_qty_in_plan_status_buy_side(
+                                    update_plan_status_obj, chore_snapshot,
                                     chore_journal_obj, total_buy_unfilled_qty)
                             case ChoreEventType.OE_LAPSE:
                                 lapse_qty = chore_snapshot.last_lapsed_qty
-                                self._handle_cxl_qty_in_strat_status_buy_side(
-                                    update_strat_status_obj, chore_snapshot, chore_journal_obj, lapse_qty)
+                                self._handle_cxl_qty_in_plan_status_buy_side(
+                                    update_plan_status_obj, chore_snapshot, chore_journal_obj, lapse_qty)
                             case (ChoreEventType.OE_AMD_DN_UNACK | ChoreEventType.OE_AMD_UP_UNACK |
                                   ChoreEventType.OE_AMD_ACK):
                                 pending_amend_type = self.pending_amend_type(chore_journal_obj, chore_snapshot)
@@ -2161,65 +2157,65 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                             old_open_qty, new_open_qty, old_open_notional, new_open_notional = (
                                                 self.get_old_n_new_open_qty_n_old_n_new_open_notional(
                                                     amend_dn_px, amend_dn_qty, pending_amend_type, chore_snapshot))
-                                            update_strat_status_obj.total_open_buy_qty = (
-                                                    update_strat_status_obj.total_open_buy_qty -
+                                            update_plan_status_obj.total_open_buy_qty = (
+                                                    update_plan_status_obj.total_open_buy_qty -
                                                     old_open_qty + new_open_qty)
-                                            update_strat_status_obj.total_open_buy_notional = (
-                                                    update_strat_status_obj.total_open_buy_notional -
+                                            update_plan_status_obj.total_open_buy_notional = (
+                                                    update_plan_status_obj.total_open_buy_notional -
                                                     old_open_notional + new_open_notional)
 
-                                        update_strat_status_obj.total_cxl_buy_qty += amend_dn_qty
+                                        update_plan_status_obj.total_cxl_buy_qty += amend_dn_qty
                                         if amend_dn_px:
                                             last_px = chore_snapshot.chore_brief.px + amend_dn_px
-                                            update_strat_status_obj.total_cxl_buy_notional += \
+                                            update_plan_status_obj.total_cxl_buy_notional += \
                                                 amend_dn_qty * self.get_usd_px(
                                                     last_px, chore_snapshot.chore_brief.security.sec_id)
                                         else:
-                                            update_strat_status_obj.total_cxl_buy_notional += \
+                                            update_plan_status_obj.total_cxl_buy_notional += \
                                                 amend_dn_qty * self.get_usd_px(
                                                     chore_snapshot.chore_brief.px,
                                                     chore_snapshot.chore_brief.security.sec_id)
-                                        update_strat_status_obj.avg_cxl_buy_px = (
+                                        update_plan_status_obj.avg_cxl_buy_px = (
                                             (self.get_local_px_or_notional(
-                                                update_strat_status_obj.total_cxl_buy_notional,
+                                                update_plan_status_obj.total_cxl_buy_notional,
                                                 chore_journal_obj.chore.security.sec_id) /
-                                             update_strat_status_obj.total_cxl_buy_qty)
-                                            if update_strat_status_obj.total_cxl_buy_qty != 0 else 0)
+                                             update_plan_status_obj.total_cxl_buy_qty)
+                                            if update_plan_status_obj.total_cxl_buy_qty != 0 else 0)
 
-                                        update_strat_status_obj.total_cxl_exposure = \
-                                            update_strat_status_obj.total_cxl_buy_notional - \
-                                            update_strat_status_obj.total_cxl_sell_notional
+                                        update_plan_status_obj.total_cxl_exposure = \
+                                            update_plan_status_obj.total_cxl_buy_notional - \
+                                            update_plan_status_obj.total_cxl_sell_notional
                                     else:
                                         # if qty is not amended then px must be amended - else block will not
                                         # allow code to each here
                                         last_px = chore_snapshot.chore_brief.px + amend_dn_px
                                         old_open_notional = (
-                                                update_strat_status_obj.total_open_buy_qty *
+                                                update_plan_status_obj.total_open_buy_qty *
                                                 self.get_usd_px(last_px,
                                                                 chore_snapshot.chore_brief.security.sec_id))
                                         new_open_notional = (
-                                                update_strat_status_obj.total_open_buy_qty *
+                                                update_plan_status_obj.total_open_buy_qty *
                                                 self.get_usd_px(chore_snapshot.chore_brief.px,
                                                                 chore_snapshot.chore_brief.security.sec_id))
-                                        update_strat_status_obj.total_open_buy_notional = (
-                                                update_strat_status_obj.total_open_buy_notional - old_open_notional +
+                                        update_plan_status_obj.total_open_buy_notional = (
+                                                update_plan_status_obj.total_open_buy_notional - old_open_notional +
                                                 new_open_notional)
                                 else:
                                     amend_up_px = chore_snapshot.pending_amend_up_px
                                     amend_up_qty = chore_snapshot.pending_amend_up_qty
 
                                     if amend_up_qty:
-                                        update_strat_status_obj.total_buy_qty += amend_up_qty
+                                        update_plan_status_obj.total_buy_qty += amend_up_qty
                                         if not chore_has_terminal_state(chore_snapshot):
                                             old_open_qty, new_open_qty, old_open_notional, new_open_notional = (
                                                 self.get_old_n_new_open_qty_n_old_n_new_open_notional(
                                                     amend_up_px, amend_up_qty, pending_amend_type, chore_snapshot))
 
-                                            update_strat_status_obj.total_open_buy_qty = (
-                                                    update_strat_status_obj.total_open_buy_qty -
+                                            update_plan_status_obj.total_open_buy_qty = (
+                                                    update_plan_status_obj.total_open_buy_qty -
                                                     old_open_qty + new_open_qty)
-                                            update_strat_status_obj.total_open_buy_notional = (
-                                                    update_strat_status_obj.total_open_buy_notional -
+                                            update_plan_status_obj.total_open_buy_notional = (
+                                                    update_plan_status_obj.total_open_buy_notional -
                                                     old_open_notional + new_open_notional)
 
                                         # if chore is amended post DOD then adding amended up qty to cxled qty
@@ -2237,18 +2233,18 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                                             amend_up_qty *
                                                             self.get_usd_px(last_px,
                                                                             chore_snapshot.chore_brief.security.sec_id))
-                                                update_strat_status_obj.total_cxl_buy_qty += amend_up_qty
-                                                update_strat_status_obj.total_cxl_buy_notional += additional_new_notional
-                                                update_strat_status_obj.avg_cxl_buy_px = (
+                                                update_plan_status_obj.total_cxl_buy_qty += amend_up_qty
+                                                update_plan_status_obj.total_cxl_buy_notional += additional_new_notional
+                                                update_plan_status_obj.avg_cxl_buy_px = (
                                                     (self.get_local_px_or_notional(
-                                                        update_strat_status_obj.total_cxl_buy_notional,
+                                                        update_plan_status_obj.total_cxl_buy_notional,
                                                         chore_journal_obj.chore.security.sec_id) /
-                                                     update_strat_status_obj.total_cxl_buy_qty)
-                                                    if update_strat_status_obj.total_cxl_buy_qty != 0 else 0)
+                                                     update_plan_status_obj.total_cxl_buy_qty)
+                                                    if update_plan_status_obj.total_cxl_buy_qty != 0 else 0)
 
-                                                update_strat_status_obj.total_cxl_exposure = \
-                                                    update_strat_status_obj.total_cxl_buy_notional - \
-                                                    update_strat_status_obj.total_cxl_sell_notional
+                                                update_plan_status_obj.total_cxl_exposure = \
+                                                    update_plan_status_obj.total_cxl_buy_notional - \
+                                                    update_plan_status_obj.total_cxl_sell_notional
                                         # AMD: else not required: if chore is not DOD then amend up has no handling
                                         # for cxled qty
 
@@ -2257,15 +2253,15 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                         # allow code to each here
                                         last_px = chore_snapshot.chore_brief.px - amend_up_px
                                         old_open_notional = (
-                                                update_strat_status_obj.total_open_buy_qty *
+                                                update_plan_status_obj.total_open_buy_qty *
                                                 self.get_usd_px(last_px,
                                                                 chore_snapshot.chore_brief.security.sec_id))
                                         new_open_notional = (
-                                                update_strat_status_obj.total_open_buy_qty *
+                                                update_plan_status_obj.total_open_buy_qty *
                                                 self.get_usd_px(chore_snapshot.chore_brief.px,
                                                                 chore_snapshot.chore_brief.security.sec_id))
-                                        update_strat_status_obj.total_open_buy_notional = (
-                                                update_strat_status_obj.total_open_buy_notional - old_open_notional +
+                                        update_plan_status_obj.total_open_buy_notional = (
+                                                update_plan_status_obj.total_open_buy_notional - old_open_notional +
                                                 new_open_notional)
 
                             case ChoreEventType.OE_AMD_REJ:
@@ -2281,66 +2277,66 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                              reverted_open_notional) = (
                                                 self.get_reverted_old_n_new_open_qty_n_old_n_new_open_notional(
                                                     amend_dn_px, amend_dn_qty, pending_amend_type, chore_snapshot))
-                                            update_strat_status_obj.total_open_buy_qty = (
-                                                    update_strat_status_obj.total_open_buy_qty -
+                                            update_plan_status_obj.total_open_buy_qty = (
+                                                    update_plan_status_obj.total_open_buy_qty -
                                                     amended_open_qty + reverted_open_qty)
-                                            update_strat_status_obj.total_open_buy_notional = (
-                                                    update_strat_status_obj.total_open_buy_notional -
+                                            update_plan_status_obj.total_open_buy_notional = (
+                                                    update_plan_status_obj.total_open_buy_notional -
                                                     amended_open_notional + reverted_open_notional)
 
-                                        update_strat_status_obj.total_cxl_buy_qty -= amend_dn_qty
+                                        update_plan_status_obj.total_cxl_buy_qty -= amend_dn_qty
                                         if amend_dn_px:
                                             last_px = chore_snapshot.chore_brief.px
-                                            update_strat_status_obj.total_cxl_buy_notional -= \
+                                            update_plan_status_obj.total_cxl_buy_notional -= \
                                                 amend_dn_qty * self.get_usd_px(
                                                     last_px, chore_snapshot.chore_brief.security.sec_id)
                                         else:
-                                            update_strat_status_obj.total_cxl_buy_notional -= \
+                                            update_plan_status_obj.total_cxl_buy_notional -= \
                                                 amend_dn_qty * self.get_usd_px(
                                                     chore_snapshot.chore_brief.px,
                                                     chore_snapshot.chore_brief.security.sec_id)
-                                        update_strat_status_obj.avg_cxl_buy_px = (
+                                        update_plan_status_obj.avg_cxl_buy_px = (
                                             (self.get_local_px_or_notional(
-                                                update_strat_status_obj.total_cxl_buy_notional,
+                                                update_plan_status_obj.total_cxl_buy_notional,
                                                 chore_journal_obj.chore.security.sec_id) /
-                                             update_strat_status_obj.total_cxl_buy_qty)
-                                            if update_strat_status_obj.total_cxl_buy_qty != 0 else 0)
+                                             update_plan_status_obj.total_cxl_buy_qty)
+                                            if update_plan_status_obj.total_cxl_buy_qty != 0 else 0)
 
-                                        update_strat_status_obj.total_cxl_exposure = \
-                                            update_strat_status_obj.total_cxl_buy_notional - \
-                                            update_strat_status_obj.total_cxl_sell_notional
+                                        update_plan_status_obj.total_cxl_exposure = \
+                                            update_plan_status_obj.total_cxl_buy_notional - \
+                                            update_plan_status_obj.total_cxl_sell_notional
                                     else:
                                         # if qty is not amended then px must be amended - else block will not
                                         # allow code to each here
                                         last_px = chore_snapshot.chore_brief.px
                                         old_open_notional = (
-                                                update_strat_status_obj.total_open_buy_qty *
+                                                update_plan_status_obj.total_open_buy_qty *
                                                 self.get_usd_px(last_px,
                                                                 chore_snapshot.chore_brief.security.sec_id))
                                         new_open_notional = (
-                                                update_strat_status_obj.total_open_buy_qty *
+                                                update_plan_status_obj.total_open_buy_qty *
                                                 self.get_usd_px(chore_snapshot.chore_brief.px,
                                                                 chore_snapshot.chore_brief.security.sec_id))
-                                        update_strat_status_obj.total_open_buy_notional = (
-                                                update_strat_status_obj.total_open_buy_notional - old_open_notional +
+                                        update_plan_status_obj.total_open_buy_notional = (
+                                                update_plan_status_obj.total_open_buy_notional - old_open_notional +
                                                 new_open_notional)
                                 else:
                                     amend_up_px = chore_snapshot.pending_amend_up_px
                                     amend_up_qty = chore_snapshot.pending_amend_up_qty
 
                                     if amend_up_qty:
-                                        update_strat_status_obj.total_buy_qty -= amend_up_qty
+                                        update_plan_status_obj.total_buy_qty -= amend_up_qty
                                         if chore_snapshot.chore_status not in NON_FILLED_TERMINAL_STATES:
                                             (amended_open_qty, reverted_open_qty, amended_open_notional,
                                              reverted_open_notional) = (
                                                 self.get_reverted_old_n_new_open_qty_n_old_n_new_open_notional(
                                                     amend_up_px, amend_up_qty, pending_amend_type, chore_snapshot))
 
-                                            update_strat_status_obj.total_open_buy_qty = (
-                                                    update_strat_status_obj.total_open_buy_qty -
+                                            update_plan_status_obj.total_open_buy_qty = (
+                                                    update_plan_status_obj.total_open_buy_qty -
                                                     amended_open_qty + reverted_open_qty)
-                                            update_strat_status_obj.total_open_buy_notional = (
-                                                    update_strat_status_obj.total_open_buy_notional -
+                                            update_plan_status_obj.total_open_buy_notional = (
+                                                    update_plan_status_obj.total_open_buy_notional -
                                                     amended_open_notional + reverted_open_notional)
 
                                     else:
@@ -2348,46 +2344,46 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                         # allow code to each here
                                         last_px = chore_snapshot.chore_brief.px + amend_up_px
                                         old_open_notional = (
-                                                update_strat_status_obj.total_open_buy_qty *
+                                                update_plan_status_obj.total_open_buy_qty *
                                                 self.get_usd_px(last_px,
                                                                 chore_snapshot.chore_brief.security.sec_id))
                                         new_open_notional = (
-                                                update_strat_status_obj.total_open_buy_qty *
+                                                update_plan_status_obj.total_open_buy_qty *
                                                 self.get_usd_px(chore_snapshot.chore_brief.px,
                                                                 chore_snapshot.chore_brief.security.sec_id))
-                                        update_strat_status_obj.total_open_buy_notional = (
-                                                update_strat_status_obj.total_open_buy_notional - old_open_notional +
+                                        update_plan_status_obj.total_open_buy_notional = (
+                                                update_plan_status_obj.total_open_buy_notional - old_open_notional +
                                                 new_open_notional)
                             case other_:
                                 err_str_ = f"Unsupported Chore Event type {other_}, " \
                                            f"chore_journal_key: {StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_journal_log_key(chore_journal_obj)}"
                                 logging.error(err_str_)
                                 return
-                        if update_strat_status_obj.total_open_buy_qty == 0:
-                            update_strat_status_obj.avg_open_buy_px = 0
+                        if update_plan_status_obj.total_open_buy_qty == 0:
+                            update_plan_status_obj.avg_open_buy_px = 0
                         else:
-                            update_strat_status_obj.avg_open_buy_px = \
-                                (self.get_local_px_or_notional(update_strat_status_obj.total_open_buy_notional,
+                            update_plan_status_obj.avg_open_buy_px = \
+                                (self.get_local_px_or_notional(update_plan_status_obj.total_open_buy_notional,
                                                                chore_journal_obj.chore.security.sec_id) /
-                                 update_strat_status_obj.total_open_buy_qty)
+                                 update_plan_status_obj.total_open_buy_qty)
                     case Side.SELL:
                         match chore_journal_obj.chore_event:
                             case ChoreEventType.OE_NEW:
-                                update_strat_status_obj.total_sell_qty += int(chore_journal_obj.chore.qty)
-                                update_strat_status_obj.total_open_sell_qty += int(chore_journal_obj.chore.qty)
-                                update_strat_status_obj.total_open_sell_notional += \
+                                update_plan_status_obj.total_sell_qty += int(chore_journal_obj.chore.qty)
+                                update_plan_status_obj.total_open_sell_qty += int(chore_journal_obj.chore.qty)
+                                update_plan_status_obj.total_open_sell_notional += \
                                     chore_journal_obj.chore.qty * self.get_usd_px(chore_journal_obj.chore.px,
                                                                                   chore_journal_obj.chore.security.sec_id)
                             case (ChoreEventType.OE_CXL_ACK | ChoreEventType.OE_UNSOL_CXL | ChoreEventType.OE_INT_REJ |
                                   ChoreEventType.OE_BRK_REJ | ChoreEventType.OE_EXH_REJ):
                                 total_sell_unfilled_qty = self.get_residual_qty_post_chore_dod(chore_snapshot)
-                                self._handle_cxl_qty_in_strat_status_sell_side(
-                                    update_strat_status_obj, chore_snapshot,
+                                self._handle_cxl_qty_in_plan_status_sell_side(
+                                    update_plan_status_obj, chore_snapshot,
                                     chore_journal_obj, total_sell_unfilled_qty)
                             case ChoreEventType.OE_LAPSE:
                                 lapse_qty = chore_snapshot.last_lapsed_qty
-                                self._handle_cxl_qty_in_strat_status_sell_side(
-                                    update_strat_status_obj, chore_snapshot, chore_journal_obj, lapse_qty)
+                                self._handle_cxl_qty_in_plan_status_sell_side(
+                                    update_plan_status_obj, chore_snapshot, chore_journal_obj, lapse_qty)
                             case (ChoreEventType.OE_AMD_DN_UNACK | ChoreEventType.OE_AMD_UP_UNACK |
                                   ChoreEventType.OE_AMD_ACK):
                                 pending_amend_type = self.pending_amend_type(chore_journal_obj, chore_snapshot)
@@ -2402,67 +2398,67 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                                 self.get_old_n_new_open_qty_n_old_n_new_open_notional(
                                                     amend_dn_px, amend_dn_qty, pending_amend_type, chore_snapshot))
 
-                                            update_strat_status_obj.total_open_sell_qty = (
-                                                    update_strat_status_obj.total_open_sell_qty -
+                                            update_plan_status_obj.total_open_sell_qty = (
+                                                    update_plan_status_obj.total_open_sell_qty -
                                                     old_open_qty + new_open_qty)
-                                            update_strat_status_obj.total_open_sell_notional = (
-                                                    update_strat_status_obj.total_open_sell_notional -
+                                            update_plan_status_obj.total_open_sell_notional = (
+                                                    update_plan_status_obj.total_open_sell_notional -
                                                     old_open_notional + new_open_notional)
 
-                                        update_strat_status_obj.total_cxl_sell_qty += amend_dn_qty
+                                        update_plan_status_obj.total_cxl_sell_qty += amend_dn_qty
                                         if amend_dn_px:
                                             last_px = chore_snapshot.chore_brief.px + amend_dn_px
-                                            update_strat_status_obj.total_cxl_sell_notional += \
+                                            update_plan_status_obj.total_cxl_sell_notional += \
                                                 amend_dn_qty * self.get_usd_px(
                                                     last_px, chore_snapshot.chore_brief.security.sec_id)
                                         else:
-                                            update_strat_status_obj.total_cxl_sell_notional += \
+                                            update_plan_status_obj.total_cxl_sell_notional += \
                                                 amend_dn_qty * self.get_usd_px(
                                                     chore_snapshot.chore_brief.px,
                                                     chore_snapshot.chore_brief.security.sec_id)
 
-                                        update_strat_status_obj.avg_cxl_sell_px = (
+                                        update_plan_status_obj.avg_cxl_sell_px = (
                                             (self.get_local_px_or_notional(
-                                                update_strat_status_obj.total_cxl_sell_notional,
+                                                update_plan_status_obj.total_cxl_sell_notional,
                                                 chore_journal_obj.chore.security.sec_id) /
-                                             update_strat_status_obj.total_cxl_sell_qty)
-                                            if update_strat_status_obj.total_cxl_sell_qty != 0 else 0)
+                                             update_plan_status_obj.total_cxl_sell_qty)
+                                            if update_plan_status_obj.total_cxl_sell_qty != 0 else 0)
 
-                                        update_strat_status_obj.total_cxl_exposure = \
-                                            update_strat_status_obj.total_cxl_buy_notional - \
-                                            update_strat_status_obj.total_cxl_sell_notional
+                                        update_plan_status_obj.total_cxl_exposure = \
+                                            update_plan_status_obj.total_cxl_buy_notional - \
+                                            update_plan_status_obj.total_cxl_sell_notional
 
                                     else:
                                         # if qty is not amended then px must be amended - else block will not
                                         # allow code to each here
                                         last_px = chore_snapshot.chore_brief.px + amend_dn_px
                                         old_open_notional = (
-                                                update_strat_status_obj.total_open_sell_qty *
+                                                update_plan_status_obj.total_open_sell_qty *
                                                 self.get_usd_px(last_px,
                                                                 chore_snapshot.chore_brief.security.sec_id))
                                         new_open_notional = (
-                                                update_strat_status_obj.total_open_sell_qty *
+                                                update_plan_status_obj.total_open_sell_qty *
                                                 self.get_usd_px(chore_snapshot.chore_brief.px,
                                                                 chore_snapshot.chore_brief.security.sec_id))
-                                        update_strat_status_obj.total_open_sell_notional = (
-                                                update_strat_status_obj.total_open_sell_notional - old_open_notional +
+                                        update_plan_status_obj.total_open_sell_notional = (
+                                                update_plan_status_obj.total_open_sell_notional - old_open_notional +
                                                 new_open_notional)
                                 else:
                                     amend_up_px = chore_snapshot.pending_amend_up_px
                                     amend_up_qty = chore_snapshot.pending_amend_up_qty
 
                                     if amend_up_qty:
-                                        update_strat_status_obj.total_sell_qty += amend_up_qty
+                                        update_plan_status_obj.total_sell_qty += amend_up_qty
                                         if not chore_has_terminal_state(chore_snapshot):
                                             old_open_qty, new_open_qty, old_open_notional, new_open_notional = (
                                                 self.get_old_n_new_open_qty_n_old_n_new_open_notional(
                                                     amend_up_px, amend_up_qty, pending_amend_type, chore_snapshot))
 
-                                            update_strat_status_obj.total_open_sell_qty = (
-                                                    update_strat_status_obj.total_open_sell_qty -
+                                            update_plan_status_obj.total_open_sell_qty = (
+                                                    update_plan_status_obj.total_open_sell_qty -
                                                     old_open_qty + new_open_qty)
-                                            update_strat_status_obj.total_open_sell_notional = (
-                                                    update_strat_status_obj.total_open_sell_notional -
+                                            update_plan_status_obj.total_open_sell_notional = (
+                                                    update_plan_status_obj.total_open_sell_notional -
                                                     old_open_notional + new_open_notional)
 
                                         # if chore is amended post DOD then adding amended up qty to cxled qty
@@ -2480,18 +2476,18 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                                             amend_up_qty *
                                                             self.get_usd_px(last_px,
                                                                             chore_snapshot.chore_brief.security.sec_id))
-                                                update_strat_status_obj.total_cxl_sell_qty += amend_up_qty
-                                                update_strat_status_obj.total_cxl_sell_notional += additional_new_notional
-                                                update_strat_status_obj.avg_cxl_sell_px = (
+                                                update_plan_status_obj.total_cxl_sell_qty += amend_up_qty
+                                                update_plan_status_obj.total_cxl_sell_notional += additional_new_notional
+                                                update_plan_status_obj.avg_cxl_sell_px = (
                                                     (self.get_local_px_or_notional(
-                                                        update_strat_status_obj.total_cxl_sell_notional,
+                                                        update_plan_status_obj.total_cxl_sell_notional,
                                                         chore_journal_obj.chore.security.sec_id) /
-                                                     update_strat_status_obj.total_cxl_sell_qty)
-                                                    if update_strat_status_obj.total_cxl_sell_qty != 0 else 0)
+                                                     update_plan_status_obj.total_cxl_sell_qty)
+                                                    if update_plan_status_obj.total_cxl_sell_qty != 0 else 0)
 
-                                                update_strat_status_obj.total_cxl_exposure = \
-                                                    update_strat_status_obj.total_cxl_buy_notional - \
-                                                    update_strat_status_obj.total_cxl_sell_notional
+                                                update_plan_status_obj.total_cxl_exposure = \
+                                                    update_plan_status_obj.total_cxl_buy_notional - \
+                                                    update_plan_status_obj.total_cxl_sell_notional
                                         # AMD: else not required: if chore is not DOD then amend up has no handling
                                         # for cxled qty
 
@@ -2500,15 +2496,15 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                         # allow code to each here
                                         last_px = chore_snapshot.chore_brief.px - amend_up_px
                                         old_open_notional = (
-                                                update_strat_status_obj.total_open_sell_qty *
+                                                update_plan_status_obj.total_open_sell_qty *
                                                 self.get_usd_px(last_px,
                                                                 chore_snapshot.chore_brief.security.sec_id))
                                         new_open_notional = (
-                                                update_strat_status_obj.total_open_sell_qty *
+                                                update_plan_status_obj.total_open_sell_qty *
                                                 self.get_usd_px(chore_snapshot.chore_brief.px,
                                                                 chore_snapshot.chore_brief.security.sec_id))
-                                        update_strat_status_obj.total_open_sell_notional = (
-                                                update_strat_status_obj.total_open_sell_notional - old_open_notional +
+                                        update_plan_status_obj.total_open_sell_notional = (
+                                                update_plan_status_obj.total_open_sell_notional - old_open_notional +
                                                 new_open_notional)
                             case ChoreEventType.OE_AMD_REJ:
                                 pending_amend_type = self.pending_amend_type(chore_journal_obj, chore_snapshot)
@@ -2523,66 +2519,66 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                              reverted_open_notional) = (
                                                 self.get_reverted_old_n_new_open_qty_n_old_n_new_open_notional(
                                                     amend_dn_px, amend_dn_qty, pending_amend_type, chore_snapshot))
-                                            update_strat_status_obj.total_open_sell_qty = (
-                                                    update_strat_status_obj.total_open_sell_qty -
+                                            update_plan_status_obj.total_open_sell_qty = (
+                                                    update_plan_status_obj.total_open_sell_qty -
                                                     amended_open_qty + reverted_open_qty)
-                                            update_strat_status_obj.total_open_sell_notional = (
-                                                    update_strat_status_obj.total_open_sell_notional -
+                                            update_plan_status_obj.total_open_sell_notional = (
+                                                    update_plan_status_obj.total_open_sell_notional -
                                                     amended_open_notional + reverted_open_notional)
 
-                                        update_strat_status_obj.total_cxl_sell_qty -= amend_dn_qty
+                                        update_plan_status_obj.total_cxl_sell_qty -= amend_dn_qty
                                         if amend_dn_px:
                                             last_px = chore_snapshot.chore_brief.px
-                                            update_strat_status_obj.total_cxl_sell_notional -= \
+                                            update_plan_status_obj.total_cxl_sell_notional -= \
                                                 amend_dn_qty * self.get_usd_px(
                                                     last_px, chore_snapshot.chore_brief.security.sec_id)
                                         else:
-                                            update_strat_status_obj.total_cxl_sell_notional -= \
+                                            update_plan_status_obj.total_cxl_sell_notional -= \
                                                 amend_dn_qty * self.get_usd_px(
                                                     chore_snapshot.chore_brief.px,
                                                     chore_snapshot.chore_brief.security.sec_id)
-                                        update_strat_status_obj.avg_cxl_sell_px = (
+                                        update_plan_status_obj.avg_cxl_sell_px = (
                                             (self.get_local_px_or_notional(
-                                                update_strat_status_obj.total_cxl_sell_notional,
+                                                update_plan_status_obj.total_cxl_sell_notional,
                                                 chore_journal_obj.chore.security.sec_id) /
-                                             update_strat_status_obj.total_cxl_sell_qty)
-                                            if update_strat_status_obj.total_cxl_sell_qty != 0 else 0)
+                                             update_plan_status_obj.total_cxl_sell_qty)
+                                            if update_plan_status_obj.total_cxl_sell_qty != 0 else 0)
 
-                                        update_strat_status_obj.total_cxl_exposure = \
-                                            update_strat_status_obj.total_cxl_buy_notional - \
-                                            update_strat_status_obj.total_cxl_sell_notional
+                                        update_plan_status_obj.total_cxl_exposure = \
+                                            update_plan_status_obj.total_cxl_buy_notional - \
+                                            update_plan_status_obj.total_cxl_sell_notional
                                     else:
                                         # if qty is not amended then px must be amended - else block will not
                                         # allow code to each here
                                         last_px = chore_snapshot.chore_brief.px
                                         old_open_notional = (
-                                                update_strat_status_obj.total_open_sell_qty *
+                                                update_plan_status_obj.total_open_sell_qty *
                                                 self.get_usd_px(last_px,
                                                                 chore_snapshot.chore_brief.security.sec_id))
                                         new_open_notional = (
-                                                update_strat_status_obj.total_open_sell_qty *
+                                                update_plan_status_obj.total_open_sell_qty *
                                                 self.get_usd_px(chore_snapshot.chore_brief.px,
                                                                 chore_snapshot.chore_brief.security.sec_id))
-                                        update_strat_status_obj.total_open_sell_notional = (
-                                                update_strat_status_obj.total_open_sell_notional - old_open_notional +
+                                        update_plan_status_obj.total_open_sell_notional = (
+                                                update_plan_status_obj.total_open_sell_notional - old_open_notional +
                                                 new_open_notional)
                                 else:
                                     amend_up_px = chore_snapshot.pending_amend_up_px
                                     amend_up_qty = chore_snapshot.pending_amend_up_qty
 
                                     if amend_up_qty:
-                                        update_strat_status_obj.total_sell_qty -= amend_up_qty
+                                        update_plan_status_obj.total_sell_qty -= amend_up_qty
                                         if chore_snapshot.chore_status not in NON_FILLED_TERMINAL_STATES:
                                             (amended_open_qty, reverted_open_qty, amended_open_notional,
                                              reverted_open_notional) = (
                                                 self.get_reverted_old_n_new_open_qty_n_old_n_new_open_notional(
                                                     amend_up_px, amend_up_qty, pending_amend_type, chore_snapshot))
 
-                                            update_strat_status_obj.total_open_sell_qty = (
-                                                    update_strat_status_obj.total_open_sell_qty -
+                                            update_plan_status_obj.total_open_sell_qty = (
+                                                    update_plan_status_obj.total_open_sell_qty -
                                                     amended_open_qty + reverted_open_qty)
-                                            update_strat_status_obj.total_open_sell_notional = (
-                                                    update_strat_status_obj.total_open_sell_notional -
+                                            update_plan_status_obj.total_open_sell_notional = (
+                                                    update_plan_status_obj.total_open_sell_notional -
                                                     amended_open_notional + reverted_open_notional)
 
                                         # if chore is amended post DOD then adding amended up qty to cxled qty
@@ -2593,18 +2589,18 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                                         amend_up_qty *
                                                         self.get_usd_px(last_px,
                                                                         chore_snapshot.chore_brief.security.sec_id))
-                                                update_strat_status_obj.total_cxl_sell_qty -= amend_up_qty
-                                                update_strat_status_obj.total_cxl_sell_notional -= additional_new_notional
-                                                update_strat_status_obj.avg_cxl_sell_px = (
+                                                update_plan_status_obj.total_cxl_sell_qty -= amend_up_qty
+                                                update_plan_status_obj.total_cxl_sell_notional -= additional_new_notional
+                                                update_plan_status_obj.avg_cxl_sell_px = (
                                                     (self.get_local_px_or_notional(
-                                                        update_strat_status_obj.total_cxl_sell_notional,
+                                                        update_plan_status_obj.total_cxl_sell_notional,
                                                         chore_journal_obj.chore.security.sec_id) /
-                                                     update_strat_status_obj.total_cxl_sell_qty)
-                                                    if update_strat_status_obj.total_cxl_sell_qty != 0 else 0)
+                                                     update_plan_status_obj.total_cxl_sell_qty)
+                                                    if update_plan_status_obj.total_cxl_sell_qty != 0 else 0)
 
-                                                update_strat_status_obj.total_cxl_exposure = \
-                                                    update_strat_status_obj.total_cxl_buy_notional - \
-                                                    update_strat_status_obj.total_cxl_sell_notional
+                                                update_plan_status_obj.total_cxl_exposure = \
+                                                    update_plan_status_obj.total_cxl_buy_notional - \
+                                                    update_plan_status_obj.total_cxl_sell_notional
                                         # AMD: else not required: if chore is not DOD then amend up has no handling
                                         # for cxled qty
 
@@ -2613,65 +2609,65 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                         # allow code to each here
                                         last_px = chore_snapshot.chore_brief.px + amend_up_px
                                         old_open_notional = (
-                                                update_strat_status_obj.total_open_sell_qty *
+                                                update_plan_status_obj.total_open_sell_qty *
                                                 self.get_usd_px(last_px,
                                                                 chore_snapshot.chore_brief.security.sec_id))
                                         new_open_notional = (
-                                                update_strat_status_obj.total_open_sell_qty *
+                                                update_plan_status_obj.total_open_sell_qty *
                                                 self.get_usd_px(chore_snapshot.chore_brief.px,
                                                                 chore_snapshot.chore_brief.security.sec_id))
-                                        update_strat_status_obj.total_open_sell_notional = (
-                                                update_strat_status_obj.total_open_sell_notional - old_open_notional +
+                                        update_plan_status_obj.total_open_sell_notional = (
+                                                update_plan_status_obj.total_open_sell_notional - old_open_notional +
                                                 new_open_notional)
                             case other_:
                                 err_str_ = f"Unsupported Chore Event type {other_} " \
                                            f"chore_journal_key: {StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_journal_log_key(chore_journal_obj)}"
                                 logging.error(err_str_)
                                 return
-                        if update_strat_status_obj.total_open_sell_qty == 0:
-                            update_strat_status_obj.avg_open_sell_px = 0
+                        if update_plan_status_obj.total_open_sell_qty == 0:
+                            update_plan_status_obj.avg_open_sell_px = 0
                         else:
-                            update_strat_status_obj.avg_open_sell_px = \
-                                self.get_local_px_or_notional(update_strat_status_obj.total_open_sell_notional,
+                            update_plan_status_obj.avg_open_sell_px = \
+                                self.get_local_px_or_notional(update_plan_status_obj.total_open_sell_notional,
                                                               chore_journal_obj.chore.security.sec_id) / \
-                                update_strat_status_obj.total_open_sell_qty
+                                update_plan_status_obj.total_open_sell_qty
                     case other_:
                         err_str_ = f"Unsupported Side Type {other_} received in chore_journal_key: " \
-                                   f"{StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_journal_log_key(chore_journal_obj)} while updating strat_status;;; " \
+                                   f"{StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_journal_log_key(chore_journal_obj)} while updating plan_status;;; " \
                                    f"{chore_journal_obj = }"
                         logging.error(err_str_)
                         return
-                update_strat_status_obj.total_chore_qty = \
-                    int(update_strat_status_obj.total_buy_qty + update_strat_status_obj.total_sell_qty)
-                update_strat_status_obj.total_open_exposure = (update_strat_status_obj.total_open_buy_notional -
-                                                               update_strat_status_obj.total_open_sell_notional)
-                if update_strat_status_obj.total_fill_buy_notional < update_strat_status_obj.total_fill_sell_notional:
-                    update_strat_status_obj.balance_notional = \
-                        strat_limits.max_single_leg_notional - update_strat_status_obj.total_fill_buy_notional
+                update_plan_status_obj.total_chore_qty = \
+                    int(update_plan_status_obj.total_buy_qty + update_plan_status_obj.total_sell_qty)
+                update_plan_status_obj.total_open_exposure = (update_plan_status_obj.total_open_buy_notional -
+                                                               update_plan_status_obj.total_open_sell_notional)
+                if update_plan_status_obj.total_fill_buy_notional < update_plan_status_obj.total_fill_sell_notional:
+                    update_plan_status_obj.balance_notional = \
+                        plan_limits.max_single_leg_notional - update_plan_status_obj.total_fill_buy_notional
                 else:
-                    update_strat_status_obj.balance_notional = \
-                        strat_limits.max_single_leg_notional - update_strat_status_obj.total_fill_sell_notional
+                    update_plan_status_obj.balance_notional = \
+                        plan_limits.max_single_leg_notional - update_plan_status_obj.total_fill_sell_notional
 
-                updated_residual = self.__get_residual_obj(chore_snapshot.chore_brief.side, strat_brief)
+                updated_residual = self.__get_residual_obj(chore_snapshot.chore_brief.side, plan_brief)
                 if updated_residual is not None:
-                    update_strat_status_obj.residual = updated_residual
+                    update_plan_status_obj.residual = updated_residual
 
-                # Updating strat_state as paused if limits get breached
+                # Updating plan_state as paused if limits get breached
                 is_cxl: bool = False
                 if chore_journal_obj.chore_event == ChoreEventType.OE_CXL_ACK or (
                         chore_journal_obj.chore_event == ChoreEventType.OE_UNSOL_CXL):
                     is_cxl = True
-                await self._pause_strat_if_limits_breached(update_strat_status_obj, strat_limits, strat_brief,
+                await self._pause_plan_if_limits_breached(update_plan_status_obj, plan_limits, plan_brief,
                                                            symbol_side_snapshot, is_cxl=is_cxl)
 
-                await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_update_strat_status_http(
-                    update_strat_status_obj)
+                await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_update_plan_status_http(
+                    update_plan_status_obj)
             else:
-                logging.error(f"error: either tuple of strat_status or strat_limits received as None from cache;;; "
-                              f"{strat_status_tuple = }, {strat_limits_tuple = }")
+                logging.error(f"error: either tuple of plan_status or plan_limits received as None from cache;;; "
+                              f"{plan_status_tuple = }, {plan_limits_tuple = }")
                 return
 
-    def _handle_cxled_qty_in_strat_brief(
+    def _handle_cxled_qty_in_plan_brief(
             self, fetched_open_qty: int, fetched_open_notional: float, fetched_all_bkr_cxlled_qty: int,
             chore_snapshot: ChoreSnapshot, cxled_qty: int) -> Tuple[int, float, int]:
         open_qty = int(fetched_open_qty - cxled_qty)
@@ -2709,10 +2705,10 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         open_notional = fetched_open_notional - amended_open_notional + reverted_open_notional
         return open_qty, open_notional
 
-    async def _update_strat_brief_from_chore_or_fill(self, chore_journal_or_fills_journal: ChoreJournal | FillsJournal,
+    async def _update_plan_brief_from_chore_or_fill(self, chore_journal_or_fills_journal: ChoreJournal | FillsJournal,
                                                      chore_snapshot: ChoreSnapshot,
                                                      symbol_side_snapshot: SymbolSideSnapshot,
-                                                     received_fill_after_dod: bool | None = None) -> StratBrief | None:
+                                                     received_fill_after_dod: bool | None = None) -> PlanBrief | None:
 
         security = symbol_side_snapshot.security
         side = symbol_side_snapshot.side
@@ -2720,25 +2716,25 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         hedge_ratio: float = self.get_hedge_ratio()
 
         async with StreetBookServiceRoutesCallbackBaseNativeOverride.residual_compute_shared_lock:
-            async with StratBrief.reentrant_lock:
-                strat_brief_tuple = self.strat_cache.get_strat_brief()
+            async with PlanBrief.reentrant_lock:
+                plan_brief_tuple = self.plan_cache.get_plan_brief()
 
-                strat_limits_tuple = self.strat_cache.get_strat_limits()
+                plan_limits_tuple = self.plan_cache.get_plan_limits()
 
-                if strat_brief_tuple is not None:
-                    strat_brief_obj, _ = strat_brief_tuple
-                    if strat_limits_tuple is not None:
-                        strat_limits, _ = strat_limits_tuple
+                if plan_brief_tuple is not None:
+                    plan_brief_obj, _ = plan_brief_tuple
+                    if plan_limits_tuple is not None:
+                        plan_limits, _ = plan_limits_tuple
 
                         all_bkr_cxlled_qty = None
                         if side == Side.BUY:
-                            fetched_open_qty = strat_brief_obj.pair_buy_side_bartering_brief.open_qty
-                            fetched_open_notional = strat_brief_obj.pair_buy_side_bartering_brief.open_notional
-                            fetched_all_bkr_cxlled_qty = strat_brief_obj.pair_buy_side_bartering_brief.all_bkr_cxlled_qty
+                            fetched_open_qty = plan_brief_obj.pair_buy_side_bartering_brief.open_qty
+                            fetched_open_notional = plan_brief_obj.pair_buy_side_bartering_brief.open_notional
+                            fetched_all_bkr_cxlled_qty = plan_brief_obj.pair_buy_side_bartering_brief.all_bkr_cxlled_qty
                         else:
-                            fetched_open_qty = strat_brief_obj.pair_sell_side_bartering_brief.open_qty
-                            fetched_open_notional = strat_brief_obj.pair_sell_side_bartering_brief.open_notional
-                            fetched_all_bkr_cxlled_qty = strat_brief_obj.pair_sell_side_bartering_brief.all_bkr_cxlled_qty
+                            fetched_open_qty = plan_brief_obj.pair_sell_side_bartering_brief.open_qty
+                            fetched_open_notional = plan_brief_obj.pair_sell_side_bartering_brief.open_notional
+                            fetched_all_bkr_cxlled_qty = plan_brief_obj.pair_sell_side_bartering_brief.all_bkr_cxlled_qty
 
                         if isinstance(chore_journal_or_fills_journal, ChoreJournal):
                             chore_journal: ChoreJournal = chore_journal_or_fills_journal
@@ -2771,12 +2767,12 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                 # unfilled qty from existing open_qty + unfilled notional
                                 # (unfilled chore Qty * chore px) from existing open_notional
                                 unfilled_qty = self.get_residual_qty_post_chore_dod(chore_snapshot)
-                                open_qty, open_notional, all_bkr_cxlled_qty = self._handle_cxled_qty_in_strat_brief(
+                                open_qty, open_notional, all_bkr_cxlled_qty = self._handle_cxled_qty_in_plan_brief(
                                     fetched_open_qty, fetched_open_notional, fetched_all_bkr_cxlled_qty,
                                     chore_snapshot, unfilled_qty)
                             elif chore_journal.chore_event == ChoreEventType.OE_LAPSE:
                                 lapsed_qty = chore_snapshot.last_lapsed_qty
-                                open_qty, open_notional, all_bkr_cxlled_qty = self._handle_cxled_qty_in_strat_brief(
+                                open_qty, open_notional, all_bkr_cxlled_qty = self._handle_cxled_qty_in_plan_brief(
                                     fetched_open_qty, fetched_open_notional, fetched_all_bkr_cxlled_qty,
                                     chore_snapshot, lapsed_qty)
 
@@ -2908,7 +2904,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                                  f"{ChoreEventType.OE_BRK_REJ}, {ChoreEventType.OE_EXH_REJ}"
                                                  f"{ChoreEventType.OE_CXL_ACK}, {ChoreEventType.OE_UNSOL_CXL}], "
                                                  f"Found: {chore_journal_or_fills_journal.chore_event} - ignoring "
-                                                 f"strat_brief update")
+                                                 f"plan_brief update")
                                 logging.error(err_str_)
                                 return
                         elif isinstance(chore_journal_or_fills_journal, FillsJournal):
@@ -2954,30 +2950,30 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                         else:
                             err_str_: str = ("Unsupported Journal type: Must be either ChoreJournal or FillsJournal, "
                                              f"Found type: {type(chore_journal_or_fills_journal)} - ignoring "
-                                             f"strat_brief update")
+                                             f"plan_brief update")
                             logging.error(err_str_)
                             return
-                        max_leg_notional = strat_limits.max_single_leg_notional * hedge_ratio if (
-                                symbol == self.strat_leg_2.sec.sec_id) else strat_limits.max_single_leg_notional
+                        max_leg_notional = plan_limits.max_single_leg_notional * hedge_ratio if (
+                                symbol == self.plan_leg_2.sec.sec_id) else plan_limits.max_single_leg_notional
                         consumable_notional = (max_leg_notional -
                                                symbol_side_snapshot.total_fill_notional - open_notional)
-                        consumable_open_notional = strat_limits.max_open_single_leg_notional - open_notional
+                        consumable_open_notional = plan_limits.max_open_single_leg_notional - open_notional
                         security_float = self.static_data.get_security_float_from_ticker(symbol)
                         if security_float is not None:
                             consumable_concentration = \
-                                int((security_float / 100) * strat_limits.max_concentration -
+                                int((security_float / 100) * plan_limits.max_concentration -
                                     (open_qty + symbol_side_snapshot.total_filled_qty))
                         else:
                             consumable_concentration = 0
                         open_chores_count = (await StreetBookServiceRoutesCallbackBaseNativeOverride.
                                              underlying_get_open_chore_count_query_http(symbol))
-                        consumable_open_chores = strat_limits.max_open_chores_per_side - open_chores_count[
+                        consumable_open_chores = plan_limits.max_open_chores_per_side - open_chores_count[
                             0].open_chore_count
                         consumable_cxl_qty = ((((symbol_side_snapshot.total_filled_qty + open_qty +
                                                  symbol_side_snapshot.total_cxled_qty) / 100) *
-                                               strat_limits.cancel_rate.max_cancel_rate) -
+                                               plan_limits.cancel_rate.max_cancel_rate) -
                                               symbol_side_snapshot.total_cxled_qty)
-                        applicable_period_second = strat_limits.market_barter_volume_participation.applicable_period_seconds
+                        applicable_period_second = plan_limits.market_barter_volume_participation.applicable_period_seconds
                         executor_check_snapshot_list = \
                             (await StreetBookServiceRoutesCallbackBaseNativeOverride.
                              underlying_get_executor_check_snapshot_query_http(
@@ -2988,7 +2984,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                             indicative_consumable_participation_qty = \
                                 get_consumable_participation_qty(
                                     executor_check_snapshot_list,
-                                    strat_limits.market_barter_volume_participation.max_participation_rate)
+                                    plan_limits.market_barter_volume_participation.max_participation_rate)
                         else:
                             logging.error("Received unexpected length of executor_check_snapshot_list from query "
                                           f"{len(executor_check_snapshot_list)}, expected 1, symbol_side_key: "
@@ -3014,20 +3010,20 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                 open_qty=open_qty)
 
                         if side == Side.BUY:
-                            other_leg_residual_qty = strat_brief_obj.pair_sell_side_bartering_brief.residual_qty
-                            stored_pair_strat_bartering_brief = strat_brief_obj.pair_buy_side_bartering_brief
-                            other_leg_symbol = strat_brief_obj.pair_sell_side_bartering_brief.security.sec_id
+                            other_leg_residual_qty = plan_brief_obj.pair_sell_side_bartering_brief.residual_qty
+                            stored_pair_plan_bartering_brief = plan_brief_obj.pair_buy_side_bartering_brief
+                            other_leg_symbol = plan_brief_obj.pair_sell_side_bartering_brief.security.sec_id
                         else:
-                            other_leg_residual_qty = strat_brief_obj.pair_buy_side_bartering_brief.residual_qty
-                            stored_pair_strat_bartering_brief = strat_brief_obj.pair_sell_side_bartering_brief
-                            other_leg_symbol = strat_brief_obj.pair_buy_side_bartering_brief.security.sec_id
+                            other_leg_residual_qty = plan_brief_obj.pair_buy_side_bartering_brief.residual_qty
+                            stored_pair_plan_bartering_brief = plan_brief_obj.pair_sell_side_bartering_brief
+                            other_leg_symbol = plan_brief_obj.pair_buy_side_bartering_brief.security.sec_id
                         top_of_book_obj = self.get_cached_top_of_book_from_symbol(symbol)
                         other_leg_top_of_book = self.get_cached_top_of_book_from_symbol(other_leg_symbol)
                         if top_of_book_obj is not None and other_leg_top_of_book is not None:
 
                             # same residual_qty will be used if no match found below else will be replaced with
                             # updated residual_qty value
-                            residual_qty = stored_pair_strat_bartering_brief.residual_qty
+                            residual_qty = stored_pair_plan_bartering_brief.residual_qty
                             if isinstance(chore_journal_or_fills_journal, ChoreJournal):
                                 if chore_journal.chore_event not in [ChoreEventType.OE_AMD_UP_UNACK,
                                                                      ChoreEventType.OE_AMD_DN_UNACK,
@@ -3040,26 +3036,26 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                         else:
                                             # If DOD came due to cxl_ack or any other non-lapse case
                                             unfilled_qty = self.get_residual_qty_post_chore_dod(chore_snapshot)
-                                        residual_qty = int(stored_pair_strat_bartering_brief.residual_qty + unfilled_qty)
+                                        residual_qty = int(stored_pair_plan_bartering_brief.residual_qty + unfilled_qty)
                                     elif chore_journal.chore_event == ChoreEventType.OE_LAPSE:
                                         lapsed_qty = chore_snapshot.last_lapsed_qty
-                                        residual_qty = int(stored_pair_strat_bartering_brief.residual_qty + lapsed_qty)
+                                        residual_qty = int(stored_pair_plan_bartering_brief.residual_qty + lapsed_qty)
                                     # else not required: No other case can affect residual qty
                                 # else not required: No amend related event updates residual qty
                             else:
                                 if received_fill_after_dod:
                                     if chore_snapshot.chore_status == ChoreStatusType.OE_DOD:
-                                        residual_qty = int((stored_pair_strat_bartering_brief.residual_qty -
+                                        residual_qty = int((stored_pair_plan_bartering_brief.residual_qty -
                                                             chore_snapshot.last_update_fill_qty))
                                     else:
                                         if chore_snapshot.chore_status == ChoreStatusType.OE_OVER_FILLED:
                                             available_qty = self.get_valid_available_fill_qty(chore_snapshot)
                                             extra_fill_qty = chore_snapshot.filled_qty - available_qty
                                             acceptable_remaining_fill_qty = fills_journal.fill_qty - extra_fill_qty
-                                            residual_qty = int((stored_pair_strat_bartering_brief.residual_qty -
+                                            residual_qty = int((stored_pair_plan_bartering_brief.residual_qty -
                                                                 acceptable_remaining_fill_qty))
                                         else:
-                                            residual_qty = int(stored_pair_strat_bartering_brief.residual_qty -
+                                            residual_qty = int(stored_pair_plan_bartering_brief.residual_qty -
                                                                chore_snapshot.filled_qty)
                                 # else not required: fills have no impact on residual qty unless they arrive post DOD
 
@@ -3070,20 +3066,20 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                             current_leg_last_barter_px, current_leg_tob_symbol = current_leg_tob_data
                             other_leg_last_barter_px, other_leg_tob_symbol = other_leg_tob_data
                             updated_pair_side_brief_obj.indicative_consumable_residual = \
-                                strat_limits.residual_restriction.max_residual - \
+                                plan_limits.residual_restriction.max_residual - \
                                 ((residual_qty * self.get_usd_px(current_leg_last_barter_px, current_leg_tob_symbol)) -
                                  (other_leg_residual_qty * self.get_usd_px(other_leg_last_barter_px, other_leg_tob_symbol)))
                         else:
-                            logging.error(f"_update_strat_brief_from_chore_or_fill failed invalid TOBs from cache for key: "
+                            logging.error(f"_update_plan_brief_from_chore_or_fill failed invalid TOBs from cache for key: "
                                           f"{StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_snapshot_log_key(chore_snapshot)};;;buy TOB: {top_of_book_obj}; sell"
                                           f" TOB: {other_leg_top_of_book}, {chore_snapshot=}")
                             return
 
                         # Updating consumable_nett_filled_notional
-                        if symbol_side_snapshot.security.sec_id == self.strat_leg_1.sec.sec_id:
-                            other_sec_id = self.strat_leg_2.sec.sec_id
+                        if symbol_side_snapshot.security.sec_id == self.plan_leg_1.sec.sec_id:
+                            other_sec_id = self.plan_leg_2.sec.sec_id
                         else:
-                            other_sec_id = self.strat_leg_1.sec.sec_id
+                            other_sec_id = self.plan_leg_1.sec.sec_id
 
                         if symbol_side_snapshot.side == Side.BUY:
                             other_side = Side.SELL
@@ -3091,55 +3087,55 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                             other_side = Side.BUY
 
                         other_symbol_side_snapshot_tuple = (
-                            self.strat_cache.get_symbol_side_snapshot_from_symbol(other_sec_id))
+                            self.plan_cache.get_symbol_side_snapshot_from_symbol(other_sec_id))
                         consumable_nett_filled_notional: float | None = None
                         if other_symbol_side_snapshot_tuple is not None:
                             other_symbol_side_snapshot, _ = other_symbol_side_snapshot_tuple
                             consumable_nett_filled_notional = (
-                                    strat_limits.max_net_filled_notional - abs(
+                                    plan_limits.max_net_filled_notional - abs(
                                         symbol_side_snapshot.total_fill_notional -
                                         other_symbol_side_snapshot.total_fill_notional))
                         else:
-                            err_str_ = ("Received symbol_side_snapshot_tuple as None from strat_cache, "
+                            err_str_ = ("Received symbol_side_snapshot_tuple as None from plan_cache, "
                                         f"symbol_side_key: {get_symbol_side_key([(other_sec_id, other_side)])}")
                             logging.error(err_str_)
 
-                        if symbol == strat_brief_obj.pair_buy_side_bartering_brief.security.sec_id:
-                            updated_strat_brief = StratBriefOptional(
-                                id=strat_brief_obj.id, pair_buy_side_bartering_brief=updated_pair_side_brief_obj,
+                        if symbol == plan_brief_obj.pair_buy_side_bartering_brief.security.sec_id:
+                            updated_plan_brief = PlanBriefOptional(
+                                id=plan_brief_obj.id, pair_buy_side_bartering_brief=updated_pair_side_brief_obj,
                                 consumable_nett_filled_notional=consumable_nett_filled_notional)
-                        elif symbol == strat_brief_obj.pair_sell_side_bartering_brief.security.sec_id:
-                            updated_strat_brief = StratBriefOptional(
-                                id=strat_brief_obj.id, pair_sell_side_bartering_brief=updated_pair_side_brief_obj,
+                        elif symbol == plan_brief_obj.pair_sell_side_bartering_brief.security.sec_id:
+                            updated_plan_brief = PlanBriefOptional(
+                                id=plan_brief_obj.id, pair_sell_side_bartering_brief=updated_pair_side_brief_obj,
                                 consumable_nett_filled_notional=consumable_nett_filled_notional)
                         else:
                             err_str_ = f"error: None of the 2 pair_side_bartering_brief(s) contain {symbol = } in " \
-                                       f"strat_brief of key: {get_strat_brief_log_key(strat_brief_obj)};;; " \
-                                       f"{strat_brief_obj = }"
+                                       f"plan_brief of key: {get_plan_brief_log_key(plan_brief_obj)};;; " \
+                                       f"{plan_brief_obj = }"
                             logging.exception(err_str_)
                             return
 
-                        updated_strat_brief_dict = updated_strat_brief.to_dict(exclude_none=True)
-                        updated_strat_brief = \
+                        updated_plan_brief_dict = updated_plan_brief.to_dict(exclude_none=True)
+                        updated_plan_brief = \
                             (await StreetBookServiceRoutesCallbackBaseNativeOverride.
-                             underlying_partial_update_strat_brief_http(updated_strat_brief_dict))
-                        logging.debug(f"Updated strat_brief for chore_id: {chore_snapshot.chore_brief.chore_id=}, "
-                                      f"symbol_side_key: {get_symbol_side_key([(symbol, side)])};;;{updated_strat_brief=}")
-                        return updated_strat_brief
+                             underlying_partial_update_plan_brief_http(updated_plan_brief_dict))
+                        logging.debug(f"Updated plan_brief for chore_id: {chore_snapshot.chore_brief.chore_id=}, "
+                                      f"symbol_side_key: {get_symbol_side_key([(symbol, side)])};;;{updated_plan_brief=}")
+                        return updated_plan_brief
                     else:
-                        logging.error(f"error: no strat_limits found in strat_cache - ignoring update of chore_id: "
-                                      f"{chore_snapshot.chore_brief.chore_id} in strat_brief, "
+                        logging.error(f"error: no plan_limits found in plan_cache - ignoring update of chore_id: "
+                                      f"{chore_snapshot.chore_brief.chore_id} in plan_brief, "
                                       f"symbol_side_key: {get_symbol_side_key([(symbol, side)])}")
                         return
 
                 else:
-                    err_str_ = (f"No strat brief found in strat_cache, ignoring update of strat_brief for chore_id: "
+                    err_str_ = (f"No plan brief found in plan_cache, ignoring update of plan_brief for chore_id: "
                                 f"{chore_snapshot.chore_brief.chore_id}, symbol_side_key: "
                                 f"{get_symbol_side_key([(symbol, side)])}")
                     logging.exception(err_str_)
                     return
 
-    def _handle_cxl_qty_in_portfolio_status(self, chore_snapshot_obj: ChoreSnapshot, cxled_qty: int) -> int:
+    def _handle_cxl_qty_in_contact_status(self, chore_snapshot_obj: ChoreSnapshot, cxled_qty: int) -> int:
         update_overall_notional = \
             -(self.get_usd_px(chore_snapshot_obj.chore_brief.px,
                               chore_snapshot_obj.chore_brief.security.sec_id) * cxled_qty)
@@ -3219,9 +3215,9 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                                    chore_snapshot_obj.chore_brief.security.sec_id))
         return old_open_qty, new_open_qty, old_open_notional, new_open_notional
 
-    async def _update_portfolio_status_from_chore_journal(
+    async def _update_contact_status_from_chore_journal(
             self, chore_journal_obj: ChoreJournal,
-            chore_snapshot_obj: ChoreSnapshot) -> PortfolioStatusUpdatesContainer | None:
+            chore_snapshot_obj: ChoreSnapshot) -> ContactStatusUpdatesContainer | None:
         match chore_journal_obj.chore.side:
             case Side.BUY:
                 update_overall_buy_notional = 0
@@ -3233,11 +3229,11 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                     case (ChoreEventType.OE_CXL_ACK | ChoreEventType.OE_UNSOL_CXL | ChoreEventType.OE_INT_REJ |
                           ChoreEventType.OE_BRK_REJ | ChoreEventType.OE_EXH_REJ):
                         total_buy_unfilled_qty = self.get_residual_qty_post_chore_dod(chore_snapshot_obj)
-                        update_overall_buy_notional = self._handle_cxl_qty_in_portfolio_status(
+                        update_overall_buy_notional = self._handle_cxl_qty_in_contact_status(
                             chore_snapshot_obj, total_buy_unfilled_qty)
                     case ChoreEventType.OE_LAPSE:
                         lapsed_qty = chore_snapshot_obj.last_lapsed_qty
-                        update_overall_buy_notional = self._handle_cxl_qty_in_portfolio_status(
+                        update_overall_buy_notional = self._handle_cxl_qty_in_contact_status(
                             chore_snapshot_obj, lapsed_qty)
                     case ChoreEventType.OE_AMD_DN_UNACK | ChoreEventType.OE_AMD_UP_UNACK | ChoreEventType.OE_AMD_ACK:
                         if chore_snapshot_obj.chore_status not in OTHER_TERMINAL_STATES:
@@ -3341,7 +3337,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                             update_overall_buy_notional = new_open_notional - old_open_notional
                         # AMD: else not required: if chore status is DOD with AMD_ACK event then it is the
                         # case of amend post DOD so open would already be removed while handling DOD
-                return PortfolioStatusUpdatesContainer(buy_notional_update=update_overall_buy_notional)
+                return ContactStatusUpdatesContainer(buy_notional_update=update_overall_buy_notional)
             case Side.SELL:
                 update_overall_sell_notional = 0
                 match chore_journal_obj.chore_event:
@@ -3352,11 +3348,11 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                     case (ChoreEventType.OE_CXL_ACK | ChoreEventType.OE_UNSOL_CXL | ChoreEventType.OE_INT_REJ |
                           ChoreEventType.OE_BRK_REJ | ChoreEventType.OE_EXH_REJ):
                         total_sell_unfilled_qty = self.get_residual_qty_post_chore_dod(chore_snapshot_obj)
-                        update_overall_sell_notional = self._handle_cxl_qty_in_portfolio_status(
+                        update_overall_sell_notional = self._handle_cxl_qty_in_contact_status(
                             chore_snapshot_obj, total_sell_unfilled_qty)
                     case ChoreEventType.OE_LAPSE:
                         lapsed_qty = chore_snapshot_obj.last_lapsed_qty
-                        update_overall_sell_notional = self._handle_cxl_qty_in_portfolio_status(
+                        update_overall_sell_notional = self._handle_cxl_qty_in_contact_status(
                             chore_snapshot_obj, lapsed_qty)
                     case ChoreEventType.OE_AMD_DN_UNACK | ChoreEventType.OE_AMD_UP_UNACK | ChoreEventType.OE_AMD_ACK:
                         if chore_snapshot_obj.chore_status not in OTHER_TERMINAL_STATES:
@@ -3461,10 +3457,10 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                             update_overall_sell_notional = new_open_notional - old_open_notional
                         # AMD: else not required: if chore status is DOD with AMD_ACK event then it is the
                         # case of amend post DOD so open would already be removed while handling DOD
-                return PortfolioStatusUpdatesContainer(sell_notional_update=update_overall_sell_notional)
+                return ContactStatusUpdatesContainer(sell_notional_update=update_overall_sell_notional)
             case other_:
                 err_str_ = f"Unsupported Side Type {other_} received in chore_journal of key: " \
-                           f"{StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_journal_log_key(chore_journal_obj)} while updating strat_status;;; " \
+                           f"{StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_journal_log_key(chore_journal_obj)} while updating plan_status;;; " \
                            f"{chore_journal_obj = } "
                 logging.error(err_str_)
                 return None
@@ -3477,26 +3473,26 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         await self.handle_create_fills_journal_pre(fills_journal_obj)
 
     async def create_fills_journal_post(self, fills_journal_obj: FillsJournal):
-        # updating bartering_data_manager's strat_cache
+        # updating bartering_data_manager's plan_cache
         self.bartering_data_manager.handle_fills_journal_get_all_ws(fills_journal_obj)
 
         async with StreetBookServiceRoutesCallbackBaseNativeOverride.journal_shared_lock:
             res = await self._apply_fill_update_in_chore_snapshot(fills_journal_obj)
 
             if res is not None:
-                chore_snapshot, strat_brief, portfolio_status_updates = res
+                chore_snapshot, plan_brief, contact_status_updates = res
 
-                # Updating and checking portfolio_limits in portfolio_manager
-                post_book_service_http_client.check_portfolio_limits_query_client(
-                    self.pair_strat_id, None, chore_snapshot, strat_brief, portfolio_status_updates)
+                # Updating and checking contact_limits in contact_manager
+                post_book_service_http_client.check_contact_limits_query_client(
+                    self.pair_plan_id, None, chore_snapshot, plan_brief, contact_status_updates)
 
             # else not required: if result returned from _apply_fill_update_in_chore_snapshot is None, that
             # signifies some unexpected exception occurred so complete update was not done,
-            # therefore avoiding portfolio_limit checks too
+            # therefore avoiding contact_limit checks too
 
-    async def _update_portfolio_status_from_fill_journal(
+    async def _update_contact_status_from_fill_journal(
             self, chore_snapshot_obj: ChoreSnapshot, received_fill_after_dod: bool
-            ) -> PortfolioStatusUpdatesContainer | None:
+            ) -> ContactStatusUpdatesContainer | None:
 
         match chore_snapshot_obj.chore_brief.side:
             case Side.BUY:
@@ -3533,7 +3529,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                     (self.get_usd_px(chore_snapshot_obj.last_update_fill_px,
                                      chore_snapshot_obj.chore_brief.security.sec_id) *
                      chore_snapshot_obj.last_update_fill_qty)
-                return PortfolioStatusUpdatesContainer(buy_notional_update=update_overall_buy_notional,
+                return ContactStatusUpdatesContainer(buy_notional_update=update_overall_buy_notional,
                                                        buy_fill_notional_update=update_overall_buy_fill_notional)
             case Side.SELL:
                 if received_fill_after_dod:
@@ -3568,11 +3564,11 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                     self.get_usd_px(chore_snapshot_obj.last_update_fill_px,
                                     chore_snapshot_obj.chore_brief.security.sec_id) * \
                     chore_snapshot_obj.last_update_fill_qty
-                return PortfolioStatusUpdatesContainer(sell_notional_update=update_overall_sell_notional,
+                return ContactStatusUpdatesContainer(sell_notional_update=update_overall_sell_notional,
                                                        sell_fill_notional_update=update_overall_sell_fill_notional)
             case other_:
                 err_str_ = f"Unsupported Side Type {other_} received in chore snapshot of key " \
-                           f"{StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_snapshot_log_key(chore_snapshot_obj)} while updating strat_status;;; " \
+                           f"{StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_snapshot_log_key(chore_snapshot_obj)} while updating plan_status;;; " \
                            f"{chore_snapshot_obj = }"
                 logging.error(err_str_)
                 return None
@@ -3580,7 +3576,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
     async def _update_symbol_side_snapshot_from_fill_applied_chore_snapshot(
             self, chore_snapshot_obj: ChoreSnapshot, received_fill_after_dod: bool) -> SymbolSideSnapshot:
         async with SymbolSideSnapshot.reentrant_lock:
-            symbol_side_snapshot_tuple = self.strat_cache.get_symbol_side_snapshot_from_symbol(
+            symbol_side_snapshot_tuple = self.plan_cache.get_symbol_side_snapshot_from_symbol(
                 chore_snapshot_obj.chore_brief.security.sec_id)
 
             if symbol_side_snapshot_tuple is not None:
@@ -3633,25 +3629,25 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                     underlying_partial_update_symbol_side_snapshot_http(updated_symbol_side_snapshot_obj_dict))
                 return updated_symbol_side_snapshot_obj
             else:
-                err_str_ = ("Received symbol_side_snapshot_tuple as None from strat_cache for symbol: "
+                err_str_ = ("Received symbol_side_snapshot_tuple as None from plan_cache for symbol: "
                             f"{chore_snapshot_obj.chore_brief.security.sec_id}, "
                             f"chore_snapshot_key: {StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_snapshot_log_key(chore_snapshot_obj)} - "
                             f"ignoring this symbol_side_snapshot update from fills")
                 logging.error(err_str_)
 
-    def pause_strat(self):
-        pair_strat = self.strat_cache.get_pair_strat_obj()
-        if is_ongoing_strat(pair_strat):
-            guaranteed_call_pair_strat_client(
-                PairStratBaseModel, email_book_service_http_client.patch_pair_strat_client,
-                _id=self.pair_strat_id, strat_state=StratState.StratState_PAUSED.value)
+    def pause_plan(self):
+        pair_plan = self.plan_cache.get_pair_plan_obj()
+        if is_ongoing_plan(pair_plan):
+            guaranteed_call_pair_plan_client(
+                PairPlanBaseModel, email_book_service_http_client.patch_pair_plan_client,
+                _id=self.pair_plan_id, plan_state=PlanState.PlanState_PAUSED.value)
         else:
-            logging.error(f"Could not pause strat, strat is not in ongoing state;;;{pair_strat=}")
+            logging.error(f"Could not pause plan, plan is not in ongoing state;;;{pair_plan=}")
 
-    def unpause_strat(self):
-        guaranteed_call_pair_strat_client(
-            PairStratBaseModel, email_book_service_http_client.patch_pair_strat_client,
-            _id=self.pair_strat_id, strat_state=StratState.StratState_ACTIVE.value)
+    def unpause_plan(self):
+        guaranteed_call_pair_plan_client(
+            PairPlanBaseModel, email_book_service_http_client.patch_pair_plan_client,
+            _id=self.pair_plan_id, plan_state=PlanState.PlanState_ACTIVE.value)
 
     async def handle_post_chore_snapshot_tasks_for_fills(
             self, fills_journal_obj: FillsJournal, chore_snapshot_obj: ChoreSnapshot,
@@ -3660,47 +3656,47 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             await self._update_symbol_side_snapshot_from_fill_applied_chore_snapshot(
                 chore_snapshot_obj, received_fill_after_dod=received_fill_after_dod)
         if symbol_side_snapshot is not None:
-            updated_strat_brief = await self._update_strat_brief_from_chore_or_fill(
+            updated_plan_brief = await self._update_plan_brief_from_chore_or_fill(
                 fills_journal_obj, chore_snapshot_obj, symbol_side_snapshot,
                 received_fill_after_dod=received_fill_after_dod)
-            if updated_strat_brief is not None:
-                await self._update_strat_status_from_fill_journal(
-                    chore_snapshot_obj, symbol_side_snapshot, updated_strat_brief,
+            if updated_plan_brief is not None:
+                await self._update_plan_status_from_fill_journal(
+                    chore_snapshot_obj, symbol_side_snapshot, updated_plan_brief,
                     received_fill_after_dod=received_fill_after_dod)
-            # else not required: if updated_strat_brief is None then it means some error occurred in
-            # _update_strat_brief_from_chore which would have got added to alert already
-            portfolio_status_updates: PortfolioStatusUpdatesContainer | None = (
-                await self._update_portfolio_status_from_fill_journal(
+            # else not required: if updated_plan_brief is None then it means some error occurred in
+            # _update_plan_brief_from_chore which would have got added to alert already
+            contact_status_updates: ContactStatusUpdatesContainer | None = (
+                await self._update_contact_status_from_fill_journal(
                     chore_snapshot_obj, received_fill_after_dod=received_fill_after_dod))
 
-            return chore_snapshot_obj, updated_strat_brief, portfolio_status_updates
+            return chore_snapshot_obj, updated_plan_brief, contact_status_updates
         # else not require_create_update_symbol_side_snapshot_from_chore_journald: if symbol_side_snapshot
         # is None then it means error occurred in _create_update_symbol_side_snapshot_from_chore_journal
         # which would have got added to alert already
 
-    async def _update_strat_status_from_fill_journal(self, chore_snapshot_obj: ChoreSnapshot,
+    async def _update_plan_status_from_fill_journal(self, chore_snapshot_obj: ChoreSnapshot,
                                                      symbol_side_snapshot: SymbolSideSnapshot,
-                                                     strat_brief_obj: StratBrief,
+                                                     plan_brief_obj: PlanBrief,
                                                      received_fill_after_dod: bool):
-        strat_limits_tuple = self.strat_cache.get_strat_limits()
+        plan_limits_tuple = self.plan_cache.get_plan_limits()
 
-        async with StratStatus.reentrant_lock:
-            strat_status_tuple = self.strat_cache.get_strat_status()
+        async with PlanStatus.reentrant_lock:
+            plan_status_tuple = self.plan_cache.get_plan_status()
 
-            if strat_limits_tuple is not None and strat_status_tuple is not None:
-                strat_limits, _ = strat_limits_tuple
-                fetched_strat_status_obj, _ = strat_status_tuple
+            if plan_limits_tuple is not None and plan_status_tuple is not None:
+                plan_limits, _ = plan_limits_tuple
+                fetched_plan_status_obj, _ = plan_status_tuple
 
-                update_strat_status_obj = StratStatusBaseModel(id=fetched_strat_status_obj.id)
+                update_plan_status_obj = PlanStatusBaseModel(id=fetched_plan_status_obj.id)
                 match chore_snapshot_obj.chore_brief.side:
                     case Side.BUY:
                         if not received_fill_after_dod:
                             if chore_snapshot_obj.chore_status != ChoreStatusType.OE_OVER_FILLED:
-                                update_strat_status_obj.total_open_buy_qty = (
-                                    int(fetched_strat_status_obj.total_open_buy_qty -
+                                update_plan_status_obj.total_open_buy_qty = (
+                                    int(fetched_plan_status_obj.total_open_buy_qty -
                                         chore_snapshot_obj.last_update_fill_qty))
-                                update_strat_status_obj.total_open_buy_notional = (
-                                    fetched_strat_status_obj.total_open_buy_notional -
+                                update_plan_status_obj.total_open_buy_notional = (
+                                    fetched_plan_status_obj.total_open_buy_notional -
                                     (chore_snapshot_obj.last_update_fill_qty *
                                      self.get_usd_px(chore_snapshot_obj.chore_brief.px,
                                                      chore_snapshot_obj.chore_brief.security.sec_id)))
@@ -3711,37 +3707,37 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                 extra_fill_qty = chore_snapshot_obj.filled_qty - available_qty
                                 acceptable_remaining_fill_qty = chore_snapshot_obj.last_update_fill_qty - extra_fill_qty
 
-                                update_strat_status_obj.total_open_buy_qty = int(
-                                    fetched_strat_status_obj.total_open_buy_qty - acceptable_remaining_fill_qty)
-                                update_strat_status_obj.total_open_buy_notional = (
-                                    fetched_strat_status_obj.total_open_buy_notional -
+                                update_plan_status_obj.total_open_buy_qty = int(
+                                    fetched_plan_status_obj.total_open_buy_qty - acceptable_remaining_fill_qty)
+                                update_plan_status_obj.total_open_buy_notional = (
+                                    fetched_plan_status_obj.total_open_buy_notional -
                                     (acceptable_remaining_fill_qty *
                                      self.get_usd_px(chore_snapshot_obj.chore_brief.px,
                                                      chore_snapshot_obj.chore_brief.security.sec_id)))
-                            update_strat_status_obj.total_open_sell_notional = (
-                                fetched_strat_status_obj.total_open_sell_notional)
-                            if update_strat_status_obj.total_open_buy_qty == 0:
-                                update_strat_status_obj.avg_open_buy_px = 0
+                            update_plan_status_obj.total_open_sell_notional = (
+                                fetched_plan_status_obj.total_open_sell_notional)
+                            if update_plan_status_obj.total_open_buy_qty == 0:
+                                update_plan_status_obj.avg_open_buy_px = 0
                             else:
-                                update_strat_status_obj.avg_open_buy_px = \
-                                    self.get_local_px_or_notional(update_strat_status_obj.total_open_buy_notional,
+                                update_plan_status_obj.avg_open_buy_px = \
+                                    self.get_local_px_or_notional(update_plan_status_obj.total_open_buy_notional,
                                                                   chore_snapshot_obj.chore_brief.security.sec_id) / \
-                                    update_strat_status_obj.total_open_buy_qty
+                                    update_plan_status_obj.total_open_buy_qty
 
-                        update_strat_status_obj.total_fill_buy_qty = int(
-                            fetched_strat_status_obj.total_fill_buy_qty + chore_snapshot_obj.last_update_fill_qty)
-                        update_strat_status_obj.total_fill_buy_notional = (
-                            fetched_strat_status_obj.total_fill_buy_notional +
+                        update_plan_status_obj.total_fill_buy_qty = int(
+                            fetched_plan_status_obj.total_fill_buy_qty + chore_snapshot_obj.last_update_fill_qty)
+                        update_plan_status_obj.total_fill_buy_notional = (
+                            fetched_plan_status_obj.total_fill_buy_notional +
                             chore_snapshot_obj.last_update_fill_qty * self.get_usd_px(
                                 chore_snapshot_obj.last_update_fill_px,
                                 chore_snapshot_obj.chore_brief.security.sec_id))
-                        update_strat_status_obj.avg_fill_buy_px = \
-                            (self.get_local_px_or_notional(update_strat_status_obj.total_fill_buy_notional,
+                        update_plan_status_obj.avg_fill_buy_px = \
+                            (self.get_local_px_or_notional(update_plan_status_obj.total_fill_buy_notional,
                                                            chore_snapshot_obj.chore_brief.security.sec_id) /
-                             update_strat_status_obj.total_fill_buy_qty
-                             if update_strat_status_obj.total_fill_buy_qty != 0 else 0)
-                        update_strat_status_obj.total_fill_sell_notional = (
-                            fetched_strat_status_obj.total_fill_sell_notional)
+                             update_plan_status_obj.total_fill_buy_qty
+                             if update_plan_status_obj.total_fill_buy_qty != 0 else 0)
+                        update_plan_status_obj.total_fill_sell_notional = (
+                            fetched_plan_status_obj.total_fill_sell_notional)
                         if received_fill_after_dod:
                             if chore_snapshot_obj.chore_status == ChoreStatusType.OE_OVER_FILLED:
                                 # if fill made chore OVER_FILLED, then extra fill can't be removed from current cxl_qty
@@ -3750,38 +3746,38 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                 extra_fill_qty = chore_snapshot_obj.filled_qty - available_qty
                                 acceptable_remaining_fill_qty = chore_snapshot_obj.last_update_fill_qty - extra_fill_qty
 
-                                update_strat_status_obj.total_cxl_buy_qty = int(
-                                    fetched_strat_status_obj.total_cxl_buy_qty - acceptable_remaining_fill_qty)
-                                update_strat_status_obj.total_cxl_buy_notional = (
-                                    fetched_strat_status_obj.total_cxl_buy_notional -
+                                update_plan_status_obj.total_cxl_buy_qty = int(
+                                    fetched_plan_status_obj.total_cxl_buy_qty - acceptable_remaining_fill_qty)
+                                update_plan_status_obj.total_cxl_buy_notional = (
+                                    fetched_plan_status_obj.total_cxl_buy_notional -
                                     (self.get_usd_px(chore_snapshot_obj.chore_brief.px,
                                                      chore_snapshot_obj.chore_brief.security.sec_id) *
                                      acceptable_remaining_fill_qty))
                             else:
-                                update_strat_status_obj.total_cxl_buy_qty = int(
-                                    fetched_strat_status_obj.total_cxl_buy_qty -
+                                update_plan_status_obj.total_cxl_buy_qty = int(
+                                    fetched_plan_status_obj.total_cxl_buy_qty -
                                     chore_snapshot_obj.last_update_fill_qty)
-                                update_strat_status_obj.total_cxl_buy_notional = (
-                                    fetched_strat_status_obj.total_cxl_buy_notional -
+                                update_plan_status_obj.total_cxl_buy_notional = (
+                                    fetched_plan_status_obj.total_cxl_buy_notional -
                                     (self.get_usd_px(chore_snapshot_obj.chore_brief.px,
                                                      chore_snapshot_obj.chore_brief.security.sec_id) *
                                      chore_snapshot_obj.last_update_fill_qty))
-                            update_strat_status_obj.avg_cxl_buy_px = (
-                                (self.get_local_px_or_notional(update_strat_status_obj.total_cxl_buy_notional,
+                            update_plan_status_obj.avg_cxl_buy_px = (
+                                (self.get_local_px_or_notional(update_plan_status_obj.total_cxl_buy_notional,
                                                                chore_snapshot_obj.chore_brief.security.sec_id) /
-                                 update_strat_status_obj.total_cxl_buy_qty)
-                                if update_strat_status_obj.total_cxl_buy_qty != 0 else 0)
-                            update_strat_status_obj.total_cxl_sell_notional = (
-                                fetched_strat_status_obj.total_cxl_sell_notional)
+                                 update_plan_status_obj.total_cxl_buy_qty)
+                                if update_plan_status_obj.total_cxl_buy_qty != 0 else 0)
+                            update_plan_status_obj.total_cxl_sell_notional = (
+                                fetched_plan_status_obj.total_cxl_sell_notional)
 
                     case Side.SELL:
                         if not received_fill_after_dod:
                             if chore_snapshot_obj.chore_status != ChoreStatusType.OE_OVER_FILLED:
-                                update_strat_status_obj.total_open_sell_qty = (
-                                    int(fetched_strat_status_obj.total_open_sell_qty -
+                                update_plan_status_obj.total_open_sell_qty = (
+                                    int(fetched_plan_status_obj.total_open_sell_qty -
                                         chore_snapshot_obj.last_update_fill_qty))
-                                update_strat_status_obj.total_open_sell_notional = (
-                                    fetched_strat_status_obj.total_open_sell_notional -
+                                update_plan_status_obj.total_open_sell_notional = (
+                                    fetched_plan_status_obj.total_open_sell_notional -
                                     (chore_snapshot_obj.last_update_fill_qty *
                                      self.get_usd_px(chore_snapshot_obj.chore_brief.px,
                                                      chore_snapshot_obj.chore_brief.security.sec_id)))
@@ -3792,39 +3788,39 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                 extra_fill_qty = chore_snapshot_obj.filled_qty - available_qty
                                 acceptable_remaining_fill_qty = chore_snapshot_obj.last_update_fill_qty - extra_fill_qty
 
-                                update_strat_status_obj.total_open_sell_qty = int(
-                                    fetched_strat_status_obj.total_open_sell_qty - acceptable_remaining_fill_qty)
-                                update_strat_status_obj.total_open_sell_notional = (
-                                    fetched_strat_status_obj.total_open_sell_notional -
+                                update_plan_status_obj.total_open_sell_qty = int(
+                                    fetched_plan_status_obj.total_open_sell_qty - acceptable_remaining_fill_qty)
+                                update_plan_status_obj.total_open_sell_notional = (
+                                    fetched_plan_status_obj.total_open_sell_notional -
                                     (acceptable_remaining_fill_qty *
                                      self.get_usd_px(chore_snapshot_obj.chore_brief.px,
                                                      chore_snapshot_obj.chore_brief.security.sec_id)))
-                            update_strat_status_obj.total_open_buy_notional = (
-                                fetched_strat_status_obj.total_open_buy_notional)
-                            if update_strat_status_obj.total_open_sell_qty == 0:
-                                update_strat_status_obj.avg_open_sell_px = 0
+                            update_plan_status_obj.total_open_buy_notional = (
+                                fetched_plan_status_obj.total_open_buy_notional)
+                            if update_plan_status_obj.total_open_sell_qty == 0:
+                                update_plan_status_obj.avg_open_sell_px = 0
                             else:
-                                update_strat_status_obj.avg_open_sell_px = \
-                                    self.get_local_px_or_notional(update_strat_status_obj.total_open_sell_notional,
+                                update_plan_status_obj.avg_open_sell_px = \
+                                    self.get_local_px_or_notional(update_plan_status_obj.total_open_sell_notional,
                                                                   chore_snapshot_obj.chore_brief.security.sec_id) / \
-                                    update_strat_status_obj.total_open_sell_qty
+                                    update_plan_status_obj.total_open_sell_qty
 
-                        update_strat_status_obj.total_fill_sell_qty = int(
-                            fetched_strat_status_obj.total_fill_sell_qty + chore_snapshot_obj.last_update_fill_qty)
-                        update_strat_status_obj.total_fill_sell_notional = (
-                                fetched_strat_status_obj.total_fill_sell_notional +
+                        update_plan_status_obj.total_fill_sell_qty = int(
+                            fetched_plan_status_obj.total_fill_sell_qty + chore_snapshot_obj.last_update_fill_qty)
+                        update_plan_status_obj.total_fill_sell_notional = (
+                                fetched_plan_status_obj.total_fill_sell_notional +
                                 chore_snapshot_obj.last_update_fill_qty * self.get_usd_px(
                                     chore_snapshot_obj.last_update_fill_px,
                                     chore_snapshot_obj.chore_brief.security.sec_id))
-                        if update_strat_status_obj.total_fill_sell_qty:
-                            update_strat_status_obj.avg_fill_sell_px = \
-                                self.get_local_px_or_notional(update_strat_status_obj.total_fill_sell_notional,
+                        if update_plan_status_obj.total_fill_sell_qty:
+                            update_plan_status_obj.avg_fill_sell_px = \
+                                self.get_local_px_or_notional(update_plan_status_obj.total_fill_sell_notional,
                                                               chore_snapshot_obj.chore_brief.security.sec_id) / \
-                                update_strat_status_obj.total_fill_sell_qty
+                                update_plan_status_obj.total_fill_sell_qty
                         else:
-                            update_strat_status_obj.avg_fill_sell_px = 0
-                        update_strat_status_obj.total_fill_buy_notional = (
-                            fetched_strat_status_obj.total_fill_buy_notional)
+                            update_plan_status_obj.avg_fill_sell_px = 0
+                        update_plan_status_obj.total_fill_buy_notional = (
+                            fetched_plan_status_obj.total_fill_buy_notional)
 
                         if received_fill_after_dod:
                             if chore_snapshot_obj.chore_status == ChoreStatusType.OE_OVER_FILLED:
@@ -3834,75 +3830,75 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                 extra_fill_qty = chore_snapshot_obj.filled_qty - available_qty
                                 acceptable_remaining_fill_qty = chore_snapshot_obj.last_update_fill_qty - extra_fill_qty
 
-                                update_strat_status_obj.total_cxl_sell_qty = int(
-                                    fetched_strat_status_obj.total_cxl_sell_qty - acceptable_remaining_fill_qty)
-                                update_strat_status_obj.total_cxl_sell_notional = (
-                                        fetched_strat_status_obj.total_cxl_sell_notional -
+                                update_plan_status_obj.total_cxl_sell_qty = int(
+                                    fetched_plan_status_obj.total_cxl_sell_qty - acceptable_remaining_fill_qty)
+                                update_plan_status_obj.total_cxl_sell_notional = (
+                                        fetched_plan_status_obj.total_cxl_sell_notional -
                                         (self.get_usd_px(chore_snapshot_obj.chore_brief.px,
                                                          chore_snapshot_obj.chore_brief.security.sec_id) *
                                          acceptable_remaining_fill_qty))
                             else:
-                                update_strat_status_obj.total_cxl_sell_qty = int(
-                                    fetched_strat_status_obj.total_cxl_sell_qty -
+                                update_plan_status_obj.total_cxl_sell_qty = int(
+                                    fetched_plan_status_obj.total_cxl_sell_qty -
                                     chore_snapshot_obj.last_update_fill_qty)
-                                update_strat_status_obj.total_cxl_sell_notional = (
-                                    fetched_strat_status_obj.total_cxl_sell_notional -
+                                update_plan_status_obj.total_cxl_sell_notional = (
+                                    fetched_plan_status_obj.total_cxl_sell_notional -
                                     (self.get_usd_px(chore_snapshot_obj.chore_brief.px,
                                                      chore_snapshot_obj.chore_brief.security.sec_id) *
                                      chore_snapshot_obj.last_update_fill_qty))
-                            update_strat_status_obj.avg_cxl_sell_px = (
-                                (self.get_local_px_or_notional(update_strat_status_obj.total_cxl_sell_notional,
+                            update_plan_status_obj.avg_cxl_sell_px = (
+                                (self.get_local_px_or_notional(update_plan_status_obj.total_cxl_sell_notional,
                                                                chore_snapshot_obj.chore_brief.security.sec_id) /
-                                 update_strat_status_obj.total_cxl_sell_qty)
-                                if update_strat_status_obj.total_cxl_sell_qty != 0 else 0)
-                            update_strat_status_obj.total_cxl_buy_notional = (
-                                fetched_strat_status_obj.total_cxl_buy_notional)
+                                 update_plan_status_obj.total_cxl_sell_qty)
+                                if update_plan_status_obj.total_cxl_sell_qty != 0 else 0)
+                            update_plan_status_obj.total_cxl_buy_notional = (
+                                fetched_plan_status_obj.total_cxl_buy_notional)
 
                     case other_:
                         err_str_ = f"Unsupported Side Type {other_} received for chore_snapshot_key: " \
-                                   f"{StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_snapshot_log_key(chore_snapshot_obj)} while updating strat_status;;; " \
+                                   f"{StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_snapshot_log_key(chore_snapshot_obj)} while updating plan_status;;; " \
                                    f"{chore_snapshot_obj = }"
                         logging.error(err_str_)
                         return
                 if not received_fill_after_dod:
-                    update_strat_status_obj.total_open_exposure = (update_strat_status_obj.total_open_buy_notional -
-                                                                   update_strat_status_obj.total_open_sell_notional)
-                update_strat_status_obj.total_fill_exposure = (update_strat_status_obj.total_fill_buy_notional -
-                                                               update_strat_status_obj.total_fill_sell_notional)
+                    update_plan_status_obj.total_open_exposure = (update_plan_status_obj.total_open_buy_notional -
+                                                                   update_plan_status_obj.total_open_sell_notional)
+                update_plan_status_obj.total_fill_exposure = (update_plan_status_obj.total_fill_buy_notional -
+                                                               update_plan_status_obj.total_fill_sell_notional)
                 if received_fill_after_dod:
-                    update_strat_status_obj.total_cxl_exposure = (update_strat_status_obj.total_cxl_buy_notional -
-                                                                  update_strat_status_obj.total_cxl_sell_notional)
-                if update_strat_status_obj.total_fill_buy_notional < update_strat_status_obj.total_fill_sell_notional:
-                    update_strat_status_obj.balance_notional = \
-                        strat_limits.max_single_leg_notional - update_strat_status_obj.total_fill_buy_notional
+                    update_plan_status_obj.total_cxl_exposure = (update_plan_status_obj.total_cxl_buy_notional -
+                                                                  update_plan_status_obj.total_cxl_sell_notional)
+                if update_plan_status_obj.total_fill_buy_notional < update_plan_status_obj.total_fill_sell_notional:
+                    update_plan_status_obj.balance_notional = \
+                        plan_limits.max_single_leg_notional - update_plan_status_obj.total_fill_buy_notional
                 else:
-                    update_strat_status_obj.balance_notional = \
-                        strat_limits.max_single_leg_notional - update_strat_status_obj.total_fill_sell_notional
+                    update_plan_status_obj.balance_notional = \
+                        plan_limits.max_single_leg_notional - update_plan_status_obj.total_fill_sell_notional
 
-                updated_residual = self.__get_residual_obj(chore_snapshot_obj.chore_brief.side, strat_brief_obj)
+                updated_residual = self.__get_residual_obj(chore_snapshot_obj.chore_brief.side, plan_brief_obj)
                 if updated_residual is not None:
-                    update_strat_status_obj.residual = updated_residual
+                    update_plan_status_obj.residual = updated_residual
 
-                # Updating strat_state as paused if limits get breached
-                await self._pause_strat_if_limits_breached(update_strat_status_obj, strat_limits,
-                                                           strat_brief_obj, symbol_side_snapshot)
+                # Updating plan_state as paused if limits get breached
+                await self._pause_plan_if_limits_breached(update_plan_status_obj, plan_limits,
+                                                           plan_brief_obj, symbol_side_snapshot)
 
-                update_strat_status_obj_dict = update_strat_status_obj.to_dict(exclude_none=True)
-                await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_partial_update_strat_status_http(
-                    update_strat_status_obj_dict)
+                update_plan_status_obj_dict = update_plan_status_obj.to_dict(exclude_none=True)
+                await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_partial_update_plan_status_http(
+                    update_plan_status_obj_dict)
             else:
-                logging.error(f"error: either tuple of strat_status or strat_limits received as None from cache;;; "
-                              f"{strat_status_tuple=}, {strat_limits_tuple=}")
+                logging.error(f"error: either tuple of plan_status or plan_limits received as None from cache;;; "
+                              f"{plan_status_tuple=}, {plan_limits_tuple=}")
                 return
 
-    async def _check_n_delete_symbol_side_snapshot_from_unload_strat(self) -> bool:
+    async def _check_n_delete_symbol_side_snapshot_from_unload_plan(self) -> bool:
         pair_symbol_side_list = [
-            (self.strat_leg_1.sec, self.strat_leg_1.side),
-            (self.strat_leg_2.sec, self.strat_leg_2.side)
+            (self.plan_leg_1.sec, self.plan_leg_1.side),
+            (self.plan_leg_2.sec, self.plan_leg_2.side)
         ]
 
         for security, side in pair_symbol_side_list:
-            symbol_side_snapshots_tuple = self.strat_cache.get_symbol_side_snapshot_from_symbol(security.sec_id)
+            symbol_side_snapshots_tuple = self.plan_cache.get_symbol_side_snapshot_from_symbol(security.sec_id)
 
             if symbol_side_snapshots_tuple is not None:
                 symbol_side_snapshot, _ = symbol_side_snapshots_tuple
@@ -3910,22 +3906,22 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                     symbol_side_snapshot.id)
         return True
 
-    async def _check_n_delete_strat_brief_for_unload_strat(self) -> bool:
-        symbol = self.strat_leg_1.sec.sec_id
-        strat_brief_obj_tuple = self.strat_cache.get_strat_brief()
+    async def _check_n_delete_plan_brief_for_unload_plan(self) -> bool:
+        symbol = self.plan_leg_1.sec.sec_id
+        plan_brief_obj_tuple = self.plan_cache.get_plan_brief()
 
-        if strat_brief_obj_tuple is not None:
-            strat_brief_obj, _ = strat_brief_obj_tuple
-            await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_delete_strat_brief_http(
-                strat_brief_obj.id)
+        if plan_brief_obj_tuple is not None:
+            plan_brief_obj, _ = plan_brief_obj_tuple
+            await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_delete_plan_brief_http(
+                plan_brief_obj.id)
         return True
 
-    async def _force_unpublish_symbol_overview_from_unload_strat(self) -> bool:
-        symbols_list = [self.strat_leg_1.sec.sec_id, self.strat_leg_2.sec.sec_id]
+    async def _force_unpublish_symbol_overview_from_unload_plan(self) -> bool:
+        symbols_list = [self.plan_leg_1.sec.sec_id, self.plan_leg_2.sec.sec_id]
 
         async with SymbolOverview.reentrant_lock:
             for symbol in symbols_list:
-                symbol_overview_tuple = self.strat_cache.get_symbol_overview_from_symbol(symbol)
+                symbol_overview_tuple = self.plan_cache.get_symbol_overview_from_symbol(symbol)
 
                 if symbol_overview_tuple is not None:
                     symbol_overview_obj, _ = symbol_overview_tuple
@@ -3952,49 +3948,49 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         await self.handle_partial_update_chore_snapshot_post(updated_chore_snapshot_obj_json)
 
     async def create_symbol_side_snapshot_post(self, symbol_side_snapshot_obj: SymbolSideSnapshot):
-        # updating bartering_data_manager's strat_cache
+        # updating bartering_data_manager's plan_cache
         self.bartering_data_manager.handle_symbol_side_snapshot_get_all_ws(symbol_side_snapshot_obj)
 
     async def update_symbol_side_snapshot_post(self, updated_symbol_side_snapshot_obj: SymbolSideSnapshot):
-        # updating bartering_data_manager's strat_cache
+        # updating bartering_data_manager's plan_cache
         self.bartering_data_manager.handle_symbol_side_snapshot_get_all_ws(updated_symbol_side_snapshot_obj)
 
     async def partial_update_symbol_side_snapshot_post(self, updated_symbol_side_snapshot_obj_json: Dict[str, Any]):
         updated_symbol_side_snapshot_obj = SymbolSideSnapshot.from_dict(updated_symbol_side_snapshot_obj_json)
-        # updating bartering_data_manager's strat_cache
+        # updating bartering_data_manager's plan_cache
         self.bartering_data_manager.handle_symbol_side_snapshot_get_all_ws(updated_symbol_side_snapshot_obj)
 
-    async def update_strat_status_post(self, updated_strat_status_obj: StratStatus):
-        # updating bartering_data_manager's strat_cache
-        self.bartering_data_manager.handle_strat_status_get_all_ws(updated_strat_status_obj)
+    async def update_plan_status_post(self, updated_plan_status_obj: PlanStatus):
+        # updating bartering_data_manager's plan_cache
+        self.bartering_data_manager.handle_plan_status_get_all_ws(updated_plan_status_obj)
 
-        # updating balance_notional field in current pair_strat's StratView using log analyzer
-        log_str = pair_strat_client_call_log_str(StratViewBaseModel,
-                                                 photo_book_service_http_client.patch_all_strat_view_client,
-                                                 UpdateType.SNAPSHOT_TYPE, _id=updated_strat_status_obj.id,
-                                                 balance_notional=updated_strat_status_obj.balance_notional,
-                                                 average_premium=updated_strat_status_obj.average_premium,
+        # updating balance_notional field in current pair_plan's PlanView using log analyzer
+        log_str = pair_plan_client_call_log_str(PlanViewBaseModel,
+                                                 photo_book_service_http_client.patch_all_plan_view_client,
+                                                 UpdateType.SNAPSHOT_TYPE, _id=updated_plan_status_obj.id,
+                                                 balance_notional=updated_plan_status_obj.balance_notional,
+                                                 average_premium=updated_plan_status_obj.average_premium,
                                                  total_fill_buy_notional=
-                                                 updated_strat_status_obj.total_fill_buy_notional,
+                                                 updated_plan_status_obj.total_fill_buy_notional,
                                                  total_fill_sell_notional=
-                                                 updated_strat_status_obj.total_fill_sell_notional)
+                                                 updated_plan_status_obj.total_fill_sell_notional)
         logging.db(log_str)
 
-    async def partial_update_strat_status_post(self, updated_strat_status_obj_json: Dict[str, Any]):
-        updated_strat_status_obj = StratStatus.from_dict(updated_strat_status_obj_json)
-        # updating bartering_data_manager's strat_cache
-        self.bartering_data_manager.handle_strat_status_get_all_ws(updated_strat_status_obj)
+    async def partial_update_plan_status_post(self, updated_plan_status_obj_json: Dict[str, Any]):
+        updated_plan_status_obj = PlanStatus.from_dict(updated_plan_status_obj_json)
+        # updating bartering_data_manager's plan_cache
+        self.bartering_data_manager.handle_plan_status_get_all_ws(updated_plan_status_obj)
 
-        # updating balance_notional field in current pair_strat's StratView using log analyzer
-        log_str = pair_strat_client_call_log_str(StratViewBaseModel,
-                                                 photo_book_service_http_client.patch_all_strat_view_client,
-                                                 UpdateType.SNAPSHOT_TYPE, _id=updated_strat_status_obj.id,
-                                                 balance_notional=updated_strat_status_obj.balance_notional,
-                                                 average_premium=updated_strat_status_obj.average_premium,
+        # updating balance_notional field in current pair_plan's PlanView using log analyzer
+        log_str = pair_plan_client_call_log_str(PlanViewBaseModel,
+                                                 photo_book_service_http_client.patch_all_plan_view_client,
+                                                 UpdateType.SNAPSHOT_TYPE, _id=updated_plan_status_obj.id,
+                                                 balance_notional=updated_plan_status_obj.balance_notional,
+                                                 average_premium=updated_plan_status_obj.average_premium,
                                                  total_fill_buy_notional=
-                                                 updated_strat_status_obj.total_fill_buy_notional,
+                                                 updated_plan_status_obj.total_fill_buy_notional,
                                                  total_fill_sell_notional=
-                                                 updated_strat_status_obj.total_fill_sell_notional)
+                                                 updated_plan_status_obj.total_fill_sell_notional)
         logging.db(log_str)
 
     @staticmethod
@@ -4008,220 +4004,220 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         return err
 
     def update_fill(self):
-        self.strat_cache.get_strat_brief()
+        self.plan_cache.get_plan_brief()
 
     async def partial_update_fills_journal_post(self, updated_fills_journal_obj_json: Dict[str, Any]):
         await self.handle_partial_update_fills_journal_post(updated_fills_journal_obj_json)
 
-    async def create_strat_brief_post(self, strat_brief_obj: StratBrief):
-        # updating bartering_data_manager's strat_cache
-        self.bartering_data_manager.handle_strat_brief_get_all_ws(strat_brief_obj)
+    async def create_plan_brief_post(self, plan_brief_obj: PlanBrief):
+        # updating bartering_data_manager's plan_cache
+        self.bartering_data_manager.handle_plan_brief_get_all_ws(plan_brief_obj)
 
-    async def update_strat_brief_post(self, updated_strat_brief_obj: StratBrief):
-        # updating bartering_data_manager's strat_cache
-        self.bartering_data_manager.handle_strat_brief_get_all_ws(updated_strat_brief_obj)
+    async def update_plan_brief_post(self, updated_plan_brief_obj: PlanBrief):
+        # updating bartering_data_manager's plan_cache
+        self.bartering_data_manager.handle_plan_brief_get_all_ws(updated_plan_brief_obj)
 
-    async def partial_update_strat_brief_post(self, updated_strat_brief_obj_json: Dict[str, Any]):
-        updated_strat_brief_obj = StratBrief.from_dict(updated_strat_brief_obj_json)
-        # updating bartering_data_manager's strat_cache
-        self.bartering_data_manager.handle_strat_brief_get_all_ws(updated_strat_brief_obj)
+    async def partial_update_plan_brief_post(self, updated_plan_brief_obj_json: Dict[str, Any]):
+        updated_plan_brief_obj = PlanBrief.from_dict(updated_plan_brief_obj_json)
+        # updating bartering_data_manager's plan_cache
+        self.bartering_data_manager.handle_plan_brief_get_all_ws(updated_plan_brief_obj)
 
-    async def create_strat_status_post(self, strat_status_obj: StratStatus):
-        # updating bartering_data_manager's strat_cache
-        self.bartering_data_manager.handle_strat_status_get_all_ws(strat_status_obj)
+    async def create_plan_status_post(self, plan_status_obj: PlanStatus):
+        # updating bartering_data_manager's plan_cache
+        self.bartering_data_manager.handle_plan_status_get_all_ws(plan_status_obj)
 
-        # updating balance_notional field in current pair_strat's StratView using log analyzer
-        log_str = pair_strat_client_call_log_str(StratViewBaseModel,
-                                                 photo_book_service_http_client.patch_all_strat_view_client,
-                                                 UpdateType.SNAPSHOT_TYPE, _id=strat_status_obj.id,
-                                                 balance_notional=strat_status_obj.balance_notional,
-                                                 average_premium=strat_status_obj.average_premium,
+        # updating balance_notional field in current pair_plan's PlanView using log analyzer
+        log_str = pair_plan_client_call_log_str(PlanViewBaseModel,
+                                                 photo_book_service_http_client.patch_all_plan_view_client,
+                                                 UpdateType.SNAPSHOT_TYPE, _id=plan_status_obj.id,
+                                                 balance_notional=plan_status_obj.balance_notional,
+                                                 average_premium=plan_status_obj.average_premium,
                                                  total_fill_buy_notional=
-                                                 strat_status_obj.total_fill_buy_notional,
+                                                 plan_status_obj.total_fill_buy_notional,
                                                  total_fill_sell_notional=
-                                                 strat_status_obj.total_fill_sell_notional, market_premium=0)
+                                                 plan_status_obj.total_fill_sell_notional, market_premium=0)
         logging.db(log_str)
 
-    async def create_strat_limits_post(self, strat_limits_obj: StratLimits):
-        # updating bartering_data_manager's strat_cache
-        self.bartering_data_manager.handle_strat_limits_get_all_ws(strat_limits_obj)
+    async def create_plan_limits_post(self, plan_limits_obj: PlanLimits):
+        # updating bartering_data_manager's plan_cache
+        self.bartering_data_manager.handle_plan_limits_get_all_ws(plan_limits_obj)
 
-        # updating max_single_leg_notional field in current pair_strat's StratView using log analyzer
-        log_str = pair_strat_client_call_log_str(StratViewBaseModel,
-                                                 photo_book_service_http_client.patch_all_strat_view_client,
-                                                 UpdateType.SNAPSHOT_TYPE, _id=strat_limits_obj.id,
+        # updating max_single_leg_notional field in current pair_plan's PlanView using log analyzer
+        log_str = pair_plan_client_call_log_str(PlanViewBaseModel,
+                                                 photo_book_service_http_client.patch_all_plan_view_client,
+                                                 UpdateType.SNAPSHOT_TYPE, _id=plan_limits_obj.id,
                                                  max_single_leg_notional=
-                                                 strat_limits_obj.max_single_leg_notional)
+                                                 plan_limits_obj.max_single_leg_notional)
         logging.db(log_str)
 
-    async def _update_strat_brief_consumables_based_on_strat_limit_updates(
-            self, stored_strat_limits_obj: Dict | StratLimits, updated_strat_limits_obj: StratLimits):
+    async def _update_plan_brief_consumables_based_on_plan_limit_updates(
+            self, stored_plan_limits_obj: Dict | PlanLimits, updated_plan_limits_obj: PlanLimits):
 
-        strat_brief_patch_dict = {"_id": updated_strat_limits_obj.id,
+        plan_brief_patch_dict = {"_id": updated_plan_limits_obj.id,
                                   "pair_buy_side_bartering_brief": {},
                                   "pair_sell_side_bartering_brief": {}}    # will keep updating based on updates found
-        do_strat_brief_update = False
+        do_plan_brief_update = False
 
         async with StreetBookServiceRoutesCallbackBaseNativeOverride.journal_shared_lock:
             # taking journal_shared_lock since in some updates open and filled qty too is involved
-            async with StratBrief.reentrant_lock:
-                stored_strat_brief_tuple = self.strat_cache.get_strat_brief()
-                if stored_strat_brief_tuple is not None:
-                    stored_strat_brief, _ = stored_strat_brief_tuple
+            async with PlanBrief.reentrant_lock:
+                stored_plan_brief_tuple = self.plan_cache.get_plan_brief()
+                if stored_plan_brief_tuple is not None:
+                    stored_plan_brief, _ = stored_plan_brief_tuple
 
                     # checking max_single_leg_notional and updating consumable_notional on both legs if updated
-                    if isinstance(stored_strat_limits_obj, dict):
-                        stored_max_single_leg_notional = stored_strat_limits_obj.get("max_single_leg_notional")
+                    if isinstance(stored_plan_limits_obj, dict):
+                        stored_max_single_leg_notional = stored_plan_limits_obj.get("max_single_leg_notional")
                     else:
-                        stored_max_single_leg_notional = stored_strat_limits_obj.max_single_leg_notional
-                    if stored_max_single_leg_notional != updated_strat_limits_obj.max_single_leg_notional:
+                        stored_max_single_leg_notional = stored_plan_limits_obj.max_single_leg_notional
+                    if stored_max_single_leg_notional != updated_plan_limits_obj.max_single_leg_notional:
                         updated_max_single_leg_notional_delta = (
-                            updated_strat_limits_obj.max_single_leg_notional - stored_max_single_leg_notional)
-                        strat_brief_patch_dict["pair_buy_side_bartering_brief"]["consumable_notional"] = (
-                            stored_strat_brief.pair_buy_side_bartering_brief.consumable_notional +
+                            updated_plan_limits_obj.max_single_leg_notional - stored_max_single_leg_notional)
+                        plan_brief_patch_dict["pair_buy_side_bartering_brief"]["consumable_notional"] = (
+                            stored_plan_brief.pair_buy_side_bartering_brief.consumable_notional +
                             updated_max_single_leg_notional_delta)
-                        strat_brief_patch_dict["pair_sell_side_bartering_brief"]["consumable_notional"] = (
-                            stored_strat_brief.pair_sell_side_bartering_brief.consumable_notional +
+                        plan_brief_patch_dict["pair_sell_side_bartering_brief"]["consumable_notional"] = (
+                            stored_plan_brief.pair_sell_side_bartering_brief.consumable_notional +
                             updated_max_single_leg_notional_delta)
-                        do_strat_brief_update = True
+                        do_plan_brief_update = True
                     # else not required: max_single_leg_notional not updated - no extra handling required
 
                     # checking max_open_single_leg_notional and updating consumable_open_notional on both legs if updated
-                    if isinstance(stored_strat_limits_obj, dict):
-                        stored_max_open_single_leg_notional = stored_strat_limits_obj.get("max_open_single_leg_notional")
+                    if isinstance(stored_plan_limits_obj, dict):
+                        stored_max_open_single_leg_notional = stored_plan_limits_obj.get("max_open_single_leg_notional")
                     else:
-                        stored_max_open_single_leg_notional = stored_strat_limits_obj.max_open_single_leg_notional
-                    if stored_max_open_single_leg_notional != updated_strat_limits_obj.max_open_single_leg_notional:
+                        stored_max_open_single_leg_notional = stored_plan_limits_obj.max_open_single_leg_notional
+                    if stored_max_open_single_leg_notional != updated_plan_limits_obj.max_open_single_leg_notional:
                         updated_max_open_single_leg_notional_delta = (
-                            updated_strat_limits_obj.max_open_single_leg_notional - stored_max_open_single_leg_notional)
-                        strat_brief_patch_dict["pair_buy_side_bartering_brief"]["consumable_open_notional"] = (
-                            stored_strat_brief.pair_buy_side_bartering_brief.consumable_open_notional +
+                            updated_plan_limits_obj.max_open_single_leg_notional - stored_max_open_single_leg_notional)
+                        plan_brief_patch_dict["pair_buy_side_bartering_brief"]["consumable_open_notional"] = (
+                            stored_plan_brief.pair_buy_side_bartering_brief.consumable_open_notional +
                             updated_max_open_single_leg_notional_delta)
-                        strat_brief_patch_dict["pair_sell_side_bartering_brief"]["consumable_open_notional"] = (
-                            stored_strat_brief.pair_sell_side_bartering_brief.consumable_open_notional +
+                        plan_brief_patch_dict["pair_sell_side_bartering_brief"]["consumable_open_notional"] = (
+                            stored_plan_brief.pair_sell_side_bartering_brief.consumable_open_notional +
                             updated_max_open_single_leg_notional_delta)
-                        do_strat_brief_update = True
+                        do_plan_brief_update = True
                     # else not required: max_open_single_leg_notional not updated - no extra handling required
 
                     # checking max_open_chores_per_side and updating consumable_open_chores on both legs if updated
-                    if isinstance(stored_strat_limits_obj, dict):
-                        stored_max_open_chores_per_side = stored_strat_limits_obj.get(
+                    if isinstance(stored_plan_limits_obj, dict):
+                        stored_max_open_chores_per_side = stored_plan_limits_obj.get(
                             "max_open_chores_per_side")
                     else:
-                        stored_max_open_chores_per_side = stored_strat_limits_obj.max_open_chores_per_side
-                    if stored_max_open_chores_per_side != updated_strat_limits_obj.max_open_chores_per_side:
+                        stored_max_open_chores_per_side = stored_plan_limits_obj.max_open_chores_per_side
+                    if stored_max_open_chores_per_side != updated_plan_limits_obj.max_open_chores_per_side:
                         updated_max_open_chores_per_side_delta = (
-                            updated_strat_limits_obj.max_open_chores_per_side - stored_max_open_chores_per_side)
-                        strat_brief_patch_dict["pair_buy_side_bartering_brief"]["consumable_open_chores"] = (
-                            stored_strat_brief.pair_buy_side_bartering_brief.consumable_open_chores +
+                            updated_plan_limits_obj.max_open_chores_per_side - stored_max_open_chores_per_side)
+                        plan_brief_patch_dict["pair_buy_side_bartering_brief"]["consumable_open_chores"] = (
+                            stored_plan_brief.pair_buy_side_bartering_brief.consumable_open_chores +
                             updated_max_open_chores_per_side_delta)
-                        strat_brief_patch_dict["pair_sell_side_bartering_brief"]["consumable_open_chores"] = (
-                            stored_strat_brief.pair_sell_side_bartering_brief.consumable_open_chores +
+                        plan_brief_patch_dict["pair_sell_side_bartering_brief"]["consumable_open_chores"] = (
+                            stored_plan_brief.pair_sell_side_bartering_brief.consumable_open_chores +
                             updated_max_open_chores_per_side_delta)
-                        do_strat_brief_update = True
+                        do_plan_brief_update = True
 
                     # else not required: max_open_chores_per_side not updated - no extra handling required
 
                     # checking max_concentration and updating consumable_open_chores on both legs if updated
-                    if isinstance(stored_strat_limits_obj, dict):
-                        stored_max_concentration = stored_strat_limits_obj.get(
+                    if isinstance(stored_plan_limits_obj, dict):
+                        stored_max_concentration = stored_plan_limits_obj.get(
                             "max_concentration")
                     else:
-                        stored_max_concentration = stored_strat_limits_obj.max_concentration
-                    if stored_max_concentration != updated_strat_limits_obj.max_concentration:
+                        stored_max_concentration = stored_plan_limits_obj.max_concentration
+                    if stored_max_concentration != updated_plan_limits_obj.max_concentration:
                         # Formula used to compute consumable_concentration is:
-                        # consumable_concentration = int((security_float / 100) * strat_limits.max_concentration -
+                        # consumable_concentration = int((security_float / 100) * plan_limits.max_concentration -
                         #                                     (total_open_qty + total_filled_qty))
                         # (total_open_qty + total_filled_qty) =
-                        #           int((security_float / 100) * strat_limits.max_concentration - consumable_concentration)
+                        #           int((security_float / 100) * plan_limits.max_concentration - consumable_concentration)
 
                         # Finding value for (total_open_qty + total_filled_qty) based on current
                         # consumable_concentration to compute consumable_concentration based on new max_concentration
 
                         security_float = self.static_data.get_security_float_from_ticker(
-                            stored_strat_brief.pair_buy_side_bartering_brief.security.sec_id)
+                            stored_plan_brief.pair_buy_side_bartering_brief.security.sec_id)
                         if security_float is not None:
                             open_n_filled_qty_sum = int((security_float / 100) * stored_max_concentration -
-                                                        stored_strat_brief.pair_buy_side_bartering_brief.consumable_concentration)
+                                                        stored_plan_brief.pair_buy_side_bartering_brief.consumable_concentration)
                             updated_consumable_concentration = (
-                                int((security_float / 100) * updated_strat_limits_obj.max_concentration -
+                                int((security_float / 100) * updated_plan_limits_obj.max_concentration -
                                     open_n_filled_qty_sum))
-                            strat_brief_patch_dict["pair_buy_side_bartering_brief"]["consumable_concentration"] = updated_consumable_concentration
+                            plan_brief_patch_dict["pair_buy_side_bartering_brief"]["consumable_concentration"] = updated_consumable_concentration
 
                             open_n_filled_qty_sum = int((security_float / 100) * stored_max_concentration -
-                                                        stored_strat_brief.pair_sell_side_bartering_brief.consumable_concentration)
+                                                        stored_plan_brief.pair_sell_side_bartering_brief.consumable_concentration)
                             updated_consumable_concentration = (
-                                int((security_float / 100) * updated_strat_limits_obj.max_concentration -
+                                int((security_float / 100) * updated_plan_limits_obj.max_concentration -
                                     open_n_filled_qty_sum))
-                            strat_brief_patch_dict["pair_sell_side_bartering_brief"]["consumable_concentration"] = updated_consumable_concentration
-                            do_strat_brief_update = True
+                            plan_brief_patch_dict["pair_sell_side_bartering_brief"]["consumable_concentration"] = updated_consumable_concentration
+                            do_plan_brief_update = True
                         # else not required: consumable_concentration is 0 when security_float is found None
                     # else not required: max_concentration not updated - no extra handling required
 
                     # checking max_net_filled_notional and updating consumable_nett_filled_notional on both legs if updated
-                    if isinstance(stored_strat_limits_obj, dict):
-                        stored_max_net_filled_notional = stored_strat_limits_obj.get(
+                    if isinstance(stored_plan_limits_obj, dict):
+                        stored_max_net_filled_notional = stored_plan_limits_obj.get(
                             "max_net_filled_notional")
                     else:
-                        stored_max_net_filled_notional = stored_strat_limits_obj.max_net_filled_notional
-                    if stored_max_net_filled_notional != updated_strat_limits_obj.max_net_filled_notional:
+                        stored_max_net_filled_notional = stored_plan_limits_obj.max_net_filled_notional
+                    if stored_max_net_filled_notional != updated_plan_limits_obj.max_net_filled_notional:
                         updated_max_net_filled_notional_delta = (
-                                updated_strat_limits_obj.max_net_filled_notional - stored_max_net_filled_notional)
-                        strat_brief_patch_dict["consumable_nett_filled_notional"] = (
-                                stored_strat_brief.consumable_nett_filled_notional +
+                                updated_plan_limits_obj.max_net_filled_notional - stored_max_net_filled_notional)
+                        plan_brief_patch_dict["consumable_nett_filled_notional"] = (
+                                stored_plan_brief.consumable_nett_filled_notional +
                                 updated_max_net_filled_notional_delta)
-                        do_strat_brief_update = True
+                        do_plan_brief_update = True
                     # else not required: max_concentration not updated - no extra handling required
 
-                    if do_strat_brief_update:
-                        # cleaning strat_brief_patch_dict
-                        if not strat_brief_patch_dict["pair_buy_side_bartering_brief"]:
-                            del strat_brief_patch_dict["pair_buy_side_bartering_brief"]
-                        if not strat_brief_patch_dict["pair_sell_side_bartering_brief"]:
-                            del strat_brief_patch_dict["pair_sell_side_bartering_brief"]
+                    if do_plan_brief_update:
+                        # cleaning plan_brief_patch_dict
+                        if not plan_brief_patch_dict["pair_buy_side_bartering_brief"]:
+                            del plan_brief_patch_dict["pair_buy_side_bartering_brief"]
+                        if not plan_brief_patch_dict["pair_sell_side_bartering_brief"]:
+                            del plan_brief_patch_dict["pair_sell_side_bartering_brief"]
 
-                        await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_partial_update_strat_brief_http(
-                            strat_brief_patch_dict)
+                        await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_partial_update_plan_brief_http(
+                            plan_brief_patch_dict)
                     # else not required: if no limit having corresponding consumable is updated
-                    # then avoiding any strat_brief update
-                # else not required: strat_brief doesn't exist - when created will use updated limit values
+                    # then avoiding any plan_brief update
+                # else not required: plan_brief doesn't exist - when created will use updated limit values
                 # for setting consumables
 
-    async def _update_strat_limits_post(self, stored_strat_limits_obj: StratLimits | Dict,
-                                        updated_strat_limits_obj: StratLimits):
-        # updating bartering_data_manager's strat_cache
-        self.bartering_data_manager.handle_strat_limits_get_all_ws(updated_strat_limits_obj)
+    async def _update_plan_limits_post(self, stored_plan_limits_obj: PlanLimits | Dict,
+                                        updated_plan_limits_obj: PlanLimits):
+        # updating bartering_data_manager's plan_cache
+        self.bartering_data_manager.handle_plan_limits_get_all_ws(updated_plan_limits_obj)
 
-        # updating max_single_leg_notional field in current pair_strat's StratView using log analyzer
-        log_str = pair_strat_client_call_log_str(StratViewBaseModel,
-                                                 photo_book_service_http_client.patch_all_strat_view_client,
-                                                 UpdateType.SNAPSHOT_TYPE, _id=updated_strat_limits_obj.id,
+        # updating max_single_leg_notional field in current pair_plan's PlanView using log analyzer
+        log_str = pair_plan_client_call_log_str(PlanViewBaseModel,
+                                                 photo_book_service_http_client.patch_all_plan_view_client,
+                                                 UpdateType.SNAPSHOT_TYPE, _id=updated_plan_limits_obj.id,
                                                  max_single_leg_notional=
-                                                 updated_strat_limits_obj.max_single_leg_notional)
+                                                 updated_plan_limits_obj.max_single_leg_notional)
         logging.db(log_str)
 
-        if isinstance(stored_strat_limits_obj, dict):
-            stored_eqt_sod_disable = stored_strat_limits_obj.get("eqt_sod_disable")
+        if isinstance(stored_plan_limits_obj, dict):
+            stored_eqt_sod_disable = stored_plan_limits_obj.get("eqt_sod_disable")
         else:
-            stored_eqt_sod_disable = stored_strat_limits_obj.eqt_sod_disable
-        if not stored_eqt_sod_disable and updated_strat_limits_obj.eqt_sod_disable:
+            stored_eqt_sod_disable = stored_plan_limits_obj.eqt_sod_disable
+        if not stored_eqt_sod_disable and updated_plan_limits_obj.eqt_sod_disable:
             script_path: str = str(PAIR_STRAT_ENGINE_DIR / "pyscripts" / "disable_sod_positions_on_eqt.py")
-            cmd: List[str] = ["python", script_path, f"{updated_strat_limits_obj.id}", "&"]
+            cmd: List[str] = ["python", script_path, f"{updated_plan_limits_obj.id}", "&"]
             launcher: subprocess.Popen = subprocess.Popen(cmd)
             logging.warning(f"Triggered eqt_sod_disable event at {DateTime.utcnow()};;;{cmd=}, {launcher=}")
 
         # updating all consumables if any corresponding limit is updated
-        await self._update_strat_brief_consumables_based_on_strat_limit_updates(stored_strat_limits_obj,
-                                                                                updated_strat_limits_obj)
+        await self._update_plan_brief_consumables_based_on_plan_limit_updates(stored_plan_limits_obj,
+                                                                                updated_plan_limits_obj)
 
-    async def update_strat_limits_post(self, stored_strat_limits_obj: StratLimits,
-                                       updated_strat_limits_obj: StratLimits):
-        await self._update_strat_limits_post(stored_strat_limits_obj, updated_strat_limits_obj)
+    async def update_plan_limits_post(self, stored_plan_limits_obj: PlanLimits,
+                                       updated_plan_limits_obj: PlanLimits):
+        await self._update_plan_limits_post(stored_plan_limits_obj, updated_plan_limits_obj)
 
-    async def partial_update_strat_limits_post(self, stored_strat_limits_obj_json: Dict[str, Any],
-                                               updated_strat_limits_obj_json: Dict[str, Any]):
-        updated_strat_limits_obj = StratLimits.from_dict(updated_strat_limits_obj_json)
-        await self._update_strat_limits_post(stored_strat_limits_obj_json, updated_strat_limits_obj)
+    async def partial_update_plan_limits_post(self, stored_plan_limits_obj_json: Dict[str, Any],
+                                               updated_plan_limits_obj_json: Dict[str, Any]):
+        updated_plan_limits_obj = PlanLimits.from_dict(updated_plan_limits_obj_json)
+        await self._update_plan_limits_post(stored_plan_limits_obj_json, updated_plan_limits_obj)
 
     async def create_new_chore_post(self, new_chore_obj: NewChore):
         await self.handle_create_new_chore_post(new_chore_obj)
@@ -4278,56 +4274,56 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
 
         return symbol_side_snapshot_objs
 
-    async def update_residuals_query_pre(self, pair_strat_class_type: Type[StratStatus], security_id: str, side: Side,
+    async def update_residuals_query_pre(self, pair_plan_class_type: Type[PlanStatus], security_id: str, side: Side,
                                          residual_qty: int):
         async with StreetBookServiceRoutesCallbackBaseNativeOverride.journal_shared_lock:
             async with (StreetBookServiceRoutesCallbackBaseNativeOverride.residual_compute_shared_lock):
-                strat_brief_tuple = self.strat_cache.get_strat_brief()
+                plan_brief_tuple = self.plan_cache.get_plan_brief()
 
-                if strat_brief_tuple is not None:
-                    strat_brief_obj, _ = strat_brief_tuple
+                if plan_brief_tuple is not None:
+                    plan_brief_obj, _ = plan_brief_tuple
                     if side == Side.BUY:
                         update_bartering_side_brief = \
                             PairSideBarteringBriefOptional(
-                                residual_qty=int(strat_brief_obj.pair_buy_side_bartering_brief.residual_qty + residual_qty))
-                        update_strat_brief = StratBriefBaseModel(id=strat_brief_obj.id,
+                                residual_qty=int(plan_brief_obj.pair_buy_side_bartering_brief.residual_qty + residual_qty))
+                        update_plan_brief = PlanBriefBaseModel(id=plan_brief_obj.id,
                                                                  pair_buy_side_bartering_brief=update_bartering_side_brief)
 
                     else:
                         update_bartering_side_brief = \
                             PairSideBarteringBriefOptional(
-                                residual_qty=int(strat_brief_obj.pair_sell_side_bartering_brief.residual_qty + residual_qty))
-                        update_strat_brief = StratBriefBaseModel(id=strat_brief_obj.id,
+                                residual_qty=int(plan_brief_obj.pair_sell_side_bartering_brief.residual_qty + residual_qty))
+                        update_plan_brief = PlanBriefBaseModel(id=plan_brief_obj.id,
                                                                  pair_sell_side_bartering_brief=update_bartering_side_brief)
 
-                    update_strat_brief_dict = update_strat_brief.to_dict(exclude_none=True)
-                    updated_strat_brief = (
+                    update_plan_brief_dict = update_plan_brief.to_dict(exclude_none=True)
+                    updated_plan_brief = (
                         await StreetBookServiceRoutesCallbackBaseNativeOverride.
-                        underlying_partial_update_strat_brief_http(update_strat_brief_dict))
+                        underlying_partial_update_plan_brief_http(update_plan_brief_dict))
                 else:
-                    err_str_ = (f"No strat_brief found from strat_cache for symbol_side_key: "
+                    err_str_ = (f"No plan_brief found from plan_cache for symbol_side_key: "
                                 f"{get_symbol_side_key([(security_id, side)])}")
                     logging.exception(err_str_)
                     raise HTTPException(status_code=500, detail=err_str_)
 
-                # updating pair_strat's residual notional
-                async with StratStatus.reentrant_lock:
-                    strat_status_tuple = self.strat_cache.get_strat_status()
+                # updating pair_plan's residual notional
+                async with PlanStatus.reentrant_lock:
+                    plan_status_tuple = self.plan_cache.get_plan_status()
 
-                    if strat_status_tuple is not None:
-                        strat_status, _ = strat_status_tuple
-                        updated_residual = self.__get_residual_obj(side, updated_strat_brief)
+                    if plan_status_tuple is not None:
+                        plan_status, _ = plan_status_tuple
+                        updated_residual = self.__get_residual_obj(side, updated_plan_brief)
                         if updated_residual is not None:
-                            strat_status = {"_id": strat_status.id, "residual": updated_residual.to_dict()}
+                            plan_status = {"_id": plan_status.id, "residual": updated_residual.to_dict()}
                             (await StreetBookServiceRoutesCallbackBaseNativeOverride.
-                             underlying_partial_update_strat_status_http(strat_status))
+                             underlying_partial_update_plan_status_http(plan_status))
                         else:
                             err_str_ = f"Something went wrong while computing residual for security_side_key: " \
                                        f"{get_symbol_side_key([(security_id, side)])}"
                             logging.exception(err_str_)
                             raise HTTPException(status_code=500, detail=err_str_)
                     else:
-                        err_str_ = ("Received strat_status_tuple as None from strat_cache - ignoring strat_status update "
+                        err_str_ = ("Received plan_status_tuple as None from plan_cache - ignoring plan_status update "
                                     "for residual changes")
                         logging.exception(err_str_)
                         raise HTTPException(status_code=500, detail=err_str_)
@@ -4354,32 +4350,32 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
 
     def get_residual_mark_secs(self):
         residual_mark_secs: int | None = None
-        strat_limits_tuple = self.strat_cache.get_strat_limits()
-        if strat_limits_tuple is not None:
-            strat_limits, _ = strat_limits_tuple
-            if strat_limits and strat_limits.residual_restriction:
-                residual_mark_secs = strat_limits.residual_restriction.residual_mark_seconds
+        plan_limits_tuple = self.plan_cache.get_plan_limits()
+        if plan_limits_tuple is not None:
+            plan_limits, _ = plan_limits_tuple
+            if plan_limits and plan_limits.residual_restriction:
+                residual_mark_secs = plan_limits.residual_restriction.residual_mark_seconds
                 if residual_mark_secs is None or residual_mark_secs == 0:
                     # if residual_mark_secs is 0 or None check is disabled - just return - no action
                     return
                 else:
                     return residual_mark_secs
             else:
-                if not strat_limits:
-                    invalid_field = f"{strat_limits=}"
+                if not plan_limits:
+                    invalid_field = f"{plan_limits=}"
                 else:
-                    invalid_field = f"{strat_limits.residual_restriction=}"
-                logging.error(f"Received strat_limits_tuple has {invalid_field} from strat_cache, ignoring cxl expiring"
+                    invalid_field = f"{plan_limits.residual_restriction=}"
+                logging.error(f"Received plan_limits_tuple has {invalid_field} from plan_cache, ignoring cxl expiring"
                               f" chore for this call, will retry again in {self.min_refresh_interval} secs")
                 return
         else:
-            logging.error(f"Received strat_limits_tuple as None from strat_cache, ignoring cxl expiring chore "
+            logging.error(f"Received plan_limits_tuple as None from plan_cache, ignoring cxl expiring chore "
                           f"for this call, will retry again in {self.min_refresh_interval} secs")
             return
 
-    async def get_strat_brief_from_symbol_query_pre(self, strat_brief_class_type: Type[StratBrief], security_id: str):
-        return await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_read_strat_brief_http(
-            get_strat_brief_from_symbol(security_id), self.get_generic_read_route())
+    async def get_plan_brief_from_symbol_query_pre(self, plan_brief_class_type: Type[PlanBrief], security_id: str):
+        return await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_read_plan_brief_http(
+            get_plan_brief_from_symbol(security_id), self.get_generic_read_route())
 
     async def get_executor_check_snapshot_query_pre(
             self, executor_check_snapshot_class_type: Type[ExecutorCheckSnapshot],
@@ -4399,8 +4395,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             return [executor_check_snapshot]
         else:
             # will only return [] if some error occurred - outside market hours this is not an error
-            # if strat cache not present - there is a bigger error detected elsewhere
-            if self.strat_cache:
+            # if plan cache not present - there is a bigger error detected elsewhere
+            if self.plan_cache:
                 if not self.market.is_non_bartering_time():
                     logging.error(f"no executor_check_snapshot for: {get_symbol_side_key([(symbol, Side(side))])}, as "
                                   f"received {last_n_sec_chore_qty=}, {last_n_sec_barter_qty=}, {last_n_sec=}; "
@@ -4408,7 +4404,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                 # else all good - outside bartering hours this is expected [except in simulation]
             else:
                 logging.error(f"get_executor_check_snapshot_query_pre error: {get_symbol_side_key([(symbol, Side(side))])}, "
-                              f"invalid {self.strat_cache=}; returning empty list []")
+                              f"invalid {self.plan_cache=}; returning empty list []")
             return []
 
     async def get_symbol_overview_from_symbol_query_pre(self, symbol_overview_class_type: Type[SymbolOverview],
@@ -4434,7 +4430,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
     async def get_last_n_sec_total_barter_qty_by_aggregated_window_first_n_lst_barters(
             self, last_sec_market_barter_vol_class_type: Type[LastNSecMarketBarterVol],
             symbol: str, last_n_sec: int) -> List[LastNSecMarketBarterVol]:
-        symbol_side_key = get_symbol_side_key([(self.strat_leg_1.sec.sec_id, self.strat_leg_1.side)])
+        symbol_side_key = get_symbol_side_key([(self.plan_leg_1.sec.sec_id, self.plan_leg_1.side)])
         first_last_barter_cont: FirstLastBarterCont | None = None
         if self.market.is_bartering_time() or self.market.is_uat():
             first_last_barter_cont = \
@@ -4481,44 +4477,43 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
     async def delete_symbol_overview_pre(self, obj_id: int):
         await self.handle_delete_symbol_overview_pre(obj_id)
 
-    async def put_strat_to_snooze_query_pre(self, strat_status_class_type: Type[StratStatus]):
+    async def put_plan_to_snooze_query_pre(self, plan_status_class_type: Type[PlanStatus]):
         try:
-            # removing current strat_status
-            await self._check_n_remove_strat_status()
+            # removing current plan_status
+            await self._check_n_remove_plan_status()
 
-            # removing current strat limits
-            await self._check_n_remove_strat_limits()
+            # removing current plan limits
+            await self._check_n_remove_plan_limits()
 
-            # If strat_cache stopped means strat is not ongoing anymore or was never ongoing
-            # - removing related models that would have created if strat got activated
-            if self.strat_cache.stopped:
-                # deleting strat's both leg's symbol_side_snapshots
-                await self._check_n_delete_symbol_side_snapshot_from_unload_strat()
+            # If plan_cache stopped means plan is not ongoing anymore or was never ongoing
+            # - removing related models that would have created if plan got activated
+            if self.plan_cache.stopped:
+                # deleting plan's both leg's symbol_side_snapshots
+                await self._check_n_delete_symbol_side_snapshot_from_unload_plan()
 
-                # deleting strat's strat_brief
-                await self._check_n_delete_strat_brief_for_unload_strat()
+                # deleting plan's plan_brief
+                await self._check_n_delete_plan_brief_for_unload_plan()
 
-                # making force publish flag back to false for current strat's symbol's symbol_overview
-                await self._force_unpublish_symbol_overview_from_unload_strat()
+                # making force publish flag back to false for current plan's symbol's symbol_overview
+                await self._force_unpublish_symbol_overview_from_unload_plan()
 
-            # removing strat_alert
+            # removing plan_alert
             try:
-                log_book_service_http_client.remove_strat_alerts_for_strat_id_query_client(self.pair_strat_id)
+                log_book_service_http_client.remove_plan_alerts_for_plan_id_query_client(self.pair_plan_id)
             except Exception as e:
-                err_str_ = f"Some Error occurred while removing strat_alerts in snoozing strat process, exception: {e}"
+                err_str_ = f"Some Error occurred while removing plan_alerts in snoozing plan process, exception: {e}"
                 raise HTTPException(detail=err_str_, status_code=500)
 
             # cleaning executor config.yaml file
             try:
                 os.remove(self.simulate_config_yaml_file_path)
             except Exception as e:
-                err_str_ = (f"Something went wrong while deleting executor_{self.pair_strat_id}_simulate_config.yaml, "
+                err_str_ = (f"Something went wrong while deleting executor_{self.pair_plan_id}_simulate_config.yaml, "
                             f"exception: {e}")
                 logging.error(err_str_)
 
-            # removing current strat's ports from cached ports
+            # removing current plan's ports from cached ports
             remove_port_list = [
-                self.cpp_ws_port,
                 self.cpp_port
             ]
             with FileLock(self.ports_cache_lock_file_path):
@@ -4527,13 +4522,13 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                     for port in remove_port_list:
                         if port is not None and str(port) in ports_list:
                             ports_list.remove(str(port))
-                        # else not required: ignore remove - None state can happen if strat started and ports are not
-                        # yet assigned but strat is unloading
+                        # else not required: ignore remove - None state can happen if plan started and ports are not
+                        # yet assigned but plan is unloading
 
                     # setting cleaned list in cache
                     f.writelines(ports_list)
         except Exception as e:
-            err_str_ = f"put_strat_to_snooze_query_pre faile with exception: {e}"
+            err_str_ = f"put_plan_to_snooze_query_pre faile with exception: {e}"
             logging.exception(err_str_)
             raise HTTPException(detail=err_str_, status_code=500)
 
@@ -4556,49 +4551,49 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                               f"aggregate query: {get_market_depths(symbol_side_tuple_list)}")
         return market_depth_list
 
-    async def get_strat_status_from_cache_query_pre(self, strat_status_class_type: Type[StratStatus]):
-        cached_strat_status_tuple = self.strat_cache.get_strat_status()
-        if cached_strat_status_tuple is not None:
-            cached_strat_status, _ = cached_strat_status_tuple
-            if cached_strat_status is not None:
-                return [cached_strat_status]
+    async def get_plan_status_from_cache_query_pre(self, plan_status_class_type: Type[PlanStatus]):
+        cached_plan_status_tuple = self.plan_cache.get_plan_status()
+        if cached_plan_status_tuple is not None:
+            cached_plan_status, _ = cached_plan_status_tuple
+            if cached_plan_status is not None:
+                return [cached_plan_status]
         return []
 
     async def get_symbol_side_snapshots_from_cache_query_pre(self,
                                                              symbol_side_snapshot_class_type: Type[SymbolSideSnapshot]):
-        cached_symbol_side_snapshot_tuple = self.strat_cache.get_symbol_side_snapshot()
+        cached_symbol_side_snapshot_tuple = self.plan_cache.get_symbol_side_snapshot()
         if cached_symbol_side_snapshot_tuple is not None:
             cached_symbol_side_snapshot, _ = cached_symbol_side_snapshot_tuple
             if cached_symbol_side_snapshot is not None:
                 return cached_symbol_side_snapshot
         return []
 
-    async def get_strat_brief_from_cache_query_pre(self, strat_brief_class_type: Type[StratBrief]):
-        cached_strat_brief_tuple = self.strat_cache.get_strat_brief()
-        if cached_strat_brief_tuple is not None:
-            cached_strat_brief, _ = cached_strat_brief_tuple
-            if cached_strat_brief is not None:
-                return [cached_strat_brief]
+    async def get_plan_brief_from_cache_query_pre(self, plan_brief_class_type: Type[PlanBrief]):
+        cached_plan_brief_tuple = self.plan_cache.get_plan_brief()
+        if cached_plan_brief_tuple is not None:
+            cached_plan_brief, _ = cached_plan_brief_tuple
+            if cached_plan_brief is not None:
+                return [cached_plan_brief]
         return []
 
     async def get_new_chore_from_cache_query_pre(self, new_chore_class_type: Type[NewChore]):
-        cached_new_chore_tuple = self.strat_cache.get_new_chore()
+        cached_new_chore_tuple = self.plan_cache.get_new_chore()
         if cached_new_chore_tuple is not None:
             cached_new_chore, _ = cached_new_chore_tuple
             if cached_new_chore is not None:
                 return cached_new_chore
         return []
 
-    async def get_strat_limits_from_cache_query_pre(self, strat_limits_class_type: Type[StratLimits]):
-        cached_strat_limits_tuple = self.strat_cache.get_strat_limits()
-        if cached_strat_limits_tuple is not None:
-            cached_strat_limits, _ = cached_strat_limits_tuple
-            if cached_strat_limits is not None:
-                return [cached_strat_limits]
+    async def get_plan_limits_from_cache_query_pre(self, plan_limits_class_type: Type[PlanLimits]):
+        cached_plan_limits_tuple = self.plan_cache.get_plan_limits()
+        if cached_plan_limits_tuple is not None:
+            cached_plan_limits, _ = cached_plan_limits_tuple
+            if cached_plan_limits is not None:
+                return [cached_plan_limits]
         return []
 
     async def get_chore_journals_from_cache_query_pre(self, chore_journal_class_type: Type[ChoreJournal]):
-        cached_chore_journal_tuple = self.strat_cache.get_chore_journal()
+        cached_chore_journal_tuple = self.plan_cache.get_chore_journal()
         if cached_chore_journal_tuple is not None:
             cached_chore_journal, _ = cached_chore_journal_tuple
             if cached_chore_journal is not None:
@@ -4606,7 +4601,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         return []
 
     async def get_fills_journal_from_cache_query_pre(self, fills_journal_class_type: Type[FillsJournal]):
-        cached_fills_journal_tuple = self.strat_cache.get_fills_journal()
+        cached_fills_journal_tuple = self.plan_cache.get_fills_journal()
         if cached_fills_journal_tuple is not None:
             cached_fills_journal, _ = cached_fills_journal_tuple
             if cached_fills_journal is not None:
@@ -4614,7 +4609,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         return []
 
     async def get_chore_snapshots_from_cache_query_pre(self, chore_snapshot_class_type: Type[ChoreSnapshot]):
-        cached_chore_snapshot_tuple = self.strat_cache.get_chore_snapshot()
+        cached_chore_snapshot_tuple = self.plan_cache.get_chore_snapshot()
         if cached_chore_snapshot_tuple is not None:
             cached_chore_snapshot, _ = cached_chore_snapshot_tuple
             if cached_chore_snapshot is not None:

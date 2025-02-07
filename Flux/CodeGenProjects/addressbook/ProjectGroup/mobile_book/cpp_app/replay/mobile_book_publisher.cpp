@@ -2,6 +2,46 @@
 
 #include "cpp_app_shared_resource.h"
 #include "../include/md_utility_functions.h"
+#include "mobile_book_web_n_ws_server.h"
+
+void inline log_md(const MarketDepthQueueElement& kr_market_depth_queue_element, const char* log_msg) {
+    LOG_INFO_IMPL(GetCppAppLogger(), "{} to write data: {};;; to SHM", log_msg,
+        std::format("symbol: {}, Side: {}, exch_time: {}, px: {}, qty: {}, position: {}",
+            kr_market_depth_queue_element.symbol_, kr_market_depth_queue_element.side_,
+            FluxCppCore::time_in_utc_str(kr_market_depth_queue_element.exch_time_),
+            kr_market_depth_queue_element.px_, kr_market_depth_queue_element.qty_,
+            kr_market_depth_queue_element.position_));
+}
+
+void inline log_lt(const LastBarterQueueElement& kr_last_barter_queue_element, const char* log_msg) {
+    LOG_INFO_IMPL(GetCppAppLogger(), "{} to write data: {};;; to SHM", log_msg,
+        std::format("symbol: {}, px: {}, qty: {}, exch_time: {}",
+            kr_last_barter_queue_element.symbol_n_exch_id_.symbol_, kr_last_barter_queue_element.px_,
+            kr_last_barter_queue_element.qty_, FluxCppCore::time_in_utc_str(kr_last_barter_queue_element.exch_time_)));
+}
+
+MobileBookPublisher::MobileBookPublisher(Config& config, std::shared_ptr<FluxCppCore::MongoDBHandler> mongo_db_handler) :
+    mr_config_(config),
+    m_sp_mongo_db_handler_(mongo_db_handler), m_market_depth_codec_(m_sp_mongo_db_handler_),
+    m_last_barter_codec_(m_sp_mongo_db_handler_), m_top_of_book_codec_(m_sp_mongo_db_handler_),
+    m_raw_market_depth_history_codec_(m_sp_mongo_db_handler_), m_raw_last_barter_history_codec_(m_sp_mongo_db_handler_),
+    m_combined_server_(nullptr){
+
+    initialize_shm();
+    m_raw_last_barter_history_codec_.get_all_data_from_collection(m_raw_last_barter_history_list_);
+    m_raw_market_depth_history_codec_.get_all_data_from_collection(m_raw_market_depth_history_list_);
+    update_market_depth_db_cache();
+    update_top_of_book_db_cache();
+    initialize_webclient();
+    m_combined_server_ = new MobileBookWebNWsServer(mr_config_, this);
+    m_combined_server_->register_route_handler(std::make_shared<FluxCppCore::MarketDepthRouteHandler>(
+    	mr_config_.m_market_depth_ws_route_, m_market_depth_codec_));
+    m_combined_server_->register_route_handler(std::make_shared<FluxCppCore::LastBarterRouteHandler>(
+    	mr_config_.m_last_barter_ws_route_, m_last_barter_codec_));
+    m_combined_server_->register_route_handler(std::make_shared<FluxCppCore::TopOfBookRouteHandler>(
+    	mr_config_.m_top_of_book_ws_route_, m_top_of_book_codec_));
+    start_monitor_threads();
+}
 
 void MobileBookPublisher::cleanup() {
 	switch (mr_config_.m_market_depth_level_) {
@@ -31,8 +71,8 @@ void MobileBookPublisher::cleanup() {
             break;
 	    }
 	}
-    if (m_web_socket_server_) {
-    	m_web_socket_server_.value().clean_ws();
+    if (m_combined_server_) {
+    	m_combined_server_->cleanup();
     }
 }
 
@@ -62,7 +102,8 @@ void MobileBookPublisher::process_market_depth(const MarketDepthQueueElement& kr
             }
             if (mr_config_.m_shm_update_publish_policy_ == PublishPolicy::PRE) {
                 auto shm_manager = static_cast<SharedMemoryManager<ShmSymbolCache<1>>*>(m_shm_manager_);
-                shm_manager->write_to_shared_memory(*shm_cache);
+                auto result = shm_manager->write_to_shared_memory(*shm_cache);
+                log_md(kr_market_depth_queue_element, result ? "successfully written to SHM" : "Failed to write to SHM");
             }
             break;
         }
@@ -76,7 +117,8 @@ void MobileBookPublisher::process_market_depth(const MarketDepthQueueElement& kr
             }
             if (mr_config_.m_shm_update_publish_policy_ == PublishPolicy::PRE) {
                 auto shm_manager = static_cast<SharedMemoryManager<ShmSymbolCache<5>>*>(m_shm_manager_);
-                shm_manager->write_to_shared_memory(*shm_cache);
+                auto result = shm_manager->write_to_shared_memory(*shm_cache);
+                log_md(kr_market_depth_queue_element, result ? "successfully written to SHM" : "Failed to write to SHM");
             }
             break;
         }
@@ -90,7 +132,8 @@ void MobileBookPublisher::process_market_depth(const MarketDepthQueueElement& kr
             }
             if (mr_config_.m_shm_update_publish_policy_ == PublishPolicy::PRE) {
                 auto shm_manager = static_cast<SharedMemoryManager<ShmSymbolCache<10>>*>(m_shm_manager_);
-                shm_manager->write_to_shared_memory(*shm_cache);
+                auto result = shm_manager->write_to_shared_memory(*shm_cache);
+                log_md(kr_market_depth_queue_element, result ? "successfully written to SHM" : "Failed to write to SHM");
             }
             break;
         }
@@ -104,7 +147,8 @@ void MobileBookPublisher::process_market_depth(const MarketDepthQueueElement& kr
             }
             if (mr_config_.m_shm_update_publish_policy_ == PublishPolicy::PRE) {
                 auto shm_manager = static_cast<SharedMemoryManager<ShmSymbolCache<15>>*>(m_shm_manager_);
-                shm_manager->write_to_shared_memory(*shm_cache);
+                auto result = shm_manager->write_to_shared_memory(*shm_cache);
+                log_md(kr_market_depth_queue_element, result ? "successfully written to SHM" : "Failed to write to SHM");
             }
             break;
         }
@@ -118,7 +162,8 @@ void MobileBookPublisher::process_market_depth(const MarketDepthQueueElement& kr
             }
             if (mr_config_.m_shm_update_publish_policy_ == PublishPolicy::PRE) {
                 auto shm_manager = static_cast<SharedMemoryManager<ShmSymbolCache<20>>*>(m_shm_manager_);
-                shm_manager->write_to_shared_memory(*shm_cache);
+                auto result = shm_manager->write_to_shared_memory(*shm_cache);
+                log_md(kr_market_depth_queue_element, result ? "successfully written to SHM" : "Failed to write to SHM");
             }
             break;
         }
@@ -150,7 +195,6 @@ void MobileBookPublisher::process_market_depth(const MarketDepthQueueElement& kr
 
     // Handle top of book for first position
     if (market_depth.position_ == 0) {
-        auto time = FluxCppCore::get_local_time_microseconds<int64_t>();
         TopOfBook top_of_book;
         top_of_book.id_ = market_depth.id_;
         top_of_book.symbol_ = market_depth.symbol_;
@@ -214,7 +258,7 @@ void MobileBookPublisher::process_market_depth(const MarketDepthQueueElement& kr
             m_top_of_book_codec_.get_data_by_id_from_collection(top_of_book, db_id);
             boost::json::object tob_json;
             if (MobileBookObjectToJson::object_to_json(top_of_book, tob_json)) {
-                m_web_socket_server_.value().publish_to_route(mr_config_.m_top_of_book_ws_route_,
+                m_combined_server_->publish_to_route(mr_config_.m_top_of_book_ws_route_,
                     boost::json::serialize(tob_json));
             } else {
                 LOG_ERROR_IMPL(GetCppAppLogger(), "Failed to serialize top_of_book;;; id: {}, symbol: {}",
@@ -318,26 +362,26 @@ void MobileBookPublisher::process_market_depth(const MarketDepthQueueElement& kr
 }
 
 void MobileBookPublisher::process_market_depth(const MarketDepth& kr_market_depth) {
-    MarketDepthQueueElement market_depth_queue_element{
-			.id_ = kr_market_depth.id_,
-			.side_ = kr_market_depth.side_[0],
-			.px_ = kr_market_depth.px_,
-			.is_px_set_ = kr_market_depth.is_px_set_,
-			.qty_ = kr_market_depth.qty_,
-			.is_qty_set_ = kr_market_depth.is_qty_set_,
-			.position_ = kr_market_depth.position_,
-			.is_smart_depth_ = kr_market_depth.is_smart_depth_,
-			.is_is_smart_depth_set_ = kr_market_depth.is_is_smart_depth_set_,
-			.cumulative_notional_ = kr_market_depth.cumulative_notional_,
-			.is_cumulative_notional_set_ = kr_market_depth.is_cumulative_notional_set_,
-			.cumulative_qty_ = kr_market_depth.cumulative_qty_,
-			.is_cumulative_qty_set_ = kr_market_depth.is_cumulative_qty_set_,
-			.cumulative_avg_px_ = kr_market_depth.cumulative_avg_px_,
-			.is_cumulative_avg_px_set_ = kr_market_depth.is_cumulative_avg_px_set_,
-		};
+
+    MarketDepthQueueElement market_depth_queue_element;
+
+    market_depth_queue_element.id_ = kr_market_depth.id_;
+    market_depth_queue_element.side_ = kr_market_depth.side_[0];
+    market_depth_queue_element.px_ = kr_market_depth.px_;
+    market_depth_queue_element.is_px_set_ = kr_market_depth.is_px_set_;
+    market_depth_queue_element.qty_ = kr_market_depth.qty_;
+    market_depth_queue_element.is_qty_set_ = kr_market_depth.is_qty_set_;
+    market_depth_queue_element.position_ = kr_market_depth.position_;
+    market_depth_queue_element.is_smart_depth_ = kr_market_depth.is_smart_depth_;
+    market_depth_queue_element.is_is_smart_depth_set_ = kr_market_depth.is_is_smart_depth_set_;
+    market_depth_queue_element.cumulative_notional_ = kr_market_depth.cumulative_notional_;
+    market_depth_queue_element.is_cumulative_notional_set_ = kr_market_depth.is_cumulative_notional_set_;
+    market_depth_queue_element.cumulative_qty_ = kr_market_depth.cumulative_qty_;
+    market_depth_queue_element.is_cumulative_qty_set_ = kr_market_depth.is_cumulative_qty_set_;
+    market_depth_queue_element.cumulative_avg_px_ = kr_market_depth.cumulative_avg_px_;
+    market_depth_queue_element.is_cumulative_avg_px_set_ = kr_market_depth.is_cumulative_avg_px_set_;
 
     market_depth_queue_element.exch_time_ = kr_market_depth.exch_time_;
-
     market_depth_queue_element.arrival_time_ = kr_market_depth.arrival_time_;
 
 	FluxCppCore::StringUtil::setString(market_depth_queue_element.symbol_, kr_market_depth.symbol_);
@@ -387,7 +431,8 @@ void MobileBookPublisher::process_last_barter(const LastBarterQueueElement& kr_l
             }
             if (mr_config_.m_shm_update_publish_policy_ == PublishPolicy::PRE) {
                 auto shm_manager = static_cast<SharedMemoryManager<ShmSymbolCache<1>>*>(m_shm_manager_);
-                shm_manager->write_to_shared_memory(*shm_cache);
+                auto result = shm_manager->write_to_shared_memory(*shm_cache);
+                log_lt(kr_last_barter_queue_element, result ? "successfully written to SHM" : "Failed to write to SHM");
             }
             break;
         }
@@ -405,7 +450,8 @@ void MobileBookPublisher::process_last_barter(const LastBarterQueueElement& kr_l
             }
             if (mr_config_.m_shm_update_publish_policy_ == PublishPolicy::PRE) {
                 auto shm_manager = static_cast<SharedMemoryManager<ShmSymbolCache<5>>*>(m_shm_manager_);
-                shm_manager->write_to_shared_memory(*shm_cache);
+                auto result = shm_manager->write_to_shared_memory(*shm_cache);
+                log_lt(kr_last_barter_queue_element, result ? "successfully written to SHM" : "Failed to write to SHM");
             }
             break;
         }
@@ -423,7 +469,8 @@ void MobileBookPublisher::process_last_barter(const LastBarterQueueElement& kr_l
             }
             if (mr_config_.m_shm_update_publish_policy_ == PublishPolicy::PRE) {
                 auto shm_manager = static_cast<SharedMemoryManager<ShmSymbolCache<10>>*>(m_shm_manager_);
-                shm_manager->write_to_shared_memory(*shm_cache);
+                auto result = shm_manager->write_to_shared_memory(*shm_cache);
+                log_lt(kr_last_barter_queue_element, result ? "successfully written to SHM" : "Failed to write to SHM");
             }
             break;
         }
@@ -441,7 +488,8 @@ void MobileBookPublisher::process_last_barter(const LastBarterQueueElement& kr_l
             }
             if (mr_config_.m_shm_update_publish_policy_ == PublishPolicy::PRE) {
                 auto shm_manager = static_cast<SharedMemoryManager<ShmSymbolCache<15>>*>(m_shm_manager_);
-                shm_manager->write_to_shared_memory(*shm_cache);
+                auto result = shm_manager->write_to_shared_memory(*shm_cache);
+                log_lt(kr_last_barter_queue_element, result ? "successfully written to SHM" : "Failed to write to SHM");
             }
             break;
         }
@@ -459,7 +507,8 @@ void MobileBookPublisher::process_last_barter(const LastBarterQueueElement& kr_l
             }
             if (mr_config_.m_shm_update_publish_policy_ == PublishPolicy::PRE) {
                 auto shm_manager = static_cast<SharedMemoryManager<ShmSymbolCache<20>>*>(m_shm_manager_);
-                shm_manager->write_to_shared_memory(*shm_cache);
+                auto result = shm_manager->write_to_shared_memory(*shm_cache);
+                log_lt(kr_last_barter_queue_element, result ? "successfully written to SHM" : "Failed to write to SHM");
             }
             break;
         }
@@ -478,7 +527,7 @@ void MobileBookPublisher::process_last_barter(const LastBarterQueueElement& kr_l
     if (mr_config_.m_last_barter_ws_update_publish_policy_ == PublishPolicy::PRE) {
         boost::json::object last_barter_json;
         if (MobileBookObjectToJson::object_to_json(last_barter, last_barter_json)) {
-            m_web_socket_server_.value().publish_to_route(mr_config_.m_last_barter_ws_route_,
+            m_combined_server_->publish_to_route(mr_config_.m_last_barter_ws_route_,
                 boost::json::serialize(last_barter_json));
         } else {
             LOG_ERROR_IMPL(GetCppAppLogger(), "Failed to serialize last barter;;; id: {}, symbol: {}", last_barter.id_,
@@ -493,7 +542,6 @@ void MobileBookPublisher::process_last_barter(const LastBarterQueueElement& kr_l
         }
     }
 
-    auto time = FluxCppCore::get_local_time_microseconds<int64_t>();
     TopOfBook top_of_book;
     top_of_book.id_ = last_barter.id_;
     top_of_book.symbol_ = last_barter.symbol_n_exch_id_.symbol_;
@@ -538,7 +586,7 @@ void MobileBookPublisher::process_last_barter(const LastBarterQueueElement& kr_l
         m_top_of_book_codec_.get_data_by_id_from_collection(top_of_book, db_id);
         boost::json::object tob_json;
         if (MobileBookObjectToJson::object_to_json(top_of_book, tob_json)) {
-            m_web_socket_server_.value().publish_to_route(mr_config_.m_top_of_book_ws_route_,
+            m_combined_server_->publish_to_route(mr_config_.m_top_of_book_ws_route_,
                 boost::json::serialize(tob_json));
         } else {
             LOG_ERROR_IMPL(GetCppAppLogger(), "Failed to serialize top_of_book;;; id: {}, symbol: {}", top_of_book.id_,
@@ -704,7 +752,6 @@ void MobileBookPublisher::update_last_barter_cache(const LastBarterQueueElement&
 void MobileBookPublisher::populate_market_depth(
     const MarketDepthQueueElement& kr_market_depth_queue_element, MarketDepth& r_market_depth) {
 
-    auto time = FluxCppCore::get_local_time_microseconds<int64_t>();
     r_market_depth.id_ = kr_market_depth_queue_element.id_;
     r_market_depth.symbol_ = kr_market_depth_queue_element.symbol_;
     r_market_depth.exch_time_ = kr_market_depth_queue_element.exch_time_;
@@ -803,30 +850,35 @@ void MobileBookPublisher::market_depth_consumer() {
                         case 1: {
                             auto shm_cache = static_cast<ShmSymbolCache<1>*>(m_shm_symbol_cache_);
                             auto shm_manger = static_cast<SharedMemoryManager<ShmSymbolCache<1>>*>(m_shm_manager_);
-                            shm_manger->write_to_shared_memory(*shm_cache);
+                            auto result = shm_manger->write_to_shared_memory(*shm_cache);
+                            log_md(market_depth_queue_element, result ? "successfully written to SHM" : "Failed to write to SHM");
                             break;
                         }
                         case 5: {
                             auto shm_cache = static_cast<ShmSymbolCache<5>*>(m_shm_symbol_cache_);
                             auto shm_manger = static_cast<SharedMemoryManager<ShmSymbolCache<5>>*>(m_shm_manager_);
-                            shm_manger->write_to_shared_memory(*shm_cache);
+                            auto result = shm_manger->write_to_shared_memory(*shm_cache);
+                            log_md(market_depth_queue_element, result ? "successfully written to SHM" : "Failed to write to SHM");
                             break;
                         }
                         case 10: {
                             auto shm_cache = static_cast<ShmSymbolCache<10>*>(m_shm_symbol_cache_);
                             auto shm_manger = static_cast<SharedMemoryManager<ShmSymbolCache<10>>*>(m_shm_manager_);
-                            shm_manger->write_to_shared_memory(*shm_cache);
+                            auto result = shm_manger->write_to_shared_memory(*shm_cache);
+                            log_md(market_depth_queue_element, result ? "successfully written to SHM" : "Failed to write to SHM");
                             break;
                         } case 15: {
                             auto shm_cache = static_cast<ShmSymbolCache<15>*>(m_shm_symbol_cache_);
                             auto shm_manger = static_cast<SharedMemoryManager<ShmSymbolCache<15>>*>(m_shm_manager_);
-                            shm_manger->write_to_shared_memory(*shm_cache);
+                            auto result = shm_manger->write_to_shared_memory(*shm_cache);
+                            log_md(market_depth_queue_element, result ? "successfully written to SHM" : "Failed to write to SHM");
                             break;
                         }
                         case 20: {
                             auto shm_cache = static_cast<ShmSymbolCache<20>*>(m_shm_symbol_cache_);
                             auto shm_manger = static_cast<SharedMemoryManager<ShmSymbolCache<20>>*>(m_shm_manager_);
-                            shm_manger->write_to_shared_memory(*shm_cache);
+                            auto result = shm_manger->write_to_shared_memory(*shm_cache);
+                            log_md(market_depth_queue_element, result ? "successfully written to SHM" : "Failed to write to SHM");
                             break;
                         }
                         default: {
@@ -875,7 +927,6 @@ void MobileBookPublisher::market_depth_consumer() {
                 }
 
                 if (market_depth.position_ == 0) {
-                    auto time = FluxCppCore::get_local_time_microseconds<int64_t>();
                     TopOfBook top_of_book;
                     top_of_book.id_ = market_depth.id_;
                     top_of_book.symbol_ = market_depth.symbol_;
@@ -939,7 +990,7 @@ void MobileBookPublisher::market_depth_consumer() {
                         m_top_of_book_codec_.get_data_by_id_from_collection(top_of_book, db_id);
                         boost::json::object tob_json;
                         if (MobileBookObjectToJson::object_to_json(top_of_book, tob_json)) {
-                            m_web_socket_server_.value().publish_to_route(mr_config_.m_top_of_book_ws_route_,
+                            m_combined_server_->publish_to_route(mr_config_.m_top_of_book_ws_route_,
                                 boost::json::serialize(tob_json));
                         } else {
                             LOG_ERROR_IMPL(GetCppAppLogger(), "Failed to serialize top_of_book to json;;; id: {}, "
@@ -952,9 +1003,10 @@ void MobileBookPublisher::market_depth_consumer() {
             if (mr_config_.m_market_depth_ws_update_publish_policy_ == PublishPolicy::POST) {
                 boost::json::object md_json;
                 if (MobileBookObjectToJson::object_to_json(m_market_depth_list_, md_json)) {
-                    m_web_socket_server_.value().publish_to_route(mr_config_.m_market_depth_ws_route_,
+                    m_combined_server_->publish_to_route(mr_config_.m_market_depth_ws_route_,
                         boost::json::serialize(md_json["market_depth"].get_array()));
                 } else {
+                    // TODO: fix error
                     LOG_ERROR_IMPL(GetCppAppLogger(), "Failed to serialize market_depth to json;;; id: {}, symbol: {}, "
                                                       "", m_market_depth.id_, m_market_depth.symbol_);
                 }
@@ -987,7 +1039,8 @@ void MobileBookPublisher::last_barter_consumer() {
                             ++shm_cache->m_leg_2_data_shm_cache_.update_counter;
                             update_last_barter_cache(last_barter_queue_element, shm_cache->m_leg_2_data_shm_cache_);
                         }
-                        shm_manager->write_to_shared_memory(*shm_cache);
+                        auto result = shm_manager->write_to_shared_memory(*shm_cache);
+                        log_lt(last_barter_queue_element, result ? "successfully written to SHM" : "Failed to write to SHM");
                         break;
                     } case 5: {
                         auto shm_cache = static_cast<ShmSymbolCache<5>*>(m_shm_symbol_cache_);
@@ -1000,7 +1053,8 @@ void MobileBookPublisher::last_barter_consumer() {
                             ++shm_cache->m_leg_2_data_shm_cache_.update_counter;
                             update_last_barter_cache(last_barter_queue_element, shm_cache->m_leg_2_data_shm_cache_);
                         }
-                        shm_manager->write_to_shared_memory(*shm_cache);
+                        auto result = shm_manager->write_to_shared_memory(*shm_cache);
+                        log_lt(last_barter_queue_element, result ? "successfully written to SHM" : "Failed to write to SHM");
                         break;
                     } case 10: {
                         auto shm_cache = static_cast<ShmSymbolCache<10>*>(m_shm_symbol_cache_);
@@ -1013,7 +1067,8 @@ void MobileBookPublisher::last_barter_consumer() {
                             ++shm_cache->m_leg_2_data_shm_cache_.update_counter;
                             update_last_barter_cache(last_barter_queue_element, shm_cache->m_leg_2_data_shm_cache_);
                         }
-                        shm_manager->write_to_shared_memory(*shm_cache);
+                        auto result = shm_manager->write_to_shared_memory(*shm_cache);
+                        log_lt(last_barter_queue_element, result ? "successfully written to SHM" : "Failed to write to SHM");
                         break;
                     } case 15: {
                         auto shm_cache = static_cast<ShmSymbolCache<15>*>(m_shm_symbol_cache_);
@@ -1026,7 +1081,8 @@ void MobileBookPublisher::last_barter_consumer() {
                             ++shm_cache->m_leg_2_data_shm_cache_.update_counter;
                             update_last_barter_cache(last_barter_queue_element, shm_cache->m_leg_2_data_shm_cache_);
                         }
-                        shm_manager->write_to_shared_memory(*shm_cache);
+                        auto result = shm_manager->write_to_shared_memory(*shm_cache);
+                        log_lt(last_barter_queue_element, result ? "successfully written to SHM" : "Failed to write to SHM");
                         break;
                     } case 20: {
                         auto shm_cache = static_cast<ShmSymbolCache<20>*>(m_shm_symbol_cache_);
@@ -1039,7 +1095,8 @@ void MobileBookPublisher::last_barter_consumer() {
                             ++shm_cache->m_leg_2_data_shm_cache_.update_counter;
                             update_last_barter_cache(last_barter_queue_element, shm_cache->m_leg_2_data_shm_cache_);
                         }
-                        shm_manager->write_to_shared_memory(*shm_cache);
+                        auto result = shm_manager->write_to_shared_memory(*shm_cache);
+                        log_lt(last_barter_queue_element, result ? "successfully written to SHM" : "Failed to write to SHM");
                         break;
                     }
                     default: {
@@ -1094,7 +1151,7 @@ void MobileBookPublisher::last_barter_consumer() {
             if (mr_config_.m_last_barter_ws_update_publish_policy_ == PublishPolicy::POST) {
                 boost::json::object lt_json;
                 if (MobileBookObjectToJson::object_to_json(last_barter, lt_json)) {
-                    m_web_socket_server_.value().publish_to_route(mr_config_.m_last_barter_ws_route_,
+                    m_combined_server_->publish_to_route(mr_config_.m_last_barter_ws_route_,
                         boost::json::serialize(lt_json));
                 } else {
                     LOG_ERROR_IMPL(GetCppAppLogger(), "Failed to serialize last_barter to json;;; id: {}, symbol: {}",
@@ -1166,7 +1223,7 @@ void MobileBookPublisher::last_barter_consumer() {
                 m_top_of_book_codec_.get_data_by_id_from_collection(top_of_book, db_id);
                 boost::json::object tob_json;
                 MobileBookObjectToJson::object_to_json(top_of_book, tob_json);
-                m_web_socket_server_.value().publish_to_route(mr_config_.m_top_of_book_ws_route_,
+                m_combined_server_->publish_to_route(mr_config_.m_top_of_book_ws_route_,
                     boost::json::serialize(tob_json));
             }
         }

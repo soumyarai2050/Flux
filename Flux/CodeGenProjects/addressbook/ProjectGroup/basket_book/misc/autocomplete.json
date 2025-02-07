@@ -11,12 +11,12 @@
       "KOTAK"
     ],
     "CB_List": [
-      "CB_Sec_1",
-      "CB_Sec_2"
+      "Type1_Sec_1",
+      "Type1_Sec_2"
     ],
-    "Mstrat_List": [
-      "Mstrat_1",
-      "Mstrat_2"
+    "Mplan_List": [
+      "Mplan_1",
+      "Mplan_2"
     ]
   }
 }

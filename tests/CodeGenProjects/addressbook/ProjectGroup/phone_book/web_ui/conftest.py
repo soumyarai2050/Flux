@@ -16,7 +16,7 @@ from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.web_ui.web_ui_mod
 def market_depth_basemodel_fixture() -> List[MarketDepthBaseModel]:
     input_data = []
 
-    for symbol in ["CB_Sec_1", "EQT_Sec_1"]:
+    for symbol in ["Type1_Sec_1", "Type2_Sec_1"]:
         for side, px, qty, dev in [("BID", 100, 90, -1), ("ASK", 110, 70, 1)]:
             for position in range(1, 6):
                 id_value = len(input_data) + 1  # Using the length of input_data as id
@@ -49,7 +49,7 @@ def last_barter_basemodel_fixture() -> List[LastBarterBaseModel]:
     input_data = []
     id: int = 0
 
-    for symbol in ["CB_Sec_1", "EQT_Sec_1"]:
+    for symbol in ["Type1_Sec_1", "Type2_Sec_1"]:
         id += 1
         symbol_n_exch_id = SymbolNExchIdBaseModel(symbol=symbol, exch_id="Exch")
         market_barter_volume = MarketBarterVolumeBaseModel(id=str(id),
@@ -78,7 +78,7 @@ def fills_journal_basemodel_fixture() -> List[FillsJournalBaseModel]:
     input_data: List[FillsJournalBaseModel] = []
     id_counter: int = 0
 
-    for symbol in ["CB_Sec_1", "EQT_Sec_1"]:
+    for symbol in ["Type1_Sec_1", "Type2_Sec_1"]:
         for _ in range(5):
             id_counter += 1
             input_data.append(
@@ -122,11 +122,11 @@ def symbol_side_snapshot_fixture():
 
 
 @pytest.fixture()
-def strat_limits_fixture(expected_brokers_) -> List[StratLimitsBaseModel]:
-    input_data: List[StratLimitsBaseModel] = []
-    # Create StratLimitsBaseModel with eligible_brokers and append to input_data
-    strat_limit_obj = StratLimitsBaseModel(eligible_brokers=expected_brokers_)
-    input_data.append(strat_limit_obj)
+def plan_limits_fixture(expected_brokers_) -> List[PlanLimitsBaseModel]:
+    input_data: List[PlanLimitsBaseModel] = []
+    # Create PlanLimitsBaseModel with eligible_brokers and append to input_data
+    plan_limit_obj = PlanLimitsBaseModel(eligible_brokers=expected_brokers_)
+    input_data.append(plan_limit_obj)
     yield input_data
 
 
@@ -135,7 +135,7 @@ def chore_journal_basemodel_fixture() -> List[ChoreJournalBaseModel]:
     input_data = []
     id_counter: int = 0
 
-    for symbol in ["CB_Sec_1", "EQT_Sec_1"]:
+    for symbol in ["Type1_Sec_1", "Type2_Sec_1"]:
         for _ in range(5):  # Adjust the range as needed
             id_counter += 1
             input_data.append(
@@ -225,7 +225,7 @@ def chore_snapshot_basemodel_fixture() -> list[ChoreSnapshotBaseModel]:
 def top_of_book_fixture() -> List:
     input_data = []
     id: int = 0
-    for index, symbol in enumerate(["CB_Sec_1", "EQT_Sec_1"]):
+    for index, symbol in enumerate(["Type1_Sec_1", "Type2_Sec_1"]):
         id += 1
         input_data.extend([
             {
@@ -273,14 +273,14 @@ def expected_chore_limits_() -> ChoreLimitsBaseModel:
 
 
 @pytest.fixture()
-def expected_portfolio_limits_(expected_brokers_) -> PortfolioLimitsBaseModel:
+def expected_contact_limits_(expected_brokers_) -> ContactLimitsBaseModel:
     rolling_max_chore_count = RollingMaxChoreCount(max_rolling_tx_count=5, rolling_tx_count_period_seconds=2)
     rolling_max_reject_count = RollingMaxChoreCount(max_rolling_tx_count=5, rolling_tx_count_period_seconds=2)
 
-    # max_accounts_nett_notional = PortfolioLimitsBaseModel(accounts_nett_notional=44.3)
+    # max_accounts_nett_notional = ContactLimitsBaseModel(accounts_nett_notional=44.3)
     # max_accounts_nett_notional_list = [max_accounts_nett_notional]
 
-    portfolio_limits_obj = PortfolioLimitsBaseModel(
+    contact_limits_obj = ContactLimitsBaseModel(
         id=1,
         max_accounts_nett_notional=[
             AccountsNettNotionalBaseModel(
@@ -296,12 +296,12 @@ def expected_portfolio_limits_(expected_brokers_) -> PortfolioLimitsBaseModel:
         eligible_brokers=expected_brokers_,
     )
 
-    yield portfolio_limits_obj
+    yield contact_limits_obj
 
 
 @pytest.fixture()
-def expected_portfolio_status_() -> PortfolioStatusBaseModel:
-    yield PortfolioStatusBaseModel(**{
+def expected_contact_status_() -> ContactStatusBaseModel:
+    yield ContactStatusBaseModel(**{
         "overall_buy_notional": 0,
         "overall_sell_notional": 0,
         "overall_buy_fill_notional": 0,
@@ -348,21 +348,21 @@ def expected_brokers_(buy_sell_symbol_list) -> List[Broker]:
 @pytest.fixture()
 def buy_sell_symbol_list() -> List:
     return [
-        ("CB_Sec_1", "EQT_Sec_1"),
-        ("CB_Sec_2", "EQT_Sec_2"),
-        ("CB_Sec_3", "EQT_Sec_3"),
-        ("CB_Sec_4", "EQT_Sec_4"),
-        ("CB_Sec_5", "EQT_Sec_5"),
-        ("CB_Sec_6", "EQT_Sec_6"),
-        ("CB_Sec_7", "EQT_Sec_7"),
-        ("CB_Sec_8", "EQT_Sec_8"),
-        ("CB_Sec_9", "EQT_Sec_9"),
-        ("CB_Sec_10", "EQT_Sec_10")
+        ("Type1_Sec_1", "Type2_Sec_1"),
+        ("Type1_Sec_2", "Type2_Sec_2"),
+        ("Type1_Sec_3", "Type2_Sec_3"),
+        ("Type1_Sec_4", "Type2_Sec_4"),
+        ("Type1_Sec_5", "Type2_Sec_5"),
+        ("Type1_Sec_6", "Type2_Sec_6"),
+        ("Type1_Sec_7", "Type2_Sec_7"),
+        ("Type1_Sec_8", "Type2_Sec_8"),
+        ("Type1_Sec_9", "Type2_Sec_9"),
+        ("Type1_Sec_10", "Type2_Sec_10")
     ]
 
 
 @pytest.fixture
-def clean_and_set_limits(expected_chore_limits_, expected_portfolio_limits_, expected_portfolio_status_,
+def clean_and_set_limits(expected_chore_limits_, expected_contact_limits_, expected_contact_status_,
                          db_names_list):
 
     # # deleting existing data available in existing executor client
@@ -375,14 +375,14 @@ def clean_and_set_limits(expected_chore_limits_, expected_portfolio_limits_, exp
     clean_all_collections_ignoring_ui_layout()
     clear_cache_in_model()
 
-    # updating portfolio_alert
+    # updating contact_alert
     clean_log_book_alerts()
 
     # setting limits
-    set_n_verify_limits(expected_chore_limits_, expected_portfolio_limits_)
+    set_n_verify_limits(expected_chore_limits_, expected_contact_limits_)
 
-    # creating portfolio_status
-    create_n_verify_portfolio_status(copy.deepcopy(expected_portfolio_status_))
+    # creating contact_status
+    create_n_verify_contact_status(copy.deepcopy(expected_contact_status_))
 
     # creating fx_symbol_overview
     create_fx_symbol_overview()
@@ -422,15 +422,15 @@ def driver(driver_type, config_dict: Dict[str, any]) -> WebDriver:
 
 
 @pytest.fixture()
-def web_project(driver: WebDriver, pair_strat: Dict, expected_chore_limits_: ChoreLimitsBaseModel,
-                expected_portfolio_limits_: PortfolioLimitsBaseModel, top_of_book_fixture: List,
+def web_project(driver: WebDriver, pair_plan: Dict, expected_chore_limits_: ChoreLimitsBaseModel,
+                expected_contact_limits_: ContactLimitsBaseModel, top_of_book_fixture: List,
                 market_depth_basemodel_fixture: List[MarketDepthBaseModel],
                 last_barter_basemodel_fixture: List[LastBarterBaseModel],
                 fills_journal_basemodel_fixture: List[FillsJournalBaseModel],
                 chore_snapshot_basemodel_fixture: List[ChoreSnapshotBaseModel],
                 chore_journal_basemodel_fixture: List[ChoreJournalBaseModel],
                 symbol_side_snapshot_fixture: SymbolSideSnapshotBaseModel,
-                strat_limits_fixture: StratLimitsBaseModel, expected_pair_strat: Dict[str, any], basket_chore):
+                plan_limits_fixture: PlanLimitsBaseModel, expected_pair_plan: Dict[str, any], basket_chore):
 
     host: str = "127.0.0.1"
     port: int = 8020
@@ -438,17 +438,17 @@ def web_project(driver: WebDriver, pair_strat: Dict, expected_chore_limits_: Cho
     fx_symbol_overview = fx_symbol_overview_obj()
     email_book_service_http_client.create_fx_symbol_overview_client(fx_symbol_overview)
 
-    override_default_limits(expected_chore_limits_, expected_portfolio_limits_)
+    override_default_limits(expected_chore_limits_, expected_contact_limits_)
     driver.maximize_window()
     time.sleep(Delay.SHORT.value)
     driver.get(get_web_project_url())
-    # verify is portfolio status is created
+    # verify is contact status is created
     time.sleep(Delay.DEFAULT.value)
-    # wait(driver).until(EC.presence_of_element_located((By.ID, "portfolio_status")))
-    # portfolio_status_widget = driver.find_element(By.ID, "portfolio_status")
-    # scroll_into_view(driver=driver, element=portfolio_status_widget)
+    # wait(driver).until(EC.presence_of_element_located((By.ID, "contact_status")))
+    # contact_status_widget = driver.find_element(By.ID, "contact_status")
+    # scroll_into_view(driver=driver, element=contact_status_widget)
     # wait(driver).until(EC.presence_of_element_located((By.NAME, "kill_switch")))
-    # kill_switch_btn = portfolio_status_widget.find_element(By.NAME, "kill_switch")
+    # kill_switch_btn = contact_status_widget.find_element(By.NAME, "kill_switch")
 
 
     wait(driver, Delay.LONG.value).until(EC.presence_of_element_located((By.ID, "system_control")))
@@ -458,75 +458,75 @@ def web_project(driver: WebDriver, pair_strat: Dict, expected_chore_limits_: Cho
     wait(driver, Delay.LONG.value).until(EC.presence_of_element_located((By.NAME, "kill_switch")))
     kill_switch_btn = widget.find_element(By.NAME, "kill_switch")
     assert kill_switch_btn.is_displayed(), "failed to load web project, kill switch button not found"
-    create_pair_strat(driver=driver, pair_strat=pair_strat, expected_pair_strat=expected_pair_strat)
+    create_pair_plan(driver=driver, pair_plan=pair_plan, expected_pair_plan=expected_pair_plan)
     create_tob_md_ld_fj_os_oj(driver=driver, top_of_book_fixture=top_of_book_fixture,
                               market_depth_basemodel_fixture=market_depth_basemodel_fixture,
                               last_barter_basemodel_fixture=last_barter_basemodel_fixture,
                               fills_journal_basemodel_fixture=fills_journal_basemodel_fixture,
                               chore_snapshot_basemodel_fixture=chore_snapshot_basemodel_fixture,
                               chore_journal_basemodel_fixture=chore_journal_basemodel_fixture,
-                              strat_limits_fixture=strat_limits_fixture)
+                              plan_limits_fixture=plan_limits_fixture)
 
 @pytest.fixture()
-def pair_strat() -> Dict[str, any]:
-    pair_strat = {
-        "pair_strat_params": {
-            "strat_leg1": {
+def pair_plan() -> Dict[str, any]:
+    pair_plan = {
+        "pair_plan_params": {
+            "plan_leg1": {
                 "sec": {
-                    "sec_id": "CB_Sec_1"
+                    "sec_id": "Type1_Sec_1"
                 },
                 "side": "BUY"
             },
-            "strat_leg2": {
+            "plan_leg2": {
                 "sec": {
-                    "sec_id": "EQT_Sec_1"
+                    "sec_id": "Type2_Sec_1"
                 }
             },
             "common_premium": 3
         }
     }
-    return pair_strat
+    return pair_plan
 
 
 
 @pytest.fixture()
-def expected_pair_strat(pair_strat) -> Dict[str, any]:
-    pair_strat_params = pair_strat["pair_strat_params"]
+def expected_pair_plan(pair_plan) -> Dict[str, any]:
+    pair_plan_params = pair_plan["pair_plan_params"]
 
-    expected_pair_strat= {
-        "pair_strat_params.strat_leg1.sec.sec_id": pair_strat_params["strat_leg1"]["sec"]["sec_id"],
-        "pair_strat_params.strat_leg1.side": pair_strat_params["strat_leg1"]["side"],
-        "pair_strat_params.strat_leg2.sec.sec_id": pair_strat_params["strat_leg2"]["sec"]["sec_id"],
-        "pair_strat_params.common_premium": pair_strat_params["common_premium"]
+    expected_pair_plan= {
+        "pair_plan_params.plan_leg1.sec.sec_id": pair_plan_params["plan_leg1"]["sec"]["sec_id"],
+        "pair_plan_params.plan_leg1.side": pair_plan_params["plan_leg1"]["side"],
+        "pair_plan_params.plan_leg2.sec.sec_id": pair_plan_params["plan_leg2"]["sec"]["sec_id"],
+        "pair_plan_params.common_premium": pair_plan_params["common_premium"]
     }
-    return expected_pair_strat
+    return expected_pair_plan
 
 
 @pytest.fixture()
-def strat_brief_fixture() -> Dict[str, any]:
-    pair_strat_edit = {
-        "pair_strat_params": {
+def plan_brief_fixture() -> Dict[str, any]:
+    pair_plan_edit = {
+        "pair_plan_params": {
             "common_premium": 55,
             "hedge_ratio": 60
         }
     }
-    yield pair_strat_edit
+    yield pair_plan_edit
 
 
 @pytest.fixture()
-def pair_strat_edit() -> Dict[str, any]:
-    pair_strat_edit = {
-        "pair_strat_params": {
+def pair_plan_edit() -> Dict[str, any]:
+    pair_plan_edit = {
+        "pair_plan_params": {
             "common_premium": 55,
             "hedge_ratio": 60
         }
     }
-    yield pair_strat_edit
+    yield pair_plan_edit
 
 
 @pytest.fixture()
-def strat_limits() -> Dict[str, any]:
-    strat_limits = {
+def plan_limits() -> Dict[str, any]:
+    plan_limits = {
         "max_open_chores_per_side": 4,
         "max_single_leg_notional": 500,
         "max_open_single_leg_notional": 600,
@@ -555,13 +555,13 @@ def strat_limits() -> Dict[str, any]:
             "residual_mark_seconds": 1,
         }
     }
-    yield strat_limits
+    yield plan_limits
 
 
 @pytest.fixture
 def set_micro_seperator_and_clean(schema_dict: Dict[str, any]):
     update_schema_json(schema_dict=copy.deepcopy(schema_dict), project_name="phone_book",
-                       update_widget_name="strat_collection", update_field_name="loaded_strat_keys",
+                       update_widget_name="plan_collection", update_field_name="loaded_plan_keys",
                        extend_field_name="micro_separator", value="=")
     yield
 
@@ -670,7 +670,7 @@ def ui_chart(expected_chart):
 def basket_chore():
     new_chore_list: List[NewChoreBaseModel] = []
     for _ in range(5):
-        sec_id = f"CB_Sec_{random.randint(1, 10)}"
+        sec_id = f"Type1_Sec_{random.randint(1, 10)}"
         side = random.choice([Side.BUY, Side.SELL])
         px = random.randint(90, 100)
         qty = random.randint(80, 90)

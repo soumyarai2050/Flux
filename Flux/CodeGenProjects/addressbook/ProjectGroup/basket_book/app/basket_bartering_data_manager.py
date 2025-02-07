@@ -29,12 +29,12 @@ from Flux.CodeGenProjects.AddressBook.ORMModel.mobile_book_n_street_book_n_baske
 
 class BasketBarteringDataManager(BaseBarteringDataManager, BasketBookServiceDataManager, EmailBookServiceDataManager):
 
-    def __init__(self, executor_trigger_method: Callable, strat_cache: BasketCache):
+    def __init__(self, executor_trigger_method: Callable, plan_cache: BasketCache):
         BaseBarteringDataManager.__init__(self)
-        BasketBookServiceDataManager.__init__(self, be_host, be_port, strat_cache)
-        EmailBookServiceDataManager.__init__(self, ps_host, ps_port, strat_cache)
+        BasketBookServiceDataManager.__init__(self, be_host, be_port, plan_cache)
+        EmailBookServiceDataManager.__init__(self, ps_host, ps_port, plan_cache)
         self.bartering_cache: BasketBarteringCache = BasketBarteringCache()
-        self.strat_cache: BasketCache = strat_cache
+        self.plan_cache: BasketCache = plan_cache
         self.id_to_new_chore_dict: Dict[int, NewChore] = {}
         self.non_cached_basket_chore_queue: Queue[BasketChore | BasketChoreOptional] = Queue()
 
@@ -58,9 +58,9 @@ class BasketBarteringDataManager(BaseBarteringDataManager, BasketBookServiceData
             self.basket_id = basket_chore_.id
             # Triggering executor when basket_chore is created
             self.street_book, self.street_book_thread = (
-                self.executor_trigger_method(self, self.strat_cache))
+                self.executor_trigger_method(self, self.plan_cache))
 
-        self.strat_cache.set_basket_chore(basket_chore_)
+        self.plan_cache.set_basket_chore(basket_chore_)
         non_cached_new_chore_list: List[NewChore] = []
         new_chore_obj: NewChore
         for new_chore_obj in basket_chore_.new_chores:
@@ -77,7 +77,7 @@ class BasketBarteringDataManager(BaseBarteringDataManager, BasketBookServiceData
             self.non_cached_basket_chore_queue.put(basket_chore_)
 
     def handle_unack_state(self, is_unack: bool, chore_snapshot: ChoreSnapshotBaseModel | ChoreSnapshot):
-        self.strat_cache.set_unack(is_unack, chore_snapshot.chore_brief.security.sec_id,
+        self.plan_cache.set_unack(is_unack, chore_snapshot.chore_brief.security.sec_id,
                                    chore_snapshot.chore_brief.side)
 
     def handle_fx_symbol_overview_get_all_ws(self, fx_symbol_overview_: FxSymbolOverviewBaseModel, **kwargs):

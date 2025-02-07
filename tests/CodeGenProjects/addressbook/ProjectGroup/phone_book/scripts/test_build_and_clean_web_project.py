@@ -3,10 +3,10 @@ from pathlib import PurePath
 
 
 def test_build_and_clean_web_project(root_dir: PurePath, build_and_clean_web_project_path: PurePath):
-    list_of_generated_files: list = ['Layout.jsx', 'ChoreLimits.jsx', 'choreLimitsSlice.js', 'PairStratParams.jsx',
-                                     'pairStratSlice.js', 'PortfolioLimits.jsx', 'portfolioLimitsSlice.js',
-                                     'PortfolioStatus.jsx', 'portfolioStatusSlice.js', 'projectSpecificUtils.js',
-                                     'store.js', 'strat_core_pb2.py', 'email_book_service_beanie_database.py',
+    list_of_generated_files: list = ['Layout.jsx', 'ChoreLimits.jsx', 'choreLimitsSlice.js', 'PairPlanParams.jsx',
+                                     'pairPlanSlice.js', 'ContactLimits.jsx', 'contactLimitsSlice.js',
+                                     'ContactStatus.jsx', 'contactStatusSlice.js', 'projectSpecificUtils.js',
+                                     'store.js', 'plan_core_pb2.py', 'email_book_service_beanie_database.py',
                                      'email_book_service_beanie_fastapi.py', 'email_book_service_beanie_model.py',
                                      'email_book_service_cache_fastapi.py', 'email_book_service_cache_model.py',
                                      'email_book_service_callback_override_set_instance.py',
@@ -16,8 +16,8 @@ def test_build_and_clean_web_project(root_dir: PurePath, build_and_clean_web_pro
                                      'email_book_service_routes_callback.py',
                                      'email_book_service_routes_callback_beanie_override.py',
                                      'email_book_service_http_client.py',
-                                     'email_book_service_ws_client.py', 'StratCollection.jsx',
-                                     'stratCollectionSlice.js', 'StratLimits.jsx', 'StratStatus.jsx', 'uiLayoutSlice.js'
+                                     'email_book_service_ws_client.py', 'PlanCollection.jsx',
+                                     'planCollectionSlice.js', 'PlanLimits.jsx', 'PlanStatus.jsx', 'uiLayoutSlice.js'
                                      ]
     generated_files_dir_path: PurePath = root_dir / 'CodeGenProjects' / 'phone_book' / 'generated'
 

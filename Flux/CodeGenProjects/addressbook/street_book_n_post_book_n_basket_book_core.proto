@@ -61,9 +61,9 @@ message ChoreJournal {
       view_layout: UI_TABLE
     },
     server_running_status_lvl: 1,
-    depending_proto_model_name: "PairStrat",
-    depending_proto_model_field_name_for_host: "PairStrat.host",
-    depending_proto_model_field_name_for_port: "PairStrat.port",
+    depending_proto_model_name: "PairPlan",
+    depending_proto_model_field_name_for_host: "PairPlan.host",
+    depending_proto_model_field_name_for_port: "PairPlan.port",
     is_read_only: true
   };
   option (FluxMsgJsonQuery) = {
@@ -126,9 +126,9 @@ message ChoreSnapshot {
       view_layout: UI_TABLE
     },
     server_running_status_lvl: 1,
-    depending_proto_model_name: "PairStrat",
-    depending_proto_model_field_name_for_host: "PairStrat.host",
-    depending_proto_model_field_name_for_port: "PairStrat.port",
+    depending_proto_model_name: "PairPlan",
+    depending_proto_model_field_name_for_host: "PairPlan.host",
+    depending_proto_model_field_name_for_port: "PairPlan.port",
     is_read_only: true
   };
   option (FluxMsgJsonQuery) = {

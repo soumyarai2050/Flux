@@ -24,13 +24,13 @@ class ChoreSnapshotContainer:
         self.has_fill: bool = has_fill
 
 
-class BaseStratCache:
+class BasePlanCache:
     KeyHandler = None   # Must be set by derived impl
     usd_fx_symbol: Final[str] = "USD|SGD"
     fx_symbol_overview_dict: Dict[str, FxSymbolOverviewBaseModel | None] = {usd_fx_symbol: None}
     chore_id_to_symbol_side_tuple_dict: Dict[str | int, Tuple[str, Side]] = dict()
 
-    error_prefix = "StratCache: "
+    error_prefix = "PlanCache: "
     load_static_data_mutex: Lock = Lock()
     static_data_service_state: ClassVar[ServiceState] = ServiceState(
         error_prefix=error_prefix + "static_data_service failed, exception: ")
@@ -38,8 +38,8 @@ class BaseStratCache:
 
     def __init__(self):
         self.usd_fx_symbol_overview: FxSymbolOverviewBaseModel | FxSymbolOverview | None = None
-        if not BaseStratCache.static_data_service_state.ready:
-            BaseStratCache.load_static_data()
+        if not BasePlanCache.static_data_service_state.ready:
+            BasePlanCache.load_static_data()
         self.re_ent_lock: RLock = RLock()
         # chore-snapshot is also stored in here iff chore snapshot is open [and removed from here if otherwise]
         self._chore_id_to_open_chore_snapshot_cont_dict: Dict[Any, ChoreSnapshotContainer] = {}  # no open
@@ -119,17 +119,17 @@ class BaseStratCache:
                 self._chore_id_to_open_chore_snapshot_cont_dict.pop(chore_snapshot.chore_brief.chore_id, None)
 
     def get_open_chore_snapshots(self) -> List[ChoreSnapshot]:
-        """caller to ensure this call is made only after both _strat_limits and _strat_brief are initialized"""
+        """caller to ensure this call is made only after both _plan_limits and _plan_brief are initialized"""
         with self._chore_id_to_open_chore_snapshot_cont_dict_n_chore_id_has_fill_set_lock:
             return [open_chore_snapshot_cont.chore_snapshot for open_chore_snapshot_cont in
                     self._chore_id_to_open_chore_snapshot_cont_dict.values()]
 
     def get_open_chore_count_from_cache(self) -> int:
-        """caller to ensure this call is made only after both _strat_limits and _strat_brief are initialized"""
+        """caller to ensure this call is made only after both _plan_limits and _plan_brief are initialized"""
         return len(self._chore_id_to_open_chore_snapshot_cont_dict)
 
     def check_has_open_chore_with_no_fill_from_cache(self) -> bool:
-        """caller to ensure this call is made only after both _strat_limits and _strat_brief are initialized"""
+        """caller to ensure this call is made only after both _plan_limits and _plan_brief are initialized"""
         open_chore_snapshot_cont: ChoreSnapshotContainer
         with self._chore_id_to_open_chore_snapshot_cont_dict_n_chore_id_has_fill_set_lock:
             for open_chore_snapshot_cont in self._chore_id_to_open_chore_snapshot_cont_dict.values():

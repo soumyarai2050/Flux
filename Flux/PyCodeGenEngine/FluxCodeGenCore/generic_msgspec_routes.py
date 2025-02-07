@@ -772,7 +772,7 @@ async def generic_read_http(msgspec_class_type: Type[MsgspecModel], proto_packag
         err_str: Final[str] = (f"Couldn't find {msgspec_class_type.__name__} objects with ids: {non_existing_ids} "
                                f"out of requested {read_ids_list}")
         logging.error(err_str)
-        raise HTTPException(detail=err_str, status_code=500)
+        raise HTTPException(detail=err_str, status_code=400)
     return json_obj_list
 
 

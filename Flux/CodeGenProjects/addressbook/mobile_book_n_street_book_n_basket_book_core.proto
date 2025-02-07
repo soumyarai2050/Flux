@@ -33,10 +33,9 @@ message TopOfBook {
       view_layout: UI_TABLE
     },
     server_running_status_lvl: 3,
-    depending_proto_model_name: "PairStrat",
-    depending_proto_model_field_name_for_host: "PairStrat.host",
-    depending_proto_model_field_name_for_port: "PairStrat.cpp_port",
-    depending_proto_model_field_name_for_ws_port: "PairStrat.cpp_ws_port",
+    depending_proto_model_name: "PairPlan",
+    depending_proto_model_field_name_for_host: "PairPlan.host",
+    depending_proto_model_field_name_for_port: "PairPlan.cpp_port",
     depending_proto_model_for_cpp_port: true,
     is_read_only: true
   };
@@ -100,10 +99,9 @@ message MarketDepth {
         sort_type: 'desc'
       }
     },
-    depending_proto_model_name: "PairStrat",
-    depending_proto_model_field_name_for_host: "PairStrat.host",
-    depending_proto_model_field_name_for_port: "PairStrat.cpp_port",
-    depending_proto_model_field_name_for_ws_port: "PairStrat.cpp_ws_port",
+    depending_proto_model_name: "PairPlan",
+    depending_proto_model_field_name_for_host: "PairPlan.host",
+    depending_proto_model_field_name_for_port: "PairPlan.cpp_port",
     depending_proto_model_for_cpp_port: true,
     is_read_only: true
   };
@@ -159,10 +157,9 @@ message LastBarter {
       view_layout: UI_TABLE
     },
     server_running_status_lvl: 3,
-    depending_proto_model_name: "PairStrat",
-    depending_proto_model_field_name_for_host: "PairStrat.host",
-    depending_proto_model_field_name_for_port: "PairStrat.cpp_port",
-    depending_proto_model_field_name_for_ws_port: "PairStrat.cpp_ws_port",
+    depending_proto_model_name: "PairPlan",
+    depending_proto_model_field_name_for_host: "PairPlan.host",
+    depending_proto_model_field_name_for_port: "PairPlan.cpp_port",
     depending_proto_model_for_cpp_port: true,
     is_read_only: true
   };
