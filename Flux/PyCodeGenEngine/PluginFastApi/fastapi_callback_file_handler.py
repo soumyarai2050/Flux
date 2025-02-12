@@ -610,20 +610,21 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
                     # If no field is found having projection enabled
                     continue
 
-                meta_data_field_name_to_field_proto_dict: Dict[str, (protogen.Field | Dict[str, protogen.Field])] = (
-                    self.get_meta_data_field_name_to_field_proto_dict(message))
+                meta_data_field_name_to_field_tuple_dict: Dict[str, Tuple[str, protogen.Field] |
+                                                                    Dict[str, Tuple[str, protogen.Field]]] = (
+                    self.get_meta_data_field_name_to_type_str_dict(message))
                 projection_val_to_query_name_dict = (
                     FastapiCallbackFileHandler.get_projection_temp_query_name_to_generated_query_name_dict(message))
                 for projection_option_val, query_name in projection_val_to_query_name_dict.items():
                     query_param_with_type_str = ""
-                    for meta_field_name, meta_field_value in meta_data_field_name_to_field_proto_dict.items():
-                        if isinstance(meta_field_value, dict):
-                            for nested_meta_field_name, nested_meta_field in meta_field_value.items():
-                                query_param_with_type_str += (f"{nested_meta_field_name}: "
-                                                              f"{self.proto_to_py_datatype(nested_meta_field)}, ")
+                    for meta_field_name, meta_field_info in meta_data_field_name_to_field_tuple_dict.items():
+                        if isinstance(meta_field_info, dict):
+                            for nested_meta_field_name, nested_meta_type in meta_field_info.items():
+                                meta_field_type_val, _ = nested_meta_type
+                                query_param_with_type_str += f"{nested_meta_field_name}: {meta_field_type_val}, "
                         else:
-                            query_param_with_type_str += (f"{meta_field_name}: "
-                                                          f"{self.proto_to_py_datatype(meta_field_value)}, ")
+                            meta_field_type_val, _ = meta_field_info
+                            query_param_with_type_str += f"{meta_field_name}: {meta_field_type_val}, "
                     query_param_with_type_str += ("start_date_time: DateTime | None = None, "
                                                   "end_date_time: DateTime | None = None")
                     # http

@@ -1,6 +1,6 @@
 # standard imports
 from abc import ABC
-from typing import List, Dict
+from typing import List, Dict, Tuple
 
 # 3rd party imports
 import protogen
@@ -122,8 +122,9 @@ class FastapiWSClientFileHandler(BaseFastapiPlugin, ABC):
 
             projection_val_to_query_name_dict = (
                 FastapiWSClientFileHandler.get_projection_temp_query_name_to_generated_query_name_dict(message))
-            meta_data_field_name_to_field_proto_dict: Dict[str, (protogen.Field | Dict[str, protogen.Field])] = (
-                self.get_meta_data_field_name_to_field_proto_dict(message))
+            meta_data_field_name_to_field_tuple_dict: Dict[str, Tuple[str, protogen.Field] |
+                                                                Dict[str, Tuple[str, protogen.Field]]] = (
+                self.get_meta_data_field_name_to_type_str_dict(message))
             for temp_query_name, query_name in projection_val_to_query_name_dict.items():
                 projection_val_to_fields_dict = (
                     FastapiWSClientFileHandler.get_projection_option_value_to_fields(message))
@@ -142,15 +143,17 @@ class FastapiWSClientFileHandler(BaseFastapiPlugin, ABC):
 
                 query_params_dict = "{"
                 query_params_str = ""
-                for meta_field_name, meta_field_value in meta_data_field_name_to_field_proto_dict.items():
-                    if isinstance(meta_field_value, dict):
-                        for nested_meta_field_name, nested_meta_field in meta_field_value.items():
+                for meta_field_name, meta_field_info in meta_data_field_name_to_field_tuple_dict.items():
+                    if isinstance(meta_field_info, dict):
+                        for nested_meta_field_name, nested_meta_field_info in meta_field_info.items():
+                            nested_meta_field_type, _ = nested_meta_field_info
                             query_params_dict += f'"{nested_meta_field_name}": {nested_meta_field_name}, '
                             query_params_str += (f"{nested_meta_field_name}: "
-                                                 f"{self.proto_to_py_datatype(nested_meta_field)}, ")
+                                                 f"{nested_meta_field_type}, ")
                     else:
+                        meta_field_type, _ = meta_field_info
                         query_params_dict += f'"{meta_field_name}": {meta_field_name}, '
-                        query_params_str += f"{meta_field_name}: {self.proto_to_py_datatype(meta_field_value)}, "
+                        query_params_str += f"{meta_field_name}: {meta_field_type}, "
                 query_params_dict += '"start_date_time": start_date_time, "end_date_time": end_date_time}'
                 query_params_str += "start_date_time: DateTime | None = None, end_date_time: DateTime | None = None"
                 output_str += (f'\tdef {query_name}_ws_client(self, notify: bool, {query_params_str}, '

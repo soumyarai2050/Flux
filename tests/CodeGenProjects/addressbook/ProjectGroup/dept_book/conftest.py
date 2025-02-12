@@ -38,8 +38,8 @@ def dash_():
                 "vwap": 10,
                 "vwap_change": 0.5
             },
-            "mkt_premium": "10",
-            "mkt_premium_change": "2"
+            "mkt_premium": 10,
+            "mkt_premium_change": 2
         }
     }
     yield dash_json
@@ -49,9 +49,10 @@ def dash_():
 def bar_data_():
     current_time = DateTime.utcnow()
     bar_data_json = {
-        "symbol_n_exch_id": {
+        "bar_meta_data": {
             "symbol": "Type1_Sec_1",
-            "exch_id": "EXCH"
+            "exch_id": "EXCH",
+            "bar_type": "OneDay"
         },
         "start_time": current_time,
         "end_time": current_time.add(seconds=1),

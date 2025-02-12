@@ -684,12 +684,14 @@ class CppWebServers(BaseProtoPlugin):
         output_content += '\t\t\t\treturn start_connection();\n'
         output_content += '\t\t\t} else {\n'
         output_content += ('\t\t\t\tLOG_ERROR_IMPL(GetCppAppLogger(), "WebSocketServer: Failed to start server on '
-                           'Host: {}, Port: {}. Error: {}. Retrying...", km_host_, km_port_, error.what());\n')
+                           'Host: {}, Port: {}. Error: {}. Retrying...", m_config_.m_http_host_, '
+                           'm_config_.m_http_server_port_, error.what());\n')
         output_content += '\t\t\t\treturn false;\n'
         output_content += '\t\t\t}\n'
         output_content += '\t\t} else {\n'
         output_content += ('\t\t\tLOG_ERROR_IMPL(GetCppAppLogger(), "WebSocketServer: Failed to start server on '
-                           'Host: {}, Port: {}. Error: {}. Retrying...", km_host_, km_port_, error.what());\n')
+                           'Host: {}, Port: {}. Error: {}. Retrying...", m_config_.m_http_host_, '
+                           'm_config_.m_http_server_port_, error.what());\n')
         output_content += f'\t\t\treturn false;\n'
         output_content += f'\t\t}}\n'
         output_content += f'\t}}\n'
@@ -769,7 +771,8 @@ class CppWebServers(BaseProtoPlugin):
         output_content += f'\t\treturn;\n'
         output_content += f'\t}}\n'
         output_content += ('\tLOG_INFO_IMPL(GetCppAppLogger(), "Handling request: Method = {}, Target = {}, data= '
-                           '{}",req.method_string(), req.target(), req.body());\n\n')
+                           '{}",std::string(req.method_string()), std::string(req.target()), '
+                           'std::string(req.body()));\n\n')
         output_content += (f'\tconst auto route = std::find_if(m_routes_.begin(), m_routes_.end(), '
                            f'[&req](const Route& route) {{\n')
         output_content += (f'\t\treturn std::find(route.methods.begin(), route.methods.end(), req.method()) != '

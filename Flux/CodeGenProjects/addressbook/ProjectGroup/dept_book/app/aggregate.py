@@ -6,18 +6,25 @@ from Flux.PyCodeGenEngine.FluxCodeGenCore.base_aggregate import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.generated.ORMModel.dept_book_service_msgspec_model import *
 
 
-def get_dict_list_for_bar_meta_data_match(symbol: str, exch_id: str, bar_type: BarType) -> List[Dict[str, Any]]:
-    return [
-        {
-            'bar_meta_data.symbol': symbol
-        },
-        {
-            'bar_meta_data.exch_id': exch_id
-        },
-        {
-            'bar_meta_data.bar_type': bar_type.value
-        }
-    ]
+def get_dict_list_for_bar_meta_data_match(symbol: str, exch_id: str, bar_type: BarType | None = None) -> List[Dict[str, Any]]:
+    agg_list = [
+            {
+                'bar_meta_data.symbol': symbol
+            },
+            {
+                'bar_meta_data.exch_id': exch_id
+            }
+        ]
+    if bar_type is None:
+        return agg_list
+    else:
+        agg_list.append(
+            {
+                'bar_meta_data.bar_type': bar_type.value
+            }
+        )
+        return agg_list
+
 
 def get_vwap_projection_from_bar_data_agg_pipeline(symbol: str, exch_id: str, bar_type: BarType,
                                                    start_date_time: int | None = None,
@@ -39,7 +46,7 @@ def get_vwap_projection_from_bar_data_agg_pipeline(symbol: str, exch_id: str, ba
         {
             '$project': {
                 '_id': 0,
-                'symbol_n_exch_id': 1,
+                'bar_meta_data': 1,
                 'projection_models': {
                     'start_time': '$start_time',
                     'vwap': '$vwap'
@@ -48,7 +55,7 @@ def get_vwap_projection_from_bar_data_agg_pipeline(symbol: str, exch_id: str, ba
         },
         {
             '$group': {
-                '_id': '$symbol_n_exch_id',
+                '_id': '$bar_meta_data',
                 'projection_models': {
                     '$push': '$projection_models'
                 }
@@ -57,7 +64,7 @@ def get_vwap_projection_from_bar_data_agg_pipeline(symbol: str, exch_id: str, ba
         {
             '$project': {
                 '_id': 0,
-                'symbol_n_exch_id': '$_id',
+                'bar_meta_data': '$_id',
                 'projection_models': 1
             }
         }
@@ -125,7 +132,7 @@ def get_vwap_n_vwap_change_projection_from_bar_data_agg_pipeline(
         {
             '$project': {
                 '_id': 0,
-                'symbol_n_exch_id': 1,
+                'bar_meta_data': 1,
                 'projection_models': {
                     'start_time': '$start_time',
                     'vwap': '$vwap',
@@ -135,7 +142,7 @@ def get_vwap_n_vwap_change_projection_from_bar_data_agg_pipeline(
         },
         {
             '$group': {
-                '_id': '$symbol_n_exch_id',
+                '_id': '$bar_meta_data',
                 'projection_models': {
                     '$push': '$projection_models'
                 }
@@ -144,7 +151,7 @@ def get_vwap_n_vwap_change_projection_from_bar_data_agg_pipeline(
         {
             '$project': {
                 '_id': 0,
-                'symbol_n_exch_id': '$_id',
+                'bar_meta_data': '$_id',
                 'projection_models': 1
             }
         }
@@ -212,7 +219,7 @@ def get_vwap_change_projection_from_bar_data_agg_pipeline(
         {
             '$project': {
                 '_id': 0,
-                'symbol_n_exch_id': 1,
+                'bar_meta_data': 1,
                 'projection_models': {
                     'start_time': '$start_time',
                     'vwap_change': '$vwap_change'
@@ -221,7 +228,7 @@ def get_vwap_change_projection_from_bar_data_agg_pipeline(
         },
         {
             '$group': {
-                '_id': '$symbol_n_exch_id',
+                '_id': '$bar_meta_data',
                 'projection_models': {
                     '$push': '$projection_models'
                 }
@@ -230,7 +237,7 @@ def get_vwap_change_projection_from_bar_data_agg_pipeline(
         {
             '$project': {
                 '_id': 0,
-                'symbol_n_exch_id': '$_id',
+                'bar_meta_data': '$_id',
                 'projection_models': 1
             }
         }
@@ -298,7 +305,7 @@ def get_premium_projection_from_bar_data_agg_pipeline(
         {
             '$project': {
                 '_id': 0,
-                'symbol_n_exch_id': 1,
+                'bar_meta_data': 1,
                 'projection_models': {
                     'start_time': '$start_time',
                     'premium': '$premium'
@@ -307,7 +314,7 @@ def get_premium_projection_from_bar_data_agg_pipeline(
         },
         {
             '$group': {
-                '_id': '$symbol_n_exch_id',
+                '_id': '$bar_meta_data',
                 'projection_models': {
                     '$push': '$projection_models'
                 }
@@ -316,7 +323,7 @@ def get_premium_projection_from_bar_data_agg_pipeline(
         {
             '$project': {
                 '_id': 0,
-                'symbol_n_exch_id': '$_id',
+                'bar_meta_data': '$_id',
                 'projection_models': 1
             }
         }
@@ -384,7 +391,7 @@ def get_premium_n_premium_change_projection_from_bar_data_agg_pipeline(
         {
             '$project': {
                 '_id': 0,
-                'symbol_n_exch_id': 1,
+                'bar_meta_data': 1,
                 'projection_models': {
                     'start_time': '$start_time',
                     'premium': '$premium',
@@ -394,7 +401,7 @@ def get_premium_n_premium_change_projection_from_bar_data_agg_pipeline(
         },
         {
             '$group': {
-                '_id': '$symbol_n_exch_id',
+                '_id': '$bar_meta_data',
                 'projection_models': {
                     '$push': '$projection_models'
                 }
@@ -403,7 +410,7 @@ def get_premium_n_premium_change_projection_from_bar_data_agg_pipeline(
         {
             '$project': {
                 '_id': 0,
-                'symbol_n_exch_id': '$_id',
+                'bar_meta_data': '$_id',
                 'projection_models': 1
             }
         }
@@ -471,7 +478,7 @@ def get_premium_change_projection_from_bar_data_agg_pipeline(
         {
             '$project': {
                 '_id': 0,
-                'symbol_n_exch_id': 1,
+                'bar_meta_data': 1,
                 'projection_models': {
                     'start_time': '$start_time',
                     'premium_change': '$premium_change'
@@ -480,7 +487,7 @@ def get_premium_change_projection_from_bar_data_agg_pipeline(
         },
         {
             '$group': {
-                '_id': '$symbol_n_exch_id',
+                '_id': '$bar_meta_data',
                 'projection_models': {
                     '$push': '$projection_models'
                 }
@@ -489,7 +496,7 @@ def get_premium_change_projection_from_bar_data_agg_pipeline(
         {
             '$project': {
                 '_id': 0,
-                'symbol_n_exch_id': '$_id',
+                'bar_meta_data': '$_id',
                 'projection_models': 1
             }
         }

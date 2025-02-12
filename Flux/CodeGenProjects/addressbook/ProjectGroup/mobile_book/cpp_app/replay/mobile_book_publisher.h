@@ -23,7 +23,7 @@ class MobileBookWebNWsServer;
 
 class MobileBookPublisher : public MobileBookPublisherInterface {
 public:
-    MobileBookPublisher(Config& config, std::shared_ptr<FluxCppCore::MongoDBHandler> mongo_db_handler);
+    MobileBookPublisher(Config& config);
 
     void cleanup();
 

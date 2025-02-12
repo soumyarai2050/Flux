@@ -7,7 +7,6 @@ core_or_util_files:
   - "dept_book_n_phone_book_core.proto"
   - "dept_book_n_mobile_book_n_street_book_n_basket_book_core.proto"
   - "phone_book_n_street_book_core.proto"
-  - "mobile_book_n_street_book_n_basket_book_core.proto"
   - "street_book_n_post_book_core.proto"
   - "street_book_n_basket_book_core.proto"
   - "street_book_n_post_book_n_basket_book_core.proto"

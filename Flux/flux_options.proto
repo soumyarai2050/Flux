@@ -68,6 +68,7 @@ message MessageJsonRoot{
   optional bool PassStoredObjToPartialUpdatePostCallback = 15 [default=false];
   optional bool PassStoredObjToPartialUpdateAllPostCallback = 16 [default=false];
   optional bool IncludeDataframeClients = 17 [default=false];
+  optional bool EnableLargeDBObject = 18 [default=false];  // enables mega db obj support - ex: mongo requires special handling if object being persisted is >16 mb
 }
 
 enum TimeSeriesGranularityType{

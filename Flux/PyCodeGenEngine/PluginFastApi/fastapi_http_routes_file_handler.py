@@ -3281,66 +3281,72 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                 filter_tuples_str += ", "
         return filter_tuples_str
 
-    # def handle_underlying_index_req_gen(self, message: protogen.Message,
-    #                                     shared_lock_list: List[str] | None = None) -> str:
-    #     msg_has_links: bool = message in self.message_to_link_messages_dict
-    #     message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-    #     index_fields: List[protogen.Field] = [field for field in message.fields
-    #                                           if self.is_bool_option_enabled(field, FastapiHttpRoutesFileHandler.flux_fld_index)]
-    #
-    #     field_params = ", ".join([f"{field.proto.name}: {self.proto_to_py_datatype(field)}" for field in index_fields])
-    #     output_str = "@perf_benchmark\n"
-    #     output_str += f"async def underlying_get_{message_name_snake_cased}_from_index_fields_http({field_params}, " \
-    #                   f"filter_agg_pipeline: Any = None, generic_callable: " \
-    #                   f"Callable[[...], Any] | None = None) -> List[{message.proto.name}]:\n"
-    #     output_str += f'    """ Index route of {message.proto.name} """\n'
-    #     output_str += f'    if generic_callable is None:\n'
-    #     output_str += f'        generic_callable = generic_read_http\n'
-    #     mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
-    #
-    #     output_str += mutex_handling_str
-    #     output_str += " " * indent_count + f"    await callback_class.index_of_{message_name_snake_cased}_pre()\n"
-    #     filter_configs_var_name = self._get_filter_configs_var_name(message, None)
-    #     if filter_configs_var_name:
-    #         output_str += " " * indent_count + f"    indexed_filter = copy.deepcopy({filter_configs_var_name})\n"
-    #         output_str += " " * indent_count + \
-    #                       f"    indexed_filter['match'] = [{self._get_filter_tuple_str(index_fields)}]\n"
-    #     else:
-    #         output_str += " " * indent_count + "    indexed_filter = {'match': " + \
-    #                       f"[{self._get_filter_tuple_str(index_fields)}]" + "}\n"
-    #     output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
-    #     output_str += " " * indent_count + \
-    #                   f"        {message_name_snake_cased}_obj = await generic_callable({message.proto.name}, " \
-    #                   f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
-    #                   f"filter_agg_pipeline, has_links={msg_has_links})\n"
-    #     output_str += " " * indent_count + "    else:\n"
-    #     output_str += " " * indent_count + \
-    #                   f"        {message_name_snake_cased}_obj = await generic_callable({message.proto.name}, " \
-    #                   f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
-    #                   f"indexed_filter, has_links={msg_has_links})\n"
-    #     output_str += " " * indent_count + f"    await callback_class.index_of_{message_name_snake_cased}_post(" \
-    #                                        f"{message_name_snake_cased}_obj)\n"
-    #     output_str += " " * indent_count + f"    return {message_name_snake_cased}_obj\n\n"
-    #     return output_str
-    #
-    # def handle_index_req_gen(self, message: protogen.Message, shared_lock_list: List[str] | None = None) -> str:
-    #     message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-    #     output_str = self.handle_underlying_index_req_gen(message, shared_lock_list)
-    #     output_str += "\n"
-    #     index_fields: List[protogen.Field] = [field for field in message.fields
-    #                                           if self.is_bool_option_enabled(field, FastapiHttpRoutesFileHandler.flux_fld_index)]
-    #
-    #     field_query = "/".join(["{" + f"{field.proto.name}" + "}" for field in index_fields])
-    #     field_params = ", ".join([f"{field.proto.name}: {self.proto_to_py_datatype(field)}" for field in index_fields])
-    #
-    #     output_str += f'@{self.api_router_app_name}.get("/get-{message_name_snake_cased}-from-index-fields/' + \
-    #                   f'{field_query}' + f'", response_model=List[{message.proto.name}], status_code=200)\n'
-    #     output_str += f"async def get_{message_name_snake_cased}_from_index_fields_http({field_params}) " \
-    #                   f"-> List[{message.proto.name}]:\n"
-    #     field_params = ", ".join([f"{field.proto.name}" for field in index_fields])
-    #     output_str += \
-    #         f"    return await underlying_get_{message_name_snake_cased}_from_index_fields_http({field_params})\n\n\n"
-    #     return output_str
+    def handle_underlying_index_req_gen(self, message: protogen.Message,
+                                        shared_lock_list: List[str] | None = None) -> str:
+        msg_has_links: bool = message in self.message_to_link_messages_dict
+        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
+        index_fields: List[protogen.Field] = [field for field in message.fields
+                                              if self.is_bool_option_enabled(field, FastapiHttpRoutesFileHandler.flux_fld_index)]
+
+        field_params = ", ".join([f"{field.proto.name}: {self.proto_to_py_datatype(field)}" for field in index_fields])
+        output_str = "@perf_benchmark\n"
+        output_str += f"async def underlying_get_{message_name_snake_cased}_from_index_fields_http({field_params}, " \
+                      f"filter_agg_pipeline: Any = None, generic_callable: " \
+                      f"Callable[[...], Any] | None = None) -> List[{message.proto.name}]:\n"
+        output_str += f'    """ Index route of {message.proto.name} """\n'
+        output_str += f'    if generic_callable is None:\n'
+        output_str += f'        generic_callable = generic_read_http\n'
+        mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
+
+        output_str += mutex_handling_str
+        output_str += " " * indent_count + f"    await callback_class.index_of_{message_name_snake_cased}_pre()\n"
+        filter_configs_var_name = self._get_filter_configs_var_name(message, None)
+        if filter_configs_var_name:
+            output_str += " " * indent_count + f"    indexed_filter = copy.deepcopy({filter_configs_var_name})\n"
+            output_str += " " * indent_count + \
+                          f"    indexed_filter['match'] = [{self._get_filter_tuple_str(index_fields)}]\n"
+        else:
+            output_str += " " * indent_count + "    indexed_filter = {'match': " + \
+                          f"[{self._get_filter_tuple_str(index_fields)}]" + "}\n"
+        output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
+        output_str += " " * indent_count + \
+                      f"        {message_name_snake_cased}_obj = await generic_callable({message.proto.name}, " \
+                      f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                      f"filter_agg_pipeline, has_links={msg_has_links})\n"
+        output_str += " " * indent_count + "    else:\n"
+        output_str += " " * indent_count + \
+                      f"        {message_name_snake_cased}_obj = await generic_callable({message.proto.name}, " \
+                      f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
+                      f"indexed_filter, has_links={msg_has_links})\n"
+        output_str += " " * indent_count + f"    await callback_class.index_of_{message_name_snake_cased}_post(" \
+                                           f"{message_name_snake_cased}_obj)\n"
+        output_str += " " * indent_count + f"    return {message_name_snake_cased}_obj\n\n"
+        return output_str
+
+    def handle_index_req_gen(self, message: protogen.Message, shared_lock_list: List[str] | None = None,
+                             model_type: ModelType = ModelType.Msgspec) -> str:
+        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
+        output_str = self.handle_underlying_index_req_gen(message, shared_lock_list)
+        output_str += "\n"
+        index_fields: List[protogen.Field] = [field for field in message.fields
+                                              if self.is_bool_option_enabled(field, FastapiHttpRoutesFileHandler.flux_fld_index)]
+
+        field_query = "/".join(["{" + f"{field.proto.name}" + "}" for field in index_fields])
+        field_params = ", ".join([f"{field.proto.name}: {self.proto_to_py_datatype(field)}" for field in index_fields])
+
+        if model_type == ModelType.Msgspec:
+            output_str += f'@{self.api_router_app_name}.get("/get-{message_name_snake_cased}-from-index-fields/' + \
+                          f'{field_query}' + f'", status_code=200)\n'
+            output_str += f"async def get_{message_name_snake_cased}_from_index_fields_http({field_params}):\n"
+        else:
+            output_str += f'@{self.api_router_app_name}.get("/get-{message_name_snake_cased}-from-index-fields/' + \
+                          f'{field_query}' + f'", response_model=List[{message.proto.name}], status_code=200)\n'
+            output_str += f"async def get_{message_name_snake_cased}_from_index_fields_http({field_params}) " \
+                          f"-> List[{message.proto.name}]:\n"
+        field_params = ", ".join([f"{field.proto.name}" for field in index_fields])
+        output_str += \
+            f"    return await underlying_get_{message_name_snake_cased}_from_index_fields_http({field_params})\n\n\n"
+        return output_str
 
     def _handle_msgspec_common_underlying_get_gen(self, message: protogen.Message, aggregation_type, msg_has_links,
                                                   shared_lock_list, id_field_type) -> str:
@@ -3861,10 +3867,10 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                 output_str += "\n\n"
             # else not required: Avoiding method creation if desc not provided in option
 
-        # for field in message.fields:
-        #     if self.is_bool_option_enabled(field, FastapiHttpRoutesFileHandler.flux_fld_index):
-        #         output_str += self.handle_index_req_gen(message, shared_mutex_list)
-        #         break
+        for field in message.fields:
+            if self.is_bool_option_enabled(field, FastapiHttpRoutesFileHandler.flux_fld_index):
+                output_str += self.handle_index_req_gen(message, shared_mutex_list)
+                break
             # else not required: Avoiding field if index option is not enabled
 
         if id_field_type == "int":
@@ -4134,8 +4140,9 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             # If no field is found having projection enabled
             return output_str
 
-        meta_data_field_name_to_field_proto_dict: Dict[str, (protogen.Field | Dict[str, protogen.Field])] = (
-            self.get_meta_data_field_name_to_field_proto_dict(message))
+        meta_data_field_name_to_field_tuple_dict: Dict[str, Tuple[str, protogen.Field] |
+                                                            Dict[str, Tuple[str, protogen.Field]]] = (
+            self.get_meta_data_field_name_to_type_str_dict(message))
         projection_val_to_fields_dict = FastapiHttpRoutesFileHandler.get_projection_option_value_to_fields(message)
         projection_val_to_query_name_dict = (
             FastapiHttpRoutesFileHandler.get_projection_temp_query_name_to_generated_query_name_dict(message))
@@ -4153,15 +4160,17 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
 
             query_param_str = ""
             query_param_with_type_str = ""
-            for meta_field_name, meta_field_value in meta_data_field_name_to_field_proto_dict.items():
-                if isinstance(meta_field_value, dict):
-                    for nested_meta_field_name, nested_meta_field in meta_field_value.items():
+            for meta_field_name, meta_field_info in meta_data_field_name_to_field_tuple_dict.items():
+                if isinstance(meta_field_info, dict):
+                    for nested_meta_field_name, nested_meta_field_info in meta_field_info.items():
+                        nested_meta_field_type, _ = nested_meta_field_info
                         query_param_str += f"{nested_meta_field_name}, "
                         query_param_with_type_str += (f"{nested_meta_field_name}: "
-                                                      f"{self.proto_to_py_datatype(nested_meta_field)}, ")
+                                                      f"{nested_meta_field_type}, ")
                 else:
+                    meta_field_type, _ = meta_field_info
                     query_param_str += f"{meta_field_name}, "
-                    query_param_with_type_str += f"{meta_field_name}: {self.proto_to_py_datatype(meta_field_value)}, "
+                    query_param_with_type_str += f"{meta_field_name}: {meta_field_type}, "
             query_param_str += "start_date_time, end_date_time"
             query_param_with_type_str += ("start_date_time: int | None = None, "
                                           "end_date_time: int | None = None")
@@ -4171,12 +4180,14 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                                       return_type_str=container_model_name, model_type=model_type)
 
             query_param_dict_str = "{"
-            for meta_field_name, meta_field_value in meta_data_field_name_to_field_proto_dict.items():
-                if isinstance(meta_field_value, dict):
-                    for nested_meta_field_name, nested_meta_field in meta_field_value.items():
+            for meta_field_name, meta_field_info in meta_data_field_name_to_field_tuple_dict.items():
+                if isinstance(meta_field_info, dict):
+                    for nested_meta_field_name, nested_meta_field_info in meta_field_info.items():
+                        nested_meta_field_type, _ = nested_meta_field_info
                         query_param_dict_str += (f'"{nested_meta_field_name}": '
-                                                 f'{nested_meta_field_name}, ')
+                                                 f'{nested_meta_field_type}, ')
                 else:
+                    meta_field_type, _ = meta_field_info
                     query_param_dict_str += f'"{meta_field_name}": {meta_field_name}, '
             query_param_dict_str += '"start_date_time": start_date_time, "end_date_time": end_date_time}'
 

@@ -95,14 +95,13 @@ message WidgetUIDataElement {
   optional bool depends_on_other_model_for_id = 17 [default=false];
   optional string depending_proto_model_field_name_for_host = 18;
   optional string depending_proto_model_field_name_for_port = 19;
-  optional string depending_proto_model_field_name_for_ws_port  = 20;
-  optional bool depending_proto_model_for_cpp_port = 21;
-  repeated OverrideDefaultCRUD override_default_crud = 22;
-  optional bool is_model_alert_type = 23;
-  optional JoinSort join_sort = 24;
-  optional bool is_read_only = 25;
-  optional int32 default_rows_per_page = 26;  // supported values = 25, 50
-  optional int32 server_running_status_lvl = 27;
+  optional bool depending_proto_model_for_cpp_port = 20;
+  repeated OverrideDefaultCRUD override_default_crud = 21;
+  optional bool is_model_alert_type = 22;
+  optional JoinSort join_sort = 23;
+  optional bool is_read_only = 24;
+  optional int32 default_rows_per_page = 25;  // supported values = 25, 50
+  optional int32 server_running_status_lvl = 26;
 }
 
 message WidgetUIOption {

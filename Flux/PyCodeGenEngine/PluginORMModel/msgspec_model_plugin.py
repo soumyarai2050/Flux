@@ -447,8 +447,14 @@ class MsgspecModelPlugin(DataclassModelPlugin):
         output_str += self._handle_cache_n_ws_connection_manager_data_members_override(message, is_msg_root)
         if self.is_option_enabled(message, MsgspecModelPlugin.flux_msg_json_root_time_series):
             output_str += "    is_time_series: ClassVar[bool] = True\n"
+            output_str += "    enable_large_db_object: ClassVar[bool] = False\n"
         else:
             output_str += "    is_time_series: ClassVar[bool] = False\n"
+            option_val = self.get_complex_option_value_from_proto(message, MsgspecModelPlugin.flux_msg_json_root)
+            if option_val.get(MsgspecModelPlugin.flux_json_root_enable_large_db_object_field):
+                output_str += "    enable_large_db_object: ClassVar[bool] = True\n"
+            else:
+                output_str += "    enable_large_db_object: ClassVar[bool] = False\n"
 
         for field in message.fields:
             if field.proto.name == MsgspecModelPlugin.default_id_field_name:

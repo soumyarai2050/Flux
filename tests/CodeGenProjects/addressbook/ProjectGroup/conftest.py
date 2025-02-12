@@ -238,7 +238,7 @@ def expected_chore_limits_():
 
 
 @pytest.fixture()
-def expected_contact_limits_(expected_brokers_):
+def expected_contact_limits_(expected_brokers_) -> ContactLimitsBaseModel:
     rolling_max_chore_count = RollingMaxChoreCountBaseModel.from_kwargs(max_rolling_tx_count=15,
                                                                         rolling_tx_count_period_seconds=2)
     rolling_max_reject_count = RollingMaxChoreCountBaseModel.from_kwargs(max_rolling_tx_count=15,
@@ -283,8 +283,8 @@ def expected_brokers_(leg1_leg2_symbol_list) -> List[BrokerBaseModel]:
         ]
         eqt_sec_position.positions = eqt_positions
         sec_positions.append(eqt_sec_position)
-    broker: BrokerBaseModel = BrokerBaseModel.from_kwargs(broker="ZERODHA", bkr_priority=10, bkr_disable=False,
-  												    		sec_positions=sec_positions)
+    broker: BrokerBaseModel = BrokerBaseModel.from_kwargs(broker="ZERODHA", bkr_priority=10,
+                                                          bkr_disable=False, sec_positions=sec_positions)
     return [broker]
 
 

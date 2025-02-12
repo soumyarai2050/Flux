@@ -220,13 +220,16 @@ class BaseFastapiPlugin(BaseProtoPlugin):
         # else not required: Avoid if message does not have custom id field
         return id_field_type
 
-    def get_meta_data_field_name_to_field_proto_dict(self, message: protogen.Message
-                                                     ) -> Dict[str, protogen.Field | Dict[str, protogen.Field]]:
-        meta_data_field_name_to_field_proto_dict: Dict[str, (protogen.Field | Dict[str, protogen.Field])] = {}
+    def get_meta_data_field_name_to_type_str_dict(
+            self, message: protogen.Message) -> Dict[str, Tuple[str, protogen.Field] |
+                                                          Dict[str, Tuple[str, protogen.Field]]]:
+        meta_data_field_name_to_field_tuple_dict: Dict[str, Tuple[str, protogen.Field] |
+                                                         Dict[str, Tuple[str, protogen.Field]]] = {}
 
         for field in message.fields:
             if self.is_bool_option_enabled(field, BaseFastapiPlugin.flux_fld_val_meta_field):
                 meta_field = field
+                is_required = field.cardinality.name.lower() == "required"
                 break
         else:
             err_str = (f"Could not find any time field in {message.proto.name} message having "
@@ -235,21 +238,31 @@ class BaseFastapiPlugin(BaseProtoPlugin):
             raise Exception(err_str)
 
         if meta_field.message is not None:
-            meta_data_field_name_to_field_proto_dict[meta_field.proto.name] = {}
+            meta_data_field_name_to_field_tuple_dict[meta_field.proto.name] = {}
             for nested_field in meta_field.message.fields:
                 if nested_field.message is None:
-                    meta_data_field_name_to_field_proto_dict[meta_field.proto.name][nested_field.proto.name] = (
-                        nested_field)
+                    is_required = nested_field.cardinality.name.lower() == "required"
+                    field_type = self.proto_to_py_datatype(nested_field)
+                    if is_required:
+                        meta_data_field_name_to_field_tuple_dict[meta_field.proto.name][nested_field.proto.name] = (
+                            field_type, nested_field)
+                    else:
+                        meta_data_field_name_to_field_tuple_dict[meta_field.proto.name][nested_field.proto.name] = (
+                            f"{field_type} | None = None", nested_field)
                 else:
                     err_str = ("Unsupported meta field type: meta field type must be either simple type or proto "
-                               f"message type with only simple field, received another field: "
+                               f"message type with only simple fields, received another field: "
                                f"{nested_field.proto.name} of message type {nested_field.message.proto.name} "
                                f"in meta_field: {meta_field.proto.name} of message: {message.proto.name}")
                     logging.exception(err_str)
                     raise Exception(err_str)
         else:
-            meta_data_field_name_to_field_proto_dict[meta_field.proto.name] = meta_field
-        return meta_data_field_name_to_field_proto_dict
+            field_type = self.proto_to_py_datatype(field)
+            if is_required:
+                meta_data_field_name_to_field_tuple_dict[meta_field.proto.name] = (field_type, field)
+            else:
+                meta_data_field_name_to_field_tuple_dict[meta_field.proto.name] = (f"{field_type} | None = None", field)
+        return meta_data_field_name_to_field_tuple_dict
 
     def _import_current_routes_callback(self) -> List[str]:
         import_statements: List[str] = []

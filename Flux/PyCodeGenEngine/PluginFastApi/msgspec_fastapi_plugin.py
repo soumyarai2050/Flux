@@ -167,48 +167,57 @@ class MsgspecFastApiPlugin(FastapiCallbackFileHandler,
         output_str += '        collection_list = await cls.instance_object.db_instance.list_collection_names()\n\n'
 
         for msg in self.root_message_list:
-            output_str += f'        if "{msg.proto.name}" not in collection_list:\n'
-            if self.is_option_enabled(msg, MsgspecFastApiPlugin.flux_msg_json_root_time_series):
-                time_field, meta_field, granularity, expire_after_sec = self.get_time_series_data_from_msg(msg)
-                output_str += "            time_series_config = {\n"
-                output_str += f"                'timeField': '{time_field}'"
-                if meta_field:
-                    output_str += f",\n"
-                    output_str += f"                'metaField': '{meta_field}'"
-                if granularity:
-                    output_str += f",\n"
-                    match granularity:
-                        case "Sec":
-                            output_str += f"                'granularity': 'seconds'"
-                        case "Min":
-                            output_str += f"                'granularity': 'minutes'"
-                        case "Hrs":
-                            output_str += f"                'granularity': 'hours'"
-                output_str += "\n"
-                output_str += "            }\n"
-
-                output_str += (f'            {msg.proto.name}.collection_obj = '
-                               f'await cls.instance_object.db_instance.create_collection("{msg.proto.name}", '
-                               f'timeseries=time_series_config')
-                if expire_after_sec:
-                    output_str += f', expireAfterSeconds={expire_after_sec}'
-                output_str += ")\n"
+            option_val = self.get_complex_option_value_from_proto(msg, MsgspecFastApiPlugin.flux_msg_json_root)
+            if option_val.get(MsgspecFastApiPlugin.flux_json_root_enable_large_db_object_field):
+                output_str += (f'        {msg.proto.name}.gridfs_bucket_obj = '
+                               f'AsyncIOMotorGridFSBucket(cls.instance_object.db_instance, '
+                               f'bucket_name="{msg.proto.name}")\n')
+                output_str += (f'        {msg.proto.name}.gridfs_files_collection_obj = '
+                               f'cls.instance_object.db_instance["{msg.proto.name}.files"]\n\n')
             else:
+                output_str += f'        if "{msg.proto.name}" not in collection_list:\n'
+                if self.is_option_enabled(msg, MsgspecFastApiPlugin.flux_msg_json_root_time_series):
+                    time_field, meta_field, granularity, expire_after_sec = self.get_time_series_data_from_msg(msg)
+                    output_str += "            time_series_config = {\n"
+                    output_str += f"                'timeField': '{time_field}'"
+                    if meta_field:
+                        output_str += f",\n"
+                        output_str += f"                'metaField': '{meta_field}'"
+                    if granularity:
+                        output_str += f",\n"
+                        match granularity:
+                            case "Sec":
+                                output_str += f"                'granularity': 'seconds'"
+                            case "Min":
+                                output_str += f"                'granularity': 'minutes'"
+                            case "Hrs":
+                                output_str += f"                'granularity': 'hours'"
+                    output_str += "\n"
+                    output_str += "            }\n"
+
+                    output_str += (f'            {msg.proto.name}.collection_obj = '
+                                   f'await cls.instance_object.db_instance.create_collection("{msg.proto.name}", '
+                                   f'timeseries=time_series_config')
+                    if expire_after_sec:
+                        output_str += f', expireAfterSeconds={expire_after_sec}'
+                    output_str += ")\n"
+                else:
+                    output_str += (f'            {msg.proto.name}.collection_obj = '
+                                   f'await cls.instance_object.db_instance.create_collection("{msg.proto.name}")\n')
+
+                # Adding index field initialization with created collection object
+                index_field_name_list = []
+                for field in msg.fields:
+                    if self.is_option_enabled(field, MsgspecFastApiPlugin.flux_fld_index):
+                        index_field_name_list.append(field.proto.name)
+
+                if index_field_name_list:
+                    output_str += (f'            await {msg.proto.name}.collection_obj.create_index('
+                                   f'{index_field_name_list})\n')
+                output_str += f'        else:\n'
                 output_str += (f'            {msg.proto.name}.collection_obj = '
-                               f'await cls.instance_object.db_instance.create_collection("{msg.proto.name}")\n')
+                               f'cls.instance_object.db_instance.get_collection("{msg.proto.name}")\n\n')
 
-            # Adding index field initialization with created collection object
-            index_field_name_list = []
-            for field in msg.fields:
-                if self.is_option_enabled(field, MsgspecFastApiPlugin.flux_fld_index):
-                    index_field_name_list.append(field.proto.name)
-
-            if index_field_name_list:
-                output_str += (f'            await {msg.proto.name}.collection_obj.create_index('
-                               f'{index_field_name_list})\n')
-            output_str += f'        else:\n'
-            output_str += (f'            {msg.proto.name}.collection_obj = '
-                           f'cls.instance_object.db_instance.get_collection("{msg.proto.name}")\n\n')
         output_str += f"    @classmethod\n"
         output_str += (f"    async def set_instance(cls, mongo_client_: motor.motor_asyncio.AsyncIOMotorClient, "
                        f"db_name: str):\n")
@@ -248,6 +257,7 @@ class MsgspecFastApiPlugin(FastapiCallbackFileHandler,
         output_str += "import motor.motor_asyncio\n"
         output_str += "from pathlib import PurePath\n"
         output_str += "import logging\n"
+        output_str += "from motor.motor_asyncio import AsyncIOMotorGridFSBucket\n"
 
         output_str += f"from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager\n"
         output_str += f'\n\n'

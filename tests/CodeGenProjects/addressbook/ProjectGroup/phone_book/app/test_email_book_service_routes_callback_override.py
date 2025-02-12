@@ -1028,6 +1028,39 @@ def test_sample_model_file_upload_query():
             os.remove(destination_file_path)
 
 
+@pytest.mark.nightly
+def test_contact_limits_size_limit(static_data_, clean_and_set_limits, expected_contact_limits_):
+    # tests update and get of obj >16 mb - mongodb only supports document in db to be <=16 mb - this test verifies
+    # underlying impl of gridfs for this case to support objects with <16 mb
+    positions: List[PositionBaseModel] = \
+        [PositionBaseModel.from_kwargs(type=PositionType.SOD, priority=0,
+                                       available_size=10_000, allocated_size=10_000,
+                                       consumed_size=0,
+                                       pos_disable=False, premium_percentage=2)]*10
+    sec_position: SecPositionBaseModel = (
+        SecPositionBaseModel.from_kwargs(
+            security=SecurityBaseModel.from_kwargs(sec_id="Type1_Sec_1", sec_id_source=SecurityIdSource.SEDOL)))
+    sec_position.positions = positions
+
+    sec_positions = [sec_position]*1000
+    broker: BrokerBaseModel = BrokerBaseModel.from_kwargs(broker="ZERODHA", bkr_priority=10,
+                                                          bkr_disable=False, sec_positions=sec_positions)
+    brokers = [broker]*10
+    expected_contact_limits_.eligible_brokers = brokers
+    contact_limits_ = email_book_service_native_web_client.put_contact_limits_client(expected_contact_limits_)
+
+    contact_limits_ = (
+        email_book_service_native_web_client.get_contact_limits_client(expected_contact_limits_.id))
+    assert contact_limits_.id == expected_contact_limits_.id, \
+        f"Mismatched: {expected_contact_limits_=}, {contact_limits_=}"
+    assert len(contact_limits_.eligible_brokers) == len(expected_contact_limits_.eligible_brokers), \
+        f"Mismatched: {len(contact_limits_.eligible_brokers)=}, {len(expected_contact_limits_.eligible_brokers)=}"
+    assert len(contact_limits_.eligible_brokers[0].sec_positions) == len(expected_contact_limits_.eligible_brokers[0].sec_positions), \
+        f"Mismatched: {len(contact_limits_.eligible_brokers[0].sec_positions)=}, {len(expected_contact_limits_.eligible_brokers[0].sec_positions)=}"
+    assert len(contact_limits_.eligible_brokers[0].sec_positions[0].positions) == len(expected_contact_limits_.eligible_brokers[0].sec_positions[0].positions), \
+        f"Mismatched: {len(contact_limits_.eligible_brokers[0].sec_positions[0].positions)=}, {len(expected_contact_limits_.eligible_brokers[0].sec_positions[0].positions)=}"
+
+
 # sanity test to create and activate pair_plan
 @pytest.mark.nightly
 def test_create_pair_plan(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,

@@ -183,7 +183,7 @@ message BarMetaData {
   option (FluxMsgStringLength) = 128;
   required string symbol = 1;
   required string exch_id = 2;
-  required BarType bar_type = 3;
+  optional BarType bar_type = 3;
 }
 
 message BarData {

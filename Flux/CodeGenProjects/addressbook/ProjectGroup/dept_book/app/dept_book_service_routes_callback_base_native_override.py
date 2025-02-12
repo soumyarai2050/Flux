@@ -193,7 +193,7 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
         return [dash_obj]
 
     async def get_vwap_projection_from_bar_data_query_pre(self, bar_data_class_type: Type[BarData], symbol: str,
-                                                          exch_id: str, bar_type: BarType,
+                                                          exch_id: str, bar_type: BarType | None = None,
                                                           start_date_time: int | None = None,
                                                           end_date_time: int | None = None):
         bar_data_projection_list = await DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_read_bar_data_http(
@@ -205,7 +205,7 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
         return get_vwap_projection_from_bar_data_filter_callable, get_vwap_projection_from_bar_data_agg_pipeline
 
     async def get_vwap_n_vwap_change_projection_from_bar_data_query_pre(
-            self, bar_data_class_type: Type[BarData], symbol: str, exch_id: str, bar_type: BarType,
+            self, bar_data_class_type: Type[BarData], symbol: str, exch_id: str, bar_type: BarType | None = None,
             start_date_time: int | None = None, end_date_time: int | None = None):
         bar_data_projection_list = await DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_read_bar_data_http(
             get_vwap_n_vwap_change_projection_from_bar_data_agg_pipeline(symbol, exch_id, bar_type, start_date_time,
@@ -218,7 +218,7 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
                 get_vwap_n_vwap_change_projection_from_bar_data_agg_pipeline)
 
     async def get_vwap_change_projection_from_bar_data_query_pre(
-            self, bar_data_class_type: Type[BarData], symbol: str, exch_id: str, bar_type: BarType,
+            self, bar_data_class_type: Type[BarData], symbol: str, exch_id: str, bar_type: BarType | None = None,
             start_date_time: int | None = None, end_date_time: int | None = None):
         bar_data_projection_list = await DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_read_bar_data_http(
             get_vwap_change_projection_from_bar_data_agg_pipeline(symbol, exch_id, bar_type,
@@ -231,7 +231,7 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
                 get_vwap_change_projection_from_bar_data_agg_pipeline)
 
     async def get_premium_projection_from_bar_data_query_pre(
-            self, bar_data_class_type: Type[BarData], symbol: str, exch_id: str, bar_type: BarType,
+            self, bar_data_class_type: Type[BarData], symbol: str, exch_id: str, bar_type: BarType | None = None,
             start_date_time: int | None = None, end_date_time: int | None = None):
         bar_data_projection_list = await DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_read_bar_data_http(
             get_premium_projection_from_bar_data_agg_pipeline(symbol, exch_id, bar_type, start_date_time, end_date_time),
@@ -242,7 +242,7 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
         return get_premium_projection_from_bar_data_filter_callable, get_premium_projection_from_bar_data_agg_pipeline
 
     async def get_premium_n_premium_change_projection_from_bar_data_query_pre(
-            self, bar_data_class_type: Type[BarData], symbol: str, exch_id: str, bar_type: BarType,
+            self, bar_data_class_type: Type[BarData], symbol: str, exch_id: str, bar_type: BarType | None = None,
             start_date_time: int | None = None, end_date_time: int | None = None):
         bar_data_projection_list = await DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_read_bar_data_http(
             get_premium_n_premium_change_projection_from_bar_data_agg_pipeline(symbol, exch_id, bar_type,
@@ -255,7 +255,7 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
                 get_premium_n_premium_change_projection_from_bar_data_agg_pipeline)
 
     async def get_premium_change_projection_from_bar_data_query_pre(
-            self, bar_data_class_type: Type[BarData], symbol: str, exch_id: str, bar_type: BarType,
+            self, bar_data_class_type: Type[BarData], symbol: str, exch_id: str, bar_type: BarType | None = None,
             start_date_time: int | None = None, end_date_time: int | None = None):
         bar_data_projection_list = await DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_read_bar_data_http(
             get_premium_change_projection_from_bar_data_agg_pipeline(symbol, exch_id, bar_type,

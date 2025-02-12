@@ -38,7 +38,8 @@ message ContactLimits {
     PatchAllOp: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found this cmt can be removed
     DeleteOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED,
-    IncludeDataframeClients: true   // currently set for tests, once real use-case is found this cmt can be removed
+    IncludeDataframeClients: true,   // currently set for tests, once real use-case is found this cmt can be removed
+    EnableLargeDBObject: true
   };
 
   // todo: take coordinates from yaml for projects in project_specific plugin

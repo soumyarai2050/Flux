@@ -17,6 +17,7 @@ import pymongo.results
 from fastapi import HTTPException, WebSocket, WebSocketDisconnect
 import orjson
 from pendulum import DateTime
+import gridfs
 
 # project specific imports
 from Flux.PyCodeGenEngine.FluxCodeGenCore.default_web_response import DefaultMsgspecWebResponse
@@ -236,24 +237,32 @@ async def generic_post_http(msgspec_class_type: Type[MsgspecModel],
                             proto_package_name: str, create_obj: MsgspecModel,
                             filter_agg_pipeline: Any = None,
                             update_agg_pipeline: Any = None, has_links: bool = False) -> Dict[str, Any] | bool:
-    collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.collection_obj
     obj_json = create_obj.to_dict()
     obj_id = create_obj.id
     if obj_id is not None:
         msgspec_class_type.init_max_id(obj_id, None)    # updates max_id to this id if is > than existing max_id
 
-    insert_one_result: pymongo.results.InsertOneResult = await collection_obj.insert_one(obj_json)
+    if msgspec_class_type.enable_large_db_object:
+        gridfs_bucket_obj: motor.motor_asyncio.AsyncIOMotorGridFSBucket = msgspec_class_type.gridfs_bucket_obj
+        await gridfs_bucket_obj.upload_from_stream_with_id(
+            file_id=obj_id,
+            filename=str(obj_id),
+            source=create_obj.to_json_str(),
+        )
+    else:
+        collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.collection_obj
+        insert_one_result: pymongo.results.InsertOneResult = await collection_obj.insert_one(obj_json)
 
-    await execute_update_agg_pipeline(msgspec_class_type, proto_package_name, update_agg_pipeline)
+        await execute_update_agg_pipeline(msgspec_class_type, proto_package_name, update_agg_pipeline)
 
-    if update_agg_pipeline or filter_agg_pipeline:
-        obj_json = await get_obj(msgspec_class_type, insert_one_result.inserted_id, filter_agg_pipeline, has_links)
+        if update_agg_pipeline or filter_agg_pipeline:
+            obj_json = await get_obj(msgspec_class_type, insert_one_result.inserted_id, filter_agg_pipeline, has_links)
 
     # handling all datetime fields - converting to epoch int values - caller of this function will handle
     # these fields back if required
     msgspec_class_type.convert_ts_fields_from_datetime_to_epoch_int(obj_json)
 
-    await publish_ws(msgspec_class_type, insert_one_result.inserted_id, obj_json, has_links)
+    await publish_ws(msgspec_class_type, obj_id, obj_json, has_links)
     return obj_json
 
 
@@ -263,24 +272,35 @@ async def generic_post_all_http(msgspec_class_type: Type[MsgspecModel], proto_pa
                                 create_obj_list: List[MsgspecModel],
                                 filter_agg_pipeline: Any = None, update_agg_pipeline: Any = None,
                                 has_links: bool = False) -> List[Dict[str, Any]] | bool:
-    collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.collection_obj
+    obj_id_list = []
     for create_obj in create_obj_list:
         obj_id = create_obj.id
+        obj_id_list.append(obj_id)
         if obj_id is not None:
             msgspec_class_type.init_max_id(obj_id, None)  # updates max_id to this id if is > than existing max_id
     obj_json_list = msgspec.to_builtins(create_obj_list, builtin_types=[DateTime])
-    insert_many_result: pymongo.results.InsertManyResult = await collection_obj.insert_many(obj_json_list)
+    if msgspec_class_type.enable_large_db_object:
+        for create_obj in create_obj_list:
+            gridfs_bucket_obj: motor.motor_asyncio.AsyncIOMotorGridFSBucket = msgspec_class_type.gridfs_bucket_obj
+            await gridfs_bucket_obj.upload_from_stream_with_id(
+                file_id=create_obj.id,
+                filename=str(create_obj.id),
+                source=create_obj.to_json_str(),
+            )
+    else:
+        collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.collection_obj
+        insert_many_result: pymongo.results.InsertManyResult = await collection_obj.insert_many(obj_json_list)
 
-    await execute_update_agg_pipeline(msgspec_class_type, proto_package_name, update_agg_pipeline)
+        await execute_update_agg_pipeline(msgspec_class_type, proto_package_name, update_agg_pipeline)
 
-    if update_agg_pipeline or filter_agg_pipeline:
-        obj_json_list = await get_obj_list(msgspec_class_type, insert_many_result.inserted_ids, filter_agg_pipeline, has_links)
+        if update_agg_pipeline or filter_agg_pipeline:
+            obj_json_list = await get_obj_list(msgspec_class_type, obj_id_list, filter_agg_pipeline, has_links)
 
-    for obj_json in obj_json_list:
-        # handling all datetime fields - converting to epoch int values - caller of this function will handle
-        # these fields back if required
-        msgspec_class_type.convert_ts_fields_from_datetime_to_epoch_int(obj_json)
-    await publish_ws_all(msgspec_class_type, insert_many_result.inserted_ids, obj_json_list, has_links)
+        for obj_json in obj_json_list:
+            # handling all datetime fields - converting to epoch int values - caller of this function will handle
+            # these fields back if required
+            msgspec_class_type.convert_ts_fields_from_datetime_to_epoch_int(obj_json)
+    await publish_ws_all(msgspec_class_type, obj_id_list, obj_json_list, has_links)
     return obj_json_list
 
 
@@ -298,18 +318,30 @@ async def _underlying_patch_n_put(msgspec_class_type: Type[MsgspecModel], proto_
     """
     _id = updated_json_obj_dict.get("_id")
 
-    collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.collection_obj
+    if msgspec_class_type.enable_large_db_object:
+        gridfs_bucket_obj: motor.motor_asyncio.AsyncIOMotorGridFSBucket = msgspec_class_type.gridfs_bucket_obj
+        # first deleting the existing object
+        await gridfs_bucket_obj.delete(_id)
 
-    if msgspec_class_type.is_time_series:
-        await _update_time_series(collection_obj, [_id], [updated_json_obj_dict])
-
+        # now creating updated object
+        await gridfs_bucket_obj.upload_from_stream_with_id(
+            file_id=_id,
+            filename=str(_id),
+            source=orjson.dumps(updated_json_obj_dict),
+        )
     else:
-        update_one_result: pymongo.results.UpdateResult = \
-            await collection_obj.update_one({"_id": _id}, {"$set": updated_json_obj_dict})
-    await execute_update_agg_pipeline(msgspec_class_type, proto_package_name, update_agg_pipeline)
+        collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.collection_obj
 
-    if update_agg_pipeline or filter_agg_pipeline:
-        updated_json_obj_dict = await get_obj(msgspec_class_type, _id, filter_agg_pipeline, has_links)
+        if msgspec_class_type.is_time_series:
+            await _update_time_series(collection_obj, [_id], [updated_json_obj_dict])
+
+        else:
+            update_one_result: pymongo.results.UpdateResult = \
+                await collection_obj.update_one({"_id": _id}, {"$set": updated_json_obj_dict})
+        await execute_update_agg_pipeline(msgspec_class_type, proto_package_name, update_agg_pipeline)
+
+        if update_agg_pipeline or filter_agg_pipeline:
+            updated_json_obj_dict = await get_obj(msgspec_class_type, _id, filter_agg_pipeline, has_links)
 
     # handling all datetime fields - converting to epoch int values - caller of this function will handle
     # these fields back if required
@@ -327,36 +359,54 @@ async def _underlying_patch_n_put_all(msgspec_class_type: Type[MsgspecModel], pr
     """
     Underlying interface for Put-All & Patch-All
     """
-    collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.collection_obj
-
     missing_ids: List[int] = []
-    if msgspec_class_type.is_time_series:
-        await _update_time_series(collection_obj, updated_obj_id_list, updated_json_obj_dict_list)
-    else:
-        update_req_list: List[UpdateOne] = []
+    if msgspec_class_type.enable_large_db_object:
         for updated_json_obj_dict in updated_json_obj_dict_list:
             _id = updated_json_obj_dict.get("_id")
-            update_req_list.append(UpdateOne({"_id": _id}, {"$set": updated_json_obj_dict}))
-        bulk_write_result: pymongo.results.BulkWriteResult = await collection_obj.bulk_write(update_req_list)
+            gridfs_bucket_obj: motor.motor_asyncio.AsyncIOMotorGridFSBucket = msgspec_class_type.gridfs_bucket_obj
+            # first deleting the existing object
+            try:
+                await gridfs_bucket_obj.delete(_id)
+            except gridfs.errors.NoFile:
+                missing_ids.append(_id)
+                continue
 
-        if bulk_write_result.matched_count != len(updated_obj_id_list):
-            # Run the aggregation pipeline
-            agg_cursor: motor.motor_asyncio.AsyncIOMotorCommandCursor = (
-                collection_obj.aggregate(get_non_stored_ids(updated_obj_id_list)))
-            agg_cursor_list = await agg_cursor.to_list(None)
+            # now creating updated object
+            await gridfs_bucket_obj.upload_from_stream_with_id(
+                file_id=_id,
+                filename=str(_id),
+                source=orjson.dumps(updated_json_obj_dict),
+            )
+    else:
+        collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.collection_obj
 
-            if len(agg_cursor_list) == 1:
-                updated_obj_id_list = agg_cursor_list[0].get("found_ids")
-                missing_ids.extend(agg_cursor_list[0].get("missing_ids"))
-            else:
-                raise HTTPException(detail=f"Found unsupported output from get_stored_ids aggregation, "
-                                           f"Can't find stored and missing ids in db for "
-                                           f"{msgspec_class_type.__name__} ;;;"
-                                           f"{agg_cursor_list=}, {updated_json_obj_dict_list=}", status_code=400)
+        if msgspec_class_type.is_time_series:
+            await _update_time_series(collection_obj, updated_obj_id_list, updated_json_obj_dict_list)
+        else:
+            update_req_list: List[UpdateOne] = []
+            for updated_json_obj_dict in updated_json_obj_dict_list:
+                _id = updated_json_obj_dict.get("_id")
+                update_req_list.append(UpdateOne({"_id": _id}, {"$set": updated_json_obj_dict}))
+            bulk_write_result: pymongo.results.BulkWriteResult = await collection_obj.bulk_write(update_req_list)
 
-    await execute_update_agg_pipeline(msgspec_class_type, proto_package_name, update_agg_pipeline)
-    if update_agg_pipeline or filter_agg_pipeline:
-        updated_json_obj_dict_list = await get_obj_list(msgspec_class_type, updated_obj_id_list, filter_agg_pipeline, has_links)
+            if bulk_write_result.matched_count != len(updated_obj_id_list):
+                # Run the aggregation pipeline
+                agg_cursor: motor.motor_asyncio.AsyncIOMotorCommandCursor = (
+                    collection_obj.aggregate(get_non_stored_ids(updated_obj_id_list)))
+                agg_cursor_list = await agg_cursor.to_list(None)
+
+                if len(agg_cursor_list) == 1:
+                    updated_obj_id_list = agg_cursor_list[0].get("found_ids")
+                    missing_ids.extend(agg_cursor_list[0].get("missing_ids"))
+                else:
+                    raise HTTPException(detail=f"Found unsupported output from get_stored_ids aggregation, "
+                                               f"Can't find stored and missing ids in db for "
+                                               f"{msgspec_class_type.__name__} ;;;"
+                                               f"{agg_cursor_list=}, {updated_json_obj_dict_list=}", status_code=400)
+
+        await execute_update_agg_pipeline(msgspec_class_type, proto_package_name, update_agg_pipeline)
+        if update_agg_pipeline or filter_agg_pipeline:
+            updated_json_obj_dict_list = await get_obj_list(msgspec_class_type, updated_obj_id_list, filter_agg_pipeline, has_links)
 
     for obj_json in updated_json_obj_dict_list:
         # handling all datetime fields - converting to epoch int values - caller of this function will handle
@@ -646,52 +696,84 @@ async def handle_reset_int_id(collection_obj: motor.motor_asyncio.AsyncIOMotorCo
 async def generic_delete_http(msgspec_class_type: Type[MsgspecModel], proto_package_name: str,
                               model_dummy_model, db_obj_id: int | str | Any,
                               update_agg_pipeline: Any = None, has_links: bool = False) -> DefaultMsgspecWebResponse | bool:
-    collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.collection_obj
-
     id_is_int_type = isinstance(db_obj_id, int)
-    delete_res = await collection_obj.delete_one({"_id": db_obj_id})
-    if delete_res.deleted_count == 1:
-        await execute_update_agg_pipeline(msgspec_class_type, proto_package_name, update_agg_pipeline)
-
-        empty_obj_dict = {'_id': db_obj_id}
-        await publish_ws(msgspec_class_type, db_obj_id, empty_obj_dict, has_links=has_links, update_ws_with_id=True)
-
-        # Setting back incremental id to 0 if collection gets empty
-        if id_is_int_type:
-            await handle_reset_int_id(collection_obj, msgspec_class_type)
-        # else not required: if id is not int then it must be of modelObjectId so no handling required
-        del_success.id = db_obj_id
-        return del_success
+    if msgspec_class_type.enable_large_db_object:
+        gridfs_bucket_obj: motor.motor_asyncio.AsyncIOMotorGridFSBucket = msgspec_class_type.gridfs_bucket_obj
+        try:
+            await gridfs_bucket_obj.delete(db_obj_id)
+        except gridfs.errors.NoFile:
+            err_str = f"Unexpected: Obj with {db_obj_id=} doesn't exist - Can't be deleted"
+            logging.error(err_str)
+            raise HTTPException(status_code=404, detail=err_str)
     else:
-        # delete_res.deleted_count for delete_one will always be either 1 or 0 - The delete_one method is
-        # implemented to stop after deleting a single matching document, so it will never delete more than
-        # one document, even if multiple documents match the query filter.
-        err_str = f"Unexpected: Obj with {db_obj_id=} doesn't exist - Can't be deleted"
-        logging.error(err_str)
-        raise HTTPException(status_code=404, detail=err_str)
+        collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.collection_obj
+        delete_res = await collection_obj.delete_one({"_id": db_obj_id})
+        if delete_res.deleted_count == 1:
+            await execute_update_agg_pipeline(msgspec_class_type, proto_package_name, update_agg_pipeline)
+
+            empty_obj_dict = {'_id': db_obj_id}
+            await publish_ws(msgspec_class_type, db_obj_id, empty_obj_dict, has_links=has_links, update_ws_with_id=True)
+
+            # Setting back incremental id to 0 if collection gets empty
+            if id_is_int_type:
+                await handle_reset_int_id(collection_obj, msgspec_class_type)
+            # else not required: if id is not int then it must be of modelObjectId so no handling required
+            del_success.id = db_obj_id
+            return del_success
+        else:
+            # delete_res.deleted_count for delete_one will always be either 1 or 0 - The delete_one method is
+            # implemented to stop after deleting a single matching document, so it will never delete more than
+            # one document, even if multiple documents match the query filter.
+            err_str = f"Unexpected: Obj with {db_obj_id=} doesn't exist - Can't be deleted"
+            logging.error(err_str)
+            raise HTTPException(status_code=404, detail=err_str)
 
 
 @http_except_n_log_error(status_code=500)
 @generic_perf_benchmark
 async def generic_delete_all_http(msgspec_class_type: Type[MsgspecModel], proto_package_name: str,
                                   msgspec_dummy_model: Type[MsgspecModel]) -> DefaultMsgspecWebResponse | bool:
-    collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.collection_obj
-
     id_is_int_type = (msgspec_class_type.__annotations__.get("_id") == int)
 
-    motor_cursor: motor.motor_asyncio.AsyncIOMotorCursor = collection_obj.find({}, {"_id": 1})
-    stored_id_dict_list = await motor_cursor.to_list(None)
+    if msgspec_class_type.enable_large_db_object:
+        gridfs_bucket_obj: motor.motor_asyncio.AsyncIOMotorGridFSBucket = msgspec_class_type.gridfs_bucket_obj
+        collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.gridfs_files_collection_obj
 
-    # preparing success message
-    del_success.id = []
-    empty_obj_dict_list: List[Dict[str, Any]] = []
-    for stored_id_dict in stored_id_dict_list:
-        _id = stored_id_dict.get("_id")
-        del_success.id.append(_id)
-        empty_obj_dict_list.append({'_id': _id})
+        data_cursor = gridfs_bucket_obj.find()
 
-    # deleting all
-    delete_result: pymongo.results.DeleteResult = await collection_obj.delete_many({})
+        del_success.id = []
+        empty_obj_dict_list: List[Dict[str, Any]] = []
+        async for grid_out in data_cursor:
+            # Read the file's content
+            data_bytes = await grid_out.read()
+
+            data_json = orjson.loads(data_bytes)
+            _id = data_json.get("_id")
+            del_success.id.append(_id)
+            empty_obj_dict_list.append({'_id': _id})
+
+            try:
+                await gridfs_bucket_obj.delete(_id)
+            except gridfs.errors.NoFile:
+                err_str = f"Unexpected: Obj with {_id=} doesn't exist - Can't be deleted"
+                logging.error(err_str)
+                raise HTTPException(status_code=404, detail=err_str)
+    else:
+        collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.collection_obj
+
+        motor_cursor: motor.motor_asyncio.AsyncIOMotorCursor = collection_obj.find({}, {"_id": 1})
+        stored_id_dict_list = await motor_cursor.to_list(None)
+
+        # deleting all
+        delete_result: pymongo.results.DeleteResult = await collection_obj.delete_many({})
+
+        # preparing success message
+        del_success.id = []
+        empty_obj_dict_list: List[Dict[str, Any]] = []
+        for stored_id_dict in stored_id_dict_list:
+            _id = stored_id_dict.get("_id")
+            del_success.id.append(_id)
+            empty_obj_dict_list.append({'_id': _id})
 
     # Setting back incremental id to 0 if collection gets empty
     if id_is_int_type:
@@ -708,47 +790,70 @@ async def generic_delete_by_id_list_http(
         msgspec_class_type: Type[MsgspecModel], proto_package_name: str,
         model_dummy_model, db_obj_id_list: List[int | str | Any], update_agg_pipeline: Any = None,
         has_links: bool = False) -> DefaultMsgspecWebResponse | bool:
-    collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.collection_obj
+    id_is_int_type = isinstance(db_obj_id_list[0], int)  # checking only first obj type assuming all will have same
+    if msgspec_class_type.enable_large_db_object:
+        gridfs_bucket_obj: motor.motor_asyncio.AsyncIOMotorGridFSBucket = msgspec_class_type.gridfs_bucket_obj
+        collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.gridfs_files_collection_obj
 
-    id_is_int_type = isinstance(db_obj_id_list[0], int)     # checking only first obj type assuming all will have same
-
-    # fetching document objs based using requested id list to verify if all ids exist
-    motor_cursor: motor.motor_asyncio.AsyncIOMotorCursor = collection_obj.find({'_id': {'$in': db_obj_id_list}})
-    documents_to_delete = await motor_cursor.to_list(None)
-    delete_res = await collection_obj.delete_many({'_id': {'$in': db_obj_id_list}})
-
-    if delete_res.deleted_count:
-        if delete_res.deleted_count != len(db_obj_id_list):
-            deleted_ids: List[int | str | Any] = []
-            empty_obj_dict_list: List[Dict[str, Any]] = []
-            for doc in documents_to_delete:
-                _id = doc.get('_id')
-                deleted_ids.append(_id)
+        del_success.id = []
+        empty_obj_dict_list: List[Dict[str, Any]] = []
+        non_existing_ids: List[int] = []
+        for _id in db_obj_id_list:
+            try:
+                await gridfs_bucket_obj.delete(_id)
+            except gridfs.errors.NoFile:
+                # obj with ids doesn't exist
+                non_existing_ids.append(_id)
+            else:
+                del_success.id.append(_id)
                 empty_obj_dict_list.append({'_id': _id})
 
-            deleted_ids = [doc['_id'] for doc in documents_to_delete]
-            non_existing_ids = list(set(db_obj_id_list) - set(deleted_ids))
-
-            logging.error(f"Expection: Can't find ids {non_existing_ids} in db, only deleted existing ids "
-                          f"{deleted_ids} out of requested id list")
+        if non_existing_ids:
             # setting only existing id list to db_obj_id_list variable to handle only those further
-            db_obj_id_list = deleted_ids
-        else:
-            empty_obj_dict_list: List[Dict[str, Any]] = [{"_id": _id} for _id in db_obj_id_list]
-
-        await execute_update_agg_pipeline(msgspec_class_type, proto_package_name, update_agg_pipeline)
-        await publish_ws_all(msgspec_class_type, db_obj_id_list, empty_obj_dict_list, has_links=has_links, update_ws_with_id=True)
-
-        # Setting back incremental id to 0 if collection gets empty
-        if id_is_int_type:
-            await handle_reset_int_id(collection_obj, msgspec_class_type)
-        # else not required: if id is not int then it must be of modelObjectId so no handling required
-        del_success.id = db_obj_id_list
-        return del_success
+            db_obj_id_list = del_success.id
+            logging.error(f"Exception: Can't find ids {non_existing_ids} in db, only deleted existing ids "
+                          f"{del_success.id} out of requested id list")
     else:
-        err_str = f"Unexpected: No obj found with ids in provided list {db_obj_id_list=}, No obj deleted"
-        logging.error(err_str)
-        raise HTTPException(status_code=404, detail=err_str)
+        collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.collection_obj
+
+        # fetching document objs based using requested id list to verify if all ids exist
+        motor_cursor: motor.motor_asyncio.AsyncIOMotorCursor = collection_obj.find({'_id': {'$in': db_obj_id_list}})
+        documents_to_delete = await motor_cursor.to_list(None)
+        delete_res = await collection_obj.delete_many({'_id': {'$in': db_obj_id_list}})
+
+        if delete_res.deleted_count:
+            if delete_res.deleted_count != len(db_obj_id_list):
+                deleted_ids: List[int | str | Any] = []
+                empty_obj_dict_list: List[Dict[str, Any]] = []
+                for doc in documents_to_delete:
+                    _id = doc.get('_id')
+                    deleted_ids.append(_id)
+                    empty_obj_dict_list.append({'_id': _id})
+
+                deleted_ids = [doc['_id'] for doc in documents_to_delete]
+                non_existing_ids = list(set(db_obj_id_list) - set(deleted_ids))
+
+                logging.error(f"Exception: Can't find ids {non_existing_ids} in db, only deleted existing ids "
+                              f"{deleted_ids} out of requested id list")
+                # setting only existing id list to db_obj_id_list variable to handle only those further
+                db_obj_id_list = deleted_ids
+            else:
+                empty_obj_dict_list: List[Dict[str, Any]] = [{"_id": _id} for _id in db_obj_id_list]
+
+            await execute_update_agg_pipeline(msgspec_class_type, proto_package_name, update_agg_pipeline)
+        else:
+            err_str = f"Unexpected: No obj found with ids in provided list {db_obj_id_list=}, No obj deleted"
+            logging.error(err_str)
+            raise HTTPException(status_code=404, detail=err_str)
+
+    await publish_ws_all(msgspec_class_type, db_obj_id_list, empty_obj_dict_list,
+                         has_links=has_links, update_ws_with_id=True)
+    # Setting back incremental id to 0 if collection gets empty
+    if id_is_int_type:
+        await handle_reset_int_id(collection_obj, msgspec_class_type)
+    # else not required: if id is not int then it must be of modelObjectId so no handling required
+    del_success.id = db_obj_id_list
+    return del_success
 
 
 @http_except_n_log_error(status_code=500)
@@ -998,32 +1103,50 @@ async def generic_read_by_id_ws(ws: WebSocket, project_name: str, msgspec_class_
 async def get_obj(msgspec_class_type: Type[MsgspecModel], db_obj_id: Any,
                   filter_agg_pipeline: Any = None, has_links: bool = False,
                   is_projection_type: bool | None = False):
-    if filter_agg_pipeline is None:
-        collection_cursor: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.collection_obj
-        fetched_json_obj = await collection_cursor.find_one({"_id": db_obj_id})
+    if msgspec_class_type.enable_large_db_object:
+        gridfs_bucket_obj: motor.motor_asyncio.AsyncIOMotorGridFSBucket = msgspec_class_type.gridfs_bucket_obj
+        # Open a download stream using the custom _id
+        download_stream = await gridfs_bucket_obj.open_download_stream(db_obj_id)
+        file_data = await download_stream.read()
+        fetched_json_obj = orjson.loads(file_data)
+
     else:
-        fetched_json_obj = await get_filtered_obj(filter_agg_pipeline, msgspec_class_type,
-                                                  db_obj_id, has_links, is_projection_type=is_projection_type)
+        if filter_agg_pipeline is None:
+            collection_cursor: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.collection_obj
+            fetched_json_obj = await collection_cursor.find_one({"_id": db_obj_id})
+        else:
+            fetched_json_obj = await get_filtered_obj(filter_agg_pipeline, msgspec_class_type,
+                                                      db_obj_id, has_links, is_projection_type=is_projection_type)
     return fetched_json_obj
 
 
 async def get_obj_list(msgspec_class_type: Type[MsgspecModel], find_ids: List[Any] | None = None,
                        filter_agg_pipeline: Any = None, has_links: bool = False,
                        is_projection_type: bool | None = False) -> List[Dict[str, Any]]:
-    if filter_agg_pipeline is None:
-        collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.collection_obj
-        if find_ids is None:
-            fetched_objs_cursor: motor.motor_asyncio.AsyncIOMotorCursor = collection_obj.find()
-        else:
-            fetched_objs_cursor: motor.motor_asyncio.AsyncIOMotorCursor = collection_obj.find({"_id": {'$in': find_ids}})
-        fetched_json_list = await fetched_objs_cursor.to_list(None)
-        return fetched_json_list
+    if msgspec_class_type.enable_large_db_object:
+        gridfs_bucket_obj: motor.motor_asyncio.AsyncIOMotorGridFSBucket = msgspec_class_type.gridfs_bucket_obj
+        data_cursor = gridfs_bucket_obj.find()
+        json_data_list = []
+        async for grid_out in data_cursor:
+            # Read the file's content
+            data_bytes = grid_out.read()
+            data_json = orjson.loads(data_bytes)
+            json_data_list.append(data_json)
+        return json_data_list
     else:
-        # find_ids if none: will be handled inside get_filtered_obj_list implicitly
-        json_list = await get_filtered_obj_list(filter_agg_pipeline, msgspec_class_type, find_ids,
-                                                has_links=has_links, is_projection_type=is_projection_type)
-        return json_list
-
+        if filter_agg_pipeline is None:
+            collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.collection_obj
+            if find_ids is None:
+                fetched_objs_cursor: motor.motor_asyncio.AsyncIOMotorCursor = collection_obj.find()
+            else:
+                fetched_objs_cursor: motor.motor_asyncio.AsyncIOMotorCursor = collection_obj.find({"_id": {'$in': find_ids}})
+            fetched_json_list = await fetched_objs_cursor.to_list(None)
+            return fetched_json_list
+        else:
+            # find_ids if none: will be handled inside get_filtered_obj_list implicitly
+            json_list = await get_filtered_obj_list(filter_agg_pipeline, msgspec_class_type, find_ids,
+                                                    has_links=has_links, is_projection_type=is_projection_type)
+            return json_list
 
 
 @http_except_n_log_error(status_code=500)

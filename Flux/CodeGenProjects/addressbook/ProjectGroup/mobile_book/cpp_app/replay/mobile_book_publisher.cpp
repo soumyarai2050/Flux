@@ -4,7 +4,7 @@
 #include "../include/md_utility_functions.h"
 #include "mobile_book_web_n_ws_server.h"
 
-void inline log_md(const MarketDepthQueueElement& kr_market_depth_queue_element, const char* log_msg) {
+void inline log_md([[maybe_unused]] const MarketDepthQueueElement& kr_market_depth_queue_element, [[maybe_unused]] const char* log_msg) {
     LOG_INFO_IMPL(GetCppAppLogger(), "{} to write data: {};;; to SHM", log_msg,
         std::format("symbol: {}, Side: {}, exch_time: {}, px: {}, qty: {}, position: {}",
             kr_market_depth_queue_element.symbol_, kr_market_depth_queue_element.side_,
@@ -13,16 +13,17 @@ void inline log_md(const MarketDepthQueueElement& kr_market_depth_queue_element,
             kr_market_depth_queue_element.position_));
 }
 
-void inline log_lt(const LastBarterQueueElement& kr_last_barter_queue_element, const char* log_msg) {
+void inline log_lt([[maybe_unused]] const LastBarterQueueElement& kr_last_barter_queue_element, [[maybe_unused]] const char* log_msg) {
     LOG_INFO_IMPL(GetCppAppLogger(), "{} to write data: {};;; to SHM", log_msg,
         std::format("symbol: {}, px: {}, qty: {}, exch_time: {}",
             kr_last_barter_queue_element.symbol_n_exch_id_.symbol_, kr_last_barter_queue_element.px_,
             kr_last_barter_queue_element.qty_, FluxCppCore::time_in_utc_str(kr_last_barter_queue_element.exch_time_)));
 }
 
-MobileBookPublisher::MobileBookPublisher(Config& config, std::shared_ptr<FluxCppCore::MongoDBHandler> mongo_db_handler) :
+MobileBookPublisher::MobileBookPublisher(Config& config) :
     mr_config_(config),
-    m_sp_mongo_db_handler_(mongo_db_handler), m_market_depth_codec_(m_sp_mongo_db_handler_),
+    m_sp_mongo_db_handler_(std::make_shared<FluxCppCore::MongoDBHandler>(mr_config_.m_mongodb_uri_, mr_config_.m_db_name_)),
+    m_market_depth_codec_(m_sp_mongo_db_handler_),
     m_last_barter_codec_(m_sp_mongo_db_handler_), m_top_of_book_codec_(m_sp_mongo_db_handler_),
     m_raw_market_depth_history_codec_(m_sp_mongo_db_handler_), m_raw_last_barter_history_codec_(m_sp_mongo_db_handler_),
     m_combined_server_(nullptr){
@@ -1006,9 +1007,9 @@ void MobileBookPublisher::market_depth_consumer() {
                     m_combined_server_->publish_to_route(mr_config_.m_market_depth_ws_route_,
                         boost::json::serialize(md_json["market_depth"].get_array()));
                 } else {
-                    // TODO: fix error
                     LOG_ERROR_IMPL(GetCppAppLogger(), "Failed to serialize market_depth to json;;; id: {}, symbol: {}, "
-                                                      "", m_market_depth.id_, m_market_depth.symbol_);
+                                                      "", m_market_depth_list_.market_depth_[0].id_,
+                                                      m_market_depth_list_.market_depth_[0].symbol_);
                 }
                 m_market_depth_list_.market_depth_.clear();
             }

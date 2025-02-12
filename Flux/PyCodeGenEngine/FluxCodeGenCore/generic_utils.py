@@ -50,14 +50,20 @@ def validate_pendulum_datetime(dt: datetime.datetime | str | None, datetime_form
 
 
 async def init_max_id_handler(model_class_type) -> int:
-    latest_obj = await model_class_type.collection_obj.find_one(sort=[("_id", -1)])
+    if model_class_type.enable_large_db_object:
+        latest_obj = await model_class_type.gridfs_files_collection_obj.find_one(sort=[("_id", -1)])
+    else:
+        latest_obj = await model_class_type.collection_obj.find_one(sort=[("_id", -1)])
     if latest_obj is not None:
         max_val = latest_obj.get("_id")
         if max_val is None:
             max_val = 0
     else:
         max_val = 0
-    latest_obj = await model_class_type.collection_obj.find_one(sort=[("update_id", -1)])
+    if model_class_type.enable_large_db_object:
+        latest_obj = await model_class_type.gridfs_files_collection_obj.find_one(sort=[("_id", -1)])
+    else:
+        latest_obj = await model_class_type.collection_obj.find_one(sort=[("update_id", -1)])
     if latest_obj is not None:
         max_update_val = latest_obj.get("update_id")
         if max_update_val is None:
