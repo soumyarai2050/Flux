@@ -1,9 +1,11 @@
 from pathlib import PurePath
 
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.ORMModel.photo_book_service_model_imports import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.FastApi.photo_book_service_http_client import (
+# from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.FastApi.photo_book_service_http_client import (
+#     PhotoBookServiceHttpClient)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.FastApi.photo_book_service_http_client_async import (
     PhotoBookServiceHttpClient)
-from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager, parse_to_int
+from FluxPythonUtils.scripts.general_utility_functions import YAMLConfigurationManager, parse_to_int
 
 
 CURRENT_PROJECT_DIR = PurePath(__file__).parent.parent

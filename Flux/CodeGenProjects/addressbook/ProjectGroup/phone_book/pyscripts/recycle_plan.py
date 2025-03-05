@@ -3,7 +3,7 @@ import datetime
 import sys
 import time
 
-from FluxPythonUtils.scripts.utility_functions import configure_logger
+from FluxPythonUtils.scripts.general_utility_functions import configure_logger
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.pyscripts.utility_functions import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_helper import (
     photo_book_service_http_client)

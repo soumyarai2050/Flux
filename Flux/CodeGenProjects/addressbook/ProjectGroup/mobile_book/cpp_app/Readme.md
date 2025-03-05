@@ -64,8 +64,8 @@ sudo cmake --build . --target install
 ### Quill is a C++ logging library.
 ```
 `git clone https://github.com/odygrd/quill.git
-git checkout v3
 cd quill
+git checkout v3
 mkdir cmake_build
 cd cmake_build
 cmake .. -DCMAKE_INSTALL_PREFIX=/home/$USER/cpp_libs/libs_13/quill

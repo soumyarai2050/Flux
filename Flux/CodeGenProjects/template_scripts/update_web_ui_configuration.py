@@ -4,7 +4,7 @@ from pathlib import PurePath
 from typing import Dict, Tuple
 import re
 
-from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager
+from FluxPythonUtils.scripts.file_n_general_utility_functions import YAMLConfigurationManager
 
 root_dir: PurePath = PurePath(__file__).parent.parent.parent
 

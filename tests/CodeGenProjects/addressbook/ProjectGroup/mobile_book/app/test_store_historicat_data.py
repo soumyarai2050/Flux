@@ -8,8 +8,8 @@ import pytest
 from ibapi.contract import Contract
 from ibapi.common import BarData
 # project imports
-from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager, configure_logger
-from FluxPythonUtils.scripts.utility_functions import str_from_file
+from FluxPythonUtils.scripts.general_utility_functions import YAMLConfigurationManager, configure_logger
+from FluxPythonUtils.scripts.file_utility_functions import str_from_file
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.app.store_historical_data_client import StoreHistoricalDataClient
 
 os.environ["DBType"] = "beanie"

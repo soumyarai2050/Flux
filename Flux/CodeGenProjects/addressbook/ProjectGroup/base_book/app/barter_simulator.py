@@ -13,7 +13,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.bartering_link_
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.executor_config_loader import (
     executor_config_yaml_dict, EXECUTOR_PROJECT_DATA_DIR)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import get_symbol_side_key
-from FluxPythonUtils.scripts.utility_functions import dict_or_list_records_csv_writer
+from FluxPythonUtils.scripts.file_utility_functions import dict_or_list_records_csv_writer
 from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_post_book_n_basket_book_core_msgspec_model import *
 from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_basket_book_core_msgspec_model import *
 

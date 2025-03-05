@@ -5,7 +5,7 @@ import time
 from pathlib import PurePath
 from typing import List
 
-from FluxPythonUtils.scripts.utility_functions import parse_to_int, YAMLConfigurationManager
+from FluxPythonUtils.scripts.general_utility_functions import parse_to_int, YAMLConfigurationManager
 
 if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug_sleep_time):
     time.sleep(parse_to_int(debug_sleep_time))
@@ -13,7 +13,7 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug
 
 import protogen
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin, main
-from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case
+from FluxPythonUtils.scripts.file_n_general_utility_functions import convert_camel_case_to_specific_case
 
 root_flux_core_config_yaml_path = PurePath(__file__).parent.parent.parent / "flux_core.yaml"
 root_flux_core_config_yaml_dict = (

@@ -15,7 +15,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_mod
     get_symbol_side_pattern)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.ORMModel.photo_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import get_alert_cache_key
-from FluxPythonUtils.scripts.utility_functions import delete_mongo_document, create_mongo_document
+from FluxPythonUtils.scripts.general_utility_functions import delete_mongo_document, create_mongo_document
 
 
 frmt_date = datetime.datetime.now().strftime("%Y%m%d")

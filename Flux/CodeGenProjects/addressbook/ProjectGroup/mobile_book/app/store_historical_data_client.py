@@ -9,7 +9,7 @@ from ibapi.common import BarData, TickerId
 
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.app.ib_api_client import IbApiClient
 from Flux.CodeGenProjects.AddressBook.ORMModel.barter_core_msgspec_model import SymbolNExchIdBaseModel
-from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager, configure_logger
+from FluxPythonUtils.scripts.general_utility_functions import YAMLConfigurationManager, configure_logger
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.generated.ORMModel.dept_book_service_msgspec_model import (
     BarDataBaseModel)
 

@@ -9,7 +9,7 @@ import pytest
 
 # project imports
 from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import *
-from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager
+from FluxPythonUtils.scripts.file_n_general_utility_functions import YAMLConfigurationManager
 
 
 PROJECT_DATA_DIR = PurePath(__file__).parent.parent / 'data'

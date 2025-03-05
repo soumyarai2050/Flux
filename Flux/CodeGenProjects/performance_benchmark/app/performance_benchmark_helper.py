@@ -1,5 +1,5 @@
 from Flux.CodeGenProjects.performance_benchmark.generated.ORMModel.performance_benchmark_service_model_imports import *
-from FluxPythonUtils.scripts.utility_functions import (
+from FluxPythonUtils.scripts.general_utility_functions import (
     YAMLConfigurationManager, parse_to_int)
 from Flux.CodeGenProjects.performance_benchmark.generated.FastApi.performance_benchmark_service_http_client import (
     PerformanceBenchmarkServiceHttpClient)

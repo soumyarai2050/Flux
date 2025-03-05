@@ -5,7 +5,7 @@ import os
 # project imports
 from Flux.PyCodeGenEngine.FluxCodeGenCore.raw_performance_data_processor import (RawPerformanceDataProcessor,
                                                                                  MongoConnectionReqs)
-from FluxPythonUtils.scripts.utility_functions import (YAMLConfigurationManager)
+from FluxPythonUtils.scripts.file_n_general_utility_functions import (YAMLConfigurationManager)
 from Flux.CodeGenProjects.performance_benchmark.app.performance_benchmark_helper import (
     performance_benchmark_service_http_client)
 from Flux.CodeGenProjects.performance_benchmark.generated.ORMModel.performance_benchmark_service_model_imports import (

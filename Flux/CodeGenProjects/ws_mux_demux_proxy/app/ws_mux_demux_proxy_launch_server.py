@@ -6,7 +6,7 @@ from pathlib import PurePath
 
 # project imports
 from Flux.CodeGenProjects.ws_mux_demux_proxy.app.ws_mux_demux_proxy_service_fastapi import *
-from FluxPythonUtils.scripts.utility_functions import configure_logger, add_logging_levels, parse_to_int
+from FluxPythonUtils.scripts.general_utility_functions import configure_logger, add_logging_levels, parse_to_int
 
 project_data_dir = PurePath(__file__).parent.parent
 config_yaml_path = project_data_dir / "data" / "config.yaml"

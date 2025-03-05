@@ -5,7 +5,7 @@ from pathlib import PurePath
 from pendulum import DateTime
 from fastapi_restful.enums import StrEnum
 
-from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager
+from FluxPythonUtils.scripts.file_n_general_utility_functions import YAMLConfigurationManager
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.markets.in_market import INMarket
 
 MARKETS_DATA_DIR = (

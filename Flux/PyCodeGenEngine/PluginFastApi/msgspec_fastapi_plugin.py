@@ -6,7 +6,7 @@ import logging
 from pathlib import PurePath
 
 # project imports
-from FluxPythonUtils.scripts.utility_functions import parse_to_int
+from FluxPythonUtils.scripts.general_utility_functions import parse_to_int
 
 if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug_sleep_time):
     time.sleep(parse_to_int(debug_sleep_time))
@@ -27,7 +27,7 @@ from Flux.PyCodeGenEngine.PluginFastApi.fastapi_openapi_schema import FastapiOpe
 from Flux.PyCodeGenEngine.PluginFastApi.base_fastapi_plugin import main
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import (
     root_core_proto_files, project_grp_core_proto_files, project_dir)
-from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager, convert_camel_case_to_specific_case
+from FluxPythonUtils.scripts.file_n_general_utility_functions import YAMLConfigurationManager, convert_camel_case_to_specific_case
 
 
 root_flux_core_config_yaml_path = PurePath(__file__).parent.parent.parent / "flux_core.yaml"
@@ -259,7 +259,7 @@ class MsgspecFastApiPlugin(FastapiCallbackFileHandler,
         output_str += "import logging\n"
         output_str += "from motor.motor_asyncio import AsyncIOMotorGridFSBucket\n"
 
-        output_str += f"from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager\n"
+        output_str += f"from FluxPythonUtils.scripts.general_utility_functions import YAMLConfigurationManager\n"
         output_str += f'\n\n'
 
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", f"{self.model_dir_name}.{self.model_file_name}")

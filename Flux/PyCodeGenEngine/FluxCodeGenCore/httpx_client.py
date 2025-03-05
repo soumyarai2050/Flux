@@ -22,7 +22,7 @@ class APIClient:
             default_headers: Default headers for all requests
             timeout: Request timeout in seconds
         """
-        self.base_url = base_url
+        self.base_url = base_url.rstrip('/')
         self.timeout = timeout
         self.session = requests.Session()
 
@@ -79,7 +79,7 @@ class APIClient:
         """Send PATCH request."""
         return self._make_request('PATCH', endpoint, **kwargs)
 
-    def delete(self, endpoint: str, **kwargs):
+    def delete(self, endpoint: str, **kwargs) -> requests.Response:
         """Send DELETE request."""
         return self._make_request('DELETE', endpoint, **kwargs)
 

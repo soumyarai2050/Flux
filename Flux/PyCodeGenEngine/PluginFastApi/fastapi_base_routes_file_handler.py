@@ -8,15 +8,15 @@ import logging
 from pathlib import PurePath
 
 # project imports
-from FluxPythonUtils.scripts.utility_functions import parse_to_int
+from FluxPythonUtils.scripts.general_utility_functions import parse_to_int
 
 if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug_sleep_time):
     time.sleep(parse_to_int(debug_sleep_time))
 # else not required: Avoid if env var is not set or if value cant be type-cased to int
 
 import protogen
-from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case, \
-    parse_string_to_original_types, convert_to_capitalized_camel_case
+from FluxPythonUtils.scripts.general_utility_functions import parse_string_to_original_types, convert_to_capitalized_camel_case
+from FluxPythonUtils.scripts.file_n_general_utility_functions import convert_camel_case_to_specific_case
 from Flux.PyCodeGenEngine.PluginFastApi.base_fastapi_plugin import BaseFastapiPlugin, ModelType
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import (
     root_core_proto_files, project_grp_core_proto_files, project_dir)
@@ -265,7 +265,7 @@ class FastapiBaseRoutesFileHandler(BaseFastapiPlugin, ABC):
         output_str += self._handle_model_imports(file, model_suffix)
         if self.response_field_case_style.lower() == "camel":
             output_str += f"from FluxPythonUtils.scripts.model_base_utils import to_camel\n"
-        output_str += f"from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager\n"
+        output_str += f"from FluxPythonUtils.scripts.general_utility_functions import YAMLConfigurationManager\n"
         # else not required: if response type is not camel type then avoid import
         default_web_response_file_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH", "default_web_response")
         output_str += f'from {default_web_response_file_path} import *\n'

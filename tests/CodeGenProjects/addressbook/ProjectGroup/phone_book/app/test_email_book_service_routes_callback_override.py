@@ -15,6 +15,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_ser
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.ORMModel.street_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.ORMModel.photo_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ORMModel.dept_book_n_mobile_book_n_street_book_n_basket_book_core_msgspec_model import *
 
 email_book_service_beanie_web_client: EmailBookServiceHttpClient = \
     EmailBookServiceHttpClient.set_or_get_if_instance_exists(HOST, parse_to_int(PAIR_STRAT_BEANIE_PORT))
@@ -1046,6 +1047,8 @@ def test_contact_limits_size_limit(static_data_, clean_and_set_limits, expected_
     broker: BrokerBaseModel = BrokerBaseModel.from_kwargs(broker="ZERODHA", bkr_priority=10,
                                                           bkr_disable=False, sec_positions=sec_positions)
     brokers = [broker]*10
+    for idx, broker_ in enumerate(brokers):
+        broker_.broker = f"broker_{idx}"
     expected_contact_limits_.eligible_brokers = brokers
     contact_limits_ = email_book_service_native_web_client.put_contact_limits_client(expected_contact_limits_)
 
@@ -25471,4 +25474,62 @@ def test_verify_deadlock_in_update_residuals_query(
 #
 #     contact_status = email_book_service_native_web_client.get_contact_status_client(contact_status_id)
 #     assert not contact_status.kill_switch
+
+def test_quote_create_from_df(sample_quote_df):
+    # Test creating QuoteBaseModel from DataFrame
+    quote = QuoteBaseModel.create_from_df(sample_quote_df)
+
+    assert isinstance(quote, QuoteBaseModel)
+    assert isinstance(quote.px, float)
+    assert isinstance(quote.qty, int)
+    assert isinstance(quote.premium, float)
+
+
+def test_quote_create_from_df_array(sample_quote_df):
+    # Test creating array of QuoteBaseModel from DataFrame
+    quotes = QuoteBaseModel.create_from_df_array(sample_quote_df)
+
+    assert isinstance(quotes, list)
+    assert len(quotes) == sample_quote_df.height
+    assert all(isinstance(q, QuoteBaseModel) for q in quotes)
+
+def test_empty_dataframe():
+    empty_df = pl.DataFrame({
+        'px': [],
+        'qty': [],
+        'premium': [],
+        'last_update_date_time': []
+    })
+
+    with pytest.raises(ValueError, match="DataFrame is empty"):
+        QuoteBaseModel.create_from_df(empty_df)
+
+    assert QuoteBaseModel.create_from_df_array(empty_df) == []
+
+def test_update_from_df(sample_quote_df):
+    # Create initial quote
+    quote = QuoteBaseModel(
+        px=0.0,
+        qty=0,
+        premium=0.0,
+        last_update_date_time=pendulum.now('UTC')
+    )
+
+    # Update from DataFrame
+    success = quote.update_from_df(sample_quote_df)
+
+    assert success is True
+    assert quote.px == sample_quote_df['px'][0]
+    assert quote.qty == sample_quote_df['qty'][0]
+    assert quote.premium == sample_quote_df['premium'][0]
+
+def test_top_of_book_create_from_df(sample_top_of_book_df):
+    # Test creating TopOfBookBaseModel from DataFrame
+    tob = TopOfBookBaseModel.create_from_df(sample_top_of_book_df)
+
+    assert isinstance(tob, TopOfBookBaseModel)
+    assert isinstance(tob.id, int)
+    assert isinstance(tob.symbol, str)
+    assert isinstance(tob.total_bartering_security_size, int)
+
 

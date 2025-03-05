@@ -10,7 +10,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.ORMMode
     NewChoreBaseModel, NewChore)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import (
     Position, Side, Broker, BrokerBaseModel, BrokerRoute)
-from FluxPythonUtils.scripts.utility_functions import configure_logger
+from FluxPythonUtils.scripts.general_utility_functions import configure_logger
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.markets.market import Market, MarketID
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecordManager
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.bartering_link import (

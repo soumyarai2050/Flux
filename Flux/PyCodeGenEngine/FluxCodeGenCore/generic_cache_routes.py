@@ -9,7 +9,8 @@ from beanie import Document
 # project specific imports
 from Flux.PyCodeGenEngine.FluxCodeGenCore.default_web_response import DefaultWebResponse
 from FluxPythonUtils.scripts.http_except_n_log_error import http_except_n_log_error
-from FluxPythonUtils.scripts.utility_functions import compare_n_patch_dict, convert_camel_case_to_specific_case
+from FluxPythonUtils.scripts.general_utility_functions import compare_n_patch_dict
+from FluxPythonUtils.scripts.file_n_general_utility_functions import convert_camel_case_to_specific_case
 from Flux.PyCodeGenEngine.FluxCodeGenCore.generic_beanie_routes import generic_perf_benchmark, \
     assign_missing_ids_n_handle_date_time_type
 from Flux.CodeGenProjects.TradeEngine.ProjectGroup.pair_strat_engine.generated.FastApi.strat_manager_service_http_client import \

@@ -2,7 +2,7 @@
 from pathlib import PurePath
 
 # project imports
-from FluxPythonUtils.scripts.utility_functions import (
+from FluxPythonUtils.scripts.general_utility_functions import (
     YAMLConfigurationManager, parse_to_int)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.generated.ORMModel.dept_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.generated.FastApi.dept_book_service_http_client import DeptBookServiceHttpClient

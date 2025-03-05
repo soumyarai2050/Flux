@@ -29,7 +29,8 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_ser
     get_plan_key_from_pair_plan, get_id_from_plan_key, get_new_plan_view_obj,
     get_reset_log_book_cache_wrapper_pattern,
     pair_plan_client_call_log_str, UpdateType,
-    get_matching_plan_from_symbol_n_side)
+    get_matching_plan_from_symbol_n_side, get_dismiss_filter_brokers, handle_shadow_broker_updates,
+    handle_shadow_broker_creates)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import get_pair_plan_log_key, get_pair_plan_dict_log_key, pair_plan_id_key
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.aggregate import (
     get_ongoing_pair_plan_filter, get_all_pair_plan_from_symbol_n_side, get_ongoing_or_all_pair_plans_by_sec_id)
@@ -38,7 +39,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.ORMModel
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_client import (
     StreetBookServiceHttpClient)
 from FluxPythonUtils.scripts.service import Service
-from FluxPythonUtils.scripts.utility_functions import (
+from FluxPythonUtils.scripts.general_utility_functions import (
     get_pid_from_port, except_n_log_alert, is_process_running, submit_task_with_first_completed_wait,
     handle_refresh_configurable_data_members, parse_to_int, set_package_logger_level)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.bartering_link import get_bartering_link
@@ -81,6 +82,10 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
     underlying_create_system_control_http: Callable[..., Any] | None = None
     underlying_read_contact_limits_http: Callable[..., Any] | None = None
     underlying_read_contact_limits_by_id_http: Callable[..., Any] | None = None
+    underlying_read_shadow_brokers_http: Callable[..., Any] | None = None
+    underlying_create_all_shadow_brokers_http: Callable[..., Any] | None = None
+    underlying_update_all_shadow_brokers_http: Callable[..., Any] | None = None
+    underlying_delete_by_id_list_shadow_brokers_http: Callable[..., Any] | None = None
 
     Fx_SO_FilePath = CURRENT_PROJECT_SCRIPTS_DIR / f"fx_so.sh"
     RecoveredKillSwitchUpdate: bool = False
@@ -103,7 +108,9 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
             underlying_read_chore_limits_http_json_dict, underlying_read_contact_limits_http_json_dict,
             underlying_read_plan_collection_http_json_dict, underlying_read_system_control_by_id_http_json_dict,
             underlying_read_pair_plan_http_json_dict, underlying_partial_update_pair_plan_http_json_dict,
-            underlying_read_plan_collection_by_id_http_json_dict, underlying_read_contact_limits_by_id_http)
+            underlying_read_plan_collection_by_id_http_json_dict, underlying_read_contact_limits_by_id_http,
+            underlying_read_shadow_brokers_http, underlying_create_all_shadow_brokers_http,
+            underlying_update_all_shadow_brokers_http, underlying_delete_by_id_list_shadow_brokers_http)
         cls.underlying_read_contact_status_http = underlying_read_contact_status_http
         cls.underlying_read_contact_status_http_json_dict = underlying_read_contact_status_http_json_dict
         cls.underlying_create_contact_status_http = underlying_create_contact_status_http
@@ -135,7 +142,12 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
         cls.underlying_read_system_control_http_json_dict = underlying_read_system_control_http_json_dict
         cls.underlying_create_system_control_http = underlying_create_system_control_http
         cls.underlying_read_contact_limits_http = underlying_read_contact_limits_http
+        cls.underlying_read_shadow_brokers_http = underlying_read_shadow_brokers_http
         cls.underlying_read_contact_limits_by_id_http = underlying_read_contact_limits_by_id_http
+        cls.underlying_create_all_shadow_brokers_http = underlying_create_all_shadow_brokers_http
+        cls.underlying_update_all_shadow_brokers_http = underlying_update_all_shadow_brokers_http
+        cls.underlying_delete_by_id_list_shadow_brokers_http = underlying_delete_by_id_list_shadow_brokers_http
+
 
     def __init__(self):
         self.asyncio_loop = None
@@ -449,7 +461,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
             db_name = "phone_book"
 
         md_shell_env_data: MDShellEnvData = (
-            MDShellEnvData(host=ps_host, port=ps_port, db_name=db_name, project_name="phone_book"))
+            MDShellEnvData.from_kwargs(host=ps_host, port=ps_port, db_name=db_name, project_name="phone_book"))
 
         create_md_shell_script(md_shell_env_data, run_fx_symbol_overview_file_path, "SO")
         os.chmod(run_fx_symbol_overview_file_path, stat.S_IRWXU)
@@ -676,36 +688,10 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
                             f";;;{pair_plan_obj=}")
 
     async def get_dismiss_filter_contact_limit_brokers_query_pre(
-            self, dismiss_filter_contact_limit_broker_class_type: Type[DismissFilterContactLimitBroker],
-            security_id1: str, security_id2: str):
-        ric1, ric2 = self.static_data.get_connect_n_qfii_rics_from_ticker(security_id1)
-        ric3, ric4 = self.static_data.get_connect_n_qfii_rics_from_ticker(security_id2)
-        sedol = self.static_data.get_sedol_from_ticker(security_id1)
-        # get security name from : pair_plan_params.plan_legs and then redact pattern
-        # security.sec_id (a pattern in positions) where there is a value match
-        dismiss_filter_agg_pipeline = {'redact': [("security.sec_id", ric1, ric2, ric3, ric4, sedol)]}
-        filtered_contact_limits: List[ContactLimits] = \
-            await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_contact_limits_http(
-                dismiss_filter_agg_pipeline, self.get_generic_read_route())
-        if len(filtered_contact_limits) == 1:
-            if filtered_contact_limits[0].eligible_brokers is not None:
-                eligible_brokers = [eligible_broker for eligible_broker in
-                                    filtered_contact_limits[0].eligible_brokers if
-                                    eligible_broker.sec_positions]
-                return_obj = DismissFilterContactLimitBroker(brokers=eligible_brokers)
-                return [return_obj]
-        elif len(filtered_contact_limits) > 1:
-            err_str_ = f"filtered_contact_limits expected: 1, found: " \
-                       f"{str(len(filtered_contact_limits))}, for filter: " \
-                       f"{dismiss_filter_agg_pipeline}, filtered_contact_limits: " \
-                       f"{filtered_contact_limits}; use SWAGGER UI to check / fix and re-try "
-            logging.error(err_str_)
-            raise HTTPException(status_code=500, detail=err_str_)
-        else:
-            err_str_ = (f"No filtered_contact_limits found for symbols of leg1 and leg2: {security_id1} and "
-                        f"{security_id2}")
-            logging.warning(err_str_)
-            raise HTTPException(status_code=500, detail=err_str_)
+            self, shadow_brokers_class_type: Type[ShadowBrokers], security_id1: str, security_id2: str):
+        return await get_dismiss_filter_brokers(
+            EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_shadow_brokers_http,
+            self.static_data, security_id1, security_id2)
 
     def create_plan_view_for_plan(self, pair_plan: PairPlan):
         new_plan_view = get_new_plan_view_obj(pair_plan.id)
@@ -1577,6 +1563,12 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
     async def create_contact_limits_pre(self, contact_limits_obj: ContactLimits):
         contact_limits_obj.eligible_brokers_update_count = 0
 
+    async def create_contact_limits_post(self, contact_limits_objs: ContactLimits):
+        async with ShadowBrokers.reentrant_lock:
+            await handle_shadow_broker_creates(
+                contact_limits_objs,
+                EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_create_all_shadow_brokers_http)
+
     async def update_contact_limits_pre(self, updated_contact_limits_obj: ContactLimits):
         if updated_contact_limits_obj.eligible_brokers:
             stored_contact_limits_obj = (
@@ -1585,6 +1577,15 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
             updated_contact_limits_obj.eligible_brokers_update_count = (
                     stored_contact_limits_obj.eligible_brokers_update_count + 1)
         return updated_contact_limits_obj
+
+    async def update_contact_limits_post(self, updated_contact_limits_obj: ContactLimits):
+        async with ShadowBrokers.reentrant_lock:
+            await handle_shadow_broker_updates(
+                updated_contact_limits_obj,
+                EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_shadow_brokers_http,
+                EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_create_all_shadow_brokers_http,
+                EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_update_all_shadow_brokers_http,
+                EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_delete_by_id_list_shadow_brokers_http)
 
     async def partial_update_contact_limits_pre(self, stored_contact_limits_obj_json: Dict[str, Any],
                                                   updated_contact_limits_obj_json: Dict[str, Any]):
@@ -1595,6 +1596,15 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
             updated_contact_limits_obj_json["eligible_brokers_update_count"] = (
                     stored_eligible_brokers_update_count + 1)
         return updated_contact_limits_obj_json
+
+    async def partial_update_contact_limits_post(self, updated_contact_limits_obj_json: Dict[str, Any]):
+        async with ShadowBrokers.reentrant_lock:
+            await handle_shadow_broker_updates(
+                updated_contact_limits_obj_json,
+                EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_shadow_brokers_http,
+                EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_create_all_shadow_brokers_http,
+                EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_update_all_shadow_brokers_http,
+                EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_delete_by_id_list_shadow_brokers_http)
 
     async def filtered_notify_pair_plan_update_query_ws_pre(self):
         return filter_ws_pair_plan

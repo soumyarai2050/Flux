@@ -149,7 +149,7 @@ async def get_consumable_participation_qty_underlying_http(symbol: str, side: Si
         return
 
 
-def get_new_plan_limits(eligible_brokers: List[Broker] | None = None) -> PlanLimits:
+def get_new_plan_limits(eligible_brokers: List[BrokerBaseModel] | None = None) -> PlanLimits:
     # setting waived_min_rolling_notional to 0 disables waived_min_rolling_notional addon from cancel_rate check impl
     cancel_rate: CancelRate = CancelRate(max_cancel_rate=60, applicable_period_seconds=0, waived_initial_chores=5,
                                          waived_min_rolling_notional=0, waived_min_rolling_period_seconds=180)

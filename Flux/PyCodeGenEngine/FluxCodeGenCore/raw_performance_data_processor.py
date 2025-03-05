@@ -9,8 +9,8 @@ from fastapi.encoders import jsonable_encoder
 # project imports
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_aggregate import get_raw_perf_data_callable_names_pipeline, \
     get_raw_performance_data_from_callable_name_agg_pipeline
-from FluxPythonUtils.scripts.utility_functions import (read_mongo_collection_as_dataframe,
-                                                       execute_tasks_list_with_all_completed)
+from FluxPythonUtils.scripts.general_utility_functions import (read_mongo_collection_as_dataframe,
+                                                               execute_tasks_list_with_all_completed)
 from FluxPythonUtils.scripts.model_base_utils import MsgspecBaseModel
 
 

@@ -75,6 +75,38 @@ message ContactLimitsList {
   repeated ContactLimits contact_limits = 1;
 }
 
+message ShadowBrokers{
+  option (FluxMsgJsonRoot) = {
+    CreateOp: AggregateType_UNSPECIFIED,
+    CreateAllOp: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found this cmt can be removed
+    ReadOp: AggregateType_UNSPECIFIED,
+    UpdateOp: AggregateType_UNSPECIFIED,
+    UpdateAllOp: AggregateType_UNSPECIFIED,
+    DeleteOp: AggregateType_UNSPECIFIED,
+    DeleteByIdListOp: AggregateType_UNSPECIFIED,
+    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED,
+  };
+  option (FluxMsgJsonQuery) = {
+    QueryName: "get_dismiss_filter_contact_limit_brokers",
+    QueryParams: {
+      QueryParamName: "security_id1",
+      QueryParamDataType: "str"
+    },
+    QueryParams: {
+      QueryParamName: "security_id2",
+      QueryParamDataType: "str"
+    }
+  };
+  option (FluxMsgStringLength) = 128;
+  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  required bool bkr_disable = 2 [default=false];
+  // per security positions
+  repeated SecPosition sec_positions = 3;
+  // broker identifier
+  required string broker = 4;
+  optional int32 bkr_priority = 5 [default = 10];
+}
+
 message FxSymbolOverview{
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,

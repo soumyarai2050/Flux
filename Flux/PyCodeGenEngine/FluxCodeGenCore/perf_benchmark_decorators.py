@@ -7,7 +7,7 @@ import functools
 from pendulum import DateTime
 
 # project imports
-from FluxPythonUtils.scripts.utility_functions import parse_to_float
+from FluxPythonUtils.scripts.general_utility_functions import parse_to_float
 
 
 def get_timeit_pattern() -> str:

@@ -6,7 +6,7 @@ from threading import Thread
 from Flux.CodeGenProjects.performance_benchmark.generated.FastApi.performance_benchmark_service_routes_msgspec_callback import (
     PerformanceBenchmarkServiceRoutesCallback)
 from Flux.CodeGenProjects.performance_benchmark.app.performance_benchmark_helper import *
-from FluxPythonUtils.scripts.utility_functions import except_n_log_alert, handle_refresh_configurable_data_members
+from FluxPythonUtils.scripts.general_utility_functions import except_n_log_alert, handle_refresh_configurable_data_members
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_aggregate import get_raw_performance_data_from_callable_name_agg_pipeline
 
 

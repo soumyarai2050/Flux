@@ -8,7 +8,7 @@ from pathlib import PurePath
 home_dir_path = PurePath(__file__).parent.parent.parent.parent
 sys.path.append(str(home_dir_path))
 from Flux.code_gen_engine_env import CodeGenEngineEnvManager
-from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager
+from FluxPythonUtils.scripts.file_n_general_utility_functions import YAMLConfigurationManager
 from Flux.PyCodeGenEngine.FluxCodeGenCore.execute import Execute
 
 code_gen_engine_env_manager = CodeGenEngineEnvManager.get_instance()

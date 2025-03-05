@@ -9,7 +9,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_ser
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.ORMModel.photo_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.markets.market import Market, MarketID
-from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager, add_logging_levels
+from FluxPythonUtils.scripts.general_utility_functions import YAMLConfigurationManager, add_logging_levels
 
 PAIR_STRAT_ENGINE_DATA_DIR: PurePath = PAIR_STRAT_ENGINE_DIR / "data"
 PAIR_STRAT_ENGINE_LOG_DIR: PurePath = PAIR_STRAT_ENGINE_DIR / "log"

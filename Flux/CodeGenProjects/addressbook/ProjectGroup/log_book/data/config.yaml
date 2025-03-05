@@ -35,8 +35,8 @@ raw_perf_data_config:
   transaction_counts_per_call_for_server: 500
   transaction_counts_per_call_for_tail_ex: 200
   transaction_timeout_secs: 60  # secs
-max_fetch_from_patch_queue_for_tail_ex: 25
-max_fetch_from_patch_queue_for_server: 50
+max_fetch_from_patch_queue_for_tail_ex: 50
+max_fetch_from_patch_queue_for_server: 500
 # to be used in loop wait in script to update performance analysis data
 raw_performance_data_processor_loop_wait: 2  # sec
 

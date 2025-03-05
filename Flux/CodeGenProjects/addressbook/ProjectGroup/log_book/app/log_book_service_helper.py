@@ -1,3 +1,12 @@
+# project imports
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.ORMModel.photo_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.ORMModel.log_book_service_model_imports import *
+from FluxPythonUtils.scripts.general_utility_functions import (
+    YAMLConfigurationManager, parse_to_int)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.FastApi.log_book_service_http_client import (
+    LogBookServiceHttpClient)
+
 # standard imports
 import datetime
 import logging
@@ -6,15 +15,6 @@ import queue
 from threading import Thread, current_thread
 import re
 import threading
-
-# project imports
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.ORMModel.photo_book_service_model_imports import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.ORMModel.log_book_service_model_imports import *
-from FluxPythonUtils.scripts.utility_functions import (
-    YAMLConfigurationManager, parse_to_int)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.FastApi.log_book_service_http_client import (
-    LogBookServiceHttpClient)
 
 CURRENT_PROJECT_DIR = PurePath(__file__).parent.parent
 CURRENT_PROJECT_DATA_DIR = PurePath(__file__).parent.parent / 'data'
@@ -189,7 +189,7 @@ def should_retry_due_to_server_down(exception: Exception) -> bool:
 
 
 def get_update_obj_list_for_journal_type_update(
-        basemodel_class_type: Type[BaseModel], update_type: str, method_name: str, patch_queue: queue.Queue,
+        basemodel_class_type: Type[MsgspecBaseModel], update_type: str, method_name: str, patch_queue: queue.Queue,
         max_fetch_from_queue: int, update_dict_list: List[MsgspecModel | Dict],
         parse_to_model: bool | None = None) -> List[Dict] | str:  # blocking function
     fetch_counts: int = 0
@@ -382,7 +382,7 @@ def handle_dynamic_queue_for_patch_n_patch_all(basemodel_type: str, method_name:
                                                snapshot_type_callable_err_handler: Callable,
                                                parse_to_model: bool | None = None):
     try:
-        basemodel_class_type: Type[BaseModel] = eval(basemodel_type)
+        basemodel_class_type: Type[MsgspecBaseModel] = eval(basemodel_type)
 
         pending_updates = []
         while 1:

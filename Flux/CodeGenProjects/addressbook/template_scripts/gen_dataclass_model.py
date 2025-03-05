@@ -7,7 +7,7 @@ home_dir_path = PurePath(__file__).parent.parent.parent.parent.parent
 sys.path.append(str(home_dir_path))
 from Flux.PyCodeGenEngine.FluxCodeGenCore.plugin_execute_script import PluginExecuteScript
 from Flux.CodeGenProjects.AddressBook.bartering_gen_engine_env import BarteringGenEngineEnv
-from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager
+from FluxPythonUtils.scripts.file_n_general_utility_functions import YAMLConfigurationManager
 
 
 if __name__ == "__main__":

@@ -10,7 +10,7 @@ if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and \
 
 import protogen
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import BaseProtoPlugin, main
-from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case
+from FluxPythonUtils.scripts.file_n_general_utility_functions import convert_camel_case_to_specific_case
 
 
 class CppBuildAndRunTestPlugin(BaseProtoPlugin):

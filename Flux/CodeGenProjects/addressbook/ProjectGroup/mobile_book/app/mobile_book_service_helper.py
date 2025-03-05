@@ -2,7 +2,7 @@
 from pathlib import PurePath
 
 # project imports
-from FluxPythonUtils.scripts.utility_functions import (
+from FluxPythonUtils.scripts.general_utility_functions import (
     YAMLConfigurationManager, parse_to_int)
 
 

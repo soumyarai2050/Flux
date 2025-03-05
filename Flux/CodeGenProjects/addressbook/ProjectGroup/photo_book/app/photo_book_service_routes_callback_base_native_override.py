@@ -9,7 +9,7 @@ import subprocess
 import re
 
 # project imports
-from FluxPythonUtils.scripts.utility_functions import (
+from FluxPythonUtils.scripts.general_utility_functions import (
     except_n_log_alert, submitted_task_result, submit_task_with_first_completed_wait,
     handle_refresh_configurable_data_members)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.FastApi.photo_book_service_routes_msgspec_callback import PhotoBookServiceRoutesCallback
@@ -191,10 +191,10 @@ class PhotoBookServiceRoutesCallbackBaseNativeOverride(PhotoBookServiceRoutesCal
 
         err_str_brief = (f"handle_dynamic_queue_for_patch running for basemodel_type: "
                          f"{basemodel_type} and update_type: {update_type} failed")
-        err_str_detail = f"exception: {err_obj}"
+        err_str_detail = f"exception: {err_obj}, {pending_updates=}"
         logging.exception(f"{err_str_brief};;; {err_str_detail}")
 
-    def _snapshot_type_callable_err_handler(self, basemodel_class_type: Type[BaseModel], kwargs):
+    def _snapshot_type_callable_err_handler(self, basemodel_class_type: Type[MsgspecBaseModel], kwargs):
         err_str_brief = ("Can't find _id key in patch kwargs dict - ignoring this update in "
                          "get_update_obj_for_snapshot_type_update, "
                          f"basemodel_class_type: {basemodel_class_type.__name__}, "

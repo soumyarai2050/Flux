@@ -28,7 +28,7 @@ from beanie.odm.operators.update.general import Set as BeanieSet
 from Flux.PyCodeGenEngine.FluxCodeGenCore.default_web_response import DefaultPydanticWebResponse
 from Flux.PyCodeGenEngine.FluxCodeGenCore.ws_connection_manager import WSData
 from FluxPythonUtils.scripts.http_except_n_log_error import http_except_n_log_error
-from FluxPythonUtils.scripts.utility_functions import compare_n_patch_dict, \
+from FluxPythonUtils.scripts.general_utility_functions import compare_n_patch_dict, \
     compare_n_patch_list, execute_tasks_list_with_all_completed, handle_ws, parse_to_int, YAMLConfigurationManager
 from Flux.PyCodeGenEngine.FluxCodeGenCore.generic_route_utils import get_aggregate_pipeline, generic_perf_benchmark
 

@@ -15,7 +15,7 @@ from fastapi.encoders import jsonable_encoder
 # project imports
 from FluxPythonUtils.scripts.ws_reader_lite import WSReaderLite
 from FluxPythonUtils.scripts.async_rlock import AsyncRLock
-from FluxPythonUtils.scripts.utility_functions import execute_tasks_list_with_all_completed
+from FluxPythonUtils.scripts.general_utility_functions import execute_tasks_list_with_all_completed
 from Flux.PyCodeGenEngine.FluxCodeGenCore.ws_connection_manager import PathWSConnectionManager
 
 

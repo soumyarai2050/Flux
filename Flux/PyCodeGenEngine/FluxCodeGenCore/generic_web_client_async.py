@@ -14,7 +14,7 @@ import urllib.parse
 
 # project imports
 from Flux.PyCodeGenEngine.FluxCodeGenCore.httpx_client import default_httpx_client as requests
-from FluxPythonUtils.scripts.utility_functions import (
+from FluxPythonUtils.scripts.general_utility_functions import (
     log_n_except, http_response_as_class_type, HTTPRequestType, ClientError, http_response_as_json)
 
 if (model_type := os.getenv("ModelType")) is None or len(model_type) == 0:

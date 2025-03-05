@@ -17,7 +17,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.generated.FastApi.p
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.app.post_book_service_helper import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     email_book_service_http_client)
-from FluxPythonUtils.scripts.utility_functions import except_n_log_alert, handle_refresh_configurable_data_members
+from FluxPythonUtils.scripts.general_utility_functions import except_n_log_alert, handle_refresh_configurable_data_members
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.app.aggregate import (
     get_open_chore_counts, get_last_n_sec_chores_by_events)
 

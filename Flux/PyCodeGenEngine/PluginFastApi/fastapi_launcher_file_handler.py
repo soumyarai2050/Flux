@@ -5,13 +5,13 @@ from abc import ABC
 import protogen
 
 # project imports
-from FluxPythonUtils.scripts.utility_functions import parse_to_int
+from FluxPythonUtils.scripts.general_utility_functions import parse_to_int
 
 if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug_sleep_time):
     time.sleep(parse_to_int(debug_sleep_time))
 # else not required: Avoid if env var is not set or if value cant be type-cased to int
 
-from FluxPythonUtils.scripts.utility_functions import convert_to_capitalized_camel_case
+from FluxPythonUtils.scripts.general_utility_functions import convert_to_capitalized_camel_case
 from Flux.PyCodeGenEngine.PluginFastApi.base_fastapi_plugin import BaseFastapiPlugin
 
 
@@ -52,7 +52,7 @@ class FastapiLauncherFileHandler(BaseFastapiPlugin, ABC):
         output_str += "import logging\n"
         output_str += "import sys\n"
         output_str += "from pathlib import PurePath\n"
-        output_str += (f"from FluxPythonUtils.scripts.utility_functions import configure_logger, add_logging_levels, "
+        output_str += (f"from FluxPythonUtils.scripts.general_utility_functions import configure_logger, add_logging_levels, "
                        f"parse_to_int, YAMLConfigurationManager\n\n")
         output_str += f'config_yaml_path = PurePath(__file__).parent.parent.parent / "data" / f"config.yaml"\n'
         output_str += f'config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(config_yaml_path))\n'

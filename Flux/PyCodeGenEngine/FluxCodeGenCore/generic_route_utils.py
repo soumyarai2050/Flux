@@ -7,7 +7,7 @@ import os
 import logging
 
 # project imports
-from FluxPythonUtils.scripts.utility_functions import parse_to_int, parse_to_float
+from FluxPythonUtils.scripts.general_utility_functions import parse_to_int, parse_to_float
 from Flux.PyCodeGenEngine.FluxCodeGenCore.perf_benchmark_decorators import get_time_it_log_pattern
 
 log_generic_timings = parse_to_int(log_generic_timings_env_var) \

@@ -12,7 +12,7 @@ import pendulum
 # Project imports
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.markets.market import Market, MarketID
 from FluxPythonUtils.log_book.log_book import LogDetail, get_transaction_counts_n_timeout_from_config
-from FluxPythonUtils.scripts.utility_functions import get_last_log_line_date_time, parse_to_float, is_file_modified
+from FluxPythonUtils.scripts.general_utility_functions import get_last_log_line_date_time, parse_to_float, is_file_modified
 from Flux.PyCodeGenEngine.FluxCodeGenCore.app_log_book import AppLogBook
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_client import (
     StreetBookServiceHttpClient)
@@ -233,7 +233,7 @@ class PhoneBookBaseLogBook(AppLogBook):
                 self.send_contact_alerts(severity=self.get_severity("error"), alert_brief=err_str_brief,
                                            alert_meta=alert_meta)
 
-    def _snapshot_type_callable_err_handler(self, model_basemodel_class_type: Type[BaseModel], kwargs):
+    def _snapshot_type_callable_err_handler(self, model_basemodel_class_type: Type[MsgspecBaseModel], kwargs):
         err_str_brief = ("Can't find _id key in patch kwargs dict - ignoring this update in "
                          "get_update_obj_for_snapshot_type_update, "
                          f"model_basemodel_class_type: {model_basemodel_class_type.__name__}, "
@@ -258,7 +258,7 @@ class PhoneBookBaseLogBook(AppLogBook):
                                    alert_meta=alert_meta)
 
     def _get_update_obj_list_for_journal_type_update(
-            self, basemodel_class_type: Type[BaseModel], update_type: str, method_name: str,
+            self, basemodel_class_type: Type[MsgspecBaseModel], update_type: str, method_name: str,
             patch_queue: Queue, max_fetch_from_queue: int, update_json_list: List[MsgspecModel | Dict],
             parse_to_model: bool | None = None):
         # blocking function

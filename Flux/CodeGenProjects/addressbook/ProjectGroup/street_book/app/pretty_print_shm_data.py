@@ -9,7 +9,7 @@ from pathlib import PurePath
 
 # project imports
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.mobile_book_structures import *
-from FluxPythonUtils.scripts.utility_functions import configure_logger
+from FluxPythonUtils.scripts.general_utility_functions import configure_logger
 
 total_char_count_per_pretty_int = 10
 total_char_count_per_pretty_datetime = 35

@@ -11,7 +11,7 @@ from ibapi.ticktype import TickTypeEnum, TickType
 
 # Local project imports
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.app.ib_api_client import IbApiClient
-from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager, configure_logger
+from FluxPythonUtils.scripts.general_utility_functions import YAMLConfigurationManager, configure_logger
 
 os.environ["DBType"] = "beanie"
 from Flux.CodeGenProjects.mobile_book.generated.mobile_book_service_web_client import MobileBookServiceWebClient

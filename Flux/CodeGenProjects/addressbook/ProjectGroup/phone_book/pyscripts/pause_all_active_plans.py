@@ -1,7 +1,7 @@
 import logging
 import datetime
 
-from FluxPythonUtils.scripts.utility_functions import configure_logger
+from FluxPythonUtils.scripts.general_utility_functions import configure_logger
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.pyscripts.utility_functions import *
 
 

@@ -9,7 +9,7 @@ from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_post_book_n_basket_
 from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_post_book_n_basket_book_core_msgspec_model import ChoreStatusType
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecordManager, SecurityRecord
 from Flux.CodeGenProjects.AddressBook.ORMModel.dept_book_n_mobile_book_n_street_book_n_basket_book_core_msgspec_model import *
-from FluxPythonUtils.scripts.utility_functions import parse_to_int
+from FluxPythonUtils.scripts.general_utility_functions import parse_to_int
 
 
 def chore_has_terminal_state(chore_snapshot: ChoreSnapshot) -> bool:

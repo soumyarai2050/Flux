@@ -10,7 +10,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.generated.ORMModel.
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import (
     get_symbol_side_key)
 from Flux.CodeGenProjects.AddressBook.ORMModel.barter_core_msgspec_model import InstrumentType
-from FluxPythonUtils.scripts.utility_functions import float_str
+from FluxPythonUtils.scripts.general_utility_functions import float_str
 from FluxPythonUtils.scripts.model_base_utils import MsgspecBaseModel
 
 

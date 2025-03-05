@@ -8,14 +8,14 @@ from typing import List, Tuple, Dict
 from pathlib import PurePath
 
 # project imports
-from FluxPythonUtils.scripts.utility_functions import parse_to_int
+from FluxPythonUtils.scripts.general_utility_functions import parse_to_int
 
 if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug_sleep_time):
     time.sleep(parse_to_int(debug_sleep_time))
 # else not required: Avoid if env var is not set or if value cant be type-cased to int
 
 import protogen
-from FluxPythonUtils.scripts.utility_functions import convert_camel_case_to_specific_case
+from FluxPythonUtils.scripts.file_n_general_utility_functions import convert_camel_case_to_specific_case
 from Flux.PyCodeGenEngine.PluginFastApi.base_fastapi_plugin import BaseFastapiPlugin, ModelType
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import (
     project_dir, root_core_proto_files, project_grp_core_proto_files)

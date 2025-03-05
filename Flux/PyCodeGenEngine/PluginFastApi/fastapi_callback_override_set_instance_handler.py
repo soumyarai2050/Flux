@@ -6,13 +6,13 @@ from pathlib import PurePath
 from typing import List
 
 # project imports
-from FluxPythonUtils.scripts.utility_functions import parse_to_int
+from FluxPythonUtils.scripts.general_utility_functions import parse_to_int
 
 if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug_sleep_time):
     time.sleep(parse_to_int(debug_sleep_time))
 # else not required: Avoid if env var is not set or if value cant be type-cased to int
 
-from FluxPythonUtils.scripts.utility_functions import convert_to_capitalized_camel_case
+from FluxPythonUtils.scripts.general_utility_functions import convert_to_capitalized_camel_case
 from Flux.PyCodeGenEngine.PluginFastApi.base_fastapi_plugin import BaseFastapiPlugin
 
 
@@ -36,7 +36,7 @@ class FastapiCallbackOverrideSetInstanceHandler(BaseFastapiPlugin, ABC):
         output_str += "# project imports\n"
         callback_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", f"{self.routes_callback_file_name}")
         output_str += f"from {callback_file_path} import {self.routes_callback_class_name}\n"
-        output_str += f"from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager\n\n\n"
+        output_str += f"from FluxPythonUtils.scripts.general_utility_functions import YAMLConfigurationManager\n\n\n"
         output_str += 'config_yaml_path = PurePath(__file__).parent.parent.parent / "data" / f"config.yaml"\n'
         output_str += 'if os.path.exists(config_yaml_path):\n'
         output_str += '    config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(config_yaml_path))\n'

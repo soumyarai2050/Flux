@@ -4,6 +4,7 @@ import pendulum
 import pytest
 import os
 import copy
+import polars
 
 os.environ["ModelType"] = "msgspec"
 
@@ -11,7 +12,7 @@ os.environ["ModelType"] = "msgspec"
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.ORMModel.street_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.ORMModel.log_book_service_model_imports import *
-from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager
+from FluxPythonUtils.scripts.file_n_general_utility_functions import YAMLConfigurationManager
 from tests.CodeGenProjects.AddressBook.ProjectGroup.conftest import *
 
 TRADING_ACCOUNT: Final[str] = "TRADING_ACCOUNT_ZERODHA_BKR"
@@ -492,3 +493,21 @@ def get_missing_id_json():
 
     sample_json = sample.to_dict()
     yield sample_json, SampleBaseModel
+
+@pytest.fixture
+def sample_quote_df():
+    return polars.DataFrame({
+        'px': [100.5],
+        'qty': [1000],
+        'premium': [0.5],
+        'last_update_date_time': [pendulum.now('UTC')]
+    })
+
+@pytest.fixture
+def sample_top_of_book_df():
+    return polars.DataFrame({
+        'id': [1],
+        'symbol': ['AAPL'],
+        'total_bartering_security_size': [10000],
+        'last_update_date_time': [pendulum.now('UTC')]
+    })

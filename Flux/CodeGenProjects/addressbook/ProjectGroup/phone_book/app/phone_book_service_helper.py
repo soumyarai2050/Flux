@@ -15,7 +15,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.
     EmailBookServiceHttpClient)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import (
     get_field_seperator_pattern, get_key_val_seperator_pattern, get_pattern_for_pair_plan_db_updates, UpdateType)
-from FluxPythonUtils.scripts.utility_functions import (
+from FluxPythonUtils.scripts.general_utility_functions import (
     YAMLConfigurationManager, except_n_log_alert, parse_to_int)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.ORMModel.photo_book_service_model_imports import (
     PlanViewBaseModel)
@@ -444,7 +444,7 @@ def guaranteed_call_pair_plan_client(basemodel_type: MsgspecModel | None, client
         logging.db(log_str)
 
 
-class MDShellEnvData(BaseModel):
+class MDShellEnvData(MsgspecBaseModel, kw_only=True):
     subscription_data: List[Tuple[str, str]] | None = None
     host: str
     port: int
@@ -587,6 +587,90 @@ def get_internal_web_client():
     else:
         web_client = email_book_service_http_client
     return web_client
+
+
+async def get_dismiss_filter_brokers(underlying_http_callable, static_data, security_id1: str, security_id2: str):
+    ric1, ric2 = static_data.get_connect_n_qfii_rics_from_ticker(security_id1)
+    ric3, ric4 = static_data.get_connect_n_qfii_rics_from_ticker(security_id2)
+    sedol = static_data.get_sedol_from_ticker(security_id1)
+    # get security name from : pair_plan_params.plan_legs and then redact pattern
+    # security.sec_id (a pattern in positions) where there is a value match
+    dismiss_filter_agg_pipeline = {'redact': [("security.sec_id", ric1, ric2, ric3, ric4, sedol)]}
+    filtered_brokers: List[ShadowBrokers] = await underlying_http_callable(dismiss_filter_agg_pipeline)
+
+    eligible_brokers = []
+    for broker in filtered_brokers:
+        if broker.sec_positions:
+            eligible_brokers.append(broker)
+    return eligible_brokers
+
+
+async def handle_shadow_broker_creates(contact_limits_objs: ContactLimits,
+                                       underlying_create_all_shadow_brokers_http):
+    broker_list: List[ShadowBrokers] = []
+    for eligible_broker in contact_limits_objs.eligible_brokers:
+        broker_dict = eligible_broker.to_dict()
+        del broker_dict["_id"]
+        broker_list.append(ShadowBrokers.from_dict(broker_dict))
+
+    if broker_list:
+        await underlying_create_all_shadow_brokers_http(broker_list)
+
+
+async def handle_shadow_broker_updates(
+        updated_contact_limits_obj: ContactLimits | Dict,
+        underlying_read_shadow_brokers_http, underlying_create_all_shadow_brokers_http,
+        underlying_update_all_shadow_brokers_http, underlying_delete_by_id_list_shadow_brokers_http):
+    create_broker_list: List[ShadowBrokers] = []
+    update_broker_list: List[ShadowBrokers] = []
+
+    shadow_brokers: List[ShadowBrokers] = await underlying_read_shadow_brokers_http()
+    shadow_broker_name_to_obj_dict = {}
+    shadow_broker_names_list = []
+    for shadow_brokers_obj in shadow_brokers:
+        shadow_broker_name_to_obj_dict[shadow_brokers_obj.broker] = shadow_brokers_obj
+        shadow_broker_names_list.append(shadow_brokers_obj.broker)
+
+    if isinstance(updated_contact_limits_obj, dict):
+        for eligible_broker in updated_contact_limits_obj.get("eligible_brokers"):
+            del eligible_broker["_id"]
+            if (broker_name := eligible_broker.get("broker")) in shadow_broker_name_to_obj_dict:
+                eligible_broker["_id"] = shadow_brokers[0].id
+                update_broker_list.append(ShadowBrokers.from_dict(eligible_broker))
+
+                # removing broker which exists
+                shadow_broker_names_list.remove(broker_name)
+            else:
+                # since this broker doesn't exist in db - creating it in shadow_brokers
+                create_broker_list.append(ShadowBrokers.from_dict(eligible_broker))
+    else:
+        for eligible_broker in updated_contact_limits_obj.eligible_brokers:
+            broker_dict = eligible_broker.to_dict()
+            del broker_dict["_id"]
+            if (broker_name := eligible_broker.broker) in shadow_broker_name_to_obj_dict:
+                broker_dict["_id"] = shadow_brokers[0].id
+                update_broker_list.append(ShadowBrokers.from_dict(broker_dict))
+
+                # removing broker which exists
+                shadow_broker_names_list.remove(broker_name)
+            else:
+                # since this broker doesn't exist in db - creating it in shadow_brokers
+                create_broker_list.append(ShadowBrokers.from_dict(broker_dict))
+
+    if create_broker_list:
+        await underlying_create_all_shadow_brokers_http(create_broker_list)
+    if update_broker_list:
+        await underlying_update_all_shadow_brokers_http(update_broker_list)
+
+    # if shadow_broker_names_list still have any value left after full contact_limits' brokers loop then
+    # it must have been removed - removing it from shadow brokers also
+    delete_id_list = []
+    for broker_name in shadow_broker_names_list:
+        shadow_brokers_obj = shadow_broker_name_to_obj_dict.get(broker_name)
+        delete_id_list.append(shadow_brokers_obj.id)
+
+    if delete_id_list:
+        await underlying_delete_by_id_list_shadow_brokers_http(delete_id_list)
 
 
 def update_ticker_to_positions_list(ticker: str, position: Position,

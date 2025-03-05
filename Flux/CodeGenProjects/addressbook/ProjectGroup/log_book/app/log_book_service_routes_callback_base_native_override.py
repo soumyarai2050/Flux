@@ -22,7 +22,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     UpdateType, email_book_service_http_client)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.aggregate import *
-from FluxPythonUtils.scripts.utility_functions import (
+from FluxPythonUtils.scripts.general_utility_functions import (
     except_n_log_alert, create_logger, submitted_task_result, handle_refresh_configurable_data_members,
     get_pid_from_port, is_process_running)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_helper import (

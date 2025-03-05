@@ -13,14 +13,14 @@ import protogen
 from fastapi_restful.enums import StrEnum
 
 # project imports
-from FluxPythonUtils.scripts.utility_functions import parse_to_int, YAMLConfigurationManager
+from FluxPythonUtils.scripts.general_utility_functions import parse_to_int, YAMLConfigurationManager
 if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug_sleep_time):
     time.sleep(parse_to_int(debug_sleep_time))
 # else not required: Avoid if env var is not set or if value cant be type-cased to int
 
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_proto_plugin import (
     BaseProtoPlugin, main, project_dir, root_core_proto_files, project_grp_core_proto_files)
-from FluxPythonUtils.scripts.utility_functions import convert_to_capitalized_camel_case
+from FluxPythonUtils.scripts.general_utility_functions import convert_to_capitalized_camel_case
 
 
 class IdType(StrEnum):

@@ -30,7 +30,7 @@ def generate_log_entry(is_error: bool) -> str:
     timestamp = current_utc_time.strftime("%Y-%m-%d %H:%M:%S") + f",{current_utc_time.microsecond // 1000:03d}"
 
     log_level = random.choice(['ERROR'])
-    file_name = "utility_functions.py"
+    file_name = "general_utility_functions.py"
     line_number = random.randint(1, 300)
     severity = random.choice(['Severity_CRITICAL', 'Severity_ERROR', 'Severity_WARNING', 'Severity_INFO',
                               'Severity_DEBUG'])
@@ -46,13 +46,13 @@ def generate_log_entry(is_error: bool) -> str:
                          f"HTTPConnection object at 0x7f1849013460>: Failed to establish a new connection: "
                          f"[Errno 111] Connection refused'))")
 
-        log_entry = (f"{timestamp} : {log_level} : [utility_functions.py : {line_number}] : "
+        log_entry = (f"{timestamp} : {log_level} : [general_utility_functions.py : {line_number}] : "
                      f"Client Error Occurred in function: generic_http_get_all_client;;;args: "
                      f"('{host}:{port}{url}', <class 'Flux.CodeGenProjects.street_book.generated.ORMModel."
                      f"street_book_service_beanie_model.UILayoutBaseModel'>, None), kwargs: {{}}, "
                      f"exception: {exception_msg}")
     else:
-        log_entry = (f"{timestamp} : {log_level} : [utility_functions.py : {line_number}] : sending alert with severity: "
+        log_entry = (f"{timestamp} : {log_level} : [general_utility_functions.py : {line_number}] : sending alert with severity: "
                      f"{severity}, alert_brief: {alert_brief}, {alert_details}")
 
     return log_entry
@@ -177,7 +177,7 @@ def test_plan_alert(clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_, exp
 
     pair_start_engine_log_file: str = str(PAIR_STRAT_ENGINE_LOG / pair_start_log_file_name)
     # Generate a list of log entries
-    file_name: str = "utility_functions.py : 6"
+    file_name: str = "general_utility_functions.py : 6"
     alert: str = ("blocked generated BUY chore, chore px: 115.0 > allowed max_px 9.5, symbol_side_key: "
                   "%%symbol-side=Type2_Sec_1-BUY%%")
     log_entries = [generate_log(Severity.Severity_ERROR, file_name, alert)]
@@ -249,22 +249,22 @@ def test_plan_alert_patch_all(clean_and_set_limits, leg1_leg2_symbol_list, pair_
     log_entries: List[str] = []
 
     # Generate a list of log entries
-    file_name: str = "utility_functions.py : 6"
+    file_name: str = "general_utility_functions.py : 6"
     alert: str = ("blocked generated BUY chore, chore px: 115.0 > allowed max_px 9.5, symbol_side_key: "
                   "%%symbol-side=Type2_Sec_1-BUY%%")
     log_entries.append(generate_log(Severity.Severity_ERROR, file_name, alert))
 
-    file_name: str = "utility_functions.py : 102"
+    file_name: str = "general_utility_functions.py : 102"
     alert: str = ("blocked generated BUY chore, chore px: 120.0 > allowed max_px 0.5, symbol_side_key: "
                   "%%symbol-side=Type1_Sec_1-BUY%%")
     log_entries.append(generate_log(Severity.Severity_ERROR, file_name, alert))
 
-    file_name: str = "utility_functions.py : 271"
+    file_name: str = "general_utility_functions.py : 271"
     alert: str = ("blocked generated BUY chore, chore px: 15.0 > allowed max_px 4.5, symbol_side_key: "
                   "%%symbol-side=EQT_Leg_1-BUY%%")
     log_entries.append(generate_log(Severity.Severity_ERROR, file_name, alert))
 
-    file_name: str = "utility_functions.py : 71"
+    file_name: str = "general_utility_functions.py : 71"
     alert: str = ("blocked generated BUY chore, chore px: 15.0 > allowed max_px 4.5, symbol_side_key: "
                   "%%symbol-side=EQT_Leg_1-SELL%%")
     log_entries.append(generate_log(Severity.Severity_ERROR, file_name, alert))

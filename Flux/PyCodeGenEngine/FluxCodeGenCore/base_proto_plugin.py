@@ -15,8 +15,9 @@ import protogen
 # project imports
 from Flux.PyCodeGenEngine.FluxCodeGenCore.extended_protogen_plugin import ExtendedProtogenPlugin
 from Flux.PyCodeGenEngine.FluxCodeGenCore.extended_protogen_options import ExtendedProtogenOptions
-from FluxPythonUtils.scripts.utility_functions import (
-    parse_to_int, parse_to_float, convert_camel_case_to_specific_case, YAMLConfigurationManager)
+from FluxPythonUtils.scripts.general_utility_functions import (
+    parse_to_int, parse_to_float)
+from FluxPythonUtils.scripts.file_n_general_utility_functions import convert_camel_case_to_specific_case, YAMLConfigurationManager
 
 # Required for accessing custom options from schema
 from Flux.PyCodeGenEngine.FluxCodeGenCore import insertion_imports

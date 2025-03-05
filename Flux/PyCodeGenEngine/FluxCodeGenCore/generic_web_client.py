@@ -17,7 +17,7 @@ import urllib.parse
 import polars as pl
 
 # project imports
-from FluxPythonUtils.scripts.utility_functions import (
+from FluxPythonUtils.scripts.general_utility_functions import (
     log_n_except, http_response_as_class_type, HTTPRequestType, ClientError, http_response_as_df, http_response_as_json)
 from FluxPythonUtils.scripts.model_base_utils import MsgspecBaseModel
 

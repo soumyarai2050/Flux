@@ -1,6 +1,6 @@
 # project imports
-from ProjectGroup.dept_book.app.yahoo_finance_base import *
-from FluxPythonUtils.scripts.utility_functions import configure_logger, read_mongo_collection_as_dataframe
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.app.yahoo_finance_base import *
+from FluxPythonUtils.scripts.general_utility_functions import configure_logger, read_mongo_collection_as_dataframe
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.app.aggregate import get_bar_data_from_symbol_n_start_n_end_datetime
 
 

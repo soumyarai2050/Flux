@@ -6,7 +6,7 @@ from datetime import datetime
 home_dir_path = PurePath(__file__).parent.parent.parent.parent.parent
 sys.path.append(str(home_dir_path))
 from Flux.code_gen_engine_env import CodeGenEngineEnvManager
-from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager, parse_to_int
+from FluxPythonUtils.scripts.general_utility_functions import YAMLConfigurationManager, parse_to_int
 
 
 if __name__ == "__main__":

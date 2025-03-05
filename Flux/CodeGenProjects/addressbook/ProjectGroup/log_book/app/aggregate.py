@@ -5,7 +5,7 @@ import os
 # project imports
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.ORMModel.log_book_service_model_imports import (
     ContactAlertBaseModel, PlanAlertBaseModel, Severity)
-from FluxPythonUtils.scripts.utility_functions import get_version_from_mongodb_uri
+from FluxPythonUtils.scripts.general_utility_functions import get_version_from_mongodb_uri
 from FluxPythonUtils.scripts.model_base_utils import MsgspecBaseModel
 # Below unused import is used by generated beanie file
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_aggregate import *

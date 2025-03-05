@@ -34,7 +34,6 @@ from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_basket_book_core_ms
 from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_post_book_core_msgspec_model import *
 from Flux.CodeGenProjects.AddressBook.ORMModel.phone_book_n_street_book_core_msgspec_model import *
 from Flux.CodeGenProjects.AddressBook.ORMModel.dept_book_n_mobile_book_n_street_book_n_basket_book_core_msgspec_model import *
-from Flux.CodeGenProjects.AddressBook.ORMModel.mobile_book_n_street_book_n_basket_book_core_msgspec_model import *
 
 
 class BasketBook(BaseBook):
@@ -235,8 +234,8 @@ class BasketBook(BaseBook):
         db_name: str = "basket_book"
         exch_code = "SS" if exch_id == "SSE" else "SZ"
         md_shell_env_data: MDShellEnvData = (
-            MDShellEnvData(subscription_data=subscription_data, host=be_host, port=be_port, db_name=db_name,
-                           exch_code=exch_code, project_name="basket_book"))
+            MDShellEnvData.from_kwargs(subscription_data=subscription_data, host=be_host, port=be_port, db_name=db_name,
+                                       exch_code=exch_code, project_name="basket_book"))
         mode = "SO_CONTINUE" if continue_mode else "SO"
         create_md_shell_script(md_shell_env_data, run_symbol_overview_file_path, mode, instance_id=sec_id)
         os.chmod(run_symbol_overview_file_path, stat.S_IRWXU)

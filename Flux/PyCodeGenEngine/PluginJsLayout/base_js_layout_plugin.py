@@ -5,8 +5,8 @@ from typing import List, Callable, Dict
 import protogen
 from pathlib import PurePath
 from abc import ABC
-from FluxPythonUtils.scripts.utility_functions import (convert_camel_case_to_specific_case, convert_to_camel_case,
-                                                       YAMLConfigurationManager)
+from FluxPythonUtils.scripts.general_utility_functions import convert_to_camel_case
+from FluxPythonUtils.scripts.file_n_general_utility_functions import YAMLConfigurationManager, convert_camel_case_to_specific_case
 from Flux.PyCodeGenEngine.FluxCodeGenCore.plugin_utils import selective_message_per_project_env_var_val_to_dict
 
 # below main is imported to be accessible to derived classes

@@ -24,7 +24,6 @@ from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_basket_book_core_ms
 from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_post_book_core_msgspec_model import *
 from Flux.CodeGenProjects.AddressBook.ORMModel.phone_book_n_street_book_core_msgspec_model import *
 from Flux.CodeGenProjects.AddressBook.ORMModel.dept_book_n_mobile_book_n_street_book_n_basket_book_core_msgspec_model import *
-from Flux.CodeGenProjects.AddressBook.ORMModel.mobile_book_n_street_book_n_basket_book_core_msgspec_model import *
 
 
 class BasketBarteringDataManager(BaseBarteringDataManager, BasketBookServiceDataManager, EmailBookServiceDataManager):

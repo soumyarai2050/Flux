@@ -6,7 +6,7 @@ from pathlib import PurePath
 
 from fastapi_restful.enums import StrEnum
 
-from FluxPythonUtils.scripts.utility_functions import dict_or_list_records_csv_reader
+from FluxPythonUtils.scripts.file_utility_functions import dict_or_list_records_csv_reader
 from FluxPythonUtils.scripts.model_base_utils import MsgspecBaseModel
 
 STATIC_DATA_DIR = (

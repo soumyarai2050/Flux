@@ -6,7 +6,7 @@ import logging
 from pathlib import PurePath
 
 # project imports
-from FluxPythonUtils.scripts.utility_functions import parse_to_int
+from FluxPythonUtils.scripts.general_utility_functions import parse_to_int
 
 if (debug_sleep_time := os.getenv("DEBUG_SLEEP_TIME")) is not None and len(debug_sleep_time):
     time.sleep(parse_to_int(debug_sleep_time))
@@ -24,7 +24,7 @@ from Flux.PyCodeGenEngine.PluginFastApi.fastapi_http_client_file_handler import 
 from Flux.PyCodeGenEngine.PluginFastApi.fastapi_ws_client_file_handler import FastapiWSClientFileHandler
 from Flux.PyCodeGenEngine.PluginFastApi.fastapi_ui_proxy_config_handler import FastapiUIProxyConfigHandler
 from Flux.PyCodeGenEngine.PluginFastApi.base_fastapi_plugin import main
-from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager
+from FluxPythonUtils.scripts.file_n_general_utility_functions import YAMLConfigurationManager
 
 
 root_flux_core_config_yaml_path = PurePath(__file__).parent.parent.parent / "flux_core.yaml"
@@ -217,7 +217,7 @@ class DataClassFastApiPlugin(FastapiCallbackFileHandler,
         output_str += "from pathlib import PurePath\n"
         output_str += "import logging\n"
 
-        output_str += f"from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager\n"
+        output_str += f"from FluxPythonUtils.scripts.general_utility_functions import YAMLConfigurationManager\n"
         output_str += f'\n\n'
         model_file_path = self.import_path_from_os_path("OUTPUT_DIR", f"{self.model_dir_name}.{self.model_file_name}")
         output_str += f'from {model_file_path} import *\n\n\n'

@@ -393,21 +393,6 @@ message PlanCollection {
   repeated string buffered_plan_keys = 3 [(FluxFldAbbreviated) = "Tickers/Side:PairPlan.pair_plan_params.plan_leg2.sec.sec_id-PairPlan.pair_plan_params.plan_leg1.sec.sec_id-PairPlan.pair_plan_params.plan_leg1.side-PairPlan.id"];
 }
 
-message DismissFilterContactLimitBroker{
-  option (FluxMsgJsonQuery) = {
-    QueryName: "get_dismiss_filter_contact_limit_brokers",
-    QueryParams: {
-      QueryParamName: "security_id1",
-      QueryParamDataType: "str"
-    },
-    QueryParams: {
-      QueryParamName: "security_id2",
-      QueryParamDataType: "str"
-    }
-  };
-  repeated Broker brokers = 1;
-}
-
 // Sample Root Model - used in tests to check basic api operations
 message SampleModel{
   option (FluxMsgJsonRoot) = {

@@ -3,7 +3,7 @@ from pathlib import PurePath
 import logging
 
 # project imports
-from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager
+from FluxPythonUtils.scripts.file_n_general_utility_functions import YAMLConfigurationManager
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     config_yaml_dict as pair_plan_config_yaml_dict)
 

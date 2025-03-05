@@ -11,7 +11,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service
     contact_alert_fail_log, simulator_contact_alert_fail_log)
 from FluxPythonUtils.email_adapter.email_handler import EmailHandler
 from FluxPythonUtils.email_adapter.email_client import EmailClient, EmailUser
-from FluxPythonUtils.scripts.utility_functions import YAMLConfigurationManager
+from FluxPythonUtils.scripts.file_n_general_utility_functions import YAMLConfigurationManager
 
 secret_yaml_path = PurePath(__file__).parent.parent / "data" / "secret.yaml"
 

@@ -6,7 +6,7 @@ import time
 import pytest
 import signal
 
-from FluxPythonUtils.scripts.utility_functions import get_pid_from_port
+from FluxPythonUtils.scripts.general_utility_functions import get_pid_from_port
 from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import *
 
 

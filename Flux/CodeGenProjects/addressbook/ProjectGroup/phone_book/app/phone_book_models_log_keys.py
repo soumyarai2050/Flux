@@ -3,7 +3,7 @@ from functools import lru_cache
 from typing import List, Tuple, Dict, Any
 
 # project imports
-from FluxPythonUtils.scripts.utility_functions import get_symbol_side_pattern
+from FluxPythonUtils.scripts.general_utility_functions import get_symbol_side_pattern
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import (
     PairPlan, PairPlanBaseModel, PairPlanOptional, Side)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.StreetBook.email_book_service_key_handler import (

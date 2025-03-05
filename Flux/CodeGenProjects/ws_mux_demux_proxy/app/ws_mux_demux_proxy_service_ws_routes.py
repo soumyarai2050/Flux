@@ -10,7 +10,7 @@ from fastapi.encoders import jsonable_encoder
 
 # project imports
 from Flux.CodeGenProjects.ws_mux_demux_proxy.app.ws_mux_demux_proxy_server_manager import WSMuxDemuxProxyServerManager
-from FluxPythonUtils.scripts.utility_functions import handle_ws, YAMLConfigurationManager, parse_to_int
+from FluxPythonUtils.scripts.general_utility_functions import handle_ws, YAMLConfigurationManager, parse_to_int
 
 ui_proxy_service_API_router = APIRouter()
 root_dir_path = PurePath(__file__).parent.parent.parent

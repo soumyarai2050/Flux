@@ -15,7 +15,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.app.aggregate impor
     get_vwap_change_projection_from_bar_data_agg_pipeline, get_premium_projection_from_bar_data_agg_pipeline,
     get_premium_n_premium_change_projection_from_bar_data_agg_pipeline,
     get_premium_change_projection_from_bar_data_agg_pipeline)
-from FluxPythonUtils.scripts.utility_functions import (
+from FluxPythonUtils.scripts.general_utility_functions import (
     except_n_log_alert)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.service_state import ServiceState
 

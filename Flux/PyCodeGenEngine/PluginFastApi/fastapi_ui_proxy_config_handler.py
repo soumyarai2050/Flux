@@ -6,8 +6,8 @@ import protogen
 
 # project imports
 from Flux.PyCodeGenEngine.PluginFastApi.base_fastapi_plugin import BaseFastapiPlugin
-from FluxPythonUtils.scripts.utility_functions import (convert_camel_case_to_specific_case,
-                                                       convert_to_capitalized_camel_case)
+from FluxPythonUtils.scripts.general_utility_functions import  convert_to_capitalized_camel_case
+from FluxPythonUtils.scripts.file_n_general_utility_functions import convert_camel_case_to_specific_case
 
 
 class FastapiUIProxyConfigHandler(BaseFastapiPlugin, ABC):

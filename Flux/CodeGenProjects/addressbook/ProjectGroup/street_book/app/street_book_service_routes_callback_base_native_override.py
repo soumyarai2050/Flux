@@ -37,7 +37,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book_helpe
     NON_FILLED_TERMINAL_STATES, get_pair_plan_id_from_cmd_argv
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     compute_max_single_leg_notional, get_premium)
-from FluxPythonUtils.scripts.utility_functions import (
+from FluxPythonUtils.scripts.general_utility_functions import (
     avg_of_new_val_sum_to_avg, find_free_port, except_n_log_alert, handle_http_response, HTTPRequestType,
     handle_refresh_configurable_data_members, set_package_logger_level, parse_to_int, YAMLConfigurationManager)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import (
@@ -79,7 +79,6 @@ from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_basket_book_core_ms
 from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_post_book_core_msgspec_model import *
 from Flux.CodeGenProjects.AddressBook.ORMModel.phone_book_n_street_book_core_msgspec_model import *
 from Flux.CodeGenProjects.AddressBook.ORMModel.dept_book_n_mobile_book_n_street_book_n_basket_book_core_msgspec_model import *
-from Flux.CodeGenProjects.AddressBook.ORMModel.mobile_book_n_street_book_n_basket_book_core_msgspec_model import *
 
 
 class FirstLastBarterCont(MsgspecBaseModel):
@@ -671,9 +670,9 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         exch_code = "SS" if pair_plan.pair_plan_params.plan_leg1.exch_id == "SSE" else "SZ"
 
         md_shell_env_data: MDShellEnvData = (
-            MDShellEnvData(subscription_data=subscription_data, host=pair_plan.host,
-                           port=pair_plan.port, db_name=db_name, exch_code=exch_code,
-                           project_name="street_book"))
+            MDShellEnvData.from_kwargs(subscription_data=subscription_data, host=pair_plan.host,
+                                       port=pair_plan.port, db_name=db_name, exch_code=exch_code,
+                                       project_name="street_book"))
 
         create_md_shell_script(md_shell_env_data, run_symbol_overview_file_path, "SO",
                                instance_id=str(pair_plan.id))
@@ -919,14 +918,11 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         else:
 
             if not plan_limits_list:
-                eligible_brokers: List[Broker] | None = None
                 try:
-                    dismiss_filter_contact_limit_broker_obj_list = (
+                    shadow_brokers: List[ShadowBrokersBaseModel] = (
                         email_book_service_http_client.get_dismiss_filter_contact_limit_brokers_query_client(
                             self.plan_leg_1.sec.sec_id, self.plan_leg_2.sec.sec_id))
-                    if dismiss_filter_contact_limit_broker_obj_list:
-                        eligible_brokers = dismiss_filter_contact_limit_broker_obj_list[0].brokers
-                    else:
+                    if not shadow_brokers:
                         err_str_ = ("Http Query get_dismiss_filter_contact_limit_brokers_query returned empty list, "
                                     "expected dismiss_filter_contact_limit_broker_obj_list obj with brokers list")
                         logging.error(err_str_)
@@ -935,6 +931,12 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                 f"will retry plan_limits create: exception: {e}")
                     logging.error(err_str_)
                     return
+
+                eligible_brokers: List[BrokerBaseModel] = []
+                for shadow_broker in shadow_brokers:
+                    shadow_broker_dict = shadow_broker.to_dict()
+                    shadow_broker_dict["_id"] = None
+                    eligible_brokers.append(BrokerBaseModel.from_dict(shadow_broker_dict))
 
                 plan_limits = get_new_plan_limits(eligible_brokers)
                 plan_limits.id = self.pair_plan_id  # syncing id with pair_plan which triggered this server
