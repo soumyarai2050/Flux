@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import os
-from typing import List, Callable
+from typing import List, Callable, Final
 import time
 import logging
 
@@ -20,6 +20,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
     """
     Plugin script to generate jsx file for ORM root messages
     """
+    indentation_space: Final[str] = "    "
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
@@ -36,23 +37,23 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
 
     def handle_body(self) -> str:
         output_str = "export const store = configureStore({\n"
-        output_str += "    reducer: {\n"
-        output_str += "        schema: schemaSlice,\n"
+        output_str += JsSliceFileGenPlugin.indentation_space + "reducer: {\n"
+        output_str += JsSliceFileGenPlugin.indentation_space*2 + "schema: schemaSlice,\n"
         for message in self.root_msg_list:
             message_name = message.proto.name
             message_name_camel_cased = capitalized_to_camel_case(message_name)
 
             # If message is last in list
             if message == self.root_msg_list[-1]:
-                output_str += f"        {message_name_camel_cased}: {message_name_camel_cased}Slice\n"
+                output_str += JsSliceFileGenPlugin.indentation_space*2 + f"{message_name_camel_cased}: {message_name_camel_cased}Slice\n"
             else:
-                output_str += f"        {message_name_camel_cased}: {message_name_camel_cased}Slice,\n"
+                output_str += JsSliceFileGenPlugin.indentation_space*2 + f"{message_name_camel_cased}: {message_name_camel_cased}Slice,\n"
 
-        output_str += "    },\n"
-        output_str += "    middleware: (getDefaultMiddleware) => getDefaultMiddleware({\n"
-        output_str += "        serializableCheck: false,\n"
-        output_str += "        immutableCheck: false\n"
-        output_str += "    })\n"
+        output_str += JsSliceFileGenPlugin.indentation_space + "},\n"
+        output_str += JsSliceFileGenPlugin.indentation_space + "middleware: (getDefaultMiddleware) => getDefaultMiddleware({\n"
+        output_str += JsSliceFileGenPlugin.indentation_space*2 + "serializableCheck: false,\n"
+        output_str += JsSliceFileGenPlugin.indentation_space*2 + "immutableCheck: false\n"
+        output_str += JsSliceFileGenPlugin.indentation_space + "})\n"
         output_str += "});\n"
 
         return output_str

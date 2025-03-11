@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useSelector } from 'react-redux';
-import { ColorTypes, DataTypes, Modes } from '../constants';
+import { COLOR_TYPES, DATA_TYPES, MODES } from '../constants';
 import { Select, MenuItem, TextField, Autocomplete, Checkbox, InputAdornment, Tooltip, IconButton } from '@mui/material';
 import { Error, Clear } from '@mui/icons-material';
 import PropTypes from 'prop-types';
@@ -53,7 +53,7 @@ const NodeField = (props) => {
     }, [props.data.forceUpdate])
 
     useEffect(() => {
-        if (props.mode === Modes.READ_MODE) {
+        if (props.mode === MODES.READ) {
             setInputValue(props.data.value);
         }
     }, [props.data.value])
@@ -97,7 +97,7 @@ const NodeField = (props) => {
     }
 
     let disabled = true;
-    if (props.data.mode === Modes.EDIT_MODE) {
+    if (props.data.mode === MODES.EDIT) {
         if (props.data.ormNoUpdate && !props.data['data-add']) {
             disabled = true;
         }
@@ -150,7 +150,7 @@ const NodeField = (props) => {
                 value={value}
                 inputValue={autocompleteInputValue}
                 onInputChange={(e, newInputValue) => setAutocompleteInputValue(newInputValue)}
-                filteredOptions={(options, { inputValue }) => 
+                filterOptions={(options, { inputValue }) => 
                     options.filter(option => option.toLowerCase().includes(inputValue.toLowerCase()))
                 }
                 onChange={(e, v) => {
@@ -177,7 +177,7 @@ const NodeField = (props) => {
                 }}
             />
         )
-    } else if (props.data.type === DataTypes.BOOLEAN) {
+    } else if (props.data.type === DATA_TYPES.BOOLEAN) {
         let value = props.data.value ? props.data.value : props.data.value === false ? false : null;
         validationError.current = validateConstraints(props.data, value);
         const endAdornment = validationError.current ? (
@@ -199,7 +199,7 @@ const NodeField = (props) => {
                 onChange={(e) => props.data.onCheckboxChange(e, props.data.dataxpath, props.data.xpath)}
             />
         )
-    } else if (props.data.type === DataTypes.ENUM) {
+    } else if (props.data.type === DATA_TYPES.ENUM) {
         let value = props.data.value ? props.data.value : null;
         validationError.current = validateConstraints(props.data, value);
         const endAdornment = validationError.current ? (
@@ -224,10 +224,10 @@ const NodeField = (props) => {
                 })}
             </Select>
         )
-    } else if (props.data.type === DataTypes.NUMBER) {
+    } else if (props.data.type === DATA_TYPES.NUMBER) {
         // round the decimal places for float. default precision is 2 digits for float
         let decimalScale = 2;
-        if (props.data.underlyingtype === DataTypes.INT32 || props.data.underlyingtype === DataTypes.INT64) {
+        if (props.data.underlyingtype === DATA_TYPES.INT32 || props.data.underlyingtype === DATA_TYPES.INT64) {
             decimalScale = 0;
         }
         if (props.data.numberFormat && props.data.numberFormat.includes(".")) {
@@ -237,19 +237,19 @@ const NodeField = (props) => {
 
         // min constrainsts for numeric field if set.
         let min = props.data.min;
-        if (typeof (min) === DataTypes.STRING) {
+        if (typeof (min) === DATA_TYPES.STRING) {
             min = getValueFromReduxStoreFromXpath(reducerDict, min);
         }
 
         // max constrainsts for numeric field if set.
         let max = props.data.max;
-        if (typeof (max) === DataTypes.STRING) {
+        if (typeof (max) === DATA_TYPES.STRING) {
             max = getValueFromReduxStoreFromXpath(reducerDict, max);
         }
 
         // let value = props.data.value ? props.data.value : props.data.value === 0 ? 0 : props.data.value === -0 ? -0 : '';
         let value = inputValue ? cloneDeep(inputValue) : inputValue === 0 ? 0 : inputValue === -0 ? -0 : '';
-        if (props.data.displayType == DataTypes.INTEGER && value !== -0 && value !== '') {
+        if (props.data.displayType == DATA_TYPES.INTEGER && value !== -0 && value !== '') {
             value = floatToInt(value);
         }
         validationError.current = validateConstraints(props.data, value, min, max);
@@ -301,7 +301,7 @@ const NodeField = (props) => {
                 }}
             />
         )
-    } else if (props.data.type === DataTypes.DATE_TIME) {
+    } else if (props.data.type === DATA_TYPES.DATE_TIME) {
         let value = props.data.value || null;
         validationError.current = validateConstraints(props.data, value);
         const endAdornment = validationError.current ? (

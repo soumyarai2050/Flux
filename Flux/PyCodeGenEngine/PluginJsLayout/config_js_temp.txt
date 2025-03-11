@@ -1,0 +1,48 @@
+/**
+ * @module config
+ * @description This module exports configuration constants for the application.
+ */
+
+/**
+ * Flag to enable the proxy server.
+ * In production, this can be controlled via environment variables.
+ * @type {boolean}
+ */
+# @@protoc_insertion_point(enable_proxy)
+
+/**
+ * The project name used in API endpoints and cookie naming.
+ * @type {string}
+ */
+# @@protoc_insertion_point(project_name)
+
+/**
+ * The proxy server root URL.
+ * @type {string}
+ */
+# @@protoc_insertion_point(proxy_server_root)
+
+/**
+ * The API root URL constructed using the project name.
+ * @type {string}
+ */
+# @@protoc_insertion_point(api_root)
+
+/**
+ * The public API URL.
+ * @type {string}
+ */
+# @@protoc_insertion_point(api_public_url)
+
+/**
+ * The primary API URL used in the application.
+ * This will use the proxy server URL if the ENABLE_PROXY flag is set to true.
+ * @type {string}
+ */
+export const API_ROOT_URL = ENABLE_PROXY ? PROXY_SERVER_ROOT : API_ROOT;
+
+/**
+ * The name of the cookie used by the application.
+ * @type {string}
+ */
+export const COOKIE_NAME = PROJECT_NAME;

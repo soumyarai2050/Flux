@@ -1,5 +1,5 @@
 import _, { cloneDeep } from 'lodash';
-import { ColorTypes, DB_ID, DataTypes, SeverityType } from './constants';
+import { COLOR_TYPES, DB_ID, DATA_TYPES, SEVERITY_TYPES, MODES } from './constants';
 import { SortComparator, SortType } from './utility/sortComparator';
 
 const FLOAT_POINT_PRECISION = 2;
@@ -55,7 +55,7 @@ export function floatToInt(value) {
     Function to convert floating point numbers to integer.
     value: integer or floating point number
     */
-    if (typeof value === DataTypes.NUMBER) {
+    if (typeof value === DATA_TYPES.NUMBER) {
         if (Number.isInteger(value)) {
             return value;
         } else {
@@ -78,7 +78,7 @@ export function getLocalizedValueAndSuffix(metadata, value) {
     */
     let adornment = '';
 
-    if (typeof value !== DataTypes.NUMBER) {
+    if (typeof value !== DATA_TYPES.NUMBER) {
         return [adornment, value];
     }
     if (metadata.numberFormat) {
@@ -90,7 +90,7 @@ export function getLocalizedValueAndSuffix(metadata, value) {
             adornment = ' $';
         }
     }
-    if (metadata.displayType === DataTypes.INTEGER) {
+    if (metadata.displayType === DATA_TYPES.INTEGER) {
         return [adornment, floatToInt(value)]
     }
     if (metadata.numberFormat && metadata.numberFormat.includes('.')) {
@@ -110,7 +110,7 @@ export function roundNumber(value, precision = FLOAT_POINT_PRECISION) {
     value: floating point number
     precision: decimal digits to round off to. default 2 (FLOAT_POINT_PRECISION)
     */
-    if (typeof value === DataTypes.NUMBER) {
+    if (typeof value === DATA_TYPES.NUMBER) {
         if (Number.isInteger(value) || precision === 0) {
             return value;
         } else {
@@ -120,7 +120,7 @@ export function roundNumber(value, precision = FLOAT_POINT_PRECISION) {
     return value;
 }
 
-export function getAbbreviatedRows(items, itemsDataDict, itemProps, abbreviation, loadedProps) {
+export function getRowsFromAbbreviation(items, itemsDataDict, itemProps, abbreviation, loadedProps) {
     /* 
         items: list of abbreviated keys built from it's abbreviated dependent fields
         itemsData: list of abbreviated dependent data for each abbreviated keys
@@ -128,7 +128,7 @@ export function getAbbreviatedRows(items, itemsDataDict, itemProps, abbreviation
         abbreviation: abbreviation syntax
     */
     let rows = [];
-    if (items) {
+    if (items && items.length > 0) {
         items.map((item, i) => {
             let row = {};
             // integer id field of item
@@ -138,12 +138,14 @@ export function getAbbreviatedRows(items, itemsDataDict, itemProps, abbreviation
                 let value;
                 let metadata = itemsDataDict[c.source].find(meta => _.get(meta, DB_ID) === id);
                 if (c.type === 'alert_bubble') {
-                    let color = ColorTypes.DEFAULT;
+                    let color = COLOR_TYPES.DEFAULT;
                     if (c.colorSource) {
                         const severityType = _.get(metadata, c.colorSource);
                         color = getColorTypeFromValue(c.colorCollection, severityType);
                     }
                     value = [_.get(metadata, c.xpath), color];
+                } else if (c.xpath === DB_ID) {
+                    value = id;
                 } else if (c.xpath.indexOf("-") !== -1) {
                     value = c.xpath.split("-").map(xpath => {
                         let collection = c.subCollections.find(col => col.tableTitle === xpath);
@@ -152,7 +154,7 @@ export function getAbbreviatedRows(items, itemsDataDict, itemProps, abbreviation
                             val = "";
                         }
                         let [numberSuffix, v] = getLocalizedValueAndSuffix(collection, val);
-                        if (typeof v === DataTypes.NUMBER && collection.type === DataTypes.NUMBER) {
+                        if (typeof v === DATA_TYPES.NUMBER && collection.type === DATA_TYPES.NUMBER) {
                             v = v.toLocaleString();
                         }
                         if (v === '') {
@@ -162,7 +164,7 @@ export function getAbbreviatedRows(items, itemsDataDict, itemProps, abbreviation
                         }
                         return val;
                     })
-                    value = value.filter(x => typeof x === DataTypes.STRING && x.length > 0);
+                    value = value.filter(x => typeof x === DATA_TYPES.STRING && x.length > 0);
                     if (loadedProps.microSeparator) {
                         value = value.join(loadedProps.microSeparator);
                     } else {
@@ -262,7 +264,7 @@ export function applyGetAllWebsocketUpdate(storedArray, updatedObj, uiLimit, isA
                 } else {  // negative uiLimit
                     if (updatedArray.length >= Math.abs(uiLimit)) {
                         if (isAlertModel) {
-                            if (SeverityType[updatedObj.severity] > SeverityType[updatedArray[updatedArray.length - 1].severity]) {
+                            if (SEVERITY_TYPES[updatedObj.severity] > SEVERITY_TYPES[updatedArray[updatedArray.length - 1].severity]) {
                                 updatedArray.pop();
                                 updatedArray.push(updatedObj);
                             }
@@ -285,8 +287,8 @@ export function applyGetAllWebsocketUpdate(storedArray, updatedObj, uiLimit, isA
 
 export function sortAlertArray(alertArray) {
     alertArray.sort((a, b) => {
-        const severityA = SeverityType[a.severity];
-        const severityB = SeverityType[b.severity];
+        const severityA = SEVERITY_TYPES[a.severity];
+        const severityB = SEVERITY_TYPES[b.severity];
         if (severityA > severityB) {
             return -1;
         } else if (severityB > severityA) {
@@ -308,7 +310,7 @@ export function sortAlertArray(alertArray) {
 }
 
 export function getColorTypeFromValue(collection, value, separator = '-') {
-    let color = ColorTypes.DEFAULT;
+    let color = COLOR_TYPES.DEFAULT;
     if (collection && collection.color) {
         const colorSplit = collection.color.split(',').map(valueColor => valueColor.trim());
         const valueColorMap = {};
@@ -321,12 +323,12 @@ export function getColorTypeFromValue(collection, value, separator = '-') {
             for (let i = 0; i < collection.xpath.split('-').length; i++) {
                 v = value.split(separator)[i];
                 if (valueColorMap.hasOwnProperty(v)) {
-                    const color = ColorTypes[valueColorMap[v]];
+                    const color = COLOR_TYPES[valueColorMap[v]];
                     return color;
                 }
             }
         } else if (valueColorMap.hasOwnProperty(v)) {
-            const color = ColorTypes[valueColorMap[v]];
+            const color = COLOR_TYPES[valueColorMap[v]];
             return color;
         }
     }
@@ -374,7 +376,7 @@ function ensureSymmetry(arr, joinSort) {
         if (sortType === SortType.DESCENDING) {
             Object.keys(maxCounts).sort().reverse().map(key => {
                 groupedObj[key] = [];
-            })  
+            })
         } else {
             Object.keys(maxCounts).sort().map(key => {
                 groupedObj[key] = [];
@@ -438,4 +440,291 @@ export function getGroupedTableRows(tableRows, groupBy, joinSort = null) {
         tableRows = tableRows.map(row => [row]);
     }
     return tableRows;
+}
+
+export function getMaxRowSize(rows) {
+    let maxSize = 1;
+    for (let i = 0; i < rows.length; i++) {
+        if (rows[i].length > maxSize) {
+            maxSize = rows[i].length;
+        }
+    }
+    return maxSize;
+}
+
+export function getCommonKeyCollections(rows, tableColumns, hide = true, collectionView = false, repeatedView = false, showLess = false) {
+    if (rows.length > 1) {
+        // exclude column with 'noCommonKey' as it cannot be added in common key
+        tableColumns = tableColumns.map(column => Object.assign({}, column)).filter(column => !column.noCommonKey);
+    }
+    let commonKeyCollections = [];
+    if (rows.length === 1 && (collectionView || repeatedView)) {
+        const hasButtonType = tableColumns.find(obj => obj.type === 'button');
+        if (hasButtonType) {
+            tableColumns.forEach(column => {
+                if (hide && column.hide) return;
+                if (column.joinKey || column.commonGroupKey) return;
+                if (showLess && column.showLess) return;
+                let fieldName = column.tableTitle;
+                if (collectionView) {
+                    if (rows.length > 1 && (column.type === 'button' || column.type === 'progressBar' || column.type === 'alert_bubble')) {
+                        return;
+                    }
+                    fieldName = column.key;
+                }
+                const value = rows[0][column.sourceIndex]?.[fieldName];
+                if (!column.noCommonKey) {
+                    if (value === null || value === undefined) {
+                        commonKeyCollections.push(column);
+                    } else if (value === 0 && !column.displayZero) {
+                        commonKeyCollections.push(column);
+                    }
+                }
+            })
+            return commonKeyCollections;
+        }
+    }
+    if (rows.length > 0) {
+        tableColumns.map((column) => {
+            if (hide && column.hide) return;
+            if (column.joinKey || column.commonGroupKey) return;
+            if (showLess && column.showLess) return;
+            let fieldName = column.tableTitle;
+            if (collectionView) {
+                if (rows.length > 1 && (column.type === 'button' || column.type === 'progressBar' || column.type === 'alert_bubble')) {
+                    return;
+                }
+                fieldName = column.key;
+            }
+            let found = true;
+            let firstValue = null;
+            for (let i = 0; i < rows.length; i++) {
+                const value = rows[i][column.sourceIndex]?.[fieldName];
+                if (!(value === null || value === undefined || value === '')) {
+                    firstValue = value;
+                    break;
+                }
+            }
+            // const value = rows[0][column.sourceIndex]?.[fieldName];
+            // for (let i = 1; i < rows.length; i++) {
+            for (let i = 0; i < rows.length; i++) {
+                const value = rows[i][column.sourceIndex]?.[fieldName];
+                if (value !== firstValue && firstValue !== null) {
+                    if (column.type === DATA_TYPES.NUMBER && column.zeroAsNone && firstValue === 0 && value === null) {
+                        continue;
+                    } else {
+                        found = false;
+                        break;
+                    }
+                }
+                // if (!(value === null || value === undefined || value === '')) {
+                //     if (value !== firstValue) {
+                //         found = false;
+                //         break;
+                //     }
+                // }
+                // if (rows[i][column.sourceIndex] && rows[i+1][column.sourceIndex]) {
+                //     if (!_.isEqual(rows[i][column.sourceIndex][fieldName], rows[i + 1][column.sourceIndex][fieldName])) {
+                //         const values = [rows[i][column.sourceIndex][fieldName], rows[i + 1][column.sourceIndex][fieldName]];
+                //         for (let i = 0; i < values.length; i++) {
+                //             let val = values[i];
+                //             if (val) {
+                //                 if (typeof val === DATA_TYPES.STRING) {
+                //                     val = val.trim();
+                //                 }
+                //             }
+                //             if (![null, undefined, ''].includes(val)) {
+                //                 found = false;
+                //                 break;
+                //             }
+                //         }
+                //     }
+                // }
+
+                // if (rows[i][column.sourceIndex]?.[fieldName] !== value) {
+                //     found = false;
+                // }
+
+                if (!found) {
+                    break;
+                }
+            }
+            if (found) {
+                let collection = column;
+                collection.value = firstValue;
+                commonKeyCollections.push(collection);
+            }
+            return column;
+        })
+    }
+    return commonKeyCollections;
+}
+
+export function getGroupedTableColumns(columns, maxRowSize, rows, groupBy = [], mode, collectionView = false) {
+    let tableColumns = []
+    let maxSequence = 0;
+    columns.forEach(column => {
+        if (column.sequenceNumber > maxSequence) {
+            maxSequence = column.sequenceNumber;
+        }
+    })
+    for (let i = 0; i < maxRowSize; i++) {
+        const updatedColumns = columns.map(column => {
+            column = Object.assign({}, column);
+            column.sourceIndex = i;
+            column.sequenceNumber = column.sequenceNumber + i * maxSequence;
+            return column;
+        })
+        tableColumns = [...tableColumns, ...updatedColumns];
+    }
+    if (mode === MODES.READ && groupBy && groupBy.length > 0) {
+        const commonColumns = [];
+        columns.forEach(column => {
+            if (column.type === 'button' || column.type === 'progressBar' || column.type === 'alert_bubble') {
+                return;
+            }
+            if (column.noCommonKey) {
+                return;
+            }
+            let fieldName = column.tableTitle;
+            if (collectionView) {
+                fieldName = column.key;
+            }
+            let found = true;
+            for (let i = 0; i < rows.length; i++) {
+                const groupedRow = rows[i];
+                let firstValue = null;
+                for (let j = 0; j < maxRowSize; j++) {
+                    const value = groupedRow?.[j]?.[fieldName];
+                    if (!(value === null || value === undefined || value === '')) {
+                        firstValue = value;
+                        break;
+                    }
+                }
+                let matched = true;
+                for (let j = 0; j < groupedRow.length; j++) {
+                    const value = groupedRow[j][fieldName];
+                    if (!(value === null || value === undefined || value === '')) {
+                        if (value !== firstValue) {
+                            matched = false;
+                            break;
+                        }
+                    }
+                }
+                if (!matched) {
+                    found = false;
+                    break;
+                }
+            }
+            if (found) {
+                commonColumns.push(fieldName);
+            }
+        })
+        tableColumns = tableColumns.filter(column => {
+            let fieldName = column.tableTitle;
+            if (collectionView) {
+                fieldName = column.key;
+            }
+            if (commonColumns.includes(fieldName) && column.sourceIndex !== 0) {
+                // exclude all common columns from non-zeroth source index
+                return false;
+            }
+            return true;
+        })
+        tableColumns = tableColumns.map(column => {
+            let fieldName = column.tableTitle;
+            if (collectionView) {
+                fieldName = column.key;
+            }
+            if (commonColumns.includes(fieldName)) {
+                column.commonGroupKey = true;
+            }
+            if (groupBy.includes(fieldName)) {
+                column.joinKey = true;
+            }
+            return column;
+        })
+    }
+    return tableColumns;
+}
+
+export function getTableColumns(fieldsMetadata, mode, enableOverride = [], disableOverride = [], showLess = [], collectionView = false, repeatedView = false) {
+    let tableColumns = fieldsMetadata
+        .map(collection => Object.assign({}, collection))
+        .map(collection => {
+            let fieldName = collection.tableTitle;
+            if (collectionView) {
+                fieldName = collection.key;
+            }
+            if (enableOverride.includes(fieldName)) {
+                collection.hide = true;
+            }
+            if (disableOverride.includes(fieldName)) {
+                collection.hide = false;
+            }
+            if (showLess.includes(fieldName)) {
+                collection.showLess = true;
+            }
+            if (repeatedView) {
+                collection.rootLevel = false;
+            }
+            return collection;
+        })
+        .filter(collection => {
+            // add all exclusion cases
+            if (mode === MODES.EDIT) {
+                if (collection.serverPopulate) return false;
+                if (collection.type === 'button' && !collection.rootLevel && collection.button.read_only) return false;
+            }
+            if ((collection.type === 'object' || collection.type === 'array') && collection.abbreviated !== 'JSON') return false;
+            return true;
+            // if (mode === MODES.EDIT && collection.serverPopulate) {
+            //     return false;
+            // } else if (mode === MODES.EDIT && collection.type === 'button' && collection.button.read_only) {
+            //     return false;
+            // }
+
+            // if (collection.serverPopulate && mode === MODES.EDIT) {
+            //     return false;
+            // } else if (primitiveDataTypes.includes(collection.type)) {
+            //     return true;
+            // } else if (collection.abbreviated && collection.abbreviated === "JSON") {
+            //     return true;
+            // } else if (collection.type === 'button' && !collection.rootLevel) {
+            //     if (mode === MODES.EDIT && collection.button.read_only) {
+            //         return false;
+            //     }
+            //     return true;
+            // } else if (collection.type === 'progressBar') {
+            //     return true;
+            // } else if (collection.type === 'alert_bubble') {
+            //     return true;
+            // }
+            // // TODO: what other cases are ignored?
+            // return false;
+        })
+
+    return tableColumns;
+}
+
+const primitiveDataTypes = [
+    DATA_TYPES.STRING,
+    DATA_TYPES.BOOLEAN,
+    DATA_TYPES.NUMBER,
+    DATA_TYPES.ENUM,  // pre-defined set of values in schema.json file
+    DATA_TYPES.DATE_TIME,
+    DATA_TYPES.INT64,
+    DATA_TYPES.FLOAT
+];
+
+export function getFilteredCells(headCells, commonKeys, showHidden, showAll, showMore, moreAll) {
+    let updatedCells = cloneDeep(headCells);
+    if (!showHidden && !showAll) {
+        updatedCells = updatedCells.filter(cell => !cell.hide);
+    }
+    if (!showMore && !moreAll) {
+        updatedCells = updatedCells.filter(cell => !cell.showLess);
+    }
+    updatedCells = updatedCells.filter(cell => commonKeys.filter(c => c.key === cell.key && c.sourceIndex === cell.sourceIndex).length === 0)
+    return updatedCells;
 }

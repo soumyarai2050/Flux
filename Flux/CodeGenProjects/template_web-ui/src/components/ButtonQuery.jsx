@@ -4,11 +4,12 @@ import ValueBasedToggleButton from './ValueBasedToggleButton';
 import { API_ROOT_URL } from '../constants';
 import { PlayArrow, Delete } from '@mui/icons-material';
 import Alert from './Alert';
-import { getColorTypeFromValue, getSizeFromValue, getShapeFromValue, computeFileChecksum, getErrorDetails, getAxiosMethod } from '../utils';
+import { getColorTypeFromValue, getSizeFromValue, getShapeFromValue, getErrorDetails, getAxiosMethod } from '../utils';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { Dialog, DialogTitle, DialogContent, DialogActions, Button, DialogContentText } from '@mui/material';
 import classes from './ButtonQuery.module.css';
+import { computeFileChecksum } from '../utils/fileHelper';
 // add utc support for datetime
 dayjs.extend(utc);
 

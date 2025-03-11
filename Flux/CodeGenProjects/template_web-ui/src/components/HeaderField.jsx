@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Typography, Box, ClickAwayListener, Tooltip, IconButton } from "@mui/material";
 import { IndeterminateCheckBox, AddBox, AddCircle, RemoveCircle, Menu, LiveHelp, ArrowDropDownSharp, ArrowDropUpSharp, HelpSharp, HelpOutline, Copyright, ContentCopy, AddOutlined, RemoveOutlined, CopyAllOutlined } from "@mui/icons-material";
-import { DataTypes, Modes } from '../constants';
+import { DATA_TYPES, MODES } from '../constants';
 import { Icon } from './Icon';
 import PropTypes from 'prop-types';
 import classes from './HeaderField.module.css';
@@ -26,12 +26,12 @@ const HeaderField = (props) => {
 
     let add = false;
     let remove = false;
-    if (props.data.mode === Modes.EDIT_MODE) {
-        if (props.data.type === DataTypes.ARRAY && !props.data['data-remove'] && !props.data.uiUpdateOnly) {
+    if (props.data.mode === MODES.EDIT) {
+        if (props.data.type === DATA_TYPES.ARRAY && !props.data['data-remove'] && !props.data.uiUpdateOnly) {
             add = true;
             remove = true;
         }
-        if (props.data.type === DataTypes.OBJECT && !props.data.required) {
+        if (props.data.type === DATA_TYPES.OBJECT && !props.data.required) {
             if (props.data['object-add']) {
                 add = true;
             }

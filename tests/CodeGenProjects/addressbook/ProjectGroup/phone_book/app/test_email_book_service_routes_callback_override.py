@@ -1064,6 +1064,151 @@ def test_contact_limits_size_limit(static_data_, clean_and_set_limits, expected_
         f"Mismatched: {len(contact_limits_.eligible_brokers[0].sec_positions[0].positions)=}, {len(expected_contact_limits_.eligible_brokers[0].sec_positions[0].positions)=}"
 
 
+@pytest.mark.nightly
+def test_shallow_brokers_with_contact_limit_updates(
+        static_data_, clean_and_set_limits, expected_contact_limits_, leg1_leg2_symbol_list):
+    # deleting contact_limits obj and shadow_brokers
+    email_book_service_native_web_client.delete_contact_limits_client(1)
+    shadow_brokers = email_book_service_native_web_client.get_all_shadow_brokers_client()
+    for shadow_broker in shadow_brokers:
+        email_book_service_native_web_client.delete_shadow_brokers_client(shadow_broker.id)
+
+    sec_positions_list = expected_contact_limits_.eligible_brokers[0].sec_positions
+    for broker in expected_contact_limits_.eligible_brokers:
+        broker.sec_positions = sec_positions_list[:4]
+
+    # creating contact_limits obj
+    created_contact_limit = email_book_service_native_web_client.create_contact_limits_client(expected_contact_limits_)
+    assert created_contact_limit.eligible_brokers, \
+        f"Mismatch: Can't find eligible_brokers after contact_limit create, {created_contact_limit=} "
+    for eligible_broker in created_contact_limit.eligible_brokers:
+        assert eligible_broker.id is not None, \
+            f"Mismatch: Can't find id in created {eligible_broker=}, {created_contact_limit=}"
+        for sec_pos in eligible_broker.sec_positions:
+            assert sec_pos.id is not None, \
+                f"Mismatch: Can't find id in created {sec_pos=}, {created_contact_limit=}"
+            for position in sec_pos.positions:
+                assert position.id is not None, \
+                    f"Mismatch: Can't find id in created {position=}, {created_contact_limit=}"
+
+    security_id1 = leg1_leg2_symbol_list[0][0]
+    security_id2 = leg1_leg2_symbol_list[0][1]
+    filtered_brokers = (
+        email_book_service_native_web_client.get_dismiss_filter_contact_limit_brokers_query_client(security_id1, security_id2))
+    for filtered_broker in filtered_brokers:
+        assert len(filtered_broker.sec_positions) == 2, \
+            f"Mismatched: expected length of sec_positions: 2, received: {len(filtered_broker.sec_positions)=}"
+
+    # updating positions using put
+    created_contact_limit.eligible_brokers[0].sec_positions[0].positions[0].pos_disable = True
+    put_contact_limit = email_book_service_native_web_client.put_contact_limits_client(
+        created_contact_limit)
+    assert put_contact_limit.eligible_brokers, \
+        f"Mismatch: Can't find eligible_brokers after contact_limit create, {put_contact_limit=} "
+    for eligible_broker in put_contact_limit.eligible_brokers:
+        assert eligible_broker.id is not None, \
+            f"Mismatch: Can't find id in created {eligible_broker=}, {put_contact_limit=}"
+        for sec_pos in eligible_broker.sec_positions:
+            assert sec_pos.id is not None, \
+                f"Mismatch: Can't find id in created {sec_pos=}, {put_contact_limit=}"
+            for position in sec_pos.positions:
+                assert position.id is not None, \
+                    f"Mismatch: Can't find id in created {position=}, {put_contact_limit=}"
+    # checking first 2 sec_positions
+    security_id1 = leg1_leg2_symbol_list[0][0]
+    security_id2 = leg1_leg2_symbol_list[0][1]
+    filtered_brokers = (
+        email_book_service_native_web_client.get_dismiss_filter_contact_limit_brokers_query_client(security_id1, security_id2))
+    assert len(filtered_brokers[0].sec_positions) == 2, \
+        f"Mismatched: expected length of sec_positions: 2, received: {len(filtered_brokers[0].sec_positions)=}"
+    assert filtered_brokers[0].sec_positions[0].positions[0].pos_disable, \
+        "Mismatched: expected pos_disable to be True found False"
+
+    # updating positions using patch
+    patch_dict = {"_id": 1,
+                  "eligible_brokers": [
+                      {"_id": created_contact_limit.eligible_brokers[0].id,
+                       "sec_positions": [
+                           {"_id": created_contact_limit.eligible_brokers[0].sec_positions[3].id,
+                            "positions": [{"_id": created_contact_limit.eligible_brokers[0].sec_positions[3].positions[0].id,
+                                           "pos_disable": True}]}]}]}
+    patched_contact_limit = email_book_service_native_web_client.patch_contact_limits_client(patch_dict)
+    assert patched_contact_limit.eligible_brokers, \
+        f"Mismatch: Can't find eligible_brokers after contact_limit create, {patched_contact_limit=} "
+    for eligible_broker in patched_contact_limit.eligible_brokers:
+        assert eligible_broker.id is not None, \
+            f"Mismatch: Can't find id in created {eligible_broker=}, {patched_contact_limit=}"
+        for sec_pos in eligible_broker.sec_positions:
+            assert sec_pos.id is not None, \
+                f"Mismatch: Can't find id in created {sec_pos=}, {patched_contact_limit=}"
+            for position in sec_pos.positions:
+                assert position.id is not None, \
+                    f"Mismatch: Can't find id in created {position=}, {patched_contact_limit=}"
+    # checking other 2 sec_positions
+    security_id1 = leg1_leg2_symbol_list[1][0]
+    security_id2 = leg1_leg2_symbol_list[1][1]
+    filtered_brokers = (
+        email_book_service_native_web_client.get_dismiss_filter_contact_limit_brokers_query_client(security_id1,
+                                                                                                        security_id2))
+    assert len(filtered_brokers[0].sec_positions) == 2, \
+        f"Mismatched: expected length of sec_positions: 2, received: {len(filtered_brokers[0].sec_positions)=}"
+    assert filtered_brokers[0].sec_positions[1].positions[0].pos_disable, \
+        "Mismatched: expected pos_disable to be True found False"
+
+    # creating sec_positions using put
+    patched_contact_limit.eligible_brokers[0].sec_positions.extend(sec_positions_list[4:6])
+    put_contact_limit = email_book_service_native_web_client.put_contact_limits_client(
+        patched_contact_limit)
+    assert put_contact_limit.eligible_brokers, \
+        f"Mismatch: Can't find eligible_brokers after contact_limit create, {put_contact_limit=} "
+    for eligible_broker in put_contact_limit.eligible_brokers:
+        assert eligible_broker.id is not None, \
+            f"Mismatch: Can't find id in created {eligible_broker=}, {put_contact_limit=}"
+        for sec_pos in eligible_broker.sec_positions:
+            assert sec_pos.id is not None, \
+                f"Mismatch: Can't find id in created {sec_pos=}, {put_contact_limit=}"
+            for position in sec_pos.positions:
+                assert position.id is not None, \
+                    f"Mismatch: Can't find id in created {position=}, {put_contact_limit=}"
+    # checking new sec_positions
+    security_id1 = leg1_leg2_symbol_list[2][0]
+    security_id2 = leg1_leg2_symbol_list[2][1]
+    filtered_brokers = (
+        email_book_service_native_web_client.get_dismiss_filter_contact_limit_brokers_query_client(security_id1,
+                                                                                                        security_id2))
+    assert len(filtered_brokers[0].sec_positions) == 2, \
+        f"Mismatched: expected length of sec_positions: 2, received: {len(filtered_brokers[0].sec_positions)=}"
+
+    # creating sec_positions using patch
+    patch_dict = {"_id": 1,
+                  "eligible_brokers": [
+                      {"_id": put_contact_limit.eligible_brokers[0].id,
+                       "sec_positions": [
+                          sec_positions_list[6].to_dict(exclude_none=True),
+                          sec_positions_list[7].to_dict(exclude_none=True)
+                       ]}
+                  ]}
+    patched_contact_limit = email_book_service_native_web_client.patch_contact_limits_client(patch_dict)
+    assert patched_contact_limit.eligible_brokers, \
+        f"Mismatch: Can't find eligible_brokers after contact_limit create, {patched_contact_limit=} "
+    for eligible_broker in patched_contact_limit.eligible_brokers:
+        assert eligible_broker.id is not None, \
+            f"Mismatch: Can't find id in created {eligible_broker=}, {patched_contact_limit=}"
+        for sec_pos in eligible_broker.sec_positions:
+            assert sec_pos.id is not None, \
+                f"Mismatch: Can't find id in created {sec_pos=}, {patched_contact_limit=}"
+            for position in sec_pos.positions:
+                assert position.id is not None, \
+                    f"Mismatch: Can't find id in created {position=}, {patched_contact_limit=}"
+    # checking other 2 sec_positions
+    security_id1 = leg1_leg2_symbol_list[3][0]
+    security_id2 = leg1_leg2_symbol_list[3][1]
+    filtered_brokers = (
+        email_book_service_native_web_client.get_dismiss_filter_contact_limit_brokers_query_client(security_id1,
+                                                                                                        security_id2))
+    assert len(filtered_brokers[0].sec_positions) == 2, \
+        f"Mismatched: expected length of sec_positions: 2, received: {len(filtered_brokers[0].sec_positions)=}"
+
 # sanity test to create and activate pair_plan
 @pytest.mark.nightly
 def test_create_pair_plan(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
@@ -1514,8 +1659,22 @@ def test_add_brokers_to_contact_limits(clean_and_set_limits):
     broker = broker_fixture()
 
     contact_limits_basemodel = ContactLimitsBaseModel.from_kwargs(_id=1, eligible_brokers=[broker])
-    email_book_service_native_web_client.patch_contact_limits_client(
-        contact_limits_basemodel.to_dict(exclude_none=True))
+    updated_contact_limits = email_book_service_native_web_client.patch_contact_limits_client(
+                                    contact_limits_basemodel.to_dict(exclude_none=True))
+
+    assert updated_contact_limits.eligible_brokers, \
+        f"Mismatch: Can't find eligible_brokers after adding it in update, {updated_contact_limits=} "
+    for eligible_broker in updated_contact_limits.eligible_brokers:
+        assert eligible_broker.id is not None, \
+            f"Mismatch: Can't find id in updated {eligible_broker=}, {updated_contact_limits=}"
+
+        for sec_pos in eligible_broker.sec_positions:
+            assert sec_pos.id is not None, \
+                f"Mismatch: Can't find id in updated {sec_pos=}, {updated_contact_limits=}"
+
+            for position in sec_pos.positions:
+                assert position.id is not None, \
+                    f"Mismatch: Can't find id in updated {position=}, {updated_contact_limits=}"
 
     stored_contact_limits_ = email_book_service_native_web_client.get_contact_limits_client(1)
     for stored_broker in stored_contact_limits_.eligible_brokers:

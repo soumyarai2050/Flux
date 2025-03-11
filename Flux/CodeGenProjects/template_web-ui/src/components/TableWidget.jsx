@@ -11,7 +11,7 @@ import { Settings, Close, Visibility, VisibilityOff, FileDownload, LiveHelp, Hel
 import { utils, writeFileXLSX } from 'xlsx';
 import { flux_toggle, flux_trigger_strat } from '../projectSpecificUtils';
 import { generateRowTrees, generateRowsFromTree, getCommonKeyCollections, getTableRowsFromData, sortColumns, getActiveRows } from '../utils';
-import { API_ROOT_URL, DataTypes, DB_ID, Modes } from '../constants';
+import { API_ROOT_URL, DATA_TYPES, DB_ID, MODES } from '../constants';
 import TreeWidget from './TreeWidget';
 import WidgetContainer from './WidgetContainer';
 import TableHead from './TableHead';
@@ -105,7 +105,7 @@ const TableWidget = (props) => {
             updatedCells = updatedCells.filter(cell => !cell.showLess);
         }
         updatedCells = updatedCells.filter(cell => {
-            if (commonkeys.some(commonkey => commonkey.key === cell.key && commonkey.tableTitle === cell.tableTitle && commonkey.sourceIndex === cell.sourceIndex) && props.mode !== Modes.EDIT_MODE) {
+            if (commonkeys.some(commonkey => commonkey.key === cell.key && commonkey.tableTitle === cell.tableTitle && commonkey.sourceIndex === cell.sourceIndex) && props.mode !== MODES.EDIT) {
                 return false;
             }
             return true;
@@ -195,8 +195,9 @@ const TableWidget = (props) => {
         setOpenModalPopup(false);
     }
 
+    // done
     const onRowClick = (e, index, xpath) => {
-        if (props.mode === Modes.EDIT_MODE) {
+        if (props.mode === MODES.EDIT) {
             setOpen(true);
             if (props.widgetType === 'repeatedRoot') {
                 const idx = rowTrees.findIndex(row => row[DB_ID] === index);
@@ -230,9 +231,10 @@ const TableWidget = (props) => {
         }
     }
 
+    // done
     const onRowSelect = (e, rowId) => {
         // row select only allowed in READ mode
-        if (props.mode !== Modes.READ_MODE) {
+        if (props.mode !== MODES.READ) {
             return;
         }
         let updatedSelectedRows;
@@ -257,9 +259,10 @@ const TableWidget = (props) => {
         }
     }
 
+    // done
     const onRowDoubleClick = (e) => {
         // if widget is in READ mode and widget supports EDIT mode, then change mode to EDIT
-        if (props.mode === Modes.READ_MODE && !currentSchema.widget_ui_data_element.is_read_only) {
+        if (props.mode === MODES.READ && !currentSchema.widget_ui_data_element.is_read_only) {
             if (selectedRows.length !== 1) {
                 return;
             } // else - single selected row
@@ -314,6 +317,7 @@ const TableWidget = (props) => {
         setUserChanges(updatedData);
     }
 
+    // done
     const onSettingsItemChange = (e, action, key, value, dataSourceId, source) => {
         // const onSettingsItemChange = (e, key) => {
         // let hide = !e.target.checked;
@@ -351,6 +355,7 @@ const TableWidget = (props) => {
         props.onOverrideChange(enableOverride, disableOverride);
     }
 
+    // done
     const onShowLessChange = (e, action, key, value, dataSourceId, source) => {
         let less = value;
         let updatedHeadCells = headCells.map(cell => cell.tableTitle === key ? { ...cell, showLess: less } : cell)
@@ -374,22 +379,25 @@ const TableWidget = (props) => {
         }
     }
 
+    // done
     const onSettingsOpen = (e) => {
         setOpenSettings(true);
         setSettingsArcholEl(e.currentTarget);
     }
 
+    // done
     const onSettingsClose = (e) => {
         setOpenSettings(false);
         setSettingsArcholEl(null);
     }
 
+    // done
     const onTextChange = useCallback((e, type, xpath, value, dataxpath, validationRes, dataSourceId, source = null) => {
         let updatedData;
         if (value === '') {
             value = null;
         }
-        if (type === DataTypes.NUMBER) {
+        if (type === DATA_TYPES.NUMBER) {
             if (value !== null) {
                 value = value * 1;
             }
@@ -412,6 +420,7 @@ const TableWidget = (props) => {
         }
     }, [data, props.onUpdate, props.onUserChange])
 
+    // done
     const onSelectItemChange = useCallback((e, dataxpath, xpath, dataSourceId, source = null) => {
         let updatedData;
         if (props.widgetType === 'repeatedRoot') {
@@ -429,6 +438,7 @@ const TableWidget = (props) => {
         props.onUserChange(xpath, e.target.value, userChangeDict);
     }, [data, props.onUpdate, props.onUserChange])
 
+    // done
     const onCheckboxChange = useCallback((e, dataxpath, xpath, dataSourceId, source = null) => {
         let updatedData;
         if (props.widgetType === 'repeatedRoot') {
@@ -446,6 +456,7 @@ const TableWidget = (props) => {
         props.onUserChange(xpath, e.target.checked, userChangeDict);
     }, [data, props.onUpdate, props.onUserChange])
 
+    // done
     const onAutocompleteOptionChange = useCallback((e, value, dataxpath, xpath, dataSourceId, source = null) => {
         let updatedData;
         if (props.widgetType === 'repeatedRoot') {
@@ -463,6 +474,7 @@ const TableWidget = (props) => {
         props.onUserChange(xpath, value, userChangeDict);
     }, [data, props.onUpdate, props.onUserChange])
 
+    // done
     const onDateTimeChange = useCallback((dataxpath, xpath, value, dataSourceId, source = null) => {
         let updatedData;
         if (props.widgetType === 'repeatedRoot') {
@@ -480,6 +492,7 @@ const TableWidget = (props) => {
         props.onUserChange(xpath, value, userChangeDict);
     }, [data, props.onUpdate, props.onUserChange])
 
+    // done
     const onButtonClick = useCallback((e, action, xpath, value, dataSourceId, source = null, confirmSave = false) => {
         if (action === 'flux_toggle') {
             let updatedData = flux_toggle(value);
@@ -492,6 +505,7 @@ const TableWidget = (props) => {
         }
     }, [flux_toggle, flux_trigger_strat, props.onButtonToggle])
 
+    // todo - partial done
     const exportToExcel = useCallback(async () => {
         // let originalRows = getTableRowsFromData(props.collections, props.originalData, props.xpath);
         const widgetType = props.widgetType === 'repeatedRoot' ? props.widgetType : 'root';
@@ -501,7 +515,7 @@ const TableWidget = (props) => {
         let originalRows = getTableRowsFromData(props.collections, storedData, props.xpath);
         originalRows.forEach(row => {
             Object.entries(row).forEach(([k, v]) => {
-                if (v !== null && typeof v === DataTypes.OBJECT) {
+                if (v !== null && typeof v === DATA_TYPES.OBJECT) {
                     row[k] = JSON.stringify(v);
                 }
             })
@@ -513,6 +527,7 @@ const TableWidget = (props) => {
         writeFileXLSX(wb, `${props.name}.xlsx`);
     }, [props.collections, props.name, props.xpath])
 
+    // done
     const copyColumnHandler = useCallback((cell) => {
         let sourceIndex = cell.sourceIndex;
         const xpath = cell.tableTitle;
@@ -539,6 +554,7 @@ const TableWidget = (props) => {
         setToastMessage(null);
     }, [])
 
+    // done
     const onColumnOrderChange = (value, xpath) => {
         let columnOrders = cloneDeep(props.columnOrders);
         if (columnOrders) {
@@ -554,16 +570,19 @@ const TableWidget = (props) => {
         props.onColumnOrdersChange(columnOrders);
     }
 
+    // done
     const onVisibilityMenuOpen = (e) => {
         setOpenVisibilityMenu(true);
         setVisibilityMenuAnchorEl(e.currentTarget);
     }
 
+    // done
     const onVisibilityMenuClose = () => {
         setOpenVisibilityMenu(false);
         setVisibilityMenuAnchorEl(null);
     }
 
+    // done
     const visibilityMenuClickHandler = (checked) => {
         if (visibilityMenuClickTimeout.current !== null) {
             // double click event
@@ -587,6 +606,7 @@ const TableWidget = (props) => {
         }
     }
 
+    // done
     const visibilityMenuDoubleClickHandler = (checked) => {
         if (checked) {
             setHide(true);
@@ -596,6 +616,7 @@ const TableWidget = (props) => {
         }
     }
 
+    // todo
     const handleContextMenu = (event) => {
         event.preventDefault();
         setContextMenu(

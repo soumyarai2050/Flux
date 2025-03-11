@@ -2,14 +2,15 @@ import React, { useState, useEffect } from 'react';
 import WidgetContainer from './WidgetContainer';
 import InfinityMenu from 'react-infinity-menu-plus';
 import _, { cloneDeep } from 'lodash';
-import { generateTreeStructure, generateObjectFromSchema, addxpath, getDataxpath, setTreeState, getXpathKeyValuePairFromObject, clearxpath, clearId } from '../utils';
+import { generateObjectFromSchema, addxpath, getDataxpath, setTreeState, getXpathKeyValuePairFromObject, clearxpath, clearId } from '../utils';
 import { Icon } from './Icon';
 import { UnfoldMore, UnfoldLess, VisibilityOff, Visibility } from '@mui/icons-material';
 import { MenuItem, Checkbox, FormControlLabel, Select } from '@mui/material';
 import { AlertErrorMessage } from './Alert';
 import PropTypes from 'prop-types';
-import { DataTypes } from '../constants';
+import { DATA_TYPES } from '../constants';
 import classes from './TreeWidget.module.css';
+import { generateTreeStructure } from '../utils/treeHelper';
 
 const TreeWidget = (props) => {
 
@@ -58,12 +59,12 @@ const TreeWidget = (props) => {
         if (value === '') {
             value = null;
         }
-        if (type === DataTypes.NUMBER) {
+        if (type === DATA_TYPES.NUMBER) {
             if (value !== null) {
                 value = Number(value);
             }
         }
-        if (type === DataTypes.STRING || (type === DataTypes.NUMBER && !isNaN(value))) {
+        if (type === DATA_TYPES.STRING || (type === DATA_TYPES.NUMBER && !isNaN(value))) {
             const updatedData = cloneDeep(props.data);
             _.set(updatedData, dataxpath, value);
             props.onUpdate(updatedData);
@@ -128,7 +129,7 @@ const TreeWidget = (props) => {
             const isArray = xpath.endsWith(']');
             let emptyObject = {};
             if (isArray) {
-                if ([DataTypes.NUMBER, DataTypes.STRING].includes(ref)) {
+                if ([DATA_TYPES.NUMBER, DATA_TYPES.STRING].includes(ref)) {
                     let parentxpath = xpath.substring(0, xpath.lastIndexOf('['));
                     let parentObject = _.get(updatedData, parentxpath);
                     parentObject.push(null)
@@ -184,7 +185,7 @@ const TreeWidget = (props) => {
             storedObj = clearxpath(storedObj);
             if (isArray) {
                 clearId(storedObj);
-                if ([DataTypes.NUMBER, DataTypes.STRING].includes(ref)) {
+                if ([DATA_TYPES.NUMBER, DATA_TYPES.STRING].includes(ref)) {
                     let parentxpath = xpath.substring(0, xpath.lastIndexOf('['));
                     let parentObject = _.get(updatedData, parentxpath);
                     parentObject.push(null)

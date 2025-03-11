@@ -6,7 +6,7 @@ import { Icon } from './Icon';
 import NodeField from './NodeField';
 import PropTypes from 'prop-types';
 import classes from './Node.module.css';
-import { Modes } from '../constants';
+import { MODES } from '../constants';
 import { useTheme } from '@emotion/react';
 
 const Node = (props) => {
@@ -42,7 +42,7 @@ const Node = (props) => {
                 )}
                 <NodeField data={props.data} />
             </Box>
-            {props.data.mode === Modes.EDIT_MODE && props.data.key == undefined && !props.data['data-remove'] && (
+            {props.data.mode === MODES.EDIT && props.data.key == undefined && !props.data['data-remove'] && (
                 <Box className={classes.menu}>
                     <RemoveCircle
                         data-remove={props.data.xpath}

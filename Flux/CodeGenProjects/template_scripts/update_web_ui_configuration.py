@@ -18,7 +18,7 @@ class UpdateWebUIConfiguration:
         self.project_config_file_path: PurePath = self.project_dir / "data" / "config.yaml"
         self.proxy_config_file_path: PurePath = self.proxy_project_dir / "data" / "config.yaml"
         self.web_ui_path: PurePath = self.project_dir / "web-ui"
-        self.project_constants_path: PurePath = self.web_ui_path / "src" / "constants.js"
+        self.project_config_path: PurePath = self.web_ui_path / "src" / "config.js"
         self.project_package_json_path: PurePath = self.web_ui_path / "package.json"
         self.project_schema_path: PurePath = self.web_ui_path / "public" / "schema.json"
 
@@ -39,39 +39,33 @@ class UpdateWebUIConfiguration:
         self.main_server_cache_port: str = self.project_config_yaml_dict.get("main_server_cache_port")
         self.ui_port: str = self.project_config_yaml_dict.get("ui_port")
 
-        self._update_constants_js()
+        self._update_config_js()
         self._update_schema_json()
         self._update_package_json()
 
-    def _update_constants_js(self):
-        with open(self.project_constants_path, 'r') as f:
+    def _update_config_js(self):
+        with open(self.project_config_path, 'r') as f:
             content = f.read()
 
-        content = re.sub(r'export const PROXY_SERVER = [^;]+;',
-                         f'export const PROXY_SERVER = {self.is_proxy_server};', content)
+        content = re.sub(r'export const ENABLE_PROXY = [^;]+;',
+                         f'export const ENABLE_PROXY = {self.is_proxy_server};', content)
 
-        content = re.sub(r'export const PROXY_SERVER_URL = [^;]+;',
-                         f"export const PROXY_SERVER_URL = "
+        content = re.sub(r'export const PROXY_SERVER_ROOT = [^;]+;',
+                         f"export const PROXY_SERVER_ROOT = "
                          f"'http://{self.proxy_server_host}:{self.proxy_server_port}/ui_proxy';", content)
 
         content = re.sub(
-            r'export const API_ROOT_URL = [^;]+;',
-            f'export const API_ROOT_URL = PROXY_SERVER ? PROXY_SERVER_URL : '
-            f'\'http://{self.server_host}:{self.main_server_beanie_port}/{self.project_name}\';', content)
-
-        content = re.sub(
-            r'export const API_ROOT_CACHE_URL = [^;]+;',
-            f'export const API_ROOT_CACHE_URL = \'http://{self.server_host}:{self.main_server_cache_port}/'
-            f'{self.project_name}\';', content)
+            r'export const API_ROOT = [^;]+;',
+            f"export const API_ROOT = 'http://{self.server_host}:{self.main_server_beanie_port}/"+"${PROJECT_NAME}';", content)
 
         content = re.sub(
             r'export const API_PUBLIC_URL = [^;]+;',
             f'export const API_PUBLIC_URL = \'http://{self.server_host}:{self.ui_port}\';', content)
 
-        with open(self.project_constants_path, 'w') as f:
+        with open(self.project_config_path, 'w') as f:
             f.write(content)
 
-        logging.debug(f"constants.js updated successfully for {self.project_name}")
+        logging.debug(f"config.js updated successfully for {self.project_name}")
 
     def _update_schema_connection_details(self, widget_schema):
         connection_details: Dict | None = widget_schema.get("connection_details")

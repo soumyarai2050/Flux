@@ -1,4 +1,4 @@
-import { SeverityType } from '../constants';
+import { SEVERITY_TYPES } from '../constants';
 
 export class AlertCache {
     static severityFirstNLastIdxDict = {};
@@ -27,7 +27,7 @@ export class AlertCache {
 
     static updateSeverityCache(name, id = null, severity, delta) {
         const severityCache = AlertCache.getSeverityCache(name, id);
-        const severityPriority = SeverityType[severity];
+        const severityPriority = SEVERITY_TYPES[severity];
         if (severityCache.hasOwnProperty(severity)) {
             const { first, last } = severityCache[severity];
             if (delta === -1) {
@@ -42,8 +42,8 @@ export class AlertCache {
         } else {
             if (delta === 1) {
                 let higherPrioritySeverityIdx;
-                Object.keys(SeverityType).forEach(k => {
-                    if (SeverityType[k] > severityPriority) {
+                Object.keys(SEVERITY_TYPES).forEach(k => {
+                    if (SEVERITY_TYPES[k] > severityPriority) {
                         if (severityCache.hasOwnProperty(k) && (severityCache[k].last || severityCache[k].last === 0)) {
                             higherPrioritySeverityIdx = severityCache[k].last;
                         }
@@ -61,8 +61,8 @@ export class AlertCache {
                 console.error('updateSeverityCache failed for name: ' + name + ', id: ' + id + ', severity: ' + severity + ', delta: ' + delta);
             }
         }
-        Object.keys(SeverityType).forEach(k => {
-            if (severityCache.hasOwnProperty(k) && SeverityType[k] < severityPriority) {
+        Object.keys(SEVERITY_TYPES).forEach(k => {
+            if (severityCache.hasOwnProperty(k) && SEVERITY_TYPES[k] < severityPriority) {
                 severityCache[k].first += delta;
                 severityCache[k].last += delta;
             }
@@ -74,10 +74,10 @@ export class AlertCache {
         if (severityCache.hasOwnProperty(severity)) {
             return severityCache[severity].first;
         } else {
-            const severityProirity = SeverityType[severity];
+            const severityProirity = SEVERITY_TYPES[severity];
             let lowerPrioritySeverityIdx;
-            Object.keys(SeverityType).some(k => {
-                if (SeverityType[k] < severityProirity) {
+            Object.keys(SEVERITY_TYPES).some(k => {
+                if (SEVERITY_TYPES[k] < severityProirity) {
                     if (severityCache.hasOwnProperty(k) && (severityCache[k].first || severityCache[k].first === 0)) {
                         lowerPrioritySeverityIdx = severityCache[k].first;
                         return true;
@@ -88,8 +88,8 @@ export class AlertCache {
                 return lowerPrioritySeverityIdx;
             }
             let higherPrioritySeverityIdx;
-            Object.keys(SeverityType).some(k => {
-                if (SeverityType[k] > severityProirity) {
+            Object.keys(SEVERITY_TYPES).some(k => {
+                if (SEVERITY_TYPES[k] > severityProirity) {
                     if (severityCache.hasOwnProperty(k) && (severityCache[k].last || severityCache[k].last === 0)) {
                         higherPrioritySeverityIdx = severityCache[k].last;
                     }

@@ -1,6 +1,6 @@
 import React from 'react';
 import { LinearProgress, Tooltip } from '@mui/material';
-import { HoverTextType } from '../constants';
+import { HOVER_TEXT_TYPES } from '../constants';
 import { getColorTypeFromPercentage, normalise } from '../utils';
 import classes from './ValueBasedProgressBar.module.css';
 
@@ -23,11 +23,11 @@ export const ValueBasedProgressBarWithHover = (props) => {
     }
 
     let hoverText = '';
-    if (props.hoverType === HoverTextType.HoverTextType_VALUE) {
+    if (props.hoverType === HOVER_TEXT_TYPES.VALUE) {
         hoverText = `${props.valueFieldName}: ${props.value ? props.value.toLocaleString() : ''}/${maxFieldName}${props.max ? props.max.toLocaleString() : ''}`;
-    } else if (props.hoverType === HoverTextType.HoverTextType_PERCENTAGE) {
+    } else if (props.hoverType === HOVER_TEXT_TYPES.PERCENTAGE) {
         hoverText = props.percentage + ' %';
-    } else if (props.hoverType === HoverTextType.HoverTextType_VALUE_AND_PERCENTAGE) {
+    } else if (props.hoverType === HOVER_TEXT_TYPES.VALUE_AND_PERCENTAGE) {
         hoverText = `${props.valueFieldName}: ${props.value ? props.value.toLocaleString() : ''}/${maxFieldName}${props.max ? props.max.toLocaleString() : ''}|${props.percentage} %`;
     }
 

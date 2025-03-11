@@ -6,9 +6,9 @@ import {
     getLocalizedValueAndSuffix, excludeNullFromObject, formatJSONObjectOrArray,
     getDateTimeFromInt
 } from '../utils';
-import { DataTypes } from '../constants';
-import AbbreviatedJson from './AbbreviatedJson';
-import _, { cloneDeep } from 'lodash';
+import { DATA_TYPES, MODES } from '../constants';
+import JsonView from './JsonView';
+import _, { cloneDeep, isObject } from 'lodash';
 import classes from './CommonKeyWidget.module.css';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -22,15 +22,20 @@ dayjs.extend(timezone);
 const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 const CommonKeyWidget = React.forwardRef((props, ref) => {
+
+    if (props.mode === MODES.EDIT || props.commonkeys.length === 0) return null;
     // filter unset or null values from common keys
-    let commonkeys = props.commonkeys.filter(commonKeyObj => {
-        if (commonKeyObj.value === undefined || commonKeyObj.value === null ||
-            (Array.isArray(commonKeyObj.value) && commonKeyObj.value.length === 0) ||
-            (_.isObject(commonKeyObj.value) && _.keys(commonKeyObj.value).length === 0)) {
-            return false;
-        }
+    let commonkeys = props.commonkeys.filter((obj) => {
+        const { value } = obj;
+        if (value === undefined || value === null) return false;
+        if (Array.isArray(value) && value.length === 0) return false;
+        if (isObject(value) && Object.keys(value) === 0) return false;
+        if (!obj.displayZero && value === 0) return false;
+
         return true;
     })
+
+    if (commonkeys.length === 0) return null;
 
     // sort the common keys based on sequence in ascending order
     commonkeys = commonkeys.sort(function (a, b) {
@@ -87,8 +92,8 @@ const CommonKey = (props) => {
     let abbreviatedField;
     if (collection.abbreviated && collection.abbreviated === "JSON") {
         let updatedData = collection.value;
-        if (collection.type === DataTypes.OBJECT || collection.type === DataTypes.ARRAY || (collection.type === DataTypes.STRING && isValidJsonString(updatedData))) {
-            if (collection.type === DataTypes.OBJECT || collection.type === DataTypes.ARRAY) {
+        if (collection.type === DATA_TYPES.OBJECT || collection.type === DATA_TYPES.ARRAY || (collection.type === DATA_TYPES.STRING && isValidJsonString(updatedData))) {
+            if (collection.type === DATA_TYPES.OBJECT || collection.type === DATA_TYPES.ARRAY) {
                 updatedData = cloneDeep(updatedData);
                 formatJSONObjectOrArray(updatedData, collection.subCollections, props.truncateDateTime);
                 updatedData = clearxpath(updatedData);
@@ -97,8 +102,8 @@ const CommonKey = (props) => {
                 updatedData = JSON.parse(updatedData);
             }
             excludeNullFromObject(updatedData);
-            abbreviatedField = (<AbbreviatedJson open={open} onClose={onCloseAbbreviatedField} src={updatedData} />)
-        } else if (collection.type === DataTypes.STRING && !isValidJsonString(updatedData)) {
+            abbreviatedField = (<JsonView open={open} onClose={onCloseAbbreviatedField} src={updatedData} />)
+        } else if (collection.type === DATA_TYPES.STRING && !isValidJsonString(updatedData)) {
             let tooltipText = "";
             if (updatedData !== null && updatedData !== undefined) {
                 let lines = updatedData.replace(/\\n/g, '\n').split('\n');
@@ -152,15 +157,15 @@ const CommonKey = (props) => {
     }
 
     let value = collection.value;
-    if (collection.type === DataTypes.DATE_TIME && value) {
+    if (collection.type === DATA_TYPES.DATE_TIME && value) {
         const dateTimeWithTimezone = getDateTimeFromInt(value);
         if (collection.displayType === 'datetime') {
             value = dateTimeWithTimezone.format('YYYY-MM-DD HH:mm:ss.SSS');
         } else {
             value = dateTimeWithTimezone.isSame(dayjs(), 'day') ? dateTimeWithTimezone.format('HH:mm:ss.SSS') : dateTimeWithTimezone.format('YYYY-MM-DD HH:mm:ss.SSS');
         }
-    } else if (value && (collection.type === DataTypes.NUMBER || typeof (value) === DataTypes.NUMBER)) {
-        if (collection.displayType === DataTypes.INTEGER) {
+    } else if (value && (collection.type === DATA_TYPES.NUMBER || typeof (value) === DATA_TYPES.NUMBER)) {
+        if (collection.displayType === DATA_TYPES.INTEGER) {
             value = floatToInt(value);
         }
     } else {
@@ -169,7 +174,7 @@ const CommonKey = (props) => {
 
     let [numberSuffix, v] = getLocalizedValueAndSuffix(collection, value);
     value = v;
-    if (typeof value === DataTypes.NUMBER) {
+    if (typeof value === DATA_TYPES.NUMBER) {
         value = value.toLocaleString();
     }
 
@@ -177,7 +182,11 @@ const CommonKey = (props) => {
 
     return (
         <Box className={classes.item}>
-            {collection.groupStart && <span style={{ color: `${groupIndicatorColor}` }} className={classes.group_indicator}>{collection.parentxpath}: [ </span>}
+            {collection.groupStart && (
+                <span style={{ color: `${groupIndicatorColor}` }} className={classes.group_indicator}>
+                    {collection.tableTitle?.substring(0, collection.tableTitle?.lastIndexOf('.'))}: [
+                </span>
+            )}
             <span style={{ color: `${commonkeyTitleColor}` }}>
                 {collection.elaborateTitle ? collection.tableTitle : collection.title ? collection.title : collection.key}:
             </span>

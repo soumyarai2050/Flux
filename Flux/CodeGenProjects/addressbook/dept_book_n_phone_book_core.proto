@@ -141,7 +141,7 @@ message FxSymbolOverview{
   };
   option (FluxMsgStringLength) = 128;
 
-  required int32 id = 1;
+  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   required string symbol = 2 [(FluxFldPk) = "true", (FluxFldIndex) = true, (FluxFldFilterEnable) = true];
   optional string  company = 3;
   optional string status = 4;

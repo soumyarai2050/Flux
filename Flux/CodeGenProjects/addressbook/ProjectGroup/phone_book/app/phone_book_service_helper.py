@@ -633,9 +633,13 @@ async def handle_shadow_broker_updates(
 
     if isinstance(updated_contact_limits_obj, dict):
         for eligible_broker in updated_contact_limits_obj.get("eligible_brokers"):
+            eligible_broker_id = eligible_broker["_id"]
             del eligible_broker["_id"]
-            if (broker_name := eligible_broker.get("broker")) in shadow_broker_name_to_obj_dict:
-                eligible_broker["_id"] = shadow_brokers[0].id
+
+            broker_name = eligible_broker.get("broker")
+            shadow_broker = shadow_broker_name_to_obj_dict.get(broker_name)
+            if shadow_broker is not None:
+                eligible_broker["_id"] = shadow_broker.id
                 update_broker_list.append(ShadowBrokers.from_dict(eligible_broker))
 
                 # removing broker which exists
@@ -643,12 +647,17 @@ async def handle_shadow_broker_updates(
             else:
                 # since this broker doesn't exist in db - creating it in shadow_brokers
                 create_broker_list.append(ShadowBrokers.from_dict(eligible_broker))
+
+            # setting eligible_broker.id back
+            eligible_broker["_id"] = eligible_broker_id
     else:
         for eligible_broker in updated_contact_limits_obj.eligible_brokers:
             broker_dict = eligible_broker.to_dict()
             del broker_dict["_id"]
-            if (broker_name := eligible_broker.broker) in shadow_broker_name_to_obj_dict:
-                broker_dict["_id"] = shadow_brokers[0].id
+            broker_name = eligible_broker.broker
+            shadow_broker = shadow_broker_name_to_obj_dict.get(broker_name)
+            if shadow_broker is not None:
+                broker_dict["_id"] = shadow_broker.id
                 update_broker_list.append(ShadowBrokers.from_dict(broker_dict))
 
                 # removing broker which exists
@@ -656,6 +665,8 @@ async def handle_shadow_broker_updates(
             else:
                 # since this broker doesn't exist in db - creating it in shadow_brokers
                 create_broker_list.append(ShadowBrokers.from_dict(broker_dict))
+
+            # No need to set eligible_broker.id back since id of generated dict is deleted and not of obj
 
     if create_broker_list:
         await underlying_create_all_shadow_brokers_http(create_broker_list)

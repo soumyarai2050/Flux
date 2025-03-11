@@ -1,59 +1,63 @@
-/* react and third-party library imports */
+/* App.js
+ * Main application component for initializing theme, loading schema, and rendering layout.
+ */
 import './colors.css';
-import React, { useEffect } from 'react';
+import './App.css';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Box, ThemeProvider, CssBaseline, useMediaQuery } from '@mui/material';
 import { HashLoader } from 'react-spinners';
-/* redux CRUD and additional helper actions */
 import { getSchema } from './features/schemaSlice';
-/* custom components */
 import { getTheme } from './theme';
+import { PROJECT_NAME } from './constants';
 import ErrorBoundary from './components/ErrorBoundary';
 import Layout from './components/Layout';
-import './App.css';
-import { useState } from 'react';
 
 
 function App() {
-  /* react states from redux */
-  const { loading } = useSelector((state) => state.schema);
-  const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)');
-  const [mode, setMode] = useState(prefersDarkMode ? 'dark' : 'light');
-  /* dispatch to trigger redux actions */
-  const dispatch = useDispatch();
-  const theme = getTheme(mode);
+    // Redux state
+    const { loading } = useSelector((state) => state.schema);
 
-  useEffect(() => {
-    /* fetch project schema. to be triggered only once when the component loads */
-    dispatch(getSchema());
-  }, [])
+    // Detect system theme preference
+    const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)');
+    const [theme, setTheme] = useState(prefersDarkMode ? 'dark' : 'light');
 
-  const onChangeMode = () => {
-    if (mode === 'light') {
-      setMode('dark');
-    } else {
-      setMode('light');
+    // Redux dispatch
+    const dispatch = useDispatch();
+
+    // Memoized theme object for performance
+    const muiTheme = useMemo(() => getTheme(theme), [theme]);
+
+    // Fetch schema on initial load
+    useEffect(() => {
+        dispatch(getSchema());
+    }, [dispatch]);
+
+    // Sync mode with system preference
+    useEffect(() => {
+        setTheme(prefersDarkMode ? 'dark' : 'light');
+    }, [prefersDarkMode]);
+
+    // Toggle theme mode
+    const handleThemeToggle = () => setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
+
+    // Render loader while schema is loading
+    if (loading) {
+        return (
+            <Box className="app" sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh' }}>
+                <HashLoader size={50} color={muiTheme.palette.primary.main} />
+            </Box>
+        );
     }
 
-  }
-
-  /* render page loader while schema is loaded */
-  if (loading) {
     return (
-      <Box className="app">
-        <HashLoader />
-      </Box>
-    )
-  }
-
-  return (
-    <ThemeProvider theme={theme}> {/* override the default theme */}
-      <CssBaseline /> {/* to set-up consistent css through */}
-      <ErrorBoundary>
-        <Layout mode={mode} onChangeMode={onChangeMode} />
-      </ErrorBoundary>
-    </ThemeProvider>
-  );
+        <ThemeProvider theme={muiTheme}>
+            <CssBaseline /> {/* Ensures consistent baseline styling */}
+            <ErrorBoundary>
+                <Layout theme={theme} onThemeToggle={handleThemeToggle} projectName={PROJECT_NAME} />
+            </ErrorBoundary>
+        </ThemeProvider>
+    );
 }
 
-export default App = React.memo(App);
+export default React.memo(App);

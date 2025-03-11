@@ -1,0 +1,10 @@
+.popup {
+    max-width: none !important;
+}
+
+.text {
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+}

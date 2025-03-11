@@ -156,6 +156,7 @@ class BaseProtoPlugin(ABC):
     widget_ui_option_depending_proto_model_field_name_for_ws_port: ClassVar[str] = \
         "depending_proto_model_field_name_for_ws_port"
     flux_msg_widget_ui_data_element_widget_ui_data_field: ClassVar[str] = "widget_ui_data"
+    flux_msg_widget_ui_data_element_is_model_alert_type_field: ClassVar[str] = "is_model_alert_type"
     flux_msg_aggregate_query_var_name: ClassVar[str] = "FluxMsgAggregateQueryVarName"
     aggregation_type_update: ClassVar[str] = "AggregateType_UpdateAggregate"
     aggregation_type_filter: ClassVar[str] = "AggregateType_FilterAggregate"

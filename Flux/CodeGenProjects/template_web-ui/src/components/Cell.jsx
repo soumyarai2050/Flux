@@ -12,10 +12,11 @@ import {
     clearxpath, isValidJsonString, getSizeFromValue, getShapeFromValue, getColorTypeFromValue,
     getHoverTextType, getValueFromReduxStoreFromXpath, floatToInt,
     validateConstraints, getLocalizedValueAndSuffix, excludeNullFromObject, formatJSONObjectOrArray, toCamelCase, capitalizeCamelCase, getReducerArrrayFromCollections,
-    getDataSourceColor, getDateTimeFromInt
+    getDateTimeFromInt
 } from '../utils';
-import { ColorTypes, DataTypes, Modes } from '../constants';
-import AbbreviatedJson from './AbbreviatedJson';
+import { getDataSourceColor } from '../utils/themeHelper';
+import { COLOR_TYPES, DATA_TYPES, MODEL_TYPES, MODES } from '../constants';
+import JsonView from './JsonView';
 import ValueBasedToggleButton from './ValueBasedToggleButton';
 import { ValueBasedProgressBarWithHover } from './ValueBasedProgressBar';
 import classes from './Cell.module.css';
@@ -85,7 +86,7 @@ const Cell = (props) => {
     }, [props.forceUpdate])
 
     useEffect(() => {
-        if (mode === Modes.READ_MODE) {
+        if (mode === MODES.READ) {
             setInputValue(currentValue);
         }
     }, [currentValue])
@@ -119,7 +120,7 @@ const Cell = (props) => {
 
     const onRowSelect = (e) => {
         if (!collection.commonGroupKey) {
-            if (props.widgetType === 'root') {
+            if (props.modelType === MODEL_TYPES.ROOT) {
                 props.onRowSelect(e, rowindex);
             } else {
                 props.onRowSelect(e, dataSourceId);
@@ -147,7 +148,7 @@ const Cell = (props) => {
     }
 
     const onFocusIn = (e) => {
-        if (mode === Modes.EDIT_MODE) {
+        if (mode === MODES.EDIT) {
             setActive(true);
         }
         onRowSelect(e);
@@ -168,7 +169,7 @@ const Cell = (props) => {
 
     const handleDiffThreshold = (storedValue, updatedValue) => {
         if (collection.diffThreshold) {
-            if (typeof storedValue === DataTypes.NUMBER && typeof updatedValue === DataTypes.NUMBER) {
+            if (typeof storedValue === DATA_TYPES.NUMBER && typeof updatedValue === DATA_TYPES.NUMBER) {
                 const diffPercentage = Math.abs(updatedValue - storedValue) * 100 / Math.abs(storedValue);
                 if (diffPercentage < collection.diffThreshold) {
                     if (props.onForceSave) {
@@ -192,7 +193,7 @@ const Cell = (props) => {
 
     const dataSourceColor = getDataSourceColor(theme, collection.sourceIndex, collection.joinKey, collection.commonGroupKey, props.dataSourceColors?.[collection.sourceIndex]);
 
-    let type = DataTypes.STRING;
+    let type = DATA_TYPES.STRING;
     let enumValues = [];
     let required = false;
 
@@ -204,25 +205,25 @@ const Cell = (props) => {
 
         if (collection.autocomplete) {
             value = value ? value : null;
-        } else if (type === DataTypes.BOOLEAN) {
+        } else if (type === DATA_TYPES.BOOLEAN) {
             value = value ? value : value === false ? false : null;
-        } else if (type === DataTypes.ENUM) {
+        } else if (type === DATA_TYPES.ENUM) {
             value = value ? value : null;
-        } else if (type === DataTypes.NUMBER) {
+        } else if (type === DATA_TYPES.NUMBER) {
             value = (value || value === 0) ? value : '';
-            if (collection.displayType === DataTypes.INTEGER) {
+            if (collection.displayType === DATA_TYPES.INTEGER) {
                 if (value !== '') {
                     value = floatToInt(value);
                 }
             }
-        } else if (type === DataTypes.DATE_TIME) {
+        } else if (type === DATA_TYPES.DATE_TIME) {
             value = value || null;
-        } else if (type === DataTypes.STRING) {
-            // if (mode === Modes.EDIT_MODE) {
+        } else if (type === DATA_TYPES.STRING) {
+            // if (mode === MODES.EDIT) {
             //     value = inputValue ? inputValue : inputValue;
             // }
         } else if (collection.abbreviated === 'JSON') {
-            if (typeof value === DataTypes.OBJECT) {
+            if (typeof value === DATA_TYPES.OBJECT) {
                 value = JSON.stringify(value);
             }
         }
@@ -251,7 +252,7 @@ const Cell = (props) => {
         if (value === null) {
             value = '';
         }
-        if (type === DataTypes.DATE_TIME) {
+        if (type === DATA_TYPES.DATE_TIME) {
             if (value !== '') {
                 const dateTimeWithTimezone = getDateTimeFromInt(value);
                 if (collection.displayType === 'datetime') {
@@ -263,7 +264,7 @@ const Cell = (props) => {
         }
         let [numberSuffix, v] = getLocalizedValueAndSuffix(collection, value);
         value = v;
-        if (typeof value === DataTypes.NUMBER) {
+        if (typeof value === DATA_TYPES.NUMBER) {
             value = value.toLocaleString();
         }
         const classesStr = `${classes.cell} ${selectedClass} ${disabledClass} ${tableCellColorClass} ${tableCellRemove} ${newUpdateClass}`;
@@ -283,8 +284,8 @@ const Cell = (props) => {
     }
     const placeholder = collection.placeholder ? collection.placeholder : !required ? 'optional' : null;
 
-    if (mode === Modes.EDIT_MODE && active && !disabled && !(['repeatedRoot', 'abbreviatedFilter'].includes(props.widgetType) && !props.selected) && (!(collection.ormNoUpdate && !dataAdd)) && !collection.serverPopulate) {
-        if (type !== DataTypes.ENUM && collection.autocomplete) {
+    if (mode === MODES.EDIT && active && !disabled && !([MODEL_TYPES.REPEATED_ROOT, MODEL_TYPES.ABBREVIATION_MERGE].includes(props.modelType) && !props.selected) && (!(collection.ormNoUpdate && !dataAdd)) && !collection.serverPopulate) {
+        if (type !== DATA_TYPES.ENUM && collection.autocomplete) {
             validationError.current = validateConstraints(collection, value);
 
             const endAdornment = validationError.current ? (
@@ -362,7 +363,7 @@ const Cell = (props) => {
                     />
                 </TableCell>
             )
-        } else if (type === DataTypes.BOOLEAN) {
+        } else if (type === DATA_TYPES.BOOLEAN) {
             validationError.current = validateConstraints(collection, value);
             const classesStr = `${classes.cell_input_field} ${selectedClass}`;
             return (
@@ -388,7 +389,7 @@ const Cell = (props) => {
                     />
                 </TableCell >
             )
-        } else if (type === DataTypes.ENUM) {
+        } else if (type === DATA_TYPES.ENUM) {
             validationError.current = validateConstraints(collection, value);
             const endAdornment = validationError.current ? (
                 <InputAdornment position='end'><Tooltip title={validationError.current} disableInteractive><Error color='error' /></Tooltip></InputAdornment>
@@ -429,10 +430,10 @@ const Cell = (props) => {
                     </Select>
                 </TableCell >
             )
-        } else if (type === DataTypes.NUMBER) {
+        } else if (type === DATA_TYPES.NUMBER) {
             // round the decimal places for float. default precision is 2 digits for float
             let decimalScale = 2;
-            if (collection.underlyingtype === DataTypes.INT32 || collection.underlyingtype === DataTypes.INT64) {
+            if (collection.underlyingtype === DATA_TYPES.INT32 || collection.underlyingtype === DATA_TYPES.INT64) {
                 decimalScale = 0;
             }
             if (collection.numberFormat && collection.numberFormat.includes(".")) {
@@ -442,13 +443,13 @@ const Cell = (props) => {
 
             // min constrainsts for numeric field if set.
             let min = collection.min;
-            if (typeof (min) === DataTypes.STRING) {
+            if (typeof (min) === DATA_TYPES.STRING) {
                 min = getValueFromReduxStoreFromXpath(reducerDict, min);
             }
 
             // max constrainsts for numeric field if set.
             let max = collection.max;
-            if (typeof (max) === DataTypes.STRING) {
+            if (typeof (max) === DATA_TYPES.STRING) {
                 max = getValueFromReduxStoreFromXpath(reducerDict, max);
             }
 
@@ -512,7 +513,7 @@ const Cell = (props) => {
                     />
                 </TableCell>
             )
-        } else if (type === DataTypes.DATE_TIME) {
+        } else if (type === DATA_TYPES.DATE_TIME) {
             validationError.current = validateConstraints(collection, value);
             const endAdornment = validationError.current ? (
                 <InputAdornment position='end'><Tooltip title={validationError.current} disableInteractive><Error color='error' /></Tooltip></InputAdornment>
@@ -609,7 +610,7 @@ const Cell = (props) => {
                     </LocalizationProvider>
                 </TableCell>
             )
-        } else if (type === DataTypes.STRING && !collection.abbreviated) {
+        } else if (type === DATA_TYPES.STRING && !collection.abbreviated) {
             validationError.current = validateConstraints(collection, value);
             const endAdornment = validationError.current ? (
                 <InputAdornment position='end'><Tooltip title={validationError.current} disableInteractive><Error color='error' /></Tooltip></InputAdornment>
@@ -674,7 +675,7 @@ const Cell = (props) => {
     if (type === 'alert_bubble') {
         const classesStr = classesArray.join(' ');
         const bubbleCount = value ? value[0] : 0;
-        const bubbleColor = value ? value[1] : ColorTypes.DEFAULT;
+        const bubbleColor = value ? value[1] : COLOR_TYPES.DEFAULT;
         return (
             <TableCell
                 className={classesStr}
@@ -689,7 +690,7 @@ const Cell = (props) => {
     }
 
     // read-only checkbox component
-    if (type === DataTypes.BOOLEAN) {
+    if (type === DATA_TYPES.BOOLEAN) {
         const classesStr = classesArray.join(' ');
         return (
             <TableCell
@@ -802,11 +803,11 @@ const Cell = (props) => {
         const valueFieldName = props.name;
         let maxFieldName = collection.maxFieldName;
         let min = collection.min;
-        if (typeof (min) === DataTypes.STRING) {
+        if (typeof (min) === DATA_TYPES.STRING) {
             min = getValueFromReduxStoreFromXpath(reducerDict, min);
         }
         let max = collection.max;
-        if (typeof (max) === DataTypes.STRING) {
+        if (typeof (max) === DATA_TYPES.STRING) {
             maxFieldName = max.substring(max.lastIndexOf(".") + 1);
             max = getValueFromReduxStoreFromXpath(reducerDict, max);
         }
@@ -840,8 +841,8 @@ const Cell = (props) => {
             classesArray.push(classes.remove);
         }
         let updatedData = currentValue;
-        if (type === DataTypes.OBJECT || type === DataTypes.ARRAY || (type === DataTypes.STRING && isValidJsonString(updatedData))) {
-            if (type === DataTypes.OBJECT || type === DataTypes.ARRAY) {
+        if (type === DATA_TYPES.OBJECT || type === DATA_TYPES.ARRAY || (type === DATA_TYPES.STRING && isValidJsonString(updatedData))) {
+            if (type === DATA_TYPES.OBJECT || type === DATA_TYPES.ARRAY) {
                 updatedData = updatedData ? cloneDeep(updatedData) : {};
                 formatJSONObjectOrArray(updatedData, collection.subCollections, props.truncateDateTime);
                 updatedData = clearxpath(updatedData);
@@ -860,10 +861,10 @@ const Cell = (props) => {
                     align='center'
                     size='small'
                     onClick={onOpenTooltip}>
-                    <AbbreviatedJson open={open} onClose={onCloseTooltip} src={updatedData} />
+                    <JsonView open={open} onClose={onCloseTooltip} src={updatedData} />
                 </TableCell >
             )
-        } else if (type === DataTypes.STRING && !isValidJsonString(updatedData)) {
+        } else if (type === DATA_TYPES.STRING && !isValidJsonString(updatedData)) {
             let tooltipText = '';
             if (updatedData !== null && updatedData !== undefined) {
                 let lines = updatedData.replace(/\\n/g, '\n').split('\n');
@@ -913,12 +914,12 @@ const Cell = (props) => {
     }
 
     let min = collection.min;
-    if (typeof (min) === DataTypes.STRING) {
+    if (typeof (min) === DATA_TYPES.STRING) {
         min = getValueFromReduxStoreFromXpath(reducerDict, min);
     }
 
     let max = collection.max;
-    if (typeof (max) === DataTypes.STRING) {
+    if (typeof (max) === DATA_TYPES.STRING) {
         max = getValueFromReduxStoreFromXpath(reducerDict, max);
     }
     validationError.current = validateConstraints(collection, value, min, max);
@@ -927,7 +928,7 @@ const Cell = (props) => {
         value = '';
     }
     
-    if (collection.type === DataTypes.DATE_TIME) {
+    if (collection.type === DATA_TYPES.DATE_TIME) {
         let text, linkText = null;
         linkText = value;
         if (!linkText) {
@@ -944,7 +945,7 @@ const Cell = (props) => {
     }
     let [numberSuffix, v] = getLocalizedValueAndSuffix(collection, value);
     value = v;
-    if (typeof value === DataTypes.NUMBER) {
+    if (typeof value === DATA_TYPES.NUMBER) {
         value = value.toLocaleString();
     }
     let dataModified = previousValue !== currentValue;
@@ -955,9 +956,9 @@ const Cell = (props) => {
         classesArray.push(disabledClass);
     }
 
-    if (mode === Modes.EDIT_MODE && dataModified && !collection.serverPopulate && !collection.ormNoUpdate) {
+    if (mode === MODES.EDIT && dataModified && !collection.serverPopulate && !collection.ormNoUpdate) {
         let originalValue = previousValue !== undefined && previousValue !== null ? previousValue : '';
-        if (collection.displayType === DataTypes.INTEGER && typeof (originalValue) === DataTypes.NUMBER) {
+        if (collection.displayType === DATA_TYPES.INTEGER && typeof (originalValue) === DATA_TYPES.NUMBER) {
             originalValue = floatToInt(originalValue);
         }
         originalValue = originalValue.toLocaleString();
@@ -1012,7 +1013,7 @@ const Cell = (props) => {
 }
 
 Cell.propTypes = {
-    mode: PropTypes.oneOf([Modes.READ_MODE, Modes.EDIT_MODE]).isRequired,
+    mode: PropTypes.oneOf([MODES.READ, MODES.EDIT]).isRequired,
     rowindex: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
     name: PropTypes.string.isRequired,
     // elaborateTitle: PropTypes.string.isRequired,

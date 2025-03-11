@@ -135,6 +135,7 @@ message WidgetUIData{
   optional int32 rows_per_page = 13;
   optional bool highlight_update = 14 [default = false];
   optional bool truncate_date_time = 15 [default = false];
+  repeated string pinned = 16;
 }
 
 message UIButton{

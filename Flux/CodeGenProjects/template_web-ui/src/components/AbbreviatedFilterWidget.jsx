@@ -8,7 +8,7 @@ import { Download, Delete, Settings, FileDownload, Visibility, ColorLens } from 
 import PropTypes from 'prop-types';
 import { Icon } from './Icon';
 import _, { cloneDeep } from 'lodash';
-import { DB_ID, Modes, DataTypes, ColorTypes, Layouts } from '../constants';
+import { DB_ID, MODES, DATA_TYPES, COLOR_TYPES, Layouts } from '../constants';
 import {
     getAlertBubbleColor, getAlertBubbleCount, getIdFromAbbreviatedKey, getAbbreviatedKeyFromId,
     getCommonKeyCollections, getTableColumns, sortColumns,
@@ -60,10 +60,12 @@ function AbbreviatedFilterWidget(props) {
 
     const maxRowSize = useMemo(() => getMaxRowSize(activeRows), [activeRows]);
 
+    // todo - check
     useEffect(() => {
         setLoading(true);
     }, [props.collectionIndex])
 
+    // deprecated
     const items = useMemo(() => {
         return props.items.filter(item => {
             const itemId = getIdFromAbbreviatedKey(props.abbreviated, item);
@@ -73,6 +75,7 @@ function AbbreviatedFilterWidget(props) {
         })
     }, [props.items, props.abbreviated, props.itemsMetadata])
 
+    // deprecated
     useEffect(() => {
         if (window.Worker) {
             worker.postMessage({
@@ -91,6 +94,7 @@ function AbbreviatedFilterWidget(props) {
         }
     }, [items, props.modifiedItemsMetadataDict, page, rowsPerPage, sortOrders, props.filters, props.joinBy])
 
+    // deprecated
     useEffect(() => {
         if (window.Worker) {
             worker.onmessage = (e) => {
@@ -106,14 +110,16 @@ function AbbreviatedFilterWidget(props) {
         }
     }, [worker])
 
+    // deprecated
     useEffect(() => {
-        const tableColumns = getTableColumns(props.collections, Modes.READ_MODE, props.enableOverride, props.disableOverride, props.showLess, true);
+        const tableColumns = getTableColumns(props.collections, MODES.READ, props.enableOverride, props.disableOverride, props.showLess, true);
         const groupedTableColumns = getGroupedTableColumns(tableColumns, maxRowSize, groupedRows, props.joinBy, props.mode, true);
         setHeadCells(groupedTableColumns);
     }, [props.enableOverride, props.disableOverride, props.showLess, maxRowSize, groupedRows, props.joinBy, props.mode])
 
+    // deprecated
     useEffect(() => {
-        if (props.mode === Modes.EDIT_MODE) {
+        if (props.mode === MODES.EDIT) {
             setCommonKeys([]);
         } else {
             const commonKeyCollections = getCommonKeyCollections(activeRows, headCells, !showHidden && !showAll, true, false, !showMore && !moreAll);
@@ -121,6 +127,7 @@ function AbbreviatedFilterWidget(props) {
         }
     }, [activeRows, headCells, props.mode, showHidden, showMore, showAll, moreAll])
 
+    // deprecated
     useEffect(() => {
         const activeItems = [];
         activeRows.map(row => {
@@ -135,12 +142,14 @@ function AbbreviatedFilterWidget(props) {
         }
     }, [activeRows, items, props.abbreviated])
 
+    // todo
     useEffect(() => {
         if (items.length === 0) {
             props.setSelectedItem(null);
         }
     }, [items, props.setSelectedItem])
 
+    // done
     const onButtonClick = (e, action, xpath, value, dataSourceId, source, confirmSave = false) => {
         if (action === 'flux_toggle') {
             let updatedData = flux_toggle(value);
@@ -153,6 +162,7 @@ function AbbreviatedFilterWidget(props) {
         }
     }
 
+    // done
     const handleRequestSort = (event, property, retainSortLevel = false) => {
         let updatedSortOrders = cloneDeep(sortOrders);
         if (!retainSortLevel) {
@@ -173,6 +183,7 @@ function AbbreviatedFilterWidget(props) {
         PageCache.setPage(props.name, 0);
     }
 
+    // done
     const handleRemoveSort = (property) => {
         const updatedSortOrders = sortOrders.filter(o => o.order_by !== property);
         setSortOrders(updatedSortOrders);
@@ -180,10 +191,11 @@ function AbbreviatedFilterWidget(props) {
         props.onSortOrdersChange(updatedSortOrders);
     }
 
+    // done
     const onRowSelect = (e, id) => {
         // event (e) is added to make the onRowSelect interface symmetric. 
         // event is used to unselect the row, not implmented in collection view
-        if (props.mode === Modes.READ_MODE) {
+        if (props.mode === MODES.READ) {
             props.onSelect(id);
             // TODO: below condition is preventing the switch to be efficient
             // if (props.selected !== id) {
@@ -192,11 +204,13 @@ function AbbreviatedFilterWidget(props) {
         }
     }
 
+    // done
     const handleChangePage = (event, newPage) => {
         setPage(newPage);
         PageCache.setPage(newPage);
     };
 
+    // done
     const handleChangeRowsPerPage = (event) => {
         const size = parseInt(event.target.value, 10);
         setRowsPerPage(size);
@@ -206,16 +220,19 @@ function AbbreviatedFilterWidget(props) {
         PageCache.setPage(0);
     };
 
+    // deprecated
     const onSettingsOpen = (e) => {
         setOpenSettings(true);
         setSettingsArcholEl(e.currentTarget);
     }
 
+    // deprecated
     const onSettingsClose = () => {
         setOpenSettings(false);
         setSettingsArcholEl(null);
     }
 
+    // done
     const exportToExcel = () => {
         const updatedRows = cloneDeep(rows);
         updatedRows.forEach(row => {
@@ -227,14 +244,16 @@ function AbbreviatedFilterWidget(props) {
         writeFileXLSX(wb, `${props.name}.xlsx`);
     }
 
+    // done
     const onRowDoubleClick = (e) => {
-        if (props.mode === Modes.READ_MODE) {
+        if (props.mode === MODES.READ) {
             if (!e.target.closest('button')) {
                 props.headerProps.onChangeMode();
             }
         }
     }
 
+    // done
     const onSettingsItemChange = (e, action, key, value, dataSourceId, source) => {
         // const onSettingsItemChange = (e, key) => {
         // let hide = !e.target.checked;
@@ -272,6 +291,7 @@ function AbbreviatedFilterWidget(props) {
         props.onOverrideChange(enableOverride, disableOverride);
     }
 
+    // done
     const onShowLessChange = (e, action, key, value, dataSourceId, source) => {
         let less = value;
         let updatedHeadCells = headCells.map(cell => cell.key === key ? { ...cell, showLess: less } : cell)
@@ -310,14 +330,17 @@ function AbbreviatedFilterWidget(props) {
     //     setHeadCells(updatedHeadCells);
     // }
 
+    // done
     const showAllHandler = (e, action, key, value, dataSourceId, source) => {
         setShowAll(!value);
     }
 
+    // done
     const moreAllHandler = (e, action, key, value, dataSourceId, source) => {
         setMoreAll(!value);
     }
 
+    // todo
     const copyColumnHandler = (cell) => {
         const columnName = cell.key;
         let sourceIndex = cell.sourceIndex;
@@ -338,11 +361,13 @@ function AbbreviatedFilterWidget(props) {
         setToastMessage("column copied to clipboard: " + columnName);
     }
 
+    // todo
     const onCloseToastMessage = () => {
         setClipboardText(null);
         setToastMessage(null);
     }
 
+    // done
     const onColumnOrderChange = (value, xpath) => {
         let columnOrders = cloneDeep(props.columnOrders);
         if (columnOrders) {
@@ -358,11 +383,12 @@ function AbbreviatedFilterWidget(props) {
         props.onColumnOrdersChange(columnOrders);
     }
 
+    // done
     const onTextChange = useCallback((e, type, xpath, value, dataxpath, validationRes, dataSourceId, source) => {
         if (value === '') {
             value = null;
         }
-        if (type === DataTypes.NUMBER) {
+        if (type === DATA_TYPES.NUMBER) {
             if (value !== null) {
                 value = value * 1;
             }
@@ -383,16 +409,19 @@ function AbbreviatedFilterWidget(props) {
         }
     }, [props.onUpdate, props.onUserChange, props.modifiedItemsMetadataDict, props.selected])
 
+    // done
     const onVisibilityMenuOpen = (e) => {
         setOpenVisibilityMenu(true);
         setVisibilityMenuAnchorEl(e.currentTarget);
     }
 
+    // done
     const onVisibilityMenuClose = () => {
         setOpenVisibilityMenu(false);
         setVisibilityMenuAnchorEl(null);
     }
 
+    // done
     const visibilityMenuClickHandler = (checked) => {
         if (visibilityMenuClickTimeout.current !== null) {
             // double click event
@@ -416,6 +445,7 @@ function AbbreviatedFilterWidget(props) {
         }
     }
 
+    // done
     const visibilityMenuDoubleClickHandler = (checked) => {
         if (checked) {
             setShowHidden(false);
@@ -425,6 +455,7 @@ function AbbreviatedFilterWidget(props) {
         }
     }
 
+    // done
     function getFilteredCells() {
         let updatedCells = cloneDeep(headCells);
         if (!showHidden && !showAll) {
@@ -440,6 +471,7 @@ function AbbreviatedFilterWidget(props) {
     const filteredHeadCells = sortColumns(getFilteredCells(), props.columnOrders, props.joinBy && props.joinBy.length > 0, props.centerJoin, props.flip, true);
     const maxSequence = Math.max(...headCells.map(cell => cell.sequenceNumber));
 
+    // deprecated
     const dynamicMenu = (
         <>
             {Object.keys(props.modifiedItemsMetadataDict).map(metadataName => {
@@ -626,7 +658,7 @@ function AbbreviatedFilterWidget(props) {
 
     return (
         <>
-            {props.headerProps.layout === Layouts.ABBREVIATED_FILTER_LAYOUT ? (
+            {props.headerProps.layout === LAYOUT_TYPES.ABBREVIATION_MERGE ? (
                 <WidgetContainer
                     name={props.headerProps.name}
                     title={props.headerProps.title}
@@ -676,7 +708,7 @@ function AbbreviatedFilterWidget(props) {
                                             // prefixCells={1}
                                             // suffixCells={props.bufferListFieldAttrs.hide ? 0 : 1}
                                             headCells={filteredHeadCells}
-                                            // mode={Modes.READ_MODE}
+                                            // mode={MODES.READ}
                                             mode={props.headerProps.mode}
                                             sortOrders={sortOrders}
                                             onRequestSort={handleRequestSort}
@@ -689,7 +721,7 @@ function AbbreviatedFilterWidget(props) {
                                                 activeRows.map((row, index) => {
                                                     // let selected = cellRow["data-id"] === props.selected;
                                                     // let alertBubbleCount = 0;
-                                                    // let alertBubbleColor = ColorTypes.INFO;
+                                                    // let alertBubbleColor = COLOR_TYPES.INFO;
                                                     // if (props.alertBubbleSource) {
                                                     //     let alertBubbleData;
                                                     //     const source = props.alertBubbleSource.split('.')[0];
@@ -729,13 +761,13 @@ function AbbreviatedFilterWidget(props) {
                                                                     }
                                                                     let selected = cellRow ? cellRow["data-id"] === props.selected : false;
                                                                     const buttonDisable = cellRow ? props.selected !== cellRow["data-id"] : false;
-                                                                    // let mode = Modes.READ_MODE;
+                                                                    // let mode = MODES.READ;
                                                                     let mode = props.headerProps.mode;
                                                                     let rowindex = cellRow ? cellRow["data-id"] : i;
                                                                     // let collection = props.collections.find(c => c.key === cell.key);
                                                                     if (cell.type === "progressBar") {
                                                                         cell = _.cloneDeep(cell);
-                                                                        if (typeof (cell.min) === DataTypes.STRING) {
+                                                                        if (typeof (cell.min) === DATA_TYPES.STRING) {
                                                                             let min = cell.min;
                                                                             const source = min.split('.')[0];
                                                                             cell.minFieldName = min.split('.').pop();
@@ -747,7 +779,7 @@ function AbbreviatedFilterWidget(props) {
                                                                                 }
                                                                             }
                                                                         }
-                                                                        if (typeof (cell.max) === DataTypes.STRING) {
+                                                                        if (typeof (cell.max) === DATA_TYPES.STRING) {
                                                                             let max = cell.max;
                                                                             const source = max.split('.')[0];
                                                                             cell.maxFieldName = max.split('.').pop();
@@ -805,7 +837,7 @@ function AbbreviatedFilterWidget(props) {
                                                                             onSelectItemChange={() => { }}
                                                                             onAutocompleteOptionChange={() => { }}
                                                                             onDateTimeChange={() => { }}
-                                                                            forceUpdate={props.mode === Modes.READ_MODE}
+                                                                            forceUpdate={props.mode === MODES.READ}
                                                                             truncateDateTime={props.truncateDateTime}
                                                                             widgetType='abbreviatedFilter'
                                                                             onForceSave={props.onForceSave}
@@ -853,7 +885,7 @@ function AbbreviatedFilterWidget(props) {
                         <CopyToClipboard text={clipboardText} copy={clipboardText !== null} />
                     </Fragment>
                 </WidgetContainer>
-            ) : props.headerProps.layout === Layouts.PIVOT_TABLE ? (
+            ) : props.headerProps.layout === LAYOUT_TYPES.PIVOT_TABLE ? (
                 <WidgetContainer
                     name={props.headerProps.name}
                     title={props.headerProps.title}
@@ -864,7 +896,7 @@ function AbbreviatedFilterWidget(props) {
                     onChangeLayout={props.headerProps.onChangeLayout}>
                     {rows.length > 0 && <PivotTable pivotData={rows} />}
                 </WidgetContainer>
-            ) : props.headerProps.layout === Layouts.CHART ? (
+            ) : props.headerProps.layout === LAYOUT_TYPES.CHART ? (
                 <ChartWidget
                     name={props.headerProps.name}
                     title={props.headerProps.title}

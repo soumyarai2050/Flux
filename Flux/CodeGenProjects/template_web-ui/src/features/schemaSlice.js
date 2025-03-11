@@ -1,7 +1,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 import _ from 'lodash';
-import { API_PUBLIC_URL, Modes, SCHEMA_AUTOCOMPLETE_XPATH, SCHEMA_DEFINITIONS_XPATH } from '../constants';
+import { API_PUBLIC_URL, MODES, SCHEMA_AUTOCOMPLETE_XPATH, SCHEMA_DEFINITIONS_XPATH } from '../constants';
 import { createCollections, getParentSchema, FileOptions } from '../utils';
 
 const initialState = {
@@ -54,7 +54,7 @@ const schemaSlice = createSlice({
                         xpath = schemaName;
                         callerProps.xpath = xpath;
                         callerProps.parentSchema = getParentSchema(schema, schemaName);
-                        callerProps.mode = Modes.READ_MODE;
+                        callerProps.mode = MODES.READ;
                     }
                     state.schemaCollections[schemaName] = createCollections(schema, currentSchema, callerProps, undefined, undefined, xpath);
                 }

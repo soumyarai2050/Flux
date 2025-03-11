@@ -1,0 +1,7 @@
+.card_header {
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    justify-content: space-between;
+}

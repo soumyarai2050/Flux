@@ -16,12 +16,14 @@ export const Icon = (props) => {
                 name={props.name}
                 size='small'
                 onClick={props.onClick}
-                onDoubleClick={props.onDoubleClick ? props.onDoubleClick : () => {}}>
+                onDoubleClick={props.onDoubleClick ? props.onDoubleClick : () => { }}>
                 {props.children}
             </IconButton>
         </Tooltip>
     )
 }
+
+export default Icon;
 
 export const ToggleIcon = (props) => {
     let selectedAvatarClass = '';

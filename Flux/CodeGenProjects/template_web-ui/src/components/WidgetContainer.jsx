@@ -3,7 +3,7 @@ import _ from 'lodash';
 import { Typography, Box, ToggleButtonGroup, ToggleButton, ClickAwayListener, Tooltip } from '@mui/material';
 import { Save, Cached, Edit, AccountTree, GridView, TableChartSharp, PivotTableChartSharp, FormatListNumberedSharp, BarChart } from '@mui/icons-material';
 import { Icon } from './Icon';
-import { Modes, Layouts } from '../constants';
+import { MODES, LAYOUT_TYPES } from '../constants';
 import PropTypes from 'prop-types';
 import CommonKeyWidget from './CommonKeyWidget';
 import classes from './WidgetContainer.module.css';
@@ -41,9 +41,9 @@ const WidgetContainer = (props) => {
 
 
     let modeMenu = '';
-    if (props.onSave && props.mode === Modes.EDIT_MODE) {
+    if (props.onSave && props.mode === MODES.EDIT) {
         modeMenu = <Icon className={classes.icon} name="Save" title="Save" onClick={props.onSave}><Save fontSize='small' /></Icon>
-    } else if (props.onChangeMode && props.mode === Modes.READ_MODE) {
+    } else if (props.onChangeMode && props.mode === MODES.READ) {
         modeMenu = <Icon className={classes.icon} name="Edit" title="Edit" onClick={props.onChangeMode}><Edit fontSize='small' /></Icon>
     }
 
@@ -64,17 +64,17 @@ const WidgetContainer = (props) => {
 
     const layoutMenu = showLayoutOptions ? (
         <ClickAwayListener onClickAway={onToggleShowLayoutOptions}>
-            <ToggleButtonGroup className={classes.toggle_button_group} value={props.layout ? props.layout : Layouts.TABLE_LAYOUT} size='small'>
+            <ToggleButtonGroup className={classes.toggle_button_group} value={props.layout ? props.layout : LAYOUT_TYPES.TABLE} size='small'>
                 {props.supportedLayouts?.map(layout => {
                     return (
                         <ToggleButton key={layout} className={classes.toggle_button} name={layout} value={layout} onClick={() => onChangeLayout(layout)}>
                             <Tooltip title={layout} disableInteractive>
                                 <span>
-                                    {layout === Layouts.TABLE_LAYOUT && <TableChartSharp fontSize='medium' />}
-                                    {layout === Layouts.TREE_LAYOUT && <AccountTree fontSize='medium' />}
-                                    {layout === Layouts.PIVOT_TABLE && <PivotTableChartSharp fontSize='medium' />}
-                                    {layout === Layouts.ABBREVIATED_FILTER_LAYOUT && <FormatListNumberedSharp fontSize='medium' />}
-                                    {layout === Layouts.CHART && <BarChart fontSize='medium' />}
+                                    {layout === LAYOUT_TYPES.TABLE && <TableChartSharp fontSize='medium' />}
+                                    {layout === LAYOUT_TYPES.TREE && <AccountTree fontSize='medium' />}
+                                    {layout === LAYOUT_TYPES.PIVOT_TABLE && <PivotTableChartSharp fontSize='medium' />}
+                                    {layout === LAYOUT_TYPES.ABBREVIATION_MERGE && <FormatListNumberedSharp fontSize='medium' />}
+                                    {layout === LAYOUT_TYPES.CHART && <BarChart fontSize='medium' />}
                                 </span>
                             </Tooltip>
                         </ToggleButton>
@@ -104,7 +104,7 @@ const WidgetContainer = (props) => {
 
     const backgroundColor = theme.palette.primary.dark;
     let widgetBodyClasses = `${classes.widget_body}`;
-    if (props.mode === Modes.EDIT_MODE) {
+    if (props.mode === MODES.EDIT) {
         widgetBodyClasses += ` ${classes.edit}`;
     }
     if (props.scrollLock) {
@@ -129,7 +129,7 @@ const WidgetContainer = (props) => {
                     </div>
                 </div>
             </Typography>
-            {commonkeys.length > 0 && props.mode !== Modes.EDIT_MODE &&
+            {commonkeys.length > 0 && props.mode !== MODES.EDIT &&
                 <CommonKeyWidget
                     ref={commonkeyRef}
                     commonkeys={commonkeys}

@@ -24,20 +24,20 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
     flux_msg_tree_layout_value: str = "UI_TREE"
     flux_msg_table_layout_value: str = "UI_TABLE"
     flux_msg_abbreviated_filter_layout_value: str = "UI_ABBREVIATED_FILTER"
+    root_type: str = 'root'
+    repeated_root_type: str = 'repeated_root'
+    non_root_type: str = 'non_root'
+    abbreviated_merge_type: str = 'abbreviation_merge'
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
         self.project_name: str | None = None
         self.root_msg_list: List[protogen.Message] = []
         self.layout_msg_list: List[protogen.Message] = []
-        self.tree_layout_msg_list: List[protogen.Message] = []
-        self.repeated_tree_layout_msg_list: List[protogen.Message] = []
-        self.table_layout_msg_list: List[protogen.Message] = []
-        self.repeated_table_layout_msg_list: List[protogen.Message] = []
-        self.simple_abbreviated_filter_layout_msg_list: List[protogen.Message] = []
-        self.parent_abbreviated_filter_layout_msg_list: List[protogen.Message] = []
-        self.abbreviated_msg_name_to_dependent_msg_name_dict: Dict[str, str] = {}
-        self.parent_abb_msg_name_to_linked_abb_msg_name_dict: Dict[str, str] = {}
+        self.repeated_msg_list: List[protogen.Message] = []
+        self.abbreviated_merge_layout_msg_list: List[protogen.Message] = []
+        self.alert_type_message_list: List[protogen.Message] = []
+        self.msg_name_to_dependent_msg_name_list_dict: Dict[str, List[str]] = {}
         self.current_proto_file_name: str | None = None
         self.proto_file_name_to_message_list_dict: Dict[str, List[protogen.Message]] = {}
         self.file_name_to_dependency_file_names_dict: Dict[str, List[str]] = {}
@@ -147,6 +147,11 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
                 widget_ui_data_option_value_dict = \
                     self.get_complex_option_value_from_proto(message,
                                                              BaseJSLayoutPlugin.flux_msg_widget_ui_data_element)
+
+                # updating alert list if is alert type
+                if widget_ui_data_option_value_dict.get(BaseJSLayoutPlugin.flux_msg_widget_ui_data_element_is_model_alert_type_field):
+                    self.alert_type_message_list.append(message)
+
                 widget_ui_data_list = (
                     widget_ui_data_option_value_dict.get(
                         BaseJSLayoutPlugin.flux_msg_widget_ui_data_element_widget_ui_data_field))
@@ -155,79 +160,35 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
                     if "view_layout" in widget_ui_data_dict:
                         self.layout_msg_list.append(message)
                         layout_type: str = widget_ui_data_dict["view_layout"].strip()
-                        if BaseJSLayoutPlugin.flux_msg_tree_layout_value == layout_type:
+                        if BaseJSLayoutPlugin.flux_msg_tree_layout_value == layout_type or BaseJSLayoutPlugin.flux_msg_table_layout_value == layout_type:
                             is_repeated: bool = widget_ui_data_option_value_dict.get("is_repeated")
                             if is_repeated is not None and is_repeated:
-                                self.repeated_tree_layout_msg_list.append(message)
-                            # if is_repeated field is not present in option val or is false both signifies
-                            # message is not repeated view of tree layout
-                            else:
-                                self.tree_layout_msg_list.append(message)
-                        elif BaseJSLayoutPlugin.flux_msg_table_layout_value == layout_type:
-                            is_repeated: bool = widget_ui_data_option_value_dict.get("is_repeated")
-                            if is_repeated is not None and is_repeated:
-                                self.repeated_table_layout_msg_list.append(message)
-                            # if is_repeated field is not present in option val or is false both signifies
-                            # message is not repeated view of tree layout
-                            else:
-                                self.table_layout_msg_list.append(message)
+                                self.repeated_msg_list.append(message)
+
+                            # checking if this message has dependency on any model - if it has then updating msg_name_to_dependent_msg_name_list_dict
+                            dependent_msg_name = widget_ui_data_option_value_dict.get(BaseJSLayoutPlugin.widget_ui_option_depending_proto_model_name_field)
+                            if dependent_msg_name is not None and dependent_msg_name in message_list:
+                                self.msg_name_to_dependent_msg_name_list_dict[message.proto.name] = [dependent_msg_name]
+                            # else not required: if no dependency then no need to update msg_name_to_dependent_msg_name_list_dict
+                            crud_override_option_list = widget_ui_data_option_value_dict.get(BaseJSLayoutPlugin.widget_ui_option_override_default_crud_field)
+                            if crud_override_option_list:
+                                crud_override_option_dict = crud_override_option_list[0]
+                                if crud_override_option_dict:
+                                    crud_dependent_msg_name = crud_override_option_dict.get(BaseJSLayoutPlugin.widget_ui_option_override_default_crud_query_src_model_name_field)
+                                    if dependent_msg_name is not None and dependent_msg_name != crud_dependent_msg_name:
+                                        raise Exception(f"multiple dependents found for non-filter model "
+                                                        f"{message.proto.name}, {dependent_msg_name=}, "
+                                                        f"{crud_dependent_msg_name=}")
+                                    if crud_dependent_msg_name is not None and crud_dependent_msg_name in message_list:
+                                        self.msg_name_to_dependent_msg_name_list_dict[message.proto.name] = [crud_dependent_msg_name]
+                                    # else not required: if no dependency then no need to update msg_name_to_dependent_msg_name_list_dict
+                            # else not required: no crud override set
                         elif BaseJSLayoutPlugin.flux_msg_abbreviated_filter_layout_value == layout_type:
-                            self.simple_abbreviated_filter_layout_msg_list.append(message)
-                            fld_abbreviated_option_value = None
-                            for field in message.fields:
-                                fld_abbreviated_option_value = \
-                                    self.get_simple_option_value_from_proto(field,
-                                                                            BaseJSLayoutPlugin.flux_fld_abbreviated)
-                                if fld_abbreviated_option_value is not None:
-                                    break
-                            else:
-                                err_str = (f"Could not find {BaseJSLayoutPlugin.flux_fld_abbreviated} in any "
-                                           f"of fields of abbreviated type message {message.proto.name}")
-                                logging.exception(err_str)
-                                raise Exception(err_str)
-                            dependent_msg_name = fld_abbreviated_option_value.split(".")[0]
-                            if ":" in dependent_msg_name:
-                                dependent_msg_name = dependent_msg_name.split(":")[-1]
-                            # else not required: if ":" not present then taking first '.' seperated name
-                            self.abbreviated_msg_name_to_dependent_msg_name_dict[message.proto.name] = (
-                                dependent_msg_name)
-                        else:
-                            err_str = f"{layout_type} is not a valid layout option value found in proto message " \
-                                      f"{message.proto.name}"
-                            logging.exception(err_str)
-                            raise Exception(err_str)
+                            self.abbreviated_merge_layout_msg_list.append(message)
+                            dependent_msg_name_list = self._get_msg_names_list_used_in_abb_option_val(message)
+                            self.msg_name_to_dependent_msg_name_list_dict[message.proto.name] = dependent_msg_name_list
                 # else not required: Avoiding if flx_msg_widget_ui_data doesn't have layout field
             # else not required: If msg doesn't have flx_msg_widget_ui_data then it will not have layout field
-
-            # Collecting all parent_abbreviated_type message from simple_abbreviated_type list
-            parent_abb_msg_name_list = []
-            for abb_msg_name, abb_dependent_msg_name in self.abbreviated_msg_name_to_dependent_msg_name_dict.items():
-                for msg in message_list:
-                    found_msg = False
-                    if abb_dependent_msg_name == msg.proto.name:
-                        found_msg = True
-                        for field in msg.fields:
-                            if self.is_option_enabled(field, BaseJSLayoutPlugin.flux_fld_abbreviated_link):
-                                abb_link_option_val = \
-                                    self.get_simple_option_value_from_proto(field,
-                                                                            BaseJSLayoutPlugin.flux_fld_abbreviated_link)
-                                dependent_abb_msg_name = abb_link_option_val.split(".")[0]
-                                self.parent_abb_msg_name_to_linked_abb_msg_name_dict[abb_msg_name] = dependent_abb_msg_name
-                                parent_abb_msg_name_list.append(abb_msg_name)
-                                break
-                    if found_msg:
-                        break
-                else:
-                    err_str = f"Could not find any message in proto files with name {abb_dependent_msg_name}"
-                    logging.exception(err_str)
-                    raise Exception(err_str)
-
-            for simple_abb_msg in self.simple_abbreviated_filter_layout_msg_list:
-                if simple_abb_msg.proto.name in parent_abb_msg_name_list:
-                    # adding parent abb type message in parent_abbreviated_filter_layout_msg_list and
-                    # removing it from simple abb type list
-                    self.parent_abbreviated_filter_layout_msg_list.append(simple_abb_msg)
-                    self.simple_abbreviated_filter_layout_msg_list.remove(simple_abb_msg)
 
         if self.response_field_case_style.lower() == "snake":
             self.case_style_convert_method = convert_camel_case_to_specific_case
@@ -247,29 +208,6 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
                         return True
         # message if not from another project for all other cases
         return False
-
-    def _get_ui_msg_dependent_msg_name_from_another_proto(self, message: protogen.Message) -> str | None:
-        """
-        :param message: msg type to check
-        :return: None if not dependent on msg from another proto file else returns
-                 msg name on which it depends from another proto file and if msg is from another
-                 proto file but is not dependent on any other message then returns empty str ''
-        """
-        if self.is_model_from_another_project(message):
-            if BaseJSLayoutPlugin.is_option_enabled(message,
-                                                    BaseJSLayoutPlugin.flux_msg_widget_ui_data_element):
-                option_dict = BaseJSLayoutPlugin.get_complex_option_value_from_proto(
-                    message, BaseJSLayoutPlugin.flux_msg_widget_ui_data_element)
-                dependent_model_name = (
-                    option_dict.get(BaseJSLayoutPlugin.widget_ui_option_depending_proto_model_name_field))
-                if dependent_model_name is None:
-                    return ""
-                else:
-                    return dependent_model_name
-            elif BaseJSLayoutPlugin.is_option_enabled(message,
-                                                      BaseJSLayoutPlugin.flux_msg_widget_ui_option):
-                return ""
-        return None
 
     def _get_abb_option_vals_cleaned_message_n_field_list(self, field: protogen.Field) -> List[str]:
         abbreviated_option_val = (
@@ -325,36 +263,3 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
 
         return msg_list
 
-    def _get_override_default_get_all_crud(self, widget_ui_option_value: Dict):
-        override_default_crud_option_fld_val_list = (
-            widget_ui_option_value.get(BaseJSLayoutPlugin.widget_ui_option_override_default_crud_field))
-        get_all_override_default_crud = None
-        if override_default_crud_option_fld_val_list:
-            for override_default_crud_option_fld_val in override_default_crud_option_fld_val_list:
-                ui_crud_type = (
-                    override_default_crud_option_fld_val.get(
-                        BaseJSLayoutPlugin.widget_ui_option_override_default_crud_ui_crud_type_field))
-                if ui_crud_type == "GET_ALL":
-                    get_all_override_default_crud = override_default_crud_option_fld_val
-        return get_all_override_default_crud
-
-    def _get_msg_name_from_another_file_n_used_in_abb_text(
-            self, message: protogen.Message, abbreviated_dependent_message_name: str) -> List[str]:
-        """
-        :param message: abb type message
-        :param abbreviated_dependent_message_name:
-        :return:
-        """
-        msg_list = []
-        msg_used_in_abb_option_list = self._get_msg_names_list_used_in_abb_option_val(message)
-        if abbreviated_dependent_message_name in msg_used_in_abb_option_list:
-            msg_used_in_abb_option_list.remove(abbreviated_dependent_message_name)
-        for msg_name_used_in_abb_option in msg_used_in_abb_option_list:
-            for file_name, message_list in self.proto_file_name_to_message_list_dict.items():
-                if (file_name != self.current_proto_file_name and
-                        file_name not in self.file_name_to_dependency_file_names_dict[
-                            self.current_proto_file_name]):
-                    for msg in message_list:
-                        if msg.proto.name == msg_name_used_in_abb_option:
-                            msg_list.append(msg_name_used_in_abb_option)
-        return msg_list

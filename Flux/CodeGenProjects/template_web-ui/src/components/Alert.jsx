@@ -3,8 +3,8 @@ import _ from 'lodash';
 import PropTypes from 'prop-types';
 import { Snackbar, Alert as AlertComponent, IconButton } from '@mui/material';
 import { Close } from '@mui/icons-material';
-import { DataTypes } from '../constants';
-import AbbreviatedJson from './AbbreviatedJson';
+import { DATA_TYPES } from '../constants';
+import JsonView from './JsonView';
 import classes from './Alert.module.css';
 
 
@@ -50,13 +50,13 @@ export const AlertErrorMessage = (props) => {
     return (
         <Alert open={props.open} onClose={props.onClose} severity={props.severity}>
             <span>error status: {status}, code: {code}, message: {message}, </span>
-            {typeof (detail) === DataTypes.STRING && <span>detail: {detail}</span>}
+            {typeof (detail) === DATA_TYPES.STRING && <span>detail: {detail}</span>}
             {(Array.isArray(detail) || _.isObject(detail)) && <span>detail: {JSON.stringify(detail)}</span>}
             {payload && (
                 <>
                     <span>, payload: </span>
                     <span className={classes.abbreviated_json} onClick={onOpenAbbreviatedField}>
-                        <AbbreviatedJson open={open} onClose={onCloseAbbreviatedField} src={payload} />
+                        <JsonView open={open} onClose={onCloseAbbreviatedField} src={payload} />
                     </span>
                 </>
             )}

@@ -1,22 +1,18 @@
 // third-party package imports
-import _, { cloneDeep, get, isObject, set } from 'lodash';
+import { cloneDeep, get, isObject, isEmpty, isNull, isEqual, has } from 'lodash';
 import dayjs from 'dayjs';
 import axios from 'axios';
 import utc from 'dayjs/plugin/utc';
-import { sha256 } from 'js-sha256';
 // project imports
 import {
-    ColorPriority, ColorTypes, DataTypes, HoverTextType, Modes, ShapeType, SizeType,
-    DB_ID, NEW_ITEM_ID, SCHEMA_DEFINITIONS_XPATH, API_ROOT_URL, SeverityType
+    COLOR_PRIORITY, COLOR_TYPES, DATA_TYPES, HOVER_TEXT_TYPES, MODES, SHAPE_TYPES, SIZE_TYPES,
+    DB_ID, NEW_ITEM_ID, SCHEMA_DEFINITIONS_XPATH, API_ROOT_URL, SEVERITY_TYPES
 } from './constants';
-import Node from './components/Node';
-import HeaderField from './components/HeaderField';
 import * as workerUtils from './workerUtils';
 import { AlertCache } from './utility/alertCache';
-import { Theme } from './theme';
-export const { applyFilter, applyGetAllWebsocketUpdate, floatToInt, getAbbreviatedRows,
+export const { applyFilter, applyGetAllWebsocketUpdate, floatToInt, getRowsFromAbbreviation,
     getActiveRows, getFilterDict, getIdFromAbbreviatedKey, getLocalizedValueAndSuffix,
-    roundNumber, stableSort, sortAlertArray, getColorTypeFromValue, getGroupedTableRows
+    roundNumber, stableSort, sortAlertArray, getColorTypeFromValue, getGroupedTableRows,
 } = workerUtils;
 const LOCAL_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -24,7 +20,7 @@ const LOCAL_TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
 dayjs.extend(utc);
 
 // stores the tree expand/collapse states
-const treeState = {};
+export const treeState = {};
 // tree state setter
 export function setTreeState(xpath, state) {
     treeState[xpath] = state;
@@ -33,14 +29,14 @@ export function setTreeState(xpath, state) {
 export const FileOptions = {};
 
 // support primitive data types
-const primitiveDataTypes = [
-    DataTypes.STRING,
-    DataTypes.BOOLEAN,
-    DataTypes.NUMBER,
-    DataTypes.ENUM,  // pre-defined set of values in schema.json file
-    DataTypes.DATE_TIME,
-    DataTypes.INT64,
-    DataTypes.FLOAT
+export const primitiveDataTypes = [
+    DATA_TYPES.STRING,
+    DATA_TYPES.BOOLEAN,
+    DATA_TYPES.NUMBER,
+    DATA_TYPES.ENUM,  // pre-defined set of values in schema.json file
+    DATA_TYPES.DATE_TIME,
+    DATA_TYPES.INT64,
+    DATA_TYPES.FLOAT
 ];
 // default floating point precision for floating point values
 export const FLOAT_POINT_PRECISION = 2;
@@ -64,7 +60,7 @@ export const ColumnDirection = {
 }
 
 // complex (object and array) field properties. applies/passed to child components also
-const complexFieldProps = [
+export const complexFieldProps = [
     // if set to true, field not shown in edit mode
     { propertyName: "server_populate", usageName: "serverPopulate" },
     // if set to true, field not shown while creation but can be subsequently modified
@@ -87,7 +83,7 @@ const complexFieldProps = [
 ]
 
 // simple field flux properties supported by project
-const fieldProps = [
+export const fieldProps = [
     // sets data type of field
     { propertyName: "type", usageName: "type" },
     // sets display title of field
@@ -231,7 +227,7 @@ function addMessageAttributes(object, attributes, message) {
 
 const KEY_INDICATOR_SEPARATOR = '@@@';
 
-function getAutocompleteDict(autocompleteValue) {
+export function getAutocompleteDict(autocompleteValue) {
     let autocompleteFieldSet = autocompleteValue.split(',').map((field) => field.trim());
     let autocompleteDict = {};
 
@@ -262,7 +258,7 @@ function getAutocompleteDict(autocompleteValue) {
     return autocompleteDict;
 }
 
-function setAutocompleteValue(schema, object, autocompleteDict, propname, usageName) {
+export function setAutocompleteValue(schema, object, autocompleteDict, propname, usageName) {
     for (const pathNIndicator in autocompleteDict) {
         const [path, indicator] = pathNIndicator.split(KEY_INDICATOR_SEPARATOR);
         if (path === propname || object.xpath.endsWith(path)) {
@@ -294,11 +290,11 @@ function getKeyValueDictFromArray(array) {
     return dict;
 }
 
-function getMappingSrcDict(mappingSrc) {
+export function getMappingSrcDict(mappingSrc) {
     return getKeyValueDictFromArray(mappingSrc)
 }
 
-function getMetaFieldDict(metaFieldList) {
+export function getMetaFieldDict(metaFieldList) {
     return getKeyValueDictFromArray(metaFieldList);
 }
 
@@ -339,7 +335,7 @@ export function createCollections(schema, currentSchema, callerProps, collection
                 collection.rootLevel = true;
             }
 
-            if (v.type === DataTypes.ENUM) {
+            if (v.type === DATA_TYPES.ENUM) {
                 let ref = v.items.$ref.split('/');
                 collection.autocomplete_list = getEnumValues(schema, ref, v.type);
             }
@@ -398,7 +394,7 @@ export function createCollections(schema, currentSchema, callerProps, collection
 
             let isRedundant = true;
             if (collections.every(col => col.tableTitle !== collection.tableTitle)) {
-                if (!(collection.serverPopulate && callerProps.mode === Modes.EDIT_MODE)) {
+                if (!(collection.serverPopulate && callerProps.mode === MODES.EDIT)) {
                     isRedundant = false;
                 }
             }
@@ -407,7 +403,7 @@ export function createCollections(schema, currentSchema, callerProps, collection
                 collections.push(collection);
             }
 
-        } else if (v.type === DataTypes.ARRAY) {
+        } else if (v.type === DATA_TYPES.ARRAY) {
             collection.key = k;
             let elaborateTitle = objectxpath ? objectxpath + '.' + k : k;
             collection.tableTitle = elaborateTitle;
@@ -459,7 +455,7 @@ export function createCollections(schema, currentSchema, callerProps, collection
 
             let isRedundant = true;
             if (collections.every(col => col.tableTitle !== collection.tableTitle)) {
-                if (!(collection.serverPopulate && callerProps.mode === Modes.EDIT_MODE)) {
+                if (!(collection.serverPopulate && callerProps.mode === MODES.EDIT)) {
                     isRedundant = false;
                 }
             }
@@ -472,7 +468,7 @@ export function createCollections(schema, currentSchema, callerProps, collection
             } else {
                 createCollections(schema, record, callerProps, collections, sequence, updatedxpath, elaborateTitle);
             }
-        } else if (v.type === DataTypes.OBJECT) {
+        } else if (v.type === DATA_TYPES.OBJECT) {
             collection.key = k;
             let elaborateTitle = objectxpath ? objectxpath + '.' + k : k;
             collection.tableTitle = elaborateTitle;
@@ -519,7 +515,7 @@ export function createCollections(schema, currentSchema, callerProps, collection
 
             let isRedundant = true;
             if (collections.every(col => col.tableTitle !== collection.tableTitle)) {
-                if (!(collection.serverPopulate && callerProps.mode === Modes.EDIT_MODE)) {
+                if (!(collection.serverPopulate && callerProps.mode === MODES.EDIT)) {
                     isRedundant = false;
                 }
             }
@@ -559,13 +555,13 @@ export function generateObjectFromSchema(schema, currentSchema, additionalProps,
 
         if (objToDup) {
             // if reached here, server_populate and ui_update_only fields are already ignored
-            if ([DataTypes.STRING, DataTypes.NUMBER, DataTypes.BOOLEAN, DataTypes.DATE_TIME, DataTypes.ENUM].includes(metadata.type)) {
-                object[propname] = _.get(objToDup, xpath);
+            if ([DATA_TYPES.STRING, DATA_TYPES.NUMBER, DATA_TYPES.BOOLEAN, DATA_TYPES.DATE_TIME, DATA_TYPES.ENUM].includes(metadata.type)) {
+                object[propname] = get(objToDup, xpath);
                 return;
             }
         }
 
-        if (metadata.type === DataTypes.STRING) {
+        if (metadata.type === DATA_TYPES.STRING) {
             object[propname] = metadata.hasOwnProperty('default') ? metadata.default : null;
             // autocomplete overrides the default if set on string. Set default via autocomplete
             if (currentSchema.hasOwnProperty('auto_complete') || metadata.hasOwnProperty('auto_complete')) {
@@ -585,14 +581,14 @@ export function generateObjectFromSchema(schema, currentSchema, additionalProps,
                     }
                 }
             }
-        } else if (metadata.type === DataTypes.NUMBER) {
+        } else if (metadata.type === DATA_TYPES.NUMBER) {
             object[propname] = metadata.hasOwnProperty('default') ? metadata.default : null;
-        } else if (metadata.type === DataTypes.BOOLEAN) {
+        } else if (metadata.type === DATA_TYPES.BOOLEAN) {
             object[propname] = metadata.hasOwnProperty('default') ? metadata.default : false;
-        } else if (metadata.type === DataTypes.DATE_TIME) {
+        } else if (metadata.type === DATA_TYPES.DATE_TIME) {
             // default date-time is null (unassigned)
             object[propname] = null;
-        } else if (metadata.type === DataTypes.ENUM) {
+        } else if (metadata.type === DATA_TYPES.ENUM) {
             let ref = metadata.items.$ref.split('/')
             let enumdata = getEnumValues(schema, ref, metadata.type)
             object[propname] = metadata.hasOwnProperty('default') ? metadata.default : enumdata ? enumdata[0] : null;
@@ -614,7 +610,7 @@ export function generateObjectFromSchema(schema, currentSchema, additionalProps,
                     }
                 }
             }
-        } else if (metadata.type === DataTypes.ARRAY) {
+        } else if (metadata.type === DATA_TYPES.ARRAY) {
             // for arrays of primitive data types
             if (!metadata.hasOwnProperty('items') || (metadata.hasOwnProperty('items') && primitiveDataTypes.includes(metadata.underlying_type))) {
                 object[propname] = [];
@@ -633,7 +629,7 @@ export function generateObjectFromSchema(schema, currentSchema, additionalProps,
                     object[propname].push(child);
                 }
             }
-        } else if (metadata.type === DataTypes.OBJECT) {
+        } else if (metadata.type === DATA_TYPES.OBJECT) {
             let ref = metadata.items.$ref.split('/');
             let childSchema = ref.length === 2 ? schema[ref[1]] : schema[ref[1]][ref[2]];
             childSchema = cloneDeep(childSchema);
@@ -655,8 +651,8 @@ export function generateObjectFromSchema(schema, currentSchema, additionalProps,
     return object;
 }
 
-function getEnumValues(schema, ref, type) {
-    if (type === DataTypes.ENUM) {
+export function getEnumValues(schema, ref, type) {
+    if (type === DATA_TYPES.ENUM) {
         return schema[ref[1]][ref[2]]['enum'];
     }
     return schema[ref[1]][ref[2]];
@@ -674,9 +670,9 @@ export function getDataxpath(data, xpath) {
         originalxpath = originalxpath + currentxpath + '[' + index + ']';
 
         let found = false;
-        if (_.get(data, updatedxpath + currentxpath)) {
-            _.get(data, updatedxpath + currentxpath).forEach((obj, idx) => {
-                let propname = _.keys(obj).find(key => key.startsWith('xpath_'));
+        if (get(data, updatedxpath + currentxpath)) {
+            get(data, updatedxpath + currentxpath).forEach((obj, idx) => {
+                let propname = Object.keys(obj).find(key => key.startsWith('xpath_'));
                 if (!propname) return;
                 let propxpath = obj[propname].substring(0, obj[propname].lastIndexOf('.'));
                 if (propxpath === originalxpath) {
@@ -697,13 +693,13 @@ export function getDataxpath(data, xpath) {
     return updatedxpath;
 }
 
-function compareNodes(originalData, data, dataxpath, propname, xpath) {
+export function compareNodes(originalData, data, dataxpath, propname, xpath) {
     let object = {};
     let current = data[propname];
     let original = originalData[propname];
     if (dataxpath || xpath) {
-        current = hasxpath(data, dataxpath) ? _.get(data, dataxpath)[propname] : undefined;
-        original = hasxpath(originalData, xpath) ? _.get(originalData, xpath)[propname] : undefined;
+        current = hasxpath(data, dataxpath) ? get(data, dataxpath)[propname] : undefined;
+        original = hasxpath(originalData, xpath) ? get(originalData, xpath)[propname] : undefined;
     }
     if (current !== undefined && original !== undefined && (current !== original)) {
         object['data-modified'] = true;
@@ -716,188 +712,6 @@ function compareNodes(originalData, data, dataxpath, propname, xpath) {
     return object;
 }
 
-function addSimpleNode(tree, schema, currentSchema, propname, callerProps, dataxpath, xpath, additionalProps) {
-    let node = {};
-    const data = callerProps.data;
-    const originalData = callerProps.originalData;
-
-    // do not add field if not present in both modified data and original data.
-    if ((Object.keys(data).length === 0 && Object.keys(originalData).length === 0) || (dataxpath && _.get(data, dataxpath) === undefined && _.get(originalData, xpath) === undefined)) return;
-
-    if (primitiveDataTypes.includes(currentSchema)) {
-        node.id = dataxpath;
-        node.required = true;
-        node.xpath = xpath;
-        node.dataxpath = dataxpath;
-        node.customComponent = Node;
-        node.onTextChange = callerProps.onTextChange;
-        node.onFormUpdate = callerProps.onFormUpdate;
-        node.mode = callerProps.mode;
-        node.showDataType = callerProps.showDataType;
-        node.type = currentSchema;
-        node.underlyingtype = additionalProps.underlyingtype;
-
-        if (node.type === DataTypes.ENUM) {
-            node.dropdowndataset = additionalProps.options;
-            node.onSelectItemChange = callerProps.onSelectItemChange;
-        }
-
-        node.value = dataxpath ? _.get(data, dataxpath) : undefined;
-        tree.push(node);
-        return;
-    }
-
-    let attributes = currentSchema.properties[propname];
-    if (attributes.hasOwnProperty('type') && primitiveDataTypes.includes(attributes.type)) {
-        node.id = propname;
-        node.key = propname;
-        node.required = currentSchema.required.some(p => p === propname);
-        node.xpath = xpath ? xpath + '.' + propname : propname;
-        node.dataxpath = dataxpath ? dataxpath + '.' + propname : propname;
-        node.parentcollection = currentSchema.title;
-        node.customComponent = Node;
-        node.onTextChange = callerProps.onTextChange;
-        node.onFormUpdate = callerProps.onFormUpdate;
-        node.mode = callerProps.mode;
-        node.showDataType = callerProps.showDataType;
-        node.index = callerProps.index;
-        node.forceUpdate = callerProps.forceUpdate;
-
-        fieldProps.map(({ propertyName, usageName }) => {
-            if (attributes.hasOwnProperty(propertyName)) {
-                node[usageName] = attributes[propertyName];
-            }
-        })
-
-        node.value = dataxpath ? hasxpath(data, dataxpath) ? _.get(data, dataxpath)[propname] : undefined : data[propname];
-
-        if (attributes.type === DataTypes.BOOLEAN) {
-            node.onCheckboxChange = callerProps.onCheckboxChange;
-        }
-
-        if (attributes.type === DataTypes.ENUM) {
-            let ref = attributes.items.$ref.split('/')
-            let enumdata = getEnumValues(schema, ref, attributes.type);
-            node.dropdowndataset = enumdata;
-            node.onSelectItemChange = callerProps.onSelectItemChange;
-        }
-
-        if (attributes.type === DataTypes.DATE_TIME) {
-            node.onDateTimeChange = callerProps.onDateTimeChange;
-        }
-
-        complexFieldProps.map(({ propertyName, usageName }) => {
-            if (currentSchema.hasOwnProperty(propertyName) || attributes.hasOwnProperty(propertyName)) {
-                const propertyValue = attributes[propertyName] ? attributes[propertyName] : currentSchema[propertyName];
-
-                if (propertyName === 'auto_complete') {
-                    let autocompleteDict = getAutocompleteDict(propertyValue);
-                    setAutocompleteValue(schema, node, autocompleteDict, propname, usageName);
-                    if (node.hasOwnProperty('options')) {
-                        if (node.hasOwnProperty('dynamic_autocomplete')) {
-                            const dynamicValuePath = node.autocomplete.substring(node.autocomplete.indexOf('.') + 1);
-                            const dynamicValue = _.get(data, dynamicValuePath);
-                            if (dynamicValue && schema.autocomplete.hasOwnProperty(dynamicValue)) {
-                                node.options = schema.autocomplete[schema.autocomplete[dynamicValue]];
-                                if (!node.options.includes(node.value) && callerProps.mode === Modes.EDIT_MODE && !node.ormNoUpdate && !node.serverPopulate) {
-                                    node.value = null;
-                                }
-                            }
-                        }
-                        node.customComponentType = 'autocomplete';
-                        node.onAutocompleteOptionChange = callerProps.onAutocompleteOptionChange;
-                    }
-                }
-
-                if (propertyName === 'mapping_underlying_meta_field' || propertyName === 'mapping_src') {
-                    let dict;
-                    if (propertyName === 'mapping_underlying_meta_field') {
-                        dict = getMetaFieldDict(propertyValue);
-                    } else {
-                        dict = getMappingSrcDict(propertyValue);
-                    }
-                    for (const field in dict) {
-                        if (node.xpath.endsWith(field)) {
-                            node[usageName] = dict[field];
-                        }
-                    }
-                }
-                if (!['auto_complete', 'mapping_underlying_meta_field', 'mapping_src'].includes(propertyName)) {
-                    node[usageName] = propertyValue;
-                }
-            }
-        })
-
-        let newprop = compareNodes(originalData, data, dataxpath, propname, xpath);
-        node = { ...node, ...newprop };
-
-        let isRedundant = true;
-        if (!(node.serverPopulate && callerProps.mode === Modes.EDIT_MODE) && !(node.hide && callerProps.hide) && !(node.uiUpdateOnly && node.value === undefined)) {
-            isRedundant = false;
-            if (node.type === DataTypes.BOOLEAN && node.button && callerProps.mode === Modes.EDIT_MODE) {
-                isRedundant = true;
-            }
-        }
-
-        if (!isRedundant) {
-            tree.push({ ...node });
-        }
-    }
-}
-
-function addHeaderNode(node, currentSchema, propname, type, callerProps, dataxpath, xpath, ref, objectState) {
-    let headerNode = {};
-    headerNode.id = Math.random();
-    headerNode.key = propname;
-    headerNode.title = currentSchema.title;
-    headerNode.name = propname;
-    headerNode.type = type
-    headerNode.ref = ref;
-    headerNode.help = currentSchema.help;
-    headerNode.mode = callerProps.mode;
-    headerNode.customComponent = HeaderField;
-    headerNode.xpath = xpath;
-    fieldProps.map(({ propertyName, usageName }) => {
-        if (currentSchema.hasOwnProperty(propertyName)) {
-            headerNode[usageName] = currentSchema[propertyName];
-        }
-    })
-
-    complexFieldProps.map(({ propertyName, usageName }) => {
-        if (currentSchema.hasOwnProperty(propertyName)) {
-            headerNode[usageName] = currentSchema[propertyName];
-        }
-    })
-
-    headerNode.required = !ref ? true : currentSchema.required ? currentSchema.required.some(prop => prop === propname) : true;
-    headerNode.uiUpdateOnly = currentSchema.ui_update_only;
-
-    if (!dataxpath) {
-        headerNode['data-remove'] = true;
-    }
-
-    if (objectState) {
-        const { add, remove } = objectState;
-        if (add) {
-            headerNode['object-add'] = true;
-        }
-        if (remove) {
-            headerNode['object-remove'] = true;
-        }
-    }
-
-    if (treeState.hasOwnProperty(xpath)) {
-        treeState[xpath] = callerProps.isOpen ? true : callerProps.isOpen === false ? false : treeState[xpath];
-    } else {
-        treeState[xpath] = true;
-    }
-
-    headerNode.isOpen = treeState[xpath];
-    headerNode.children = [];
-    node.push(headerNode);
-    return headerNode.children;
-}
-
 function sortSchemaProperties(properties) {
     return Object.keys(properties).sort(function (a, b) {
         if (properties[a].sequence_number < properties[b].sequence_number) return -1;
@@ -908,227 +722,19 @@ function sortSchemaProperties(properties) {
     }, {})
 }
 
-export function generateTreeStructure(schema, currentSchemaName, callerProps, topLevel = true) {
-    // return if full schema is not present
-    let tree = [];
-    if (schema === undefined || schema === null || Object.keys(schema).length === 0) return tree;
 
-    let currentSchema;
-    if (topLevel) {
-        currentSchema = _.get(schema, currentSchemaName);
-    } else {
-        currentSchema = _.get(schema, [SCHEMA_DEFINITIONS_XPATH, currentSchemaName]);
-    }
-    let childNode;
-    // if (currentSchema.widget_ui_data_element && currentSchema.widget_ui_data_element.is_repeated) {
-    //     childNode = addHeaderNode(tree, currentSchema, currentSchemaName, DataTypes.ARRAY, callerProps, currentSchemaName, currentSchemaName);
-    //     for (let i = 0; i < callerProps.data.length; i++) {
-    //         let dataxpath = "[" + i + "]";
-    //         let node = addHeaderNode(childNode, currentSchema, currentSchemaName, DataTypes.OBJECT, callerProps, dataxpath, dataxpath);
-    //         Object.keys(currentSchema.properties).map((propname) => {
-    //             if (callerProps.xpath && callerProps.xpath !== propname) return;
-    //             let metadataProp = currentSchema.properties[propname];
-    //             if (metadataProp.hasOwnProperty('type') && primitiveDataTypes.includes(metadataProp.type)) {
-    //                 addSimpleNode(node, schema, currentSchema, propname, callerProps, dataxpath, null, dataxpath);
-    //             }
-    //             else {
-    //                 dataxpath += dataxpath + "." + propname;
-    //                 addNode(node, schema, metadataProp, propname, callerProps, dataxpath, null, dataxpath);
-    //             }
-    //         });
-    //     }
-    // } else {
-    childNode = addHeaderNode(tree, currentSchema, currentSchemaName, DataTypes.OBJECT, callerProps, currentSchemaName, currentSchemaName);
-    Object.keys(currentSchema.properties).map((propname) => {
-        if (callerProps.xpath && callerProps.xpath !== propname) return;
-        let metadataProp = currentSchema.properties[propname];
-        if (!currentSchema.required.includes(propname)) {
-            metadataProp.required = [];
-        }
-        if (metadataProp.hasOwnProperty('type') && primitiveDataTypes.includes(metadataProp.type)) {
-            addSimpleNode(childNode, schema, currentSchema, propname, callerProps);
-        }
-        else {
-            addNode(childNode, schema, metadataProp, propname, callerProps, propname, null, propname);
-        }
-    });
-    // }
-    return tree;
-}
-
-function addNode(tree, schema, currentSchema, propname, callerProps, dataxpath, type, xpath) {
-    const data = callerProps.data;
-    const originalData = callerProps.originalData;
-    let currentSchemaType = type ? type : currentSchema.type;
-
-    if (currentSchema.hasOwnProperty('items') && currentSchemaType === DataTypes.OBJECT) {
-        if (_.get(data, dataxpath) === undefined && _.get(originalData, xpath) === undefined) return;
-        let headerState = {};
-        if (_.get(originalData, xpath) === undefined) {
-            if (_.get(data, xpath) === null) {
-                headerState.add = true;
-                headerState.remove = false;
-            } else {
-                headerState.add = false;
-                headerState.remove = true;
-            }
-        } else if (currentSchema.hasOwnProperty('orm_no_update')) {
-            if (_.get(originalData, xpath) !== undefined) {
-                headerState.add = false;
-                headerState.remove = false;
-            }
-        } else if (!currentSchema.hasOwnProperty('orm_no_update')) {
-            if (_.get(data, dataxpath) === null) {
-                headerState.add = true;
-                headerState.remove = false;
-            } else {
-                headerState.add = false;
-                headerState.remove = true;
-            }
-        }
-        if (callerProps.mode === Modes.EDIT_MODE && currentSchema.hasOwnProperty('server_populate')) return;
-        let childNode = addHeaderNode(tree, currentSchema, propname, currentSchema.type, callerProps, dataxpath, xpath, currentSchema.items.$ref, headerState);
-        if (_.get(data, dataxpath) === null && (_.get(originalData, xpath) === undefined || _.get(originalData, xpath) === null)) return;
-        let ref = currentSchema.items.$ref.split('/');
-        let metadata = ref.length === 2 ? schema[ref[1]] : schema[ref[1]][ref[2]];
-        metadata = cloneDeep(metadata);
-
-        // if (currentSchema.hasOwnProperty('required') && currentSchema.required.length === 0) {
-        //     metadata.required = [];
-        // }
-
-        if (currentSchema.hasOwnProperty('orm_no_update') || metadata.hasOwnProperty('orm_no_update')) {
-            metadata.orm_no_update = metadata.no_orm_update ? metadata.no_orm_update : currentSchema.orm_no_update;
-        }
-
-        if (currentSchema.hasOwnProperty('server_populate') || metadata.hasOwnProperty('server_populate')) {
-            metadata.server_populate = metadata.server_populate ? metadata.server_populate : currentSchema.server_populate;
-            if (callerProps.mode === Modes.EDIT_MODE) return;
-        }
-
-        if (currentSchema.hasOwnProperty('ui_update_only') || metadata.hasOwnProperty('ui_update_only')) {
-            metadata.ui_update_only = metadata.ui_update_only ? metadata.ui_update_only : currentSchema.ui_update_only;
-        }
-
-        if (currentSchema.hasOwnProperty('auto_complete') || metadata.hasOwnProperty('auto_complete')) {
-            metadata.auto_complete = metadata.auto_complete ? metadata.auto_complete : currentSchema.auto_complete;
-        }
-
-        if (metadata.hasOwnProperty('properties')) {
-            Object.keys(metadata.properties).forEach((prop) => {
-                let metadataProp = metadata.properties[prop];
-                if (!metadata.required.includes(prop)) {
-                    metadataProp.required = [];
-                }
-                if (metadata.hasOwnProperty('ui_update_only')) {
-                    metadataProp.ui_update_only = metadata.ui_update_only;
-                }
-                if (metadata.hasOwnProperty('server_populate')) {
-                    metadataProp.ui_update_only = metadata.server_populate;
-                }
-                if (metadata.hasOwnProperty('orm_no_update')) {
-                    metadataProp.orm_no_update = metadata.orm_no_update;
-                }
-                if (metadata.hasOwnProperty('auto_complete')) {
-                    metadataProp.auto_complete = metadataProp.auto_complete ?? metadata.auto_complete;
-                }
-                if (metadataProp.hasOwnProperty('type') && (metadataProp.type === DataTypes.OBJECT)) {
-                    let childxpath = dataxpath;
-                    if (childxpath) {
-                        childxpath = childxpath + '.' + prop;
-                    }
-                    let updatedxpath = xpath + '.' + prop;
-                    addNode(childNode, schema, metadataProp, prop, callerProps, childxpath, null, updatedxpath);
-                } else if (metadataProp.hasOwnProperty('type') && primitiveDataTypes.includes(metadataProp.type)) {
-                    addSimpleNode(childNode, schema, metadata, prop, callerProps, dataxpath, xpath);
-                } else {
-                    let childxpath = dataxpath;
-                    if (childxpath) {
-                        childxpath = childxpath + '.' + prop;
-                    }
-                    let updatedxpath = xpath + '.' + prop;
-                    addNode(childNode, schema, metadataProp, prop, callerProps, childxpath, null, updatedxpath);
-                }
-            });
-        }
-    } else if (currentSchema.hasOwnProperty('items') && currentSchema.type === DataTypes.ARRAY && !primitiveDataTypes.includes(currentSchema.underlying_type)) {
-        if (callerProps.mode === Modes.EDIT_MODE && currentSchema.hasOwnProperty('server_populate')) return;
-        if (((_.get(data, dataxpath) && _.get(data, dataxpath).length === 0) || (_.keys(data).length > 0 && !_.get(data, dataxpath))) &&
-            ((_.get(originalData, xpath) && _.get(originalData, xpath).length === 0) || !_.get(originalData, xpath))) {
-            let childxpath = dataxpath + '[-1]';
-            let updatedxpath = xpath + '[-1]';
-            addHeaderNode(tree, currentSchema, propname, currentSchema.type, callerProps, childxpath, updatedxpath, currentSchema.items.$ref);
-        } else {
-            let paths = [];
-            if (_.get(originalData, xpath)) {
-                for (let i = 0; i < _.get(originalData, xpath).length; i++) {
-                    let updatedxpath = xpath + '[' + i + ']';
-                    let childxpath = dataxpath + '[' + i + ']';
-                    childxpath = getDataxpath(data, updatedxpath);
-                    paths.push(updatedxpath);
-                    if (!isNodeInSubtree(callerProps, xpath, updatedxpath)) continue;
-                    addNode(tree, schema, currentSchema, propname, callerProps, childxpath, DataTypes.OBJECT, updatedxpath);
-                }
-            }
-            if (_.get(data, dataxpath)) {
-                _.get(data, dataxpath).map((childobject, i) => {
-                    let subpropname = _.keys(childobject).find(key => key.startsWith('xpath_'));
-                    if (!subpropname) return;
-                    let propxpath = childobject[subpropname];
-                    let propindex = propxpath.substring(propxpath.lastIndexOf('[') + 1, propxpath.lastIndexOf(']'));
-                    let updatedxpath = xpath + '[' + propindex + ']';
-                    if (paths.includes(updatedxpath)) return;
-                    let childxpath = dataxpath + '[' + i + ']';
-                    if (!isNodeInSubtree(callerProps, xpath, updatedxpath)) return;
-                    addNode(tree, schema, currentSchema, propname, callerProps, childxpath, DataTypes.OBJECT, updatedxpath);
-                    paths.push(childxpath);
-
-                })
-
-            }
-        }
-    } else if (currentSchema.type === DataTypes.ARRAY) {
-        // array of simple data types
-        if ((_.get(originalData, xpath) === undefined) && _.get(data, dataxpath) === undefined) return;
-        let arrayDataType = currentSchema.underlying_type;
-        if ([DataTypes.INT32, DataTypes.INT64, DataTypes.INTEGER, DataTypes.FLOAT].includes(arrayDataType)) {
-            arrayDataType = DataTypes.NUMBER;
-        }
-        let ref = arrayDataType;
-        const additionalProps = {};
-        additionalProps.underlyingtype = currentSchema.underlying_type;
-        if (currentSchema.underlying_type === DataTypes.ENUM) {
-            ref = currentSchema.items.$ref;
-            let refSplit = ref.split('/');
-            let metadata = refSplit.length === 2 ? schema[refSplit[1]] : schema[refSplit[1]][refSplit[2]];
-            additionalProps.options = metadata.enum;
-        }
-        let childxpath = dataxpath + '[-1]';
-        let updatedxpath = xpath + '[-1]';
-        const objectState = { add: true, remove: false };
-        const childNode = addHeaderNode(tree, currentSchema, propname, currentSchema.type, callerProps, childxpath, updatedxpath, ref, objectState);
-        if (_.get(data, dataxpath)) {
-            _.get(data, dataxpath).forEach((value, i) => {
-                let childxpath = dataxpath + '[' + i + ']';
-                let updatedxpath = xpath + '[' + i + ']';
-                addSimpleNode(childNode, schema, arrayDataType, null, callerProps, childxpath, updatedxpath, additionalProps);
-            })
-        }
-    }
-}
-
-function isNodeInSubtree(callerProps, xpath, dataxpath) {
+export function isNodeInSubtree(callerProps, xpath, dataxpath) {
     xpath = xpath.replace(/\[.\]/g, '[0]');
     if (callerProps.subtree) {
         if (callerProps.xpath) {
             xpath = xpath.substring(xpath.indexOf('.') + 1);
         }
-        if (!_.get(callerProps.subtree, xpath + '[0]')) return false;
+        if (!get(callerProps.subtree, xpath + '[0]')) return false;
         else {
-            let propname = _.keys(_.get(callerProps.subtree, xpath + '[0]')).find(key => key.startsWith('xpath_'));
+            let propname = Object.keys(get(callerProps.subtree, xpath + '[0]')).find(key => key.startsWith('xpath_'));
             if (!propname) return false;
             let propxpath = xpath + '[0].' + propname
-            propxpath = _.get(callerProps.subtree, propxpath);
+            propxpath = get(callerProps.subtree, propxpath);
             propxpath = propxpath.substring(0, propxpath.lastIndexOf(']') + 1);
             if (propxpath !== dataxpath) return false;
         }
@@ -1175,14 +781,14 @@ export function generateRowTrees(jsondata, collections, xpath) {
     const trees = [];
     // if xpath is present, jsondata is subset of data
     if (xpath) {
-        jsondata = _.get(jsondata, xpath);
+        jsondata = get(jsondata, xpath);
     }
     if (!jsondata) {
         return trees;
     }
 
     while (true) {
-        if (_.isArray(jsondata)) {
+        if (Array.isArray(jsondata)) {
             for (let i = 0; i < jsondata.length; i++) {
                 let tree = {};
                 createTree(tree, jsondata[i], null, { delete: 1 }, collections);
@@ -1195,7 +801,7 @@ export function generateRowTrees(jsondata, collections, xpath) {
                 // array object should be of flat-type
                 tree['data-id'] = jsondata[i][DB_ID];
 
-                if (trees.length > 0 && _.isEqual(trees[trees.length - 1], tree)) {
+                if (trees.length > 0 && isEqual(trees[trees.length - 1], tree)) {
                     continue;
                 }
                 trees.push(tree);
@@ -1204,16 +810,19 @@ export function generateRowTrees(jsondata, collections, xpath) {
         } else {
             let tree = {};
             Object.entries(jsondata).map(([k, v]) => {
-                if ([DataTypes.STRING, DataTypes.BOOLEAN, DataTypes.NUMBER].includes(typeof (v))) {
+                if ([DATA_TYPES.STRING, DATA_TYPES.BOOLEAN, DATA_TYPES.NUMBER].includes(typeof (v))) {
                     tree[k] = v;
-                } else if (_.isNull(v)) {
+                } else if (isNull(v)) {
                     tree[k] = null;
                 } else if (Array.isArray(v)) {
                     tree[k] = [];
                     createTree(tree, jsondata[k], k, { delete: 1 }, collections);
-                } else if (_.isObject(v)) {
+                    if (tree[k][0]?.hasOwnProperty('data-id')) {
+                        tree['data-id'] = tree[k][0]['data-id'];
+                    }
+                } else if (isObject(v)) {
                     tree[k] = {};
-                    createTree(tree, jsondata[k], k, { delete: 1 }, collections)
+                    createTree(tree, jsondata[k], k, { delete: 1 }, collections);
                 }
             })
 
@@ -1223,7 +832,7 @@ export function generateRowTrees(jsondata, collections, xpath) {
                 tree['data-id'] = 0;
             }
 
-            if (trees.length > 0 && _.isEqual(trees[trees.length - 1], tree)) {
+            if (trees.length > 0 && isEqual(trees[trees.length - 1], tree)) {
                 break;
             }
             trees.push(tree);
@@ -1261,12 +870,12 @@ function createTree(tree, currentjson, propname, count, collections) {
         if (collections.some(c => c.key === propname && c.hasOwnProperty('abbreviated') && c.abbreviated === "JSON")) {
             tree[propname] = currentjson;
         } else {
-            if (currentjson[0] === null || primitiveDataTypes.includes(typeof currentjson[0])) {
+            if (currentjson[0] === null || currentjson[0] === undefined || primitiveDataTypes.includes(typeof currentjson[0])) {
                 return;
             } else {
                 let node = {};
                 tree[propname].push(node);
-                let xpath = currentjson[0][_.keys(currentjson[0]).find(k => k.startsWith('xpath_'))];
+                let xpath = currentjson[0][Object.keys(currentjson[0]).find(k => k.startsWith('xpath_'))];
                 xpath = xpath ? xpath.substring(0, xpath.lastIndexOf('.')) : xpath;
                 node['data-id'] = currentjson[0].hasOwnProperty(DB_ID) ? currentjson[0][DB_ID] : xpath;
                 createTree(tree[propname], currentjson[0], 0, count, collections);
@@ -1276,9 +885,9 @@ function createTree(tree, currentjson, propname, count, collections) {
                 }
             }
         }
-    } else if (_.isNull(currentjson)) {
+    } else if (isNull(currentjson)) {
         tree[propname] = null;
-    } else if (_.isObject(currentjson)) {
+    } else if (isObject(currentjson)) {
         if (collections.some(c => c.key === propname && c.hasOwnProperty('abbreviated') && c.abbreviated === "JSON")) {
             tree[propname] = currentjson;
         } else {
@@ -1287,12 +896,17 @@ function createTree(tree, currentjson, propname, count, collections) {
                 node = tree;
             }
             Object.entries(currentjson).map(([k, v]) => {
-                if ([DataTypes.STRING, DataTypes.BOOLEAN, DataTypes.NUMBER].includes(typeof (v))) {
+                if ([DATA_TYPES.STRING, DATA_TYPES.BOOLEAN, DATA_TYPES.NUMBER].includes(typeof (v))) {
                     node[k] = v;
-                } else if (typeof (v) === DataTypes.OBJECT) {
-                    node[k] = {};
+                } else if (isNull(v)) {
+                    node[k] = null;
+                } else if (Array.isArray(v)) {
+                    node[k] = [];
                     createTree(node, currentjson[k], k, count, collections);
-                } else if (typeof (v) === DataTypes.ARRAY) {
+                    if (node[k][0]?.hasOwnProperty('data-id')) {
+                        node['data-id'] = node[k][0]['data-id'];
+                    }
+                } else if (isObject(v)) {
                     node[k] = {};
                     createTree(node, currentjson[k], k, count, collections);
                 }
@@ -1303,7 +917,7 @@ function createTree(tree, currentjson, propname, count, collections) {
 
 
 export function addxpath(jsondata, xpath) {
-    if (_.isArray(jsondata)) {
+    if (Array.isArray(jsondata)) {
         for (let i = 0; i < jsondata.length; i++) {
             let dataxpath = "[" + i + "]";
             if (xpath) {
@@ -1319,12 +933,12 @@ export function addxpath(jsondata, xpath) {
 
 function _addxpath(jsondata, xpath) {
     Object.entries(jsondata).map(([k, v]) => {
-        if ([DataTypes.STRING, DataTypes.BOOLEAN, DataTypes.NUMBER].includes(typeof (v))) {
+        if ([DATA_TYPES.STRING, DATA_TYPES.BOOLEAN, DATA_TYPES.NUMBER].includes(typeof (v))) {
             jsondata['xpath_' + k] = xpath ? xpath + '.' + k : k;
-        } else if (_.isNull(v)) {
+        } else if (isNull(v)) {
             jsondata['xpath_' + k] = xpath ? xpath + '.' + k : k;
         } else if (Array.isArray(v)) {
-            if (v.length > 0 && _.isObject(v[0])) {
+            if (v.length > 0 && isObject(v[0])) {
                 for (let i = 0; i < v.length; i++) {
                     let childxpath = xpath ? `${xpath}.${k}[${i}]` : `${k}[${i}]`;
                     addxpath(jsondata[k][i], childxpath);
@@ -1332,7 +946,7 @@ function _addxpath(jsondata, xpath) {
             } else {
                 jsondata['xpath_' + k] = xpath ? xpath + '.' + k : k;
             }
-        } else if (_.isObject(v)) {
+        } else if (isObject(v)) {
             jsondata['xpath_' + k] = xpath ? xpath + '.' + k : k;
             let childxpath = xpath ? xpath + '.' + k : k;
             addxpath(jsondata[k], childxpath)
@@ -1343,17 +957,18 @@ function _addxpath(jsondata, xpath) {
 
 export function clearxpath(jsondata) {
     Object.entries(jsondata).map(([k, v]) => {
-        if ([DataTypes.STRING, DataTypes.BOOLEAN, DataTypes.NUMBER].includes(typeof (v))) {
-            if (k.startsWith('xpath_')) {
+        if ([DATA_TYPES.STRING, DATA_TYPES.BOOLEAN, DATA_TYPES.NUMBER].includes(typeof (v))) {
+            // remove data-id for repeated_root model_types
+            if (k.startsWith('xpath_') || k === 'data-id') {
                 delete jsondata[k];
             }
         } else if (Array.isArray(v)) {
-            if (v.length > 0 && _.isObject(v[0])) {
+            if (v.length > 0 && isObject(v[0])) {
                 for (let i = 0; i < v.length; i++) {
                     clearxpath(jsondata[k][i]);
                 }
             }
-        } else if (_.isObject(v)) {
+        } else if (isObject(v)) {
             clearxpath(jsondata[k])
         }
     });
@@ -1362,7 +977,7 @@ export function clearxpath(jsondata) {
 
 function flattenObject(jsondata, object, collections, xpath, parentxpath) {
     Object.entries(jsondata).map(([k, v]) => {
-        if ([DataTypes.STRING, DataTypes.BOOLEAN, DataTypes.NUMBER].includes(typeof (v))) {
+        if ([DATA_TYPES.STRING, DATA_TYPES.BOOLEAN, DATA_TYPES.NUMBER].includes(typeof (v))) {
             if (parentxpath && k !== 'data-id') {
                 if (xpath && xpath === parentxpath) {
                     object[k] = v;
@@ -1372,7 +987,7 @@ function flattenObject(jsondata, object, collections, xpath, parentxpath) {
             } else {
                 object[k] = v;
             }
-        } else if (_.isNull(v)) {
+        } else if (isNull(v)) {
             if (parentxpath) {
                 if (xpath && xpath === parentxpath) {
                     object[k] = v;
@@ -1393,7 +1008,7 @@ function flattenObject(jsondata, object, collections, xpath, parentxpath) {
                 let updatedParentxpath = parentxpath ? parentxpath + '.' + k : k;
                 flattenObject(jsondata[k][0], object, collections, xpath, updatedParentxpath);
             }
-        } else if (_.isObject(v)) {
+        } else if (isObject(v)) {
             if (collections.some((c) => c.key === k && c.hasOwnProperty('abbreviated') && c.abbreviated === "JSON")) {
                 if (parentxpath) {
                     object[parentxpath + '.' + k] = v;
@@ -1424,21 +1039,21 @@ export function compareObjects(updated, original, current, xpath, diff = []) {
     Object.entries(current).map(([k, v]) => {
         if (primitiveDataTypes.includes(typeof (v))) {
             let updatedxpath = xpath ? xpath + '.' + k : k;
-            if ((!_.get(original, updatedxpath) && _.get(original, updatedxpath) !== false && _.get(original, updatedxpath) !== 0) || !_.isEqual(_.get(updated, updatedxpath), _.get(original, updatedxpath))) {
+            if ((!get(original, updatedxpath) && get(original, updatedxpath) !== false && get(original, updatedxpath) !== 0) || !isEqual(get(updated, updatedxpath), get(original, updatedxpath))) {
                 if (!diff.includes(updatedxpath)) diff.push(updatedxpath);
             }
         } else if (Array.isArray(v)) {
             for (let i = 0; i < v.length; i++) {
                 let updatedxpath = xpath ? xpath + '.' + k + '[' + i + ']' : k + '[' + i + ']';
                 if (primitiveDataTypes.includes(typeof (v[0]))) {
-                    if ((!_.get(original, updatedxpath) && _.get(original, updatedxpath) !== false && _.get(original, updatedxpath) !== 0) || !_.isEqual(_.get(updated, updatedxpath), _.get(original, updatedxpath))) {
+                    if ((!get(original, updatedxpath) && get(original, updatedxpath) !== false && get(original, updatedxpath) !== 0) || !isEqual(get(updated, updatedxpath), get(original, updatedxpath))) {
                         if (!diff.includes(updatedxpath)) diff.push(updatedxpath);
                     }
                 } else {
                     compareObjects(updated, original, current[k][i], updatedxpath, diff);
                 }
             }
-        } else if (_.isObject(v)) {
+        } else if (isObject(v)) {
             let updatedxpath = xpath ? xpath + '.' + k : k;
             compareObjects(updated, original, current[k], updatedxpath, diff);
         }
@@ -1503,9 +1118,9 @@ export function getAbbreviatedKeyFromId(keyArray, abbreviated, id) {
 
 export function getAlertBubbleCount(data, bubbleSourcePath) {
     let bubbleCount = 0;
-    const bubbleSource = _.get(data, bubbleSourcePath);
+    const bubbleSource = get(data, bubbleSourcePath);
     if (bubbleSource) {
-        if (typeof bubbleSource === DataTypes.NUMBER) {
+        if (typeof bubbleSource === DATA_TYPES.NUMBER) {
             bubbleCount = bubbleSource;
         } else if (Array.isArray(bubbleSource)) {
             bubbleCount = bubbleSource.length;
@@ -1515,7 +1130,7 @@ export function getAlertBubbleCount(data, bubbleSourcePath) {
 }
 
 export function getColorTypeFromPercentage(collection, percentage) {
-    let color = ColorTypes.DEFAULT;
+    let color = COLOR_TYPES.DEFAULT;
     if (collection && collection.color) {
         let colorSplit = collection.color.split(',');
         for (let i = 0; i < colorSplit.length; i++) {
@@ -1526,7 +1141,7 @@ export function getColorTypeFromPercentage(collection, percentage) {
                 try {
                     val = parseInt(val);
                     if (val === percentage) {
-                        color = ColorTypes[colorType];
+                        color = COLOR_TYPES[colorType];
                         break;
                     }
                 } catch (e) {
@@ -1538,7 +1153,7 @@ export function getColorTypeFromPercentage(collection, percentage) {
                 try {
                     val = parseInt(val);
                     if (val < percentage) {
-                        color = ColorTypes[colorType];
+                        color = COLOR_TYPES[colorType];
                         break;
                     }
                 } catch (e) {
@@ -1554,14 +1169,14 @@ export function getPriorityColorType(colorTypesSet) {
     let colorTypesArray = Array.from(colorTypesSet);
     if (colorTypesArray.length > 0) {
         colorTypesArray.sort(function (a, b) {
-            if (ColorPriority[a] > ColorPriority[b]) {
+            if (COLOR_PRIORITY[a] > COLOR_PRIORITY[b]) {
                 return -1;
             }
             return 1;
         })
         return colorTypesArray[0];
     } else {
-        return ColorTypes.DEFAULT;
+        return COLOR_TYPES.DEFAULT;
     }
 }
 
@@ -1570,9 +1185,9 @@ export function getAlertBubbleColor(data, collections, bubbleSourcePath, bubbleC
     // let collection = collections.find(col => col.key === alertBubbleColorKey);
     // let alertBubbleColorRelativePath = alertBubbleColorXpath.replace(alertBubbleSourceXpath, '');
     // let alertBubbleColorTypes = new Set();
-    // if (_.get(data, alertBubbleSourceXpath) && _.get(data, alertBubbleSourceXpath).length > 0) {
-    //     for (let i = 0; i < _.get(data, alertBubbleSourceXpath).length; i++) {
-    //         let value = _.get(data, alertBubbleSourceXpath + '[' + i + ']' + alertBubbleColorRelativePath);
+    // if (get(data, alertBubbleSourceXpath) && get(data, alertBubbleSourceXpath).length > 0) {
+    //     for (let i = 0; i < get(data, alertBubbleSourceXpath).length; i++) {
+    //         let value = get(data, alertBubbleSourceXpath + '[' + i + ']' + alertBubbleColorRelativePath);
     //         let colorType = getColorTypeFromValue(collection, value);
     //         alertBubbleColorTypes.add(colorType);
     //     }
@@ -1580,11 +1195,11 @@ export function getAlertBubbleColor(data, collections, bubbleSourcePath, bubbleC
     // return getPriorityColorType(alertBubbleColorTypes);
     const collection = collections.find(col => col.tableTitle === bubbleColorSourcePath);
     if (collection) {
-        const value = _.get(data, bubbleColorSourcePath);
+        const value = get(data, bubbleColorSourcePath);
         const colorType = getColorTypeFromValue(collection, value);
         return colorType;
     }
-    return ColorTypes.DEFAULT;
+    return COLOR_TYPES.DEFAULT;
 }
 
 export function getObjectWithLeastId(objectArray) {
@@ -1609,23 +1224,23 @@ export function getIconText(text) {
 
 export function getSizeFromValue(value) {
     let size = value.split('_').pop();
-    if (SizeType.hasOwnProperty(size)) {
-        return SizeType[size];
+    if (SIZE_TYPES.hasOwnProperty(size)) {
+        return SIZE_TYPES[size];
     }
-    return SizeType.UNSPECIFIED;
+    return SIZE_TYPES.UNSPECIFIED;
 
 }
 
 export function getShapeFromValue(value) {
     let shape = value.split('_').pop();
-    if (ShapeType.hasOwnProperty(shape)) {
-        return ShapeType[shape];
+    if (SHAPE_TYPES.hasOwnProperty(shape)) {
+        return SHAPE_TYPES[shape];
     }
-    return ShapeType.UNSPECIFIED;
+    return SHAPE_TYPES.UNSPECIFIED;
 }
 
 export function isValidJsonString(jsonString) {
-    if (typeof (jsonString) !== DataTypes.STRING) return false;
+    if (typeof (jsonString) !== DATA_TYPES.STRING) return false;
     jsonString = jsonString.replace(/\\/g, '');
     try {
         JSON.parse(jsonString);
@@ -1636,256 +1251,256 @@ export function isValidJsonString(jsonString) {
 }
 
 export function hasxpath(data, xpath) {
-    if (_.get(data, xpath)) return true;
+    if (get(data, xpath)) return true;
     else {
-        let value = _.get(data, xpath);
+        let value = get(data, xpath);
         if (value === 0 || value === false || value === '') return true;
     }
     return false;
 }
 
-export function getTableColumns(collections, mode, enableOverride = [], disableOverride = [], showLess = [], collectionView = false, repeatedView = false) {
-    let tableColumns = collections
-        .map(collection => Object.assign({}, collection))
-        .map(collection => {
-            let fieldName = collection.tableTitle;
-            if (collectionView) {
-                fieldName = collection.key;
-            }
-            if (enableOverride.includes(fieldName)) {
-                collection.hide = true;
-            }
-            if (disableOverride.includes(fieldName)) {
-                collection.hide = false;
-            }
-            if (showLess.includes(fieldName)) {
-                collection.showLess = true;
-            }
-            if (repeatedView) {
-                collection.rootLevel = false;
-            }
-            return collection;
-        })
-        .filter(collection => {
-            // add all exclusion cases
-            if (collection.serverPopulate && mode === Modes.EDIT_MODE) {
-                return false;
-            } else if (primitiveDataTypes.includes(collection.type)) {
-                return true;
-            } else if (collection.abbreviated && collection.abbreviated === "JSON") {
-                return true;
-            } else if (collection.type === 'button' && !collection.rootLevel) {
-                if (mode === Modes.EDIT_MODE && collection.button.read_only) {
-                    return false;
-                }
-                return true;
-            } else if (collection.type === 'progressBar') {
-                return true;
-            } else if (collection.type === 'alert_bubble') {
-                return true;
-            }
-            // TODO: what other cases are ignored?
-            return false;
-        })
+// export function getTableColumns(collections, mode, enableOverride = [], disableOverride = [], showLess = [], collectionView = false, repeatedView = false) {
+//     let tableColumns = collections
+//         .map(collection => Object.assign({}, collection))
+//         .map(collection => {
+//             let fieldName = collection.tableTitle;
+//             if (collectionView) {
+//                 fieldName = collection.key;
+//             }
+//             if (enableOverride.includes(fieldName)) {
+//                 collection.hide = true;
+//             }
+//             if (disableOverride.includes(fieldName)) {
+//                 collection.hide = false;
+//             }
+//             if (showLess.includes(fieldName)) {
+//                 collection.showLess = true;
+//             }
+//             if (repeatedView) {
+//                 collection.rootLevel = false;
+//             }
+//             return collection;
+//         })
+//         .filter(collection => {
+//             // add all exclusion cases
+//             if (collection.serverPopulate && mode === MODES.EDIT) {
+//                 return false;
+//             } else if (primitiveDataTypes.includes(collection.type)) {
+//                 return true;
+//             } else if (collection.abbreviated && collection.abbreviated === "JSON") {
+//                 return true;
+//             } else if (collection.type === 'button' && !collection.rootLevel) {
+//                 if (mode === MODES.EDIT && collection.button.read_only) {
+//                     return false;
+//                 }
+//                 return true;
+//             } else if (collection.type === 'progressBar') {
+//                 return true;
+//             } else if (collection.type === 'alert_bubble') {
+//                 return true;
+//             }
+//             // TODO: what other cases are ignored?
+//             return false;
+//         })
 
-    return tableColumns;
-}
+//     return tableColumns;
+// }
 
-export function getGroupedTableColumns(columns, maxRowSize, rows, groupBy = [], mode, collectionView = false) {
-    let tableColumns = []
-    let maxSequence = 0;
-    columns.forEach(column => {
-        if (column.sequenceNumber > maxSequence) {
-            maxSequence = column.sequenceNumber;
-        }
-    })
-    for (let i = 0; i < maxRowSize; i++) {
-        const updatedColumns = columns.map(column => {
-            column = Object.assign({}, column);
-            column.sourceIndex = i;
-            column.sequenceNumber = column.sequenceNumber + i * maxSequence;
-            return column;
-        })
-        tableColumns = [...tableColumns, ...updatedColumns];
-    }
-    if (mode === Modes.READ_MODE && groupBy && groupBy.length > 0) {
-        const commonColumns = [];
-        columns.forEach(column => {
-            if (column.type === 'button' || column.type === 'progressBar' || column.type === 'alert_bubble') {
-                return;
-            }
-            if (column.noCommonKey) {
-                return;
-            }
-            let fieldName = column.tableTitle;
-            if (collectionView) {
-                fieldName = column.key;
-            }
-            let found = true;
-            for (let i = 0; i < rows.length; i++) {
-                const groupedRow = rows[i];
-                let firstValue = null;
-                for (let j = 0; j < maxRowSize; j++) {
-                    const value = groupedRow?.[j]?.[fieldName];
-                    if (!(value === null || value === undefined || value === '')) {
-                        firstValue = value;
-                        break;
-                    }
-                }
-                let matched = true;
-                for (let j = 0; j < groupedRow.length; j++) {
-                    const value = groupedRow[j][fieldName];
-                    if (!(value === null || value === undefined || value === '')) {
-                        if (value !== firstValue) {
-                            matched = false;
-                            break;
-                        }
-                    }
-                }
-                if (!matched) {
-                    found = false;
-                    break;
-                }
-            }
-            if (found) {
-                commonColumns.push(fieldName);
-            }
-        })
-        tableColumns = tableColumns.filter(column => {
-            let fieldName = column.tableTitle;
-            if (collectionView) {
-                fieldName = column.key;
-            }
-            if (commonColumns.includes(fieldName) && column.sourceIndex !== 0) {
-                // exclude all common columns from non-zeroth source index
-                return false;
-            }
-            return true;
-        })
-        tableColumns = tableColumns.map(column => {
-            let fieldName = column.tableTitle;
-            if (collectionView) {
-                fieldName = column.key;
-            }
-            if (commonColumns.includes(fieldName)) {
-                column.commonGroupKey = true;
-            }
-            if (groupBy.includes(fieldName)) {
-                column.joinKey = true;
-            }
-            return column;
-        })
-    }
-    return tableColumns;
-}
+// export function getGroupedTableColumns(columns, maxRowSize, rows, groupBy = [], mode, collectionView = false) {
+//     let tableColumns = []
+//     let maxSequence = 0;
+//     columns.forEach(column => {
+//         if (column.sequenceNumber > maxSequence) {
+//             maxSequence = column.sequenceNumber;
+//         }
+//     })
+//     for (let i = 0; i < maxRowSize; i++) {
+//         const updatedColumns = columns.map(column => {
+//             column = Object.assign({}, column);
+//             column.sourceIndex = i;
+//             column.sequenceNumber = column.sequenceNumber + i * maxSequence;
+//             return column;
+//         })
+//         tableColumns = [...tableColumns, ...updatedColumns];
+//     }
+//     if (mode === MODES.READ && groupBy && groupBy.length > 0) {
+//         const commonColumns = [];
+//         columns.forEach(column => {
+//             if (column.type === 'button' || column.type === 'progressBar' || column.type === 'alert_bubble') {
+//                 return;
+//             }
+//             if (column.noCommonKey) {
+//                 return;
+//             }
+//             let fieldName = column.tableTitle;
+//             if (collectionView) {
+//                 fieldName = column.key;
+//             }
+//             let found = true;
+//             for (let i = 0; i < rows.length; i++) {
+//                 const groupedRow = rows[i];
+//                 let firstValue = null;
+//                 for (let j = 0; j < maxRowSize; j++) {
+//                     const value = groupedRow?.[j]?.[fieldName];
+//                     if (!(value === null || value === undefined || value === '')) {
+//                         firstValue = value;
+//                         break;
+//                     }
+//                 }
+//                 let matched = true;
+//                 for (let j = 0; j < groupedRow.length; j++) {
+//                     const value = groupedRow[j][fieldName];
+//                     if (!(value === null || value === undefined || value === '')) {
+//                         if (value !== firstValue) {
+//                             matched = false;
+//                             break;
+//                         }
+//                     }
+//                 }
+//                 if (!matched) {
+//                     found = false;
+//                     break;
+//                 }
+//             }
+//             if (found) {
+//                 commonColumns.push(fieldName);
+//             }
+//         })
+//         tableColumns = tableColumns.filter(column => {
+//             let fieldName = column.tableTitle;
+//             if (collectionView) {
+//                 fieldName = column.key;
+//             }
+//             if (commonColumns.includes(fieldName) && column.sourceIndex !== 0) {
+//                 // exclude all common columns from non-zeroth source index
+//                 return false;
+//             }
+//             return true;
+//         })
+//         tableColumns = tableColumns.map(column => {
+//             let fieldName = column.tableTitle;
+//             if (collectionView) {
+//                 fieldName = column.key;
+//             }
+//             if (commonColumns.includes(fieldName)) {
+//                 column.commonGroupKey = true;
+//             }
+//             if (groupBy.includes(fieldName)) {
+//                 column.joinKey = true;
+//             }
+//             return column;
+//         })
+//     }
+//     return tableColumns;
+// }
 
-export function getCommonKeyCollections(rows, tableColumns, hide = true, collectionView = false, repeatedView = false, showLess = false) {
-    if (rows.length > 1) {
-        // exclude column with 'noCommonKey' as it cannot be added in common key
-        tableColumns = tableColumns.map(column => Object.assign({}, column)).filter(column => !column.noCommonKey);
-    }
-    let commonKeyCollections = [];
-    if (rows.length === 1 && (collectionView || repeatedView)) {
-        const hasButtonType = tableColumns.find(obj => obj.type === 'button');
-        if (hasButtonType) {
-            tableColumns.forEach(column => {
-                if (hide && column.hide) return;
-                if (column.joinKey || column.commonGroupKey) return;
-                if (showLess && column.showLess) return;
-                let fieldName = column.tableTitle;
-                if (collectionView) {
-                    if (rows.length > 1 && (column.type === 'button' || column.type === 'progressBar' || column.type === 'alert_bubble')) {
-                        return;
-                    }
-                    fieldName = column.key;
-                }
-                const value = rows[0][column.sourceIndex]?.[fieldName];
-                if (!column.noCommonKey) {
-                    if (value === null || value === undefined) {
-                        commonKeyCollections.push(column);
-                    } else if (value === 0 && !column.displayZero) {
-                        commonKeyCollections.push(column);
-                    }
-                }
-            })
-            return commonKeyCollections;
-        }
-    }
-    if (rows.length > 0) {
-        tableColumns.map((column) => {
-            if (hide && column.hide) return;
-            if (column.joinKey || column.commonGroupKey) return;
-            if (showLess && column.showLess) return;
-            let fieldName = column.tableTitle;
-            if (collectionView) {
-                if (rows.length > 1 && (column.type === 'button' || column.type === 'progressBar' || column.type === 'alert_bubble')) {
-                    return;
-                }
-                fieldName = column.key;
-            }
-            let found = true;
-            let firstValue = null;
-            for (let i = 0; i < rows.length; i++) {
-                const value = rows[i][column.sourceIndex]?.[fieldName];
-                if (!(value === null || value === undefined || value === '')) {
-                    firstValue = value;
-                    break;
-                }
-            }
-            // const value = rows[0][column.sourceIndex]?.[fieldName];
-            // for (let i = 1; i < rows.length; i++) {
-            for (let i = 0; i < rows.length; i++) {
-                const value = rows[i][column.sourceIndex]?.[fieldName];
-                if (value !== firstValue && firstValue !== null) {
-                    if (column.type === DataTypes.NUMBER && column.zeroAsNone && firstValue === 0 && value === null) {
-                        continue;
-                    } else {
-                        found = false;
-                        break;
-                    }
-                }
-                // if (!(value === null || value === undefined || value === '')) {
-                //     if (value !== firstValue) {
-                //         found = false;
-                //         break;
-                //     }
-                // }
-                // if (rows[i][column.sourceIndex] && rows[i+1][column.sourceIndex]) {
-                //     if (!_.isEqual(rows[i][column.sourceIndex][fieldName], rows[i + 1][column.sourceIndex][fieldName])) {
-                //         const values = [rows[i][column.sourceIndex][fieldName], rows[i + 1][column.sourceIndex][fieldName]];
-                //         for (let i = 0; i < values.length; i++) {
-                //             let val = values[i];
-                //             if (val) {
-                //                 if (typeof val === DataTypes.STRING) {
-                //                     val = val.trim();
-                //                 }
-                //             }
-                //             if (![null, undefined, ''].includes(val)) {
-                //                 found = false;
-                //                 break;
-                //             }
-                //         }
-                //     }
-                // }
+// export function getCommonKeyCollections(rows, tableColumns, hide = true, collectionView = false, repeatedView = false, showLess = false) {
+//     if (rows.length > 1) {
+//         // exclude column with 'noCommonKey' as it cannot be added in common key
+//         tableColumns = tableColumns.map(column => Object.assign({}, column)).filter(column => !column.noCommonKey);
+//     }
+//     let commonKeyCollections = [];
+//     if (rows.length === 1 && (collectionView || repeatedView)) {
+//         const hasButtonType = tableColumns.find(obj => obj.type === 'button');
+//         if (hasButtonType) {
+//             tableColumns.forEach(column => {
+//                 if (hide && column.hide) return;
+//                 if (column.joinKey || column.commonGroupKey) return;
+//                 if (showLess && column.showLess) return;
+//                 let fieldName = column.tableTitle;
+//                 if (collectionView) {
+//                     if (rows.length > 1 && (column.type === 'button' || column.type === 'progressBar' || column.type === 'alert_bubble')) {
+//                         return;
+//                     }
+//                     fieldName = column.key;
+//                 }
+//                 const value = rows[0][column.sourceIndex]?.[fieldName];
+//                 if (!column.noCommonKey) {
+//                     if (value === null || value === undefined) {
+//                         commonKeyCollections.push(column);
+//                     } else if (value === 0 && !column.displayZero) {
+//                         commonKeyCollections.push(column);
+//                     }
+//                 }
+//             })
+//             return commonKeyCollections;
+//         }
+//     }
+//     if (rows.length > 0) {
+//         tableColumns.map((column) => {
+//             if (hide && column.hide) return;
+//             if (column.joinKey || column.commonGroupKey) return;
+//             if (showLess && column.showLess) return;
+//             let fieldName = column.tableTitle;
+//             if (collectionView) {
+//                 if (rows.length > 1 && (column.type === 'button' || column.type === 'progressBar' || column.type === 'alert_bubble')) {
+//                     return;
+//                 }
+//                 fieldName = column.key;
+//             }
+//             let found = true;
+//             let firstValue = null;
+//             for (let i = 0; i < rows.length; i++) {
+//                 const value = rows[i][column.sourceIndex]?.[fieldName];
+//                 if (!(value === null || value === undefined || value === '')) {
+//                     firstValue = value;
+//                     break;
+//                 }
+//             }
+//             // const value = rows[0][column.sourceIndex]?.[fieldName];
+//             // for (let i = 1; i < rows.length; i++) {
+//             for (let i = 0; i < rows.length; i++) {
+//                 const value = rows[i][column.sourceIndex]?.[fieldName];
+//                 if (value !== firstValue && firstValue !== null) {
+//                     if (column.type === DATA_TYPES.NUMBER && column.zeroAsNone && firstValue === 0 && value === null) {
+//                         continue;
+//                     } else {
+//                         found = false;
+//                         break;
+//                     }
+//                 }
+//                 // if (!(value === null || value === undefined || value === '')) {
+//                 //     if (value !== firstValue) {
+//                 //         found = false;
+//                 //         break;
+//                 //     }
+//                 // }
+//                 // if (rows[i][column.sourceIndex] && rows[i+1][column.sourceIndex]) {
+//                 //     if (!isEqual(rows[i][column.sourceIndex][fieldName], rows[i + 1][column.sourceIndex][fieldName])) {
+//                 //         const values = [rows[i][column.sourceIndex][fieldName], rows[i + 1][column.sourceIndex][fieldName]];
+//                 //         for (let i = 0; i < values.length; i++) {
+//                 //             let val = values[i];
+//                 //             if (val) {
+//                 //                 if (typeof val === DATA_TYPES.STRING) {
+//                 //                     val = val.trim();
+//                 //                 }
+//                 //             }
+//                 //             if (![null, undefined, ''].includes(val)) {
+//                 //                 found = false;
+//                 //                 break;
+//                 //             }
+//                 //         }
+//                 //     }
+//                 // }
 
-                // if (rows[i][column.sourceIndex]?.[fieldName] !== value) {
-                //     found = false;
-                // }
+//                 // if (rows[i][column.sourceIndex]?.[fieldName] !== value) {
+//                 //     found = false;
+//                 // }
 
-                if (!found) {
-                    break;
-                }
-            }
-            if (found) {
-                let collection = column;
-                collection.value = firstValue;
-                commonKeyCollections.push(collection);
-            }
-            return column;
-        })
-    }
-    return commonKeyCollections;
-}
+//                 if (!found) {
+//                     break;
+//                 }
+//             }
+//             if (found) {
+//                 let collection = column;
+//                 collection.value = firstValue;
+//                 commonKeyCollections.push(collection);
+//             }
+//             return column;
+//         })
+//     }
+//     return commonKeyCollections;
+// }
 
 export function getTableRowsFromData(collections, data, xpath) {
     let trees = generateRowTrees(cloneDeep(data), collections, xpath);
@@ -1895,7 +1510,7 @@ export function getTableRowsFromData(collections, data, xpath) {
 
 export function getTableRows(collections, mode, originalData, data, xpath, repeatedView = false) {
     let tableRows = [];
-    if (mode === Modes.READ_MODE) {
+    if (mode === MODES.READ) {
         if (repeatedView) {
             tableRows = getTableRowsFromData(collections, data, xpath);
         } else {
@@ -1943,7 +1558,7 @@ export function getValueFromReduxStore(state, sliceName, propertyName, xpath) {
         if (slice) {
             let object = slice[propertyName];
             if (object && hasxpath(object, xpath)) {
-                return _.get(object, xpath);
+                return get(object, xpath);
             }
         }
         return null;
@@ -1951,7 +1566,7 @@ export function getValueFromReduxStore(state, sliceName, propertyName, xpath) {
 }
 
 export function normalise(value, max, min) {
-    if (typeof (value) === DataTypes.NUMBER && typeof (min) === DataTypes.NUMBER && typeof (max) === DataTypes.NUMBER) {
+    if (typeof (value) === DATA_TYPES.NUMBER && typeof (min) === DATA_TYPES.NUMBER && typeof (max) === DATA_TYPES.NUMBER) {
         let percentage = ((value - min) * 100) / (max - min);
         return percentage > 100 ? 100 : percentage;
     }
@@ -1960,17 +1575,17 @@ export function normalise(value, max, min) {
 
 export function getHoverTextType(value) {
     let hoverType = value.trim();
-    if (HoverTextType.hasOwnProperty(hoverType)) {
-        return HoverTextType[hoverType];
+    if (HOVER_TEXT_TYPES.hasOwnProperty(hoverType)) {
+        return HOVER_TEXT_TYPES[hoverType];
     }
-    return HoverTextType.HoverTextType_NONE;
+    return HOVER_TEXT_TYPES.NONE;
 }
 
 export function getParentSchema(schema, currentSchemaName) {
     let parentSchema;
-    _.keys(_.get(schema, SCHEMA_DEFINITIONS_XPATH)).map((key) => {
-        let current = _.get(schema, [SCHEMA_DEFINITIONS_XPATH, key]);
-        if (current.type === DataTypes.OBJECT && _.has(current.properties, currentSchemaName)) {
+    Object.keys(get(schema, SCHEMA_DEFINITIONS_XPATH)).map((key) => {
+        let current = get(schema, [SCHEMA_DEFINITIONS_XPATH, key]);
+        if (current.type === DATA_TYPES.OBJECT && has(current.properties, currentSchemaName)) {
             parentSchema = current;
         }
         return;
@@ -1991,12 +1606,12 @@ export function isAllowedNumericValue(value, min, max) {
 
 export function getXpathKeyValuePairFromObject(object, dict = {}) {
     Object.entries(object).map(([k, v]) => {
-        if ([DataTypes.STRING, DataTypes.BOOLEAN, DataTypes.NUMBER].includes(typeof (v))) {
+        if ([DATA_TYPES.STRING, DATA_TYPES.BOOLEAN, DATA_TYPES.NUMBER].includes(typeof (v))) {
             if (!k.startsWith('xpath_')) {
                 let xpath = object['xpath_' + k];
                 dict[xpath] = v;
             }
-        } else if (_.isNull(v)) {
+        } else if (isNull(v)) {
             if (!k.startsWith('xpath_')) {
                 let xpath = object['xpath_' + k];
                 dict[xpath] = v;
@@ -2005,7 +1620,7 @@ export function getXpathKeyValuePairFromObject(object, dict = {}) {
             for (let i = 0; i < v.length; i++) {
                 getXpathKeyValuePairFromObject(object[k][i], dict);
             }
-        } else if (_.isObject(v)) {
+        } else if (isObject(v)) {
             getXpathKeyValuePairFromObject(object[k], dict);
         }
         return;
@@ -2060,7 +1675,7 @@ export function getErrorDetails(error) {
 
 export function createObjectFromDict(obj, dict = {}) {
     let objArray = [];
-    _.entries(dict).map(([k, v]) => {
+    Object.entries(dict).map(([k, v]) => {
         let updatedObj = createObjectFromXpathDict(obj, k, v);
         objArray.push(updatedObj);
         return;
@@ -2080,20 +1695,20 @@ export function createObjectFromXpathDict(obj, xpath, value) {
     xpath.split('.').forEach((f, i) => {
         currentXpath = currentXpath ? currentXpath + '.' + f : f;
         let fieldName = f.indexOf('[') === -1 ? f : f.substring(0, f.indexOf('['));
-        let fieldType = f.indexOf('[') === -1 ? DataTypes.OBJECT : DataTypes.ARRAY;
-        _.keys(currentObj).forEach(k => {
+        let fieldType = f.indexOf('[') === -1 ? DATA_TYPES.OBJECT : DATA_TYPES.ARRAY;
+        Object.keys(currentObj).forEach(k => {
             if (k !== DB_ID) {
                 delete currentObj[k];
             }
         })
-        if (fieldType === DataTypes.OBJECT) {
-            currentObj[fieldName] = _.cloneDeep(_.get(obj, currentXpath));
+        if (fieldType === DATA_TYPES.OBJECT) {
+            currentObj[fieldName] = cloneDeep(get(obj, currentXpath));
             if (i === xpath.split('.').length - 1) {
                 currentObj[fieldName] = value;
             }
             currentObj = currentObj[fieldName];
         } else {
-            currentObj[fieldName] = [_.cloneDeep(_.get(obj, currentXpath))];
+            currentObj[fieldName] = [cloneDeep(get(obj, currentXpath))];
             currentObj = currentObj[fieldName][0];
         }
     })
@@ -2214,7 +1829,7 @@ export function applyWebSocketUpdateForAlertModel(storedArray, updatedObj, uiLim
 //         const filterDict = getFilterDict(filters);
 //         Object.keys(filterDict).forEach(key => {
 //             let values = filterDict[key].split(",").map(val => val.trim()).filter(val => val !== "");
-//             updatedArr = updatedArr.filter(data => values.includes(String(_.get(data, key))));
+//             updatedArr = updatedArr.filter(data => values.includes(String(get(data, key))));
 //         })
 //         return updatedArr;
 //     }
@@ -2226,7 +1841,7 @@ export function applyWebSocketUpdateForAlertModel(storedArray, updatedObj, uiLim
 //     Function to convert floating point numbers to integer.
 //     value: integer or floating point number
 //     */
-//     if (typeof value === DataTypes.NUMBER) {
+//     if (typeof value === DATA_TYPES.NUMBER) {
 //         if (Number.isInteger(value)) {
 //             return value;
 //         } else {
@@ -2281,7 +1896,7 @@ function mergeObjects(obj1, obj2) {
         if (obj1.hasOwnProperty(prop)) {
             if (Array.isArray(obj1[prop]) && Array.isArray(obj2[prop])) {
                 mergedObj[prop] = mergeArrays(obj1[prop], obj2[prop]);
-            } else if (typeof obj1[prop] === DataTypes.OBJECT && typeof obj2[prop] === DataTypes.OBJECT) {
+            } else if (typeof obj1[prop] === DATA_TYPES.OBJECT && typeof obj2[prop] === DATA_TYPES.OBJECT) {
                 mergedObj[prop] = mergeObjects(obj1[prop], obj2[prop]);
             } else {
                 mergedObj[prop] = obj1[prop];
@@ -2320,7 +1935,7 @@ function mergeArrays(arr1, arr2) {
 //     value: floating point number
 //     precision: decimal digits to round off to. default 2 (FLOAT_POINT_PRECISION)
 //     */
-//     if (typeof value === DataTypes.NUMBER) {
+//     if (typeof value === DATA_TYPES.NUMBER) {
 //         if (Number.isInteger(value) || precision === 0) {
 //             return value;
 //         } else {
@@ -2338,7 +1953,7 @@ function mergeArrays(arr1, arr2) {
 //     */
 //     let adornment = '';
 
-//     if (typeof value !== DataTypes.NUMBER) {
+//     if (typeof value !== DATA_TYPES.NUMBER) {
 //         return [adornment, value];
 //     }
 //     if (metadata.numberFormat) {
@@ -2348,7 +1963,7 @@ function mergeArrays(arr1, arr2) {
 //             adornment = ' bps';
 //         }
 //     }
-//     if (metadata.displayType === DataTypes.INTEGER) {
+//     if (metadata.displayType === DATA_TYPES.INTEGER) {
 //         return [adornment, floatToInt(value)]
 //     }
 //     if (metadata.numberFormat && metadata.numberFormat.includes('.')) {
@@ -2367,12 +1982,12 @@ export function excludeNullFromObject(obj) {
     Function to remove null values from mutable object inplace.
     obj: mutable object
     */
-    if (_.isObject(obj)) {
+    if (isObject(obj)) {
         for (const key in obj) {
-            if (obj[key] === null || (typeof obj[key] === DataTypes.STRING && obj[key].includes('_UNSPECIFIED'))) {
+            if (obj[key] === null || (typeof obj[key] === DATA_TYPES.STRING && obj[key].includes('_UNSPECIFIED'))) {
                 // delete key with null values or enum with UNSPECIFIED values
                 delete obj[key];
-            } else if (_.isObject(obj[key])) {
+            } else if (isObject(obj[key])) {
                 excludeNullFromObject(obj[key]);
             } else if (Array.isArray(obj[key])) {
                 for (let i = 0; i < obj[key].length; i++) {
@@ -2381,7 +1996,7 @@ export function excludeNullFromObject(obj) {
             }
             // else not required
         }
-    } else if (_.isArray(obj)) {
+    } else if (Array.isArray(obj)) {
         obj.forEach(o => {
             excludeNullFromObject(o);
         })
@@ -2408,7 +2023,7 @@ function getAllObjectPaths(obj, prefix = '', paths = new Set()) {
     return Array.from(paths);  // Covert set to array
 }
 
-export function compareJSONObjects(obj1, obj2, collections) {
+export function compareJSONObjects(obj1, obj2, fieldsMetadata, isCreate = false) {
     /* 
     Function to compare two objects and clear null fields from diff
     obj1: initial / original object
@@ -2418,12 +2033,12 @@ export function compareJSONObjects(obj1, obj2, collections) {
         return null;
     }
     let diff = {};
-    if (_.isObject(obj1) && _.isObject(obj2)) {
+    if (isObject(obj1) && isObject(obj2)) {
         diff = getObjectsDiff(obj1, obj2);
-    } else if (_.isObject(obj2)) {
+    } else if (isObject(obj2)) {
         diff = obj2;
     }
-    if (_.keys(diff).length > 0) {
+    if (Object.keys(diff).length > 0) {
         // add the object ID if diff found and ID exists on initial object
         if (DB_ID in obj1) {
             diff[DB_ID] = obj1[DB_ID];
@@ -2432,7 +2047,7 @@ export function compareJSONObjects(obj1, obj2, collections) {
             excludeNullFromObject(diff);
         }
     }
-    if (collections) {
+    if (fieldsMetadata) {
         const paths = getAllObjectPaths(diff);
         for (const path of paths) {
             // ignore DB_ID
@@ -2440,8 +2055,9 @@ export function compareJSONObjects(obj1, obj2, collections) {
                 continue;
             }
 
-            const collection = collections.find(col => col.tableTitle === path);
-            if (!collection) {
+            const metadata = fieldsMetadata.find(col => col.tableTitle === path);
+
+            if (!metadata) {
                 const err_ = `ERROR: no collection obj (metadata) found for path: ${path}, likely UI bug. Please send screenshot to DEV for investigation`;
                 console.error(err_);
                 alert(err_);
@@ -2449,7 +2065,11 @@ export function compareJSONObjects(obj1, obj2, collections) {
                 return;
             }  // else not required - collection obj exists
 
-            if (collection.serverPopulate || collection.ormNoUpdate) {
+            if (metadata.key === DB_ID) {
+                continue;
+            }
+
+            if (metadata.serverPopulate || (!isCreate && metadata.ormNoUpdate)) {
                 const err_ = `CRITICAL: Update request discarded, unmodifiable field found in patch update for path: ${path}, likely UI bug. Please send screenshot to DEV for investigation`;
                 console.error(err_);
                 alert(err_);
@@ -2486,7 +2106,7 @@ export function getObjectsDiff(obj1, obj2) {
                     // array object found with matching object ID. compare the nested object
                     let element2 = arr2.find(element2 => element2 instanceof Object && DB_ID in element2 && element2[DB_ID] === element1[DB_ID]);
                     let nestedDiff = getObjectsDiff(element1, element2);
-                    if (!_.isEmpty(nestedDiff)) {
+                    if (!isEmpty(nestedDiff)) {
                         // store the diff along with the nested object ID
                         arrDiff.push({ [DB_ID]: element1[DB_ID], ...nestedDiff });
                     }
@@ -2501,7 +2121,7 @@ export function getObjectsDiff(obj1, obj2) {
             }
             // else {
             //    // compare arrays of primitive data types
-            //    if (!_.isEqual(arr1, arr2)) {
+            //    if (!isEqual(arr1, arr2)) {
             //        arrDiff = arr2;
             //    }
             //
@@ -2519,7 +2139,7 @@ export function getObjectsDiff(obj1, obj2) {
                 if (obj1[key] instanceof Array) {
                     if (obj2[key] instanceof Array) {
                         const arrDiff = compareArrays(obj1[key], obj2[key]);
-                        if (!_.isEmpty(arrDiff)) {
+                        if (!isEmpty(arrDiff)) {
                             diff[key] = arrDiff;
                         }
                         // else not required: no difference found
@@ -2529,7 +2149,7 @@ export function getObjectsDiff(obj1, obj2) {
                 } else if (obj1[key] instanceof Object) {
                     if (obj2[key] instanceof Object) {
                         const nestedDiff = getObjectsDiff(obj1[key], obj2[key]);
-                        if (!_.isEmpty(nestedDiff)) {
+                        if (!isEmpty(nestedDiff)) {
                             diff[key] = nestedDiff;
                         }
                         // else not required: no difference found
@@ -2586,20 +2206,20 @@ export function validateConstraints(metadata, value, min, max) {
         // else not required: value is set
     }
     // Check if enum field has "UNSPECIFIED" value
-    if (metadata.type === DataTypes.ENUM && metadata.required) {
+    if (metadata.type === DATA_TYPES.ENUM && metadata.required) {
         if (value && value.includes('UNSPECIFIED')) {
             errors.push(Message.UNSPECIFIED_FIELD);
         }
         // else not required: value is set
     }
     // Check if field violates minimum requirement    
-    if (typeof min === DataTypes.NUMBER) {
+    if (typeof min === DATA_TYPES.NUMBER) {
         if (value !== undefined && value !== null && value < min) {
             errors.push(Message.MIN + ': ' + min);
         }
     }
     // Check if field violates maximum requirement
-    if (typeof max === DataTypes.NUMBER) {
+    if (typeof max === DATA_TYPES.NUMBER) {
         if (value !== undefined && value !== null && value > max) {
             errors.push(Message.MAX + ': ' + max);
         }
@@ -2611,7 +2231,7 @@ export function validateConstraints(metadata, value, min, max) {
 
 export function removeRedundantFieldsFromRows(rows) {
     rows = rows.map(row => {
-        _.keys(row).forEach(key => {
+        Object.keys(row).forEach(key => {
             if (key.includes('xpath')) {
                 delete row[key];
             }
@@ -2630,19 +2250,19 @@ export function getRowsFromAbbreviatedItems(items, itemsData, itemFieldPropertie
         items.map((item, i) => {
             let row = {};
             let id = getIdFromAbbreviatedKey(abbreviation, item);
-            let metadata = itemsData.find(metadata => _.get(metadata, DB_ID) === id);
+            let metadata = itemsData.find(metadata => get(metadata, DB_ID) === id);
             row['data-id'] = id;
             itemFieldProperties.forEach(c => {
                 let value = null;
                 if (c.xpath.indexOf("-") !== -1) {
                     value = c.xpath.split("-").map(xpath => {
                         let collection = c.subCollections.find(col => col.tableTitle === xpath);
-                        let val = _.get(metadata, xpath);
+                        let val = get(metadata, xpath);
                         if (val === undefined || val === null) {
                             val = "";
                         }
                         let [numberSuffix, v] = getLocalizedValueAndSuffix(collection, val);
-                        if (typeof v === DataTypes.NUMBER && collection.type === DataTypes.NUMBER) {
+                        if (typeof v === DATA_TYPES.NUMBER && collection.type === DATA_TYPES.NUMBER) {
                             v = v.toLocaleString();
                         }
                         val = v + numberSuffix;
@@ -2654,7 +2274,7 @@ export function getRowsFromAbbreviatedItems(items, itemsData, itemFieldPropertie
                         value = value.join("-");
                     }
                 } else {
-                    value = _.get(metadata, c.xpath);
+                    value = get(metadata, c.xpath);
                     if (value === undefined || value === null) {
                         value = null;
                     }
@@ -2710,7 +2330,7 @@ export function formatJSONObjectOrArray(json, fieldProps, truncateDateTime = fal
                     formatJSONArray(json[key], fieldProps, truncateDateTime);
                 } else if (json[key] instanceof Object) {
                     formatJSONObjectOrArray(json[key], fieldProps, truncateDateTime);
-                } else if (prop.type === DataTypes.DATE_TIME) {
+                } else if (prop.type === DATA_TYPES.DATE_TIME) {
                     if (json[key]) {
                         const dateTimeWithTimezone = getDateTimeFromInt(json[key]);
                         if (prop.displayType === 'datetime') {
@@ -2719,7 +2339,7 @@ export function formatJSONObjectOrArray(json, fieldProps, truncateDateTime = fal
                             json[key] = dateTimeWithTimezone.isSame(dayjs(), 'day') ? dateTimeWithTimezone.format('HH:mm:ss.SSS') : dateTimeWithTimezone.format('YYYY-MM-DD HH:mm:ss.SSS');
                         }
                     }
-                } else if (typeof json[key] === DataTypes.NUMBER) {
+                } else if (typeof json[key] === DATA_TYPES.NUMBER) {
                     const [suffix, v] = getLocalizedValueAndSuffix(prop, json[key]);
                     json[key] = v.toLocaleString() + suffix;
                 }
@@ -2760,7 +2380,7 @@ export function getWidgetTitle(widgetOption, widgetSchema, widgetName, data) {
         const name = dynamicWidgetTitleField.split('.')[0];
         if (name === widgetName) {
             const fieldxpath = dynamicWidgetTitleField.substring(dynamicWidgetTitleField.indexOf('.') + 1);
-            const value = _.get(data, fieldxpath);
+            const value = get(data, fieldxpath);
             if (value) {
                 return value;
             }
@@ -2817,11 +2437,11 @@ function getChartAxisTypeAndName(collections, axisField, isCollectionType = fals
     const collection = getCollectionByName(collections, axisField, isCollectionType);
     let axisName = collection.title;
     let axisType = ChartAxisType.VALUE;
-    if (collection.type === DataTypes.STRING) {
+    if (collection.type === DATA_TYPES.STRING) {
         axisType = ChartAxisType.CATEGORY;
-    } else if (collection.type === DataTypes.NUMBER) {
+    } else if (collection.type === DATA_TYPES.NUMBER) {
         axisType = ChartAxisType.VALUE;
-    } else if (collection.type === DataTypes.DATE_TIME) {
+    } else if (collection.type === DATA_TYPES.DATE_TIME) {
         axisType = ChartAxisType.TIME;
     }
     return [axisType, axisName];
@@ -3153,7 +2773,7 @@ function updateChartAttributesInSchema(schema, currentSchema) {
                 } else if (['y_min', 'y_max'].includes(key)) {
                     attributes.hide = true;
                 }
-            } else if ([DataTypes.OBJECT, DataTypes.ARRAY].includes(attributes.type)) {
+            } else if ([DATA_TYPES.OBJECT, DATA_TYPES.ARRAY].includes(attributes.type)) {
                 const ref = attributes.items.$ref.split('/')
                 const nestedSchema = ref.length === 2 ? schema[ref[1]] : schema[ref[1]][ref[2]];
                 updateChartAttributesInSchema(schema, nestedSchema);
@@ -3164,23 +2784,23 @@ function updateChartAttributesInSchema(schema, currentSchema) {
 
 export function updateChartSchema(schema, collections, isCollectionType = false) {
     schema = cloneDeep(schema);
-    const chartDataSchema = _.get(schema, [SCHEMA_DEFINITIONS_XPATH, 'chart_data']);
+    const chartDataSchema = get(schema, [SCHEMA_DEFINITIONS_XPATH, 'chart_data']);
     updateChartAttributesInSchema(schema, chartDataSchema);
     chartDataSchema.auto_complete = 'partition_fld:StrFldList';
-    const chartEncodeSchema = _.get(schema, [SCHEMA_DEFINITIONS_XPATH, 'chart_encode']);
+    const chartEncodeSchema = get(schema, [SCHEMA_DEFINITIONS_XPATH, 'chart_encode']);
     chartEncodeSchema.auto_complete = 'x:FldList,y:FldList';
-    const filterSchema = _.get(schema, [SCHEMA_DEFINITIONS_XPATH, 'ui_filter']);
+    const filterSchema = get(schema, [SCHEMA_DEFINITIONS_XPATH, 'ui_filter']);
     filterSchema.auto_complete = 'fld_name:FldList';
     let fldList;
     let strFldList;
     let metaFldList;
     if (isCollectionType) {
         fldList = collections.map(collection => collection.key);
-        strFldList = collections.filter(collection => collection.type === DataTypes.STRING).map(collection => collection.key);
+        strFldList = collections.filter(collection => collection.type === DATA_TYPES.STRING).map(collection => collection.key);
         metaFldList = collections.filter(collection => collection.hasOwnProperty('mapping_underlying_meta_field')).map(collection => collection.key);
     } else {
         fldList = collections.map(collection => collection.tableTitle);
-        strFldList = collections.filter(collection => collection.type === DataTypes.STRING).map(collection => collection.tableTitle);
+        strFldList = collections.filter(collection => collection.type === DATA_TYPES.STRING).map(collection => collection.tableTitle);
         metaFldList = collections.filter(collection => collection.hasOwnProperty('mapping_underlying_meta_field')).map(collection => collection.tableTitle);
     }
     schema.autocomplete['FldList'] = fldList;
@@ -3242,7 +2862,7 @@ export function getChartDatasets(rows, partitionFld, chartObj) {
         if (chartObj.xAxis) {
             const axis = chartObj.xAxis[0];
             groups.forEach(group => {
-                group.sort((a, b) => _.get(a, axis.encode) > _.get(b, axis.encode) ? 1 : _.get(a, axis.encode) < _.get(b, axis.encode) ? -1 : 0);
+                group.sort((a, b) => get(a, axis.encode) > get(b, axis.encode) ? 1 : get(a, axis.encode) < get(b, axis.encode) ? -1 : 0);
             })
         }
         groups.forEach(group => {
@@ -3269,7 +2889,7 @@ export function genChartDatasets(rows = [], tsData, chartObj, queryDict, collect
                         if (seriesTsData) {
                             seriesTsData.forEach(ts => {
                                 if (ts.projection_models && ts.projection_models.length > 0) {
-                                    let name = query.params.map(param => _.get(ts, param)).join(' ');
+                                    let name = query.params.map(param => get(ts, param)).join(' ');
                                     const { projection_models, ...meta } = ts;
                                     const metaFieldName = Object.keys(meta)[0];
                                     ts.projection_models.map(projection => {
@@ -3300,7 +2920,7 @@ export function genChartDatasets(rows = [], tsData, chartObj, queryDict, collect
                     for (const groupName in groupsDict) {
                         const group = groupsDict[groupName];
                         if (sortAxis) {
-                            group.sort((a, b) => _.get(a, sortAxis) > _.get(b, sortAxis) ? 1 : _.get(a, sortAxis) < _.get(b, sortAxis) ? -1 : 0);
+                            group.sort((a, b) => get(a, sortAxis) > get(b, sortAxis) ? 1 : get(a, sortAxis) < get(b, sortAxis) ? -1 : 0);
                         }
                         datasets.push({
                             dimensions: Object.keys(rows[0]),
@@ -3313,7 +2933,7 @@ export function genChartDatasets(rows = [], tsData, chartObj, queryDict, collect
                 } else {
                     const sortAxis = series.encode.x;
                     if (sortAxis) {
-                        rows.sort((a, b) => _.get(a, sortAxis) > _.get(b, sortAxis) ? 1 : _.get(a, sortAxis) < _.get(b, sortAxis) ? -1 : 0);
+                        rows.sort((a, b) => get(a, sortAxis) > get(b, sortAxis) ? 1 : get(a, sortAxis) < get(b, sortAxis) ? -1 : 0);
                     }
                     datasets.push({
                         dimensions: Object.keys(rows[0]),
@@ -3346,7 +2966,7 @@ export function mergeTsData(tsData, updatedData, queryDict) {
                 const timeSeries = tsData[queryName].find(ts => {
                     let found = true;
                     query.params.forEach(param => {
-                        if (_.get(ts, param) !== _.get(data, param)) {
+                        if (get(ts, param) !== get(data, param)) {
                             found = false;
                         }
                     })
@@ -3387,10 +3007,10 @@ export function genMetaFilters(arr, collections, filterDict, filterFld, isCollec
     })
     let values = filterDict[filterFld].split(",").map(val => val.trim()).filter(val => val !== "");
     arr.forEach(row => {
-        if (values.includes(_.get(row, filterFld))) {
+        if (values.includes(get(row, filterFld))) {
             const filter = {};
             for (const key in fldMappingDict) {
-                filter[fldMappingDict[key]] = _.get(row, key);
+                filter[fldMappingDict[key]] = get(row, key);
             }
             filters.push(filter);
         }
@@ -3399,7 +3019,7 @@ export function genMetaFilters(arr, collections, filterDict, filterFld, isCollec
 }
 
 export function tooltipFormatter(value) {
-    if (typeof value === DataTypes.NUMBER) {
+    if (typeof value === DATA_TYPES.NUMBER) {
         if (Number.isInteger(value)) {
             return value.toLocaleString();
         } else {
@@ -3411,7 +3031,7 @@ export function tooltipFormatter(value) {
 
 export function updatePartitionFldSchema(schema, chartObj) {
     const updatedSchema = cloneDeep(schema);
-    const chartSchema = _.get(updatedSchema, [SCHEMA_DEFINITIONS_XPATH, 'chart_data']);
+    const chartSchema = get(updatedSchema, [SCHEMA_DEFINITIONS_XPATH, 'chart_data']);
     if (chartObj.time_series) {
         chartSchema.properties.partition_fld.hide = true;
     } else {
@@ -3424,20 +3044,21 @@ function jsonify(obj) {
     return JSON.stringify({ obj });
 }
 
-export function getServerUrl(widgetSchema, linkedObj, serverReadyStatusFld, requestType='http') {
+export function getServerUrl(widgetSchema, linkedObj, linkedFieldsMetadata, requestType = 'http') {
     if (widgetSchema.connection_details) {
         const connectionDetails = widgetSchema.connection_details;
         const { host, port, project_name } = connectionDetails;
         // set url only if linkedObj running field is set to true for dynamic as well as static
         if (widgetSchema.widget_ui_data_element?.depending_proto_model_name) {
+            const serverReadyStatusFld = linkedFieldsMetadata?.find(col => col.hasOwnProperty('server_ready_status')).key;
             const requiredStateLvl = widgetSchema.widget_ui_data_element.server_running_status_lvl || 0;
-            if (linkedObj && Object.keys(linkedObj).length && _.get(linkedObj, serverReadyStatusFld) >= requiredStateLvl) {
+            if (linkedObj && Object.keys(linkedObj).length && get(linkedObj, serverReadyStatusFld) >= requiredStateLvl) {
                 if (connectionDetails.dynamic_url) {
                     const hostxpath = host.substring(host.indexOf('.') + 1);
                     const portFld = port;
                     const portxpath = portFld.substring(port.indexOf('.') + 1);
-                    const hostVal = _.get(linkedObj, hostxpath);
-                    const portVal = _.get(linkedObj, portxpath);
+                    const hostVal = get(linkedObj, hostxpath);
+                    const portVal = get(linkedObj, portxpath);
                     if (!hostVal || !portVal) return null;
                     if (requestType === 'http') {
                         if (widgetSchema.widget_ui_data_element?.depending_proto_model_for_cpp_port) {
@@ -3455,17 +3076,17 @@ export function getServerUrl(widgetSchema, linkedObj, serverReadyStatusFld, requ
                     }
                     // if (widgetSchema.widget_ui_data_element.depends_on_model_name_for_port && schemaName) {
                     //     if (requestType === 'http') {
-                    //         const port = _.get(linkedObj, portxpath);
+                    //         const port = get(linkedObj, portxpath);
                     //         if (!port) return null;
-                    //         return `http://${_.get(linkedObj, hostxpath)}:${port}/${project_name}`;
+                    //         return `http://${get(linkedObj, hostxpath)}:${port}/${project_name}`;
                     //     } else if (requestType === 'ws') {
                     //         portxpath = schemaName + '_port';
-                    //         const port = _.get(linkedObj, portxpath);
+                    //         const port = get(linkedObj, portxpath);
                     //         if (!port) return null;
-                    //         return `http:${_.get(linkedObj, hostxpath)}:${port}`;
+                    //         return `http:${get(linkedObj, hostxpath)}:${port}`;
                     //     }
                     // } else {
-                    //     return `http://${_.get(linkedObj, hostxpath)}:${_.get(linkedObj, portxpath)}/${project_name}`;
+                    //     return `http://${get(linkedObj, hostxpath)}:${get(linkedObj, portxpath)}/${project_name}`;
                     // }
                 } else {
                     return `http://${host}:${port}/${project_name}`;
@@ -3484,6 +3105,7 @@ export function getAbbreviatedCollections(widgetCollectionsDict, loadListFieldAt
     const abbreviated = loadListFieldAttrs.abbreviated;
     const abbreviatedCollections = [];
     let sequenceNumber = 1;
+    // alert bubble is the first column always
     if (loadListFieldAttrs.alertBubbleSource) {
         let collection = {};
         collection.key = '';
@@ -3558,7 +3180,7 @@ export function getAbbreviatedCollections(widgetCollectionsDict, loadListFieldAt
             collection.subCollections = subCollections;
             // if field has values from multiple source, it's data-type is considered STRING
             if (xpath.indexOf('-') !== -1) {
-                collection.type = DataTypes.STRING;
+                collection.type = DATA_TYPES.STRING;
             }
             abbreviatedCollections.push(collection);
             sequenceNumber += 1;
@@ -3714,11 +3336,11 @@ export function isWebSocketAlive(webSocket) {
 export function getReducerArrrayFromCollections(collections) {
     const reducerArray = [];
     collections
-        .filter(col => typeof col.min === DataTypes.STRING || typeof col.max === DataTypes.STRING || col.dynamic_autocomplete)
+        .filter(col => typeof col.min === DATA_TYPES.STRING || typeof col.max === DATA_TYPES.STRING || col.dynamic_autocomplete)
         .map(col => {
             const dynamicListenProperties = ['min', 'max', 'autocomplete'];
             dynamicListenProperties.forEach(property => {
-                if (col.hasOwnProperty(property) && typeof col[property] === DataTypes.STRING) {
+                if (col.hasOwnProperty(property) && typeof col[property] === DATA_TYPES.STRING) {
                     if (property === 'autocomplete' && !col.dynamic_autocomplete) {
                         return;
                     }
@@ -3744,113 +3366,21 @@ export function getRepeatedWidgetModifiedArray(storedArray, selectedId, updatedO
     return updatedArray;
 }
 
-export function getMaxRowSize(rows) {
-    let maxSize = 1;
-    for (let i = 0; i < rows.length; i++) {
-        if (rows[i].length > maxSize) {
-            maxSize = rows[i].length;
-        }
-    }
-    return maxSize;
-}
-
-export function getDataSourceColor(theme, dataSourceIndex, joinKey = false, commonGroupKey = false, overrideColor = null) {
-    if (joinKey) {
-        return theme.palette.primary.dark;
-    } else if (commonGroupKey) {
-        return theme.palette.primary.light;
-    }
-    if (overrideColor && overrideColor.startsWith('#')) {
-        let updatedOverrideColor = overrideColor;
-        if (overrideColor.length === 4) {
-            updatedOverrideColor = '#';
-            for (let i = 1; i < overrideColor.length; i++) {
-                updatedOverrideColor += `${overrideColor[i]}${overrideColor[i]}`;
-            }
-        }
-        if (!/^#[0-9A-F]{6}$/i.test(updatedOverrideColor)) {
-            throw new Error('Invalid base color format');
-        } else {
-            return updatedOverrideColor;
-        }
-    }
-    let baseColor = theme.palette.background.primary;
-    if (typeof baseColor === DataTypes.STRING) {
-        baseColor = baseColor.toUpperCase();
-        if (baseColor.length === 4) {
-            let updatedBaseColor = '#';
-            for (let i = 1; i < baseColor.length; i++) {
-                updatedBaseColor += `${baseColor[i]}${baseColor[i]}`;
-            }
-            baseColor = updatedBaseColor;
-        }
-    }
-    let stepSize;
-    if (theme.palette.mode === Theme.DARK) {
-        stepSize = 20;
-    } else {
-        stepSize = -20;
-    }
-    const updatedColor = getColorByIndex(baseColor, dataSourceIndex, stepSize);
-    return updatedColor;
-}
-
-function getColorByIndex(baseColor, index, stepSize) {
-    // Ensure index is non-negative
-    if (index < 0) {
-        throw new Error('Index must be non-negative');
-    }
-
-    // Ensure baseColor is in the format '#RRGGBB'
-    if (!/^#[0-9A-F]{6}$/i.test(baseColor)) {
-        throw new Error('Invalid base color format');
-    }
-
-    // Extract RGB components
-    const red = parseInt(baseColor.substring(1, 3), 16);
-    const green = parseInt(baseColor.substring(3, 5), 16);
-    const blue = parseInt(baseColor.substring(5, 7), 16);
-
-    const stepIndex = index / 3;
-    const stepModulo = index % 3;
-
-    let updatedRed;
-    let updatedGreen;
-    let updatedBlue;
-    if (stepSize >= 0) {
-        updatedRed = Math.min(red + (stepSize * stepIndex), 255);
-        updatedGreen = Math.min(green + (stepSize * stepIndex), 255);
-        updatedBlue = Math.min(blue + (stepSize * stepIndex), 255);
-
-        if (stepModulo === 1) {
-            updatedGreen = Math.min(updatedGreen + (stepSize * 1), 255);
-        } else if (stepModulo === 2) {
-            updatedBlue = Math.min(updatedBlue + (stepSize * 1), 255);
-        }
-    } else {  //  step size is negative
-        updatedRed = Math.max(red + (stepSize * stepIndex), 0);
-        updatedGreen = Math.max(green + (stepSize * stepIndex), 0);
-        updatedBlue = Math.max(blue + (stepSize * stepIndex), 0);
-
-        if (stepModulo === 1) {
-            updatedGreen = Math.max(updatedGreen + (stepSize * 1), 0);
-        } else if (stepModulo === 2) {
-            updatedBlue = Math.max(updatedBlue + (stepSize * 1), 0);
-        }
-    }
-    updatedRed = Math.floor(updatedRed);
-    updatedGreen = Math.floor(updatedGreen);
-    updatedBlue = Math.floor(updatedBlue);
-
-    // Convert reduced RGB components back to hexadecimal
-    const finalColor = `#${updatedRed.toString(16).padStart(2, '0')}${updatedGreen.toString(16).padStart(2, '0')}${updatedBlue.toString(16).padStart(2, '0')}`;
-    return finalColor;
-}
+// export function getMaxRowSize(rows) {
+//     let maxSize = 1;
+//     for (let i = 0; i < rows.length; i++) {
+//         if (rows[i].length > maxSize) {
+//             maxSize = rows[i].length;
+//         }
+//     }
+//     return maxSize;
+// }
 
 export function getBufferAbbreviatedOptionLabel(bufferOption, bufferListFieldAttrs, loadListFieldAttrs, storedArray) {
     if (!bufferListFieldAttrs.abbreviated) {
         return bufferOption;
     }
+    if (bufferOption === '') return bufferOption;
     const id = getIdFromAbbreviatedKey(loadListFieldAttrs.abbreviated, bufferOption);
     const storedObj = storedArray.find(obj => obj[DB_ID] === id);
     if (storedObj) {
@@ -3858,7 +3388,7 @@ export function getBufferAbbreviatedOptionLabel(bufferOption, bufferListFieldAtt
         abbreviatedSplit = abbreviatedSplit.map(xpath => xpath.substring(xpath.indexOf('.') + 1));
         const values = [];
         abbreviatedSplit.forEach(xpath => {
-            values.push(_.get(storedObj, xpath));
+            values.push(get(storedObj, xpath));
         })
         return values.join('-');
     }
@@ -3955,35 +3485,6 @@ export function clearId(obj) {
     }
 }
 
-export async function computeFileChecksum(file) {
-    if (crypto.subtle) {
-        // crypto API is supported by browser
-        const arrayBuffer = await file.arrayBuffer();
-        const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
-        const hashArray = Array.from(new Uint8Array(hashBuffer));  // Convert buffer to byte array
-        const hashHex = hashArray.map((byte) => byte.toString(16).padStart(2, '0')).join('');
-        return hashHex;
-    } else {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-
-            reader.onload = (event) => {
-                const fileData = event.target.result;
-                const hash = sha256(fileData);
-                resolve(hash);
-            }
-
-            reader.onerror = (err) => {
-                const err_ = `Error occurred while reading file: ${err}`;
-                console.error(err_);
-                reject();
-            }
-
-            reader.readAsArrayBuffer(file);
-        })
-    }
-}
-
 function checkConstraints(storedObj, updatedObj) {
     // DB_ID constraints - stored and updated obj DB_ID should be same
     if (storedObj.hasOwnProperty(DB_ID) && updatedObj.hasOwnProperty(DB_ID) && storedObj[DB_ID] !== updatedObj[DB_ID]) {
@@ -4019,4 +3520,53 @@ export function getDateTimeFromInt(value) {
         dateTimeWithTimezone = dateTime.tz(FileOptions.date_time_print_timezone);
     }
     return dateTimeWithTimezone;
+}
+
+export function getModelSchema(modelName, schema) {
+    return schema[modelName] || schema[SCHEMA_DEFINITIONS_XPATH][modelName];
+}
+
+/**
+ * Converts a snake_case string to PascalCase.
+ * @param {string} snakeStr - The snake_case string.
+ * @returns {string} - The PascalCase string.
+ */
+export function snakeToPascal(snakeStr) {
+    return snakeStr
+        .split('_')
+        .map(word => word === 'ui' ? word.toUpperCase() : word.charAt(0).toUpperCase() + word.slice(1))
+        .join('');
+}
+
+/**
+ * Converts a snake_case string to TitleCase.
+ * @param {string} snakeStr - The snake_case string.
+ * @returns {string} - The PascalCase string.
+ */
+export function snakeToTitle(snakeStr) {
+    return snakeStr
+        .split('_')
+        .map(word => word === 'ui' ? word.toUpperCase() : word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+}
+
+/**
+ * Utility function to build API URL and parameters.
+ *
+ * @param {string} defaultEndpoint - Default endpoint string.
+ * @param {string} overrideUrl - Optional URL override.
+ * @param {string} overrideEndpoint - Optional endpoint override.
+ * @param {number} uiLimit - UI limit for number of items.
+ * @param {Object} params - Additional parameters.
+ * @returns {[string, Object]} The API URL and parameters.
+ */
+export function getApiUrlMetadata(defaultEndpoint, overrideUrl, overrideEndpoint, uiLimit, params) {
+    const baseUrl = overrideUrl || API_ROOT_URL;
+    const baseEndpoint = overrideEndpoint || defaultEndpoint;
+    const apiUrl = `${baseUrl}/${baseEndpoint}`;
+    const apiParams = params ? { ...params } : {};
+    if (uiLimit) {
+        apiParams['limitObjCount'] = uiLimit;
+    }
+    return [apiUrl, apiParams];
 }

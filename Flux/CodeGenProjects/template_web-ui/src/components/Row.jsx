@@ -3,7 +3,7 @@ import { TableRow } from '@mui/material';
 import PropTypes from 'prop-types';
 import _ from 'lodash';
 import { getDataxpath } from '../utils';
-import { DB_ID, Modes } from '../constants';
+import { DB_ID, MODES } from '../constants';
 import Cell from './Cell';
 import classes from './Row.module.css';
 
@@ -52,7 +52,7 @@ const Row = (props) => {
                 if (cellRow) {
                     if (cellRow[cell.tableTitle] === undefined) {
                         disabled = true;
-                    } else if (mode === Modes.EDIT_MODE) {
+                    } else if (mode === MODES.EDIT) {
                         if (collection && collection.ormNoUpdate && !cellRow['data-add']) {
                             disabled = true;
                         } else if (collection.uiUpdateOnly && cellRow['data-add']) {
@@ -163,7 +163,7 @@ Row.propTypes = {
     // row: PropTypes.object.isRequired,
     cells: PropTypes.array.isRequired,
     // selected: PropTypes.bool.isRequired,
-    mode: PropTypes.oneOf([Modes.READ_MODE, Modes.EDIT_MODE]).isRequired,
+    mode: PropTypes.oneOf([MODES.READ, MODES.EDIT]).isRequired,
     data: PropTypes.oneOfType([PropTypes.object, PropTypes.array]).isRequired,
     originalData: PropTypes.oneOfType([PropTypes.object, PropTypes.array]).isRequired,
     collections: PropTypes.array.isRequired,

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import json
 import os
-from typing import List, Callable, Dict
+from typing import List, Callable, Dict, Final
 import time
 import logging
 from pathlib import PurePath
@@ -22,6 +22,7 @@ class JsProjectSpecificUtilsPlugin(BaseJSLayoutPlugin):
     """
     Plugin script to generate projectSpecificUtils.js file from proto schema.
     """
+    indentation_space: Final[str] = "    "
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
@@ -59,18 +60,26 @@ class JsProjectSpecificUtilsPlugin(BaseJSLayoutPlugin):
                 widget_ui_data_list = widget_ui_data_option_value_dict["widget_ui_data"]
                 if widget_ui_data_list:
                     # since we will always have single obj in list
-                    widget_ui_data = widget_ui_data_list[0]
-                    highlight_update = widget_ui_data.get("highlight_update")
-                    if highlight_update is not None:
-                        widget_ui_data["highlight_update"] = f"{highlight_update}".lower()
-                    truncate_date_time = widget_ui_data.get("truncate_date_time")
-                    if truncate_date_time is not None:
-                        widget_ui_data["truncate_date_time"] = f"{truncate_date_time}".lower()
-                widget_ui_data_list_str = json.dumps(widget_ui_data_list)
-                for old_item, new_item in [('"true"', 'true'), ('"false"', 'false')]:
-                    widget_ui_data_list_str = widget_ui_data_list_str.replace(old_item, new_item)
+                    widget_ui_data_dict = widget_ui_data_list[0]
+                    for key, value in widget_ui_data_dict.items():
+                        if value is not None:
+                            widget_ui_data_dict[key] = value
+                    # highlight_update = widget_ui_data.get("highlight_update")
+                    # if highlight_update is not None:
+                    #     widget_ui_data["highlight_update"] = f"{highlight_update}".lower()
+                    # truncate_date_time = widget_ui_data.get("truncate_date_time")
+                    # if truncate_date_time is not None:
+                    #     widget_ui_data["truncate_date_time"] = f"{truncate_date_time}".lower()
+                # widget_ui_data_list_str = json.dumps(widget_ui_data_list)
+                # for old_item, new_item in [('"true"', 'true'), ('"false"', 'false'), ('"True"', 'true'), ('"False"', 'false')]:
+                #     widget_ui_data_list_str = widget_ui_data_list_str.replace(old_item, new_item)
 
-                output_str += '    { ' + f'i: "{title_val}", '
+                # output_str += '    { ' + f'i: "{title_val}", '
+
+                widget_ui_option_dict = {
+                    "i": title_val,
+                    "widget_ui_data": widget_ui_data_list
+                }
 
                 msg_coordinates_override = ui_coordinates_override_msg_dict.get(message.proto.name)
 
@@ -84,20 +93,34 @@ class JsProjectSpecificUtilsPlugin(BaseJSLayoutPlugin):
                                        f"of current project has no key '{coordinate}'")
                             logging.error(err_str)
                             raise Exception(err_str)
-                    output_str += f'{coordinate}: {val}, '
+                    widget_ui_option_dict[coordinate] = val
 
-                output_str += f'widget_ui_data: {widget_ui_data_list_str}' + \
-                              ' },\n'
+                    # output_str += f'{coordinate}: {val}, '
+
+                for key, value in widget_ui_data_option_value_dict.items():
+                    if key in ["i", "x", "y", "w", "h", "widget_ui_data"]:
+                        continue
+                    if value is not None:
+                        widget_ui_option_dict[key] = value
+
+                widget_ui_option_dict_str = json.dumps(widget_ui_option_dict)
+                for old_item, new_item in [('"true"', 'true'), ('"false"', 'false'), ('"True"', 'true'), ('"False"', 'false')]:
+                    widget_ui_option_dict_str = widget_ui_option_dict_str.replace(old_item, new_item)
+
+                # output_str += f'widget_ui_data: {widget_ui_data_list_str}' + \
+                #               ' },\n'
+                output_str += f"{widget_ui_option_dict_str}, \n"
+
         output_str += "]\n\n"
         output_str += "export function flux_toggle(value) {\n"
-        output_str += "    return !value;\n"
+        output_str += JsProjectSpecificUtilsPlugin.indentation_space + "return !value;\n"
         output_str += "}\n\n"
         output_str += "export function flux_trigger_strat(value) {\n"
-        output_str += "    if (['StratState_READY', 'StratState_PAUSED', 'StratState_ERROR'].includes(value)) {\n"
-        output_str += "        return 'StratState_ACTIVE';\n"
-        output_str += "    } else if ('StratState_ACTIVE' === value) {\n"
-        output_str += "        return 'StratState_PAUSED';\n"
-        output_str += "    }\n"
+        output_str += JsProjectSpecificUtilsPlugin.indentation_space + "if (['StratState_READY', 'StratState_PAUSED', 'StratState_ERROR'].includes(value)) {\n"
+        output_str += JsProjectSpecificUtilsPlugin.indentation_space*2 + "return 'StratState_ACTIVE';\n"
+        output_str += JsProjectSpecificUtilsPlugin.indentation_space + "} else if ('StratState_ACTIVE' === value) {\n"
+        output_str += JsProjectSpecificUtilsPlugin.indentation_space*2 + "return 'StratState_PAUSED';\n"
+        output_str += JsProjectSpecificUtilsPlugin.indentation_space + "}\n"
         output_str += "}\n"
 
         output_file_name = "projectSpecificUtils.js"

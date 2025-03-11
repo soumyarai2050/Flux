@@ -8,7 +8,7 @@ import {
 import _, { cloneDeep } from 'lodash';
 import { Add, Delete } from '@mui/icons-material';
 // project constants and common utility function imports
-import { DataTypes, Modes, SCHEMA_DEFINITIONS_XPATH, API_ROOT_URL } from '../constants';
+import { DATA_TYPES, MODES, SCHEMA_DEFINITIONS_XPATH, API_ROOT_URL } from '../constants';
 import {
     addxpath, applyFilter, clearxpath, genChartDatasets, genMetaFilters, generateObjectFromSchema, 
     getChartOption, getCollectionByName, getFilterDict, getIdFromAbbreviatedKey, mergeTsData, tooltipFormatter, 
@@ -35,7 +35,7 @@ function ChartWidget(props) {
     const [selectedIndex, setSelectedIndex] = useState();
     const [open, setOpen] = useState(false);
     const [openModalPopup, setOpenModalPopup] = useState(false);
-    const [mode, setMode] = useState(Modes.READ_MODE);
+    const [mode, setMode] = useState(MODES.READ);
     const [data, setData] = useState({});
     // @deprecated - partition moved to chart option
     // const [openPartition, setOpenPartition] = useState(false);
@@ -72,7 +72,7 @@ function ChartWidget(props) {
 
     useEffect(() => {
         // update the local row dataset on update from parent
-        if (mode === Modes.READ_MODE) {
+        if (mode === MODES.READ) {
             let updatedRows = props.rows;
             if (storedChartObj.filters && storedChartObj.filters.length > 0) {
                 updatedRows = applyFilter(props.rows, storedChartObj.filters, props.collectionView, props.collections);
@@ -144,7 +144,7 @@ function ChartWidget(props) {
                         }
                     })
                     seriesCollections.forEach(col => {
-                        if (col.val_meta_field && ![DataTypes.OBJECT, DataTypes.ARRAY].includes(col.type)) {
+                        if (col.val_meta_field && ![DATA_TYPES.OBJECT, DATA_TYPES.ARRAY].includes(col.type)) {
                             params.push(col.tableTitle);
                         }
                     })
@@ -228,7 +228,7 @@ function ChartWidget(props) {
 
     const flushGetAllWs = useCallback(() => {
         /* apply get-all websocket changes */
-        if (Object.keys(getAllWsDict.current).length > 0 && mode === Modes.READ_MODE) {
+        if (Object.keys(getAllWsDict.current).length > 0 && mode === MODES.READ) {
             const updatedWsDict = cloneDeep(getAllWsDict.current);
             getAllWsDict.current = {}
             const updatedTsData = mergeTsData(tsData, updatedWsDict, queryDict);
@@ -284,7 +284,7 @@ function ChartWidget(props) {
                     if (row) {
                         if (row.hasOwnProperty(idField)) {
                             let id = row[idField];
-                            if (typeof id === DataTypes.STRING) {
+                            if (typeof id === DATA_TYPES.STRING) {
                                 id = getIdFromAbbreviatedKey(props.abbreviated, id);
                             }
                             props.setSelectedId(id);
@@ -293,7 +293,7 @@ function ChartWidget(props) {
                 }
             } else {
                 let id = selectedData[idField];
-                if (typeof id === DataTypes.STRING) {
+                if (typeof id === DATA_TYPES.STRING) {
                     id = getIdFromAbbreviatedKey(props.abbreviated, id);
                 }
                 props.setSelectedId(id);
@@ -307,7 +307,7 @@ function ChartWidget(props) {
             setOpenModalPopup(true);
         } else {
             setOpen(false);
-            setMode(Modes.READ_MODE);
+            setMode(MODES.READ);
         }
     }
 
@@ -321,7 +321,7 @@ function ChartWidget(props) {
     }
 
     const onSave = () => {
-        setMode(Modes.READ_MODE);
+        setMode(MODES.READ);
         setOpen(false);
         setOpenModalPopup(false);
         const updatedObj = clearxpath(cloneDeep(data));
@@ -336,17 +336,17 @@ function ChartWidget(props) {
             setData(modifiedChartObj);
             setOpen(false);
             setOpenModalPopup(false);
-            setMode(Modes.READ_MODE);
+            setMode(MODES.READ);
         }
     }
 
     const onChangeMode = () => {
-        setMode(Modes.EDIT_MODE);
+        setMode(MODES.EDIT);
         setOpen(true);
     }
 
     const onReload = () => {
-        setMode(Modes.READ_MODE);
+        setMode(MODES.READ);
         props.onReload();
         setReloadCounter(prevCount => prevCount + 1);
     }
@@ -357,7 +357,7 @@ function ChartWidget(props) {
         setModifiedChartObj(updatedObj);
         setData(updatedObj);
         setStoredChartObj({});
-        setMode(Modes.EDIT_MODE);
+        setMode(MODES.EDIT);
         setOpen(true);
     }
 
@@ -439,7 +439,7 @@ function ChartWidget(props) {
     //                     }
     //                 />
     //                 {props.collections.map(collection => {
-    //                     if (collection.type === DataTypes.STRING) {
+    //                     if (collection.type === DATA_TYPES.STRING) {
     //                         let label = collection.elaborateTitle ? collection.tableTitle : collection.title;
     //                         let value = collection.tableTitle;
     //                         if (props.collectionView) {
@@ -464,7 +464,7 @@ function ChartWidget(props) {
     // )
 
     let createMenu = '';
-    if (mode === Modes.READ_MODE) {
+    if (mode === MODES.READ) {
         createMenu = <Icon title='Create' name='Create' onClick={onCreate}><Add fontSize='small' /></Icon>;
     }
 

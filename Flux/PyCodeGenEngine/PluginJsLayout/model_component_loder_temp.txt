@@ -1,0 +1,23 @@
+import React, { lazy, Suspense } from 'react';
+import Skeleton from '../components/Skeleton';
+
+// Lazy load components
+# @@protoc_insertion_point(lazy_load_components)
+
+// Component dictionary
+const modelComponentDict = {
+    # @@protoc_insertion_point(component_dictionary)
+};
+
+// Function to get the component by key
+export const getModelComponent = (modelName, props = {}) => {
+    const Component = modelComponentDict[modelName];
+
+    return Component ? (
+        <Suspense fallback={<Skeleton name={modelName} />}>
+            <Component {...props} />
+        </Suspense>
+    ) : (
+        <div>Component not found</div>
+    )
+}
