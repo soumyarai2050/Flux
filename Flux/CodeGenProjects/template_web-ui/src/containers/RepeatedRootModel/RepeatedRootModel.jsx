@@ -1,11 +1,15 @@
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { cloneDeep, get, isObject, set } from 'lodash';
-import { LAYOUT_TYPES, MODEL_TYPES, MODES, DB_ID } from '../../constants';
+import { DB_ID, LAYOUT_TYPES, MODEL_TYPES, MODES } from '../../constants';
 import * as Selectors from '../../selectors';
-import { clearxpath, getWidgetOptionById, sortColumns, generateObjectFromSchema, addxpath, compareJSONObjects, getServerUrl, getApiUrlMetadata, getWidgetTitle, } from '../../utils';
+import {
+    clearxpath, getWidgetOptionById, sortColumns, generateObjectFromSchema,
+    addxpath, compareJSONObjects, getServerUrl, getWidgetTitle,
+    isWebSocketAlive, getApiUrlMetadata, removeRedundantFieldsFromRows
+} from '../../utils';
 import { FullScreenModalOptional } from '../../components/Modal';
-import { ModelCard, ModelCardContent, ModelCardHeader } from '../../components/cards';
+import { ModelCard, ModelCardHeader, ModelCardContent } from '../../components/cards';
 import MenuGroup from '../../components/MenuGroup';
 import { cleanAllCache } from '../../utility/attributeCache';
 import { actions as LayoutActions } from '../../features/uiLayoutSlice';
@@ -20,7 +24,9 @@ import {
     joinByChangeHandler,
     centerJoinToggleHandler,
     flipToggleHandler,
-    pinnedChangeHandler
+    pinnedChangeHandler,
+    filtersChangeHandler,
+    chartDataChangeHandler
 } from '../../utils/genericModelHandler';
 import { utils, writeFileXLSX } from 'xlsx';
 import CommonKeyWidget from '../../components/CommonKeyWidget';
@@ -39,6 +45,7 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
     const { storedObj: dataSourceStoredObj } = useSelector(dataSource?.selector ?? (() => ({ storedObj: null })), (prev, curr) => {
         return JSON.stringify(prev) === JSON.stringify(curr);
     });
+
     const [isMaximized, setIsMaximized] = useState(false);
     const [isWsDisabled, setIsWsDisabled] = useState(false);
     const [page, setPage] = useState(0);
@@ -231,7 +238,12 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                 console.error(`excepected either array or object, received: ${updatedArrayOrObj}`)
             }
         }
-        socket.onclose = () => { }
+        socket.onclose = () => {
+            socketRef.current = null;
+        }
+        socket.onerror = () => {
+            socketRef.current = null;
+        }
 
         return () => {
             if (socketRef.current) {
@@ -325,7 +337,9 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
     }
 
     const handleLayoutTypeChange = (updatedLayoutType) => {
-        layoutTypeChangeHandler(modelHandlerConfig, updatedLayoutType, allowedLayoutTypes);
+        const layoutTypeKey = mode === MODES.READ ? 'view_layout' : 'edit_layout';
+        layoutTypeChangeHandler(modelHandlerConfig, updatedLayoutType, layoutTypeKey);
+        setLayoutType(updatedLayoutType);
     }
 
     const handleDataSourceColorsChange = (updatedDataSourceColors) => {
@@ -346,6 +360,14 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
 
     const handleModeToggle = () => {
         dispatch(actions.setMode(mode === MODES.READ ? MODES.EDIT : MODES.READ));
+    }
+
+    const handleFiltersChange = (updatedFilters) => {
+        filtersChangeHandler(modelHandlerConfig, updatedFilters);
+    }
+
+    const handleChartDataChange = (updatedChartData) => {
+        chartDataChangeHandler(modelHandlerConfig, updatedChartData);
     }
 
     const handleDownload = () => {
@@ -395,10 +417,6 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
         setShowMore((prev) => !prev);
     }
 
-    const handleFiltersChange = () => {
-
-    }
-
     const handleConfirmSavePopupClose = () => {
         dispatch(actions.setIsConfirmSavePopupOpen(false));
         handleReload();
@@ -409,14 +427,16 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
         const modelUpdatedObj = addxpath(newObj);
         dispatch(actions.setStoredObj({}));
         dispatch(actions.setUpdatedObj(modelUpdatedObj));
+        dispatch(actions.setMode(MODES.EDIT));
         handleModeToggle();
     }
 
     const handleSave = (modifiedObj, force = false) => {
         const modelUpdatedObj = modifiedObj || clearxpath(cloneDeep(updatedObj));
         const activeChanges = compareJSONObjects(storedObj, modelUpdatedObj, fieldsMetadata);
-        if (!activeChanges) {
+        if (!activeChanges || Object.keys(activeChanges).length === 0) {
             changesRef.current = {};
+            dispatch(actions.setMode(MODES.READ));
             return;
         }
         changesRef.current.active = activeChanges;
@@ -436,6 +456,7 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
             dispatch(actions.partialUpdate({ url, data: changeDict }));
         } else {
             dispatch(actions.create({ url, data: changeDict }));
+            dispatch(actions.setMode(MODES.READ));
         }
         changesRef.current = {};
         dispatch(actions.setMode(MODES.READ));
@@ -473,6 +494,13 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
         dispatch(actions.setObjId(id));
     }
 
+    const cleanedRows = useMemo(() => {
+        if ([LAYOUT_TYPES.CHART, LAYOUT_TYPES.PIVOT_TABLE].includes(layoutType)) {
+            return removeRedundantFieldsFromRows(rows);
+        }
+        return [];
+    }, [rows, layoutType])
+
     // A helper function to decide which content to render based on layoutType
     const renderContent = () => {
         switch (layoutType) {
@@ -508,19 +536,20 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                     </>
                 );
             case LAYOUT_TYPES.PIVOT_TABLE:
-                return <PivotTable />;
+                return <PivotTable pivotData={cleanedRows} />;
             case LAYOUT_TYPES.CHART:
                 return (
                     <ChartView
                         modelName={modelName}
                         onReload={handleReload}
-                        chartRows={[]}
-                        onChartDataChange={() => { }}
-                        onChartDelete={() => { }}
+                        chartRows={cleanedRows}
+                        onChartDataChange={handleChartDataChange}
                         fieldsMetadata={fieldsMetadata}
-                        chartData={modelLayoutOption.chart_data}
+                        chartData={modelLayoutOption.chart_data || []}
                         modelType={MODEL_TYPES.REPEATED_ROOT}
                         onRowSelect={handleRowSelect}
+                        mode={mode}
+                        onModeToggle={handleModeToggle}
                     />
                 );
             default:
@@ -550,7 +579,6 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                         // filter
                         filters={modelLayoutOption.filters || []}
                         fieldsMetadata={fieldsMetadata || []}
-                        isCollectionModel={false}
                         onFiltersChange={handleFiltersChange}
                         // visibility
                         showMore={showMore}
@@ -585,6 +613,12 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                         // maximize
                         isMaximized={isMaximized}
                         onMaximizeToggle={handleFullScreenToggle}
+                        // dynamic menu
+                        commonKeys={commonKeys}
+                        onButtonToggle={handleButtonToggle}
+                        // button query menu
+                        modelSchema={modelSchema}
+                        url={url}
                         // misc
                         enableOverride={modelLayoutData.enable_override || []}
                         disableOverride={modelLayoutData.disable_override || []}
@@ -594,12 +628,12 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                         onPinToggle={handlePinnedChange}
                     />
                 </ModelCardHeader>
-                <ModelCardContent isDisabled={isLoading} error={error} onClear={handleErrorClear}>
+                <ModelCardContent isDisabled={isLoading} error={error} onClear={handleErrorClear} isDisconnected={!isWebSocketAlive(socketRef.current)}>
                     {renderContent()}
                 </ModelCardContent>
             </ModelCard>
             <ConfirmSavePopup
-                title={modelName}
+                title={modelTitle}
                 open={isConfirmSavePopupOpen}
                 onClose={handleConfirmSavePopupClose}
                 onSave={executeSave}

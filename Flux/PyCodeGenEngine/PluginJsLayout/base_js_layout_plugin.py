@@ -135,6 +135,7 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
             self.project_name = file.proto.package
 
         message_list.sort(key=lambda message_: message_.proto.name)
+        message_name_list = [message_.proto.name for message_ in message_list]
 
         # handling current file
         for message in set(message_list):
@@ -167,7 +168,7 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
 
                             # checking if this message has dependency on any model - if it has then updating msg_name_to_dependent_msg_name_list_dict
                             dependent_msg_name = widget_ui_data_option_value_dict.get(BaseJSLayoutPlugin.widget_ui_option_depending_proto_model_name_field)
-                            if dependent_msg_name is not None and dependent_msg_name in message_list:
+                            if dependent_msg_name is not None and dependent_msg_name in message_name_list:
                                 self.msg_name_to_dependent_msg_name_list_dict[message.proto.name] = [dependent_msg_name]
                             # else not required: if no dependency then no need to update msg_name_to_dependent_msg_name_list_dict
                             crud_override_option_list = widget_ui_data_option_value_dict.get(BaseJSLayoutPlugin.widget_ui_option_override_default_crud_field)
@@ -179,7 +180,7 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
                                         raise Exception(f"multiple dependents found for non-filter model "
                                                         f"{message.proto.name}, {dependent_msg_name=}, "
                                                         f"{crud_dependent_msg_name=}")
-                                    if crud_dependent_msg_name is not None and crud_dependent_msg_name in message_list:
+                                    if crud_dependent_msg_name is not None and crud_dependent_msg_name in message_name_list:
                                         self.msg_name_to_dependent_msg_name_list_dict[message.proto.name] = [crud_dependent_msg_name]
                                     # else not required: if no dependency then no need to update msg_name_to_dependent_msg_name_list_dict
                             # else not required: no crud override set

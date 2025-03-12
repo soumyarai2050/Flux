@@ -4,6 +4,7 @@ import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, TextFie
 import { FilterAlt, PushPin, PushPinOutlined } from '@mui/icons-material';
 import Icon from '../../Icon';
 import MenuItem from '../../MenuItem';
+import styles from './FilterMenu.module.css';
 
 /**
  * FilterMenu renders a dialog that allows users to apply filters on a data set.
@@ -16,7 +17,7 @@ import MenuItem from '../../MenuItem';
  * @param {Array<Object>} props.fieldsMetadata - Array of metadata objects for each field.
  *        Each object should include:
  *          - key: {string} Unique identifier for the field.
- *          - filter_enable: {boolean} (Optional) Indicates if filtering is enabled for the field.
+ *          - filterEnable: {boolean} (Optional) Indicates if filtering is enabled for the field.
  *          - elaborateTitle: {boolean} (Optional) If true, use tableTitle as the display name.
  *          - tableTitle: {string} Display name when elaborateTitle is true.
  *          - title: {string} Display name when elaborateTitle is false.
@@ -88,7 +89,7 @@ const FilterMenu = ({
     setIsPopupOpen(false);
   };
 
-  const filterFieldsMetadata = useMemo(() => fieldsMetadata.filter(meta => meta.filter_enable), []);
+  const filterFieldsMetadata = useMemo(() => fieldsMetadata.filter(meta => meta.filterEnable), []);
 
   if (filterFieldsMetadata.length === 0) return null;
 
@@ -136,14 +137,15 @@ const FilterMenu = ({
                   : meta.title;
               const fieldKey = isCollectionModel ? 'key' : 'path';
               return (
-                <Box key={displayName} mb={2}>
-                  <span>{displayName}</span>
+                <Box key={displayName} className={styles.filter} mb={2}>
+                  <span className={styles.filter_name}>{displayName}</span>
                   <TextField
-                    id={meta.tableTitle}
-                    name={meta.tableTitle}
+                    id={meta[fieldKey]}
+                    className={styles.text_field}
+                    name={meta[fieldKey]}
                     size='small'
-                    value={filterDict[fieldKey] || ''}
-                    onChange={(e) => handleTextChange(e, fieldKey)}
+                    value={filterDict[meta[fieldKey]] || ''}
+                    onChange={(e) => handleTextChange(e, meta[fieldKey])}
                     variant='outlined'
                     placeholder='Comma separated values'
                     inputProps={{
@@ -157,10 +159,10 @@ const FilterMenu = ({
             })}
         </DialogContent>
         <DialogActions>
-          <Button color='error' onClick={handleFilterClear} autoFocus>
+          <Button color='error' variant='contained' onClick={handleFilterClear} autoFocus>
             Clear
           </Button>
-          <Button onClick={handleFilterApply} autoFocus>
+          <Button color='success' variant='contained' onClick={handleFilterApply} autoFocus>
             Apply
           </Button>
         </DialogActions>

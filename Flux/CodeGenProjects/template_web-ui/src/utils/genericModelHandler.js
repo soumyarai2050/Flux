@@ -55,9 +55,30 @@ export function flipToggleHandler(config, updatedFlip) {
   layoutDataChangeHandler(config, layoutDataUpdateDict);
 }
 
+export function joinSortChangeHandler(config, updatedJoinSort) {
+  const layoutOptionUpdateDict = { join_sort: updatedJoinSort };
+  layoutOptionChangeHandler(config, layoutOptionUpdateDict);
+}
+
+export function filtersChangeHandler(config, updatedFilters) {
+  const layoutOptionUpdateDict = { filters: updatedFilters };
+  layoutOptionChangeHandler(config, layoutOptionUpdateDict);
+}
+
+export function chartDataChangeHandler(config, updatedChartData) {
+  const layoutOptionUpdateDict = { chart_data: updatedChartData };
+  layoutOptionChangeHandler(config, layoutOptionUpdateDict);
+}
+
 function layoutDataChangeHandler(config, layoutDataUpdateDict) {
   const { layoutOption, modelName, dispatch, objId, onLayoutChangeCallback } = config;
   const layoutData = getWidgetOptionById(layoutOption.widget_ui_data, objId, layoutOption.bind_id_fld);
   const updatedLayoutData = { ...layoutData, ...layoutDataUpdateDict };
-  dispatch(onLayoutChangeCallback({ name: modelName, data: updatedLayoutData }));
+  dispatch(onLayoutChangeCallback({ name: modelName, data: updatedLayoutData, type: 'data' }));
+}
+
+function layoutOptionChangeHandler(config, layoutOptionUpdateDict) {
+  const { layoutOption, modelName, dispatch, onLayoutChangeCallback } = config;
+  const updatedLayoutOption = { ...layoutOption, ...layoutOptionUpdateDict };
+  dispatch(onLayoutChangeCallback({ name: modelName, data: updatedLayoutOption, type: 'option' }));
 }

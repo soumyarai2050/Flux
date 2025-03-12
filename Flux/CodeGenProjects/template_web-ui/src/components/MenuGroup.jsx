@@ -21,7 +21,6 @@ const MenuGroup = ({
     dataSourceColors,
     fieldsMetadata,
     filters,
-    isCollectionModel,
     centerJoin,
     flip,
     layout,
@@ -64,7 +63,7 @@ const MenuGroup = ({
 
     const handleColumnToggle = (e, xpath, key, value, ...rest) => {
         const isHidden = value;
-        const fieldKey = isCollectionModel ? 'key' : 'tableTitle';
+        const fieldKey = modelType === MODEL_TYPES.ABBREVIATION_MERGE ? 'key' : 'tableTitle';
         const updatedColumns = columns.map((o) => o[fieldKey] === key ? { ...o, hide: isHidden } : o);
         const meta = fieldsMetadata.find((o) => o[fieldKey] === key);
         const updatedEnableOverride = cloneDeep(enableOverride);
@@ -97,7 +96,7 @@ const MenuGroup = ({
 
     const handleShowLessToggle = (e, xpath, key, value, ...rest) => {
         const isLess = value;
-        const fieldKey = isCollectionModel ? 'key' : 'tableTitle';
+        const fieldKey = modelType === MODEL_TYPES.ABBREVIATION_MERGE ? 'key' : 'tableTitle';
         const updatedColumns = columns.map((o) => o[fieldKey] === key ? { ...o, showLess: isLess } : o);
         const meta = fieldsMetadata.find((o) => o[fieldKey] === key);
         const updatedShowLess = cloneDeep(showLess);
@@ -203,7 +202,7 @@ const MenuGroup = ({
                         key={menuKey}
                         filters={filters}
                         fieldsMetadata={fieldsMetadata}
-                        isCollectionModel={isCollectionModel}
+                        isCollectionModel={modelType === MODEL_TYPES.ABBREVIATION_MERGE}
                         onFiltersChange={onFiltersChange}
                         menuType={menuType}
                         isPinned={pinned.includes(menuName)}

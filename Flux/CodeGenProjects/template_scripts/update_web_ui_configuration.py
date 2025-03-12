@@ -55,8 +55,8 @@ class UpdateWebUIConfiguration:
                          f"'http://{self.proxy_server_host}:{self.proxy_server_port}/ui_proxy';", content)
 
         content = re.sub(
-            r'export const API_ROOT = [^;]+;',
-            f"export const API_ROOT = 'http://{self.server_host}:{self.main_server_beanie_port}/"+"${PROJECT_NAME}';", content)
+            r'const API_ROOT = [^;]+;',
+            f"const API_ROOT = `http://{self.server_host}:{self.main_server_beanie_port}/"+"${PROJECT_NAME}`;", content)
 
         content = re.sub(
             r'export const API_PUBLIC_URL = [^;]+;',

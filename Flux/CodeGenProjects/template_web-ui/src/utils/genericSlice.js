@@ -11,7 +11,7 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 import { camelCase } from 'lodash';
 import { API_ROOT_URL, MODES } from '../constants';
-import { getApiUrlMetadata, snakeToPascal } from '../utils';
+import { getApiUrlMetadata, snakeToPascal, getErrorDetails } from '../utils';
 import {
   setStoredArrayHandler,
   setStoredArrayWsHandler,
@@ -109,7 +109,7 @@ export function createGenericSlice({
       const res = await axios.get(apiUrl, { params: apiParams });
       return res.data;
     } catch (err) {
-      return rejectWithValue(err.response?.data || err.message);
+      return rejectWithValue(getErrorDetails(err));
     }
   });
 
@@ -121,7 +121,7 @@ export function createGenericSlice({
       const res = await axios.get(`${apiUrl}/${id}`, { params: apiParams });
       return res.data;
     } catch (err) {
-      return rejectWithValue(err.response?.data || err.message);
+      return rejectWithValue(getErrorDetails(err));
     }
   });
 
@@ -133,7 +133,7 @@ export function createGenericSlice({
       const res = await axios.post(apiUrl, data, { params: apiParams });
       return res.data;
     } catch (err) {
-      return rejectWithValue(err.response?.data || err.message);
+      return rejectWithValue(getErrorDetails(err));
     }
   });
 
@@ -145,7 +145,7 @@ export function createGenericSlice({
       const res = await axios.put(apiUrl, data, { params: apiParams });
       return res.data;
     } catch (err) {
-      return rejectWithValue(err.response?.data || err.message);
+      return rejectWithValue(getErrorDetails(err));
     }
   });
 
@@ -157,7 +157,7 @@ export function createGenericSlice({
       const res = await axios.patch(apiUrl, data, { params: apiParams });
       return res.data;
     } catch (err) {
-      return rejectWithValue(err.response?.data || err.message);
+      return rejectWithValue(getErrorDetails(err));
     }
   });
 

@@ -1,16 +1,16 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 // third-party package imports
 import {
-    Box, Divider, List, ListItem, ListItemButton, ListItemText
+    Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Divider, List, ListItem, ListItemButton, ListItemText
 } from '@mui/material';
 import { cloneDeep, get, isEqual } from 'lodash';
-import { Add, Delete } from '@mui/icons-material';
+import { Add, Close, Delete, SaveAlt } from '@mui/icons-material';
 // project constants and common utility function imports
 import { DATA_TYPES, MODES, SCHEMA_DEFINITIONS_XPATH, API_ROOT_URL, MODEL_TYPES } from '../../../constants';
 import {
     addxpath, applyFilter, clearxpath, genChartDatasets, genMetaFilters, generateObjectFromSchema,
-    getChartOption, getCollectionByName, getFilterDict, getIdFromAbbreviatedKey, mergeTsData, tooltipFormatter,
+    getChartOption, getCollectionByName, getFilterDict, getIdFromAbbreviatedKey, getModelSchema, mergeTsData, tooltipFormatter,
     updateChartDataObj, updateChartSchema, updatePartitionFldSchema
 } from '../../../utils';
 // custom component imports
@@ -19,6 +19,8 @@ import FullScreenModal from '../../Modal';
 import EChart from '../../EChart';
 import styles from './ChartView.module.css';
 import { useTheme } from '@emotion/react';
+import DataTree from '../../trees/DataTree/DataTree';
+import { ModelCard, ModelCardContent, ModelCardHeader } from '../../cards';
 
 const CHART_SCHEMA_NAME = 'chart_data';
 
@@ -32,23 +34,22 @@ function ChartView({
     onRowSelect,
     onReload,
     onChartDataChange,
-    onChartDelete
+    // onChartDelete,
+    onModeToggle,
+    mode
 }) {
     // redux states
     const theme = useTheme();
     const { schema: projectSchema, schemaCollections } = useSelector(state => state.schema);
 
     const [storedChartObj, setStoredChartObj] = useState({});
-    const [modifiedChartObj, setModifiedChartObj] = useState({});
+    const [updatedChartObj, setUpdatedChartObj] = useState({});
     const [selectedIndex, setSelectedIndex] = useState();
-    const [open, setOpen] = useState(false);
-    const [openModalPopup, setOpenModalPopup] = useState(false);
-    const [mode, setMode] = useState(MODES.READ);
+    const [isChartOptionOpen, setIsChartOptionOpen] = useState(false);
+    const [isConfirmPopupOpen, setIsConfirmPopupOpen] = useState(false);
+    // const [mode, setMode] = useState(MODES.READ);
     const [data, setData] = useState({});
-    // @deprecated - partition moved to chart option
-    // const [openPartition, setOpenPartition] = useState(false);
-    // const [anchorEl, setAnchorEl] = useState(null);
-    const [chartObj, setChartObj] = useState({});
+    const [chartOption, setChartOption] = useState({});
     const [tsData, setTsData] = useState({});
     const [datasets, setDatasets] = useState([]);
     const [rows, setRows] = useState(chartRows);
@@ -89,7 +90,7 @@ function ChartView({
                 setRows(updatedRows);
             }
         }
-    }, [chartRows])
+    }, [chartRows, mode])
 
     useEffect(() => {
         // auto-select the chart obj if exists and not already selected
@@ -97,35 +98,35 @@ function ChartView({
             if (!((selectedIndex || selectedIndex === 0) && chartData[selectedIndex]) || !selectedIndex) {
                 setSelectedIndex(0);
                 setStoredChartObj(chartData[0]);
-                setModifiedChartObj(addxpath(cloneDeep(chartData[0])));
+                setUpdatedChartObj(addxpath(cloneDeep(chartData[0])));
             }
             else {
                 setStoredChartObj(chartData[selectedIndex]);
-                setModifiedChartObj(addxpath(cloneDeep(chartData[selectedIndex])));
+                setUpdatedChartObj(addxpath(cloneDeep(chartData[selectedIndex])));
                 const updatedSchema = updatePartitionFldSchema(schema, chartData[selectedIndex]);
                 setSchema(updatedSchema);
             }
         }
-        setChartUpdateCounter(prevCount => prevCount + 1);
+        setChartUpdateCounter((prevCount) => prevCount + 1);
     }, [chartData])
 
     useEffect(() => {
         if (selectedIndex || selectedIndex === 0) {
             setStoredChartObj(chartData[selectedIndex]);
-            setModifiedChartObj(addxpath(cloneDeep(chartData[selectedIndex])));
+            setUpdatedChartObj(addxpath(cloneDeep(chartData[selectedIndex])));
             const updatedSchema = updatePartitionFldSchema(schema, chartData[selectedIndex]);
             setSchema(updatedSchema);
         } else {
             setStoredChartObj({});
-            setModifiedChartObj({});
-            resetChart();
+            setUpdatedChartObj({});
+            handleChartReset();
         }
         setChartUpdateCounter(prevCount => prevCount + 1);
     }, [selectedIndex])
 
     useEffect(() => {
-        setData(modifiedChartObj);
-    }, [modifiedChartObj])
+        setData(updatedChartObj);
+    }, [updatedChartObj])
 
     useEffect(() => {
         // identify if the chart configuration obj selected has a time series or not
@@ -229,8 +230,8 @@ function ChartView({
     useEffect(() => {
         if (storedChartObj.series) {
             const updatedObj = addxpath(cloneDeep(storedChartObj));
-            const updatedChartObj = updateChartDataObj(updatedObj, fieldsMetadata, rows, datasets, modelType === MODEL_TYPES.ABBREVIATION_MERGE, schemaCollections, queryDict);
-            setChartObj(updatedChartObj)
+            const updatedChartOption = updateChartDataObj(updatedObj, fieldsMetadata, rows, datasets, modelType === MODEL_TYPES.ABBREVIATION_MERGE, schemaCollections, queryDict);
+            setChartOption(updatedChartOption);
         }
     }, [datasetUpdateCounter, queryDict])
 
@@ -310,16 +311,18 @@ function ChartView({
     }, [selectedData, queryDict])
 
     // on closing of modal, open a pop up to confirm/discard changes
-    const onClose = (e) => {
-        if (!isEqual(modifiedChartObj, data)) {
-            setOpenModalPopup(true);
+    const handleChartOptionClose = (e, reason) => {
+        if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;
+        if (!isEqual(updatedChartObj, data)) {
+            setIsConfirmPopupOpen(true);
         } else {
-            setOpen(false);
-            setMode(MODES.READ);
+            setIsChartOptionOpen(false);
+            // setMode(MODES.READ);
+            onModeToggle();
         }
     }
 
-    const resetChart = () => {
+    const handleChartReset = () => {
         setRows(chartRows);
         setDatasets([]);
         setTsData({});
@@ -328,56 +331,69 @@ function ChartView({
         setDatasetUpdateCounter(0);
     }
 
-    const onSave = () => {
-        setMode(MODES.READ);
-        setOpen(false);
-        setOpenModalPopup(false);
+    const handleSave = () => {
+        // setMode(MODES.READ);
+        onModeToggle();
+        setIsChartOptionOpen(false);
+        setIsConfirmPopupOpen(false);
         const updatedObj = clearxpath(cloneDeep(data));
-        onChartDataChange(modelName, updatedObj);
-        setChartUpdateCounter(prevCount => prevCount + 1);
+        const idx = chartData.findIndex((o) => o.chart_name === updatedObj.chart_name);
+        const updatedChartData = cloneDeep(chartData);
+        if (idx !== -1) {
+            updatedChartData.splice(idx, 1, updatedObj);
+        } else {
+            updatedChartData.push(updatedObj);
+        }
+        onChartDataChange(updatedChartData);
+        setChartUpdateCounter((prevCount) => prevCount + 1);
     }
 
     // on closing of modal popup (discard), revert back the changes
-    const onConfirmClose = (e, reason) => {
+    const handleConfirmClose = (e, reason) => {
         if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;
         else {
-            setData(modifiedChartObj);
-            setOpen(false);
-            setOpenModalPopup(false);
-            setMode(MODES.READ);
+            setData(updatedChartObj);
+            setIsChartOptionOpen(false);
+            setIsConfirmPopupOpen(false);
+            // setMode(MODES.READ);
+            onModeToggle();
         }
     }
 
     const onChangeMode = () => {
-        setMode(MODES.EDIT);
-        setOpen(true);
+        // setMode(MODES.EDIT);
+        onModeToggle();
+        isChartOptionOpen(true);
     }
 
     const handleReload = () => {
-        setMode(MODES.READ);
+        // setMode(MODES.READ);
         onReload();
-        setReloadCounter(prevCount => prevCount + 1);
+        setReloadCounter((prevCount) => prevCount + 1);
     }
 
-    const onCreate = () => {
-        let updatedObj = generateObjectFromSchema(schema, get(schema, [SCHEMA_DEFINITIONS_XPATH, CHART_SCHEMA_NAME]));
-        updatedObj = addxpath(updatedObj);
-        setModifiedChartObj(updatedObj);
+    const handleChartCreate = () => {
+        const chartSchema = getModelSchema(CHART_SCHEMA_NAME, schema);
+        const updatedObj = addxpath(generateObjectFromSchema(schema, chartSchema));
+        setUpdatedChartObj(updatedObj);
         setData(updatedObj);
         setStoredChartObj({});
-        setMode(MODES.EDIT);
-        setOpen(true);
+        // setMode(MODES.EDIT);
+        onModeToggle();
+        setIsChartOptionOpen(true);
     }
 
-    const onUserChange = () => {
+    const handleUserChange = () => {
 
     }
 
-    const onUpdate = (updatedData) => {
+    const handleUpdate = (updatedData) => {
         setData(updatedData);
         const updatedSchema = cloneDeep(schema);
-        const filterSchema = get(updatedSchema, [SCHEMA_DEFINITIONS_XPATH, 'ui_filter']);
-        const chartSchema = get(updatedSchema, [SCHEMA_DEFINITIONS_XPATH, CHART_SCHEMA_NAME]);
+        const filterSchema = getModelSchema('ui_filter', updatedSchema);
+        // get(updatedSchema, [SCHEMA_DEFINITIONS_XPATH, 'ui_filter']);
+        const chartSchema = getModelSchema(CHART_SCHEMA_NAME, updatedSchema);
+        // get(updatedSchema, [SCHEMA_DEFINITIONS_XPATH, CHART_SCHEMA_NAME]);
         if (updatedData.time_series) {
             filterSchema.auto_complete = 'fld_name:MetaFldList';
             chartSchema.properties.partition_fld.hide = true;
@@ -391,25 +407,31 @@ function ChartView({
     const onSelect = (index) => {
         if (index !== selectedIndex) {
             setSelectedIndex(index);
-            resetChart();
+            handleChartReset();
         }
     }
 
     const handleChartDelete = (chartName, index) => {
-        onChartDelete(modelName, chartName);
+        const updatedChartData = chartData.filter((o) => o.chart_name !== chartName);
+        onChartDataChange(updatedChartData);
+        // onChartDelete(modelName, chartName);
         if (index === selectedIndex) {
             setSelectedIndex();
             setStoredChartObj({});
-            setModifiedChartObj({});
+            setUpdatedChartObj({});
         }
     }
 
-    const options = getChartOption(clearxpath(cloneDeep(chartObj)));
+    const options = useMemo(() => getChartOption(clearxpath(cloneDeep(chartOption))), [chartOption]);
 
     return (
         <>
             <Box className={styles.container}>
                 <Box className={styles.list_container}>
+                    <Button color='warning' variant='contained' onClick={handleChartCreate}>
+                        <Add fontSize='small' />
+                        Add new chart
+                    </Button>
                     <List>
                         {chartData && chartData.map((item, index) => (
                             <ListItem className={styles.list_item} key={index} selected={selectedIndex === index} disablePadding onClick={() => onSelect(index)}>
@@ -470,34 +492,41 @@ function ChartView({
                 </Box>
             </Box>
             <FullScreenModal
-                id={`${modelName}-modal`}
-                open={open}
-                onClose={onClose}
-                onSave={onSave}
-                popup={openModalPopup}
-                onConfirmClose={onConfirmClose}>
-                {/* <TreeWidget
-                    name={CHART_SCHEMA_NAME}
-                    schema={schema}
-                    data={data}
-                    originalData={storedChartObj}
-                    mode={mode}
-                    onUpdate={onUpdate}
-                    onUserChange={onUserChange}
-                    topLevel={false}
-                /> */}
-                {/* <Dialog
-                    open={openModalPopup}
-                    onClose={onConfirmClose}>
+                id={'chart-option-modal'}
+                open={isChartOptionOpen}
+                onClose={handleChartOptionClose}
+            >
+                <ModelCard>
+                    <ModelCardHeader name={CHART_SCHEMA_NAME} >
+                        <Icon name='save' title='save' onClick={handleSave}><SaveAlt fontSize='small' /></Icon>
+                        <Icon name='close' title='close' onClick={handleChartOptionClose}><Close fontSize='small' /></Icon>
+                    </ModelCardHeader>
+                    <ModelCardContent>
+                        <DataTree
+                            projectSchema={schema}
+                            modelName={CHART_SCHEMA_NAME}
+                            updatedData={data}
+                            storedData={storedChartObj}
+                            subtree={null}
+                            mode={mode}
+                            xpath={null}
+                            onUpdate={handleUpdate}
+                            onUserChange={handleUserChange}
+                        />
+                    </ModelCardContent>
+                </ModelCard>
+                <Dialog
+                    open={isConfirmPopupOpen}
+                    onClose={handleConfirmClose}>
                     <DialogTitle>Save Changes</DialogTitle>
                     <DialogContent>
                         <DialogContentText>Do you want to save changes?</DialogContentText>
                     </DialogContent>
                     <DialogActions>
-                        <Button onClick={onConfirmClose} autoFocus>Discard</Button>
-                        <Button onClick={onSave} autoFocus>Save</Button>
+                        <Button color='error' variant='contained' onClick={handleConfirmClose} autoFocus>Discard</Button>
+                        <Button color='success' variant='contained' onClick={handleSave} autoFocus>Save</Button>
                     </DialogActions>
-                </Dialog> */}
+                </Dialog>
             </FullScreenModal>
         </>
     )

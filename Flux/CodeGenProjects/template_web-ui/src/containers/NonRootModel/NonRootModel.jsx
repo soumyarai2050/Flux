@@ -5,7 +5,8 @@ import { LAYOUT_TYPES, MODEL_TYPES, MODES, DB_ID } from '../../constants';
 import * as Selectors from '../../selectors';
 import {
     clearxpath, getWidgetOptionById, sortColumns, generateObjectFromSchema,
-    addxpath, compareJSONObjects, getServerUrl, getWidgetTitle
+    addxpath, compareJSONObjects, getServerUrl, getWidgetTitle,
+    isWebSocketAlive
 } from '../../utils';
 import { FullScreenModalOptional } from '../../components/Modal';
 import { ModelCard, ModelCardContent, ModelCardHeader } from '../../components/cards';
@@ -19,7 +20,8 @@ import {
     columnOrdersChangeHandler,
     showLessChangeHandler,
     overrideChangeHandler,
-    pinnedChangeHandler
+    pinnedChangeHandler,
+    filtersChangeHandler,
 } from '../../utils/genericModelHandler';
 import { utils, writeFileXLSX } from 'xlsx';
 import CommonKeyWidget from '../../components/CommonKeyWidget';
@@ -99,6 +101,7 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
 
         workerRef.current.onmessage = (event) => {
             const { rows, groupedRows, activeRows, maxRowSize, headCells, commonKeys, filteredCells } = event.data;
+
             startTransition(() => {
                 setRows(rows);
                 setGroupedRows(groupedRows);
@@ -180,7 +183,12 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
                 console.error(`excepected either array or object, received: ${updatedArrayOrObj}`)
             }
         }
-        socket.onclose = () => { }
+        socket.onclose = () => {
+            socketRef.current = null;
+        }
+        socket.onerror = () => {
+            socketRef.current = null;
+        }
 
         return () => {
             if (socketRef.current) {
@@ -275,6 +283,10 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
         dispatch(actions.setMode(mode === MODES.READ ? MODES.EDIT : MODES.READ));
     }
 
+    const handleFiltersChange = (updatedFilters) => {
+        filtersChangeHandler(modelHandlerConfig, updatedFilters);
+    }
+
     const handleDownload = () => {
         const updatedRows = cloneDeep(rows);
         updatedRows.forEach((row) => {
@@ -322,16 +334,13 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
         setShowMore((prev) => !prev);
     }
 
-    const handleFiltersChange = () => {
-
-    }
-
     const handleConfirmSavePopupClose = () => {
         dispatch(actions.setIsConfirmSavePopupOpen(false));
+        handleReload();
     }
 
     const handleCreate = () => {
-        const newObj = generateObjectFromSchema(projectSchema, modelRootName);
+        const newObj = generateObjectFromSchema(projectSchema, modelSchema);
         const modelUpdatedObj = addxpath(newObj);
         dispatch(actions.setStoredObj({}));
         dispatch(actions.setUpdatedObj(modelUpdatedObj));
@@ -472,7 +481,6 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
                         // filter
                         filters={modelLayoutOption.filters || []}
                         fieldsMetadata={fieldsMetadata || []}
-                        isCollectionModel={false}
                         onFiltersChange={handleFiltersChange}
                         // visibility
                         showMore={showMore}
@@ -522,7 +530,7 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
                         onPinToggle={handlePinnedChange}
                     />
                 </ModelCardHeader>
-                <ModelCardContent isDisabled={isLoading} error={error} onClear={handleErrorClear}>
+                <ModelCardContent isDisabled={isLoading} error={error} onClear={handleErrorClear} isDisconnected={!isWebSocketAlive(socketRef.current)}>
                     {renderContent()}
                 </ModelCardContent>
             </ModelCard>

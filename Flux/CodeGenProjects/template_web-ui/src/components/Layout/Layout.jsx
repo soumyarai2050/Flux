@@ -141,8 +141,10 @@ const Layout = ({ projectName, theme, onThemeToggle }) => {
    * @param {Array} newLayout - The updated layout array.
    */
   const handleLayoutChange = useCallback((newLayout) => {
-    setLayout(newLayout);
-  }, []);
+    if (isDraggable) {
+      setLayout(newLayout);
+    }
+  }, [isDraggable]);
 
   /**
    * Opens the popover for toggling components.
@@ -175,7 +177,7 @@ const Layout = ({ projectName, theme, onThemeToggle }) => {
 
   if (isLoading) return <div>Loading layout...</div>;
   if (!layout && !storedObj.widget_ui_data_elements) return null;
-  
+
   const popoverId = Boolean(anchorEl) ? 'toggle-popover' : undefined;
 
   const DraggableIcon = isDraggable ? DoNotTouch : PanTool;

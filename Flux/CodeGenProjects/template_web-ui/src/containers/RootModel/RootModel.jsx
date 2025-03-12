@@ -1,14 +1,15 @@
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { cloneDeep, isObject, set } from 'lodash';
-import { LAYOUT_TYPES, MODEL_TYPES, MODES, DB_ID } from '../../constants';
+import { DB_ID, LAYOUT_TYPES, MODEL_TYPES, MODES } from '../../constants';
 import * as Selectors from '../../selectors';
 import {
     clearxpath, getWidgetOptionById, sortColumns, generateObjectFromSchema,
-    addxpath, compareJSONObjects, getServerUrl, getWidgetTitle
+    addxpath, compareJSONObjects, getServerUrl, getWidgetTitle,
+    isWebSocketAlive
 } from '../../utils';
 import { FullScreenModalOptional } from '../../components/Modal';
-import { ModelCard, ModelCardContent, ModelCardHeader } from '../../components/cards';
+import { ModelCard, ModelCardHeader, ModelCardContent } from '../../components/cards';
 import MenuGroup from '../../components/MenuGroup';
 import { cleanAllCache } from '../../utility/attributeCache';
 import { actions as LayoutActions } from '../../features/uiLayoutSlice';
@@ -19,7 +20,8 @@ import {
     columnOrdersChangeHandler,
     showLessChangeHandler,
     overrideChangeHandler,
-    pinnedChangeHandler
+    pinnedChangeHandler,
+    filtersChangeHandler,
 } from '../../utils/genericModelHandler';
 import { utils, writeFileXLSX } from 'xlsx';
 import CommonKeyWidget from '../../components/CommonKeyWidget';
@@ -38,6 +40,7 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
     const { storedObj: dataSourceStoredObj } = useSelector(dataSource?.selector ?? (() => ({ storedObj: null })), (prev, curr) => {
         return JSON.stringify(prev) === JSON.stringify(curr);
     });
+
     const [isMaximized, setIsMaximized] = useState(false);
     const [isWsDisabled, setIsWsDisabled] = useState(false);
     const [page, setPage] = useState(0);
@@ -99,6 +102,7 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
 
         workerRef.current.onmessage = (event) => {
             const { rows, groupedRows, activeRows, maxRowSize, headCells, commonKeys, filteredCells } = event.data;
+
             startTransition(() => {
                 setRows(rows);
                 setGroupedRows(groupedRows);
@@ -179,7 +183,12 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
                 console.error(`excepected either array or object, received: ${updatedArrayOrObj}`)
             }
         }
-        socket.onclose = () => { }
+        socket.onclose = () => {
+            socketRef.current = null;
+        }
+        socket.onerror = () => {
+            socketRef.current = null;
+        }
 
         return () => {
             if (socketRef.current) {
@@ -259,7 +268,6 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
         pinnedChangeHandler(modelHandlerConfig, updatedPinned);
     }
 
-
     const handleOverrideChange = (updatedEnableOverride, updatedDisableOverride, updatedColumns) => {
         setHeadCells(updatedColumns);
         overrideChangeHandler(modelHandlerConfig, updatedEnableOverride, updatedDisableOverride);
@@ -273,6 +281,10 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
 
     const handleModeToggle = () => {
         dispatch(actions.setMode(mode === MODES.READ ? MODES.EDIT : MODES.READ));
+    }
+
+    const handleFiltersChange = (updatedFilters) => {
+        filtersChangeHandler(modelHandlerConfig, updatedFilters);
     }
 
     const handleDownload = () => {
@@ -322,12 +334,9 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
         setShowMore((prev) => !prev);
     }
 
-    const handleFiltersChange = () => {
-
-    }
-
     const handleConfirmSavePopupClose = () => {
         dispatch(actions.setIsConfirmSavePopupOpen(false));
+        handleReload();
     }
 
     const handleCreate = () => {
@@ -335,6 +344,7 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
         const modelUpdatedObj = addxpath(newObj);
         dispatch(actions.setStoredObj({}));
         dispatch(actions.setUpdatedObj(modelUpdatedObj));
+        dispatch(actions.setMode(MODES.EDIT));
         handleModeToggle();
     }
 
@@ -363,6 +373,7 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
             dispatch(actions.partialUpdate({ url, data: changeDict }));
         } else {
             dispatch(actions.create({ url, data: changeDict }));
+            dispatch(actions.setMode(MODES.READ));
         }
         changesRef.current = {};
         dispatch(actions.setMode(MODES.READ));
@@ -472,7 +483,6 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
                         // filter
                         filters={modelLayoutOption.filters || []}
                         fieldsMetadata={fieldsMetadata || []}
-                        isCollectionModel={false}
                         onFiltersChange={handleFiltersChange}
                         // visibility
                         showMore={showMore}
@@ -522,12 +532,12 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
                         onPinToggle={handlePinnedChange}
                     />
                 </ModelCardHeader>
-                <ModelCardContent isDisabled={isLoading} error={error} onClear={handleErrorClear}>
+                <ModelCardContent isDisabled={isLoading} error={error} onClear={handleErrorClear} isDisconnected={!isWebSocketAlive(socketRef.current)}>
                     {renderContent()}
                 </ModelCardContent>
             </ModelCard>
             <ConfirmSavePopup
-                title={modelName}
+                title={modelTitle}
                 open={isConfirmSavePopupOpen}
                 onClose={handleConfirmSavePopupClose}
                 onSave={executeSave}
