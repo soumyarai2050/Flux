@@ -2048,6 +2048,13 @@ export function compareJSONObjects(obj1, obj2, fieldsMetadata, isCreate = false)
         }
     }
     if (fieldsMetadata) {
+        let subFieldsMetadata = [];
+        fieldsMetadata
+            .filter((meta) => meta.subCollections)
+            .forEach((meta) => {
+                subFieldsMetadata = [...subFieldsMetadata, ...meta.subCollections];
+            })
+        const combinedFieldsMetadata = [...fieldsMetadata, ...subFieldsMetadata];
         const paths = getAllObjectPaths(diff);
         for (const path of paths) {
             // ignore DB_ID
@@ -2055,7 +2062,8 @@ export function compareJSONObjects(obj1, obj2, fieldsMetadata, isCreate = false)
                 continue;
             }
 
-            const metadata = fieldsMetadata.find(col => col.tableTitle === path);
+
+            const metadata = combinedFieldsMetadata.find(col => col.tableTitle === path);
 
             if (!metadata) {
                 const err_ = `ERROR: no collection obj (metadata) found for path: ${path}, likely UI bug. Please send screenshot to DEV for investigation`;

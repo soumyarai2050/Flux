@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { cloneDeep, isObject, set } from 'lodash';
-import { LAYOUT_TYPES, MODEL_TYPES, MODES, DB_ID } from '../../constants';
+import { DB_ID, LAYOUT_TYPES, MODEL_TYPES, MODES } from '../../constants';
 import * as Selectors from '../../selectors';
 import {
     clearxpath, getWidgetOptionById, sortColumns, generateObjectFromSchema,
@@ -9,7 +9,7 @@ import {
     isWebSocketAlive
 } from '../../utils';
 import { FullScreenModalOptional } from '../../components/Modal';
-import { ModelCard, ModelCardContent, ModelCardHeader } from '../../components/cards';
+import { ModelCard, ModelCardHeader, ModelCardContent } from '../../components/cards';
 import MenuGroup from '../../components/MenuGroup';
 import { cleanAllCache } from '../../utility/attributeCache';
 import { actions as LayoutActions } from '../../features/uiLayoutSlice';
@@ -31,15 +31,17 @@ import DataTree from '../../components/trees/DataTree/DataTree';
 
 
 function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName }) {
-    const { schema: projectSchema } = useSelector((state) => state.schema);
+    const { schema: projectSchema, schemaCollections } = useSelector((state) => state.schema);
     const modelLayoutOption = useSelector((state) => Selectors.selectLayout(state, modelName), (prev, curr) => {
         return JSON.stringify(prev) === JSON.stringify(curr);
     });
     const { schema: modelSchema, fieldsMetadata, actions, selector } = modelDataSource;
+    const modelRootFieldsMetadata = schemaCollections[modelRootName];
     const { storedArray, storedObj, updatedObj, objId, mode, error, isLoading, isConfirmSavePopupOpen } = useSelector(selector);
     const { storedObj: dataSourceStoredObj } = useSelector(dataSource?.selector ?? (() => ({ storedObj: null })), (prev, curr) => {
         return JSON.stringify(prev) === JSON.stringify(curr);
     });
+
     const [isMaximized, setIsMaximized] = useState(false);
     const [isWsDisabled, setIsWsDisabled] = useState(false);
     const [page, setPage] = useState(0);
@@ -182,9 +184,6 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
             } else {
                 console.error(`excepected either array or object, received: ${updatedArrayOrObj}`)
             }
-        }
-        socket.onclose = () => {
-            socketRef.current = null;
         }
         socket.onerror = () => {
             socketRef.current = null;
@@ -344,12 +343,13 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
         const modelUpdatedObj = addxpath(newObj);
         dispatch(actions.setStoredObj({}));
         dispatch(actions.setUpdatedObj(modelUpdatedObj));
+        dispatch(actions.setMode(MODES.EDIT));
         handleModeToggle();
     }
 
     const handleSave = (modifiedObj, force = false) => {
         const modelUpdatedObj = modifiedObj || clearxpath(cloneDeep(updatedObj));
-        const activeChanges = compareJSONObjects(storedObj, modelUpdatedObj, fieldsMetadata);
+        const activeChanges = compareJSONObjects(storedObj, modelUpdatedObj, modelRootFieldsMetadata);
         if (!activeChanges || Object.keys(activeChanges).length === 0) {
             changesRef.current = {};
             dispatch(actions.setMode(MODES.READ));
@@ -372,6 +372,7 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
             dispatch(actions.partialUpdate({ url, data: changeDict }));
         } else {
             dispatch(actions.create({ url, data: changeDict }));
+            dispatch(actions.setMode(MODES.READ));
         }
         changesRef.current = {};
         dispatch(actions.setMode(MODES.READ));
@@ -393,7 +394,7 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
         const modelUpdatedObj = clearxpath(cloneDeep(updatedObj));
         set(modelUpdatedObj, xpath, value);
         if (force) {
-            const activeChanges = compareJSONObjects(storedObj, modelUpdatedObj, fieldsMetadata);
+            const activeChanges = compareJSONObjects(storedObj, modelUpdatedObj, modelRootFieldsMetadata);
             changesRef.current.active = activeChanges;
             executeSave();
         } else if (storedObj[DB_ID]) {

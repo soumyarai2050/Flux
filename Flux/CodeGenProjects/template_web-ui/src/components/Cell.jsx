@@ -70,7 +70,7 @@ const Cell = (props) => {
     const validationError = useRef(null);
     const [inputValue, setInputValue] = useState(currentValue);
     const [isDateTimePickerOpen, setIsDateTimePickerOpen] = useState(false);
-    const [autocompleteInputValue, setAutoCompleteInputValue] = useState('');
+    const [autocompleteInputValue, setAutocompleteInputValue] = useState('');
     const inputRef = useRef(null);
     const cursorPos = useRef(null);
     const autocompleteRef = useRef(null);
@@ -138,7 +138,7 @@ const Cell = (props) => {
         if (e.keyCode === 13) {
             if (filteredOptions.length === 1) {
                 props.onAutocompleteOptionChange(e, filteredOptions[0], dataxpath, xpath, dataSourceId, collection.source);
-                setAutoCompleteInputValue('');
+                setAutocompleteInputValue('');
 
                 if (autocompleteRef.current) {
                     autocompleteRef.current.blur();
@@ -333,15 +333,15 @@ const Cell = (props) => {
                         // clearOnBlur={false}
                         value={collection.value}
                         inputValue={autocompleteInputValue}
-                        onInputChange={(e, newInputValue) => setAutoCompleteInputValue(newInputValue)}
-                        filteredOptions={(options, { inputValue }) => 
+                        onInputChange={(e, newInputValue) => setAutocompleteInputValue(newInputValue)}
+                        filterOptions={(options, { inputValue }) =>
                             options.filter(option => option.toLowerCase().includes(inputValue.toLowerCase()))
                         }
                         onBlur={onFocusOut}
                         autoFocus
                         onChange={(e, v) => {
                             props.onAutocompleteOptionChange(e, v, dataxpath, xpath, dataSourceId, collection.source);
-                            setAutoCompleteInputValue('');
+                            setAutocompleteInputValue('');
                         }}
                         renderInput={(params) => {
                             const filteredOptions = collection.options.filter(option => option.toLowerCase().includes(inputValue.toLowerCase()));

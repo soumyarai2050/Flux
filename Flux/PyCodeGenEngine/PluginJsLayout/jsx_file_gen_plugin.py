@@ -115,15 +115,12 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += JsxFileGenPlugin.indentation_space*3 + "actions: ModelActions,\n"
         output_str += JsxFileGenPlugin.indentation_space*3 + "schema: modelSchema,\n"
         output_str += JsxFileGenPlugin.indentation_space*3 + "url: getServerUrl(modelSchema),\n"
-        output_str += JsxFileGenPlugin.indentation_space*3 + "fieldsMetadata: schemaCollections[modelName],\n"
+        output_str += JsxFileGenPlugin.indentation_space * 3 + "fieldsMetadata: schemaCollections[modelName],\n"
         if model_type == JsxFileGenPlugin.non_root_type:
             root_msg = self.get_root_msg_for_non_root_type(message)
             root_message_name = root_msg.proto.name
-            root_message_name_snake_cased = convert_camel_case_to_specific_case(root_message_name)
-            output_str += JsxFileGenPlugin.indentation_space * 3 + f"fieldsMetadata: schemaCollections['{root_message_name_snake_cased}'],\n"
             output_str += JsxFileGenPlugin.indentation_space*3 + f"selector: Selectors.select{root_message_name}\n"
         else:
-            output_str += JsxFileGenPlugin.indentation_space * 3 + "fieldsMetadata: schemaCollections[modelName],\n"
             output_str += JsxFileGenPlugin.indentation_space*3 + f"selector: Selectors.select{message_name}\n"
         output_str += JsxFileGenPlugin.indentation_space*2 + "}\n"
         output_str += JsxFileGenPlugin.indentation_space + "}, [schema, schemaCollections]);\n\n"

@@ -78,7 +78,7 @@ const NodeField = (props) => {
     }, [props.data.onFormUpdate])
 
     const handleTextChange = (e, type, xpath, value, dataxpath, validationRes) => {
-        cursorPos.current = e.target.selectionStart;
+        cursorPos.current = e?.target.selectionStart ?? null;
         setInputValue(value);
         props.data.onTextChange(e, type, xpath, value, dataxpath, validationRes);
     }

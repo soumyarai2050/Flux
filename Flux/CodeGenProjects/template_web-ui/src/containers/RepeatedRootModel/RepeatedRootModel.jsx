@@ -238,9 +238,6 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                 console.error(`excepected either array or object, received: ${updatedArrayOrObj}`)
             }
         }
-        socket.onclose = () => {
-            socketRef.current = null;
-        }
         socket.onerror = () => {
             socketRef.current = null;
         }

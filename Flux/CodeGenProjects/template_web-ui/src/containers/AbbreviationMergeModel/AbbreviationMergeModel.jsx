@@ -239,9 +239,6 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                 console.error(`excepected either array or object, received: ${updatedArrayOrObj}`)
             }
         }
-        socket.onclose = () => {
-            socketRef.current = null;
-        }
         socket.onerror = () => {
             socketRef.current = null;
         }
