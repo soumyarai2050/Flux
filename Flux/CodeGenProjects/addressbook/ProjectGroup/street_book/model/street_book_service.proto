@@ -96,8 +96,6 @@ message PlanStatus{
     y: 23,
     w: 7,
     h: 8,
-    alert_bubble_source: "PairPlan.plan_status.plan_alerts",
-    alert_bubble_color: "PairPlan.plan_status.plan_alerts.severity",
     widget_ui_data: {
       view_layout: UI_TABLE
     },

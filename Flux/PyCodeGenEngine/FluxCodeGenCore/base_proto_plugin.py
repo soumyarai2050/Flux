@@ -16,8 +16,9 @@ import protogen
 from Flux.PyCodeGenEngine.FluxCodeGenCore.extended_protogen_plugin import ExtendedProtogenPlugin
 from Flux.PyCodeGenEngine.FluxCodeGenCore.extended_protogen_options import ExtendedProtogenOptions
 from FluxPythonUtils.scripts.general_utility_functions import (
-    parse_to_int, parse_to_float)
+    parse_to_int, parse_to_float, convert_to_camel_case)
 from FluxPythonUtils.scripts.file_n_general_utility_functions import convert_camel_case_to_specific_case, YAMLConfigurationManager
+from FluxPythonUtils.scripts.model_base_utils import remove_none_values
 
 # Required for accessing custom options from schema
 from Flux.PyCodeGenEngine.FluxCodeGenCore import insertion_imports
@@ -142,6 +143,10 @@ class BaseProtoPlugin(ABC):
     widget_ui_option_depending_proto_model_name_field: ClassVar[str] = "depending_proto_model_name"
     widget_ui_option_depends_on_other_model_for_id_field: ClassVar[str] = "depends_on_other_model_for_id"
     widget_ui_option_depending_proto_model_for_cpp_port_field: ClassVar[str] = "depending_proto_model_for_cpp_port"
+    widget_ui_option_alert_bubble_source_field: ClassVar[str] = "alert_bubble_source"
+    widget_ui_option_alert_bubble_color_field: ClassVar[str] = "alert_bubble_color"
+    widget_ui_option_bind_id_fld_field: ClassVar[str] = "bind_id_fld"
+    widget_ui_option_dynamic_widget_title_fld_field: ClassVar[str] = "dynamic_widget_title_fld"
     widget_ui_option_override_default_crud_field: ClassVar[str] = "override_default_crud"
     widget_ui_option_override_default_crud_ui_crud_type_field: ClassVar[str] = "ui_crud_type"
     widget_ui_option_override_default_crud_query_name_field: ClassVar[str] = "query_name"
@@ -238,6 +243,26 @@ class BaseProtoPlugin(ABC):
         "float": "number",
         "double": "number"
     }
+    options_having_msg_fld_names: List[str] = [
+        flux_fld_abbreviated,
+        flux_fld_alert_bubble_color,
+        flux_fld_alert_bubble_source,
+        flux_fld_val_max,
+        flux_fld_val_min,
+        flux_fld_mapping_underlying_meta_field,
+        flux_fld_mapping_src
+    ]
+    widget_ui_option_fields_having_msg_names: List[str] = [
+        widget_ui_option_depending_proto_model_name_field,
+        widget_ui_option_depending_proto_model_field_name_for_host,
+        widget_ui_option_depending_proto_model_field_name_for_port,
+        widget_ui_option_alert_bubble_source_field,
+        widget_ui_option_alert_bubble_color_field,
+        widget_ui_option_override_default_crud_query_src_model_name_field,
+        widget_ui_option_override_default_crud_ui_query_params_src_field,
+        widget_ui_option_bind_id_fld_field,
+        widget_ui_option_dynamic_widget_title_fld_field
+    ]
 
     def __init__(self, base_dir_path: str):
         self.base_dir_path: str = base_dir_path
@@ -823,6 +848,239 @@ class BaseProtoPlugin(ABC):
                                                           f"{file_.generated_filename_prefix}_{model_file_suffix}"))
                     dependency_file_path_list.append(gen_model_import_path)
         return dependency_file_path_list
+
+    def _underlying_handle_options_value_having_msg_fld_name(
+            self, option_val: str, option_name: str, case_style_name: str = "snake") -> str:
+        mapping_key_value = ""
+        if ":" in option_val:
+            option_value_colan_sep = option_val.split(":")
+            if len(option_value_colan_sep) != 2:
+                err_str = (f"Unsupported option value in {option_name} option, Option value having mapping "
+                           f"syntax using ':' in value must have instance of ':' only once;;; option_val: {option_val}")
+                logging.exception(err_str)
+                raise Exception(err_str)
+
+            mapping_key_value = option_value_colan_sep[0]
+            option_value_with_message_names = option_value_colan_sep[-1]
+        else:
+            option_value_with_message_names = option_val
+
+        option_value_with_message_names_dot_sep: List[str] = option_value_with_message_names.split(".")
+        for index, option_value_with_message_name in enumerate(option_value_with_message_names_dot_sep):
+            # checking id field
+            if "id" == option_value_with_message_name:
+                option_value_with_message_names_dot_sep[index] = "_id"
+            else:
+                if index == 0:
+                    # handling message names
+                    if case_style_name == "camel":
+                        temp = convert_to_camel_case(option_value_with_message_name)
+                        option_value_with_message_name_case_styled = temp[0].upper() + temp[1:]
+                    else:
+                        option_value_with_message_name_case_styled = (
+                            convert_camel_case_to_specific_case(option_value_with_message_name))
+                    option_value_with_message_names_dot_sep[index] = option_value_with_message_name_case_styled
+                else:
+                    # handling field names
+                    if case_style_name == "camel":
+                        option_value_with_message_name_case_styled = (
+                            convert_to_camel_case(option_value_with_message_name))
+                        option_value_with_message_names_dot_sep[index] = option_value_with_message_name_case_styled
+                    else:
+                        option_value_with_message_name_case_styled = (
+                            convert_camel_case_to_specific_case(option_value_with_message_name))
+                        option_value_with_message_names_dot_sep[index] = option_value_with_message_name_case_styled
+
+        option_value_with_message_names = ".".join(option_value_with_message_names_dot_sep)
+        if mapping_key_value:
+            option_value = f"{mapping_key_value}:{option_value_with_message_names}"
+            return option_value
+        else:
+            return option_value_with_message_names
+
+    def _validate_if_fields_exists_for_msg(self, option_value: str, option_name: str,
+                                           all_message_dict: Dict[str, protogen.Message]):
+        """
+        looping field to field, to verify all fields are present mentioned in option_value by dot notation
+        """
+
+        # cleaning msg_str containing full attribute path to be checked
+        if ":" in option_value:
+            option_value = option_value.split(":")[1]
+
+        msg_attr_dot_seperated_list = option_value.split(".")
+        parent_message_name = msg_attr_dot_seperated_list[0]
+        message = all_message_dict.get(parent_message_name)
+
+        if message is not None:
+            # going each layer inside of each field
+            for field_name in msg_attr_dot_seperated_list[1:]:
+                for field in message.fields:
+                    if field_name == field.proto.name:
+                        if field_name != msg_attr_dot_seperated_list[-1]:
+                            message = field.message
+                        parent_message_name = field_name
+                        break
+                else:
+                    err_str_ = f"Couldn't find attribute/field: {field_name} in {parent_message_name=} of " \
+                              f"type message: {message.proto.name}, while validating given fields " \
+                              f"existence in message in {option_name} option"
+                    logging.exception(err_str_)
+                    raise Exception(err_str_)
+        else:
+            # if parent message mentioned in option value is not part of this project
+            return False
+        return True
+
+    def handle_options_value_having_msg_or_fld_name(
+            self, option_value: str, option_name: str,
+            all_message_dict: Dict[str, protogen.Message], case_style_name: str = "snake",
+            hard_msg_check: bool = False):
+        """
+        Converting all message names and field names to specific case style
+        note: option_name is just used in logging
+        """
+        # checking if option_value is not float type and is relevant to be used here
+        if type(option_value).__name__ == "str" and \
+                (("-" in option_value or "." in option_value) and any(char.isalpha() for char in option_value)):
+
+            option_value_caret_separated = option_value.split("^")
+            temp_list_1 = []
+
+            for option_val in option_value_caret_separated:
+                if '-' in option_val:
+                    option_val_hyphen_separated = option_val.split('-')
+                    temp_list_2 = []
+                    for option_val in option_val_hyphen_separated:
+                        # Validating if attribute path that is dot seperated valid or not
+                        validated = self._validate_if_fields_exists_for_msg(option_val, option_name, all_message_dict)
+                        if not validated:
+                            # if not validated then returning None to signal ignoring this key-value
+                            return None
+
+                        temp_str = self._underlying_handle_options_value_having_msg_fld_name(
+                            option_val, option_name, case_style_name)
+                        temp_list_2.append(temp_str)
+                    temp_str_dollar_joined = "-".join(temp_list_2)
+                    temp_list_1.append(temp_str_dollar_joined)
+                else:
+                    # Validating if attribute path that is dot seperated valid or not
+                    validated = self._validate_if_fields_exists_for_msg(option_val, option_name, all_message_dict)
+                    if not validated:
+                        # if not validated then returning None to signal ignoring this key-value
+                        return None
+
+                    temp_str = self._underlying_handle_options_value_having_msg_fld_name(
+                        option_val, option_name, case_style_name)
+                    temp_list_1.append(temp_str)
+            return "^".join(temp_list_1)
+
+        else:
+            # verifying if string value is msg name - if yes converting case style
+            message = all_message_dict.get(option_value)
+            if message is not None:
+                if case_style_name == "camel":
+                    msg_name_style_cased = convert_to_camel_case(option_value)
+                else:
+                    msg_name_style_cased = convert_camel_case_to_specific_case(option_value)
+                return msg_name_style_cased
+            else:
+                if hard_msg_check:
+                    return None
+                else:
+                    # else just passing back value as it is
+                    return option_value
+
+    def _get_abb_option_vals_cleaned_message_n_field_list(self, field: protogen.Field) -> List[str]:
+        abbreviated_option_val = (
+            BaseProtoPlugin.get_simple_option_value_from_proto(field, BaseProtoPlugin.flux_fld_abbreviated))
+        abbreviated_option_val_check_str_list: List[str] = []
+        if abbreviated_option_val and "^" in abbreviated_option_val:
+            abbreviated_option_val_caret_sep = abbreviated_option_val.split("^")
+            for abbreviated_option_val_caret_sep_line in abbreviated_option_val_caret_sep:
+                if "-" in abbreviated_option_val_caret_sep:
+                    abbreviated_option_val_caret_sep_hyphen_sep = (
+                        abbreviated_option_val_caret_sep_line.split("-"))
+                    for abbreviated_option_val_caret_sep_hyphen_sep_line in (
+                            abbreviated_option_val_caret_sep_hyphen_sep):
+                        if ":" in abbreviated_option_val_caret_sep_hyphen_sep_line:
+                            mapping_key, mapping_value = (
+                                abbreviated_option_val_caret_sep_hyphen_sep_line.split(":"))
+                            abbreviated_option_val_check_str_list.append(mapping_value)
+                        else:
+                            abbreviated_option_val_check_str_list.append(
+                                abbreviated_option_val_caret_sep_hyphen_sep_line)
+                else:
+                    if ":" in abbreviated_option_val_caret_sep_line:
+                        mapping_key, mapping_value = abbreviated_option_val_caret_sep_line.split(":")
+                        abbreviated_option_val_check_str_list.append(mapping_value)
+                    else:
+                        abbreviated_option_val_check_str_list.append(
+                            abbreviated_option_val_caret_sep_line)
+
+        alert_bubble_source_option_val = (
+            BaseProtoPlugin.get_simple_option_value_from_proto(field, BaseProtoPlugin.flux_fld_alert_bubble_source))
+        if alert_bubble_source_option_val:
+            abbreviated_option_val_check_str_list.append(alert_bubble_source_option_val)
+
+        alert_bubble_color_option_val = (
+            BaseProtoPlugin.get_simple_option_value_from_proto(field, BaseProtoPlugin.flux_fld_alert_bubble_color))
+        if alert_bubble_color_option_val:
+            abbreviated_option_val_check_str_list.append(alert_bubble_color_option_val)
+
+        return abbreviated_option_val_check_str_list
+
+    def _get_msg_names_list_used_in_abb_option_val(self, message: protogen.Message) -> List[str]:
+        msg_list = []
+        for field in message.fields:
+            if (self.is_option_enabled(field, BaseProtoPlugin.flux_fld_abbreviated) or
+                    self.is_option_enabled(field, BaseProtoPlugin.flux_fld_alert_bubble_source),
+                    self.is_option_enabled(field, BaseProtoPlugin.flux_fld_alert_bubble_color)):
+                msg_n_field_list: List[str] = self._get_abb_option_vals_cleaned_message_n_field_list(field)
+
+                for msg_n_field_str in msg_n_field_list:
+                    msg_name = msg_n_field_str.split(".")[0]
+                    if msg_name not in msg_list:
+                        msg_list.append(msg_name)
+
+        return msg_list
+
+
+    def handle_n_get_ui_widget_data_option_values_having_msg_name(self, message: protogen.Message,
+                                                                  all_message_dict: Dict[str, protogen.Message]):
+        widget_ui_data_option_value_dict = \
+            self.get_complex_option_value_from_proto(message,
+                                                     BaseProtoPlugin.flux_msg_widget_ui_data_element)
+
+        # handling special fields in widget_ui option having message names - converting msg name to snake cased
+        for key, value in widget_ui_data_option_value_dict.items():
+            if key in BaseProtoPlugin.widget_ui_option_fields_having_msg_names:
+                # special handling if option value have message name
+                case_handled_value = self.handle_options_value_having_msg_or_fld_name(value, key,
+                                                             all_message_dict, hard_msg_check=True)
+                widget_ui_data_option_value_dict[key] = case_handled_value
+            elif key == BaseProtoPlugin.widget_ui_option_override_default_crud_field:
+                for idx, override_default_crud_option_val in enumerate(value):
+                    for override_default_crud_key, override_default_crud_value in override_default_crud_option_val.items():
+                        if override_default_crud_key in BaseProtoPlugin.widget_ui_option_fields_having_msg_names:
+                            case_handled_value = self.handle_options_value_having_msg_or_fld_name(override_default_crud_value, override_default_crud_key,
+                                                                                                  all_message_dict, hard_msg_check=True)
+                            override_default_crud_option_val[override_default_crud_key] = case_handled_value
+                        elif override_default_crud_key == BaseProtoPlugin.widget_ui_option_override_default_crud_ui_query_params_field:
+                            for idx, ui_query_params_option_val_dict in enumerate(override_default_crud_value):
+                                for ui_query_params_key, ui_query_params_val in ui_query_params_option_val_dict.items():
+                                    if ui_query_params_key in BaseProtoPlugin.widget_ui_option_fields_having_msg_names:
+                                        case_handled_value = self.handle_options_value_having_msg_or_fld_name(
+                                            ui_query_params_val, ui_query_params_key,
+                                            all_message_dict, hard_msg_check=True)
+                                        ui_query_params_option_val_dict[ui_query_params_key] = case_handled_value
+            else:
+                widget_ui_data_option_value_dict[key] = value
+
+        # removing none from dict
+        widget_ui_data_option_value_dict = remove_none_values(widget_ui_data_option_value_dict)
+
+        return widget_ui_data_option_value_dict
 
     def _process(self, plugin: ExtendedProtogenPlugin) -> None:
         """

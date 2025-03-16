@@ -46,8 +46,17 @@ const LayoutSwitchMenu = ({
     [LAYOUT_TYPES.CHART]: BarChart,
   }), []);
 
+  const layoutNameMap = useMemo(() => ({
+    [LAYOUT_TYPES.TABLE]: 'table',
+    [LAYOUT_TYPES.TREE]: 'tree',
+    [LAYOUT_TYPES.PIVOT_TABLE]: 'pivot',
+    [LAYOUT_TYPES.ABBREVIATION_MERGE]: 'list',
+    [LAYOUT_TYPES.CHART]: 'chart'
+  }), [])
+
   const menuName = 'layout-switch';
   const IconComponent = componentMap[layout] || TableChartSharp; // Fallback to TableChartSharp if layout not found.
+  const layoutTitle = `layout - ${layoutNameMap[layout] ?? layoutNameMap[LAYOUT_TYPES.TABLE]}`;
   const isPopoverOpen = Boolean(anchorEl);
   const popoverId = isPopoverOpen ? `${menuName}-popover` : undefined;
 
@@ -78,7 +87,7 @@ const LayoutSwitchMenu = ({
           <MenuItem name={menuName} onClick={handlePopoverOpen}>
             <span>
               <IconComponent sx={{ marginRight: '5px' }} fontSize='small' />
-              {menuName}
+              {layoutTitle}
             </span>
             {<PinCompononent onClick={handlePinToggle} fontSize='small' />}
           </MenuItem>
@@ -105,6 +114,7 @@ const LayoutSwitchMenu = ({
         <ToggleButtonGroup value={layout} size='small'>
           {supportedLayouts.map((layoutType) => {
             const LayoutComponent = componentMap[layoutType];
+            const layoutTitle = layoutNameMap[layoutType];
             return (
               <ToggleButton
                 key={layoutType}
@@ -112,7 +122,7 @@ const LayoutSwitchMenu = ({
                 value={layoutType}
                 onClick={() => handleLayoutSwitch(layoutType)}
               >
-                <Tooltip title={layoutType} disableInteractive>
+                <Tooltip title={layoutTitle} disableInteractive>
                   <LayoutComponent fontSize='small' />
                 </Tooltip>
               </ToggleButton>

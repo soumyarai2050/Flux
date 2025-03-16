@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { cloneDeep, get, isObject, set } from 'lodash';
+import { cloneDeep, get, isEqual, isObject, set } from 'lodash';
 import { DB_ID, LAYOUT_TYPES, MODEL_TYPES, MODES, NEW_ITEM_ID } from '../../constants';
 import * as Selectors from '../../selectors';
 import {
@@ -93,6 +93,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     const [showAll, setShowAll] = useState(false);
     const [moreAll, setMoreAll] = useState(false);
     const [url, setUrl] = useState(modelDataSource.url);
+    const [isProcessingUserActions, setIsProcessingUserActions] = useState(false);
 
     const socketRef = useRef(null);
     const workerRef = useRef(null);
@@ -101,14 +102,17 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         acc[name] = {};
         return acc;
     }, {}));
-    const isWorkerBusyRef = useRef(false);
+    const isWorkerBusyRef = useRef({
+        isBusy: false,
+        hasPendingUserActions: false,
+    });
     const pendingUpdateRef = useRef(null);
     const changesRef = useRef({});
     const sourceRef = useRef(null);
     const wsRefs = useRef({});
 
     const dispatch = useDispatch();
-    const [isPending, startTransition] = useTransition();
+    const [_, startTransition] = useTransition();
 
     const allowedLayoutTypes = useMemo(() => [LAYOUT_TYPES.ABBREVIATION_MERGE, LAYOUT_TYPES.CHART, LAYOUT_TYPES.PIVOT_TABLE], [])
     const dataSourcesMetadataDict = useMemo(() => {
@@ -124,12 +128,15 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     const modelItemIdField = useMemo(() => modelItemFieldsMetadata.find(meta => meta.tableTitle === DB_ID)?.key);
     const modelAbbreviatedItems = useMemo(() => get(storedObj, loadedFieldMetadata.key) || [], [storedObj]);
     const modelAbbreviatedBufferItems = useMemo(() => get(storedObj, bufferedFieldMetadata.key) || [], [storedObj]);
-    const modelLayoutData = useMemo(() => getWidgetOptionById(modelLayoutOption.widget_ui_data, objId), [modelLayoutOption, objId]);
+    const modelLayoutData = useMemo(() => getWidgetOptionById(modelLayoutOption.widget_ui_data, objId, modelLayoutOption.bind_id_fld), [modelLayoutOption, objId]);
     const [layoutType, setLayoutType] = useState(modelLayoutData.view_layout);
     const sortedCells = useMemo(() => {
         return sortColumns(filteredCells, modelLayoutData.column_orders || [], modelLayoutData.join_by && modelLayoutData.join_by.length > 0, modelLayoutData.joined_at_center, modelLayoutData.flip, true);
     }, [filteredCells, modelLayoutData.column_orders, modelLayoutData.join_by, modelLayoutData.joined_at_center, modelLayoutData.flip])
     const modelTitle = useMemo(() => getWidgetTitle(modelLayoutOption, modelSchema, modelName, storedObj), [storedObj]);
+
+    // refs to identify change
+    const optionsRef = useRef(null);
 
     const modelHandlerConfig = useMemo(() => (
         {
@@ -163,14 +170,24 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                 setHeadCells(headCells);
                 setCommonKeys(commonKeys);
                 setFilteredCells(filteredCells);
-                isWorkerBusyRef.current = false;
 
                 // If a new update came in while the worker was busy, send it now.
                 if (pendingUpdateRef.current) {
                     const pendingMessage = pendingUpdateRef.current;
                     pendingUpdateRef.current = null;
-                    isWorkerBusyRef.current = true;
+                    const { hasPendingUserActions } = isWorkerBusyRef.current;
+                    isWorkerBusyRef.current = {
+                        isBusy: true,
+                        hasPendingUserActions: false
+                    }
+                    setIsProcessingUserActions(hasPendingUserActions);
                     workerRef.current.postMessage(pendingMessage);
+                } else {
+                    isWorkerBusyRef.current = {
+                        isBusy: false,
+                        hasPendingUserActions: false
+                    }
+                    setIsProcessingUserActions(false);
                 }
             })
         }
@@ -179,7 +196,11 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
             if (workerRef.current) {
                 workerRef.current.terminate();
                 workerRef.current = null;
-                isWorkerBusyRef.current = false;
+                isWorkerBusyRef.current = {
+                    isBusy: false,
+                    hasPendingUserActions: false
+                }
+                setIsProcessingUserActions(false);
             }
         })
     }, [])
@@ -209,17 +230,39 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                 showAll
             }
 
+            const updatedOptionsRef = {
+                mode,
+                page,
+                showMore,
+                moreAll,
+                showHidden,
+                showAll,
+                modelLayoutOption,
+                modelLayoutData,
+                objId
+            }
+
+            if (!isEqual(optionsRef.current, updatedOptionsRef)) {
+                isWorkerBusyRef.current.hasPendingUserActions = true;
+            }
+            optionsRef.current = updatedOptionsRef;
+
             // If worker is busy, store the latest message in pendingUpdateRef
-            if (isWorkerBusyRef.current === true) {
+            if (isWorkerBusyRef.current.isBusy === true) {
                 pendingUpdateRef.current = messageData;
             } else {
-                isWorkerBusyRef.current = true;
+                const { hasPendingUserActions } = isWorkerBusyRef.current;
+                isWorkerBusyRef.current = {
+                    isBusy: true,
+                    hasPendingUserActions: false
+                }
+                setIsProcessingUserActions(hasPendingUserActions);
                 workerRef.current.postMessage(messageData);
             }
         }
     }, [
         modelAbbreviatedItems, dataSourcesUpdatedArrayDict, modelItemFieldsMetadata, abbreviationKey,
-        loadedFieldMetadata, modelLayoutData, modelLayoutOption, page, mode, showMore, moreAll, showHidden, showAll
+        loadedFieldMetadata, modelLayoutData, modelLayoutOption, page, mode, showMore, moreAll, showHidden, showAll, objId
     ])
 
     useEffect(() => {
@@ -699,13 +742,12 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
             case LAYOUT_TYPES.CHART:
                 return (
                     <ChartView
-                        modelName={modelName}
                         onReload={handleReload}
                         chartRows={cleanedRows}
                         onChartDataChange={handleChartDataChange}
                         fieldsMetadata={modelItemFieldsMetadata}
                         chartData={modelLayoutOption.chart_data || []}
-                        modelType={MODEL_TYPES.REPEATED_ROOT}
+                        modelType={MODEL_TYPES.ABBREVIATION_MERGE}
                         onRowSelect={handleRowSelect}
                         mode={mode}
                         onModeToggle={handleModeToggle}
@@ -784,7 +826,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                         onPinToggle={handlePinnedChange}
                     />
                 </ModelCardHeader>
-                <ModelCardContent isDisabled={isCreate || isLoading} error={error} onClear={handleErrorClear} isDisconnected={!isWebSocketAlive(socketRef.current)}>
+                <ModelCardContent isDisabled={isCreate || isLoading || isProcessingUserActions} error={error} onClear={handleErrorClear} isDisconnected={!isWsDisabled && !isWebSocketAlive(socketRef.current)}>
                     {renderContent()}
                 </ModelCardContent>
             </ModelCard>

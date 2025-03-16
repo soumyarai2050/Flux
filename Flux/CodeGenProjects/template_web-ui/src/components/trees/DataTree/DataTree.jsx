@@ -15,7 +15,8 @@ const DataTree = ({
     xpath,
     onUpdate,
     onUserChange,
-    selectedId
+    selectedId,
+    showHidden
 }) => {
 
     const [dataTree, setDataTree] = useState([]);
@@ -24,7 +25,7 @@ const DataTree = ({
         setDataTree(generateTreeStructure(cloneDeep(projectSchema), modelName, {
             'data': updatedData,
             'isOpen': true,
-            'hide': false,
+            'hide': !showHidden ?? false,
             'showDataType': false,
             'originalData': storedData,
             'subtree': subtree,
@@ -38,7 +39,7 @@ const DataTree = ({
             'index': selectedId,
             'forceUpdate': false
         }))
-    }, [projectSchema, storedData, updatedData, mode, subtree, xpath, selectedId])
+    }, [projectSchema, storedData, updatedData, mode, subtree, xpath, selectedId, showHidden])
 
     const handleFormUpdate = (xpath, dataxpath, value, validationRes = null) => {
         const updatedObj = cloneDeep(updatedData);

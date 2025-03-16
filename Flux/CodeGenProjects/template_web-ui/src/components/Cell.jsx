@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, memo, useMemo } from 'react';
 import { useSelector } from 'react-redux';
-import _, { cloneDeep, isEqual } from 'lodash';
+import _, { cloneDeep, debounce, isEqual } from 'lodash';
 import PropTypes from 'prop-types';
 import { NumericFormat } from 'react-number-format';
 import { MenuItem, TableCell, Select, TextField, Checkbox, Autocomplete, Tooltip, ClickAwayListener, InputAdornment, IconButton } from '@mui/material';
@@ -74,16 +74,21 @@ const Cell = (props) => {
     const inputRef = useRef(null);
     const cursorPos = useRef(null);
     const autocompleteRef = useRef(null);
+    const onTextChangeRef = useRef(props.onTextChange);
+
+    useEffect(() => {
+        onTextChangeRef.current = props.onTextChange;
+    }, [props.onTextChange])
 
     useEffect(() => {
         setInputValue(currentValue);
     }, [props.index, mode])
 
-    useEffect(() => {
-        if (props.forceUpdate) {
-            setInputValue(currentValue);
-        }
-    }, [props.forceUpdate])
+    // useEffect(() => {
+    //     if (props.forceUpdate) {
+    //         setInputValue(currentValue);
+    //     }
+    // }, [props.forceUpdate])
 
     useEffect(() => {
         if (mode === MODES.READ) {
@@ -99,11 +104,11 @@ const Cell = (props) => {
         }
     }, [inputValue])
 
-    useEffect(() => {
-        if (props.onFormUpdate && xpath) {
-            props.onFormUpdate(xpath, validationError.current);
-        }
-    }, [validationError.current])
+    // useEffect(() => {
+    //     if (props.onFormUpdate && xpath) {
+    //         props.onFormUpdate(xpath, validationError.current);
+    //     }
+    // }, [validationError.current])
 
     useEffect(() => {
         if (props.highlightUpdate && currentValue !== oldValue) {
@@ -128,10 +133,21 @@ const Cell = (props) => {
         }
     }
 
+    // Debounced transformation to update rows from the source JSON.
+    const debouncedTransform = useRef(
+        debounce((e, type, xpath, value, dataxpath, validationRes) => {
+            onTextChangeRef.current(e, type, xpath, value, dataxpath, validationRes);
+        }, 300)
+    ).current;
+
+    const handleBlur = () => {
+        debouncedTransform.flush();
+    }
+
     const handleTextChange = (e, type, xpath, value, dataxpath, validationRes) => {
         cursorPos.current = e.target.selectionStart;
         setInputValue(value);
-        props.onTextChange(e, type, xpath, value, dataxpath, validationRes);
+        debouncedTransform(e, type, xpath, value, dataxpath, validationRes);
     }
 
     const handleKeyDown = (e, filteredOptions) => {
@@ -496,12 +512,13 @@ const Cell = (props) => {
                         value={value}
                         disabled={disabled}
                         thousandSeparator=','
-                        onValueChange={(values, sourceInfo) => props.onTextChange(sourceInfo.event, type, xpath, values.value, dataxpath,
+                        onValueChange={(values, sourceInfo) => handleTextChange(sourceInfo.event, type, xpath, values.value, dataxpath,
                             validateConstraints(collection, values.value, min, max), dataSourceId, collection.source)}
                         variant='outlined'
                         decimalScale={decimalScale}
                         placeholder={placeholder}
                         autoFocus
+                        onBlur={handleBlur}
                         // ref={inputRef}
                         InputProps={inputProps}
                         // isAllowed={(values) => isAllowedNumericValue(values.value, min, max)}
@@ -546,7 +563,7 @@ const Cell = (props) => {
                     onBlur={() => {
                         if (!isDateTimePickerOpen) {
                             onFocusOut();
-                        } 
+                        }
                     }}
                     onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
                     <LocalizationProvider dateAdapter={AdapterDayjs}>
@@ -592,11 +609,11 @@ const Cell = (props) => {
                                         readOnly: true,
                                         endAdornment: (
                                             <InputAdornment position='end'>
-                                                <IconButton 
+                                                <IconButton
                                                     onClick={(e) => {
                                                         props.onDateTimeChange(dataxpath, xpath, null, dataSourceId, collection.source);
                                                         e.stopPropagation();
-                                                    }} 
+                                                    }}
                                                     disabled={!value}
                                                     size='small'>
                                                     <Clear fontSize='small' />
@@ -638,6 +655,7 @@ const Cell = (props) => {
                         required={required}
                         error={validationError.current !== null}
                         value={value}
+                        onBlur={handleBlur}
                         disabled={disabled}
                         // ref={inputRef}
                         placeholder={placeholder}
@@ -927,7 +945,7 @@ const Cell = (props) => {
     if (value === null) {
         value = '';
     }
-    
+
     if (collection.type === DATA_TYPES.DATE_TIME) {
         let text, linkText = null;
         linkText = value;

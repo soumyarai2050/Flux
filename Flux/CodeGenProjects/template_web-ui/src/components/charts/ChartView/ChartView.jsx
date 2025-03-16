@@ -7,7 +7,7 @@ import {
 import { cloneDeep, get, isEqual } from 'lodash';
 import { Add, Close, Delete, SaveAlt } from '@mui/icons-material';
 // project constants and common utility function imports
-import { DATA_TYPES, MODES, SCHEMA_DEFINITIONS_XPATH, API_ROOT_URL, MODEL_TYPES } from '../../../constants';
+import { DATA_TYPES, MODES, API_ROOT_URL, MODEL_TYPES } from '../../../constants';
 import {
     addxpath, applyFilter, clearxpath, genChartDatasets, genMetaFilters, generateObjectFromSchema,
     getChartOption, getCollectionByName, getFilterDict, getIdFromAbbreviatedKey, getModelSchema, mergeTsData, tooltipFormatter,
@@ -30,7 +30,6 @@ function ChartView({
     fieldsMetadata,
     modelType,
     abbreviation,
-    modelName,
     onRowSelect,
     onReload,
     onChartDataChange,
@@ -414,7 +413,6 @@ function ChartView({
     const handleChartDelete = (chartName, index) => {
         const updatedChartData = chartData.filter((o) => o.chart_name !== chartName);
         onChartDataChange(updatedChartData);
-        // onChartDelete(modelName, chartName);
         if (index === selectedIndex) {
             setSelectedIndex();
             setStoredChartObj({});

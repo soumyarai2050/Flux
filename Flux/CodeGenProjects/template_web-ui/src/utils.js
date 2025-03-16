@@ -2360,14 +2360,16 @@ export function formatJSONObjectOrArray(json, fieldProps, truncateDateTime = fal
 }
 
 export function getWidgetOptionById(widgetOptions, id, isIdBound = false) {
-    let widgetOption = widgetOptions[0];
+    let widgetOption = cloneDeep(widgetOptions[0]);
     if (isIdBound) {
         const dataElement = widgetOptions.find(data => data.hasOwnProperty('bind_id_val') && String(data.bind_id_val) === String(id));
         if (dataElement) {
-            widgetOption = dataElement;
+            widgetOption = cloneDeep(dataElement);
+        } else {
+            widgetOption.bind_id_val = id;
         }
     }
-    widgetOption = cloneDeep(widgetOption);
+    // widgetOption = cloneDeep(widgetOption);
     if (!widgetOption.enable_override) {
         widgetOption.enable_override = [];
     }

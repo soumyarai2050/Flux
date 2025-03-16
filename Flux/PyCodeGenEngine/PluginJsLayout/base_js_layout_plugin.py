@@ -32,6 +32,7 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
         self.project_name: str | None = None
+        self.message_name_to_message_dict: Dict[str, protogen.Message] = {}
         self.root_msg_list: List[protogen.Message] = []
         self.layout_msg_list: List[protogen.Message] = []
         self.repeated_msg_list: List[protogen.Message] = []
@@ -139,6 +140,7 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
 
         # handling current file
         for message in set(message_list):
+            self.message_name_to_message_dict[message.proto.name] = message
             if (BaseJSLayoutPlugin.is_option_enabled(message, BaseJSLayoutPlugin.flux_msg_json_root) or
                     BaseJSLayoutPlugin.is_option_enabled(message, BaseJSLayoutPlugin.flux_msg_json_root_time_series)):
                 self.root_msg_list.append(message)
@@ -209,58 +211,3 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
                         return True
         # message if not from another project for all other cases
         return False
-
-    def _get_abb_option_vals_cleaned_message_n_field_list(self, field: protogen.Field) -> List[str]:
-        abbreviated_option_val = (
-            BaseJSLayoutPlugin.get_simple_option_value_from_proto(field, BaseJSLayoutPlugin.flux_fld_abbreviated))
-        abbreviated_option_val_check_str_list: List[str] = []
-        if abbreviated_option_val and "^" in abbreviated_option_val:
-            abbreviated_option_val_caret_sep = abbreviated_option_val.split("^")
-            for abbreviated_option_val_caret_sep_line in abbreviated_option_val_caret_sep:
-                if "-" in abbreviated_option_val_caret_sep:
-                    abbreviated_option_val_caret_sep_hyphen_sep = (
-                        abbreviated_option_val_caret_sep_line.split("-"))
-                    for abbreviated_option_val_caret_sep_hyphen_sep_line in (
-                            abbreviated_option_val_caret_sep_hyphen_sep):
-                        if ":" in abbreviated_option_val_caret_sep_hyphen_sep_line:
-                            mapping_key, mapping_value = (
-                                abbreviated_option_val_caret_sep_hyphen_sep_line.split(":"))
-                            abbreviated_option_val_check_str_list.append(mapping_value)
-                        else:
-                            abbreviated_option_val_check_str_list.append(
-                                abbreviated_option_val_caret_sep_hyphen_sep_line)
-                else:
-                    if ":" in abbreviated_option_val_caret_sep_line:
-                        mapping_key, mapping_value = abbreviated_option_val_caret_sep_line.split(":")
-                        abbreviated_option_val_check_str_list.append(mapping_value)
-                    else:
-                        abbreviated_option_val_check_str_list.append(
-                            abbreviated_option_val_caret_sep_line)
-
-        alert_bubble_source_option_val = (
-            BaseJSLayoutPlugin.get_simple_option_value_from_proto(field, BaseJSLayoutPlugin.flux_fld_alert_bubble_source))
-        if alert_bubble_source_option_val:
-            abbreviated_option_val_check_str_list.append(alert_bubble_source_option_val)
-
-        alert_bubble_color_option_val = (
-            BaseJSLayoutPlugin.get_simple_option_value_from_proto(field, BaseJSLayoutPlugin.flux_fld_alert_bubble_color))
-        if alert_bubble_color_option_val:
-            abbreviated_option_val_check_str_list.append(alert_bubble_color_option_val)
-
-        return abbreviated_option_val_check_str_list
-
-    def _get_msg_names_list_used_in_abb_option_val(self, message: protogen.Message) -> List[str]:
-        msg_list = []
-        for field in message.fields:
-            if (self.is_option_enabled(field, BaseJSLayoutPlugin.flux_fld_abbreviated) or
-                    self.is_option_enabled(field, BaseJSLayoutPlugin.flux_fld_alert_bubble_source),
-                    self.is_option_enabled(field, BaseJSLayoutPlugin.flux_fld_alert_bubble_color)):
-                msg_n_field_list: List[str] = self._get_abb_option_vals_cleaned_message_n_field_list(field)
-
-                for msg_n_field_str in msg_n_field_list:
-                    msg_name = msg_n_field_str.split(".")[0]
-                    if msg_name not in msg_list:
-                        msg_list.append(msg_name)
-
-        return msg_list
-

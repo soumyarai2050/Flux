@@ -81,6 +81,15 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             output_str += JsSliceFileGenPlugin.indentation_space + f"modelType: MODEL_TYPES.ABBREVIATION_MERGE,\n"
         else:
             output_str += JsSliceFileGenPlugin.indentation_space + f"modelType: MODEL_TYPES.ROOT,\n"
+
+        # adding attribute telling some abbreviated msg is dependent on this message
+        for abb_msg in self.abbreviated_merge_layout_msg_list:
+            dependent_msg_list = self.msg_name_to_dependent_msg_name_list_dict.get(abb_msg.proto.name)
+            if message_name in dependent_msg_list and message not in self.abbreviated_merge_layout_msg_list:
+                # if some abbreviated message is dependent on this message and this message
+                # itself is not abbreviated type
+                output_str += JsSliceFileGenPlugin.indentation_space + f"isAbbreviationSource: true,\n"
+
         if message_name == "UILayout":
             output_str += JsSliceFileGenPlugin.indentation_space + "extraState: {\n"
             output_str += JsSliceFileGenPlugin.indentation_space*2 + f"stored{message_name}Obj: "+"{ profile_id: 'default', widget_ui_data_elements: defaultLayouts },\n"

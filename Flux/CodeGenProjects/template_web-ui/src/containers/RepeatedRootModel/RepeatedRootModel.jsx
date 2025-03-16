@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { cloneDeep, get, isObject, set } from 'lodash';
+import { cloneDeep, get, isEqual, isObject, set } from 'lodash';
 import { DB_ID, LAYOUT_TYPES, MODEL_TYPES, MODES } from '../../constants';
 import * as Selectors from '../../selectors';
 import {
@@ -61,17 +61,21 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
     const [showAll, setShowAll] = useState(false);
     const [moreAll, setMoreAll] = useState(false);
     const [url, setUrl] = useState(modelDataSource.url);
+    const [isProcessingUserActions, setIsProcessingUserActions] = useState(false);
     const [params, setParams] = useState(null);
 
     const socketRef = useRef(null);
     const workerRef = useRef(null);
     const modelObjDictRef = useRef({});
-    const isWorkerBusyRef = useRef(false);
+    const isWorkerBusyRef = useRef({
+        isBusy: false,
+        hasPendingUserActions: false,
+    });
     const pendingUpdateRef = useRef(null);
     const changesRef = useRef({});
 
     const dispatch = useDispatch();
-    const [isPending, startTransition] = useTransition();
+    const [_, startTransition] = useTransition();
 
     const allowedLayoutTypes = useMemo(() => [LAYOUT_TYPES.TABLE, LAYOUT_TYPES.PIVOT_TABLE, LAYOUT_TYPES.CHART], [])
     const modelLayoutData = useMemo(() => getWidgetOptionById(modelLayoutOption.widget_ui_data, objId), [modelLayoutOption, objId]);
@@ -93,6 +97,9 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
         }, {}) || {};
     }, [])
     const uiLimit = useMemo(() => modelSchema.ui_get_all_limit ?? null, []);
+
+    // refs to identify change
+    const optionsRef = useRef(null);
 
     const modelHandlerConfig = useMemo(() => (
         {
@@ -150,14 +157,24 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                 setHeadCells(headCells);
                 setCommonKeys(commonKeys);
                 setFilteredCells(filteredCells);
-                isWorkerBusyRef.current = false;
 
                 // If a new update came in while the worker was busy, send it now.
                 if (pendingUpdateRef.current) {
                     const pendingMessage = pendingUpdateRef.current;
                     pendingUpdateRef.current = null;
-                    isWorkerBusyRef.current = true;
+                    const { hasPendingUserActions } = isWorkerBusyRef.current;
+                    isWorkerBusyRef.current = {
+                        isBusy: true,
+                        hasPendingUserActions: false
+                    }
+                    setIsProcessingUserActions(hasPendingUserActions);
                     workerRef.current.postMessage(pendingMessage);
+                } else {
+                    isWorkerBusyRef.current = {
+                        isBusy: false,
+                        hasPendingUserActions: false
+                    }
+                    setIsProcessingUserActions(false);
                 }
             })
         }
@@ -166,7 +183,11 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
             if (workerRef.current) {
                 workerRef.current.terminate();
                 workerRef.current = null;
-                isWorkerBusyRef.current = false;
+                isWorkerBusyRef.current = {
+                    isBusy: false,
+                    hasPendingUserActions: false
+                }
+                setIsProcessingUserActions(false);
             }
         })
     }, [])
@@ -194,11 +215,32 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                 showAll
             }
 
+            const updatedOptionsRef = {
+                mode,
+                page,
+                showMore,
+                moreAll,
+                showHidden,
+                showAll,
+                modelLayoutOption,
+                modelLayoutData
+            }
+
+            if (!isEqual(optionsRef.current, updatedOptionsRef)) {
+                isWorkerBusyRef.current.hasPendingUserActions = true;
+            }
+            optionsRef.current = updatedOptionsRef;
+
             // If worker is busy, store the latest message in pendingUpdateRef
-            if (isWorkerBusyRef.current === true) {
+            if (isWorkerBusyRef.current.isBusy === true) {
                 pendingUpdateRef.current = messageData;
             } else {
-                isWorkerBusyRef.current = true;
+                const { hasPendingUserActions } = isWorkerBusyRef.current;
+                isWorkerBusyRef.current = {
+                    isBusy: true,
+                    hasPendingUserActions: false
+                }
+                setIsProcessingUserActions(hasPendingUserActions);
                 workerRef.current.postMessage(messageData);
             }
         }
@@ -625,7 +667,7 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                         onPinToggle={handlePinnedChange}
                     />
                 </ModelCardHeader>
-                <ModelCardContent isDisabled={isLoading} error={error} onClear={handleErrorClear} isDisconnected={!isWebSocketAlive(socketRef.current)}>
+                <ModelCardContent isDisabled={isLoading || isProcessingUserActions} error={error} onClear={handleErrorClear} isDisconnected={!isWsDisabled && !isWebSocketAlive(socketRef.current)}>
                     {renderContent()}
                 </ModelCardContent>
             </ModelCard>

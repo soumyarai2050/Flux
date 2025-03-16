@@ -9,7 +9,7 @@ import { getColorTypeFromValue, getValueFromReduxStoreFromXpath, isAllowedNumeri
 import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import classes from './NodeField.module.css';
-import { cloneDeep } from 'lodash';
+import { cloneDeep, debounce } from 'lodash';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
@@ -41,16 +41,21 @@ const NodeField = (props) => {
     const inputRef = useRef(null);
     const cursorPos = useRef(null);
     const autocompleteRef = useRef(null);
+    const onTextChangeRef = useRef(props.data.onTextChange);
+
+    useEffect(() => {
+        onTextChangeRef.current = props.data.onTextChange;
+    }, [props.data.onTextChange])
 
     useEffect(() => {
         setInputValue(props.data.value);
     }, [props.data.index])
 
-    useEffect(() => {
-        if (props.data.forceUpdate) {
-            setInputValue(props.data.value);
-        }
-    }, [props.data.forceUpdate])
+    // useEffect(() => {
+    //     if (props.data.forceUpdate) {
+    //         setInputValue(props.data.value);
+    //     }
+    // }, [props.data.forceUpdate])
 
     useEffect(() => {
         if (props.mode === MODES.READ) {
@@ -66,21 +71,37 @@ const NodeField = (props) => {
         }
     }, [inputValue])
 
-    useEffect(() => {
-        if (props.data.onFormUpdate) {
-            props.data.onFormUpdate(props.data.xpath, validationError.current);
-        }
-        return () => {
-            if (props.data.onFormUpdate) {
-                props.data.onFormUpdate(props.data.xpath, null);
-            }
-        }
-    }, [props.data.onFormUpdate])
+    // useEffect(() => {
+    //     if (props.data.onFormUpdate) {
+    //         props.data.onFormUpdate(props.data.xpath, validationError.current);
+    //     }
+    //     return () => {
+    //         if (props.data.onFormUpdate) {
+    //             props.data.onFormUpdate(props.data.xpath, null);
+    //         }
+    //     }
+    // }, [props.data.onFormUpdate])
+
+    // Debounced transformation to update rows from the source JSON.
+    const debouncedTransform = useRef(
+        debounce((e, type, xpath, value, dataxpath, validationRes) => {
+            onTextChangeRef.current(e, type, xpath, value, dataxpath, validationRes);
+        }, 300)
+    ).current;
+
+    const handleBlur = () => {
+        debouncedTransform.flush();
+        setFocus(false);
+    }
+
+    const handleFocus = () => {
+        setFocus(true);
+    }
 
     const handleTextChange = (e, type, xpath, value, dataxpath, validationRes) => {
         cursorPos.current = e?.target.selectionStart ?? null;
         setInputValue(value);
-        props.data.onTextChange(e, type, xpath, value, dataxpath, validationRes);
+        debouncedTransform(e, type, xpath, value, dataxpath, validationRes);
     }
 
     const handleKeyDown = (e, filteredOptions) => {
@@ -150,7 +171,7 @@ const NodeField = (props) => {
                 value={value}
                 inputValue={autocompleteInputValue}
                 onInputChange={(e, newInputValue) => setAutocompleteInputValue(newInputValue)}
-                filterOptions={(options, { inputValue }) => 
+                filterOptions={(options, { inputValue }) =>
                     options.filter(option => option.toLowerCase().includes(inputValue.toLowerCase()))
                 }
                 onChange={(e, v) => {
@@ -293,6 +314,7 @@ const NodeField = (props) => {
                 variant='outlined'
                 decimalScale={decimalScale}
                 placeholder={placeholder}
+                onBlur={handleBlur}
                 InputProps={inputProps}
                 inputProps={{
                     style: { padding: '6px 10px' },
@@ -366,11 +388,11 @@ const NodeField = (props) => {
                                 readOnly: true,
                                 endAdornment: (
                                     <InputAdornment position='end'>
-                                        <IconButton 
+                                        <IconButton
                                             onClick={(e) => {
                                                 props.data.onDateTimeChange(props.data.dataxpath, props.data.xpath, null);
                                                 e.stopPropagation();
-                                            }} 
+                                            }}
                                             disabled={!value}
                                             size='small'>
                                             <Clear fontSize='small' />
@@ -401,8 +423,8 @@ const NodeField = (props) => {
                 required={props.data.required}
                 error={validationError.current !== null}
                 focused={focus}
-                onFocus={() => setFocus(true)}
-                onBlur={() => setFocus(false)}
+                onFocus={handleFocus}
+                onBlur={handleBlur}
                 value={value}
                 disabled={disabled}
                 onChange={(e) => handleTextChange(e, props.data.type, props.data.xpath, e.target.value, props.data.dataxpath,

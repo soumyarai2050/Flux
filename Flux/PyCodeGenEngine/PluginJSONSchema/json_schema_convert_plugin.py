@@ -108,18 +108,6 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
     flx_msg_complex_repeated_attribute_options: List[str] = [
         BaseProtoPlugin.flux_msg_button_query
     ]
-
-    options_having_msg_fld_names: List[str] = [
-        BaseProtoPlugin.flux_fld_abbreviated,
-        BaseProtoPlugin.flux_fld_alert_bubble_color,
-        BaseProtoPlugin.flux_fld_alert_bubble_source,
-        BaseProtoPlugin.flux_fld_val_max,
-        BaseProtoPlugin.flux_fld_val_min,
-        BaseProtoPlugin.flux_fld_mapping_underlying_meta_field,
-        BaseProtoPlugin.flux_fld_mapping_src
-    ]
-    # use to handle option fields having msg_n_field names in set value
-    flux_msg_widget_ui_data_element_fields_having_msg_n_fld_names_in_val = ["alert_bubble_source", "alert_bubble_color", "bind_id_fld", "dynamic_widget_title_fld", "query_param_field_src", "query_src_model_name"]
     # @LOW todo: query_param_field_src should have same query_src_model_name as src model
 
     def __init__(self, base_dir_path: str):
@@ -131,6 +119,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
             err_str = f"Env var 'RESPONSE_FIELD_CASE_STYLE' received as {response_field_case_style}"
             logging.exception(err_str)
             raise Exception(err_str)
+        self.all_message_dict: Dict[str, protogen.Message] = {}
         self.__json_layout_message_list: List[protogen.Message] = []
         self.__json_non_layout_message_list: List[protogen.Message] = []
         self.__enum_list: List[protogen.Enum] = []
@@ -173,9 +162,9 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                 # else not required: avoiding repetition
             elif field.kind.name.lower() == "message":
                 if self.is_option_enabled(field.message, JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element):
-                    widget_ui_data_option_value_dict = \
-                        self.get_complex_option_value_from_proto(field.message,
-                                                                 JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element)
+                    widget_ui_data_option_value_dict = (
+                        self.handle_n_get_ui_widget_data_option_values_having_msg_name(message,
+                                                                                       self.all_message_dict))
                     widget_ui_data_list = widget_ui_data_option_value_dict.get("widget_ui_data")
                     # since there will always be single widget_ui_data
                     if widget_ui_data_list and "view_layout" in widget_ui_data_list[0]:
@@ -232,10 +221,11 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         # else not required: core_or_util_files key is not in yaml dict config
 
         for message in set(message_list):
+            self.all_message_dict[message.proto.name] = message
             if self.is_option_enabled(message, JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element):
-                widget_ui_data_option_value_dict = \
-                    self.get_complex_option_value_from_proto(message,
-                                                             JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element)
+                widget_ui_data_option_value_dict = (
+                    self.handle_n_get_ui_widget_data_option_values_having_msg_name(message,
+                                                                                   self.all_message_dict))
                 widget_ui_data_list = widget_ui_data_option_value_dict.get("widget_ui_data")
                 # since there will always be single widget_ui_data
                 if widget_ui_data_list and "view_layout" in widget_ui_data_list[0]:
@@ -348,115 +338,6 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
 
         return json_msg_str
 
-    def _validate_if_msg_attrs_exist(self, msg_attr_str: str, option_name: str):
-        # cleaning msg_str containing full attribute path to be checked
-        if ":" in msg_attr_str:
-            msg_attr_str = msg_attr_str.split(":")[1]
-
-        message_list = self.__json_layout_message_list + self.__json_non_layout_message_list
-        msg_attr_dot_seperated_list = msg_attr_str.split(".")
-        for message in message_list:
-            if message.proto.name == msg_attr_dot_seperated_list[0]:
-                parent_attr = msg_attr_dot_seperated_list[0]
-                for attr in msg_attr_dot_seperated_list[1:]:
-                    for field in message.fields:
-                        if attr == field.proto.name:
-                            if attr != msg_attr_dot_seperated_list[-1]:
-                                message = field.message
-                            parent_attr = attr
-                            break
-                    else:
-                        err_str = f"Couldn't find attribute/field: {attr} in parent_attribute {parent_attr} of " \
-                                  f"type message: {message.proto.name}, while validating given fields " \
-                                  f"existence in message in {option_name} option"
-                        logging.exception(err_str)
-                        raise Exception(err_str)
-                else:
-                    break
-        else:
-            err_str = f"Couldn't find any message with name: {msg_attr_dot_seperated_list[0]}, while validating " \
-                      f"if all attributes exists mentioned in {option_name} options"
-            logging.exception(err_str)
-            raise Exception(err_str)
-
-    def __underlying_handle_options_value_having_msg_fld_name(self, option_val: str, option_name: str) -> str:
-        mapping_key_value = ""
-        if ":" in option_val:
-            option_value_colan_sep = option_val.split(":")
-            if len(option_value_colan_sep) != 2:
-                err_str = (f"Unsupported option value in {option_name} option, Option value having mapping "
-                           f"syntax using ':' in value must have instance of ':' only once;;; option_val: {option_val}")
-                logging.exception(err_str)
-                raise Exception(err_str)
-
-            mapping_key_value = option_value_colan_sep[0]
-            option_value_with_message_names = option_value_colan_sep[-1]
-        else:
-            option_value_with_message_names = option_val
-
-        option_value_with_message_names_dot_sep: List[str] = option_value_with_message_names.split(".")
-        for index, option_value_with_message_name in enumerate(option_value_with_message_names_dot_sep):
-            # checking id field
-            if "id" == option_value_with_message_name:
-                option_value_with_message_names_dot_sep[index] = "_id"
-            else:
-                if index == 0:
-                    # handling message names
-                    if self.__response_field_case_style == "camel":
-                        temp = self.__case_style_convert_method(option_value_with_message_name)
-                        option_value_with_message_name_case_styled = temp[0].upper() + temp[1:]
-                    else:
-                        option_value_with_message_name_case_styled = (
-                            self.__case_style_convert_method(option_value_with_message_name))
-                    option_value_with_message_names_dot_sep[index] = option_value_with_message_name_case_styled
-                else:
-                    # handling field names
-                    option_value_with_message_name_case_styled = (
-                        self.__case_style_convert_method(option_value_with_message_name))
-                    option_value_with_message_names_dot_sep[index] = option_value_with_message_name_case_styled
-
-        option_value_with_message_names = ".".join(option_value_with_message_names_dot_sep)
-        if mapping_key_value:
-            option_value = f"{mapping_key_value}:{option_value_with_message_names}"
-            return option_value
-        else:
-            return option_value_with_message_names
-
-    def __handle_options_value_case_having_msg_fld_name(self, option_value: str, option_name: str):
-        """
-        Converting all message names and field names to specific case style
-        note: option_name is just used in logging
-        """
-        # checking if option_value is not float type and is relevant to be used here
-        if type(option_value).__name__ == "str" and \
-                (("-" in option_value or "." in option_value) and any(char.isalpha() for char in option_value)):
-
-            option_value_caret_separated = option_value.split("^")
-            temp_list_1 = []
-
-            for option_val in option_value_caret_separated:
-                if '-' in option_val:
-                    option_val_hyphen_separated = option_val.split('-')
-                    temp_list_2 = []
-                    for option_val in option_val_hyphen_separated:
-                        # Validating if attribute path that is dot seperated valid or not
-                        self._validate_if_msg_attrs_exist(option_val, option_name)
-
-                        temp_str = self.__underlying_handle_options_value_having_msg_fld_name(option_val, option_name)
-                        temp_list_2.append(temp_str)
-                    temp_str_dollar_joined = "-".join(temp_list_2)
-                    temp_list_1.append(temp_str_dollar_joined)
-                else:
-                    # Validating if attribute path that is dot seperated valid or not
-                    self._validate_if_msg_attrs_exist(option_val, option_name)
-
-                    temp_str = self.__underlying_handle_options_value_having_msg_fld_name(option_val, option_name)
-                    temp_list_1.append(temp_str)
-            return "^".join(temp_list_1)
-
-        else:
-            return option_value
-
     def __convert_option_name_to_json_attribute_name(self, option_name) -> str:
         if (fld_standard_prefix := JsonSchemaConvertPlugin.fld_options_standard_prefix) in option_name:
             flux_prefix_removed_option_name = option_name.removeprefix(fld_standard_prefix)
@@ -509,7 +390,8 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                     # else not required: if option is not flux_fld_help then avoiding check
 
                     if option in JsonSchemaConvertPlugin.options_having_msg_fld_names:
-                        option_value = self.__handle_options_value_case_having_msg_fld_name(option_value, option)
+                        option_value = self.handle_options_value_having_msg_or_fld_name(option_value,
+                                                                                        option, self.all_message_dict)
                     elif option == JsonSchemaConvertPlugin.flux_fld_auto_complete:
                         autocomplete_option_val = \
                             self.get_simple_option_value_from_proto(field_or_message_obj,
@@ -548,7 +430,8 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                     if option in JsonSchemaConvertPlugin.options_having_msg_fld_names:
                         for index, option_value in enumerate(option_value_list):
                             option_value_list[index] = (
-                                self.__handle_options_value_case_having_msg_fld_name(option_value, option))
+                                self.handle_options_value_having_msg_or_fld_name(option_value,
+                                                                                 option, self.all_message_dict))
                     # else not required: if option is not in options_having_msg_fld_names then avoid
 
                     if option == BaseProtoPlugin.flux_fld_projections:
@@ -934,10 +817,6 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
 
             for key, value in option_value.items():
                 if isinstance(value, list):
-                    if key in JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element_fields_having_msg_n_fld_names_in_val:
-                        for idx, v in enumerate(value):
-                            v = f"{self.__underlying_handle_options_value_having_msg_fld_name(v, JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element)}"
-                            value[idx] = v
                     output_str += " " * (indent_count*2) + f'"{key}": [\n'
                     indent_count += 1
                     output_str += self._get_json_formatted_value_str_for_list_n_dict(value, indent_count)
@@ -947,8 +826,6 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                     output_str += self._get_json_formatted_value_str_for_list_n_dict(value, indent_count,
                                                                                      add_dict_key=key)
                 elif isinstance(value, str):
-                    if key in JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element_fields_having_msg_n_fld_names_in_val:
-                        value = f"{self.__underlying_handle_options_value_having_msg_fld_name(value, JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element)}"
                     output_str += (" " * (indent_count*2) + f'"{key}": '
                                    f'{self.parse_python_type_to_json_type_str(self.parse_string_to_original_types(value))}')
                 elif isinstance(value, bool):
@@ -988,8 +865,6 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                 indent_count -= 1
                 output_str += " " * (indent_count * 2) + '}'
             elif isinstance(value, str):
-                if key in JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element_fields_having_msg_n_fld_names_in_val:
-                    value = f"{self.__underlying_handle_options_value_having_msg_fld_name(value, JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element)}"
                 output_str += " " * (indent_count * 2) + (f'"{key}": '
                               f'{self.parse_python_type_to_json_type_str(self.parse_string_to_original_types(value))}')
             elif isinstance(value, bool):
@@ -1025,9 +900,9 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         return output_str
 
     def __handle_connection_details_output(self, message: protogen.Message, indent_count: int) -> str:
-        widget_ui_data_option_value_dict = \
-            self.get_complex_option_value_from_proto(message,
-                                                     JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element)
+        widget_ui_data_option_value_dict = (
+            self.handle_n_get_ui_widget_data_option_values_having_msg_name(message,
+                                                                           self.all_message_dict))
 
         # Also checking if msg is from another project used in this project
         is_not_from_this_project: bool = True
@@ -1053,14 +928,14 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
             json_msg_str += (" " * indent_count) + '"connection_details": {\n'
             indent_count += 2
             if dynamic_host:
-                json_msg_str += (" " * indent_count) + f'"host": "{self.__handle_options_value_case_having_msg_fld_name(dynamic_host, 
-                                                                                                                        JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element)}",\n'
-                json_msg_str += (" " * indent_count) + f'"port": "{self.__handle_options_value_case_having_msg_fld_name(dynamic_port, 
-                                                                                                                        JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element)}",\n'
+                json_msg_str += (" " * indent_count) + f'"host": "{self.handle_options_value_having_msg_or_fld_name(dynamic_host,
+                                                                                                                    JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element, self.all_message_dict)}",\n'
+                json_msg_str += (" " * indent_count) + f'"port": "{self.handle_options_value_having_msg_or_fld_name(dynamic_port,
+                                                                                                                    JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element, self.all_message_dict)}",\n'
                 if dynamic_ws_port:
                     json_msg_str += (
-                                                " " * indent_count) + f'"ws_port": "{self.__handle_options_value_case_having_msg_fld_name(dynamic_ws_port, 
-                                                                                                                                          JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element)}",\n'
+                                                " " * indent_count) + f'"ws_port": "{self.handle_options_value_having_msg_or_fld_name(dynamic_ws_port,
+                                                                                                                                      JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element, self.all_message_dict)}",\n'
                 json_msg_str += (" " * indent_count) + f'"project_name": "{other_project_name}",\n'
                 json_msg_str += (" " * indent_count) + f'"dynamic_url": true\n'
             else:
@@ -1092,9 +967,9 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         widget_ui_data_prefix_stripped = \
             JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element.lstrip(
                 JsonSchemaConvertPlugin.msg_options_standard_prefix)
-        widget_ui_data_option_value_dict = \
-            self.get_complex_option_value_from_proto(message,
-                                                     JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element)
+        widget_ui_data_option_value_dict = (
+            self.handle_n_get_ui_widget_data_option_values_having_msg_name(message,
+                                                                           self.all_message_dict))
 
         widget_ui_data_key = self.__case_style_convert_method(widget_ui_data_prefix_stripped)
 

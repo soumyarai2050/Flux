@@ -50,8 +50,9 @@ class JsProjectSpecificUtilsPlugin(BaseJSLayoutPlugin):
         for index, message in enumerate(self.layout_msg_list):
             if self.is_option_enabled(message, JsProjectSpecificUtilsPlugin.flux_msg_widget_ui_data_element):
                 widget_ui_data_option_value_dict = \
-                    self.get_complex_option_value_from_proto(message,
-                                                             JsProjectSpecificUtilsPlugin.flux_msg_widget_ui_data_element)
+                    self.handle_n_get_ui_widget_data_option_values_having_msg_name(message,
+                                                                                   self.message_name_to_message_dict)
+
 
                 title_val = widget_ui_data_option_value_dict["i"] if "i" in widget_ui_data_option_value_dict \
                     else convert_camel_case_to_specific_case(message.proto.name)

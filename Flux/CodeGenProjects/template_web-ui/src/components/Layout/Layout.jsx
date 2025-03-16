@@ -79,9 +79,15 @@ const Layout = ({ projectName, theme, onThemeToggle }) => {
 
     // Check if we have an active layout in the stored array.
     if (activeLayoutId) {
-      const activeLayout = storedArray?.find(o => o.profile_id === activeLayoutId);
+      const activeLayout = cloneDeep(storedArray?.find(o => o.profile_id === activeLayoutId));
       if (activeLayout) {
-        newLayout = activeLayout.widget_ui_data_elements;
+        const updatedDataElememts = activeLayout.widget_ui_data_elements.map((item) => {
+          const { x, y, w, h, widget_ui_data, chart_data, filters, join_sort } = item;
+          const defaultElement = defaultLayouts.find((o) => o.i === item.i);
+          return { ...defaultElement, x, y, w, h, widget_ui_data, chart_data, filters, join_sort };
+        })
+        activeLayout.widget_ui_data_elements = updatedDataElememts;
+        newLayout = updatedDataElememts;
         newVisibleComponents = newLayout.map(item => item.i);
         dispatch(LayoutActions.setStoredObj(activeLayout));
         setProfileId(activeLayout.profile_id);
@@ -123,10 +129,11 @@ const Layout = ({ projectName, theme, onThemeToggle }) => {
         if (prev.includes(component)) {
           return prev.filter((item) => item !== component);
         } else {
-          const defaultPosition = layout?.find((item) => item.i === component);
-          const newPosition = defaultPosition
-            ? defaultPosition
-            : { i: component, x: 0, y: getMaxY(), w: 3, h: 2 };
+          const defaultPosition = defaultLayouts.find((item) => item.i === component);
+          const currentPosition = layout?.find((item) => item.i === component);
+          const newPosition = currentPosition
+            ? currentPosition
+            : { i: component, x: 0, y: getMaxY(), w: defaultPosition.w, h: defaultPosition.h };
           setLayout((prevLayout) => [...(prevLayout || []), newPosition]);
           return [...prev, component];
         }
@@ -331,6 +338,7 @@ const Layout = ({ projectName, theme, onThemeToggle }) => {
           {...defaultGridProps}
           isDraggable={isDraggable}
           isResizable={isDraggable}
+          layouts={{ lg: layout }}
           onLayoutChange={handleLayoutChange}
         >
           {visibleComponents.map((key) => (
@@ -338,7 +346,7 @@ const Layout = ({ projectName, theme, onThemeToggle }) => {
               key={key}
               className={styles.gridItem}
               aria-label={`${key}_model`}
-              data-grid={layout.find((item) => key === item.i)}
+            // data-grid={layout.find((item) => key === item.i)}
             >
               {getModelComponent(key)}
             </div>

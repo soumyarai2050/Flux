@@ -30,7 +30,7 @@ const ModelCardContent = ({ children, isDisabled, error, onClear, isDisconnected
                     {isDisabled && <BeatLoader color='yellow' />}
                     {isDisconnected && (
                         <div className={styles.disconnect}>
-                            <span>Websocket connection lost...</span>
+                            <span>Websocket connection inactive...</span>
                             <LinkOff fontSize='large' color='error' />
                         </div>
                     )}

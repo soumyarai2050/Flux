@@ -18,6 +18,6 @@ export const getModelComponent = (modelName, props = {}) => {
             <Component {...props} />
         </Suspense>
     ) : (
-        <div>Component not found</div>
+        <div>{modelName} Component not found</div>
     )
 }
