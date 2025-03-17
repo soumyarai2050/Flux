@@ -62,6 +62,7 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
     const [moreAll, setMoreAll] = useState(false);
     const [url, setUrl] = useState(modelDataSource.url);
     const [isProcessingUserActions, setIsProcessingUserActions] = useState(false);
+    const [reconnectCounter, setReconnectCounter] = useState(0);
     const [params, setParams] = useState(null);
 
     const socketRef = useRef(null);
@@ -280,8 +281,17 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                 console.error(`excepected either array or object, received: ${updatedArrayOrObj}`)
             }
         }
-        socket.onerror = () => {
+        socket.onerror = (e) => {
             socketRef.current = null;
+            console.error(`ws closed on error for ${modelName}. ${e}`)
+        }
+        socket.onclose = (e) => {
+            const { code, reason, wasClean } = e;
+            if (wasClean) {
+                console.log(`ws closed for ${modelName}, code: ${code}, reason: ${reason}, wasClean: ${wasClean}`);
+            } else {
+                console.error(`ws closed for ${modelName}, code: ${code}, reason: ${reason}, wasClean: ${wasClean}`);
+            }
         }
 
         return () => {
@@ -290,13 +300,14 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                 socketRef.current = null;
             }
         }
-    }, [url, params, isWsDisabled])
+    }, [url, isWsDisabled, reconnectCounter, params])
 
     useEffect(() => {
         const intervalId = setInterval(() => {
             if (Object.keys(modelObjDictRef.current).length > 0) {
-                dispatch(actions.setStoredArrayWs(cloneDeep(modelObjDictRef.current)));
+                const pendingUpdateDict = modelObjDictRef.current;
                 modelObjDictRef.current = {};
+                dispatch(actions.setStoredArrayWs(pendingUpdateDict));
             }
         }, 500);
         return () => clearInterval(intervalId);
@@ -529,6 +540,10 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
         dispatch(actions.setError(null));
     }
 
+    const handleReconnect = () => {
+        setReconnectCounter((prev) => prev + 1);
+    }
+
     const handleRowSelect = (id) => {
         dispatch(actions.setObjId(id));
     }
@@ -667,7 +682,13 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                         onPinToggle={handlePinnedChange}
                     />
                 </ModelCardHeader>
-                <ModelCardContent isDisabled={isLoading || isProcessingUserActions} error={error} onClear={handleErrorClear} isDisconnected={!isWsDisabled && !isWebSocketAlive(socketRef.current)}>
+                <ModelCardContent
+                    isDisabled={isLoading || isProcessingUserActions}
+                    error={error}
+                    onClear={handleErrorClear}
+                    isDisconnected={!isWsDisabled && !isWebSocketAlive(socketRef.current)}
+                    onReconnect={handleReconnect}
+                >
                     {renderContent()}
                 </ModelCardContent>
             </ModelCard>

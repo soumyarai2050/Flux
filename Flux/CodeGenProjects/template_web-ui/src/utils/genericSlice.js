@@ -49,6 +49,7 @@ export function createGenericSlice({
   modelType,
   isAlertModel = false,
   injectedReducers = {},
+  isAbbreviationSource = false
 }) {
   // Dynamically construct keys for state properties.
   const endpointBase = modelName;
@@ -56,14 +57,12 @@ export function createGenericSlice({
   const capModelName = snakeToPascal(modelName);
 
   const storedArrayKey = `stored${capModelName}Array`;
-  const storedObjDictKey = `stored${capModelName}ObjDict`;
   const storedObjKey = `stored${capModelName}Obj`;
   const updatedObjKey = `updated${capModelName}Obj`;
   const objIdKey = `selected${capModelName}Id`;
 
   const modelKeys = {
     storedArrayKey,
-    storedObjDictKey,
     storedObjKey,
     updatedObjKey,
     objIdKey,
@@ -72,7 +71,6 @@ export function createGenericSlice({
   // Define the initial state.
   const initialState = {
     [storedArrayKey]: [],
-    [storedObjDictKey]: {},
     [storedObjKey]: {},
     [updatedObjKey]: {},
     [objIdKey]: null,
@@ -90,7 +88,8 @@ export function createGenericSlice({
     modelKeys,
     modelType,
     isAlertModel,
-    initialState
+    initialState,
+    isAbbreviationSource
   };
 
   /* Async Thunks for CRUD Operations */

@@ -22,8 +22,9 @@ const CreateMenu = ({
   isPinned,
   onPinToggle,
   menuType,
+  isAbbreviationSource
 }) => {
-  if (mode !== MODES.READ) return null;
+  if (mode !== MODES.READ || isAbbreviationSource) return null;
 
   const menuName = 'create';
 

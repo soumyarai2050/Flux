@@ -41,6 +41,94 @@ function wsUpdateHandler(payload, storedArray, uiLimit = null, isAlertModel = fa
   return storedArray;
 }
 
+/**
+ * Optimized WebSocket update handler.
+ *
+ * This function merges incoming WebSocket updates into the stored array.
+ * It builds a map of updates (keyed by DB_ID), applies those updates to existing items,
+ * and then batches new updates (inserting them at the beginning or end based on uiLimit).
+ *
+ * @param {Array|Object} payload - The incoming update payload (array or object).
+ * @param {Array} storedArray - The current array of stored items.
+ * @param {number|null} uiLimit - Optional UI limit. If positive, new items are appended;
+ *                                if negative, new items are prepended.
+ * @param {boolean} isAlertModel - Indicates if this is an alert model (affects deletion logic).
+ * @returns {Array} - The updated array after merging WebSocket updates.
+ */
+function optimizedWsUpdateHandler(payload, storedArray, uiLimit = null, isAlertModel = false) {
+  // Normalize payload to an array.
+  let data;
+  if (Array.isArray(payload)) {
+    data = payload;
+  } else if (payload && typeof payload === 'object') {
+    data = Object.values(payload);
+  } else {
+    console.error(`Invalid payload, expected array or object, received: ${payload}`);
+    return storedArray;
+  }
+
+  // Build a map of updates keyed by DB_ID.
+  // For deletion cases (alert dismissed or update with only DB_ID), we store a null.
+  const updatesMap = new Map();
+  for (const update of data) {
+    if ((isAlertModel && update.dismiss) || Object.keys(update).length === 1) {
+      updatesMap.set(update[DB_ID], null);
+    } else {
+      updatesMap.set(update[DB_ID], update);
+    }
+  }
+
+  // Merge updates with the existing stored array.
+  // For each existing item, apply the update if available (or remove if deletion).
+  const mergedArray = [];
+  for (const item of storedArray) {
+    if (updatesMap.has(item[DB_ID])) {
+      const update = updatesMap.get(item[DB_ID]);
+      if (update !== null) {
+        mergedArray.push(update);
+      }
+      updatesMap.delete(item[DB_ID]);
+    } else {
+      mergedArray.push(item);
+    }
+  }
+
+  // Collect new updates that weren't in the stored array.
+  const newUpdates = [];
+  for (const [id, update] of updatesMap.entries()) {
+    if (update !== null) {
+      newUpdates.push(update);
+    }
+  }
+
+  // Merge new updates based on uiLimit.
+  // If uiLimit is negative, batch prepend new updates; otherwise, append them.
+  let finalArray;
+  if (uiLimit !== null && uiLimit < 0) {
+    // Prepend new updates in one operation to avoid multiple unshift calls.
+    finalArray = newUpdates.concat(mergedArray);
+  } else {
+    finalArray = mergedArray.concat(newUpdates);
+  }
+
+  // If a UI limit is set, trim the final array to the limit.
+  if (uiLimit !== null) {
+    const limit = Math.abs(uiLimit);
+    if (finalArray.length > limit) {
+      finalArray = uiLimit >= 0
+        ? finalArray.slice(finalArray.length - limit) // For positive uiLimit, keep latest items.
+        : finalArray.slice(0, limit);                  // For negative uiLimit, keep from the start.
+    }
+  }
+
+  // For negative uiLimit in alert mode, apply additional sorting if required.
+  if (uiLimit !== null && uiLimit < 0 && isAlertModel) {
+    sortAlertArray(finalArray);
+  }
+
+  return finalArray;
+}
+
 /* Synchronous Reducer Handlers */
 
 /**
@@ -72,12 +160,11 @@ export function setStoredArrayHandler(state, action, config) {
  */
 export function setStoredArrayWsHandler(state, action, config) {
   const { modelKeys, initialState, isAlertModel, modelType } = config;
-  const { storedArrayKey, storedObjDictKey, storedObjKey, updatedObjKey, objIdKey } = modelKeys;
-  const updatedArray = wsUpdateHandler(action.payload, state[storedArrayKey], null, isAlertModel);
+  const { storedArrayKey, storedObjKey, updatedObjKey, objIdKey } = modelKeys;
+  // const updatedArray = wsUpdateHandler(action.payload, state[storedArrayKey], null, isAlertModel);
+  // Update the stored array with incoming WebSocket updates.
+  const updatedArray = optimizedWsUpdateHandler(action.payload, state[storedArrayKey], null, isAlertModel);
   state[storedArrayKey] = updatedArray;
-  updatedArray.forEach((o) => {
-    state[storedObjDictKey][o[DB_ID]] = o;
-  })
   if (state[objIdKey]) {
     const storedObj = updatedArray.find((o) => o[DB_ID] === state[objIdKey]);
     if (!storedObj) {
@@ -206,12 +293,11 @@ export function setIsConfirmSavePopupOpenHandler(state, action, config) {
  * @param {Object} config - Configuration object containing modelKeys, initialState, modelType, and isAlertModel.
  */
 export function handleGetAll(builder, thunk, config) {
-  const { modelKeys, initialState, modelName } = config;
-  const { storedArrayKey, storedObjDictKey, storedObjKey, updatedObjKey, objIdKey } = modelKeys;
+  const { modelKeys, initialState, modelName, isAbbreviationSource } = config;
+  const { storedArrayKey, storedObjKey, updatedObjKey, objIdKey } = modelKeys;
   builder.addCase(thunk.pending, (state) => {
     state.isLoading = true;
     state[storedArrayKey] = initialState[storedArrayKey];
-    state[storedObjDictKey] = initialState[storedObjDictKey];
     state[storedObjKey] = initialState[storedObjKey];
     state[updatedObjKey] = initialState[updatedObjKey];
     state[objIdKey] = initialState[objIdKey];
@@ -221,15 +307,12 @@ export function handleGetAll(builder, thunk, config) {
     state[storedArrayKey] = action.payload || [];
     if (!action.payload || action.payload.length === 0) {
       // no action required - all state already cleared in pending
-    } else if (modelName !== 'ui_layout') {
+    } else if (modelName !== 'ui_layout' && !isAbbreviationSource) {
       const obj = getObjectWithLeastId(action.payload);
       state[objIdKey] = obj[DB_ID];
       state[storedObjKey] = obj;
       state[updatedObjKey] = addxpath(cloneDeep(obj));
     }
-    state[storedArrayKey].forEach((o) => {
-      state[storedObjDictKey][o[DB_ID]] = o;
-    })
     state.isLoading = false;
   });
   builder.addCase(thunk.rejected, (state, action) => {

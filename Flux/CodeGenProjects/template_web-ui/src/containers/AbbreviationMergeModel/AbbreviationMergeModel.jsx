@@ -94,6 +94,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     const [moreAll, setMoreAll] = useState(false);
     const [url, setUrl] = useState(modelDataSource.url);
     const [isProcessingUserActions, setIsProcessingUserActions] = useState(false);
+    const [reconnectCounter, setReconnectCounter] = useState(0);
 
     const socketRef = useRef(null);
     const workerRef = useRef(null);
@@ -282,8 +283,17 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                 console.error(`excepected either array or object, received: ${updatedArrayOrObj}`)
             }
         }
-        socket.onerror = () => {
+        socket.onerror = (e) => {
             socketRef.current = null;
+            console.error(`ws closed on error for ${modelName}. ${e}`)
+        }
+        socket.onclose = (e) => {
+            const { code, reason, wasClean } = e;
+            if (wasClean) {
+                console.log(`ws closed for ${modelName}, code: ${code}, reason: ${reason}, wasClean: ${wasClean}`);
+            } else {
+                console.error(`ws closed for ${modelName}, code: ${code}, reason: ${reason}, wasClean: ${wasClean}`);
+            }
         }
 
         return () => {
@@ -292,19 +302,69 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                 socketRef.current = null;
             }
         }
-    }, [url, isWsDisabled])
+    }, [url, isWsDisabled, reconnectCounter])
 
     useEffect(() => {
         const intervalId = setInterval(() => {
             if (Object.keys(modelObjDictRef.current).length > 0) {
-                dispatch(modelActions.setStoredArrayWs(cloneDeep(modelObjDictRef.current)));
+                const pendingUpdateDict = modelObjDictRef.current;
                 modelObjDictRef.current = {};
+                dispatch(modelActions.setStoredArrayWs(pendingUpdateDict));
             }
         }, 500);
         return () => clearInterval(intervalId);
     }, [])
 
     useEffect(() => {
+        if (!modelLayoutOption.ws_connection_by_get_all) return;
+
+        if (isWsDisabled) {
+            Object.keys(wsRefs.current).forEach((name) => {
+                wsRefs.current[name].close();
+                delete wsRefs.current[name];
+            });
+            return;
+        }
+
+        dataSources.forEach(({ name, url }) => {
+            if (!dataSourcesObjDictRef.current[name]) {
+                dataSourcesObjDictRef.current[name] = {};
+            }
+
+            if (!wsRefs.current[name]) {
+                const ws = new WebSocket(`${url.replace('http', 'ws')}/get-all-${name}-ws`);
+                wsRefs.current[name] = ws;
+                ws.onmessage = (event) => {
+                    const updatedArrayOrObj = JSON.parse(event.data);
+                    if (Array.isArray(updatedArrayOrObj)) {
+                        updatedArrayOrObj.forEach((o) => {
+                            dataSourcesObjDictRef.current[name][o[DB_ID]] = o;
+                        })
+                    } else if (isObject(updatedArrayOrObj)) {
+                        dataSourcesObjDictRef.current[name][updatedArrayOrObj[DB_ID]] = updatedArrayOrObj;
+                    } else {
+                        console.error(`excepected either array or object, received: ${updatedArrayOrObj}`)
+                    }
+                };
+                ws.onerror = (e) => {
+                    wsRefs.current[name] = null;
+                    console.error(`ws closed on error for ${name}. ${e}`)
+                }
+                ws.onclose = (e) => {
+                    const { code, reason, wasClean } = e;
+                    if (wasClean) {
+                        console.log(`ws closed for ${name}, code: ${code}, reason: ${reason}, wasClean: ${wasClean}`);
+                    } else {
+                        console.error(`ws closed for ${name}, code: ${code}, reason: ${reason}, wasClean: ${wasClean}`);
+                    }
+                }
+            }
+        });
+    }, [isWsDisabled])
+
+    useEffect(() => {
+        if (modelLayoutOption.ws_connection_by_get_all) return;
+
         if (isWsDisabled) {
             Object.keys(wsRefs.current).forEach((name) => {
                 Object.keys(wsRefs.current[name]).forEach((id) => {
@@ -365,8 +425,9 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         const intervalId = setInterval(() => {
             dataSources.forEach(({ name, actions }) => {
                 if (dataSourcesObjDictRef.current[name] && Object.keys(dataSourcesObjDictRef.current[name]).length > 0) {
-                    dispatch(actions.setStoredArrayWs(cloneDeep(dataSourcesObjDictRef.current[name])));
+                    const pendingUpdateDict = dataSourcesObjDictRef.current[name];
                     dataSourcesObjDictRef.current[name] = {};
+                    dispatch(actions.setStoredArrayWs(pendingUpdateDict));
                 }
             })
         }, 500);
@@ -374,16 +435,25 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     }, [])
 
     useEffect(() => {
-        if (modelAbbreviatedItems && modelAbbreviatedItems.length === 0) {
-            const updatedAbbreviatedItems = get(updatedObj, loadedFieldMetadata.key);
-            if (updatedAbbreviatedItems && updatedAbbreviatedItems.length === 0) {
-                dataSources.forEach(({ actions }) => {
-                    dispatch(actions.setObjId(null));
-                })
-                // todo - handle ws popup on edit mode if datasource id is selected
+        if (modelAbbreviatedItems) {
+            if (modelAbbreviatedItems.length === 0) {
+                const updatedAbbreviatedItems = get(updatedObj, loadedFieldMetadata.key);
+                if (updatedAbbreviatedItems && updatedAbbreviatedItems.length === 0) {
+                    dataSources.forEach(({ actions }) => {
+                        dispatch(actions.setObjId(null));
+                    })
+                    // todo - handle ws popup on edit mode if datasource id is selected
+                }
+            } else {
+                if (!dataSourcesObjIdDict[dataSources[0].name]) {
+                    const id = getIdFromAbbreviatedKey(abbreviationKey, modelAbbreviatedItems[0]);
+                    dataSources.forEach(({ actions }) => {
+                        dispatch(actions.setObjId(id));
+                    })
+                }
             }
         }
-    }, [modelAbbreviatedItems, updatedObj, mode])
+    }, [modelAbbreviatedItems, dataSourcesObjIdDict, updatedObj, mode])
 
     useEffect(() => {
         const { disable_ws_on_edit } = modelLayoutOption;
@@ -588,6 +658,10 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     }
 
     const handleSave = (modifiedObj, force = false) => {
+        if (!sourceRef.current) {
+            dispatch(modelActions.setMode(MODES.READ));
+            return;
+        }
         const dataSourceStoredObj = dataSourcesStoredObjDict[sourceRef.current];
         const dataSourceUpdatedObj = modifiedObj || clearxpath(cloneDeep(dataSourcesUpdatedObjDict[sourceRef.current]));
         const fieldsMetadata = dataSourcesMetadataDict[sourceRef.current];
@@ -684,6 +758,10 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
 
     const handleErrorClear = () => {
         dispatch(modelActions.setError(null));
+    }
+
+    const handleReconnect = () => {
+        setReconnectCounter((prev) => prev + 1);
     }
 
     const handleRowSelect = (id) => {
@@ -826,7 +904,13 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                         onPinToggle={handlePinnedChange}
                     />
                 </ModelCardHeader>
-                <ModelCardContent isDisabled={isCreate || isLoading || isProcessingUserActions} error={error} onClear={handleErrorClear} isDisconnected={!isWsDisabled && !isWebSocketAlive(socketRef.current)}>
+                <ModelCardContent
+                    isDisabled={isLoading || isProcessingUserActions}
+                    error={error}
+                    onClear={handleErrorClear}
+                    isDisconnected={!isWsDisabled && !isWebSocketAlive(socketRef.current)}
+                    onReconnect={handleReconnect}
+                >
                     {renderContent()}
                 </ModelCardContent>
             </ModelCard>

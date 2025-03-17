@@ -101,7 +101,8 @@ message DashCollection {
     h: 22,
     disable_ws_on_edit: true,
     bind_id_fld: "DashCollection.id",
-    dynamic_widget_title_fld: "DashCollection.dash_name"
+    dynamic_widget_title_fld: "DashCollection.dash_name",
+    ws_connection_by_get_all: true,
     widget_ui_data: {
       view_layout: UI_ABBREVIATED_FILTER,
       truncate_date_time: true
@@ -168,7 +169,8 @@ message DashFiltersCollection {
     h: 14,
     widget_ui_data: {
       view_layout: UI_ABBREVIATED_FILTER
-    }
+    },
+    ws_connection_by_get_all: true
   };
   option (FluxMsgStringLength) = 128;
   //Server generated unique Id

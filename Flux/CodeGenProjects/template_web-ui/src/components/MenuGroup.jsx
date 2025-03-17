@@ -57,7 +57,8 @@ const MenuGroup = ({
     onSave,
     onButtonToggle,
     pinned,
-    onPinToggle
+    onPinToggle,
+    isAbbreviationSource
 }) => {
     const [anchorEl, setAnchorEl] = useState(null);
 
@@ -269,6 +270,7 @@ const MenuGroup = ({
                         isPinned={pinned.includes(menuName)}
                         onMenuClose={handleMenuClose}
                         onPinToggle={handlePinToggle}
+                        isAbbreviationSource={isAbbreviationSource}
                     />
                 );
             case 'download':

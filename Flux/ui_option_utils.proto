@@ -102,6 +102,7 @@ message WidgetUIDataElement {
   optional bool is_read_only = 24;
   optional int32 default_rows_per_page = 25;  // supported values = 25, 50
   optional int32 server_running_status_lvl = 26;
+  optional bool ws_connection_by_get_all = 27;  // for abbreviation widget
 }
 
 message WidgetUIOption {

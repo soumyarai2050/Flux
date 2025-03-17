@@ -45,7 +45,7 @@ const ResponsiveGridLayout = WidthProvider(Responsive);
  * @returns {JSX.Element} The Layout component.
  */
 const Layout = ({ projectName, theme, onThemeToggle }) => {
-  const { storedArray, storedObj, storedObjDict, isLoading } = useSelector(Selectors.selectUILayout);
+  const { storedArray, storedObj, isLoading } = useSelector(Selectors.selectUILayout);
   const [layout, setLayout] = useState(null);
   const [visibleComponents, setVisibleComponents] = useState([]);
   const [isDraggable, setIsDraggable] = useState(false);
@@ -127,19 +127,21 @@ const Layout = ({ projectName, theme, onThemeToggle }) => {
     (component) => {
       setVisibleComponents((prev) => {
         if (prev.includes(component)) {
+          setLayout((prevLayout) => prevLayout.filter((item) => item.i !== component));
           return prev.filter((item) => item !== component);
         } else {
           const defaultPosition = defaultLayouts.find((item) => item.i === component);
           const currentPosition = layout?.find((item) => item.i === component);
           const newPosition = currentPosition
             ? currentPosition
-            : { i: component, x: 0, y: getMaxY(), w: defaultPosition.w, h: defaultPosition.h };
+            : { ...defaultPosition, x: 0, y: getMaxY() };
           setLayout((prevLayout) => [...(prevLayout || []), newPosition]);
+          dispatch(LayoutActions.setStoredObj({ ...storedObj, widget_ui_data_elements: [...storedObj.widget_ui_data_elements, newPosition] }));
           return [...prev, component];
         }
       });
     },
-    [layout, getMaxY]
+    [layout, getMaxY, storedObj]
   );
 
   /**
@@ -225,16 +227,16 @@ const Layout = ({ projectName, theme, onThemeToggle }) => {
     }, {});
 
     // Retrieve an existing profile from storedArray, or use storedObj as a fallback.
-    let profileData = storedArray.find((item) => item.profile_id === profileId);
-    if (!profileData) {
-      profileData = {
-        profile_id: profileId,
-        widget_ui_data_elements: storedObj?.widget_ui_data_elements || [],
-      };
-    }
+    // let profileData = storedArray.find((item) => item.profile_id === profileId);
+    // if (!profileData) {
+    //   profileData = {
+    //     profile_id: profileId,
+    //     widget_ui_data_elements: storedObj?.widget_ui_data_elements || [],
+    //   };
+    // }
 
     // Deep clone to avoid accidental mutations of the original object.
-    const newProfileData = cloneDeep(profileData);
+    const newProfileData = cloneDeep(storedObj);
 
     // Filter out widget elements that do not exist in the current layout,
     // then map each widget to include updated position/size properties.

@@ -115,6 +115,20 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += JsxFileGenPlugin.indentation_space*3 + "actions: ModelActions,\n"
         output_str += JsxFileGenPlugin.indentation_space*3 + "schema: modelSchema,\n"
         output_str += JsxFileGenPlugin.indentation_space*3 + "url: getServerUrl(modelSchema),\n"
+        # adding attribute telling some abbreviated msg is dependent on this message
+        for abb_msg in self.abbreviated_merge_layout_msg_list:
+            dependent_msg_list = self.msg_name_to_dependent_msg_name_list_dict.get(abb_msg.proto.name)
+            if model_type == JsxFileGenPlugin.root_type:
+                if message_name in dependent_msg_list:
+                    # if some abbreviated message is dependent on this message
+                    output_str += JsxFileGenPlugin.indentation_space * 2 + f"isAbbreviationSource: true,\n"
+            elif model_type == JsxFileGenPlugin.non_root_type:
+                root_msg = self.get_root_msg_for_non_root_type(message)
+                root_message_name = root_msg.proto.name
+                if root_message_name in dependent_msg_list:
+                    # if some abbreviated message is dependent on this message
+                    output_str += JsxFileGenPlugin.indentation_space*3 + f"isAbbreviationSource: true,\n"
+            # else not required: ignore if this message itself is abbreviated type
         output_str += JsxFileGenPlugin.indentation_space * 3 + "fieldsMetadata: schemaCollections[modelName],\n"
         if model_type == JsxFileGenPlugin.non_root_type:
             root_msg = self.get_root_msg_for_non_root_type(message)
@@ -183,7 +197,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += "};\n\n"
         return output_str
 
-    def handle_model_proptype(self, message_name: str, model_type: str):
+    def handle_model_proptype(self, message: protogen.Message, message_name: str, model_type: str):
         output_str = "/**\n"
         output_str += f" * PropTypes for {message_name}.\n"
         output_str += f" */\n"
@@ -194,7 +208,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += JsxFileGenPlugin.indentation_space*2 + "selector: PropTypes.func.isRequired,\n"
         output_str += JsxFileGenPlugin.indentation_space*2 + "actions: PropTypes.object.isRequired,\n"
         output_str += JsxFileGenPlugin.indentation_space*2 + "schema: PropTypes.object.isRequired,\n"
-        output_str += JsxFileGenPlugin.indentation_space*2 + "url: PropTypes.string\n"
+        output_str += JsxFileGenPlugin.indentation_space*2 + "url: PropTypes.string,\n"
         output_str += JsxFileGenPlugin.indentation_space + "}),\n"
         if model_type == JsxFileGenPlugin.abbreviated_merge_type:
             output_str += JsxFileGenPlugin.indentation_space + "dataSources: PropTypes.arrayOf(\n"
@@ -223,7 +237,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str = self.handle_import_output(message, model_type)
         output_str += self.handle_model_doc_str(message_name, model_type)
         output_str += self.handle_model_declaration(message, model_type)
-        output_str += self.handle_model_proptype(message_name, model_type)
+        output_str += self.handle_model_proptype(message, message_name, model_type)
         output_str += f"export default {message_name};\n"
 
         return output_str

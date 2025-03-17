@@ -35,8 +35,8 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
     const modelLayoutOption = useSelector((state) => Selectors.selectLayout(state, modelName), (prev, curr) => {
         return JSON.stringify(prev) === JSON.stringify(curr);
     });
-    const { schema: modelSchema, fieldsMetadata, actions, selector } = modelDataSource;
-    const { storedArray, storedObj, updatedObj, objId, mode, error, isLoading, isConfirmSavePopupOpen } = useSelector(selector);
+    const { schema: modelSchema, fieldsMetadata, actions, selector, isAbbreviationSource = false } = modelDataSource;
+    const { storedObj, updatedObj, objId, mode, error, isLoading, isConfirmSavePopupOpen } = useSelector(selector);
     const { storedObj: dataSourceStoredObj } = useSelector(dataSource?.selector ?? (() => ({ storedObj: null })), (prev, curr) => {
         return JSON.stringify(prev) === JSON.stringify(curr);
     });
@@ -57,6 +57,7 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
     const [moreAll, setMoreAll] = useState(false);
     const [url, setUrl] = useState(modelDataSource.url);
     const [isProcessingUserActions, setIsProcessingUserActions] = useState(false);
+    const [reconnectCounter, setReconnectCounter] = useState(0);
 
     const socketRef = useRef(null);
     const workerRef = useRef(null);
@@ -99,7 +100,7 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
     }, [dataSourceStoredObj])
 
     useEffect(() => {
-        if (url) {
+        if (url && !isAbbreviationSource) {
             dispatch(actions.getAll({ url }));
         }
     }, [url])
@@ -209,7 +210,7 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
     ])
 
     useEffect(() => {
-        if (!url || isWsDisabled) return;
+        if (!url || isWsDisabled || isAbbreviationSource) return;
 
         const socket = new WebSocket(`${url.replace('http', 'ws')}/get-all-${modelName}-ws`);
         socketRef.current = socket;
@@ -225,8 +226,17 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
                 console.error(`excepected either array or object, received: ${updatedArrayOrObj}`)
             }
         }
-        socket.onerror = () => {
+        socket.onerror = (e) => {
             socketRef.current = null;
+            console.error(`ws closed on error for ${modelName}. ${e}`)
+        }
+        socket.onclose = (e) => {
+            const { code, reason, wasClean } = e;
+            if (wasClean) {
+                console.log(`ws closed for ${modelName}, code: ${code}, reason: ${reason}, wasClean: ${wasClean}`);
+            } else {
+                console.error(`ws closed for ${modelName}, code: ${code}, reason: ${reason}, wasClean: ${wasClean}`);
+            }
         }
 
         return () => {
@@ -235,13 +245,14 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
                 socketRef.current = null;
             }
         }
-    }, [url, isWsDisabled])
+    }, [url, isWsDisabled, reconnectCounter])
 
     useEffect(() => {
         const intervalId = setInterval(() => {
             if (Object.keys(modelObjDictRef.current).length > 0) {
-                dispatch(actions.setStoredArrayWs(cloneDeep(modelObjDictRef.current)));
+                const pendingUpdateDict = modelObjDictRef.current;
                 modelObjDictRef.current = {};
+                dispatch(actions.setStoredArrayWs(pendingUpdateDict));
             }
         }, 500);
         return () => clearInterval(intervalId);
@@ -446,6 +457,10 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
         dispatch(actions.setError(null));
     }
 
+    const handleReconnect = () => {
+        setReconnectCounter((prev) => prev + 1);
+    }
+
     // A helper function to decide which content to render based on layoutType
     const renderContent = () => {
         switch (layoutType) {
@@ -570,9 +585,16 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
                         modelType={MODEL_TYPES.ROOT}
                         pinned={modelLayoutData.pinned || []}
                         onPinToggle={handlePinnedChange}
+                        isAbbreviationSource={isAbbreviationSource}
                     />
                 </ModelCardHeader>
-                <ModelCardContent isDisabled={isLoading || isProcessingUserActions} error={error} onClear={handleErrorClear} isDisconnected={!isWsDisabled && !isWebSocketAlive(socketRef.current)}>
+                <ModelCardContent
+                    isDisabled={isLoading || isProcessingUserActions}
+                    error={error}
+                    onClear={handleErrorClear}
+                    isDisconnected={!isWsDisabled && !isAbbreviationSource && !isWebSocketAlive(socketRef.current)}
+                    onReconnect={handleReconnect}
+                >
                     {renderContent()}
                 </ModelCardContent>
             </ModelCard>
