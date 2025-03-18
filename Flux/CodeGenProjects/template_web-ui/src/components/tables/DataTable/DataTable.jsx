@@ -275,8 +275,8 @@ const DataTable = ({
           copyColumnHandler={handleCopy}
         />
         <TableBody>
-          {activeRows.map((groupedRow) => {
-            const rowKey = groupedRow[0]['data-id'];
+          {activeRows.map((groupedRow, idx) => {
+            const rowKey = groupedRow[0]['data-id'] ?? idx;
 
             return (
               <TableRow

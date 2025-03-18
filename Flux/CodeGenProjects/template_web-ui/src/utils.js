@@ -2366,7 +2366,7 @@ export function getWidgetOptionById(widgetOptions, id, isIdBound = false) {
         if (dataElement) {
             widgetOption = cloneDeep(dataElement);
         } else {
-            widgetOption.bind_id_val = id;
+            widgetOption.bind_id_val = String(id);
         }
     }
     // widgetOption = cloneDeep(widgetOption);
@@ -3580,3 +3580,12 @@ export function getApiUrlMetadata(defaultEndpoint, overrideUrl, overrideEndpoint
     }
     return [apiUrl, apiParams];
 }
+
+export const getDataSourceObj = (dataSources, sourceName) => {
+    const dataSource = dataSources.find(o => o.name === sourceName);
+    if (!dataSource) {
+        alert('error');
+    }
+    return dataSource;
+}
+

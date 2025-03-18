@@ -79,6 +79,14 @@ message Dash {
       QueryRouteType: PATCH,
       RequireJsSliceChanges: true
   };
+  option (FluxMsgJsonQuery) = {
+      QueryName: "filtered_dash_by_dash_filters",
+      QueryParams: {
+        QueryParamName: "dash_name",
+        QueryParamDataType: "str"
+      }
+      QueryType: BOTH
+  };
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   required RTDash rt_dash = 2 [(FluxFldPk) = "leg2.sec.sec_id"];

@@ -28,7 +28,7 @@ import CommonKeyWidget from '../../components/CommonKeyWidget';
 import { DataTable } from '../../components/tables';
 import { ConfirmSavePopup } from '../../components/Popup';
 import DataTree from '../../components/trees/DataTree/DataTree';
-
+import { useWebSocketWorker } from '../../hooks';
 
 function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName }) {
     const { schema: projectSchema, schemaCollections } = useSelector((state) => state.schema);
@@ -211,54 +211,24 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
         showMore, moreAll, showHidden, showAll
     ])
 
-    useEffect(() => {
-        if (!url || isWsDisabled || isAbbreviationSource) return;
+    const handleModelDataSourceUpdate = (updatedArray) => {
+        dispatch(actions.setStoredArray(updatedArray));
+    }
 
-        const socket = new WebSocket(`${url.replace('http', 'ws')}/get-all-${modelRootName}-ws`);
-        socketRef.current = socket;
-        socket.onmessage = (event) => {
-            const updatedArrayOrObj = JSON.parse(event.data);
-            if (Array.isArray(updatedArrayOrObj)) {
-                updatedArrayOrObj.forEach((o) => {
-                    modelObjDictRef.current[o[DB_ID]] = o;
-                })
-            } else if (isObject(updatedArrayOrObj)) {
-                modelObjDictRef.current[updatedArrayOrObj[DB_ID]] = updatedArrayOrObj;
-            } else {
-                console.error(`excepected either array or object, received: ${updatedArrayOrObj}`)
-            }
-        }
-        socket.onerror = (e) => {
-            socketRef.current = null;
-            console.error(`ws closed on error for ${modelName}. ${e}`)
-        }
-        socket.onclose = (e) => {
-            const { code, reason, wasClean } = e;
-            if (wasClean) {
-                console.log(`ws closed for ${modelName}, code: ${code}, reason: ${reason}, wasClean: ${wasClean}`);
-            } else {
-                console.error(`ws closed for ${modelName}, code: ${code}, reason: ${reason}, wasClean: ${wasClean}`);
-            }
-        }
+    const handleReconnect = () => {
+        setReconnectCounter((prev) => prev + 1);
+    }
 
-        return () => {
-            if (socketRef.current) {
-                socketRef.current.close();
-                socketRef.current = null;
-            }
-        }
-    }, [url, isWsDisabled, reconnectCounter])
-
-    useEffect(() => {
-        const intervalId = setInterval(() => {
-            if (Object.keys(modelObjDictRef.current).length > 0) {
-                const pendingUpdateDict = modelObjDictRef.current;
-                modelObjDictRef.current = {};
-                dispatch(actions.setStoredArrayWs(pendingUpdateDict));
-            }
-        }, 500);
-        return () => clearInterval(intervalId);
-    }, [])
+    socketRef.current = useWebSocketWorker({
+        url,
+        modelName: modelRootName,
+        isDisabled: isWsDisabled,
+        reconnectCounter,
+        isAbbreviationSource,
+        selector,
+        onWorkerUpdate: handleModelDataSourceUpdate,
+        onReconnect: handleReconnect
+    })
 
     useEffect(() => {
         const { disable_ws_on_edit } = modelLayoutOption;
@@ -457,10 +427,6 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
 
     const handleErrorClear = () => {
         dispatch(actions.setError(null));
-    }
-
-    const handleReconnect = () => {
-        setReconnectCounter((prev) => prev + 1);
     }
 
     // A helper function to decide which content to render based on layoutType

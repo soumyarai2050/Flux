@@ -4,9 +4,11 @@ import { BeatLoader } from 'react-spinners';
 import { AlertErrorMessage } from '../../Alert';
 import { LinkOff } from '@mui/icons-material';
 import { Button } from '@mui/material';
+import { useTheme } from '@emotion/react';
 
 const ModelCardContent = ({ children, isDisabled, error, onClear, isDisconnected, onReconnect }) => {
     const [isScrollable, setIsScrollable] = useState(false);
+    const theme = useTheme();
 
     const handleClick = (e) => {
         // e.stopPropagation();
@@ -23,8 +25,9 @@ const ModelCardContent = ({ children, isDisabled, error, onClear, isDisconnected
         cardContentClass += ` ${styles.no_scroll}`;
     }
 
+    const backgroundColor = theme.palette.primary.dark;
     return (
-        <div className={cardContentClass} onClick={handleClick} onDoubleClick={handleDoubleClick}>
+        <div className={cardContentClass} style={{ background: backgroundColor }} onClick={handleClick} onDoubleClick={handleDoubleClick}>
             {children}
             {(isDisabled || error || isDisconnected) && (
                 <div className={styles.backdrop}>

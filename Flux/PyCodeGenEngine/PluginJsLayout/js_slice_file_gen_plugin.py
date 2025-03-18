@@ -53,7 +53,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             output_str += JsSliceFileGenPlugin.indentation_space*3 + "if (!data.bind_id_val) {\n"
             output_str += JsSliceFileGenPlugin.indentation_space*4 + "layoutDataElement.widget_ui_data.splice(0, 1, data);\n"
             output_str += JsSliceFileGenPlugin.indentation_space*3 + "} else {\n"
-            output_str += (JsSliceFileGenPlugin.indentation_space*4 + "const idx = layoutDataElement.widget_ui_data.indexOf((o) => "
+            output_str += (JsSliceFileGenPlugin.indentation_space*4 + "const idx = layoutDataElement.widget_ui_data.findIndex((o) => "
                            "o.bind_id_val === data.bind_id_val);\n")
             output_str += JsSliceFileGenPlugin.indentation_space*4 + "if (idx !== -1) {\n"
             output_str += JsSliceFileGenPlugin.indentation_space*5 + "layoutDataElement.widget_ui_data.splice(idx, 1, data);\n"

@@ -922,20 +922,12 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                 JsonSchemaConvertPlugin.widget_ui_option_depending_proto_model_field_name_for_host)
             dynamic_port = widget_ui_data_option_value_dict.get(
                 JsonSchemaConvertPlugin.widget_ui_option_depending_proto_model_field_name_for_port)
-            dynamic_ws_port = widget_ui_data_option_value_dict.get(
-                JsonSchemaConvertPlugin.widget_ui_option_depending_proto_model_field_name_for_ws_port)
             indent_count += 2
             json_msg_str += (" " * indent_count) + '"connection_details": {\n'
             indent_count += 2
             if dynamic_host:
-                json_msg_str += (" " * indent_count) + f'"host": "{self.handle_options_value_having_msg_or_fld_name(dynamic_host,
-                                                                                                                    JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element, self.all_message_dict)}",\n'
-                json_msg_str += (" " * indent_count) + f'"port": "{self.handle_options_value_having_msg_or_fld_name(dynamic_port,
-                                                                                                                    JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element, self.all_message_dict)}",\n'
-                if dynamic_ws_port:
-                    json_msg_str += (
-                                                " " * indent_count) + f'"ws_port": "{self.handle_options_value_having_msg_or_fld_name(dynamic_ws_port,
-                                                                                                                                      JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element, self.all_message_dict)}",\n'
+                json_msg_str += (" " * indent_count) + f'"host": "{dynamic_host}",\n'
+                json_msg_str += (" " * indent_count) + f'"port": "{dynamic_port}",\n'
                 json_msg_str += (" " * indent_count) + f'"project_name": "{other_project_name}",\n'
                 json_msg_str += (" " * indent_count) + f'"dynamic_url": true\n'
             else:

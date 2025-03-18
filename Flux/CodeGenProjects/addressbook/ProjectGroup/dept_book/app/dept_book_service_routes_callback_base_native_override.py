@@ -10,11 +10,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.generated.FastApi.d
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.app.dept_book_service_helper import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     get_new_contact_limits)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.app.aggregate import (
-    get_vwap_projection_from_bar_data_agg_pipeline, get_vwap_n_vwap_change_projection_from_bar_data_agg_pipeline,
-    get_vwap_change_projection_from_bar_data_agg_pipeline, get_premium_projection_from_bar_data_agg_pipeline,
-    get_premium_n_premium_change_projection_from_bar_data_agg_pipeline,
-    get_premium_change_projection_from_bar_data_agg_pipeline)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.app.aggregate import *
 from FluxPythonUtils.scripts.general_utility_functions import (
     except_n_log_alert)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.service_state import ServiceState
@@ -29,6 +25,9 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
     underlying_create_dash_collection_http: Callable[..., Any] | None = None
     underlying_update_dash_collection_http: Callable[..., Any] | None = None
     underlying_read_bar_data_http: Callable[Any, Any] | None = None
+    underlying_read_dash_filters_http: Callable[Any, Any] | None = None
+    underlying_read_dash_http: Callable[Any, Any] | None = None
+    underlying_filtered_dash_by_dash_filters_query_http: Callable[Any, Any] | None = None
 
     def __init__(self):
         super().__init__()
@@ -47,7 +46,8 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
             underlying_read_contact_limits_http_json_dict, underlying_create_contact_limits_http,
             underlying_read_dash_filters_collection_http_json_dict, underlying_create_dash_filters_collection_http,
             underlying_read_dash_collection_by_id_http, underlying_create_dash_collection_http,
-            underlying_update_dash_collection_http, underlying_read_bar_data_http)
+            underlying_update_dash_collection_http, underlying_read_bar_data_http, underlying_read_dash_filters_http,
+            underlying_read_dash_http, underlying_filtered_dash_by_dash_filters_query_http)
         cls.underlying_read_contact_limits_http_json_dict = underlying_read_contact_limits_http_json_dict
         cls.underlying_create_contact_limits_http = underlying_create_contact_limits_http
         cls.underlying_read_dash_filters_collection_http_json_dict = underlying_read_dash_filters_collection_http_json_dict
@@ -56,6 +56,9 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
         cls.underlying_create_dash_collection_http = underlying_create_dash_collection_http
         cls.underlying_update_dash_collection_http = underlying_update_dash_collection_http
         cls.underlying_read_bar_data_http = underlying_read_bar_data_http
+        cls.underlying_read_dash_filters_http = underlying_read_dash_filters_http
+        cls.underlying_read_dash_http = underlying_read_dash_http
+        cls.underlying_filtered_dash_by_dash_filters_query_http = underlying_filtered_dash_by_dash_filters_query_http
 
     @except_n_log_alert()
     def _app_launch_pre_thread_func(self):
@@ -267,27 +270,57 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
         return (get_premium_change_projection_from_bar_data_filter_callable,
                 get_premium_change_projection_from_bar_data_agg_pipeline)
 
+    async def filtered_dash_by_dash_filters_query_pre(self, dash_class_type: Type[Dash], dash_name: str):
+        dash_filters_list: List[DashFilters] = await DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_read_dash_filters_http(get_dash_filter_by_dash_name(dash_name))
+        if dash_filters_list:
+            dash_filters = dash_filters_list[0]
 
-def get_vwap_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str, **kwargs):
+            dash_filter_agg_pipeline = filter_dash_from_dash_filters_agg(dash_filters)
+            agg_pipeline = {"aggregate": dash_filter_agg_pipeline}
+            filtered_dash_list = DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_read_dash_http(agg_pipeline)
+            return filtered_dash_list
+
+        return []
+
+    async def filtered_dash_by_dash_filters_query_ws_pre(self, *args):
+        dash_filters_list: List[DashFilters] = \
+            await DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_read_dash_filters_http(
+                get_dash_filter_by_dash_name(args[0]))
+        if dash_filters_list:
+            dash_filters = dash_filters_list[0]
+
+            dash_filter_agg_pipeline = filter_dash_from_dash_filters_agg(dash_filters)
+        else:
+            err_str_ = f"No dash_filter found with dash_name: {args[0]}"
+            logging.error(err_str_)
+            raise HTTPException(detail=err_str_, status_code=404)
+        return self.filtered_dash_by_dash_filters_callable, dash_filter_agg_pipeline
+
+    async def filtered_dash_by_dash_filters_callable(self, obj_json_str: str, **kwargs):
+        data = await DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_filtered_dash_by_dash_filters_query_http(kwargs.get("dash_name"))
+        return_obj_bytes = msgspec.json.encode(data, enc_hook=Dash.enc_hook)
+        return return_obj_bytes
+
+async def get_vwap_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str, **kwargs):
     return bar_data_obj_json_str
 
 
-def get_vwap_n_vwap_change_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str, **kwargs):
+async def get_vwap_n_vwap_change_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str, **kwargs):
     return bar_data_obj_json_str
 
 
-def get_vwap_change_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str, **kwargs):
+async def get_vwap_change_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str, **kwargs):
     return bar_data_obj_json_str
 
 
-def get_premium_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str, **kwargs):
+async def get_premium_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str, **kwargs):
     return bar_data_obj_json_str
 
 
-def get_premium_n_premium_change_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str, **kwargs):
+async def get_premium_n_premium_change_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str, **kwargs):
     return bar_data_obj_json_str
 
 
-def get_premium_change_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str, **kwargs):
+async def get_premium_change_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str, **kwargs):
     return bar_data_obj_json_str
 

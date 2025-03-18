@@ -16,8 +16,10 @@
     z-index: 10;
     /* ensure it appears on top of the content */
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
+    gap: 10px;
 }
 
 .disconnect {

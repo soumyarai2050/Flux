@@ -1,16 +1,6 @@
-import { useRef, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
-export const usePrevious = (value) => {
-    const ref = useRef();
-
-    useEffect(() => {
-        ref.current = value;
-    }, [value]);
-
-    return ref.current;
-}
-
-export function useQueryParams() {
+function useQueryParams() {
   const [params, setParams] = useState({});
 
   useEffect(() => {
@@ -41,3 +31,5 @@ export function useQueryParams() {
 
   return params;
 }
+
+export default useQueryParams;

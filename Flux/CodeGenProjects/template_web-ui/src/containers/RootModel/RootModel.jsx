@@ -28,7 +28,7 @@ import CommonKeyWidget from '../../components/CommonKeyWidget';
 import { DataTable } from '../../components/tables';
 import { ConfirmSavePopup } from '../../components/Popup';
 import DataTree from '../../components/trees/DataTree/DataTree';
-
+import { useWebSocketWorker } from '../../hooks';
 
 function RootModel({ modelName, modelDataSource, dataSource }) {
     const { schema: projectSchema } = useSelector((state) => state.schema);
@@ -51,6 +51,7 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
     const [headCells, setHeadCells] = useState([]);
     const [commonKeys, setCommonKeys] = useState([]);
     const [filteredCells, setFilteredCells] = useState([]);
+    const [isCreate, setIsCreate] = useState(false);
     const [showHidden, setShowHidden] = useState(false);
     const [showMore, setShowMore] = useState(false);
     const [showAll, setShowAll] = useState(false);
@@ -183,7 +184,8 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
                 showHidden,
                 showAll,
                 modelLayoutOption,
-                modelLayoutData
+                modelLayoutData,
+                objId
             }
 
             if (!isEqual(optionsRef.current, updatedOptionsRef)) {
@@ -205,58 +207,28 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
             }
         }
     }, [
-        storedObj, updatedObj, fieldsMetadata, modelLayoutData, modelLayoutOption, page, mode,
+        storedObj, updatedObj, objId, fieldsMetadata, modelLayoutData, modelLayoutOption, page, mode,
         showMore, moreAll, showHidden, showAll
     ])
 
-    useEffect(() => {
-        if (!url || isWsDisabled || isAbbreviationSource) return;
+    const handleModelDataSourceUpdate = (updatedArray) => {
+        dispatch(actions.setStoredArray(updatedArray));
+    }
 
-        const socket = new WebSocket(`${url.replace('http', 'ws')}/get-all-${modelName}-ws`);
-        socketRef.current = socket;
-        socket.onmessage = (event) => {
-            const updatedArrayOrObj = JSON.parse(event.data);
-            if (Array.isArray(updatedArrayOrObj)) {
-                updatedArrayOrObj.forEach((o) => {
-                    modelObjDictRef.current[o[DB_ID]] = o;
-                })
-            } else if (isObject(updatedArrayOrObj)) {
-                modelObjDictRef.current[updatedArrayOrObj[DB_ID]] = updatedArrayOrObj;
-            } else {
-                console.error(`excepected either array or object, received: ${updatedArrayOrObj}`)
-            }
-        }
-        socket.onerror = (e) => {
-            socketRef.current = null;
-            console.error(`ws closed on error for ${modelName}. ${e}`)
-        }
-        socket.onclose = (e) => {
-            const { code, reason, wasClean } = e;
-            if (wasClean) {
-                console.log(`ws closed for ${modelName}, code: ${code}, reason: ${reason}, wasClean: ${wasClean}`);
-            } else {
-                console.error(`ws closed for ${modelName}, code: ${code}, reason: ${reason}, wasClean: ${wasClean}`);
-            }
-        }
+    const handleReconnect = () => {
+        setReconnectCounter((prev) => prev + 1);
+    }
 
-        return () => {
-            if (socketRef.current) {
-                socketRef.current.close();
-                socketRef.current = null;
-            }
-        }
-    }, [url, isWsDisabled, reconnectCounter])
-
-    useEffect(() => {
-        const intervalId = setInterval(() => {
-            if (Object.keys(modelObjDictRef.current).length > 0) {
-                const pendingUpdateDict = modelObjDictRef.current;
-                modelObjDictRef.current = {};
-                dispatch(actions.setStoredArrayWs(pendingUpdateDict));
-            }
-        }, 500);
-        return () => clearInterval(intervalId);
-    }, [])
+    socketRef.current = useWebSocketWorker({
+        url,
+        modelName,
+        isDisabled: isWsDisabled,
+        reconnectCounter,
+        isAbbreviationSource,
+        selector,
+        onWorkerUpdate: handleModelDataSourceUpdate,
+        onReconnect: handleReconnect
+    })
 
     useEffect(() => {
         const { disable_ws_on_edit } = modelLayoutOption;
@@ -289,6 +261,7 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
         if (mode !== MODES.READ) {
             handleModeToggle();
         }
+        setIsCreate(false);
         cleanAllCache(modelName);
     }
 
@@ -396,11 +369,12 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
         dispatch(actions.setUpdatedObj(modelUpdatedObj));
         dispatch(actions.setMode(MODES.EDIT));
         handleModeToggle();
+        setIsCreate(true);
     }
 
     const handleSave = (modifiedObj, force = false) => {
         const modelUpdatedObj = modifiedObj || clearxpath(cloneDeep(updatedObj));
-        const activeChanges = compareJSONObjects(storedObj, modelUpdatedObj, fieldsMetadata);
+        const activeChanges = compareJSONObjects(storedObj, modelUpdatedObj, fieldsMetadata, isCreate);
         if (!activeChanges || Object.keys(activeChanges).length === 0) {
             changesRef.current = {};
             dispatch(actions.setMode(MODES.READ));
@@ -424,6 +398,7 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
         } else {
             dispatch(actions.create({ url, data: changeDict }));
             dispatch(actions.setMode(MODES.READ));
+            setIsCreate(false);
         }
         changesRef.current = {};
         dispatch(actions.setMode(MODES.READ));
@@ -455,10 +430,6 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
 
     const handleErrorClear = () => {
         dispatch(actions.setError(null));
-    }
-
-    const handleReconnect = () => {
-        setReconnectCounter((prev) => prev + 1);
     }
 
     // A helper function to decide which content to render based on layoutType

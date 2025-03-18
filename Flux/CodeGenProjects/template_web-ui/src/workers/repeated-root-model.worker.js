@@ -14,7 +14,7 @@ onmessage = (e) => {
     const filteredArray = applyFilter(storedArray, filters);
     const clonedArray = addxpath(cloneDeep(filteredArray));
     const updatedArray = clonedArray.map((o) => o[DB_ID] === updatedObj[DB_ID] ? updatedObj : o);
-    const rows = getTableRows(fieldsMetadata, mode, filteredArray, updatedArray);
+    const rows = getTableRows(fieldsMetadata, mode, filteredArray, updatedArray, null, true);
     const groupedRows = getGroupedTableRows(rows, joinBy, joinSort);
     const activeRows = getActiveRows(groupedRows, page, rowsPerPage, sortOrders, false);
     const maxRowSize = getMaxRowSize(activeRows);

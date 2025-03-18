@@ -15,6 +15,13 @@ custom_logger_lvls:
 log_mongo_uri: True
 mongo_server: "mongodb://localhost:27017"
 
+# to be used by plugins to take proto files from these projects to generate combined output
+multi_project_plugin:
+  - log_book:
+      - "ContactAlert"
+  - phone_book:
+      - "SystemControl"
+
 # below 2 configs are used to check types of override files to be initialized by fastapi launch script
 # supported values: "native" or "bare"
 msgspec_override_type: "native"

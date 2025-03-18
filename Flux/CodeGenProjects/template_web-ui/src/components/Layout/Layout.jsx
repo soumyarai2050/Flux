@@ -236,7 +236,8 @@ const Layout = ({ projectName, theme, onThemeToggle }) => {
     // }
 
     // Deep clone to avoid accidental mutations of the original object.
-    const newProfileData = cloneDeep(storedObj);
+    let newProfileData = cloneDeep(storedObj);
+    newProfileData.profile_id = profileId;
 
     // Filter out widget elements that do not exist in the current layout,
     // then map each widget to include updated position/size properties.
@@ -340,7 +341,7 @@ const Layout = ({ projectName, theme, onThemeToggle }) => {
           {...defaultGridProps}
           isDraggable={isDraggable}
           isResizable={isDraggable}
-          layouts={{ lg: layout }}
+          layouts={{ lg: layout ?? [] }}
           onLayoutChange={handleLayoutChange}
         >
           {visibleComponents.map((key) => (

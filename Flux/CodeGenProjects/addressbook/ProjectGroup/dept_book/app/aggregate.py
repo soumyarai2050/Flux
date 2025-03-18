@@ -593,3 +593,166 @@ def get_bar_data_from_symbol_n_start_n_end_datetime(
             ]
         }
     return {'aggregate': agg_pipeline}
+
+def get_dash_filter_by_dash_name(dash_name: str):
+    agg_pipeline: List[Dict] = [
+        {"$match": {
+            "dash_name": dash_name
+        }},
+    ]
+    return {'aggregate': agg_pipeline}
+
+def filter_dash_from_dash_filters_agg(dash_filters: DashFilters):
+    agg_pipeline: List[Dict] = []
+
+    leg_match_list = []
+    for required_legs in dash_filters.required_legs:
+        if required_legs.leg_type == Leg.leg_type.LegType_CB:
+            leg_match = {"rt_dash.leg1": {"$exists": True}}
+            if dash_filters.px_range:
+                leg_match["rt_dash.leg1.vwap"] = { "$gte": dash_filters.px_range.px_low, "$lte": dash_filters.px_range.px_high}
+            leg_match_list.append(leg_match)
+        elif required_legs.leg_type == Leg.leg_type.LegType_EQT_A:
+            leg_match = {"rt_dash.leg2": {"$exists": True}}
+            if dash_filters.px_range:
+                leg_match["rt_dash.leg2.vwap"] = { "$gte": dash_filters.px_range.px_low, "$lte": dash_filters.px_range.px_high}
+            leg_match_list.append(leg_match)
+        elif required_legs.leg_type == Leg.leg_type.LegType_EQT_H:
+            leg_match = {"rt_dash.leg3": {"$exists": True}}
+            if dash_filters.px_range:
+                leg_match["rt_dash.leg3.vwap"] = { "$gte": dash_filters.px_range.px_low, "$lte": dash_filters.px_range.px_high}
+            leg_match_list.append(leg_match)
+        else:
+            raise Exception(f"Unknown leg_type: {required_legs.leg_type}")
+    # matching if leg exists based on dash_filters.required_legs
+    # also checking leg.vwap ranges within min to max of px_range
+    agg_pipeline.append({
+        "$match": {
+            "$or": leg_match_list
+        }
+    })
+
+    # if premium_range exists matching mkt_premium
+    if dash_filters.premium_range:
+        agg_pipeline.append({
+            "$match": {
+                "rt_dash.mkt_premium": {"$gte": dash_filters.premium_range.premium_low, "$lte": dash_filters.premium_range.premium_high}
+            }
+        })
+
+    # if premium_change_range exists matching mkt_premium_change
+    if dash_filters.premium_change_range:
+        agg_pipeline.append({
+            "$match": {
+                "rt_dash.mkt_premium_change": {"$gte": dash_filters.premium_change_range.premium_change_low, "$lte": dash_filters.premium_change_range.premium_change_high}
+            }
+        })
+
+    # if inventory exists matching inventory's position type bools with position_type in positions of sec_positions of eligible_brokers
+    if dash_filters.inventory:
+        if dash_filters.inventory.any:
+            agg_pipeline.append({
+                "$match": {
+                    "rt_dash.eligible_brokers.sec_positions.positions": {
+                        "$elemMatch": {
+                            "type": {
+                                "$in": [
+                                    PositionType.PTH,
+                                    PositionType.LOCATE,
+                                    PositionType.SOD,
+                                    PositionType.INDICATIVE
+                                ]
+                            }
+                        }
+                    }
+                }
+            })
+        else:
+            position_type_list: List[PositionType] = []
+            if dash_filters.inventory.pth:
+                position_type_list.append(PositionType.PTH)
+            elif dash_filters.inventory.locate:
+                position_type_list.append(PositionType.LOCATE)
+            elif dash_filters.inventory.sod:
+                position_type_list.append(PositionType.SOD)
+            elif dash_filters.inventory.indicative:
+                position_type_list.append(PositionType.INDICATIVE)
+
+            if position_type_list:
+                agg_pipeline.append({
+                    "$match": {
+                        "eligible_brokers.sec_positions.positions": {
+                            "$elemMatch": {
+                                "type": {
+                                    "$in": position_type_list
+                                }
+                            }
+                        }
+                    }
+                })
+
+    # if has_ashare_locate_request exists matching rt_dash.ashare_locate_requests
+    if dash_filters.has_ashare_locate_request:
+        agg_pipeline.append({
+            "$match": {
+                "$and": [
+                  { "rt_dash.ashare_locate_requests": { "$exists": True } },
+                  { "rt_dash.ashare_locate_requests": { "$ne": [] } }
+                ]
+            }
+        })
+
+    # if optimizer_criteria exists matching rt_dash.ashare_locate_requests
+    if dash_filters.optimizer_criteria:
+        if dash_filters.optimizer_criteria.pos_type == PositionType.INDICATIVE:
+            agg_pipeline.append({
+                "$match": {
+                    "$and": [
+                        {"rt_dash.indicative_summary": {"$exists": True}},
+                        {"rt_dash.indicative_summary": {"$gte": dash_filters.optimizer_criteria.min_notional}}
+                    ]
+                }
+            })
+        elif dash_filters.optimizer_criteria.pos_type == PositionType.LOCATE:
+            agg_pipeline.append({
+                "$match": {
+                    "$and": [
+                        {"rt_dash.locate_summary": {"$exists": True}},
+                        {"rt_dash.locate_summary": {"$gte": dash_filters.optimizer_criteria.min_notional}}
+                    ]
+                }
+            })
+        elif dash_filters.optimizer_criteria.pos_type == PositionType.PTH:
+            agg_pipeline.append({
+                "$match": {
+                    "$and": [
+                        {"rt_dash.pth_summary": {"$exists": True}},
+                        {"rt_dash.pth_summary": {"$gte": dash_filters.optimizer_criteria.min_notional}}
+                    ]
+                }
+            })
+        elif dash_filters.optimizer_criteria.pos_type == PositionType.SOD:
+            agg_pipeline.append({
+                "$match": {
+                    "$and": [
+                        {"rt_dash.sod_summary": {"$exists": True}},
+                        {"rt_dash.sod_summary": {"$gte": dash_filters.optimizer_criteria.min_notional}}
+                    ]
+                }
+            })
+
+    # if sort_criteria exists adding sorts
+    if dash_filters.sort_criteria:
+        for lvl, lvl_chore in [(dash_filters.sort_criteria.level1, dash_filters.sort_criteria.level1_chore),
+                               (dash_filters.sort_criteria.level2, dash_filters.sort_criteria.level2_chore),
+                               (dash_filters.sort_criteria.level3, dash_filters.sort_criteria.level3_chore)]:
+            if lvl:
+                if lvl_chore == SortType.ASCENDING:
+                    sort_type = 1
+                else:
+                    sort_type = -1
+                agg_pipeline.append({
+                    "$sort": {lvl: sort_type},
+                })
+
+    return agg_pipeline

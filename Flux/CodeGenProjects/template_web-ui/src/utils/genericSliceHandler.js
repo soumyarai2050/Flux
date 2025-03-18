@@ -14,6 +14,7 @@ import {
   clearxpath,
   applyGetAllWebsocketUpdate,
   getObjectWithLeastId,
+  sortAlertArray
 } from '../utils';
 
 /**
@@ -143,8 +144,38 @@ function optimizedWsUpdateHandler(payload, storedArray, uiLimit = null, isAlertM
  *   - isAlertModel: {boolean} Flag for alert models.
  */
 export function setStoredArrayHandler(state, action, config) {
-  const { modelKeys } = config;
-  state[modelKeys.storedArrayKey] = action.payload;
+  const { modelKeys, modelType, initialState, isAbbreviationSource } = config;
+  const { storedArrayKey, storedObjKey, updatedObjKey, objIdKey } = modelKeys;
+  state[storedArrayKey] = action.payload;
+  if (state[objIdKey]) {
+    const storedObj = action.payload.find((o) => o[DB_ID] === state[objIdKey]);
+    if (!storedObj) {
+      // Active entity was deleted; reset to initial state.
+      state[objIdKey] = initialState[objIdKey];
+      state[storedObjKey] = initialState[storedObjKey];
+      state[updatedObjKey] = initialState[updatedObjKey];
+    } else {
+      state[storedObjKey] = storedObj;
+      if (state.mode === MODES.READ) {
+        state[updatedObjKey] = addxpath(cloneDeep(storedObj));
+      } else {  // mode is MODES.EDIT
+        if (modelType === MODEL_TYPES.ABBREVIATION_MERGE) {
+          state[updatedObjKey] = addxpath(cloneDeep(storedObj));
+        }
+        // TODO: handle ws update conflict
+      }
+    }
+  } else {
+    if ([MODEL_TYPES.ABBREVIATION_MERGE, MODEL_TYPES.ROOT, MODEL_TYPES.NON_ROOT].includes(modelType) && !isAbbreviationSource) {
+      if (action.payload.length > 0) {
+        const obj = getObjectWithLeastId(action.payload);
+        console.log(obj);
+        state[objIdKey] = obj[DB_ID];
+        state[storedObjKey] = obj;
+        state[updatedObjKey] = addxpath(cloneDeep(obj));
+      }
+    }
+  }
 }
 
 /**

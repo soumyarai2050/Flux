@@ -33,7 +33,7 @@ import CommonKeyWidget from '../../components/CommonKeyWidget';
 import { DataTable, PivotTable } from '../../components/tables';
 import { ConfirmSavePopup } from '../../components/Popup';
 import { ChartView } from '../../components/charts';
-
+import { useWebSocketWorker } from '../../hooks';
 
 function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
     const { schema: projectSchema } = useSelector((state) => state.schema);
@@ -250,68 +250,27 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
         showMore, moreAll, showHidden, showAll
     ])
 
-    useEffect(() => {
-        if (!url || isWsDisabled) return;
+    const handleModelDataSourceUpdate = (updatedArray) => {
+        dispatch(actions.setStoredArray(updatedArray));
+    }
 
-        const wsUrl = url.replace('http', 'ws');
-        let apiUrl = `${wsUrl}/get-all-${modelName}-ws`;
-        if (crudOverrideDict.GET_ALL) {
-            const { endpoint, paramDict } = crudOverrideDict.GET_ALL;
-            if (!params && Object.keys(paramDict).length > 0) {
-                return;
-            }
-            apiUrl = `${wsUrl}/ws-${endpoint}`;
-            if (params) {
-                const paramsStr = '?' + Object.keys(params).map((k) => `${k}=${params[k]}`).join('&');
-                apiUrl += paramsStr;
-            }
-        }
+    const handleReconnect = () => {
+        setReconnectCounter((prev) => prev + 1);
+    }
 
-        const socket = new WebSocket(apiUrl);
-        socketRef.current = socket;
-        socket.onmessage = (event) => {
-            const updatedArrayOrObj = JSON.parse(event.data);
-            if (Array.isArray(updatedArrayOrObj)) {
-                updatedArrayOrObj.forEach((o) => {
-                    modelObjDictRef.current[o[DB_ID]] = o;
-                })
-            } else if (isObject(updatedArrayOrObj)) {
-                modelObjDictRef.current[updatedArrayOrObj[DB_ID]] = updatedArrayOrObj;
-            } else {
-                console.error(`excepected either array or object, received: ${updatedArrayOrObj}`)
-            }
-        }
-        socket.onerror = (e) => {
-            socketRef.current = null;
-            console.error(`ws closed on error for ${modelName}. ${e}`)
-        }
-        socket.onclose = (e) => {
-            const { code, reason, wasClean } = e;
-            if (wasClean) {
-                console.log(`ws closed for ${modelName}, code: ${code}, reason: ${reason}, wasClean: ${wasClean}`);
-            } else {
-                console.error(`ws closed for ${modelName}, code: ${code}, reason: ${reason}, wasClean: ${wasClean}`);
-            }
-        }
-
-        return () => {
-            if (socketRef.current) {
-                socketRef.current.close();
-                socketRef.current = null;
-            }
-        }
-    }, [url, isWsDisabled, reconnectCounter, params])
-
-    useEffect(() => {
-        const intervalId = setInterval(() => {
-            if (Object.keys(modelObjDictRef.current).length > 0) {
-                const pendingUpdateDict = modelObjDictRef.current;
-                modelObjDictRef.current = {};
-                dispatch(actions.setStoredArrayWs(pendingUpdateDict));
-            }
-        }, 500);
-        return () => clearInterval(intervalId);
-    }, [])
+    socketRef.current = useWebSocketWorker({
+        url,
+        modelName,
+        isDisabled: isWsDisabled,
+        reconnectCounter,
+        selector,
+        onWorkerUpdate: handleModelDataSourceUpdate,
+        onReconnect: handleReconnect,
+        params,
+        crudOverrideDict,
+        uiLimit,
+        isAlertModel: modelLayoutOption.is_model_alert_type
+    })
 
     useEffect(() => {
         const { disable_ws_on_edit } = modelLayoutOption;
@@ -540,10 +499,6 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
         dispatch(actions.setError(null));
     }
 
-    const handleReconnect = () => {
-        setReconnectCounter((prev) => prev + 1);
-    }
-
     const handleRowSelect = (id) => {
         dispatch(actions.setObjId(id));
     }
@@ -601,7 +556,7 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                         fieldsMetadata={fieldsMetadata}
                         chartData={modelLayoutOption.chart_data || []}
                         modelType={MODEL_TYPES.REPEATED_ROOT}
-                        onRowSelect={handleRowSelect}
+                        onRowSelect={() => {}}
                         mode={mode}
                         onModeToggle={handleModeToggle}
                     />

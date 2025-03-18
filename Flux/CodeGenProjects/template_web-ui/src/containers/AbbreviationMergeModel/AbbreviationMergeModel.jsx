@@ -6,7 +6,7 @@ import * as Selectors from '../../selectors';
 import {
     clearxpath, getWidgetOptionById, sortColumns, generateObjectFromSchema,
     addxpath, compareJSONObjects, getWidgetTitle,
-    isWebSocketAlive, removeRedundantFieldsFromRows, getAbbreviatedCollections, getNewItem
+    isWebSocketAlive, removeRedundantFieldsFromRows, getAbbreviatedCollections, getNewItem, getDataSourceObj
 } from '../../utils';
 import { FullScreenModalOptional } from '../../components/Modal';
 import { ModelCard, ModelCardHeader, ModelCardContent } from '../../components/cards';
@@ -35,16 +35,7 @@ import { ConfirmSavePopup } from '../../components/Popup';
 import { ChartView } from '../../components/charts';
 import AbbreviationMergeView from '../../components/AbbreviationMergeView';
 import { getIdFromAbbreviatedKey } from '../../workerUtils';
-import styles from './AbbreviationMergeModel.module.css';
-
-const getDataSourceObj = (dataSources, sourceName) => {
-    const dataSource = dataSources.find(o => o.name === sourceName);
-    if (!dataSource) {
-        alert('error');
-    }
-    return dataSource;
-}
-
+import { useWebSocketWorker, useDataSourcesWebsocketWorker } from '../../hooks';
 
 function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     const { schema: projectSchema } = useSelector((state) => state.schema);
@@ -129,6 +120,14 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     const modelItemIdField = useMemo(() => modelItemFieldsMetadata.find(meta => meta.tableTitle === DB_ID)?.key);
     const modelAbbreviatedItems = useMemo(() => get(storedObj, loadedFieldMetadata.key) || [], [storedObj]);
     const modelAbbreviatedBufferItems = useMemo(() => get(storedObj, bufferedFieldMetadata.key) || [], [storedObj]);
+    const modelAbbreviatedItemIdMap = useMemo(() => {
+        const itemIdMap = new Map();
+        modelAbbreviatedItems.forEach((item) => {
+            const id = getIdFromAbbreviatedKey(abbreviationKey, item);
+            itemIdMap.set(id, item);
+        })
+        return itemIdMap;
+    }, [modelAbbreviatedItems])
     const modelLayoutData = useMemo(() => getWidgetOptionById(modelLayoutOption.widget_ui_data, objId, modelLayoutOption.bind_id_fld), [modelLayoutOption, objId]);
     const [layoutType, setLayoutType] = useState(modelLayoutData.view_layout);
     const sortedCells = useMemo(() => {
@@ -266,101 +265,31 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         loadedFieldMetadata, modelLayoutData, modelLayoutOption, page, mode, showMore, moreAll, showHidden, showAll, objId
     ])
 
-    useEffect(() => {
-        if (!url || isWsDisabled) return;
+    const handleModelDataSourceUpdate = (updatedArray) => {
+        dispatch(modelActions.setStoredArray(updatedArray));
+    }
 
-        const socket = new WebSocket(`${modelDataSource.url.replace('http', 'ws')}/get-all-${modelName}-ws`);
-        socketRef.current = socket;
-        socket.onmessage = (event) => {
-            const updatedArrayOrObj = JSON.parse(event.data);
-            if (Array.isArray(updatedArrayOrObj)) {
-                updatedArrayOrObj.forEach((o) => {
-                    modelObjDictRef.current[o[DB_ID]] = o;
-                })
-            } else if (isObject(updatedArrayOrObj)) {
-                modelObjDictRef.current[updatedArrayOrObj[DB_ID]] = updatedArrayOrObj;
-            } else {
-                console.error(`excepected either array or object, received: ${updatedArrayOrObj}`)
-            }
-        }
-        socket.onerror = (e) => {
-            socketRef.current = null;
-            console.error(`ws closed on error for ${modelName}. ${e}`)
-        }
-        socket.onclose = (e) => {
-            const { code, reason, wasClean } = e;
-            if (wasClean) {
-                console.log(`ws closed for ${modelName}, code: ${code}, reason: ${reason}, wasClean: ${wasClean}`);
-            } else {
-                console.error(`ws closed for ${modelName}, code: ${code}, reason: ${reason}, wasClean: ${wasClean}`);
-            }
-        }
+    const handleReconnect = () => {
+        setReconnectCounter((prev) => prev + 1);
+    }
 
-        return () => {
-            if (socketRef.current) {
-                socketRef.current.close();
-                socketRef.current = null;
-            }
-        }
-    }, [url, isWsDisabled, reconnectCounter])
+    socketRef.current = useWebSocketWorker({
+        url,
+        modelName,
+        isDisabled: isWsDisabled,
+        reconnectCounter,
+        selector: modelSelector,
+        onWorkerUpdate: handleModelDataSourceUpdate,
+        onReconnect: handleReconnect
+    })
 
-    useEffect(() => {
-        const intervalId = setInterval(() => {
-            if (Object.keys(modelObjDictRef.current).length > 0) {
-                const pendingUpdateDict = modelObjDictRef.current;
-                modelObjDictRef.current = {};
-                dispatch(modelActions.setStoredArrayWs(pendingUpdateDict));
-            }
-        }, 500);
-        return () => clearInterval(intervalId);
-    }, [])
-
-    useEffect(() => {
-        if (!modelLayoutOption.ws_connection_by_get_all) return;
-
-        if (isWsDisabled) {
-            Object.keys(wsRefs.current).forEach((name) => {
-                wsRefs.current[name].close();
-                delete wsRefs.current[name];
-            });
-            return;
-        }
-
-        dataSources.forEach(({ name, url }) => {
-            if (!dataSourcesObjDictRef.current[name]) {
-                dataSourcesObjDictRef.current[name] = {};
-            }
-
-            if (!wsRefs.current[name]) {
-                const ws = new WebSocket(`${url.replace('http', 'ws')}/get-all-${name}-ws`);
-                wsRefs.current[name] = ws;
-                ws.onmessage = (event) => {
-                    const updatedArrayOrObj = JSON.parse(event.data);
-                    if (Array.isArray(updatedArrayOrObj)) {
-                        updatedArrayOrObj.forEach((o) => {
-                            dataSourcesObjDictRef.current[name][o[DB_ID]] = o;
-                        })
-                    } else if (isObject(updatedArrayOrObj)) {
-                        dataSourcesObjDictRef.current[name][updatedArrayOrObj[DB_ID]] = updatedArrayOrObj;
-                    } else {
-                        console.error(`excepected either array or object, received: ${updatedArrayOrObj}`)
-                    }
-                };
-                ws.onerror = (e) => {
-                    wsRefs.current[name] = null;
-                    console.error(`ws closed on error for ${name}. ${e}`)
-                }
-                ws.onclose = (e) => {
-                    const { code, reason, wasClean } = e;
-                    if (wasClean) {
-                        console.log(`ws closed for ${name}, code: ${code}, reason: ${reason}, wasClean: ${wasClean}`);
-                    } else {
-                        console.error(`ws closed for ${name}, code: ${code}, reason: ${reason}, wasClean: ${wasClean}`);
-                    }
-                }
-            }
-        });
-    }, [isWsDisabled])
+    useDataSourcesWebsocketWorker({
+        dataSources,
+        isWsDisabled,
+        reconnectCounter,
+        onReconnect: handleReconnect,
+        activeItemIdMap: modelAbbreviatedItemIdMap
+    });
 
     useEffect(() => {
         if (modelLayoutOption.ws_connection_by_get_all) return;
@@ -760,10 +689,6 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         dispatch(modelActions.setError(null));
     }
 
-    const handleReconnect = () => {
-        setReconnectCounter((prev) => prev + 1);
-    }
-
     const handleRowSelect = (id) => {
         dataSources.forEach(({ actions }) => {
             dispatch(actions.setObjId(id));
@@ -826,7 +751,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                         fieldsMetadata={modelItemFieldsMetadata}
                         chartData={modelLayoutOption.chart_data || []}
                         modelType={MODEL_TYPES.ABBREVIATION_MERGE}
-                        onRowSelect={handleRowSelect}
+                        onRowSelect={() => { }}
                         mode={mode}
                         onModeToggle={handleModeToggle}
                     />
