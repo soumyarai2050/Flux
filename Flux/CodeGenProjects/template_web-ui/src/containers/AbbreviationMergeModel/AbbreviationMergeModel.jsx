@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { cloneDeep, get, isEqual, isObject, set } from 'lodash';
+import { cloneDeep, get, isEqual, set } from 'lodash';
 import { DB_ID, LAYOUT_TYPES, MODEL_TYPES, MODES, NEW_ITEM_ID } from '../../constants';
 import * as Selectors from '../../selectors';
 import {
     clearxpath, getWidgetOptionById, sortColumns, generateObjectFromSchema,
     addxpath, compareJSONObjects, getWidgetTitle,
-    isWebSocketAlive, removeRedundantFieldsFromRows, getAbbreviatedCollections, getNewItem, getDataSourceObj
+    isWebSocketAlive, getDataSourcesCrudOverrideDict, removeRedundantFieldsFromRows,
+    getAbbreviatedCollections, getNewItem, getDataSourceObj
 } from '../../utils';
 import { FullScreenModalOptional } from '../../components/Modal';
 import { ModelCard, ModelCardHeader, ModelCardContent } from '../../components/cards';
@@ -17,45 +18,40 @@ import {
     sortOrdersChangeHandler,
     rowsPerPageChangeHandler,
     layoutTypeChangeHandler,
-    dataSourceColorsChangeHandler,
     columnOrdersChangeHandler,
     showLessChangeHandler,
     overrideChangeHandler,
+    pinnedChangeHandler,
+    filtersChangeHandler,
+    dataSourceColorsChangeHandler,
     joinByChangeHandler,
     centerJoinToggleHandler,
     flipToggleHandler,
-    pinnedChangeHandler,
-    filtersChangeHandler,
     chartDataChangeHandler
 } from '../../utils/genericModelHandler';
 import { utils, writeFileXLSX } from 'xlsx';
 import CommonKeyWidget from '../../components/CommonKeyWidget';
-import { PivotTable } from '../../components/tables';
 import { ConfirmSavePopup } from '../../components/Popup';
+import { PivotTable } from '../../components/tables';
 import { ChartView } from '../../components/charts';
 import AbbreviationMergeView from '../../components/AbbreviationMergeView';
 import { getIdFromAbbreviatedKey } from '../../workerUtils';
 import { useWebSocketWorker, useDataSourcesWebsocketWorker } from '../../hooks';
+import { dataSourcesSelectorEquality } from '../../utils/reselectHelper';
 
 function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     const { schema: projectSchema } = useSelector((state) => state.schema);
-    const modelLayoutOption = useSelector((state) => Selectors.selectLayout(state, modelName), (prev, curr) => {
+    const modelLayoutOption = useSelector((state) => Selectors.selectModelLayout(state, modelName), (prev, curr) => {
         return JSON.stringify(prev) === JSON.stringify(curr);
     });
     const { schema: modelSchema, fieldsMetadata: modelFieldsMetadata, actions: modelActions, selector: modelSelector } = modelDataSource;
-    const { storedArray, storedObj, updatedObj, objId, mode, error, isLoading, isConfirmSavePopupOpen } = useSelector(modelSelector);
-    const dataSourcesStoredArrayDict = useSelector((state) => Selectors.selectDataSourcesStoredArray(state, dataSources), (prev, curr) => {
-        return JSON.stringify(prev) === JSON.stringify(curr);
-    });
-    const dataSourcesStoredObjDict = useSelector((state) => Selectors.selectDataSourcesStoredObj(state, dataSources), (prev, curr) => {
-        return JSON.stringify(prev) === JSON.stringify(curr);
-    });
-    const dataSourcesUpdatedObjDict = useSelector((state) => Selectors.selectDataSourcesUpdatedObj(state, dataSources), (prev, curr) => {
-        return JSON.stringify(prev) === JSON.stringify(curr);
-    });
-    const dataSourcesObjIdDict = useSelector((state) => Selectors.selectDataSourcesObjId(state, dataSources), (prev, curr) => {
-        return JSON.stringify(prev) === JSON.stringify(curr);
-    });
+    const { storedObj, updatedObj, objId, mode, isCreating, error, isLoading, isConfirmSavePopupOpen } = useSelector(modelSelector);
+    const {
+        storedArrayDict: dataSourcesStoredArrayDict,
+        storedObjDict: dataSourcesStoredObjDict,
+        updatedObjDict: dataSourcesUpdatedObjDict,
+        objIdDict: dataSourcesObjIdDict
+    } = useSelector((state) => Selectors.selectDataSourcesDictionaries(state, dataSources), dataSourcesSelectorEquality);
     const dataSourcesUpdatedArrayDict = useMemo(() => {
         return dataSources.reduce((acc, { name }) => {
             acc[name] = dataSourcesStoredArrayDict[name];
@@ -74,11 +70,11 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     const [rows, setRows] = useState([]);
     const [groupedRows, setGroupedRows] = useState([]);
     const [activeRows, setActiveRows] = useState([]);
+    const [activeIds, setActiveIds] = useState([]);
     const [maxRowSize, setMaxRowSize] = useState(null);
     const [headCells, setHeadCells] = useState([]);
     const [commonKeys, setCommonKeys] = useState([]);
-    const [filteredCells, setFilteredCells] = useState([]);
-    const [isCreate, setIsCreate] = useState(false);
+    const [sortedCells, setSortedCells] = useState([]);
     const [showHidden, setShowHidden] = useState(false);
     const [showMore, setShowMore] = useState(false);
     const [showAll, setShowAll] = useState(false);
@@ -86,14 +82,17 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     const [url, setUrl] = useState(modelDataSource.url);
     const [isProcessingUserActions, setIsProcessingUserActions] = useState(false);
     const [reconnectCounter, setReconnectCounter] = useState(0);
+    const [dataSourcesParams, setDataSourcesParams] = useState(null);
+    const modelLayoutData = useMemo(() => getWidgetOptionById(modelLayoutOption.widget_ui_data, objId, modelLayoutOption.bind_id_fld), [modelLayoutOption, objId]);
+    // layout type initial only available after getting modelLayoutOption
+    const [layoutType, setLayoutType] = useState(modelLayoutData.view_layout);
 
+    const dispatch = useDispatch();
+    const [, startTransition] = useTransition();
+
+    // refs
     const socketRef = useRef(null);
     const workerRef = useRef(null);
-    const modelObjDictRef = useRef({});
-    const dataSourcesObjDictRef = useRef(dataSources.reduce((acc, { name }) => {
-        acc[name] = {};
-        return acc;
-    }, {}));
     const isWorkerBusyRef = useRef({
         isBusy: false,
         hasPendingUserActions: false,
@@ -101,12 +100,12 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     const pendingUpdateRef = useRef(null);
     const changesRef = useRef({});
     const sourceRef = useRef(null);
-    const wsRefs = useRef({});
+    const dataSourcesCrudOverrideDictRef = useRef(getDataSourcesCrudOverrideDict(dataSources));
+    const allowedLayoutTypesRef = useRef([LAYOUT_TYPES.ABBREVIATION_MERGE, LAYOUT_TYPES.PIVOT_TABLE, LAYOUT_TYPES.CHART]);
+    // refs to identify change
+    const optionsRef = useRef(null);
 
-    const dispatch = useDispatch();
-    const [_, startTransition] = useTransition();
-
-    const allowedLayoutTypes = useMemo(() => [LAYOUT_TYPES.ABBREVIATION_MERGE, LAYOUT_TYPES.CHART, LAYOUT_TYPES.PIVOT_TABLE], [])
+    // calculated fields
     const dataSourcesMetadataDict = useMemo(() => {
         return dataSources.reduce((acc, { name, fieldsMetadata }) => {
             acc[name] = fieldsMetadata;
@@ -117,27 +116,9 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     const loadedFieldMetadata = useMemo(() => modelFieldsMetadata.find(meta => meta.key.includes('load')), []);
     const abbreviationKey = loadedFieldMetadata.abbreviated;
     const modelItemFieldsMetadata = useMemo(() => getAbbreviatedCollections(dataSourcesMetadataDict, loadedFieldMetadata), []);
-    const modelItemIdField = useMemo(() => modelItemFieldsMetadata.find(meta => meta.tableTitle === DB_ID)?.key);
     const modelAbbreviatedItems = useMemo(() => get(storedObj, loadedFieldMetadata.key) || [], [storedObj]);
     const modelAbbreviatedBufferItems = useMemo(() => get(storedObj, bufferedFieldMetadata.key) || [], [storedObj]);
-    const modelAbbreviatedItemIdMap = useMemo(() => {
-        const itemIdMap = new Map();
-        modelAbbreviatedItems.forEach((item) => {
-            const id = getIdFromAbbreviatedKey(abbreviationKey, item);
-            itemIdMap.set(id, item);
-        })
-        return itemIdMap;
-    }, [modelAbbreviatedItems])
-    const modelLayoutData = useMemo(() => getWidgetOptionById(modelLayoutOption.widget_ui_data, objId, modelLayoutOption.bind_id_fld), [modelLayoutOption, objId]);
-    const [layoutType, setLayoutType] = useState(modelLayoutData.view_layout);
-    const sortedCells = useMemo(() => {
-        return sortColumns(filteredCells, modelLayoutData.column_orders || [], modelLayoutData.join_by && modelLayoutData.join_by.length > 0, modelLayoutData.joined_at_center, modelLayoutData.flip, true);
-    }, [filteredCells, modelLayoutData.column_orders, modelLayoutData.join_by, modelLayoutData.joined_at_center, modelLayoutData.flip])
     const modelTitle = useMemo(() => getWidgetTitle(modelLayoutOption, modelSchema, modelName, storedObj), [storedObj]);
-
-    // refs to identify change
-    const optionsRef = useRef(null);
-
     const modelHandlerConfig = useMemo(() => (
         {
             modelName,
@@ -150,26 +131,74 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     ), [objId, modelLayoutOption])
 
     useEffect(() => {
+        let updatedParams = null;
+        if (storedObj && Object.keys(storedObj).length > 0) {
+            dataSources.forEach(({ name }) => {
+                const crudOverrideDict = dataSourcesCrudOverrideDictRef.current?.[name];
+                if (crudOverrideDict?.GET_ALL) {
+                    const { paramDict } = crudOverrideDict.GET_ALL;
+                    if (Object.keys(paramDict).length > 0) {
+                        Object.keys(paramDict).forEach((k) => {
+                            const paramSrc = paramDict[k];
+                            const paramValue = get(storedObj, paramSrc);
+                            if (paramValue !== null || paramValue !== undefined) {
+                                if (!updatedParams) {
+                                    updatedParams = {
+                                        [name]: {}
+                                    }
+                                } else if (!updatedParams[name]) {
+                                    updatedParams[name] = {};
+                                }
+                            }
+                            updatedParams[name][k] = paramValue;
+                        })
+                    }
+                }
+            })
+        }
+        setDataSourcesParams((prev) => {
+            if (JSON.stringify(prev) === JSON.stringify(updatedParams)) {
+                return prev;
+            }
+            return updatedParams;
+        });
+    }, [storedObj])
+
+    useEffect(() => {
         dispatch(modelActions.getAll());
-        dataSources.forEach(({ actions, url }) => {
-            dispatch(actions.getAll({ url }));
-        })
     }, [])
+
+    useEffect(() => {
+        dataSources.forEach(({ actions, name, url }) => {
+            let args = { url };
+            const crudOverrideDict = dataSourcesCrudOverrideDictRef.current?.[name];
+            const params = dataSourcesParams?.[name];
+            if (crudOverrideDict?.GET_ALL) {
+                const { endpoint, paramDict } = crudOverrideDict.GET_ALL;
+                if (!params && Object.keys(paramDict).length > 0) {
+                    return;
+                }
+                args = { ...args, endpoint, params };
+            }
+            dispatch(actions.getAll({ ...args }));
+        })
+    }, [dataSourcesParams])
 
     useEffect(() => {
         workerRef.current = new Worker(new URL('../../workers/abbreviation-merge-model.worker.js', import.meta.url));
 
         workerRef.current.onmessage = (event) => {
-            const { rows, groupedRows, activeRows, maxRowSize, headCells, commonKeys, filteredCells } = event.data;
+            const { rows, groupedRows, activeRows, maxRowSize, headCells, commonKeys, sortedCells, activeIds } = event.data;
 
             startTransition(() => {
                 setRows(rows);
                 setGroupedRows(groupedRows);
                 setActiveRows(activeRows);
+                setActiveIds(activeIds);
                 setMaxRowSize(maxRowSize);
                 setHeadCells(headCells);
                 setCommonKeys(commonKeys);
-                setFilteredCells(filteredCells);
+                setSortedCells(sortedCells);
 
                 // If a new update came in while the worker was busy, send it now.
                 if (pendingUpdateRef.current) {
@@ -227,7 +256,10 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                 moreAll,
                 showLess: modelLayoutData.show_less || [],
                 showHidden,
-                showAll
+                showAll,
+                columnOrders: modelLayoutData.column_orders || [],
+                centerJoin: modelLayoutData.joined_at_center,
+                flip: modelLayoutData.flip
             }
 
             const updatedOptionsRef = {
@@ -288,80 +320,12 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         isWsDisabled,
         reconnectCounter,
         onReconnect: handleReconnect,
-        activeItemIdMap: modelAbbreviatedItemIdMap
+        storedArrayDict: dataSourcesStoredArrayDict,
+        dataSourcesCrudOverrideDict: dataSourcesCrudOverrideDictRef.current,
+        dataSourcesParams,
+        connectionByGetAll: modelLayoutOption.ws_connection_by_get_all,
+        activeIds
     });
-
-    useEffect(() => {
-        if (modelLayoutOption.ws_connection_by_get_all) return;
-
-        if (isWsDisabled) {
-            Object.keys(wsRefs.current).forEach((name) => {
-                Object.keys(wsRefs.current[name]).forEach((id) => {
-                    id = id * 1;
-                    wsRefs.current[name][id].close();
-                    delete wsRefs.current[name][id];
-                })
-            });
-            return;
-        }
-
-        const activeObjIds = new Set();
-        if (activeRows.length > 0) {
-            activeRows.forEach((groupedRow) => {
-                groupedRow.forEach((row) => {
-                    const id = row[modelItemIdField];
-                    if (id) {
-                        activeObjIds.add(id);
-                    }
-                });
-            });
-        }
-
-        dataSources.forEach(({ name, url }) => {
-            if (!dataSourcesObjDictRef.current[name]) {
-                dataSourcesObjDictRef.current[name] = {};
-            }
-            if (!wsRefs.current[name]) {
-                wsRefs.current[name] = {};
-            }
-
-            activeObjIds.forEach((id) => {
-                id = id * 1;
-                if (!wsRefs.current[name][id]) {
-                    const ws = new WebSocket(`${url.replace('http', 'ws')}/get-${name}-ws/${id}`);
-                    ws.onmessage = (event) => {
-                        const obj = JSON.parse(event.data);
-                        dataSourcesObjDictRef.current[name][obj[DB_ID]] = obj;
-                    };
-                    wsRefs.current[name][id] = ws;
-                }
-            })
-        });
-
-        // Close and remove WebSockets that are no longer needed
-        Object.keys(wsRefs.current).forEach((name) => {
-            Object.keys(wsRefs.current[name]).forEach((id) => {
-                id = id * 1;
-                if (!activeObjIds.has(id)) {
-                    wsRefs.current[name][id].close();
-                    delete wsRefs.current[name][id];
-                }
-            })
-        });
-    }, [activeRows, isWsDisabled]);
-
-    useEffect(() => {
-        const intervalId = setInterval(() => {
-            dataSources.forEach(({ name, actions }) => {
-                if (dataSourcesObjDictRef.current[name] && Object.keys(dataSourcesObjDictRef.current[name]).length > 0) {
-                    const pendingUpdateDict = dataSourcesObjDictRef.current[name];
-                    dataSourcesObjDictRef.current[name] = {};
-                    dispatch(actions.setStoredArrayWs(pendingUpdateDict));
-                }
-            })
-        }, 500);
-        return () => clearInterval(intervalId);
-    }, [])
 
     useEffect(() => {
         if (modelAbbreviatedItems) {
@@ -409,19 +373,30 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
 
     const handleReload = () => {
         dispatch(modelActions.getAll());
-        dataSources.forEach(({ url, actions }) => {
-            dispatch(actions.getAll({ url }));
+        dataSources.forEach(({ name, url, actions }) => {
+            let args = { url };
+            const crudOverrideDict = dataSourcesCrudOverrideDictRef.current?.[name];
+            const params = dataSourcesParams?.[name];
+            if (crudOverrideDict?.GET_ALL) {
+                const { endpoint, paramDict } = crudOverrideDict.GET_ALL;
+                if (!params && Object.keys(paramDict).length > 0) {
+                    return;
+                }
+                args = { ...args, endpoint, params };
+            }
+            dispatch(actions.getAll({ ...args }));
         })
         changesRef.current = {};
         sourceRef.current = null;
         if (mode !== MODES.READ) {
             handleModeToggle();
         }
-        setIsCreate(false);
         setSearchQuery('');
         cleanAllCache(modelName);
-        dataSources.forEach(({ name }) => {
+        dispatch(modelActions.setIsCreating(false));
+        dataSources.forEach(({ name, actions }) => {
             cleanAllCache(name);
+            dispatch(actions.setIsCreating(false));
         })
     }
 
@@ -488,6 +463,14 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         setLayoutType(updatedLayoutType);
     }
 
+    const handleModeToggle = () => {
+        dispatch(modelActions.setMode(mode === MODES.READ ? MODES.EDIT : MODES.READ));
+    }
+
+    const handleFiltersChange = (updatedFilters) => {
+        filtersChangeHandler(modelHandlerConfig, updatedFilters);
+    }
+
     const handleDataSourceColorsChange = (updatedDataSourceColors) => {
         dataSourceColorsChangeHandler(modelHandlerConfig, updatedDataSourceColors);
     }
@@ -502,14 +485,6 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
 
     const handleFlipToggle = () => {
         flipToggleHandler(modelHandlerConfig, !modelLayoutData.flip);
-    }
-
-    const handleModeToggle = () => {
-        dispatch(modelActions.setMode(mode === MODES.READ ? MODES.EDIT : MODES.READ));
-    }
-
-    const handleFiltersChange = (updatedFilters) => {
-        filtersChangeHandler(modelHandlerConfig, updatedFilters);
     }
 
     const handleChartDataChange = (updatedChartData) => {
@@ -578,12 +553,13 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         dispatch(actions.setUpdatedObj(dataSourceUpdateObj));
         dispatch(actions.setObjId(NEW_ITEM_ID));
         dispatch(actions.setMode(MODES.EDIT));
+        dispatch(actions.setIsCreating(true));
         const newModelAbbreviatedItem = getNewItem(fieldsMetadata, abbreviationKey);
         const clonedUpdatedObj = cloneDeep(updatedObj);
         get(clonedUpdatedObj, loadedFieldMetadata.key).push(newModelAbbreviatedItem);
         dispatch(modelActions.setUpdatedObj(clonedUpdatedObj));
         handleModeToggle();
-        setIsCreate(true);
+        dispatch(modelActions.setIsCreating(true));
     }
 
     const handleSave = (modifiedObj, force = false) => {
@@ -594,10 +570,10 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         const dataSourceStoredObj = dataSourcesStoredObjDict[sourceRef.current];
         const dataSourceUpdatedObj = modifiedObj || clearxpath(cloneDeep(dataSourcesUpdatedObjDict[sourceRef.current]));
         const fieldsMetadata = dataSourcesMetadataDict[sourceRef.current];
-        if (isCreate) {
+        if (isCreating) {
             delete dataSourceUpdatedObj[DB_ID];
         }
-        const activeChanges = compareJSONObjects(dataSourceStoredObj, dataSourceUpdatedObj, fieldsMetadata, isCreate);
+        const activeChanges = compareJSONObjects(dataSourceStoredObj, dataSourceUpdatedObj, fieldsMetadata, isCreating);
         if (!activeChanges || Object.keys(activeChanges).length === 0) {
             changesRef.current = {};
             dispatch(modelActions.setMode(MODES.READ));
@@ -630,7 +606,8 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         } else {
             dispatch(actions.create({ url, data: changeDict }));
             dispatch(actions.setMode(MODES.READ));
-            setIsCreate(false);
+            dispatch(actions.setIsCreating(false));
+            dispatch(modelActions.setIsCreating(false));
         }
         changesRef.current = {};
         dispatch(modelActions.setMode(MODES.READ));
@@ -813,7 +790,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                         // layout switch
                         layout={layoutType}
                         onLayoutSwitch={handleLayoutTypeChange}
-                        supportedLayouts={allowedLayoutTypes}
+                        supportedLayouts={allowedLayoutTypesRef.current}
                         // maximize
                         isMaximized={isMaximized}
                         onMaximizeToggle={handleFullScreenToggle}
@@ -827,10 +804,11 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                         modelType={MODEL_TYPES.ABBREVIATION_MERGE}
                         pinned={modelLayoutData.pinned || []}
                         onPinToggle={handlePinnedChange}
+                        onReload={handleReload}
                     />
                 </ModelCardHeader>
                 <ModelCardContent
-                    isDisabled={isLoading || isProcessingUserActions}
+                    isDisabled={isLoading || isCreating || isProcessingUserActions}
                     error={error}
                     onClear={handleErrorClear}
                     isDisconnected={!isWsDisabled && !isWebSocketAlive(socketRef.current)}

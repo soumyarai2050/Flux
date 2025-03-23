@@ -19,6 +19,7 @@ import {
   setUpdatedObjHandler,
   setObjIdHandler,
   setModeHandler,
+  setIsCreatingHandler,
   setErrorHandler,
   setIsConfirmSavePopupOpenHandler,
   setIsWsPopupOpenHandler,
@@ -75,6 +76,7 @@ export function createGenericSlice({
     [updatedObjKey]: {},
     [objIdKey]: null,
     mode: MODES.READ,
+    isCreating: false,
     error: null,
     isLoading: false,
     isConfirmSavePopupOpen: false,
@@ -182,6 +184,9 @@ export function createGenericSlice({
       },
       setMode(state, action) {
         setModeHandler(state, action, sliceConfig);
+      },
+      setIsCreating(state, action) {
+        setIsCreatingHandler(state, action, sliceConfig);
       },
       setError(state, action) {
         setErrorHandler(state, action, sliceConfig);

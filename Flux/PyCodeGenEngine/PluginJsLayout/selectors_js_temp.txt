@@ -1,105 +1,39 @@
-import { createSelector, createSelectorCreator } from 'reselect';
-import { memoize, camelCase } from 'lodash';
-import { MODES } from './constants';
-import { snakeToPascal } from './utils';
-
-const customMemoize = memoize(
-    (func) => func,
-    (...args) => JSON.stringify(args) // Cache key based on shallow equality of arguments
-);
-
-const createShallowEqualSelector = createSelectorCreator(customMemoize);
-
-/**
- * Generates selectors for a given data source.
- * @param {string} snakeCaseDataSourceName - The name of the data source in snake case.
- * @param {object} selector - The Redux state slice.
- * @returns {object} - Object containing selectors.
- */
-function getDataSourceSelector(snakeCaseDataSourceName, selector) {
-    const dataSourceName = camelCase(snakeCaseDataSourceName);
-    const capDataSourceName = snakeToPascal(snakeCaseDataSourceName);
-
-    return {
-        storedArray: selector?.[`stored${capDataSourceName}Array`] ?? [],
-        storedObjDict: selector?.[`stored${capDataSourceName}ObjDict`] ?? {},
-        storedObj: selector?.[`stored${capDataSourceName}Obj`] ?? {},
-        updatedObj: selector?.[`updated${capDataSourceName}Obj`] ?? {},
-        objId: selector?.[`selected${capDataSourceName}Id`] ?? null,
-        mode: selector?.mode ?? MODES.READ,
-        isLoading: selector?.isLoading ?? false,
-        error: selector?.error ?? null,
-        isConfirmSavePopupOpen: selector?.isConfirmSavePopupOpen ?? false,
-        isWsPopupOpen: selector?.isWsPopupOpen ?? false
-    };
-}
-
-function getLayoutOption(modelName, selector) {
-    return selector.storedUILayoutObj.widget_ui_data_elements.find(o => o.i === modelName);
-}
+import { createSelector } from 'reselect';
+import { getDataSourceSelector, getModelLayoutOption } from './utils/reselectHelper';
 
 // Basic selectors
 const stateSelector = (state) => state;
 
 # @@protoc_insertion_point(const_selector_per_model)
 # @@protoc_insertion_point(memoized_selector_per_model)
-// Memoized selector for layout
-export const selectLayout = createSelector(
+
+// custom selector to read layout for a model
+export const selectModelLayout = createSelector(
     [uiLayoutSelector, (state, modelName) => modelName],
-    (state, modelName) => getLayoutOption(modelName, state)
+    (state, modelName) => getModelLayoutOption(modelName, state)
 );
 
-export const selectDataSources = createSelector(
+// custom selector to read states from multiple dataSources
+export const selectDataSourcesDictionaries = createSelector(
     [stateSelector, (state, dataSources) => dataSources],
     (state, dataSources) => {
-        return dataSources.reduce((acc, { name, selector }) => {
-            acc[name] = selector(state);
-            return acc;
-        }, {});
+        const result = {
+            storedArrayDict: {},
+            storedObjDict: {},
+            updatedObjDict: {},
+            objIdDict: {},
+            isLoadingDict: {}
+        };
+
+        dataSources.forEach(({ name, selector }) => {
+            const selectorResult = selector(state);
+            result.storedArrayDict[name] = selectorResult.storedArray;
+            result.storedObjDict[name] = selectorResult.storedObj;
+            result.updatedObjDict[name] = selectorResult.updatedObj;
+            result.objIdDict[name] = selectorResult.objId;
+            result.isLoadingDict[name] = selectorResult.isLoading;
+        })
+
+        return result;
     }
-)
-
-export const selectDataSourcesStoredArray = createSelector(
-    [stateSelector, (state, dataSources) => dataSources],
-    (state, dataSources) =>
-        dataSources.reduce((acc, { name, selector }) => {
-            acc[name] = selector(state).storedArray;
-            return acc;
-        }, {})
-)
-
-export const selectDataSourcesStoredObj = createSelector(
-    [stateSelector, (state, dataSources) => dataSources],
-    (state, dataSources) =>
-        dataSources.reduce((acc, { name, selector }) => {
-            acc[name] = selector(state).storedObj;
-            return acc;
-        }, {})
-)
-
-export const selectDataSourcesUpdatedObj = createSelector(
-    [stateSelector, (state, dataSources) => dataSources],
-    (state, dataSources) =>
-        dataSources.reduce((acc, { name, selector }) => {
-            acc[name] = selector(state).updatedObj;
-            return acc;
-        }, {})
-)
-
-export const selectDataSourcesObjId = createSelector(
-    [stateSelector, (state, dataSources) => dataSources],
-    (state, dataSources) =>
-        dataSources.reduce((acc, { name, selector }) => {
-            acc[name] = selector(state).objId;
-            return acc;
-        }, {})
-)
-
-export const selectDataSourcesIsLoading = createSelector(
-    [stateSelector, (state, dataSources) => dataSources],
-    (state, dataSources) =>
-        dataSources.reduce((acc, { name, selector }) => {
-            acc[name] = selector(state).isLoading;
-            return acc;
-        }, {})
 )

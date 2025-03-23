@@ -1,170 +1,359 @@
-import { useEffect, useRef } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import * as Selectors from '../selectors';
+import { useEffect, useRef, useCallback } from 'react';
+import { useDispatch } from 'react-redux';
 import { WEBSOCKET_CLOSE_CODES, WEBSOCKET_RETRY_CODES } from '../constants';
+import { isWebSocketAlive } from '../utils';
 
 /**
- * Custom hook to handle multiple WebSocket connections with dedicated Web Workers.
+ * Hook for managing WebSocket connections with dedicated Web Workers.
+ * Supports two modes:
+ *  - Get-all mode: A single connection per dataSource.
+ *  - By-id mode: Multiple connections per dataSource keyed by active IDs.
  *
- * @param {Array} dataSources - An array of dataSource objects.
- * Each dataSource should have:
- *   - url: The WebSocket URL.
- *   - name: Unique name for the connection.
- *   - actions: An object containing at least an `update` action creator.
- *   - selector: A function that accepts the Redux state and returns the current stored array.
+ * The hook buffers messages received from each WebSocket and periodically posts
+ * them to a Web Worker for processing. When processed, a Redux action is dispatched
+ * to update the corresponding stored array.
+ *
+ * @param {Object} params - The hook parameters.
+ * @param {Array} params.dataSources - Array of dataSource objects. Each should include:
+ *   - {string} url - The WebSocket URL.
+ *   - {string} name - Unique name for the connection.
+ *   - {Object} actions - Object containing at least a `setStoredArray` action creator.
+ * @param {boolean} params.isDisabled - If true, all connections are disabled.
+ * @param {number} params.reconnectCounter - Changing this value triggers a reconnection.
+ * @param {Function} params.onReconnect - Callback triggered when a reconnection is attempted.
+ * @param {Object} params.storedArrayDict - Maps dataSource names to their stored arrays.
+ * @param {Object} [params.dataSourcesCrudOverrideDict=null] - Optionally override endpoints per dataSource.
+ * @param {Object} [params.dataSourcesParams=null] - Optional parameters per dataSource.
+ * @param {boolean} [params.connectionByGetAll=false] - If true, use a single WebSocket per dataSource.
+ * @param {Array} [params.activeIds=[]] - For by-id mode, an array of active IDs to maintain connections for.
  */
 const useDataSourcesWebsocketWorker = ({
   dataSources,
   isDisabled,
   reconnectCounter,
   onReconnect,
-  activeItemIdMap
+  storedArrayDict,
+  dataSourcesCrudOverrideDict = null,
+  dataSourcesParams = null,
+  connectionByGetAll = false,
+  activeIds = []
 }) => {
   const dispatch = useDispatch();
 
-  // Access the Redux state with a custom selector.
-  const storedArrayDict = useSelector(
-    (state) => Selectors.selectDataSourcesStoredArray(state, dataSources), (prev, curr) => {
-      return JSON.stringify(prev) === JSON.stringify(curr);
-    }
-  );
+  // Constants for retry logic.
+  const MAX_RETRY_COUNT = 10;
+  const BASE_RETRY_DELAY = 10000; // milliseconds
 
-  // Initialize the connectionsRef as an empty object.
+  // Ref to store connection objects for each dataSource.
   const connectionsRef = useRef({});
 
-  const activeItemIdMapRef = useRef(activeItemIdMap);
-
-  // Create connections (worker, message buffer, WebSocket, etc.) for each dataSource.
-  useEffect(() => {
-    dataSources.forEach(ds => {
-      if (!connectionsRef.current[ds.name]) {
-        // Create the Web Worker. Adjust the worker import as needed for your bundler.
-        const worker = new Worker(new URL('../workers/websocket-update.worker.js', import.meta.url));
-        connectionsRef.current[ds.name] = {
-          worker,
-          messageBuffer: [],
-          isWorkerBusy: false,
-          ws: null,
-          // We'll store the event listener so we can remove it later.
-          messageHandler: null,
-          retryCount: 0
-        };
-      }
-    });
-  }, []);
-
-  // Keep a ref of the latest storedArray for use in worker postMessage.
-  const storedArrayDictRef = useRef({});
+  // Ref to maintain the latest stored arrays.
+  const storedArrayDictRef = useRef(storedArrayDict);
   useEffect(() => {
     storedArrayDictRef.current = storedArrayDict;
   }, [storedArrayDict]);
 
-  useEffect(() => {
-    activeItemIdMapRef.current = activeItemIdMap;
-  }, [activeItemIdMap])
+  /**
+   * Converts an HTTP/HTTPS URL to the corresponding WS/WSS URL.
+   * @param {string} url - The original URL.
+   * @returns {string} - The WebSocket URL.
+   */
+  const getWebSocketUrl = useCallback((url) => {
+    try {
+      const parsedUrl = new URL(url);
+      parsedUrl.protocol = parsedUrl.protocol === 'https:' ? 'wss:' : 'ws:';
+      return parsedUrl.toString();
+    } catch (error) {
+      console.error('Invalid URL provided for WebSocket:', url);
+      return url;
+    }
+  }, []);
 
-  // Set up WebSocket connections.
+  /**
+   * Handles reconnection logic for a given connection.
+   * Increases the retry count and calls the provided onReconnect callback after a delay.
+   *
+   * @param {Object} connection - The connection object.
+   * @param {string} name - The dataSource name.
+   * @param {string|number} [id] - Optional ID for by-id mode.
+   */
+  const handleReconnection = (connection, name, id = null) => {
+    if (connection.retryCount < MAX_RETRY_COUNT) {
+      connection.retryCount += 1;
+      const delay = connection.lastCloseCode === WEBSOCKET_CLOSE_CODES.TRY_AGAIN_LATER
+        ? connection.retryCount * BASE_RETRY_DELAY
+        : BASE_RETRY_DELAY;
+      setTimeout(() => {
+        console.info(`Reconnecting WebSocket for ${name}${id ? ` id ${id}` : ''}, retryCount: ${connection.retryCount}`);
+        onReconnect();
+      }, delay);
+    } else {
+      console.error(`WebSocket closed for ${name}${id ? ` id ${id}` : ''} after maximum retry attempts`);
+    }
+  };
+
+  // -----------------------------
+  // Initialization: Create connection objects and start Web Workers.
+  // -----------------------------
   useEffect(() => {
+    dataSources.forEach(({ name }) => {
+      if (!connectionsRef.current[name]) {
+        const worker = new Worker(new URL('../workers/websocket-update.worker.js', import.meta.url));
+        connectionsRef.current[name] = {
+          worker,
+          messageBuffer: [],
+          isWorkerBusy: false,
+          // For get-all mode: single WebSocket instance; for by-id mode: an object keyed by id.
+          ws: connectionByGetAll ? null : {},
+          messageHandler: null,
+          retryCount: 0,
+          lastCloseCode: null,
+        };
+      }
+    });
+
+    // Cleanup: Terminate workers on unmount.
+    return () => {
+      Object.values(connectionsRef.current).forEach((connection) => {
+        if (connection.worker) {
+          connection.worker.terminate();
+        }
+      });
+    };
+  }, []);
+
+  // -----------------------------
+  // GET-ALL MODE: Single WebSocket per dataSource
+  // -----------------------------
+  useEffect(() => {
+    if (!connectionByGetAll) return;
+
     const currentConnectionDict = connectionsRef.current;
-    dataSources.forEach(ds => {
-      if (!ds.url || isDisabled) return;
+    dataSources.forEach(({ name, url }) => {
+      if (!url || isDisabled) return;
 
-      const connection = currentConnectionDict[ds.name];
-      const { messageBuffer, retryCount } = connection;
-      // Only create a new connection if one doesn't already exist.
-      if (!connection.ws) {
-        const ws = new WebSocket(`${ds.url.replace('http', 'ws')}/get-all-${ds.name}-ws`);
+      const wsUrl = getWebSocketUrl(url);
+      let apiUrl = `${wsUrl}/get-all-${name}-ws`;
+      const crudOverrideDict = dataSourcesCrudOverrideDict?.[name];
+      const params = dataSourcesParams?.[name] ?? null;
+      if (crudOverrideDict?.GET_ALL) {
+        const { endpoint, paramDict } = crudOverrideDict.GET_ALL;
+        if (!params && Object.keys(paramDict).length > 0) return;
+        apiUrl = `${wsUrl}/ws-${endpoint}`;
+        if (params) {
+          const paramsStr = '?' + Object.keys(params)
+            .map((k) => `${encodeURIComponent(k)}=${encodeURIComponent(params[k])}`)
+            .join('&');
+          apiUrl += paramsStr;
+        }
+      }
+
+      const connection = currentConnectionDict[name];
+      const { messageBuffer } = connection;
+      if (!connection.ws || connection.ws.readyState === WebSocket.CLOSED) {
+        connection.retryCount = 0; // Reset retry count for a new connection.
+        const ws = new WebSocket(apiUrl);
         connection.ws = ws;
 
+        ws.onopen = () => {
+          connection.retryCount = 0;
+        };
+
         ws.onmessage = (event) => {
-          // Add incoming messages to the buffer.
           messageBuffer.push(event.data);
         };
 
         ws.onerror = (e) => {
-          console.error(`WebSocket error for ${ds.name}:`, e);
+          console.error(`WebSocket error for ${name}:`, e);
         };
 
         ws.onclose = (e) => {
           const { code, reason, wasClean } = e;
+          connection.lastCloseCode = code;
           if (WEBSOCKET_RETRY_CODES.includes(code)) {
-            if (retryCount <= 10) {
-              connection.retryCount += 1;
-              setTimeout(() => {
-                console.log(`reconnecting ws for ${ds.name}, retryCount: ${retryCount}`);
-                onReconnect();
-              },
-                code === WEBSOCKET_CLOSE_CODES.TRY_AGAIN_LATER
-                  ? connection.retryCount * 10000
-                  : 10000);
-            }
+            handleReconnection(connection, name);
           }
           if (code !== WEBSOCKET_CLOSE_CODES.NORMAL_CLOSURE) {
-            console.error(`ws closed for ${ds.name}, code: ${code}, reason: ${reason}, wasClean: ${wasClean}`);
+            console.error(`WebSocket closed for ${name}, code: ${code}, reason: ${reason}, wasClean: ${wasClean}`);
           }
         };
       }
     });
 
-    // Cleanup: close all WebSocket connections and terminate workers.
+    // Cleanup: Close all WebSocket connections on unmount or dependency change.
     return () => {
-      Object.values(currentConnectionDict).forEach(connection => {
-        if (connection.ws) {
-          connection.ws.close();
+      if (!connectionByGetAll) return;
+      Object.values(connectionsRef.current).forEach(connection => {
+        if (connection.ws && connection.ws.readyState !== WebSocket.CLOSED) {
+          connection.ws.close(WEBSOCKET_CLOSE_CODES.NORMAL_CLOSURE, 'Normal closure on cleanup');
           connection.ws = null;
         }
       });
     };
-  }, [isDisabled, reconnectCounter]);
+  }, [
+    dataSourcesParams,
+    isDisabled,
+    reconnectCounter
+  ]);
 
-  // Periodically post messages to workers.
+  // -----------------------------
+  // BY-ID MODE: Create or update connections for active IDs
+  // -----------------------------
+  useEffect(() => {
+    if (connectionByGetAll) return;
+
+    // If disabled, close all active connections.
+    if (isDisabled) {
+      dataSources.forEach(({ name }) => {
+        const connection = connectionsRef.current[name];
+        if (connection) {
+          Object.keys(connection.ws).forEach((id) => {
+            const socket = connection.ws[id];
+            if (socket && socket.readyState !== WebSocket.CLOSED) {
+              socket.close(WEBSOCKET_CLOSE_CODES.NORMAL_CLOSURE, 'Disabled: closing connection');
+            }
+            delete connection.ws[id];
+          });
+        }
+      });
+      return;
+    }
+
+    const currentConnectionDict = connectionsRef.current;
+    dataSources.forEach(({ name, url }) => {
+      if (!url) return;
+
+      const wsUrl = getWebSocketUrl(url);
+      let apiUrl = `${wsUrl}/get-${name}-ws`;
+      const crudOverrideDict = dataSourcesCrudOverrideDict?.[name];
+      const params = dataSourcesParams?.[name] ?? null;
+      let paramsStr = '';
+      if (crudOverrideDict?.GET_ALL) {
+        const { endpoint, paramDict } = crudOverrideDict.GET_ALL;
+        if (!params && Object.keys(paramDict).length > 0) return;
+        apiUrl = `${wsUrl}/ws-${endpoint}`;
+        if (params) {
+          paramsStr = '?' + Object.keys(params)
+            .map((k) => `${encodeURIComponent(k)}=${encodeURIComponent(params[k])}`)
+            .join('&');
+        }
+      }
+
+      const connection = currentConnectionDict[name];
+      const { messageBuffer, ws } = connection;
+
+      // For each active ID, create or update the corresponding WebSocket.
+      activeIds.forEach((id) => {
+        const normalizedId = String(id);
+        let socket = ws[normalizedId];
+        if (!socket || !isWebSocketAlive(socket)) {
+          connection.retryCount = 0;
+          socket = new WebSocket(`${apiUrl}/${id}${paramsStr}`);
+          ws[normalizedId] = socket;
+
+          socket.onopen = () => {
+            connection.retryCount = 0;
+          };
+
+          socket.onmessage = (event) => {
+            messageBuffer.push(event.data);
+          };
+
+          socket.onerror = (e) => {
+            console.error(`WebSocket error for ${name} id ${normalizedId}:`, e);
+          };
+
+          socket.onclose = (e) => {
+            const { code, reason, wasClean } = e;
+            connection.lastCloseCode = code;
+            if (WEBSOCKET_RETRY_CODES.includes(code)) {
+              handleReconnection(connection, name, normalizedId);
+            }
+            if (code !== WEBSOCKET_CLOSE_CODES.NORMAL_CLOSURE) {
+              console.error(`WebSocket closed for ${name} id ${normalizedId}, code: ${code}, reason: ${reason}, wasClean: ${wasClean}`);
+            }
+          };
+        }
+      });
+
+      // Close any connections that are no longer active.
+      Object.keys(ws).forEach((id) => {
+        if (!activeIds.map(String).includes(id)) {
+          const socket = ws[id];
+          if (socket && socket.readyState !== WebSocket.CLOSED) {
+            socket.close(WEBSOCKET_CLOSE_CODES.NORMAL_CLOSURE, 'Closing inactive socket');
+          }
+          delete ws[id];
+        }
+      });
+    });
+  }, [
+    activeIds,
+    dataSourcesParams,
+    isDisabled,
+    reconnectCounter
+  ]);
+
+  // Cleanup for by-id mode on unmount: close all active connections.
+  useEffect(() => {
+    return () => {
+      if (connectionByGetAll) return;
+      Object.values(connectionsRef.current).forEach((connection) => {
+        Object.keys(connection.ws).forEach((id) => {
+          const socket = connection.ws[id];
+          if (socket && socket.readyState !== WebSocket.CLOSED) {
+            socket.close(WEBSOCKET_CLOSE_CODES.NORMAL_CLOSURE, 'Normal closure on cleanup');
+          }
+          delete connection.ws[id];
+        });
+      });
+    };
+  }, []);
+
+  // -----------------------------
+  // Periodically post buffered messages to the Web Worker.
+  // -----------------------------
   useEffect(() => {
     const interval = setInterval(() => {
-      dataSources.forEach(ds => {
-        const connection = connectionsRef.current[ds.name];
+      dataSources.forEach(({ name }) => {
+        const connection = connectionsRef.current[name];
         const { messageBuffer, isWorkerBusy } = connection;
-        // Check if there are messages and the worker is free.
         if (messageBuffer.length > 0 && !isWorkerBusy) {
           const messages = [...messageBuffer];
           connection.messageBuffer.length = 0;
           connection.isWorkerBusy = true;
           connection.worker.postMessage({
             messages,
-            storedArray: storedArrayDictRef.current[ds.name],
-            activeItemIdMap: activeItemIdMapRef.current
+            storedArray: storedArrayDictRef.current[name]
           });
         }
       });
-    }, 1000); // Dispatch every 1 sec
-
+    }, 1000);
     return () => clearInterval(interval);
   }, [])
 
+  // -----------------------------
   // Set up worker event listeners to handle responses.
+  // -----------------------------
   useEffect(() => {
-    const currentConnectionDict = connectionsRef.current;
-    dataSources.forEach(ds => {
-      const connection = currentConnectionDict[ds.name];
-      // Define the event handler.
+    dataSources.forEach(({ name, actions }) => {
+      const connection = connectionsRef.current[name];
       const handleWorkerMessage = (e) => {
-        dispatch(ds.actions.setStoredArray(e.data));
+        dispatch(actions.setStoredArray(e.data));
         connection.isWorkerBusy = false;
       };
-      // Save the handler reference for later removal.
       connection.messageHandler = handleWorkerMessage;
       connection.worker.addEventListener('message', handleWorkerMessage);
     });
-
-    // Cleanup: remove event listeners.
     return () => {
-      dataSources.forEach(ds => {
-        const connection = currentConnectionDict[ds.name];
+      dataSources.forEach(({ name }) => {
+        const connection = connectionsRef.current[name];
         if (connection && connection.worker && connection.messageHandler) {
           connection.worker.removeEventListener('message', connection.messageHandler);
         }
       });
     };
-  }, [dataSources, dispatch]);
+  }, []);
 };
 
 export default useDataSourcesWebsocketWorker;

@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { cloneDeep, isEqual, isObject, set } from 'lodash';
+import { cloneDeep, get, isEqual, set } from 'lodash';
 import { DB_ID, LAYOUT_TYPES, MODEL_TYPES, MODES } from '../../constants';
 import * as Selectors from '../../selectors';
 import {
     clearxpath, getWidgetOptionById, sortColumns, generateObjectFromSchema,
     addxpath, compareJSONObjects, getServerUrl, getWidgetTitle,
-    isWebSocketAlive
+    isWebSocketAlive, getCrudOverrideDict
 } from '../../utils';
 import { FullScreenModalOptional } from '../../components/Modal';
 import { ModelCard, ModelCardHeader, ModelCardContent } from '../../components/cards';
@@ -25,19 +25,19 @@ import {
 } from '../../utils/genericModelHandler';
 import { utils, writeFileXLSX } from 'xlsx';
 import CommonKeyWidget from '../../components/CommonKeyWidget';
-import { DataTable } from '../../components/tables';
 import { ConfirmSavePopup } from '../../components/Popup';
-import DataTree from '../../components/trees/DataTree/DataTree';
+import { DataTable } from '../../components/tables';
+import DataTree from '../../components/trees/DataTree';
 import { useWebSocketWorker } from '../../hooks';
 
 function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName }) {
     const { schema: projectSchema, schemaCollections } = useSelector((state) => state.schema);
-    const modelLayoutOption = useSelector((state) => Selectors.selectLayout(state, modelName), (prev, curr) => {
+    const modelLayoutOption = useSelector((state) => Selectors.selectModelLayout(state, modelName), (prev, curr) => {
         return JSON.stringify(prev) === JSON.stringify(curr);
     });
     const { schema: modelSchema, fieldsMetadata, actions, selector, isAbbreviationSource = false } = modelDataSource;
     const modelRootFieldsMetadata = schemaCollections[modelRootName];
-    const { storedObj, updatedObj, objId, mode, error, isLoading, isConfirmSavePopupOpen } = useSelector(selector);
+    const { storedObj, updatedObj, objId, mode, isCreating, error, isLoading, isConfirmSavePopupOpen } = useSelector(selector);
     const { storedObj: dataSourceStoredObj } = useSelector(dataSource?.selector ?? (() => ({ storedObj: null })), (prev, curr) => {
         return JSON.stringify(prev) === JSON.stringify(curr);
     });
@@ -46,12 +46,11 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
     const [isWsDisabled, setIsWsDisabled] = useState(false);
     const [page, setPage] = useState(0);
     const [rows, setRows] = useState([]);
-    const [groupedRows, setGroupedRows] = useState([]);
     const [activeRows, setActiveRows] = useState([]);
     const [maxRowSize, setMaxRowSize] = useState(null);
     const [headCells, setHeadCells] = useState([]);
     const [commonKeys, setCommonKeys] = useState([]);
-    const [filteredCells, setFilteredCells] = useState([]);
+    const [sortedCells, setSortedCells] = useState([]);
     const [showHidden, setShowHidden] = useState(false);
     const [showMore, setShowMore] = useState(false);
     const [showAll, setShowAll] = useState(false);
@@ -59,31 +58,30 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
     const [url, setUrl] = useState(modelDataSource.url);
     const [isProcessingUserActions, setIsProcessingUserActions] = useState(false);
     const [reconnectCounter, setReconnectCounter] = useState(0);
+    const [params, setParams] = useState(null);
+    const modelLayoutData = useMemo(() => getWidgetOptionById(modelLayoutOption.widget_ui_data, objId), [modelLayoutOption, objId]);
+    // layout type initial only available after getting modelLayoutOption
+    const [layoutType, setLayoutType] = useState(modelLayoutData.view_layout);
 
+    const dispatch = useDispatch();
+    const [, startTransition] = useTransition();
+
+    // refs
     const socketRef = useRef(null);
     const workerRef = useRef(null);
-    const modelObjDictRef = useRef({});
     const isWorkerBusyRef = useRef({
         isBusy: false,
         hasPendingUserActions: false,
     });
     const pendingUpdateRef = useRef(null);
     const changesRef = useRef({});
-
-    const dispatch = useDispatch();
-    const [_, startTransition] = useTransition();
-
-    const allowedLayoutTypes = useMemo(() => [LAYOUT_TYPES.TABLE, LAYOUT_TYPES.TREE], [])
-    const modelLayoutData = useMemo(() => getWidgetOptionById(modelLayoutOption.widget_ui_data, objId), [modelLayoutOption, objId]);
-    const [layoutType, setLayoutType] = useState(modelLayoutData.view_layout);
-    const sortedCells = useMemo(() => {
-        return sortColumns(filteredCells, modelLayoutData.column_orders || [], false, false, false, false);
-    }, [filteredCells, modelLayoutData.column_orders])
-    const modelTitle = useMemo(() => getWidgetTitle(modelLayoutOption, modelSchema, modelName, storedObj), [storedObj]);
-
+    const crudOverrideDictRef = useRef(getCrudOverrideDict(modelSchema));
+    const allowedLayoutTypesRef = useRef([LAYOUT_TYPES.TABLE, LAYOUT_TYPES.PIVOT_TABLE, LAYOUT_TYPES.CHART]);
     // refs to identify change
     const optionsRef = useRef(null);
 
+    // calculated fields
+    const modelTitle = useMemo(() => getWidgetTitle(modelLayoutOption, modelSchema, modelName, storedObj), [storedObj]);
     const modelHandlerConfig = useMemo(() => (
         {
             modelName,
@@ -98,28 +96,57 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
     useEffect(() => {
         const url = getServerUrl(modelSchema, dataSourceStoredObj, dataSource?.fieldsMetadata);
         setUrl(url);
+        let updatedParams = null;
+        if (dataSourceStoredObj && Object.keys(dataSourceStoredObj).length > 0 && crudOverrideDictRef.current?.GET_ALL) {
+            const { paramDict } = crudOverrideDictRef.current.GET_ALL;
+            if (Object.keys(paramDict).length > 0) {
+                Object.keys(paramDict).forEach((k) => {
+                    const paramSrc = paramDict[k];
+                    const paramValue = get(dataSourceStoredObj, paramSrc);
+                    if (paramValue !== null && paramValue !== undefined) {
+                        if (!updatedParams) {
+                            updatedParams = {};
+                        }
+                        updatedParams[k] = paramValue;
+                    }
+                })
+            }
+        }
+        setParams((prev) => {
+            if (JSON.stringify(prev) === JSON.stringify(updatedParams)) {
+                return prev;
+            }
+            return updatedParams;
+        })
     }, [dataSourceStoredObj])
 
     useEffect(() => {
         if (url && !isAbbreviationSource) {
-            dispatch(actions.getAll({ url }));
+            let args = { url };
+            if (crudOverrideDictRef.current?.GET_ALL) {
+                const { endpoint, paramDict } = crudOverrideDictRef.current.GET_ALL;
+                if (!params && Object.keys(paramDict).length > 0) {
+                    return;
+                }
+                args = { ...args, endpoint, params };
+            }
+            dispatch(actions.getAll({ ...args }));
         }
-    }, [url])
+    }, [url, params])
 
     useEffect(() => {
         workerRef.current = new Worker(new URL("../../workers/non-root-model.worker.js", import.meta.url));
 
         workerRef.current.onmessage = (event) => {
-            const { rows, groupedRows, activeRows, maxRowSize, headCells, commonKeys, filteredCells } = event.data;
+            const { rows, activeRows, maxRowSize, headCells, commonKeys, sortedCells } = event.data;
 
             startTransition(() => {
                 setRows(rows);
-                setGroupedRows(groupedRows);
                 setActiveRows(activeRows);
                 setMaxRowSize(maxRowSize);
                 setHeadCells(headCells);
                 setCommonKeys(commonKeys);
-                setFilteredCells(filteredCells);
+                setSortedCells(sortedCells);
 
                 // If a new update came in while the worker was busy, send it now.
                 if (pendingUpdateRef.current) {
@@ -174,6 +201,7 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
                 showLess: modelLayoutData.show_less || [],
                 showHidden,
                 showAll,
+                columnOrders: modelLayoutData.column_orders || [],
                 xpath: modelName
             }
 
@@ -185,7 +213,8 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
                 showHidden,
                 showAll,
                 modelLayoutOption,
-                modelLayoutData
+                modelLayoutData,
+                objId
             }
 
             if (!isEqual(optionsRef.current, updatedOptionsRef)) {
@@ -207,7 +236,7 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
             }
         }
     }, [
-        storedObj, updatedObj, fieldsMetadata, modelLayoutData, modelLayoutOption, page, mode,
+        storedObj, updatedObj, objId, fieldsMetadata, modelLayoutData, modelLayoutOption, page, mode,
         showMore, moreAll, showHidden, showAll
     ])
 
@@ -227,7 +256,9 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
         isAbbreviationSource,
         selector,
         onWorkerUpdate: handleModelDataSourceUpdate,
-        onReconnect: handleReconnect
+        onReconnect: handleReconnect,
+        params,
+        crudOverrideDict: crudOverrideDictRef.current,
     })
 
     useEffect(() => {
@@ -255,12 +286,21 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
 
     const handleReload = () => {
         if (url) {
-            dispatch(actions.getAll({ url }));
+            let args = { url };
+            if (crudOverrideDictRef.current?.GET_ALL) {
+                const { endpoint, paramDict } = crudOverrideDictRef.current.GET_ALL;
+                if (!params && Object.keys(paramDict).length > 0) {
+                    return;
+                }
+                args = { ...args, endpoint, params };
+            }
+            dispatch(actions.getAll({ ...args }));
         }
         changesRef.current = {};
         if (mode !== MODES.READ) {
             handleModeToggle();
         }
+        dispatch(actions.setIsCreating(false));
         cleanAllCache(modelName);
     }
 
@@ -368,11 +408,12 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
         dispatch(actions.setUpdatedObj(modelUpdatedObj));
         dispatch(actions.setMode(MODES.EDIT));
         handleModeToggle();
+        dispatch(actions.setIsCreating(true));
     }
 
     const handleSave = (modifiedObj, force = false) => {
         const modelUpdatedObj = modifiedObj || clearxpath(cloneDeep(updatedObj));
-        const activeChanges = compareJSONObjects(storedObj, modelUpdatedObj, modelRootFieldsMetadata);
+        const activeChanges = compareJSONObjects(storedObj, modelUpdatedObj, modelRootFieldsMetadata, isCreating);
         if (!activeChanges || Object.keys(activeChanges).length === 0) {
             changesRef.current = {};
             dispatch(actions.setMode(MODES.READ));
@@ -396,6 +437,7 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
         } else {
             dispatch(actions.create({ url, data: changeDict }));
             dispatch(actions.setMode(MODES.READ));
+            dispatch(actions.setIsCreating(false));
         }
         changesRef.current = {};
         dispatch(actions.setMode(MODES.READ));
@@ -536,7 +578,7 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
                         // layout switch
                         layout={layoutType}
                         onLayoutSwitch={handleLayoutTypeChange}
-                        supportedLayouts={allowedLayoutTypes}
+                        supportedLayouts={allowedLayoutTypesRef.current}
                         // maximize
                         isMaximized={isMaximized}
                         onMaximizeToggle={handleFullScreenToggle}
@@ -554,6 +596,8 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
                         pinned={modelLayoutData.pinned || []}
                         onPinToggle={handlePinnedChange}
                         isAbbreviationSource={isAbbreviationSource}
+                        isCreating={isCreating}
+                        onReload={handleReload}
                     />
                 </ModelCardHeader>
                 <ModelCardContent

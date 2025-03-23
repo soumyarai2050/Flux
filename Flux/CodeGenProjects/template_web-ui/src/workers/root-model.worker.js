@@ -1,6 +1,6 @@
 import { cloneDeep } from 'lodash';
 import { MODES } from '../constants';
-import { addxpath, getTableRows } from '../utils';
+import { addxpath, getTableRows, sortColumns } from '../utils';
 import {
     applyFilter, getActiveRows, getCommonKeyCollections, getFilteredCells,
     getGroupedTableColumns, getGroupedTableRows, getMaxRowSize,
@@ -9,8 +9,9 @@ import {
 
 onmessage = (e) => {
     const { storedObj, updatedObj, fieldsMetadata, filters, mode, page, rowsPerPage, sortOrders,
-        enableOverride, disableOverride, showLess, showHidden, showAll, showMore, moreAll } = e.data;
-    const start = Date.now();
+        enableOverride, disableOverride, showLess, showHidden, showAll, showMore, moreAll,
+        columnOrders 
+    } = e.data;
     const rows = getTableRows(fieldsMetadata, mode, storedObj, addxpath(cloneDeep(updatedObj)));
     const filteredRows = applyFilter(rows, filters);
     const groupedRows = getGroupedTableRows(filteredRows, [], null);
@@ -25,8 +26,8 @@ onmessage = (e) => {
         commonKeys = getCommonKeyCollections(activeRows, groupedColumns, !showHidden && !showAll, false, false, !showMore && !moreAll);
     }
     const cells = getFilteredCells(groupedColumns, commonKeys, showHidden, showAll, showMore, moreAll);
-    // console.log(Date.now() - start);
-    postMessage({ rows: filteredRows, groupedRows, activeRows, maxRowSize, headCells: groupedColumns, commonKeys, filteredCells: cells });
+    const sortedCells = sortColumns(cells, columnOrders, false, false, false, false);
+    postMessage({ rows: filteredRows, groupedRows, activeRows, maxRowSize, headCells: groupedColumns, commonKeys, sortedCells });
 }
 
 export { };

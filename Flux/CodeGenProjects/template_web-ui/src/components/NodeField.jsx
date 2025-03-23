@@ -143,7 +143,7 @@ const NodeField = (props) => {
     const placeholder = props.data.placeholder ? props.data.placeholder : !props.data.required ? 'optional' : null;
 
     if (props.data.customComponentType === 'autocomplete') {
-        let value = props.data.value ? props.data.value : null;
+        let value = props.data.value ? props.data.value : props.data.value === 0 ? '0' : null;
         validationError.current = validateConstraints(props.data, value);
 
         const endAdornment = validationError.current ? (
@@ -157,8 +157,10 @@ const NodeField = (props) => {
             <Autocomplete
                 id={props.data.key}
                 options={props.data.options}
-                getOptionLabel={(option) => option}
-                isOptionEqualToValue={(option, value) => option == value}
+                getOptionLabel={(option) => option?.toString()}
+                isOptionEqualToValue={(option, value) => (
+                    option == value || (option === 0 && value === 0)
+                )}
                 // disableClearable
                 disabled={disabled}
                 forcePopupIcon={false}
@@ -172,7 +174,7 @@ const NodeField = (props) => {
                 inputValue={autocompleteInputValue}
                 onInputChange={(e, newInputValue) => setAutocompleteInputValue(newInputValue)}
                 filterOptions={(options, { inputValue }) =>
-                    options.filter(option => option.toLowerCase().includes(inputValue.toLowerCase()))
+                    options.filter(option => String(option).toLowerCase().includes(inputValue.toLowerCase()))
                 }
                 onChange={(e, v) => {
                     props.data.onAutocompleteOptionChange(e, v, props.data.dataxpath, props.data.xpath);
@@ -180,7 +182,7 @@ const NodeField = (props) => {
                 }}
                 // componentsProps={{ popper: { style: { minWidth: 'fit-content', width: 'parent' } } }}
                 renderInput={(params) => {
-                    const filteredOptions = props.data.options.filter(option => option.toLowerCase().includes(autocompleteInputValue.toLowerCase()));
+                    const filteredOptions = props.data.options.filter(option => String(option).toLowerCase().includes(autocompleteInputValue.toLowerCase()));
                     return (
                         <TextField
                             {...params}

@@ -602,30 +602,59 @@ def get_dash_filter_by_dash_name(dash_name: str):
     ]
     return {'aggregate': agg_pipeline}
 
-def filter_dash_from_dash_filters_agg(dash_filters: DashFilters):
+def filter_dash_from_dash_filters_agg(dash_filters: DashFilters, obj_id_list: List[int] | None = None):
     agg_pipeline: List[Dict] = []
 
-    leg_match_list = []
-    for required_legs in dash_filters.required_legs:
-        if required_legs.leg_type == Leg.leg_type.LegType_CB:
-            leg_match = {"rt_dash.leg1": {"$exists": True}}
-            if dash_filters.px_range:
-                leg_match["rt_dash.leg1.vwap"] = { "$gte": dash_filters.px_range.px_low, "$lte": dash_filters.px_range.px_high}
-            leg_match_list.append(leg_match)
-        elif required_legs.leg_type == Leg.leg_type.LegType_EQT_A:
-            leg_match = {"rt_dash.leg2": {"$exists": True}}
-            if dash_filters.px_range:
-                leg_match["rt_dash.leg2.vwap"] = { "$gte": dash_filters.px_range.px_low, "$lte": dash_filters.px_range.px_high}
-            leg_match_list.append(leg_match)
-        elif required_legs.leg_type == Leg.leg_type.LegType_EQT_H:
-            leg_match = {"rt_dash.leg3": {"$exists": True}}
-            if dash_filters.px_range:
-                leg_match["rt_dash.leg3.vwap"] = { "$gte": dash_filters.px_range.px_low, "$lte": dash_filters.px_range.px_high}
-            leg_match_list.append(leg_match)
-        else:
-            raise Exception(f"Unknown leg_type: {required_legs.leg_type}")
+    # if obj_id_list is passed matching with these id(s) to avoid any non-updated ws notification
+    if obj_id_list:
+        agg_pipeline.append({
+            "$match": {
+                "_id": {
+                    "$in": obj_id_list
+                }
+            }
+        })
+
     # matching if leg exists based on dash_filters.required_legs
     # also checking leg.vwap ranges within min to max of px_range
+    leg_match_list = []
+    for required_legs in dash_filters.required_legs:
+        if required_legs.leg_type == LegType.LegType_CB:
+            leg_match = {"$and": [
+                {"rt_dash.leg1": {"$exists": True}},
+                {"rt_dash.leg1": {"$ne": None}}
+            ]}
+            if dash_filters.px_range:
+                leg_match["rt_dash.leg1.vwap"] = {}
+                if dash_filters.px_range.px_low is not None:
+                    leg_match["rt_dash.leg1.vwap"]["$gte"] = dash_filters.px_range.px_low
+                if dash_filters.px_range.px_high is not None:
+                    leg_match["rt_dash.leg1.vwap"]["$lte"] = dash_filters.px_range.px_high
+            leg_match_list.append(leg_match)
+        if required_legs.leg_type == LegType.LegType_EQT_A:
+            leg_match = {"$and": [
+                {"rt_dash.leg2": {"$exists": True}},
+                {"rt_dash.leg2": {"$ne": None}}
+            ]}
+            if dash_filters.px_range:
+                leg_match["rt_dash.leg2.vwap"] = {}
+                if dash_filters.px_range.px_low is not None:
+                    leg_match["rt_dash.leg2.vwap"]["$gte"] = dash_filters.px_range.px_low
+                if dash_filters.px_range.px_high is not None:
+                    leg_match["rt_dash.leg2.vwap"]["$lte"] = dash_filters.px_range.px_high
+            leg_match_list.append(leg_match)
+        if required_legs.leg_type == LegType.LegType_EQT_H:
+            leg_match = {"$and": [
+                {"rt_dash.leg3": {"$exists": True}},
+                {"rt_dash.leg3": {"$ne": None}}
+            ]}
+            if dash_filters.px_range:
+                leg_match["rt_dash.leg3.vwap"] = {}
+                if dash_filters.px_range.px_low is not None:
+                    leg_match["rt_dash.leg3.vwap"]["$gte"] = dash_filters.px_range.px_low
+                if dash_filters.px_range.px_high is not None:
+                    leg_match["rt_dash.leg3.vwap"]["$lte"] = dash_filters.px_range.px_high
+            leg_match_list.append(leg_match)
     agg_pipeline.append({
         "$match": {
             "$or": leg_match_list
@@ -634,17 +663,27 @@ def filter_dash_from_dash_filters_agg(dash_filters: DashFilters):
 
     # if premium_range exists matching mkt_premium
     if dash_filters.premium_range:
+        match_agg = {}
+        if dash_filters.premium_range.premium_low is not None:
+            match_agg["$gte"] = dash_filters.premium_range.premium_low
+        if dash_filters.premium_range.premium_high is not None:
+            match_agg["$lte"] = dash_filters.premium_range.premium_high
         agg_pipeline.append({
             "$match": {
-                "rt_dash.mkt_premium": {"$gte": dash_filters.premium_range.premium_low, "$lte": dash_filters.premium_range.premium_high}
+                "rt_dash.mkt_premium": match_agg
             }
         })
 
     # if premium_change_range exists matching mkt_premium_change
     if dash_filters.premium_change_range:
+        match_agg = {}
+        if dash_filters.premium_change_range.premium_change_low is not None:
+            match_agg["$gte"] = dash_filters.premium_change_range.premium_change_low
+        if dash_filters.premium_change_range.premium_change_high is not None:
+            match_agg["$lte"] = dash_filters.premium_change_range.premium_change_high
         agg_pipeline.append({
             "$match": {
-                "rt_dash.mkt_premium_change": {"$gte": dash_filters.premium_change_range.premium_change_low, "$lte": dash_filters.premium_change_range.premium_change_high}
+                "rt_dash.mkt_premium_change": match_agg
             }
         })
 
@@ -671,17 +710,17 @@ def filter_dash_from_dash_filters_agg(dash_filters: DashFilters):
             position_type_list: List[PositionType] = []
             if dash_filters.inventory.pth:
                 position_type_list.append(PositionType.PTH)
-            elif dash_filters.inventory.locate:
+            if dash_filters.inventory.locate:
                 position_type_list.append(PositionType.LOCATE)
-            elif dash_filters.inventory.sod:
+            if dash_filters.inventory.sod:
                 position_type_list.append(PositionType.SOD)
-            elif dash_filters.inventory.indicative:
+            if dash_filters.inventory.indicative:
                 position_type_list.append(PositionType.INDICATIVE)
 
             if position_type_list:
                 agg_pipeline.append({
                     "$match": {
-                        "eligible_brokers.sec_positions.positions": {
+                        "rt_dash.eligible_brokers.sec_positions.positions": {
                             "$elemMatch": {
                                 "type": {
                                     "$in": position_type_list
@@ -709,7 +748,8 @@ def filter_dash_from_dash_filters_agg(dash_filters: DashFilters):
                 "$match": {
                     "$and": [
                         {"rt_dash.indicative_summary": {"$exists": True}},
-                        {"rt_dash.indicative_summary": {"$gte": dash_filters.optimizer_criteria.min_notional}}
+                        {"rt_dash.indicative_summary": {"$ne": None}},
+                        {"rt_dash.indicative_summary.usd_notional": {"$gte": dash_filters.optimizer_criteria.min_notional}}
                     ]
                 }
             })
@@ -718,7 +758,8 @@ def filter_dash_from_dash_filters_agg(dash_filters: DashFilters):
                 "$match": {
                     "$and": [
                         {"rt_dash.locate_summary": {"$exists": True}},
-                        {"rt_dash.locate_summary": {"$gte": dash_filters.optimizer_criteria.min_notional}}
+                        {"rt_dash.locate_summary": {"$ne": None}},
+                        {"rt_dash.locate_summary.usd_notional": {"$gte": dash_filters.optimizer_criteria.min_notional}}
                     ]
                 }
             })
@@ -727,7 +768,8 @@ def filter_dash_from_dash_filters_agg(dash_filters: DashFilters):
                 "$match": {
                     "$and": [
                         {"rt_dash.pth_summary": {"$exists": True}},
-                        {"rt_dash.pth_summary": {"$gte": dash_filters.optimizer_criteria.min_notional}}
+                        {"rt_dash.pth_summary": {"$ne": None}},
+                        {"rt_dash.pth_summary.usd_notional": {"$gte": dash_filters.optimizer_criteria.min_notional}}
                     ]
                 }
             })
@@ -736,7 +778,8 @@ def filter_dash_from_dash_filters_agg(dash_filters: DashFilters):
                 "$match": {
                     "$and": [
                         {"rt_dash.sod_summary": {"$exists": True}},
-                        {"rt_dash.sod_summary": {"$gte": dash_filters.optimizer_criteria.min_notional}}
+                        {"rt_dash.sod_summary": {"$ne": None}},
+                        {"rt_dash.sod_summary.usd_notional": {"$gte": dash_filters.optimizer_criteria.min_notional}}
                     ]
                 }
             })
@@ -754,5 +797,4 @@ def filter_dash_from_dash_filters_agg(dash_filters: DashFilters):
                 agg_pipeline.append({
                     "$sort": {lvl: sort_type},
                 })
-
     return agg_pipeline

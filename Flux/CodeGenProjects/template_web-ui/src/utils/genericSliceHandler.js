@@ -7,14 +7,15 @@
  * factory.
  */
 
-import { cloneDeep, isObject } from 'lodash';
+import { isObject } from 'lodash';
 import { DB_ID, MODEL_TYPES, MODES, NEW_ITEM_ID } from '../constants';
 import {
   addxpath,
   clearxpath,
   applyGetAllWebsocketUpdate,
   getObjectWithLeastId,
-  sortAlertArray
+  sortAlertArray,
+  fastClone
 } from '../utils';
 
 /**
@@ -157,10 +158,10 @@ export function setStoredArrayHandler(state, action, config) {
     } else {
       state[storedObjKey] = storedObj;
       if (state.mode === MODES.READ) {
-        state[updatedObjKey] = addxpath(cloneDeep(storedObj));
+        state[updatedObjKey] = addxpath(fastClone(storedObj));
       } else {  // mode is MODES.EDIT
         if (modelType === MODEL_TYPES.ABBREVIATION_MERGE) {
-          state[updatedObjKey] = addxpath(cloneDeep(storedObj));
+          state[updatedObjKey] = addxpath(fastClone(storedObj));
         }
         // TODO: handle ws update conflict
       }
@@ -169,10 +170,9 @@ export function setStoredArrayHandler(state, action, config) {
     if ([MODEL_TYPES.ABBREVIATION_MERGE, MODEL_TYPES.ROOT, MODEL_TYPES.NON_ROOT].includes(modelType) && !isAbbreviationSource) {
       if (action.payload.length > 0) {
         const obj = getObjectWithLeastId(action.payload);
-        console.log(obj);
         state[objIdKey] = obj[DB_ID];
         state[storedObjKey] = obj;
-        state[updatedObjKey] = addxpath(cloneDeep(obj));
+        state[updatedObjKey] = addxpath(fastClone(obj));
       }
     }
   }
@@ -206,10 +206,10 @@ export function setStoredArrayWsHandler(state, action, config) {
     } else {
       state[storedObjKey] = storedObj;
       if (state.mode === MODES.READ) {
-        state[updatedObjKey] = addxpath(cloneDeep(storedObj));
+        state[updatedObjKey] = addxpath(fastClone(storedObj));
       } else {  // mode is MODES.EDIT
         if (modelType === MODEL_TYPES.ABBREVIATION_MERGE) {
-          state[updatedObjKey] = addxpath(cloneDeep(storedObj));
+          state[updatedObjKey] = addxpath(fastClone(storedObj));
         }
         // TODO: handle ws update conflict
       }
@@ -265,7 +265,7 @@ export function setObjIdHandler(state, action, config) {
     const storedObj = state[storedArrayKey].find((o) => o[DB_ID] === action.payload);
     if (storedObj) {
       state[storedObjKey] = storedObj;
-      state[updatedObjKey] = addxpath(cloneDeep(storedObj));
+      state[updatedObjKey] = addxpath(fastClone(storedObj));
     }
   }
 }
@@ -280,6 +280,18 @@ export function setObjIdHandler(state, action, config) {
 export function setModeHandler(state, action, config) {
   state.mode = action.payload;
 }
+
+/**
+ * Set the isCreating field to its default state.
+ *
+ * @param {Object} state - Redux state.
+ * @param {Object} action - Redux action.
+ * @param {Object} config - Configuration object.
+ */
+export function setIsCreatingHandler(state, action, config) {
+  state.isCreating = action.payload;
+}
+
 
 /**
  * Resets the error field to its default state.
@@ -342,7 +354,7 @@ export function handleGetAll(builder, thunk, config) {
       const obj = getObjectWithLeastId(action.payload);
       state[objIdKey] = obj[DB_ID];
       state[storedObjKey] = obj;
-      state[updatedObjKey] = addxpath(cloneDeep(obj));
+      state[updatedObjKey] = addxpath(fastClone(obj));
     }
     state.isLoading = false;
   });
@@ -370,7 +382,7 @@ export function handleGet(builder, thunk, config) {
   builder.addCase(thunk.fulfilled, (state, action) => {
     state[storedObjKey] = action.payload;
     if (!state[objIdKey]) {
-      state[updatedObjKey] = addxpath(cloneDeep(action.payload));
+      state[updatedObjKey] = addxpath(fastClone(action.payload));
     } else {
       // TODO: handle applying user changes
     }
@@ -406,8 +418,8 @@ export function handleCreate(builder, thunk, config) {
     state.isLoading = false;
   });
   builder.addCase(thunk.rejected, (state, action) => {
-    const updatedObj = clearxpath(cloneDeep(state[updatedObjKey]));
-    state[updatedObjKey] = addxpath(cloneDeep(state[storedObjKey]));
+    const updatedObj = clearxpath(fastClone(state[updatedObjKey]));
+    state[updatedObjKey] = addxpath(fastClone(state[storedObjKey]));
     const { code, message, detail, status } = action.payload || {};
     state.error = { code, message, detail, status, payload: updatedObj };
     state.isLoading = false;
@@ -431,13 +443,13 @@ export function handleUpdate(builder, thunk, config) {
     state[storedArrayKey] = state[storedArrayKey].map((o) => o[DB_ID] === action.payload[DB_ID] ? action.payload : o);
     if (state[objIdKey] && state[objIdKey] === action.payload[DB_ID]) {
       state[storedObjKey] = action.payload;
-      state[updatedObjKey] = addxpath(cloneDeep(action.payload));
+      state[updatedObjKey] = addxpath(fastClone(action.payload));
     }
     state.isLoading = false;
   });
   builder.addCase(thunk.rejected, (state, action) => {
-    const updatedData = clearxpath(cloneDeep(state[updatedObjKey]));
-    state[updatedObjKey] = addxpath(cloneDeep(state[storedObjKey]));
+    const updatedData = clearxpath(fastClone(state[updatedObjKey]));
+    state[updatedObjKey] = addxpath(fastClone(state[storedObjKey]));
     const { code, message, detail, status } = action.payload || {};
     state.error = { code, message, detail, status, payload: updatedData };
     state.isLoading = false;
@@ -461,13 +473,13 @@ export function handlePartialUpdate(builder, thunk, config) {
     state[storedArrayKey] = state[storedArrayKey].map((o) => o[DB_ID] === action.payload[DB_ID] ? action.payload : o);
     if (state[objIdKey] && state[objIdKey] === action.payload[DB_ID]) {
       state[storedObjKey] = action.payload;
-      state[updatedObjKey] = addxpath(cloneDeep(action.payload));
+      state[updatedObjKey] = addxpath(fastClone(action.payload));
     }
     state.isLoading = false;
   });
   builder.addCase(thunk.rejected, (state, action) => {
-    const updatedData = clearxpath(cloneDeep(state[updatedObjKey]));
-    state[updatedObjKey] = addxpath(cloneDeep(state[storedObjKey]));
+    const updatedData = clearxpath(fastClone(state[updatedObjKey]));
+    state[updatedObjKey] = addxpath(fastClone(state[storedObjKey]));
     const { code, message, detail, status } = action.payload || {};
     state.error = { code, message, detail, status, payload: updatedData };
     state.isLoading = false;

@@ -1,14 +1,21 @@
-import React from 'react';
+import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import { Box, TableHead, TableSortLabel, TableRow, TableCell, IconButton, Tooltip } from '@mui/material';
-import { ContentCopy } from '@mui/icons-material';
+import { ContentCopy, LibraryAddCheckRounded } from '@mui/icons-material';
 import { visuallyHidden } from '@mui/utils';
 import { useTheme } from '@emotion/react';
 import classes from './TableHead.module.css';
 
-const CustomHeadCell = (props) => {
-    const { prefixCells, sortOrders, suffixCells, onRemoveSort, onRequestSort } = props;
+const CustomHeadCell = ({
+    sortOrders,
+    onRemoveSort,
+    onRequestSort,
+    headCells,
+    copyColumnHandler,
+    collectionView
+}) => {
     const theme = useTheme();
+    const [copiedCellId, setCopiedCellId] = useState(null);
 
     const createSortHandler = (property) => (event) => {
         let retainSortLevel = false;
@@ -22,53 +29,45 @@ const CustomHeadCell = (props) => {
         onRemoveSort(property);
     }
 
-    let emptyPrefixCells;
-    if (prefixCells && prefixCells > 0) {
-        emptyPrefixCells = Array(prefixCells).fill().map((_, i) => {
-            return (
-                <TableCell key={i} />
-            )
-        })
-    }
-
-    let emptySuffixCells;
-    if (suffixCells && suffixCells > 0) {
-        emptySuffixCells = Array(suffixCells).fill().map((_, i) => {
-            return (
-                <TableCell key={i} />
-            )
-        })
+    const handleColumnCopy = (cell) => {
+        const cellKey = collectionView ? cell.key : cell.tableTitle;
+        setCopiedCellId(cellKey);
+        copyColumnHandler(cell);
+        setTimeout(() => {
+            setCopiedCellId((prev) => prev === cellKey ? null : prev);
+        }, 5000)
     }
 
     return (
         <TableHead className={classes.head}>
             <TableRow>
-                {emptyPrefixCells}
-                {props.headCells.map((cell, index) => {
+                {headCells.map((cell) => {
                     // don't add cells which starts with xpath or cells that are hidden
-                    if (cell.key.startsWith('xpath_')) {
-                        return;
-                    }
+                    // if (cell.key.startsWith('xpath_')) {
+                    //     return;
+                    // }
                     // if (cell.showLess) return;
-                    let tableHeadColor = theme.palette.text.primary;
+                    let tableHeadColor = 'white';
                     if (cell.nameColor) {
                         const color = cell.nameColor.toLowerCase();
                         tableHeadColor = theme.palette.text[color];
                     }
-                    const cellKey = props.collectionView ? cell.key : cell.tableTitle;
+                    const cellKey = collectionView ? cell.key : cell.tableTitle;
                     const sortOrder = sortOrders.find(o => o.order_by === cellKey);
+                    const isSelected = copiedCellId === cellKey;
+                    const iconText = isSelected ? 'Column copied!' : 'Click to copy column';
                     return (
                         <TableCell
-                            key={index}
+                            key={cellKey}
                             className={`${classes.cell}`}
-                            sx={{ color: `${tableHeadColor} !important` }}
+                            sx={{ color: `${tableHeadColor}` }}
                             align='center'
                             padding='normal'
                             sortDirection={sortOrder ? sortOrder.sort_type : false}>
-                            {props.copyColumnHandler && (
-                                <Tooltip title="Click to copy column" disableInteractive>
-                                    <IconButton className={classes.icon} size='small' onClick={() => props.copyColumnHandler(cell)}>
-                                        <ContentCopy fontSize='small' />
+                            {copyColumnHandler && (
+                                <Tooltip title={iconText} disableInteractive>
+                                    <IconButton className={classes.icon} size='small' sx={{ color: 'inherit' }} onClick={() => handleColumnCopy(cell)}>
+                                        {isSelected ? <LibraryAddCheckRounded sx={{ color: 'success.main' }} fontSize='small' /> : <ContentCopy fontSize='small' />}
                                     </IconButton>
                                 </Tooltip>
                             )}
@@ -79,7 +78,7 @@ const CustomHeadCell = (props) => {
                                 onDoubleClick={() => removeSortHandler(cellKey)}>
                                 {cell.elaborateTitle ? cell.tableTitle : cell.title ? cell.title : cell.key}
                                 {sortOrder && sortOrder.order_by === cellKey ? (
-                                    <Box component="span" sx={visuallyHidden}>
+                                    <Box component='span' sx={visuallyHidden}>
                                         {sortOrder.sort_type === 'desc' ? 'sorted descending' : 'sorted ascending'}
                                     </Box>
                                 ) : null}
@@ -87,7 +86,6 @@ const CustomHeadCell = (props) => {
                         </TableCell>
                     )
                 })}
-                {emptySuffixCells}
             </TableRow>
         </TableHead>
     );

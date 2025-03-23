@@ -53,8 +53,8 @@ message WebPageUIData{
 }
 
 message UIQueryParam{
-  required string query_param_field = 1;
-  required string query_param_field_src = 2;
+  required string query_param_name = 1;
+  required string query_param_value_src = 2;
 }
 
 message OverrideDefaultCRUD{
@@ -96,13 +96,12 @@ message WidgetUIDataElement {
   optional string depending_proto_model_field_name_for_host = 18;
   optional string depending_proto_model_field_name_for_port = 19;
   optional bool depending_proto_model_for_cpp_port = 20;
-  repeated OverrideDefaultCRUD override_default_crud = 21;
-  optional bool is_model_alert_type = 22;
-  optional JoinSort join_sort = 23;
-  optional bool is_read_only = 24;
-  optional int32 default_rows_per_page = 25;  // supported values = 25, 50
-  optional int32 server_running_status_lvl = 26;
-  optional bool ws_connection_by_get_all = 27;  // for abbreviation widget
+  optional bool is_model_alert_type = 21;
+  optional JoinSort join_sort = 22;
+  optional bool is_read_only = 23;
+  optional int32 default_rows_per_page = 24;  // supported values = 25, 50
+  optional int32 server_running_status_lvl = 25;
+  optional bool ws_connection_by_get_all = 26;  // for abbreviation widget
 }
 
 message WidgetUIOption {

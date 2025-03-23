@@ -44,17 +44,17 @@ message PlanAlert {
       view_layout: UI_TABLE
     },
     server_running_status_lvl: 1,
-    override_default_crud: {
-      ui_crud_type: GET_ALL,
-      query_name: "filtered_plan_alert_by_plan_id",
-      query_src_model_name: "PairPlan",
-      ui_query_params: {
-        query_param_field: "plan_id",
-        query_param_field_src: "PairPlan.id"
-      },
-    },
     is_read_only: true,
     is_model_alert_type: true
+  };
+  option (FluxMsgOverrideDefaultCrud) = {
+    ui_crud_type: GET_ALL,
+    query_name: "filtered_plan_alert_by_plan_id",
+    query_src_model_name: "PairPlan",
+    ui_query_params: {
+      query_param_name: "plan_id",
+      query_param_value_src: "PairPlan.id"
+    }
   };
   option (FluxMsgJsonQuery) = {
       QueryName: "create_or_update_plan_alert"

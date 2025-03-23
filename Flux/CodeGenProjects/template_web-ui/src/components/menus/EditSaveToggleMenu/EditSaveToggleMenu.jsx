@@ -22,9 +22,10 @@ const EditSaveToggleMenu = ({
   onSave,
   isPinned,
   onPinToggle,
-  menuType
+  menuType,
+  disabled
 }) => {
-  if (!onModeToggle) return null;
+  if (!onModeToggle || disabled) return null;
 
   const menuBaseName = 'edit-save';
   const menuName = mode === MODES.READ ? 'edit' : 'save';

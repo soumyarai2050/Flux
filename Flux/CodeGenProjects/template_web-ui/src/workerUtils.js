@@ -143,7 +143,11 @@ export function getRowsFromAbbreviation(items, itemsDataDict, itemProps, abbrevi
                         const severityType = _.get(metadata, c.colorSource);
                         color = getColorTypeFromValue(c.colorCollection, severityType);
                     }
-                    value = [_.get(metadata, c.xpath), color];
+                    let fldValue = _.get(metadata, c.xpath);
+                    if (Array.isArray(fldValue)) {
+                        fldValue = fldValue.length;
+                    }
+                    value = [fldValue, color];
                 } else if (c.xpath === DB_ID) {
                     value = id;
                 } else if (c.xpath.indexOf("-") !== -1) {
@@ -461,13 +465,13 @@ export function getCommonKeyCollections(rows, tableColumns, hide = true, collect
     if (rows.length === 1 && (collectionView || repeatedView)) {
         const hasButtonType = tableColumns.find(obj => obj.type === 'button');
         if (hasButtonType) {
-            tableColumns.forEach(column => {
+            tableColumns.forEach((column) => {
                 if (hide && column.hide) return;
                 if (column.joinKey || column.commonGroupKey) return;
                 if (showLess && column.showLess) return;
                 let fieldName = column.tableTitle;
                 if (collectionView) {
-                    if (rows.length > 1 && (column.type === 'button' || column.type === 'progressBar' || column.type === 'alert_bubble')) {
+                    if ((column.type === 'button' || column.type === 'progressBar' || column.type === 'alert_bubble')) {
                         return;
                     }
                     fieldName = column.key;

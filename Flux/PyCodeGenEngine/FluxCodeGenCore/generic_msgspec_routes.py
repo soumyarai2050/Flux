@@ -79,7 +79,7 @@ async def broadcast_all_from_active_ws_data_set(active_ws_data_set: List[WSData]
         # else not required: passing provided list of dict if ws_data is not of projection type
 
         json_str = orjson.dumps(db_obj_dict_list, default=non_jsonable_types_handler).decode('utf-8')
-        await broadcast_callable(json_str, ws_data, tasks_list)
+        await broadcast_callable(json_str, db_obj_id_list, ws_data, tasks_list)
 
 
 async def broadcast_from_active_ws_data_set(active_ws_data_set: List[WSData], msgspec_class_type: Type[MsgspecModel],
@@ -105,10 +105,7 @@ async def broadcast_from_active_ws_data_set(active_ws_data_set: List[WSData], ms
         # else not required: passing provided db_obj_dict if ws_data is not of projection type
 
         json_str = orjson.dumps(db_obj_dict, default=non_jsonable_types_handler).decode("utf-8")
-        if broadcast_with_id:
-            await broadcast_callable(json_str, db_obj_id, ws_data, tasks_list)
-        else:
-            await broadcast_callable(json_str, ws_data, tasks_list)
+        await broadcast_callable(json_str, db_obj_id, ws_data, tasks_list)
 
 
 async def publish_ws(msgspec_class_type: Type[MsgspecModel], db_obj_id: Any, db_obj_dict: Dict[str, Any],

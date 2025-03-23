@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { cloneDeep, get, isEqual, isObject, set } from 'lodash';
+import { cloneDeep, get, isEqual, set } from 'lodash';
 import { DB_ID, LAYOUT_TYPES, MODEL_TYPES, MODES } from '../../constants';
 import * as Selectors from '../../selectors';
 import {
     clearxpath, getWidgetOptionById, sortColumns, generateObjectFromSchema,
-    addxpath, compareJSONObjects, getServerUrl, getWidgetTitle,
-    isWebSocketAlive, getApiUrlMetadata, removeRedundantFieldsFromRows
+    addxpath, compareJSONObjects, getWidgetTitle, getServerUrl,
+    isWebSocketAlive, getCrudOverrideDict, removeRedundantFieldsFromRows
 } from '../../utils';
 import { FullScreenModalOptional } from '../../components/Modal';
 import { ModelCard, ModelCardHeader, ModelCardContent } from '../../components/cards';
@@ -17,27 +17,27 @@ import {
     sortOrdersChangeHandler,
     rowsPerPageChangeHandler,
     layoutTypeChangeHandler,
-    dataSourceColorsChangeHandler,
     columnOrdersChangeHandler,
     showLessChangeHandler,
     overrideChangeHandler,
+    pinnedChangeHandler,
+    filtersChangeHandler,
+    dataSourceColorsChangeHandler,
     joinByChangeHandler,
     centerJoinToggleHandler,
     flipToggleHandler,
-    pinnedChangeHandler,
-    filtersChangeHandler,
     chartDataChangeHandler
 } from '../../utils/genericModelHandler';
 import { utils, writeFileXLSX } from 'xlsx';
 import CommonKeyWidget from '../../components/CommonKeyWidget';
-import { DataTable, PivotTable } from '../../components/tables';
 import { ConfirmSavePopup } from '../../components/Popup';
+import { DataTable, PivotTable } from '../../components/tables';
 import { ChartView } from '../../components/charts';
 import { useWebSocketWorker } from '../../hooks';
 
 function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
     const { schema: projectSchema } = useSelector((state) => state.schema);
-    const modelLayoutOption = useSelector((state) => Selectors.selectLayout(state, modelName), (prev, curr) => {
+    const modelLayoutOption = useSelector((state) => Selectors.selectModelLayout(state, modelName), (prev, curr) => {
         return JSON.stringify(prev) === JSON.stringify(curr);
     });
     const { schema: modelSchema, fieldsMetadata, actions, selector } = modelDataSource;
@@ -50,12 +50,11 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
     const [isWsDisabled, setIsWsDisabled] = useState(false);
     const [page, setPage] = useState(0);
     const [rows, setRows] = useState([]);
-    const [groupedRows, setGroupedRows] = useState([]);
     const [activeRows, setActiveRows] = useState([]);
     const [maxRowSize, setMaxRowSize] = useState(null);
     const [headCells, setHeadCells] = useState([]);
     const [commonKeys, setCommonKeys] = useState([]);
-    const [filteredCells, setFilteredCells] = useState([]);
+    const [sortedCells, setSortedCells] = useState([]);
     const [showHidden, setShowHidden] = useState(false);
     const [showMore, setShowMore] = useState(false);
     const [showAll, setShowAll] = useState(false);
@@ -64,44 +63,29 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
     const [isProcessingUserActions, setIsProcessingUserActions] = useState(false);
     const [reconnectCounter, setReconnectCounter] = useState(0);
     const [params, setParams] = useState(null);
+    const modelLayoutData = useMemo(() => getWidgetOptionById(modelLayoutOption.widget_ui_data, objId), [modelLayoutOption, objId]);
+    // layout type initial only available after getting modelLayoutOption
+    const [layoutType, setLayoutType] = useState(modelLayoutData.view_layout);
 
+    const dispatch = useDispatch();
+    const [, startTransition] = useTransition();
+
+    // refs
     const socketRef = useRef(null);
     const workerRef = useRef(null);
-    const modelObjDictRef = useRef({});
     const isWorkerBusyRef = useRef({
         isBusy: false,
         hasPendingUserActions: false,
     });
     const pendingUpdateRef = useRef(null);
     const changesRef = useRef({});
-
-    const dispatch = useDispatch();
-    const [_, startTransition] = useTransition();
-
-    const allowedLayoutTypes = useMemo(() => [LAYOUT_TYPES.TABLE, LAYOUT_TYPES.PIVOT_TABLE, LAYOUT_TYPES.CHART], [])
-    const modelLayoutData = useMemo(() => getWidgetOptionById(modelLayoutOption.widget_ui_data, objId), [modelLayoutOption, objId]);
-    const [layoutType, setLayoutType] = useState(modelLayoutData.view_layout);
-    const sortedCells = useMemo(() => {
-        return sortColumns(filteredCells, modelLayoutData.column_orders || [], modelLayoutData.join_by && modelLayoutData.join_by.length > 0, modelLayoutData.joined_at_center, modelLayoutData.flip, true);
-    }, [filteredCells, modelLayoutData.column_orders, modelLayoutData.join_by, modelLayoutData.joined_at_center, modelLayoutData.flip])
-    const modelTitle = useMemo(() => getWidgetTitle(modelLayoutOption, modelSchema, modelName, storedObj), [storedObj]);
-    const crudOverrideDict = useMemo(() => {
-        return modelSchema.widget_ui_data_element.override_default_crud?.reduce((acc, { ui_crud_type, query_name, ui_query_params }) => {
-            const paramDict = {};
-            ui_query_params.forEach(queryParam => {
-                let fieldSrc = queryParam.query_param_field_src;
-                fieldSrc = fieldSrc.substring(fieldSrc.indexOf('.') + 1);
-                paramDict[queryParam.query_param_field] = fieldSrc;
-            })
-            acc[ui_crud_type] = { endpoint: `query-${query_name}`, paramDict };
-            return acc;
-        }, {}) || {};
-    }, [])
-    const uiLimit = useMemo(() => modelSchema.ui_get_all_limit ?? null, []);
-
+    const crudOverrideDictRef = useRef(getCrudOverrideDict(modelSchema));
+    const allowedLayoutTypesRef = useRef([LAYOUT_TYPES.TABLE, LAYOUT_TYPES.PIVOT_TABLE, LAYOUT_TYPES.CHART]);
     // refs to identify change
     const optionsRef = useRef(null);
 
+    // calculated fields
+    const modelTitle = useMemo(() => getWidgetTitle(modelLayoutOption, modelSchema, modelName, storedObj), [storedObj]);
     const modelHandlerConfig = useMemo(() => (
         {
             modelName,
@@ -112,29 +96,40 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
             onLayoutChangeCallback: LayoutActions.setStoredObjByName
         }
     ), [objId, modelLayoutOption])
+    const uiLimit = modelSchema.ui_get_all_limit ?? null;
 
     useEffect(() => {
         const url = getServerUrl(modelSchema, dataSourceStoredObj, dataSource?.fieldsMetadata);
         setUrl(url);
-        if (dataSourceStoredObj && Object.keys(dataSourceStoredObj).length > 0 && crudOverrideDict.GET_ALL) {
-            const { paramDict } = crudOverrideDict.GET_ALL;
-            const params = Object.keys(paramDict).length > 0 ? {} : null;
-            Object.keys(paramDict).forEach((k) => {
-                const paramSrc = paramDict[k];
-                const paramValue = get(dataSourceStoredObj, paramSrc);
-                params[k] = paramValue;
-            })
-            setParams(params);
-        } else {
-            setParams(null);
+        let updatedParams = null;
+        if (dataSourceStoredObj && Object.keys(dataSourceStoredObj).length > 0 && crudOverrideDictRef.current?.GET_ALL) {
+            const { paramDict } = crudOverrideDictRef.current.GET_ALL;
+            if (Object.keys(paramDict).length > 0) {
+                Object.keys(paramDict).forEach((k) => {
+                    const paramSrc = paramDict[k];
+                    const paramValue = get(dataSourceStoredObj, paramSrc);
+                    if (paramValue !== null && paramValue !== undefined) {
+                        if (!updatedParams) {
+                            updatedParams = {};
+                        }
+                        updatedParams[k] = paramValue;
+                    }
+                })
+            }
         }
+        setParams((prev) => {
+            if (JSON.stringify(prev) === JSON.stringify(updatedParams)) {
+                return prev;
+            }
+            return updatedParams;
+        })
     }, [dataSourceStoredObj])
 
     useEffect(() => {
         if (url) {
             let args = { url };
-            if (crudOverrideDict.GET_ALL) {
-                const { endpoint, paramDict } = crudOverrideDict.GET_ALL;
+            if (crudOverrideDictRef.current?.GET_ALL) {
+                const { endpoint, paramDict } = crudOverrideDictRef.current.GET_ALL;
                 if (!params && Object.keys(paramDict).length > 0) {
                     return;
                 }
@@ -148,16 +143,15 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
         workerRef.current = new Worker(new URL("../../workers/repeated-root-model.worker.js", import.meta.url));
 
         workerRef.current.onmessage = (event) => {
-            const { rows, groupedRows, activeRows, maxRowSize, headCells, commonKeys, filteredCells } = event.data;
+            const { rows, activeRows, maxRowSize, headCells, commonKeys, sortedCells } = event.data;
 
             startTransition(() => {
                 setRows(rows);
-                setGroupedRows(groupedRows);
                 setActiveRows(activeRows);
                 setMaxRowSize(maxRowSize);
                 setHeadCells(headCells);
                 setCommonKeys(commonKeys);
-                setFilteredCells(filteredCells);
+                setSortedCells(sortedCells);
 
                 // If a new update came in while the worker was busy, send it now.
                 if (pendingUpdateRef.current) {
@@ -213,7 +207,10 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                 moreAll,
                 showLess: modelLayoutData.show_less || [],
                 showHidden,
-                showAll
+                showAll,
+                columnOrders: modelLayoutData.column_orders || [],
+                centerJoin: modelLayoutData.joined_at_center,
+                flip: modelLayoutData.flip
             }
 
             const updatedOptionsRef = {
@@ -267,7 +264,7 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
         onWorkerUpdate: handleModelDataSourceUpdate,
         onReconnect: handleReconnect,
         params,
-        crudOverrideDict,
+        crudOverrideDict: crudOverrideDictRef.current,
         uiLimit,
         isAlertModel: modelLayoutOption.is_model_alert_type
     })
@@ -298,8 +295,8 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
     const handleReload = () => {
         if (url) {
             let args = { url };
-            if (crudOverrideDict.GET_ALL) {
-                const { endpoint, paramDict } = crudOverrideDict.GET_ALL;
+            if (crudOverrideDictRef.current?.GET_ALL) {
+                const { endpoint, paramDict } = crudOverrideDictRef.current.GET_ALL;
                 if (!params && Object.keys(paramDict).length > 0) {
                     return;
                 }
@@ -351,6 +348,14 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
         setLayoutType(updatedLayoutType);
     }
 
+    const handleModeToggle = () => {
+        dispatch(actions.setMode(mode === MODES.READ ? MODES.EDIT : MODES.READ));
+    }
+
+    const handleFiltersChange = (updatedFilters) => {
+        filtersChangeHandler(modelHandlerConfig, updatedFilters);
+    }
+
     const handleDataSourceColorsChange = (updatedDataSourceColors) => {
         dataSourceColorsChangeHandler(modelHandlerConfig, updatedDataSourceColors);
     }
@@ -365,14 +370,6 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
 
     const handleFlipToggle = () => {
         flipToggleHandler(modelHandlerConfig, !modelLayoutData.flip);
-    }
-
-    const handleModeToggle = () => {
-        dispatch(actions.setMode(mode === MODES.READ ? MODES.EDIT : MODES.READ));
-    }
-
-    const handleFiltersChange = (updatedFilters) => {
-        filtersChangeHandler(modelHandlerConfig, updatedFilters);
     }
 
     const handleChartDataChange = (updatedChartData) => {
@@ -556,7 +553,7 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                         fieldsMetadata={fieldsMetadata}
                         chartData={modelLayoutOption.chart_data || []}
                         modelType={MODEL_TYPES.REPEATED_ROOT}
-                        onRowSelect={() => {}}
+                        onRowSelect={() => { }}
                         mode={mode}
                         onModeToggle={handleModeToggle}
                     />
@@ -618,7 +615,7 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                         // layout switch
                         layout={layoutType}
                         onLayoutSwitch={handleLayoutTypeChange}
-                        supportedLayouts={allowedLayoutTypes}
+                        supportedLayouts={allowedLayoutTypesRef.current}
                         // maximize
                         isMaximized={isMaximized}
                         onMaximizeToggle={handleFullScreenToggle}
@@ -635,6 +632,7 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                         modelType={MODEL_TYPES.REPEATED_ROOT}
                         pinned={modelLayoutData.pinned || []}
                         onPinToggle={handlePinnedChange}
+                        onReload={handleReload}
                     />
                 </ModelCardHeader>
                 <ModelCardContent

@@ -25,4 +25,5 @@ export { default as JoinMenu } from './JoinMenu';
 export { default as LayoutSwitchMenu } from './LayoutSwitchMenu';
 export { default as MaximizeRestoreToggleMenu } from './MaximizeRestoreToggleMenu';
 export { default as VisibilityMenu } from './VisibilityMenu';
+export { default as ReloadMenu } from './ReloadMenu';
 export { default as DynamicMenu } from './DynamicMenu';

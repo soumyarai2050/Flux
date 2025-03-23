@@ -25634,6 +25634,7 @@ def test_verify_deadlock_in_update_residuals_query(
 #     contact_status = email_book_service_native_web_client.get_contact_status_client(contact_status_id)
 #     assert not contact_status.kill_switch
 
+@pytest.mark.nightly
 def test_quote_create_from_df(sample_quote_df):
     # Test creating QuoteBaseModel from DataFrame
     quote = QuoteBaseModel.create_from_df(sample_quote_df)
@@ -25644,6 +25645,7 @@ def test_quote_create_from_df(sample_quote_df):
     assert isinstance(quote.premium, float)
 
 
+@pytest.mark.nightly
 def test_quote_create_from_df_array(sample_quote_df):
     # Test creating array of QuoteBaseModel from DataFrame
     quotes = QuoteBaseModel.create_from_df_array(sample_quote_df)
@@ -25652,6 +25654,7 @@ def test_quote_create_from_df_array(sample_quote_df):
     assert len(quotes) == sample_quote_df.height
     assert all(isinstance(q, QuoteBaseModel) for q in quotes)
 
+@pytest.mark.nightly
 def test_empty_dataframe():
     empty_df = pl.DataFrame({
         'px': [],
@@ -25665,6 +25668,7 @@ def test_empty_dataframe():
 
     assert QuoteBaseModel.create_from_df_array(empty_df) == []
 
+@pytest.mark.nightly
 def test_update_from_df(sample_quote_df):
     # Create initial quote
     quote = QuoteBaseModel(
@@ -25682,6 +25686,7 @@ def test_update_from_df(sample_quote_df):
     assert quote.qty == sample_quote_df['qty'][0]
     assert quote.premium == sample_quote_df['premium'][0]
 
+@pytest.mark.nightly
 def test_top_of_book_create_from_df(sample_top_of_book_df):
     # Test creating TopOfBookBaseModel from DataFrame
     tob = TopOfBookBaseModel.create_from_df(sample_top_of_book_df)

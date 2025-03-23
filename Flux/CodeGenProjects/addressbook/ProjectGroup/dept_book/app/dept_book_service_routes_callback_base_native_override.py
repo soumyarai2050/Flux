@@ -271,15 +271,21 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
                 get_premium_change_projection_from_bar_data_agg_pipeline)
 
     async def filtered_dash_by_dash_filters_query_pre(self, dash_class_type: Type[Dash], dash_name: str):
-        dash_filters_list: List[DashFilters] = await DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_read_dash_filters_http(get_dash_filter_by_dash_name(dash_name))
+        filtered_dash_list: List[Dash] = await self.underlying_filtered_dash_by_dash_filters(dash_name)
+        return filtered_dash_list
+
+    async def underlying_filtered_dash_by_dash_filters(self, dash_name: str, obj_id_list: List[int] | None = None):
+        dash_filters_list: List[
+            DashFilters] = await DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_read_dash_filters_http(
+            get_dash_filter_by_dash_name(dash_name))
         if dash_filters_list:
             dash_filters = dash_filters_list[0]
 
-            dash_filter_agg_pipeline = filter_dash_from_dash_filters_agg(dash_filters)
+            dash_filter_agg_pipeline = filter_dash_from_dash_filters_agg(dash_filters, obj_id_list)
             agg_pipeline = {"aggregate": dash_filter_agg_pipeline}
-            filtered_dash_list = DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_read_dash_http(agg_pipeline)
+            filtered_dash_list = await DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_read_dash_http(
+                agg_pipeline)
             return filtered_dash_list
-
         return []
 
     async def filtered_dash_by_dash_filters_query_ws_pre(self, *args):
@@ -296,31 +302,34 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
             raise HTTPException(detail=err_str_, status_code=404)
         return self.filtered_dash_by_dash_filters_callable, dash_filter_agg_pipeline
 
-    async def filtered_dash_by_dash_filters_callable(self, obj_json_str: str, **kwargs):
-        data = await DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_filtered_dash_by_dash_filters_query_http(kwargs.get("dash_name"))
-        return_obj_bytes = msgspec.json.encode(data, enc_hook=Dash.enc_hook)
-        return return_obj_bytes
+    async def filtered_dash_by_dash_filters_callable(self, obj_json_str: str, obj_id_or_list: int | List[int], **kwargs):
+        if isinstance(obj_id_or_list, int):
+            obj_id_or_list = [obj_id_or_list]
+        filtered_dash_list: List[Dash] = await self.underlying_filtered_dash_by_dash_filters(kwargs.get("dash_name"), obj_id_or_list)
+        return_obj_bytes = msgspec.json.encode(filtered_dash_list, enc_hook=Dash.enc_hook)
+        return_obj_json_str = return_obj_bytes.decode("utf-8")
+        return return_obj_json_str
 
-async def get_vwap_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str, **kwargs):
+async def get_vwap_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str, obj_id_or_list: int | List[int], **kwargs):
     return bar_data_obj_json_str
 
 
-async def get_vwap_n_vwap_change_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str, **kwargs):
+async def get_vwap_n_vwap_change_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str, obj_id_or_list: int | List[int], **kwargs):
     return bar_data_obj_json_str
 
 
-async def get_vwap_change_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str, **kwargs):
+async def get_vwap_change_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str, obj_id_or_list: int | List[int], **kwargs):
     return bar_data_obj_json_str
 
 
-async def get_premium_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str, **kwargs):
+async def get_premium_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str, obj_id_or_list: int | List[int], **kwargs):
     return bar_data_obj_json_str
 
 
-async def get_premium_n_premium_change_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str, **kwargs):
+async def get_premium_n_premium_change_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str, obj_id_or_list: int | List[int], **kwargs):
     return bar_data_obj_json_str
 
 
-async def get_premium_change_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str, **kwargs):
+async def get_premium_change_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str, obj_id_or_list: int | List[int], **kwargs):
     return bar_data_obj_json_str
 

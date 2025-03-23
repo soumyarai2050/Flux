@@ -23,7 +23,7 @@ import classes from './Cell.module.css';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
-import CopyToClipboard from './CopyToClipboard';
+import ClipboardCopier from './ClipboardCopier';
 import AlertBubble from './AlertBubble';
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -220,7 +220,7 @@ const Cell = (props) => {
         required = collection.required;
 
         if (collection.autocomplete) {
-            value = value ? value : null;
+            value = value ? value : value === 0 ? '0' : null;
         } else if (type === DATA_TYPES.BOOLEAN) {
             value = value ? value : value === false ? false : null;
         } else if (type === DATA_TYPES.ENUM) {
@@ -336,8 +336,10 @@ const Cell = (props) => {
                     <Autocomplete
                         id={collection.key}
                         options={collection.options}
-                        getOptionLabel={(option) => option}
-                        isOptionEqualToValue={(option, value) => option === value}
+                        getOptionLabel={(option) => option?.toString()}
+                        isOptionEqualToValue={(option, value) => (
+                            option === value || (option === 0 && value === 0)
+                        )}
                         disableClearable
                         disabled={disabled}
                         forcePopupIcon={false}
@@ -351,7 +353,7 @@ const Cell = (props) => {
                         inputValue={autocompleteInputValue}
                         onInputChange={(e, newInputValue) => setAutocompleteInputValue(newInputValue)}
                         filterOptions={(options, { inputValue }) =>
-                            options.filter(option => option.toLowerCase().includes(inputValue.toLowerCase()))
+                            options.filter(option => String(option).toLowerCase().includes(inputValue.toLowerCase()))
                         }
                         onBlur={onFocusOut}
                         autoFocus
@@ -360,7 +362,7 @@ const Cell = (props) => {
                             setAutocompleteInputValue('');
                         }}
                         renderInput={(params) => {
-                            const filteredOptions = collection.options.filter(option => option.toLowerCase().includes(inputValue.toLowerCase()));
+                            const filteredOptions = collection.options.filter(option => String(option).toLowerCase().includes(autocompleteInputValue.toLowerCase()));
                             return (
                                 <TextField
                                     {...params}
@@ -911,7 +913,7 @@ const Cell = (props) => {
                     align='center'
                     size='small'
                     onClick={onOpenTooltip}>
-                    <CopyToClipboard text={clipboardText} copy={clipboardText !== null} />
+                    <ClipboardCopier text={clipboardText} />
                     <ClickAwayListener onClickAway={onCloseTooltip}>
                         <div className={classes.abbreviated_json_cell}>
                             <Tooltip

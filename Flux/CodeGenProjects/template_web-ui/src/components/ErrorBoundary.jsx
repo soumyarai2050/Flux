@@ -59,7 +59,7 @@ const ErrorBoundary = ({ children }) => (
     <Boundary
         FallbackComponent={ErrorFallback}
         onReset={() => {
-            console.log('Error boundary reset triggered.');
+            console.warn('Error boundary reset triggered.');
         }}
     >
         {children}

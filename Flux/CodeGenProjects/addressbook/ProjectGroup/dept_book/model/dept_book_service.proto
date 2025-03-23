@@ -68,6 +68,7 @@ message Dash {
     PatchOp: AggregateType_UNSPECIFIED,
     PatchAllOp: AggregateType_UNSPECIFIED,   // currently set for tests, once real use-case is found can be removed
     DeleteOp: AggregateType_UNSPECIFIED,
+    DeleteAllOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
   option (FluxMsgJsonQuery) = {
@@ -76,8 +77,7 @@ message Dash {
         QueryParamName: "dash",
         QueryParamDataType: "DashBaseModel"
       }
-      QueryRouteType: PATCH,
-      RequireJsSliceChanges: true
+      QueryRouteType: PATCH
   };
   option (FluxMsgJsonQuery) = {
       QueryName: "filtered_dash_by_dash_filters",
@@ -86,6 +86,15 @@ message Dash {
         QueryParamDataType: "str"
       }
       QueryType: BOTH
+  };
+  option (FluxMsgOverrideDefaultCrud) = {
+    ui_crud_type: GET_ALL,
+      query_name: "filtered_dash_by_dash_filters",
+      query_src_model_name: "DashCollection",
+      ui_query_params: {
+        query_param_name: "dash_name",
+        query_param_value_src: "DashCollection.dash_name"
+      },
   };
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
@@ -100,6 +109,7 @@ message DashCollection {
     ReadOp: AggregateType_UNSPECIFIED,
     UpdateOp: AggregateType_UNSPECIFIED,
     DeleteOp: AggregateType_UNSPECIFIED,
+    DeleteAllOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
   option (FluxMsgWidgetUIDataElement) = {
@@ -134,6 +144,7 @@ message DashFilters {
     UpdateOp: AggregateType_UNSPECIFIED,
     PatchOp: AggregateType_UNSPECIFIED,
     DeleteOp: AggregateType_UNSPECIFIED,
+    DeleteAllOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
   option (FluxMsgWidgetUIDataElement) = {

@@ -132,7 +132,8 @@ class PathWSConnectionManager(WSConnectionManager):
                 logging.error(f"Unexpected! likely bug, ws: {ws} not in active_ws_n_callable_tuple_set: {str(self)}")
             await WSConnectionManager.remove_from_master_ws_set(ws)
 
-    async def broadcast(self, json_str: str, ws_data: WSData, task_list: List[asyncio.Task]):
+    async def broadcast(self, json_str: str, obj_id_or_list: int | List[int],
+                        ws_data: WSData, task_list: List[asyncio.Task]):
         remove_websocket: WebSocket | None = None
         try:
             async with self.rlock:
@@ -141,7 +142,7 @@ class PathWSConnectionManager(WSConnectionManager):
                 kwargs_dict = ws_data.filter_callable_kwargs
                 # somehow this was found as a string
                 if filter_callable is not None:
-                    json_str = filter_callable(json_str, **kwargs_dict)
+                    json_str = await filter_callable(json_str, obj_id_or_list, **kwargs_dict)
                 # else not required: if no filter_callable exists then pass json_str as is
 
                 if json_str:
@@ -232,7 +233,7 @@ class PathWithIdWSConnectionManager(WSConnectionManager):
     def get_activ_ws_tuple_list_with_id(self, obj_id) -> Set[WSData] | None:
         return self.id_to_active_ws_data_list_dict.get(obj_id)
 
-    async def broadcast(self, json_str, obj_id: Any, ws_data: WSData, task_list: List[asyncio.Task]):
+    async def broadcast(self, json_str, obj_id: int, ws_data: WSData, task_list: List[asyncio.Task]):
         async with self.rlock:
             remove_websocket: WebSocket | None = None
             try:
@@ -240,7 +241,7 @@ class PathWithIdWSConnectionManager(WSConnectionManager):
                 filter_callable_kwargs = ws_data.filter_callable_kwargs
                 # somehow this was found as a string
                 if filter_callable is not None:
-                    json_str = filter_callable(json_str, **filter_callable_kwargs)
+                    json_str = await filter_callable(json_str, obj_id, **filter_callable_kwargs)
                 # else not required: if no filter_callable exists then pass json_str as is
 
                 if json_str:

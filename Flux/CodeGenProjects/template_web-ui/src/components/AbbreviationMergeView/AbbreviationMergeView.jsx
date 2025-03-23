@@ -21,6 +21,7 @@ import Cell from '../../components/Cell';
 import { getBufferAbbreviatedOptionLabel } from '../../utils';
 import styles from './AbbreviationMergeView.module.css';
 import { flux_toggle, flux_trigger_strat } from '../../projectSpecificUtils';
+import ClipboardCopier from '../ClipboardCopier';
 
 /**
  * BufferedView renders an autocomplete dropdown and a load button
@@ -181,12 +182,7 @@ const LoadedView = ({
       values.push(row[columnName]);
     })
     const text = values.join('\n');
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(text);
-    } else {
-      setClipboardText(text);
-    }
-    // setToastMessage("column copied to clipboard: " + columnName);
+    setClipboardText(text);
   }
 
   const handleButtonClick = (e, action, xpath, value, dataSourceId, source, force = false) => {
@@ -422,6 +418,7 @@ const LoadedView = ({
           onRowsPerPageChange={handleRowsPerPageChange}
         />
       )}
+      <ClipboardCopier text={clipboardText} />
     </TableContainer>
   );
 };

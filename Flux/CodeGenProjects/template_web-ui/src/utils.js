@@ -2062,7 +2062,6 @@ export function compareJSONObjects(obj1, obj2, fieldsMetadata, isCreate = false)
                 continue;
             }
 
-
             const metadata = combinedFieldsMetadata.find(col => col.tableTitle === path);
 
             if (!metadata) {
@@ -3587,5 +3586,50 @@ export const getDataSourceObj = (dataSources, sourceName) => {
         alert('error');
     }
     return dataSource;
+}
+
+export function getCrudOverrideDict(modelSchema) {
+    return modelSchema.override_default_crud?.reduce((acc, { ui_crud_type, query_name, ui_query_params }) => {
+        const paramDict = {};
+        ui_query_params.forEach(({ query_param_name, query_param_value_src }) => {
+            const param_value_src = query_param_value_src.substring(query_param_value_src.indexOf('.') + 1);
+            paramDict[query_param_name] = param_value_src;
+        })
+        acc[ui_crud_type] = { endpoint: `query-${query_name}`, paramDict };
+        return acc;
+    }, {}) || null;
+}
+
+export function getDataSourcesCrudOverrideDict(dataSources) {
+    const dataSourcesCrudOverrideDict = {};
+    dataSources.forEach(({ name, schema }) => {
+        const crudOverrideDict = getCrudOverrideDict(schema);
+        if (crudOverrideDict) {
+            dataSourcesCrudOverrideDict[name] = crudOverrideDict;
+        }
+    });
+    if (Object.keys(dataSourcesCrudOverrideDict).length === 0) {
+        return null;
+    }
+    return dataSourcesCrudOverrideDict;
+}
+
+export function fastClone(obj) {
+    return JSON.parse(JSON.stringify(obj));
+}
+
+export function getActiveIds(activeRows, idField) {
+    const activeObjIds = new Set();
+    if (activeRows.length > 0) {
+        activeRows.forEach((groupedRow) => {
+            groupedRow.forEach((row) => {
+                const id = row[idField];
+                if (id) {
+                    activeObjIds.add(id);
+                }
+            });
+        });
+    }
+    return activeObjIds;
 }
 

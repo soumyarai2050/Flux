@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
     ColumnSettingsMenu, CreateMenu, DataSourceColorMenu, DownloadMenu, DynamicMenu,
-    EditSaveToggleMenu, FilterMenu, JoinMenu, LayoutSwitchMenu, MaximizeRestoreToggleMenu, VisibilityMenu
+    EditSaveToggleMenu, FilterMenu, JoinMenu, LayoutSwitchMenu, MaximizeRestoreToggleMenu, ReloadMenu, VisibilityMenu
 } from './menus';
 import { MODEL_TYPES } from '../constants';
 import { cloneDeep } from 'lodash';
@@ -58,7 +58,9 @@ const MenuGroup = ({
     onButtonToggle,
     pinned,
     onPinToggle,
-    isAbbreviationSource
+    isAbbreviationSource,
+    isCreating,
+    onReload
 }) => {
     const [anchorEl, setAnchorEl] = useState(null);
 
@@ -170,7 +172,8 @@ const MenuGroup = ({
         'download',
         'edit-save',
         'layout-switch',
-        'maximize-restore'
+        'maximize-restore',
+        'reload'
     ]
 
     const renderMenu = (menuName, menuType = 'icon') => {
@@ -295,6 +298,7 @@ const MenuGroup = ({
                         isPinned={pinned.includes(menuName)}
                         onMenuClose={handleMenuClose}
                         onPinToggle={handlePinToggle}
+                        disabled={isAbbreviationSource && isCreating}
                     />
                 );
             case 'layout-switch':
@@ -322,6 +326,17 @@ const MenuGroup = ({
                         onPinToggle={handlePinToggle}
                     />
                 );
+            case 'reload':
+                return (
+                    <ReloadMenu
+                        key={menuKey}
+                        onReload={onReload}
+                        menuType={menuType}
+                        isPinned={pinned.includes(menuName)}
+                        onMenuClose={handleMenuClose}
+                        onPinToggle={handlePinToggle}
+                    />
+                )
         }
     }
 

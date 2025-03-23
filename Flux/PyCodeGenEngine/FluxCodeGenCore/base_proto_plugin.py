@@ -147,13 +147,13 @@ class BaseProtoPlugin(ABC):
     widget_ui_option_alert_bubble_color_field: ClassVar[str] = "alert_bubble_color"
     widget_ui_option_bind_id_fld_field: ClassVar[str] = "bind_id_fld"
     widget_ui_option_dynamic_widget_title_fld_field: ClassVar[str] = "dynamic_widget_title_fld"
-    widget_ui_option_override_default_crud_field: ClassVar[str] = "override_default_crud"
-    widget_ui_option_override_default_crud_ui_crud_type_field: ClassVar[str] = "ui_crud_type"
-    widget_ui_option_override_default_crud_query_name_field: ClassVar[str] = "query_name"
-    widget_ui_option_override_default_crud_query_src_model_name_field: ClassVar[str] = "query_src_model_name"
-    widget_ui_option_override_default_crud_ui_query_params_field: ClassVar[str] = "ui_query_params"
-    widget_ui_option_override_default_crud_ui_query_params_field_fld: ClassVar[str] = "query_param_field"
-    widget_ui_option_override_default_crud_ui_query_params_src_field: ClassVar[str] = "query_param_field_src"
+    flux_msg_override_default_crud: ClassVar[str] = "FluxMsgOverrideDefaultCrud"
+    override_default_crud_option_ui_crud_type_field: ClassVar[str] = "ui_crud_type"
+    override_default_crud_option_query_name_field: ClassVar[str] = "query_name"
+    override_default_crud_option_query_src_model_name_field: ClassVar[str] = "query_src_model_name"
+    override_default_crud_option_ui_query_params_field: ClassVar[str] = "ui_query_params"
+    override_default_crud_option_ui_query_params_name_field: ClassVar[str] = "query_param_name"
+    override_default_crud_option_ui_query_params_value_src_field: ClassVar[str] = "query_param_value_src"
     widget_ui_option_depending_proto_model_field_name_for_host: ClassVar[str] = \
         "depending_proto_model_field_name_for_host"
     widget_ui_option_depending_proto_model_field_name_for_port: ClassVar[str] = \
@@ -258,10 +258,12 @@ class BaseProtoPlugin(ABC):
         widget_ui_option_depending_proto_model_field_name_for_port,
         widget_ui_option_alert_bubble_source_field,
         widget_ui_option_alert_bubble_color_field,
-        widget_ui_option_override_default_crud_query_src_model_name_field,
-        widget_ui_option_override_default_crud_ui_query_params_src_field,
         widget_ui_option_bind_id_fld_field,
         widget_ui_option_dynamic_widget_title_fld_field
+    ]
+    override_default_crud_option_fields_having_msg_names: List[str] = [
+        override_default_crud_option_query_src_model_name_field,
+        override_default_crud_option_ui_query_params_value_src_field,
     ]
 
     def __init__(self, base_dir_path: str):
@@ -1045,7 +1047,6 @@ class BaseProtoPlugin(ABC):
 
         return msg_list
 
-
     def handle_n_get_ui_widget_data_option_values_having_msg_name(self, message: protogen.Message,
                                                                   all_message_dict: Dict[str, protogen.Message]):
         widget_ui_data_option_value_dict = \
@@ -1059,28 +1060,38 @@ class BaseProtoPlugin(ABC):
                 case_handled_value = self.handle_options_value_having_msg_or_fld_name(value, key,
                                                              all_message_dict, hard_msg_check=True)
                 widget_ui_data_option_value_dict[key] = case_handled_value
-            elif key == BaseProtoPlugin.widget_ui_option_override_default_crud_field:
-                for idx, override_default_crud_option_val in enumerate(value):
-                    for override_default_crud_key, override_default_crud_value in override_default_crud_option_val.items():
-                        if override_default_crud_key in BaseProtoPlugin.widget_ui_option_fields_having_msg_names:
-                            case_handled_value = self.handle_options_value_having_msg_or_fld_name(override_default_crud_value, override_default_crud_key,
-                                                                                                  all_message_dict, hard_msg_check=True)
-                            override_default_crud_option_val[override_default_crud_key] = case_handled_value
-                        elif override_default_crud_key == BaseProtoPlugin.widget_ui_option_override_default_crud_ui_query_params_field:
-                            for idx, ui_query_params_option_val_dict in enumerate(override_default_crud_value):
-                                for ui_query_params_key, ui_query_params_val in ui_query_params_option_val_dict.items():
-                                    if ui_query_params_key in BaseProtoPlugin.widget_ui_option_fields_having_msg_names:
-                                        case_handled_value = self.handle_options_value_having_msg_or_fld_name(
-                                            ui_query_params_val, ui_query_params_key,
-                                            all_message_dict, hard_msg_check=True)
-                                        ui_query_params_option_val_dict[ui_query_params_key] = case_handled_value
             else:
                 widget_ui_data_option_value_dict[key] = value
 
         # removing none from dict
         widget_ui_data_option_value_dict = remove_none_values(widget_ui_data_option_value_dict)
-
         return widget_ui_data_option_value_dict
+
+    def handle_n_get_override_default_crud_option_value_having_msg_name(self, message: protogen.Message,
+                                                                        all_message_dict: Dict[str, protogen.Message]):
+        override_default_crud_option_value_dict_list = \
+            self.get_complex_option_value_from_proto(message,
+                                                     BaseProtoPlugin.flux_msg_override_default_crud,
+                                                     is_option_repeated=True)
+        for idx, override_default_crud_option_val in enumerate(override_default_crud_option_value_dict_list):
+            for override_default_crud_key, override_default_crud_value in override_default_crud_option_val.items():
+                if override_default_crud_key in BaseProtoPlugin.override_default_crud_option_fields_having_msg_names:
+                    case_handled_value = self.handle_options_value_having_msg_or_fld_name(override_default_crud_value,
+                                                                                          override_default_crud_key,
+                                                                                          all_message_dict,
+                                                                                          hard_msg_check=True)
+                    override_default_crud_option_val[override_default_crud_key] = case_handled_value
+                elif override_default_crud_key == BaseProtoPlugin.override_default_crud_option_ui_query_params_field:
+                    for idx, ui_query_params_option_val_dict in enumerate(override_default_crud_value):
+                        for ui_query_params_key, ui_query_params_val in ui_query_params_option_val_dict.items():
+                            if ui_query_params_key in BaseProtoPlugin.override_default_crud_option_fields_having_msg_names:
+                                case_handled_value = self.handle_options_value_having_msg_or_fld_name(
+                                    ui_query_params_val, ui_query_params_key,
+                                    all_message_dict, hard_msg_check=True)
+                                ui_query_params_option_val_dict[ui_query_params_key] = case_handled_value
+        # removing none from dict
+        override_default_crud_option_value_dict_list = remove_none_values(override_default_crud_option_value_dict_list)
+        return override_default_crud_option_value_dict_list
 
     def _process(self, plugin: ExtendedProtogenPlugin) -> None:
         """

@@ -169,23 +169,27 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
                                 self.repeated_msg_list.append(message)
 
                             # checking if this message has dependency on any model - if it has then updating msg_name_to_dependent_msg_name_list_dict
-                            dependent_msg_name = widget_ui_data_option_value_dict.get(BaseJSLayoutPlugin.widget_ui_option_depending_proto_model_name_field)
+                            dependent_msg_name = widget_ui_data_option_value_dict.get(
+                                BaseJSLayoutPlugin.widget_ui_option_depending_proto_model_name_field)
                             if dependent_msg_name is not None and dependent_msg_name in message_name_list:
-                                self.msg_name_to_dependent_msg_name_list_dict[message.proto.name] = [dependent_msg_name]
+                                self.msg_name_to_dependent_msg_name_list_dict[message.proto.name] = [
+                                    dependent_msg_name]
                             # else not required: if no dependency then no need to update msg_name_to_dependent_msg_name_list_dict
-                            crud_override_option_list = widget_ui_data_option_value_dict.get(BaseJSLayoutPlugin.widget_ui_option_override_default_crud_field)
-                            if crud_override_option_list:
-                                crud_override_option_dict = crud_override_option_list[0]
-                                if crud_override_option_dict:
-                                    crud_dependent_msg_name = crud_override_option_dict.get(BaseJSLayoutPlugin.widget_ui_option_override_default_crud_query_src_model_name_field)
-                                    if dependent_msg_name is not None and dependent_msg_name != crud_dependent_msg_name:
-                                        raise Exception(f"multiple dependents found for non-filter model "
-                                                        f"{message.proto.name}, {dependent_msg_name=}, "
-                                                        f"{crud_dependent_msg_name=}")
+
+                            if BaseProtoPlugin.is_option_enabled(message,
+                                                                   BaseJSLayoutPlugin.flux_msg_override_default_crud):
+                                override_default_crud_option_val_list: List[Dict] = (
+                                    BaseJSLayoutPlugin.get_complex_option_value_from_proto(
+                                        message, BaseJSLayoutPlugin.flux_msg_override_default_crud,
+                                        is_option_repeated=True))
+
+                                for override_default_crud_option_val in override_default_crud_option_val_list:
+                                    crud_dependent_msg_name = override_default_crud_option_val.get(
+                                        BaseJSLayoutPlugin.override_default_crud_option_query_src_model_name_field)
                                     if crud_dependent_msg_name is not None and crud_dependent_msg_name in message_name_list:
-                                        self.msg_name_to_dependent_msg_name_list_dict[message.proto.name] = [crud_dependent_msg_name]
-                                    # else not required: if no dependency then no need to update msg_name_to_dependent_msg_name_list_dict
-                            # else not required: no crud override set
+                                        self.msg_name_to_dependent_msg_name_list_dict[message.proto.name] = [
+                                            crud_dependent_msg_name]
+                            # else not required: if no dependency then no need to update msg_name_to_dependent_msg_name_list_dict
                         elif BaseJSLayoutPlugin.flux_msg_abbreviated_filter_layout_value == layout_type:
                             self.abbreviated_merge_layout_msg_list.append(message)
                             dependent_msg_name_list = self._get_msg_names_list_used_in_abb_option_val(message)

@@ -16,7 +16,7 @@ import Icon, { ToggleIcon } from '../Icon';
 import { LoadLayoutPopup, SaveLayoutPopup } from '../Popup';
 import { COOKIE_NAME } from '../../config';
 import { DB_ID } from '../../constants';
-import { useQueryParams } from '../../hooks';
+import { useURLParams } from '../../hooks';
 import { cloneDeep } from 'lodash';
 
 const defaultGridProps = {
@@ -57,7 +57,7 @@ const Layout = ({ projectName, theme, onThemeToggle }) => {
   const [profileId, setProfileId] = useState(''); // save layout by profile input
   const dispatch = useDispatch();
 
-  const queryParams = useQueryParams();
+  const urlParams = useURLParams();
 
   /**
    * Fetch the layout data on mount and update the loading state.
@@ -73,7 +73,7 @@ const Layout = ({ projectName, theme, onThemeToggle }) => {
     if (isLoading) return;
 
     // Retrieve the active layout ID from sessionStorage.
-    const activeLayoutId = queryParams?.layout ?? sessionStorage.getItem(COOKIE_NAME);
+    const activeLayoutId = urlParams?.layout ?? sessionStorage.getItem(COOKIE_NAME);
     let newLayout;
     let newVisibleComponents;
 

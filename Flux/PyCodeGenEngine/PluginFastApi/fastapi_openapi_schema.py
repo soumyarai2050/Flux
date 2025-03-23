@@ -1,6 +1,6 @@
 # standard imports
 from abc import ABC
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Final
 import logging
 
 import protogen
@@ -12,6 +12,9 @@ from FluxPythonUtils.scripts.file_n_general_utility_functions import convert_cam
 
 
 class FastapiOpenapiSchema(BaseFastapiPlugin, ABC):
+    param_query_type: Final[str] = "query"
+    param_path_type: Final[str] = "path"
+
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
         self.cache_schema_message_name_to_res_type_list_dict: Dict[str, List[str]] = {}
@@ -403,13 +406,14 @@ class FastapiOpenapiSchema(BaseFastapiPlugin, ABC):
         output_str += f'\n'
         return output_str
 
-    def _handle_query_parameter_req_body(self, query_params_name_n_param_type_tuple_list: List[Tuple[str, str]]) -> str:
+    def _handle_query_parameter_req_body(self, query_params_name_n_param_type_tuple_list: List[Tuple[str, str]],
+                                         query_param_type: str) -> str:
         output_str = '                "parameters": [\n'
         for query_param_name_n_param_type in query_params_name_n_param_type_tuple_list:
             query_param_name, param_type = query_param_name_n_param_type
             output_str += '                    {\n'
             output_str += f'                        "name": "{query_param_name}",\n'
-            output_str += '                        "in": "query",\n'
+            output_str += f'                        "in": "{query_param_type}",\n'
             if 'None' in param_type:
                 output_str += '                        "required": False,\n'
             else:
@@ -577,6 +581,33 @@ class FastapiOpenapiSchema(BaseFastapiPlugin, ABC):
         output_str += '        }'
         return output_str
 
+    def handle_index_req_body(self, message: protogen.Message) -> str:
+        index_fields: List[protogen.Field] = [field for field in message.fields
+                                              if self.is_bool_option_enabled(field, FastapiOpenapiSchema.flux_fld_index)]
+
+        field_query = "/".join(["{" + f"{field.proto.name}" + "}" for field in index_fields])
+
+        field_query_param_str_list: List[str] = []
+        query_params_name_n_param_type_tuple_list: List[Tuple[str, str]] = []
+        for field in message.fields:
+            if self.is_bool_option_enabled(field, FastapiOpenapiSchema.flux_fld_index):
+                index_fields.append(field)
+                field_query_param_str_list.append("{" + f"{field.proto.name}" + "}")
+                query_params_name_n_param_type_tuple_list.append((field.proto.name, self.proto_to_py_datatype(field)))
+
+        message_name = message.proto.name
+        message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
+        output_str = (f'        "/{self.proto_file_package}/get-{message_name_snake_cased}-from-index-fields/' +
+                      f'{field_query}": ' + '{\n')
+        output_str += '            "get": {\n'
+        output_str += f'                "summary": "Index api for {message_name}",\n'
+        output_str += f'                "responses": {message_name_snake_cased}_list_response,\n'
+        output_str += self._handle_query_parameter_req_body(query_params_name_n_param_type_tuple_list,
+                                                            FastapiOpenapiSchema.param_path_type)
+        output_str += '            }\n'
+        output_str += '        }'
+        return output_str
+
     def handle_DELETE_req_body(self, message: protogen.Message) -> str:
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
@@ -635,7 +666,8 @@ class FastapiOpenapiSchema(BaseFastapiPlugin, ABC):
             output_str += '            "get": {\n'
             output_str += f'                "summary": "Get query api for {query_name} query",\n'
             output_str += f'                "responses": {message_name_snake_cased}_list_response,\n'
-            output_str += self._handle_query_parameter_req_body(query_params_name_n_param_type_tuple_list)
+            output_str += self._handle_query_parameter_req_body(query_params_name_n_param_type_tuple_list,
+                                                                FastapiOpenapiSchema.param_query_type)
             output_str += '            }\n'
             output_str += '        }'
             return output_str
@@ -689,7 +721,8 @@ class FastapiOpenapiSchema(BaseFastapiPlugin, ABC):
         output_str += '                    },\n'
         output_str += '                    "required": True\n'
         output_str += '                },\n'
-        output_str += self._handle_query_parameter_req_body(query_params_name_n_param_type_tuple_list)
+        output_str += self._handle_query_parameter_req_body(query_params_name_n_param_type_tuple_list,
+                                                            FastapiOpenapiSchema.param_query_type)
         output_str += '            }\n'
         output_str += '        }'
         return output_str
@@ -777,7 +810,8 @@ class FastapiOpenapiSchema(BaseFastapiPlugin, ABC):
             output_str += '                    },\n'
             output_str += self.handle_status_404_response(indent_count=16)
             output_str += '                },\n'
-            output_str += self._handle_query_parameter_req_body(query_params_name_n_param_type_tuple_list)
+            output_str += self._handle_query_parameter_req_body(query_params_name_n_param_type_tuple_list,
+                                                                FastapiOpenapiSchema.param_query_type)
             output_str += '            }\n'
             output_str += '        },\n'
         return output_str
@@ -857,6 +891,13 @@ class FastapiOpenapiSchema(BaseFastapiPlugin, ABC):
                         output_str += self.handle_GET_all_req_body(message)
 
                     output_str += ",\n"
+
+            for field in message.fields:
+                if self.is_bool_option_enabled(field, FastapiOpenapiSchema.flux_fld_index):
+                    output_str += self.handle_index_req_body(message)
+                    output_str += ",\n"
+                    break
+                # else not required: Avoiding field if index option is not enabled
 
         # query req_body and response
         for message in self.message_to_query_option_list_dict:

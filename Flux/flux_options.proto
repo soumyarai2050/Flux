@@ -136,8 +136,7 @@ message MessageJsonQuery{
   repeated QueryParamData QueryParams = 3;  // list of params required for aggregation
   optional QueryTypeEnum QueryType = 5 [default=HTTP];
   optional QueryRouteTypeEnum QueryRouteType = 6 [default=GET];
-  optional bool RequireJsSliceChanges = 7 [default=false];
-  optional bool IncludeDataframeClients = 8[default=false];
+  optional bool IncludeDataframeClients = 7[default=false];
 }
 
 
@@ -260,6 +259,7 @@ extend google.protobuf.MessageOptions
   optional WidgetUIOption FluxMsgWidgetUIOption = 55260; // Use this to populate ui widget data for layout messages
   repeated MessageButtonQuery FluxMsgButtonQuery = 55261;   // adds file query for message
   optional MessageJsonRoot FluxMsgCppJsonRoot = 55262;
+  repeated OverrideDefaultCRUD FluxMsgOverrideDefaultCrud = 55263;
 
   //Complexity Option - 56
   optional string FluxMsgCmplxHigh = 56151;

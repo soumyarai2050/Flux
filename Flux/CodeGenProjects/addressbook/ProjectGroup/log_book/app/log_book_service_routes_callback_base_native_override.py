@@ -1382,7 +1382,7 @@ def _handle_plan_alert_ids_list_update_for_start_id_in_filter_callable(
         # else not required: mismatched start_id case - not this ws' plan_id
 
 
-def filtered_plan_alert_by_plan_id_query_callable(plan_alert_obj_json_str: str, **kwargs):
+async def filtered_plan_alert_by_plan_id_query_callable(plan_alert_obj_json_str: str, obj_id_or_list: int | List[int], **kwargs):
     plan_id: int = kwargs.get('plan_id')
     if plan_id is None:
         err_str_ = ("filtered_plan_alert_by_plan_id_query_callable failed: received inappropriate **kwargs to be "

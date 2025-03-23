@@ -5,12 +5,13 @@ import {
     getGroupedTableColumns, getGroupedTableRows, getMaxRowSize,
     getTableColumns
 } from '../workerUtils';
-import { addxpath, getTableRows } from '../utils';
+import { addxpath, getTableRows, sortColumns } from '../utils';
 
 onmessage = (e) => {
     const { storedArray, updatedObj, fieldsMetadata, filters, mode, page, rowsPerPage, sortOrders,
-        joinBy, joinSort, enableOverride, disableOverride, showLess, showHidden, showAll, showMore, moreAll } = e.data;
-    const start = Date.now();
+        joinBy, joinSort, enableOverride, disableOverride, showLess, showHidden, showAll, showMore, moreAll,
+        columnOrders, centerJoin, flip
+    } = e.data;
     const filteredArray = applyFilter(storedArray, filters);
     const clonedArray = addxpath(cloneDeep(filteredArray));
     const updatedArray = clonedArray.map((o) => o[DB_ID] === updatedObj[DB_ID] ? updatedObj : o);
@@ -26,8 +27,8 @@ onmessage = (e) => {
         var commonKeys = getCommonKeyCollections(activeRows, groupedColumns, !showHidden && !showAll, false, true, !showMore && !moreAll);
     }
     const cells = getFilteredCells(groupedColumns, commonKeys, showHidden, showAll, showMore, moreAll);
-    // console.log(Date.now() - start);
-    postMessage({ rows, groupedRows, activeRows, maxRowSize, headCells: groupedColumns, commonKeys, filteredCells: cells });
+    const sortedCells = sortColumns(cells, columnOrders, joinBy && joinBy.length > 0, centerJoin, flip);
+    postMessage({ rows, groupedRows, activeRows, maxRowSize, headCells: groupedColumns, commonKeys, sortedCells });
 }
 
 export { };

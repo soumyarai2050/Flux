@@ -12,6 +12,7 @@ import FullScreenModal from '../../Modal';
 import { ModelCard, ModelCardHeader, ModelCardContent } from '../../cards';
 import { useSelector } from 'react-redux';
 import DataTree from '../../trees/DataTree/DataTree';
+import ClipboardCopier from '../../ClipboardCopier';
 
 const DataTable = ({
   rows,
@@ -79,12 +80,7 @@ const DataTable = ({
       values.push(row[columnName]);
     })
     const text = values.join('\n');
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(text);
-    } else {
-      setClipboardText(text);
-    }
-    // setToastMessage("column copied to clipboard: " + columnName);
+    setClipboardText(text);
   }
 
   // const handleContextMenuOpen = (e) => {
@@ -396,6 +392,7 @@ const DataTable = ({
           onRowsPerPageChange={handleRowsPerPageChange}
         />
       }
+      <ClipboardCopier text={clipboardText} />
       {/* <Menu
                 open={isContextMenuOpen}
                 onClose={handleContextMenuClose}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-function useQueryParams() {
+function useURLParams() {
   const [params, setParams] = useState({});
 
   useEffect(() => {
@@ -32,4 +32,4 @@ function useQueryParams() {
   return params;
 }
 
-export default useQueryParams;
+export default useURLParams;

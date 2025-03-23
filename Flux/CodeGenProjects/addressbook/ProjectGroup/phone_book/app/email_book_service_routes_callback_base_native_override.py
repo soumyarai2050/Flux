@@ -1795,7 +1795,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
             raise HTTPException(status_code=400, detail=err_str_)
 
 
-def filter_ws_pair_plan(pair_plan_obj_json: Dict, **kwargs):
+async def filter_ws_pair_plan(pair_plan_obj_json: Dict, **kwargs):
     symbols = kwargs.get("symbols")
     pair_plan_params = pair_plan_obj_json.get("pair_plan_params")
     if pair_plan_params is not None:

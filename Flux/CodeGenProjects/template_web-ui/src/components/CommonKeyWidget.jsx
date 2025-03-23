@@ -14,7 +14,7 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import { useTheme } from '@emotion/react';
-import CopyToClipboard from './CopyToClipboard';
+import ClipboardCopier from './ClipboardCopier';
 import { ContentCopy } from '@mui/icons-material';
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -124,7 +124,7 @@ const CommonKey = (props) => {
             }
             abbreviatedField = (
                 <>
-                    <CopyToClipboard text={clipboardText} copy={clipboardText !== null} />
+                    <ClipboardCopier text={clipboardText} />
                     <ClickAwayListener onClickAway={onCloseAbbreviatedField}>
                         <div className={classes.abbreviated_json}>
                             <Tooltip

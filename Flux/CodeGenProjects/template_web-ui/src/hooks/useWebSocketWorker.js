@@ -13,7 +13,7 @@ function useWebSocketWorker({
   onReconnect,
   uiLimit = null,
   isAlertModel = false,
-  crudOverrideDict = {},
+  crudOverrideDict = null,
   params = null
 }) {
   // Get the current stored array from Redux (slice can be dynamic)
@@ -46,7 +46,7 @@ function useWebSocketWorker({
     }
     const wsUrl = url.replace('http', 'ws');
     let apiUrl = `${wsUrl}/get-all-${modelName}-ws`;
-    if (crudOverrideDict.GET_ALL) {
+    if (crudOverrideDict?.GET_ALL) {
       const { endpoint, paramDict } = crudOverrideDict.GET_ALL;
       if (!params && Object.keys(paramDict).length > 0) {
         return;
@@ -76,9 +76,11 @@ function useWebSocketWorker({
         if (retryCount <= 10) {
           connection.retryCount += 1;
           setTimeout(() => {
-            console.log(`reconnecting ws for ${modelName}, retryCount: ${retryCount}`);
+            console.info(`reconnecting ws for ${modelName}, retryCount: ${retryCount}`);
             onReconnect();
           }, code === WEBSOCKET_CLOSE_CODES.TRY_AGAIN_LATER ? connection.retryCount * 10000 : 10000);
+        } else {
+          console.error(`ws closed for ${modelName}, retryCount exhausted`);
         }
       }
       if (code !== WEBSOCKET_CLOSE_CODES.NORMAL_CLOSURE) {
@@ -88,7 +90,7 @@ function useWebSocketWorker({
 
     return () => {
       if (connectionRef.current.ws) {
-        connectionRef.current.ws.close();
+        connectionRef.current.ws.close(1000, 'Normal closure on useEffect cleanup');
         connectionRef.current.ws = null;
       }
     };

@@ -106,7 +106,8 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         # put this category's options here
     ]
     flx_msg_complex_repeated_attribute_options: List[str] = [
-        BaseProtoPlugin.flux_msg_button_query
+        BaseProtoPlugin.flux_msg_button_query,
+        BaseProtoPlugin.flux_msg_override_default_crud
     ]
     # @LOW todo: query_param_field_src should have same query_src_model_name as src model
 
@@ -552,8 +553,13 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                 elif option in (self.flx_fld_complex_repeated_attribute_options +
                                 self.flx_msg_complex_repeated_attribute_options +
                                 self.flx_file_complex_repeated_attribute_options):
-                    option_value_dict: List[Dict] = \
-                        self.get_complex_option_value_from_proto(field_or_message_obj, option, is_option_repeated=True)
+                    if option == JsonSchemaConvertPlugin.flux_msg_override_default_crud:
+                        # special handling required to case_etyle field values present in this option
+                        option_value_dict: List[Dict] = (
+                            self.handle_n_get_override_default_crud_option_value_having_msg_name(field_or_message_obj, self.all_message_dict))
+                    else:
+                        option_value_dict: List[Dict] = \
+                            self.get_complex_option_value_from_proto(field_or_message_obj, option, is_option_repeated=True)
                     # converting flux_option into json attribute name
                     flux_prefix_removed_option_name = self.__convert_option_name_to_json_attribute_name(option)
                     flux_prefix_removed_option_name_case_styled = \
