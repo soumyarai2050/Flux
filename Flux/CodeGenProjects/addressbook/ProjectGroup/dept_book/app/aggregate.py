@@ -743,46 +743,141 @@ def filter_dash_from_dash_filters_agg(dash_filters: DashFilters, obj_id_list: Li
 
     # if optimizer_criteria exists matching rt_dash.ashare_locate_requests
     if dash_filters.optimizer_criteria:
-        if dash_filters.optimizer_criteria.pos_type == PositionType.INDICATIVE:
-            agg_pipeline.append({
-                "$match": {
-                    "$and": [
-                        {"rt_dash.indicative_summary": {"$exists": True}},
-                        {"rt_dash.indicative_summary": {"$ne": None}},
-                        {"rt_dash.indicative_summary.usd_notional": {"$gte": dash_filters.optimizer_criteria.min_notional}}
-                    ]
+        ignore_pos_type_list: List[PositionType] = [
+            PositionType.SOD,   # always ignored
+            dash_filters.optimizer_criteria.pos_type    # avoiding same pos_type
+        ]
+        if dash_filters.optimizer_criteria.pos_type == PositionType.LOCATE:
+            ignore_pos_type_list.append(PositionType.PTH)
+
+        agg_pipeline.extend([
+            {
+                # Step 1: Filter out documents with no eligible brokers
+                '$match': {
+                    'rt_dash.eligible_brokers': {
+                        '$exists': True,
+                        '$ne': []
+                    }
                 }
-            })
-        elif dash_filters.optimizer_criteria.pos_type == PositionType.LOCATE:
-            agg_pipeline.append({
-                "$match": {
-                    "$and": [
-                        {"rt_dash.locate_summary": {"$exists": True}},
-                        {"rt_dash.locate_summary": {"$ne": None}},
-                        {"rt_dash.locate_summary.usd_notional": {"$gte": dash_filters.optimizer_criteria.min_notional}}
-                    ]
+            }, {
+                # Step 2: Unwind eligible_brokers to process each broker individually
+                '$unwind': '$rt_dash.eligible_brokers'
+            }, {
+                # Step 3: Unwind sec_positions within each broker
+                '$unwind': '$rt_dash.eligible_brokers.sec_positions'
+            }, {
+                # Step 4: Unwind positions within each sec_position
+                '$unwind': '$rt_dash.eligible_brokers.sec_positions.positions'
+            }, {
+                # Step 5: Group positions by document _id
+                '$group': {
+                    '_id': '$_id',
+                    'all_positions': {
+                        '$push': {
+                            'type': '$rt_dash.eligible_brokers.sec_positions.positions.type',
+                            'acquire_cost': '$rt_dash.eligible_brokers.sec_positions.positions.acquire_cost',
+                            'broker': '$rt_dash.eligible_brokers.broker'
+                        }
+                    }
                 }
-            })
-        elif dash_filters.optimizer_criteria.pos_type == PositionType.PTH:
-            agg_pipeline.append({
-                "$match": {
-                    "$and": [
-                        {"rt_dash.pth_summary": {"$exists": True}},
-                        {"rt_dash.pth_summary": {"$ne": None}},
-                        {"rt_dash.pth_summary.usd_notional": {"$gte": dash_filters.optimizer_criteria.min_notional}}
-                    ]
+            }, {
+                # Step 6: Compute optimize_pos_cost
+                '$project': {
+                    '_id': 1,
+                    'all_positions': 1,
+                    'optimize_pos_cost': {
+                        '$max': {
+                            '$map': {
+                                'input': {
+                                    '$filter': {
+                                        'input': '$all_positions',
+                                        'cond': {
+                                            '$and': [
+                                                {
+                                                    '$eq': [
+                                                        '$$this.type', dash_filters.optimizer_criteria.pos_type
+                                                    ]
+                                                }, {
+                                                    '$ne': [
+                                                        '$$this.acquire_cost', None
+                                                    ]
+                                                }, {
+                                                    '$ne': [
+                                                        '$$this.acquire_cost', 0
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    }
+                                },
+                                'as': 'filtered_position',
+                                'in': '$$filtered_position.acquire_cost'
+                            }
+                        }
+                    }
                 }
-            })
-        elif dash_filters.optimizer_criteria.pos_type == PositionType.SOD:
-            agg_pipeline.append({
-                "$match": {
-                    "$and": [
-                        {"rt_dash.sod_summary": {"$exists": True}},
-                        {"rt_dash.sod_summary": {"$ne": None}},
-                        {"rt_dash.sod_summary.usd_notional": {"$gte": dash_filters.optimizer_criteria.min_notional}}
-                    ]
+            }, {
+                # Step 7: Compute has_opportunity using the resolved optimize_pos_cost
+                '$project': {
+                    '_id': 1,
+                    'optimize_pos_cost': 1,
+                    'has_opportunity': {
+                        '$gt': [
+                            {
+                                '$size': {
+                                    '$filter': {
+                                        'input': '$all_positions',
+                                        'cond': {
+                                            '$and': [
+                                                {
+                                                    '$not': {
+                                                        '$in': [
+                                                            '$$this.type', ignore_pos_type_list
+                                                        ]
+                                                    }
+                                                }, {
+                                                    '$ne': [
+                                                        '$$this.acquire_cost', None
+                                                    ]
+                                                }, {
+                                                    '$ne': [
+                                                        '$$this.acquire_cost', 0
+                                                    ]
+                                                }, {
+                                                    '$lt': [
+                                                        '$$this.acquire_cost', '$optimize_pos_cost'
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            }, 0
+                        ]
+                    }
                 }
-            })
+            }, {
+                # Step 8: Filter documents where has_opportunity is true
+                '$match': {
+                    'has_opportunity': True
+                }
+            },
+            # Step 9: Reconstruct the original document structure (optional)
+            {
+                '$lookup': {
+                    'from': 'Dash',
+                    'localField': '_id',
+                    'foreignField': '_id',
+                    'as': 'original_doc'
+                }
+            }, {
+                '$unwind': '$original_doc'
+            }, {
+                '$replaceRoot': {
+                    'newRoot': '$original_doc'
+                }
+            }
+        ])
 
     # if sort_criteria exists adding sorts
     if dash_filters.sort_criteria:

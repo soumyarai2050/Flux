@@ -18,10 +18,10 @@ export function getDataSourceSelector(dataSourceName, selector) {
         updatedObj: selector?.[`updated${capDataSourceName}Obj`] ?? {},
         objId: selector?.[`selected${capDataSourceName}Id`] ?? null,
         mode: selector?.mode ?? MODES.READ,
+        isCreating: selector?.isCreating ?? false,
         isLoading: selector?.isLoading ?? false,
         error: selector?.error ?? null,
-        isConfirmSavePopupOpen: selector?.isConfirmSavePopupOpen ?? false,
-        isWsPopupOpen: selector?.isWsPopupOpen ?? false
+        popupStatus: selector?.popupStatus ?? {}
     };
 }
 

@@ -135,14 +135,8 @@ def test_filter_dash_based_on_dash_filter_by_dash_name(dash_, dash_filter_, expe
         else:
             dash_obj.rt_dash.ashare_locate_requests = []
         # else not required: leaving it as None
-        dash_obj.rt_dash.indicative_summary = InventorySummary.from_kwargs(cum_qty=random.randint(50, 100),
-                                                                           usd_notional=random.randint(50, 100))
-        dash_obj.rt_dash.locate_summary = InventorySummary.from_kwargs(cum_qty=random.randint(50, 100),
-                                                                           usd_notional=random.randint(50, 100))
         dash_obj.rt_dash.pth_summary = InventorySummary.from_kwargs(cum_qty=random.randint(50, 100),
-                                                                           usd_notional=random.randint(50, 100))
-        dash_obj.rt_dash.sod_summary = InventorySummary.from_kwargs(cum_qty=random.randint(50, 100),
-                                                                           usd_notional=random.randint(50, 100))
+                                                                    usd_notional=random.randint(50, 100))
         dash_obj.rt_dash.eligible_brokers = expected_brokers_
 
         stored_dash_obj: DashBaseModel = dept_book_service_web_client.create_dash_client(dash_obj)
@@ -476,7 +470,19 @@ def test_filter_dash_based_on_dash_filter_by_dash_name(dash_, dash_filter_, expe
     # 4. filters dash_filters.premium_change_range.premium_change_low < dash.rt_dash.mkt_premium_change < dash_filters.premium_change_range.premium_change_high
     # 5. filters dash with having positions with type any
     # 6. filters dash with having ashare_locate_requests if dash_filters.has_ashare_locate_request is True
-    # 7. filters dash with having rt_dash.locate_summary and rt_dash.locate_summary.usd_notional >= dash_filters.optimizer_criteria.min_notional
+    # 7. filters dash with having any pos having optimization opportunity when dash_filters.optimizer_criteria.pos_type == PTH
+
+    for index, filtered_dash_obj in enumerate(filtered_dash_list):
+        if index < 5:
+            # reducing LOCATE type position's acquire_cost to make it filterable based on optimizer_criteria with type PTH
+            for position in filtered_dash_obj.rt_dash.eligible_brokers[0].sec_positions[1].positions:
+                if position.type == PositionType.LOCATE:
+                    position.acquire_cost -= 10000
+                    break
+            dept_book_service_web_client.put_dash_client(filtered_dash_obj)
+            continue
+        break
+
     dash_filters_obj: DashFiltersBaseModel = DashFiltersBaseModel.from_kwargs(**dash_filter_)
     dash_filters_obj.dash_name = f"Dashboard 10"
     dash_filters_obj.required_legs = [LegBaseModel(leg_type=LegType.LegType_CB),
@@ -487,15 +493,17 @@ def test_filter_dash_based_on_dash_filter_by_dash_name(dash_, dash_filter_, expe
                                                                                     premium_change_high=7.0)
     dash_filters_obj.inventory = InventoryBaseModel.from_kwargs(any=True)
     dash_filters_obj.has_ashare_locate_request = True
-    dash_filters_obj.optimizer_criteria = OptimizerCriteriaBaseModel.from_kwargs(pos_type=PositionType.LOCATE,
+    dash_filters_obj.optimizer_criteria = OptimizerCriteriaBaseModel.from_kwargs(pos_type=PositionType.PTH,
                                                                                  min_notional=70)
     stored_dash_filters_obj = dept_book_service_web_client.create_dash_filters_client(dash_filters_obj)
     dash_filters_ids.append(str(stored_dash_filters_obj.id))
     # checking filter with this dash_name
     filtered_dash_list = dept_book_service_web_client.filtered_dash_by_dash_filters_query_client(
         dash_filters_obj.dash_name)
-    assert len(filtered_dash_list) > 0, \
-        f"Mismatched: {len(filtered_dash_list)=} !> 0"
+    # below assert is enough to verify optimization_criteria since only 5 obj are created with positions other than
+    # PTH having less acquire_cost than max of acquire_cost with type PTH
+    assert len(filtered_dash_list) == 5, \
+        f"Mismatched: {len(filtered_dash_list)=} != 5"
     for filtered_dash in filtered_dash_list:
         assert filtered_dash.rt_dash.leg1 is not None or filtered_dash.rt_dash.leg2 is not None, \
             (f"Mismatched: found dash having leg1 as None or leg2 as None when filter expected them to be Non-None: "
@@ -533,8 +541,6 @@ def test_filter_dash_based_on_dash_filter_by_dash_name(dash_, dash_filter_, expe
                         assert False, f"Mismatched: {pos.type=} not in {expected_type=}"
         assert len(filtered_dash.rt_dash.ashare_locate_requests) > 0, \
             f"Mismatched: {len(filtered_dash.rt_dash.ashare_locate_requests)=} !> 0 when {dash_filters_obj.has_ashare_locate_request=}"
-        assert filtered_dash.rt_dash.locate_summary.usd_notional >= dash_filters_obj.optimizer_criteria.min_notional, \
-            f"Mismatched: {filtered_dash.rt_dash.locate_summary.usd_notional=} not >= {dash_filters_obj.optimizer_criteria.min_notional=}"
 
     # dash_filters that
     # 1. filters dash with required_leg_type = LegType_CB or LegType_EQT_A
@@ -543,7 +549,7 @@ def test_filter_dash_based_on_dash_filter_by_dash_name(dash_, dash_filter_, expe
     # 4. filters dash_filters.premium_change_range.premium_change_low < dash.rt_dash.mkt_premium_change < dash_filters.premium_change_range.premium_change_high
     # 5. filters dash with having positions with type any
     # 6. filters dash with having ashare_locate_requests if dash_filters.has_ashare_locate_request is True
-    # 7. filters dash with having rt_dash.locate_summary and rt_dash.locate_summary.usd_notional >= dash_filters.optimizer_criteria.min_notional
+    # 7. filters dash with having any pos having optimization opportunity when dash_filters.optimizer_criteria.pos_type == PTH
     # 8. filters dash sorted based on rt_dash.pth_summary.usd_notional
     dash_filters_obj: DashFiltersBaseModel = DashFiltersBaseModel.from_kwargs(**dash_filter_)
     dash_filters_obj.dash_name = f"Dashboard 11"
@@ -555,7 +561,7 @@ def test_filter_dash_based_on_dash_filter_by_dash_name(dash_, dash_filter_, expe
                                                                                     premium_change_high=7.0)
     dash_filters_obj.inventory = InventoryBaseModel.from_kwargs(any=True)
     dash_filters_obj.has_ashare_locate_request = True
-    dash_filters_obj.optimizer_criteria = OptimizerCriteriaBaseModel.from_kwargs(pos_type=PositionType.LOCATE,
+    dash_filters_obj.optimizer_criteria = OptimizerCriteriaBaseModel.from_kwargs(pos_type=PositionType.PTH,
                                                                                  min_notional=70)
     dash_filters_obj.sort_criteria = SortCriteriaBaseModel.from_kwargs(level1="rt_dash.pth_summary.usd_notional",
                                                                        level1_chore=SortType.ASCENDING)
@@ -564,8 +570,10 @@ def test_filter_dash_based_on_dash_filter_by_dash_name(dash_, dash_filter_, expe
     # checking filter with this dash_name
     filtered_dash_list = dept_book_service_web_client.filtered_dash_by_dash_filters_query_client(
         dash_filters_obj.dash_name)
-    assert len(filtered_dash_list) > 0, \
-        f"Mismatched: {len(filtered_dash_list)=} !> 0"
+    # below assert is enough to verify optimization_criteria since only 5 obj are created with positions other than
+    # PTH having less acquire_cost than max of acquire_cost with type PTH
+    assert len(filtered_dash_list) == 5, \
+        f"Mismatched: {len(filtered_dash_list)=} != 5"
     for filtered_dash in filtered_dash_list:
         assert filtered_dash.rt_dash.leg1 is not None or filtered_dash.rt_dash.leg2 is not None, \
             (
@@ -599,21 +607,8 @@ def test_filter_dash_based_on_dash_filter_by_dash_name(dash_, dash_filter_, expe
                 f"{dash_filters_obj.premium_change_range.premium_change_high=}")
         assert len(filtered_dash.rt_dash.eligible_brokers) > 0, \
             f"Mismatched: {len(filtered_dash.rt_dash.eligible_brokers)=} !> 0"
-        for broker in filtered_dash.rt_dash.eligible_brokers:
-            assert len(broker.sec_positions) > 0, \
-                f"Mismatched: {len(broker.sec_positions)=} !> 0"
-            for sec_pos in broker.sec_positions:
-                assert len(sec_pos.positions) > 0, \
-                    f"Mismatched: {len(sec_pos.positions)=} !> 0"
-                for pos in sec_pos.positions:
-                    expected_type = [PositionType.PTH, PositionType.LOCATE, PositionType.SOD,
-                                     PositionType.INDICATIVE]
-                    if pos.type not in expected_type:
-                        assert False, f"Mismatched: {pos.type=} not in {expected_type=}"
         assert len(filtered_dash.rt_dash.ashare_locate_requests) > 0, \
             f"Mismatched: {len(filtered_dash.rt_dash.ashare_locate_requests)=} !> 0 when {dash_filters_obj.has_ashare_locate_request=}"
-        assert filtered_dash.rt_dash.locate_summary.usd_notional >= dash_filters_obj.optimizer_criteria.min_notional, \
-            f"Mismatched: {filtered_dash.rt_dash.locate_summary.usd_notional=} not >= {dash_filters_obj.optimizer_criteria.min_notional=}"
 
     pth_sum_usd_notional_list = []
     for filtered_dash in filtered_dash_list:

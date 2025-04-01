@@ -77,7 +77,7 @@ const DataTable = ({
     const values = [columnName];
     activeRows.forEach((groupedRow) => {
       const row = groupedRow[sourceIndex];
-      values.push(row[columnName]);
+      values.push(row[column.tableTitle]);
     })
     const text = values.join('\n');
     setClipboardText(text);
@@ -125,7 +125,7 @@ const DataTable = ({
       [xpath]: value
     }
     if (onUserChange) {
-      onUserChange(xpath, changeDict, null, validationRes);
+      onUserChange(xpath, changeDict, validationRes, null);
     }
   }
 
@@ -195,6 +195,12 @@ const DataTable = ({
     }
     if (onUpdate) {
       onUpdate(updatedObj);
+    }
+  }
+
+  const handleUserChange = (xpath, changeDict, validationRes, source = null) => {
+    if (onUserChange) {
+      onUserChange(xpath, changeDict, validationRes, source);
     }
   }
 
@@ -423,7 +429,7 @@ const DataTable = ({
               mode={mode}
               xpath={modelRootPath}
               onUpdate={handleUpdate}
-              onUserChange={() => { }}
+              onUserChange={handleUserChange}
               selectedId={selectedId}
             />
           </ModelCardContent>

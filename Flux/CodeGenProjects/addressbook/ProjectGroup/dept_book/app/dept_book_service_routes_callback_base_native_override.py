@@ -306,9 +306,11 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
         if isinstance(obj_id_or_list, int):
             obj_id_or_list = [obj_id_or_list]
         filtered_dash_list: List[Dash] = await self.underlying_filtered_dash_by_dash_filters(kwargs.get("dash_name"), obj_id_or_list)
-        return_obj_bytes = msgspec.json.encode(filtered_dash_list, enc_hook=Dash.enc_hook)
-        return_obj_json_str = return_obj_bytes.decode("utf-8")
-        return return_obj_json_str
+        if filtered_dash_list:
+            return_obj_bytes = msgspec.json.encode(filtered_dash_list, enc_hook=Dash.enc_hook)
+            return_obj_json_str = return_obj_bytes.decode("utf-8")
+            return return_obj_json_str
+        return None
 
 async def get_vwap_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str, obj_id_or_list: int | List[int], **kwargs):
     return bar_data_obj_json_str

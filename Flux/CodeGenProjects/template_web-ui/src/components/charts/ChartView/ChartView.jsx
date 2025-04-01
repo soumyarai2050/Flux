@@ -152,7 +152,7 @@ function ChartView({
                         }
                     })
                     seriesCollections.forEach(col => {
-                        if (col.val_meta_field && ![DATA_TYPES.OBJECT, DATA_TYPES.ARRAY].includes(col.type)) {
+                        if (col.val_meta_field && col.required && ![DATA_TYPES.OBJECT, DATA_TYPES.ARRAY].includes(col.type)) {
                             params.push(col.tableTitle);
                         }
                     })

@@ -1,17 +1,20 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ClickAwayListener, Tooltip } from '@mui/material';
 import ReactJson from 'react-json-view'
 import PropTypes from 'prop-types';
 import { useTheme } from '@emotion/react';
 import styles from './JsonView.module.css';
+import ClipboardCopier from '../ClipboardCopier';
 
 const JsonView = (props) => {
     const theme = useTheme();
+    const [clipboardText, setClipboardText] = useState(null);
     const jsonViewTheme = theme.palette.mode === 'dark' ? 'tube' : 'rjv-default';
- 
+
     return (
         <ClickAwayListener onClickAway={props.onClose}>
             <div className={styles.text}>
+                <ClipboardCopier text={clipboardText} />
                 <Tooltip
                     componentsProps={{ tooltip: { className: styles.popup } }}
                     open={props.open}
@@ -25,7 +28,7 @@ const JsonView = (props) => {
                             theme={jsonViewTheme}
                             displayDataTypes={false}
                             displayObjectSize={false}
-                            enableClipboard={true}
+                            enableClipboard={(o) => setClipboardText(JSON.stringify(o.src, null, 2))}
                             iconStyle='square'
                             indentWidth={6}
                             name={false}

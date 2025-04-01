@@ -264,7 +264,8 @@ def expected_brokers_(leg1_leg2_symbol_list) -> List[BrokerBaseModel]:
             [PositionBaseModel.from_kwargs(type=PositionType.SOD, priority=0,
                                            available_size=10_000, allocated_size=10_000,
                                            consumed_size=0,
-                                           pos_disable=False, premium_percentage=2)]
+                                           pos_disable=False, premium_percentage=2,
+                                           acquire_cost=15_000)]
         cb_sec_position.positions = cb_positions
         sec_positions.append(cb_sec_position)
         eqt_sec_position: SecPositionBaseModel = (
@@ -273,13 +274,16 @@ def expected_brokers_(leg1_leg2_symbol_list) -> List[BrokerBaseModel]:
         eqt_positions: List[PositionBaseModel] = [
             PositionBaseModel.from_kwargs(type=PositionType.SOD, priority=0,
                                           available_size=10_000, allocated_size=10_000,
-                                          consumed_size=0, pos_disable=False, premium_percentage=2),
+                                          consumed_size=0, pos_disable=False, premium_percentage=2,
+                                          acquire_cost=15_000),
             PositionBaseModel.from_kwargs(type=PositionType.LOCATE, priority=1,
                                           available_size=10_000, allocated_size=10_000,
-                                          consumed_size=0, pos_disable=False, premium_percentage=2),
+                                          consumed_size=0, pos_disable=False, premium_percentage=2,
+                                          acquire_cost=15_000),
             PositionBaseModel.from_kwargs(type=PositionType.PTH, priority=2, available_size=10_000,
                                           allocated_size=10_000, consumed_size=0,
-                                          pos_disable=False, premium_percentage=2)
+                                          pos_disable=False, premium_percentage=2,
+                                          acquire_cost=15_000)
         ]
         eqt_sec_position.positions = eqt_positions
         sec_positions.append(eqt_sec_position)

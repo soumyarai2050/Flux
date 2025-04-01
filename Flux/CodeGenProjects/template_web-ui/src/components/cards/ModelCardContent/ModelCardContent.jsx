@@ -3,10 +3,10 @@ import styles from './ModelCardContent.module.css';
 import { BeatLoader } from 'react-spinners';
 import { AlertErrorMessage } from '../../Alert';
 import { LinkOff } from '@mui/icons-material';
-import { Button } from '@mui/material';
+import { Button, LinearProgress } from '@mui/material';
 import { useTheme } from '@emotion/react';
 
-const ModelCardContent = ({ children, isDisabled, error, onClear, isDisconnected, onReconnect }) => {
+const ModelCardContent = ({ children, isDisabled, error, onClear, isDisconnected, onReconnect, isDownloading = false, progress = 0 }) => {
     const [isScrollable, setIsScrollable] = useState(false);
     const theme = useTheme();
 
@@ -28,6 +28,13 @@ const ModelCardContent = ({ children, isDisabled, error, onClear, isDisconnected
     const backgroundColor = theme.palette.primary.dark;
     return (
         <div className={cardContentClass} style={{ background: backgroundColor }} onClick={handleClick} onDoubleClick={handleDoubleClick}>
+            {isDownloading && (
+                <LinearProgress
+                    variant={progress === 0 ? 'indeterminate' : 'determinate'}
+                    color={progress === 0 ? 'inherit' : 'success'}
+                    value={progress}
+                />
+            )}
             {children}
             {(isDisabled || error || isDisconnected) && (
                 <div className={styles.backdrop}>

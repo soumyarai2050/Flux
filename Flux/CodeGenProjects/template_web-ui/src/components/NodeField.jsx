@@ -58,7 +58,7 @@ const NodeField = (props) => {
     // }, [props.data.forceUpdate])
 
     useEffect(() => {
-        if (props.mode === MODES.READ) {
+        if (props.data.mode === MODES.READ) {
             setInputValue(props.data.value);
         }
     }, [props.data.value])

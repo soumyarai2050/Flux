@@ -55,16 +55,20 @@ ErrorFallback.propTypes = {
  * @param {Object} props - Component props.
  * @param {React.ReactNode} props.children - Child components to be wrapped.
  */
-const ErrorBoundary = ({ children }) => (
-    <Boundary
-        FallbackComponent={ErrorFallback}
-        onReset={() => {
-            console.warn('Error boundary reset triggered.');
-        }}
-    >
-        {children}
-    </Boundary>
-);
+const ErrorBoundary = ({ children }) => {
+    const handleReset = () => {
+        window.location.reload();
+    }
+
+    return (
+        <Boundary
+            FallbackComponent={ErrorFallback}
+            onReset={handleReset}
+        >
+            {children}
+        </Boundary>
+    )
+}
 
 // Prop validation for ErrorBoundary
 ErrorBoundary.propTypes = {

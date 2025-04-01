@@ -17,7 +17,7 @@ onmessage = (e) => {
     const updatedArray = clonedArray.map((o) => o[DB_ID] === updatedObj[DB_ID] ? updatedObj : o);
     const rows = getTableRows(fieldsMetadata, mode, filteredArray, updatedArray, null, true);
     const groupedRows = getGroupedTableRows(rows, joinBy, joinSort);
-    const activeRows = getActiveRows(groupedRows, page, rowsPerPage, sortOrders, false);
+    const activeRows = getActiveRows(groupedRows, page, rowsPerPage, sortOrders, true);
     const maxRowSize = getMaxRowSize(activeRows);
     const columns = getTableColumns(fieldsMetadata, mode, enableOverride, disableOverride, showLess, false, true);  // not used externally
     const groupedColumns = getGroupedTableColumns(columns, maxRowSize, groupedRows, joinBy, mode, false);  // headCells

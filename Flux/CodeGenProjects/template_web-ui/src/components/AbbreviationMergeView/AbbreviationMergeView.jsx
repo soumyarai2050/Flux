@@ -209,7 +209,7 @@ const LoadedView = ({
         [xpath]: value
       }
       if (onUserChange) {
-        onUserChange(xpath, changeDict, source, validationRes);
+        onUserChange(xpath, changeDict, validationRes, source);
       }
     }
   }

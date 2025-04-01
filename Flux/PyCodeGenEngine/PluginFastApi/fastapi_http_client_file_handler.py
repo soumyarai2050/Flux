@@ -689,7 +689,8 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
 
         return output_str
 
-    def handle_client_file_gen(self, file: protogen.File, model_file_suffix: str) -> str:
+    def handle_client_file_gen(self, file: protogen.File, model_file_suffix: str,
+                               handle_async: bool = False) -> str:
         if self.is_option_enabled(file, FastapiHttpClientFileHandler.flux_file_crud_host):
             host = self.get_simple_option_value_from_proto(file, FastapiHttpClientFileHandler.flux_file_crud_host)
         else:
@@ -710,7 +711,10 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
         output_str += f'# 3rd party imports\n'
         output_str += f'import polars as pl\n\n'
         output_str += f'# project imports\n'
-        generic_web_client_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH", "generic_web_client")
+        if handle_async:
+            generic_web_client_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH", "generic_web_client_async")
+        else:
+            generic_web_client_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH", "generic_web_client")
         output_str += f'from {generic_web_client_path} import *\n'
         output_str += self._import_model_in_client_file(file, model_file_suffix)
         output_str += "\n\n"

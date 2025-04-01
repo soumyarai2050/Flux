@@ -48,7 +48,7 @@ const DataTree = ({
             onUpdate(updatedObj);
         }
         if (onUserChange) {
-            onUserChange(xpath, value, null, validationRes);
+            onUserChange(xpath, value, validationRes, null);
         }
     }
 
@@ -100,7 +100,6 @@ const DataTree = ({
                 set(updatedObj, xpath, null);
             }
             // let changesDict = getXpathKeyValuePairFromObject(get(updatedObj, xpath));
-            // onUserChange(undefined, undefined, true, changesDict);
             onUpdate(updatedObj, 'remove');
         } else if (e.currentTarget.attributes['data-add']) {
             let updatedObj = cloneDeep(updatedData);
@@ -151,7 +150,6 @@ const DataTree = ({
                 set(updatedObj, xpath, emptyObject);
             }
             // let changesDict = getXpathKeyValuePairFromObject(emptyObject);
-            // onUserChange(undefined, undefined, false, changesDict);
             onUpdate(updatedObj, 'add');
         }
         else if (e.currentTarget.attributes['data-addcopy']) {
@@ -202,7 +200,6 @@ const DataTree = ({
                 console.error('duplicate on object is not supported')
             }
             // let changesDict = getXpathKeyValuePairFromObject(emptyObject);
-            // onUserChange(undefined, undefined, false, changesDict);
             onUpdate(updatedObj, 'add');
         }
         else {

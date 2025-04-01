@@ -14,15 +14,13 @@ import { API_ROOT_URL, MODES } from '../constants';
 import { getApiUrlMetadata, snakeToPascal, getErrorDetails } from '../utils';
 import {
   setStoredArrayHandler,
-  setStoredArrayWsHandler,
   setStoredObjHandler,
   setUpdatedObjHandler,
   setObjIdHandler,
   setModeHandler,
   setIsCreatingHandler,
   setErrorHandler,
-  setIsConfirmSavePopupOpenHandler,
-  setIsWsPopupOpenHandler,
+  setPopupStatusHandler,
   handleGetAll,
   handleGet,
   handleCreate,
@@ -79,8 +77,11 @@ export function createGenericSlice({
     isCreating: false,
     error: null,
     isLoading: false,
-    isConfirmSavePopupOpen: false,
-    isWsPopupOpen: false,
+    popupStatus: {
+      confirmSave: false,
+      formValidation: false,
+      wsConflict: false,
+    },
     ...extraState,
   };
 
@@ -170,9 +171,6 @@ export function createGenericSlice({
       setStoredArray(state, action) {
         setStoredArrayHandler(state, action, sliceConfig);
       },
-      setStoredArrayWs(state, action) {
-        setStoredArrayWsHandler(state, action, sliceConfig);
-      },
       setStoredObj(state, action) {
         setStoredObjHandler(state, action, sliceConfig);
       },
@@ -191,11 +189,8 @@ export function createGenericSlice({
       setError(state, action) {
         setErrorHandler(state, action, sliceConfig);
       },
-      setIsConfirmSavePopupOpen(state, action) {
-        setIsConfirmSavePopupOpenHandler(state, action, sliceConfig);
-      },
-      setIsWsPopupOpen(state, action) {
-        setIsWsPopupOpenHandler(state, action, sliceConfig);
+      setPopupStatus(state, action) {
+        setPopupStatusHandler(state, action, sliceConfig);
       },
       // Merge in additional reducers injected by the caller.
       ...injectedReducers,

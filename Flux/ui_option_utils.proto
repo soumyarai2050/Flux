@@ -46,6 +46,7 @@ enum UILayoutType{
 enum UICRUDType{
   GET_ = 0;
   GET_ALL = 1;
+  CREATE = 2;
 }
 
 message WebPageUIData{
@@ -60,7 +61,7 @@ message UIQueryParam{
 message OverrideDefaultCRUD{
   required UICRUDType ui_crud_type = 1;
   required string query_name = 2;
-  required string query_src_model_name = 3;  // Source can be only one
+  optional string query_src_model_name = 3;  // Source can be only one
   repeated UIQueryParam ui_query_params = 4;
 }
 

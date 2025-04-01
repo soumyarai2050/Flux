@@ -4,9 +4,10 @@ import { cloneDeep, get, isEqual, set } from 'lodash';
 import { DB_ID, LAYOUT_TYPES, MODEL_TYPES, MODES } from '../../constants';
 import * as Selectors from '../../selectors';
 import {
-    clearxpath, getWidgetOptionById, sortColumns, generateObjectFromSchema,
+    clearxpath, getWidgetOptionById, generateObjectFromSchema,
     addxpath, compareJSONObjects, getServerUrl, getWidgetTitle,
-    isWebSocketAlive, getCrudOverrideDict
+    getCrudOverrideDict, getCSVFileName, isWebSocketActive,
+    updateFormValidation
 } from '../../utils';
 import { FullScreenModalOptional } from '../../components/Modal';
 import { ModelCard, ModelCardHeader, ModelCardContent } from '../../components/cards';
@@ -23,12 +24,12 @@ import {
     pinnedChangeHandler,
     filtersChangeHandler,
 } from '../../utils/genericModelHandler';
-import { utils, writeFileXLSX } from 'xlsx';
 import CommonKeyWidget from '../../components/CommonKeyWidget';
-import { ConfirmSavePopup } from '../../components/Popup';
+import { ConfirmSavePopup, FormValidation } from '../../components/Popup';
 import { DataTable } from '../../components/tables';
 import DataTree from '../../components/trees/DataTree';
-import { useWebSocketWorker } from '../../hooks';
+import { useWebSocketWorker, useDownload } from '../../hooks';
+import { saveAs } from 'file-saver';
 
 function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName }) {
     const { schema: projectSchema, schemaCollections } = useSelector((state) => state.schema);
@@ -37,7 +38,7 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
     });
     const { schema: modelSchema, fieldsMetadata, actions, selector, isAbbreviationSource = false } = modelDataSource;
     const modelRootFieldsMetadata = schemaCollections[modelRootName];
-    const { storedObj, updatedObj, objId, mode, isCreating, error, isLoading, isConfirmSavePopupOpen } = useSelector(selector);
+    const { storedObj, updatedObj, objId, mode, isCreating, error, isLoading, popupStatus } = useSelector(selector);
     const { storedObj: dataSourceStoredObj } = useSelector(dataSource?.selector ?? (() => ({ storedObj: null })), (prev, curr) => {
         return JSON.stringify(prev) === JSON.stringify(curr);
     });
@@ -75,8 +76,9 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
     });
     const pendingUpdateRef = useRef(null);
     const changesRef = useRef({});
+    const formValidationRef = useRef({});
     const crudOverrideDictRef = useRef(getCrudOverrideDict(modelSchema));
-    const allowedLayoutTypesRef = useRef([LAYOUT_TYPES.TABLE, LAYOUT_TYPES.PIVOT_TABLE, LAYOUT_TYPES.CHART]);
+    const allowedLayoutTypesRef = useRef([LAYOUT_TYPES.TABLE, LAYOUT_TYPES.TREE]);
     // refs to identify change
     const optionsRef = useRef(null);
 
@@ -92,6 +94,8 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
             onLayoutChangeCallback: LayoutActions.setStoredObjByName
         }
     ), [objId, modelLayoutOption])
+
+    const { downloadCSV, isDownloading, progress } = useDownload(modelName, modelRootFieldsMetadata, modelName);
 
     useEffect(() => {
         const url = getServerUrl(modelSchema, dataSourceStoredObj, dataSource?.fieldsMetadata);
@@ -262,20 +266,20 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
     })
 
     useEffect(() => {
-        const { disable_ws_on_edit } = modelLayoutOption;
+        // const { disable_ws_on_edit } = modelLayoutOption;
         const { edit_layout, view_layout } = modelLayoutData;
         if (mode === MODES.EDIT) {
             if (edit_layout && view_layout !== edit_layout) {
                 handleLayoutTypeChange(edit_layout);
                 setLayoutType(edit_layout);
             }
-            if (disable_ws_on_edit) {
-                setIsWsDisabled(true);
-            }
+            // if (disable_ws_on_edit) {
+            //     setIsWsDisabled(true);
+            // }
         } else if (mode === MODES.READ) {
-            if (disable_ws_on_edit) {
-                setIsWsDisabled(false);
-            }
+            // if (disable_ws_on_edit) {
+            //     setIsWsDisabled(false);
+            // }
             setLayoutType(view_layout);
         }
     }, [mode, modelLayoutOption, modelLayoutData])
@@ -297,6 +301,7 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
             dispatch(actions.getAll({ ...args }));
         }
         changesRef.current = {};
+        formValidationRef.current = {};
         if (mode !== MODES.READ) {
             handleModeToggle();
         }
@@ -349,15 +354,15 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
         filtersChangeHandler(modelHandlerConfig, updatedFilters);
     }
 
-    const handleDownload = () => {
-        const updatedRows = cloneDeep(rows);
-        updatedRows.forEach((row) => {
-            delete row['data-id'];
-        })
-        const worksheet = utils.json_to_sheet(updatedRows);
-        const workbook = utils.book_new();
-        utils.book_append_sheet(workbook, worksheet, 'Data');
-        writeFileXLSX(workbook, `${modelName}_${new Date().toISOString()}.xlsx`);
+    const handleDownload = async () => {
+        const fileName = getCSVFileName(modelName);
+        try {
+            const csvContent = await downloadCSV(storedObj);
+            const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+            saveAs(blob, fileName);
+        } catch (error) {
+            console.error('CSV download failed:', error);
+        }
     }
 
     const handleVisibilityMenuClick = (isChecked) => {
@@ -396,9 +401,21 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
         setShowMore((prev) => !prev);
     }
 
-    const handleConfirmSavePopupClose = () => {
-        dispatch(actions.setIsConfirmSavePopupOpen(false));
+    const handlePopupClose = (popupName) => {
+        dispatch(actions.setPopupStatus({ [popupName]: false }));
         handleReload();
+    }
+
+    const handleConfirmSavePopupClose = () => {
+        handlePopupClose('confirmSave');
+    }
+
+    const handleFormValidationPopupClose = () => {
+        handlePopupClose('formValidation');
+    }
+
+    const handleContinue = () => {
+        dispatch(actions.setPopupStatus({ formValidation: false }));
     }
 
     const handleCreate = () => {
@@ -412,6 +429,10 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
     }
 
     const handleSave = (modifiedObj, force = false) => {
+        if (Object.keys(formValidationRef.current).length > 0) {
+            dispatch(actions.setPopupStatus({ formValidation: true }));
+            return;
+        }
         const modelUpdatedObj = modifiedObj || clearxpath(cloneDeep(updatedObj));
         const activeChanges = compareJSONObjects(storedObj, modelUpdatedObj, modelRootFieldsMetadata, isCreating);
         if (!activeChanges || Object.keys(activeChanges).length === 0) {
@@ -427,7 +448,7 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
                 return;
             }
         }
-        dispatch(actions.setIsConfirmSavePopupOpen(true));
+        dispatch(actions.setPopupStatus({ confirmSave: true }));
     }
 
     const executeSave = () => {
@@ -441,18 +462,19 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
         }
         changesRef.current = {};
         dispatch(actions.setMode(MODES.READ));
-        dispatch(actions.setIsConfirmSavePopupOpen(false));
+        dispatch(actions.setPopupStatus({ confirmSave: false }));
     }
 
     const handleUpdate = (updatedObj) => {
         dispatch(actions.setUpdatedObj(updatedObj));
     }
 
-    const handleUserChange = (xpath, updateDict, source, validationRes) => {
+    const handleUserChange = (xpath, updateDict, validationRes, source) => {
         changesRef.current.user = {
             ...changesRef.current.user,
             ...updateDict
         }
+        updateFormValidation(formValidationRef, xpath, validationRes);
     }
 
     const handleButtonToggle = (e, xpath, value, objId, source, force = false) => {
@@ -604,18 +626,27 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
                     isDisabled={isLoading || isProcessingUserActions}
                     error={error}
                     onClear={handleErrorClear}
-                    isDisconnected={!isWsDisabled && !isAbbreviationSource && !isWebSocketAlive(socketRef.current)}
+                    isDisconnected={!isWsDisabled && !isAbbreviationSource && !isWebSocketActive(socketRef.current)}
                     onReconnect={handleReconnect}
+                    isDownloading={isDownloading}
+                    progress={progress}
                 >
                     {renderContent()}
                 </ModelCardContent>
             </ModelCard>
             <ConfirmSavePopup
                 title={modelTitle}
-                open={isConfirmSavePopupOpen}
+                open={popupStatus.confirmSave}
                 onClose={handleConfirmSavePopupClose}
                 onSave={executeSave}
                 src={changesRef.current.active}
+            />
+            <FormValidation
+                title={modelTitle}
+                open={popupStatus.formValidation}
+                onClose={handleFormValidationPopupClose}
+                onContinue={handleContinue}
+                src={formValidationRef.current}
             />
         </FullScreenModalOptional>
     )

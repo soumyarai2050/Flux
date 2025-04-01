@@ -135,8 +135,8 @@ const Cell = (props) => {
 
     // Debounced transformation to update rows from the source JSON.
     const debouncedTransform = useRef(
-        debounce((e, type, xpath, value, dataxpath, validationRes) => {
-            onTextChangeRef.current(e, type, xpath, value, dataxpath, validationRes);
+        debounce((e, type, xpath, value, dataxpath, validationRes, dataSourceId, source) => {
+            onTextChangeRef.current(e, type, xpath, value, dataxpath, validationRes, dataSourceId, source);
         }, 300)
     ).current;
 
@@ -144,10 +144,10 @@ const Cell = (props) => {
         debouncedTransform.flush();
     }
 
-    const handleTextChange = (e, type, xpath, value, dataxpath, validationRes) => {
+    const handleTextChange = (e, type, xpath, value, dataxpath, validationRes, dataSourceId, source) => {
         cursorPos.current = e.target.selectionStart;
         setInputValue(value);
-        debouncedTransform(e, type, xpath, value, dataxpath, validationRes);
+        debouncedTransform(e, type, xpath, value, dataxpath, validationRes, dataSourceId, source);
     }
 
     const handleKeyDown = (e, filteredOptions) => {

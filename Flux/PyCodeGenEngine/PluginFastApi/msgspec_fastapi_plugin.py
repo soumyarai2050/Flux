@@ -477,6 +477,10 @@ class MsgspecFastApiPlugin(FastapiCallbackFileHandler,
             # Adding client file
             self.client_file_name + ".py": self.handle_client_file_gen(file, self.model_file_suffix),
 
+            # Adding async client file
+            self.async_client_file_name + ".py": self.handle_client_file_gen(file, self.model_file_suffix,
+                                                                             handle_async=True),
+
             # Adding WS client file
             self.ws_client_file_name + ".py": self.handle_ws_client_file_gen(file, self.model_file_suffix),
 

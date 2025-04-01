@@ -70,6 +70,7 @@ class BaseFastapiPlugin(BaseProtoPlugin):
         self.http_routes_file_name: str = ""
         self.ws_routes_file_name: str = ""
         self.client_file_name: str = ""
+        self.async_client_file_name: str = ""
         self.ws_client_file_name: str = ""
         self.ws_ui_proxy_config_file_name: Final[str] = "ui_uri_to_server_uri_config.yaml"
         self.launch_file_name: str = ""
@@ -312,6 +313,7 @@ class BaseFastapiPlugin(BaseProtoPlugin):
         self.fastapi_app_name = f"{self.proto_file_name}_app"
         self.api_router_app_name = f"{self.proto_file_name}_API_router"
         self.client_file_name = f"{self.proto_file_name}_http_client"
+        self.async_client_file_name = f"{self.proto_file_name}_http_client_async"
         self.ws_client_file_name = f"{self.proto_file_name}_ws_client"
         self.model_file_name = f'{self.proto_file_name}_model_imports'
         self.launch_file_name = self.proto_file_name + "_launch_server"

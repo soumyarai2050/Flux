@@ -496,6 +496,8 @@ class MsgspecModelPlugin(DataclassModelPlugin):
         output_str += "import datetime\n\n"
         output_str += "# 3rd party imports\n"
         output_str += "import pendulum\n"
+        output_str += "from pendulum import DateTime\n"
+        output_str += "from pandas import Timestamp\n"
 
         if self.enum_list:
             if self.enum_type == "int_enum":

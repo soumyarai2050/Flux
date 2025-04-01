@@ -3,6 +3,7 @@ import { cloneDeep, get, isObject, isEmpty, isNull, isEqual, has } from 'lodash'
 import dayjs from 'dayjs';
 import axios from 'axios';
 import utc from 'dayjs/plugin/utc';
+import * as XLSX from 'xlsx';
 // project imports
 import {
     COLOR_PRIORITY, COLOR_TYPES, DATA_TYPES, HOVER_TEXT_TYPES, MODES, SHAPE_TYPES, SIZE_TYPES,
@@ -3590,9 +3591,12 @@ export const getDataSourceObj = (dataSources, sourceName) => {
 
 export function getCrudOverrideDict(modelSchema) {
     return modelSchema.override_default_crud?.reduce((acc, { ui_crud_type, query_name, ui_query_params }) => {
-        const paramDict = {};
-        ui_query_params.forEach(({ query_param_name, query_param_value_src }) => {
+        let paramDict = null;
+        ui_query_params?.forEach(({ query_param_name, query_param_value_src }) => {
             const param_value_src = query_param_value_src.substring(query_param_value_src.indexOf('.') + 1);
+            if (!paramDict) {
+                paramDict = {};
+            }
             paramDict[query_param_name] = param_value_src;
         })
         acc[ui_crud_type] = { endpoint: `query-${query_name}`, paramDict };
@@ -3630,6 +3634,41 @@ export function getActiveIds(activeRows, idField) {
             });
         });
     }
-    return activeObjIds;
+    return Array.from(activeObjIds);
 }
 
+export function generateExcel(rows, fileName, csv = false) {
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Data');
+    const bookType = csv ? 'csv' : 'xlsx'
+    XLSX.writeFile(wb, fileName, { bookType: bookType });
+}
+
+export function getCSVFileName(modelName) {
+    return `${modelName}_${new Date().toISOString()}.csv`;
+}
+
+export function isWebSocketActive(webSocket) {
+    if (webSocket) {
+        if (webSocket.readyState === WebSocket.OPEN) {
+            return true;
+        }
+    }
+    return false;
+}
+
+export function updateFormValidation(formValidationRef, xpath, validation) {
+    if (!formValidationRef?.current) {
+        console.error('form validation ref found null');
+        return;
+    }
+
+    if (validation) {
+        formValidationRef.current = { ...formValidationRef.current, [xpath]: validation };
+    } else {
+        if (xpath in formValidationRef.current) {
+            delete formValidationRef.current[xpath];
+        }
+    }
+}

@@ -4,10 +4,11 @@ import { cloneDeep, get, isEqual, set } from 'lodash';
 import { DB_ID, LAYOUT_TYPES, MODEL_TYPES, MODES, NEW_ITEM_ID } from '../../constants';
 import * as Selectors from '../../selectors';
 import {
-    clearxpath, getWidgetOptionById, sortColumns, generateObjectFromSchema,
+    clearxpath, getWidgetOptionById, generateObjectFromSchema,
     addxpath, compareJSONObjects, getWidgetTitle,
-    isWebSocketAlive, getDataSourcesCrudOverrideDict, removeRedundantFieldsFromRows,
-    getAbbreviatedCollections, getNewItem, getDataSourceObj
+    getDataSourcesCrudOverrideDict, getCSVFileName, isWebSocketActive, removeRedundantFieldsFromRows,
+    getAbbreviatedCollections, getNewItem, getDataSourceObj, generateExcel,
+    updateFormValidation
 } from '../../utils';
 import { FullScreenModalOptional } from '../../components/Modal';
 import { ModelCard, ModelCardHeader, ModelCardContent } from '../../components/cards';
@@ -29,15 +30,15 @@ import {
     flipToggleHandler,
     chartDataChangeHandler
 } from '../../utils/genericModelHandler';
-import { utils, writeFileXLSX } from 'xlsx';
 import CommonKeyWidget from '../../components/CommonKeyWidget';
-import { ConfirmSavePopup } from '../../components/Popup';
+import { ConfirmSavePopup, FormValidation } from '../../components/Popup';
 import { PivotTable } from '../../components/tables';
 import { ChartView } from '../../components/charts';
 import AbbreviationMergeView from '../../components/AbbreviationMergeView';
 import { getIdFromAbbreviatedKey } from '../../workerUtils';
-import { useWebSocketWorker, useDataSourcesWebsocketWorker } from '../../hooks';
+import { useWebSocketWorker, useDataSourcesWebsocketWorker, useDownload } from '../../hooks';
 import { dataSourcesSelectorEquality } from '../../utils/reselectHelper';
+import { saveAs } from 'file-saver';
 
 function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     const { schema: projectSchema } = useSelector((state) => state.schema);
@@ -45,7 +46,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         return JSON.stringify(prev) === JSON.stringify(curr);
     });
     const { schema: modelSchema, fieldsMetadata: modelFieldsMetadata, actions: modelActions, selector: modelSelector } = modelDataSource;
-    const { storedObj, updatedObj, objId, mode, isCreating, error, isLoading, isConfirmSavePopupOpen } = useSelector(modelSelector);
+    const { storedObj, updatedObj, objId, mode, isCreating, error, isLoading, popupStatus } = useSelector(modelSelector);
     const {
         storedArrayDict: dataSourcesStoredArrayDict,
         storedObjDict: dataSourcesStoredObjDict,
@@ -99,6 +100,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     });
     const pendingUpdateRef = useRef(null);
     const changesRef = useRef({});
+    const formValidationRef = useRef({});
     const sourceRef = useRef(null);
     const dataSourcesCrudOverrideDictRef = useRef(getDataSourcesCrudOverrideDict(dataSources));
     const allowedLayoutTypesRef = useRef([LAYOUT_TYPES.ABBREVIATION_MERGE, LAYOUT_TYPES.PIVOT_TABLE, LAYOUT_TYPES.CHART]);
@@ -129,6 +131,8 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
             onLayoutChangeCallback: LayoutActions.setStoredObjByName
         }
     ), [objId, modelLayoutOption])
+
+    const { downloadCSV, isDownloading, progress } = useDownload(modelName, modelItemFieldsMetadata, null, MODEL_TYPES.ABBREVIATION_MERGE);
 
     useEffect(() => {
         let updatedParams = null;
@@ -169,6 +173,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     }, [])
 
     useEffect(() => {
+        if (dataSourcesCrudOverrideDictRef.current) return;
         dataSources.forEach(({ actions, name, url }) => {
             let args = { url };
             const crudOverrideDict = dataSourcesCrudOverrideDictRef.current?.[name];
@@ -349,20 +354,20 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     }, [modelAbbreviatedItems, dataSourcesObjIdDict, updatedObj, mode])
 
     useEffect(() => {
-        const { disable_ws_on_edit } = modelLayoutOption;
+        // const { disable_ws_on_edit } = modelLayoutOption;
         const { edit_layout, view_layout } = modelLayoutData;
         if (mode === MODES.EDIT) {
             if (edit_layout && view_layout !== edit_layout) {
                 handleLayoutTypeChange(edit_layout);
                 setLayoutType(edit_layout);
             }
-            if (disable_ws_on_edit) {
-                setIsWsDisabled(true);
-            }
+            // if (disable_ws_on_edit) {
+            //     setIsWsDisabled(true);
+            // }
         } else if (mode === MODES.READ) {
-            if (disable_ws_on_edit) {
-                setIsWsDisabled(false);
-            }
+            // if (disable_ws_on_edit) {
+            //     setIsWsDisabled(false);
+            // }
             setLayoutType(view_layout);
         }
     }, [mode, modelLayoutOption, modelLayoutData])
@@ -387,6 +392,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
             dispatch(actions.getAll({ ...args }));
         })
         changesRef.current = {};
+        formValidationRef.current = {};
         sourceRef.current = null;
         if (mode !== MODES.READ) {
             handleModeToggle();
@@ -405,8 +411,8 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     }
 
     const handleLoad = () => {
-        const idx = modelAbbreviatedItems.indexOf(searchQuery);
-        if (idx) {
+        const idx = modelAbbreviatedBufferItems.indexOf(searchQuery);
+        if (idx !== -1) {
             const modifiedObj = cloneDeep(storedObj);
             get(modifiedObj, bufferedFieldMetadata.key).splice(idx, 1);
             get(modifiedObj, loadedFieldMetadata.key).push(searchQuery);
@@ -491,15 +497,15 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         chartDataChangeHandler(modelHandlerConfig, updatedChartData);
     }
 
-    const handleDownload = () => {
-        const updatedRows = cloneDeep(rows);
-        updatedRows.forEach((row) => {
-            delete row['data-id'];
-        })
-        const worksheet = utils.json_to_sheet(updatedRows);
-        const workbook = utils.book_new();
-        utils.book_append_sheet(workbook, worksheet, 'Data');
-        writeFileXLSX(workbook, `${modelName}_${new Date().toISOString()}.xlsx`);
+    const handleDownload = async () => {
+        const fileName = getCSVFileName(modelName);
+        try {
+            const csvContent = await downloadCSV(rows);
+            const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+            saveAs(blob, fileName);
+        } catch (error) {
+            console.error('CSV download failed:', error);
+        }
     }
 
     const handleVisibilityMenuClick = (isChecked) => {
@@ -538,9 +544,21 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         setShowMore((prev) => !prev);
     }
 
-    const handleConfirmSavePopupClose = () => {
-        dispatch(modelActions.setIsConfirmSavePopupOpen(false));
+    const handlePopupClose = (popupName) => {
+        dispatch(modelActions.setPopupStatus({ [popupName]: false }));
         handleReload();
+    }
+
+    const handleConfirmSavePopupClose = () => {
+        handlePopupClose('confirmSave');
+    }
+
+    const handleFormValidationPopupClose = () => {
+        handlePopupClose('formValidation');
+    }
+
+    const handleContinue = () => {
+        dispatch(modelActions.setPopupStatus({ formValidation: false }));
     }
 
     const handleCreate = () => {
@@ -567,6 +585,10 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
             dispatch(modelActions.setMode(MODES.READ));
             return;
         }
+        if (Object.keys(formValidationRef.current).length > 0) {
+            dispatch(modelActions.setPopupStatus({ formValidation: true }));
+            return;
+        }
         const dataSourceStoredObj = dataSourcesStoredObjDict[sourceRef.current];
         const dataSourceUpdatedObj = modifiedObj || clearxpath(cloneDeep(dataSourcesUpdatedObjDict[sourceRef.current]));
         const fieldsMetadata = dataSourcesMetadataDict[sourceRef.current];
@@ -591,7 +613,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         if (!dataSource) {
             return;
         }
-        dispatch(modelActions.setIsConfirmSavePopupOpen(true));
+        dispatch(modelActions.setPopupStatus({ confirmSave: true }));
     }
 
     const executeSave = () => {
@@ -600,18 +622,24 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         if (!dataSource) {
             return;
         }
-        const { url, actions } = dataSource;
+        const { url, actions, name } = dataSource;
         if (changeDict[DB_ID]) {
             dispatch(actions.partialUpdate({ url, data: changeDict }));
         } else {
-            dispatch(actions.create({ url, data: changeDict }));
+            let args = { url };
+            const crudOverrideDict = dataSourcesCrudOverrideDictRef.current?.[name];
+            if (crudOverrideDict?.CREATE) {
+                const { endpoint } = crudOverrideDict.GET_ALL;
+                args = { ...args, endpoint };
+            }
+            dispatch(actions.create({ ...args, data: changeDict }));
             dispatch(actions.setMode(MODES.READ));
             dispatch(actions.setIsCreating(false));
             dispatch(modelActions.setIsCreating(false));
         }
         changesRef.current = {};
         dispatch(modelActions.setMode(MODES.READ));
-        dispatch(modelActions.setIsConfirmSavePopupOpen(false));
+        dispatch(modelActions.setPopupStatus({ confirmSave: false }));
         sourceRef.current = null;
     }
 
@@ -623,7 +651,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         dispatch(dataSource.actions.setUpdatedObj(updatedObj));
     }
 
-    const handleUserChange = (xpath, updateDict, source, validationRes) => {
+    const handleUserChange = (xpath, updateDict, validationRes, source) => {
         if (sourceRef.current && sourceRef.current !== source) {
             if (changesRef.current.user && Object.keys(changesRef.current.user) > 0) {
                 alert('error');
@@ -635,6 +663,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
             ...changesRef.current.user,
             ...updateDict
         }
+        updateFormValidation(formValidationRef, xpath, validationRes);
     }
 
     const handleButtonToggle = (e, xpath, value, objId, source, force = false) => {
@@ -730,6 +759,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                         modelType={MODEL_TYPES.ABBREVIATION_MERGE}
                         onRowSelect={() => { }}
                         mode={mode}
+                        abbreviation={abbreviationKey}
                         onModeToggle={handleModeToggle}
                     />
                 );
@@ -811,18 +841,27 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                     isDisabled={isLoading || isCreating || isProcessingUserActions}
                     error={error}
                     onClear={handleErrorClear}
-                    isDisconnected={!isWsDisabled && !isWebSocketAlive(socketRef.current)}
+                    isDisconnected={!isWsDisabled && !isWebSocketActive(socketRef.current)}
                     onReconnect={handleReconnect}
+                    isDownloading={isDownloading}
+                    progress={progress}
                 >
                     {renderContent()}
                 </ModelCardContent>
             </ModelCard>
             <ConfirmSavePopup
                 title={sourceRef.current}
-                open={isConfirmSavePopupOpen}
+                open={popupStatus.confirmSave}
                 onClose={handleConfirmSavePopupClose}
                 onSave={executeSave}
                 src={changesRef.current.active}
+            />
+            <FormValidation
+                title={sourceRef.current}
+                open={popupStatus.formValidation}
+                onClose={handleFormValidationPopupClose}
+                onContinue={handleContinue}
+                src={formValidationRef.current}
             />
         </FullScreenModalOptional>
     )

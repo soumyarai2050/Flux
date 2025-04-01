@@ -77,7 +77,7 @@ message Dash {
         QueryParamName: "dash",
         QueryParamDataType: "DashBaseModel"
       }
-      QueryRouteType: PATCH
+      QueryRouteType: POST
   };
   option (FluxMsgJsonQuery) = {
       QueryName: "filtered_dash_by_dash_filters",
@@ -89,12 +89,16 @@ message Dash {
   };
   option (FluxMsgOverrideDefaultCrud) = {
     ui_crud_type: GET_ALL,
-      query_name: "filtered_dash_by_dash_filters",
-      query_src_model_name: "DashCollection",
-      ui_query_params: {
-        query_param_name: "dash_name",
-        query_param_value_src: "DashCollection.dash_name"
-      },
+    query_name: "filtered_dash_by_dash_filters",
+    query_src_model_name: "DashCollection",
+    ui_query_params: {
+      query_param_name: "dash_name",
+      query_param_value_src: "DashCollection.dash_name"
+    },
+  };
+  option (FluxMsgOverrideDefaultCrud) = {
+    ui_crud_type: CREATE,
+    query_name: "search_n_update_dash"
   };
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];

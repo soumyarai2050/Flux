@@ -4,9 +4,10 @@ import { cloneDeep, get, isEqual, set } from 'lodash';
 import { DB_ID, LAYOUT_TYPES, MODEL_TYPES, MODES } from '../../constants';
 import * as Selectors from '../../selectors';
 import {
-    clearxpath, getWidgetOptionById, sortColumns, generateObjectFromSchema,
-    addxpath, compareJSONObjects, getWidgetTitle, getServerUrl,
-    isWebSocketAlive, getCrudOverrideDict, removeRedundantFieldsFromRows
+    clearxpath, getWidgetOptionById, generateObjectFromSchema,
+    addxpath, compareJSONObjects, getServerUrl, getWidgetTitle,
+    getCrudOverrideDict, getCSVFileName, isWebSocketActive, removeRedundantFieldsFromRows,
+    updateFormValidation
 } from '../../utils';
 import { FullScreenModalOptional } from '../../components/Modal';
 import { ModelCard, ModelCardHeader, ModelCardContent } from '../../components/cards';
@@ -28,12 +29,12 @@ import {
     flipToggleHandler,
     chartDataChangeHandler
 } from '../../utils/genericModelHandler';
-import { utils, writeFileXLSX } from 'xlsx';
 import CommonKeyWidget from '../../components/CommonKeyWidget';
-import { ConfirmSavePopup } from '../../components/Popup';
+import { ConfirmSavePopup, FormValidation } from '../../components/Popup';
 import { DataTable, PivotTable } from '../../components/tables';
 import { ChartView } from '../../components/charts';
-import { useWebSocketWorker } from '../../hooks';
+import { useWebSocketWorker, useDownload } from '../../hooks';
+import { saveAs } from 'file-saver';
 
 function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
     const { schema: projectSchema } = useSelector((state) => state.schema);
@@ -41,7 +42,7 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
         return JSON.stringify(prev) === JSON.stringify(curr);
     });
     const { schema: modelSchema, fieldsMetadata, actions, selector } = modelDataSource;
-    const { storedArray, storedObj, updatedObj, objId, mode, error, isLoading, isConfirmSavePopupOpen } = useSelector(selector);
+    const { storedArray, storedObj, updatedObj, objId, mode, error, isLoading, popupStatus } = useSelector(selector);
     const { storedObj: dataSourceStoredObj } = useSelector(dataSource?.selector ?? (() => ({ storedObj: null })), (prev, curr) => {
         return JSON.stringify(prev) === JSON.stringify(curr);
     });
@@ -79,6 +80,7 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
     });
     const pendingUpdateRef = useRef(null);
     const changesRef = useRef({});
+    const formValidationRef = useRef({});
     const crudOverrideDictRef = useRef(getCrudOverrideDict(modelSchema));
     const allowedLayoutTypesRef = useRef([LAYOUT_TYPES.TABLE, LAYOUT_TYPES.PIVOT_TABLE, LAYOUT_TYPES.CHART]);
     // refs to identify change
@@ -97,6 +99,8 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
         }
     ), [objId, modelLayoutOption])
     const uiLimit = modelSchema.ui_get_all_limit ?? null;
+
+    const { downloadCSV, isDownloading, progress } = useDownload(modelName, fieldsMetadata, null);
 
     useEffect(() => {
         const url = getServerUrl(modelSchema, dataSourceStoredObj, dataSource?.fieldsMetadata);
@@ -270,20 +274,20 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
     })
 
     useEffect(() => {
-        const { disable_ws_on_edit } = modelLayoutOption;
+        // const { disable_ws_on_edit } = modelLayoutOption;
         const { edit_layout, view_layout } = modelLayoutData;
         if (mode === MODES.EDIT) {
             if (edit_layout && view_layout !== edit_layout) {
                 handleLayoutTypeChange(edit_layout);
                 setLayoutType(edit_layout);
             }
-            if (disable_ws_on_edit) {
-                setIsWsDisabled(true);
-            }
+            // if (disable_ws_on_edit) {
+            //     setIsWsDisabled(true);
+            // }
         } else if (mode === MODES.READ) {
-            if (disable_ws_on_edit) {
-                setIsWsDisabled(false);
-            }
+            // if (disable_ws_on_edit) {
+            //     setIsWsDisabled(false);
+            // }
             setLayoutType(view_layout);
         }
     }, [mode, modelLayoutOption, modelLayoutData])
@@ -305,6 +309,7 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
             dispatch(actions.getAll({ ...args }));
         }
         changesRef.current = {};
+        formValidationRef.current = {};
         if (mode !== MODES.READ) {
             handleModeToggle();
         }
@@ -376,15 +381,23 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
         chartDataChangeHandler(modelHandlerConfig, updatedChartData);
     }
 
-    const handleDownload = () => {
-        const updatedRows = cloneDeep(rows);
-        updatedRows.forEach((row) => {
-            delete row['data-id'];
-        })
-        const worksheet = utils.json_to_sheet(updatedRows);
-        const workbook = utils.book_new();
-        utils.book_append_sheet(workbook, worksheet, 'Data');
-        writeFileXLSX(workbook, `${modelName}_${new Date().toISOString()}.xlsx`);
+    const handleDownload = async () => {
+        let args = { url };
+        if (crudOverrideDictRef.current?.GET_ALL) {
+            const { endpoint, paramDict } = crudOverrideDictRef.current.GET_ALL;
+            if (!params && Object.keys(paramDict).length > 0) {
+                return;
+            }
+            args = { ...args, endpoint, params };
+        }
+        const fileName = getCSVFileName(modelName);
+        try {
+            const csvContent = await downloadCSV(uiLimit ? null : storedArray, args);
+            const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+            saveAs(blob, fileName);
+        } catch (error) {
+            console.error('CSV download failed:', error);
+        }
     }
 
     const handleVisibilityMenuClick = (isChecked) => {
@@ -423,9 +436,21 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
         setShowMore((prev) => !prev);
     }
 
-    const handleConfirmSavePopupClose = () => {
-        dispatch(actions.setIsConfirmSavePopupOpen(false));
+    const handlePopupClose = (popupName) => {
+        dispatch(actions.setPopupStatus({ [popupName]: false }));
         handleReload();
+    }
+
+    const handleConfirmSavePopupClose = () => {
+        handlePopupClose('confirmSave');
+    }
+
+    const handleFormValidationPopupClose = () => {
+        handlePopupClose('formValidation');
+    }
+
+    const handleContinue = () => {
+        dispatch(actions.setPopupStatus({ formValidation: false }));
     }
 
     const handleCreate = () => {
@@ -438,6 +463,10 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
     }
 
     const handleSave = (modifiedObj, force = false) => {
+        if (Object.keys(formValidationRef.current).length > 0) {
+            dispatch(actions.setPopupStatus({ formValidation: true }));
+            return;
+        }
         const modelUpdatedObj = modifiedObj || clearxpath(cloneDeep(updatedObj));
         const activeChanges = compareJSONObjects(storedObj, modelUpdatedObj, fieldsMetadata);
         if (!activeChanges || Object.keys(activeChanges).length === 0) {
@@ -453,7 +482,7 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                 return;
             }
         }
-        dispatch(actions.setIsConfirmSavePopupOpen(true));
+        dispatch(actions.setPopupStatus({ confirmSave: true }));
     }
 
     const executeSave = () => {
@@ -466,18 +495,19 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
         }
         changesRef.current = {};
         dispatch(actions.setMode(MODES.READ));
-        dispatch(actions.setIsConfirmSavePopupOpen(false));
+        dispatch(actions.setPopupStatus({ confirmSave: false }));
     }
 
     const handleUpdate = (updatedObj) => {
         dispatch(actions.setUpdatedObj(updatedObj));
     }
 
-    const handleUserChange = (xpath, updateDict, source, validationRes) => {
+    const handleUserChange = (xpath, updateDict, validationRes, source) => {
         changesRef.current.user = {
             ...changesRef.current.user,
             ...updateDict
         }
+        updateFormValidation(formValidationRef, xpath, validationRes);
     }
 
     const handleButtonToggle = (e, xpath, value, objId, source, force = false) => {
@@ -639,18 +669,27 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                     isDisabled={isLoading || isProcessingUserActions}
                     error={error}
                     onClear={handleErrorClear}
-                    isDisconnected={!isWsDisabled && !isWebSocketAlive(socketRef.current)}
+                    isDisconnected={!isWsDisabled && !isWebSocketActive(socketRef.current)}
                     onReconnect={handleReconnect}
+                    isDownloading={isDownloading}
+                    progress={progress}
                 >
                     {renderContent()}
                 </ModelCardContent>
             </ModelCard>
             <ConfirmSavePopup
                 title={modelTitle}
-                open={isConfirmSavePopupOpen}
+                open={popupStatus.confirmSave}
                 onClose={handleConfirmSavePopupClose}
                 onSave={executeSave}
                 src={changesRef.current.active}
+            />
+            <FormValidation
+                title={modelTitle}
+                open={popupStatus.formValidation}
+                onClose={handleFormValidationPopupClose}
+                onContinue={handleContinue}
+                src={formValidationRef.current}
             />
         </FullScreenModalOptional>
     )
