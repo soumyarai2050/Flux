@@ -11,6 +11,7 @@ import {
 } from './constants';
 import * as workerUtils from './workerUtils';
 import { AlertCache } from './utility/alertCache';
+import { getWebSocketConnection } from './cache/websocketConnectionCache';
 export const { applyFilter, applyGetAllWebsocketUpdate, floatToInt, getRowsFromAbbreviation,
     getActiveRows, getFilterDict, getIdFromAbbreviatedKey, getLocalizedValueAndSuffix,
     roundNumber, stableSort, sortAlertArray, getColorTypeFromValue, getGroupedTableRows,
@@ -2554,7 +2555,7 @@ function updateChartTypeSpecificOptions(chartSeries, dataset) {
     }
 }
 
-function getYAxisIndex(encodes = [], yEncode) {
+function getYAxisIndex(encodes = [], yEncode, isStack = false) {
     if (encodes.length === 0) {
         return 0;
     } else {
@@ -2586,6 +2587,7 @@ export function updateChartDataObj(chartDataObj, collections, rows, datasets, is
         let forceMin = false;
         let forceMax = false;
         let chartSeriesCollections = collections;
+        let updatedSeries;
         if (chartDataObj.time_series) {
             const collection = getCollectionByName(collections, series.encode.y, isCollectionType);
             if (collection.hasOwnProperty('mapping_src')) {
@@ -2603,7 +2605,7 @@ export function updateChartDataObj(chartDataObj, collections, rows, datasets, is
                     const tsRows = [];
                     datasets.forEach((dataset, index) => {
                         if (dataset.type === 'time_series' && dataset.query === query.name && dataset.series_type === series.type) {
-                            const updatedSeries = cloneDeep(series);
+                            updatedSeries = cloneDeep(series);
                             updatedSeries.datasetIndex = index;
                             updatedSeries.name = dataset.name + ' ' + series.encode.y + ' ' + series.type;
                             updatedSeries.animation = false;
@@ -2637,7 +2639,7 @@ export function updateChartDataObj(chartDataObj, collections, rows, datasets, is
                 const partitionRows = [];
                 datasets.forEach((dataset, index) => {
                     if (dataset.type === 'partition' && dataset.series_type === series.type) {
-                        const updatedSeries = cloneDeep(series);
+                        updatedSeries = cloneDeep(series);
                         updatedSeries.datasetIndex = index;
                         updatedSeries.name = dataset.name + ' ' + series.encode.y + ' ' + series.type;
                         updatedSeries.animation = false;
@@ -2666,7 +2668,7 @@ export function updateChartDataObj(chartDataObj, collections, rows, datasets, is
             } else {
                 const dataset = datasets.find(dataset => dataset.type === 'default');
                 if (dataset) {
-                    const updatedSeries = cloneDeep(series);
+                    updatedSeries = cloneDeep(series);
                     updatedSeries.datasetIndex = datasets.indexOf(dataset);
                     updatedSeries.name = series.encode.y + ' ' + series.type;
                     updatedSeries.animation = false;
@@ -2692,17 +2694,38 @@ export function updateChartDataObj(chartDataObj, collections, rows, datasets, is
                 }
             }
         }
-        if (xEncode && yEncode) {
-            if (!prevYEncode) {
-                prevYEncode = yEncode;
-            } else if (prevYEncode !== yEncode) {
-                prevYEncodeIndex += 1;
-            }
-            if (!xEndodes.find(encode => encode.encode === xEncode)) {
-                xEndodes.push({ encode: xEncode, seriesCollections: chartSeriesCollections, isCollectionType: !chartDataObj.time_series });
-            }
-            if (!yEncodes.find(encode => encode.encode === yEncode)) {
-                yEncodes.push({ encode: yEncode, seriesCollections: chartSeriesCollections, isCollectionType: !chartDataObj.time_series, max: yMax, min: yMin, forceMin, forceMax });
+        if (updatedSeries) {
+            if (xEncode && yEncode) {
+                // unused
+                // if (!prevYEncode) {
+                //     prevYEncode = yEncode;
+                // } else if (prevYEncode !== yEncode) {
+                //     prevYEncodeIndex += 1;
+                // }
+                if (!xEndodes.find(encode => encode.encode === xEncode)) {
+                    xEndodes.push({ encode: xEncode, seriesCollections: chartSeriesCollections, isCollectionType: !chartDataObj.time_series });
+                }
+                // if already stack - new stack does not add encode
+                if (series.stack) {
+                    if (!yEncodes.find((encode) => encode.stack)) {
+                        yEncodes.push({ encode: yEncode, seriesCollections: chartSeriesCollections, isCollectionType: !chartDataObj.time_series, max: yMax, min: yMin, forceMin, forceMax, stack: series.stack });
+                        prevYEncodeIndex += 1;
+                    }
+                    // else not create new encode if stack already exists
+                } else if (!yEncodes.find(encode => encode.encode === yEncode && !encode.stack)) {
+                    yEncodes.push({ encode: yEncode, seriesCollections: chartSeriesCollections, isCollectionType: !chartDataObj.time_series, max: yMax, min: yMin, forceMin, forceMax });
+                    prevYEncodeIndex += 1;
+                }
+                updatedSeries.yAxisIndex = prevYEncodeIndex - 1;
+                if (updatedSeries.stack) {
+                    updatedSeries.stack = 'total';
+                    if (updatedSeries.type === 'line') {
+                        updatedSeries.areaStyle = {};
+                        updatedSeries.emphasis = {
+                            focus: 'series'
+                        }
+                    }
+                }
             }
         }
     })
@@ -2735,7 +2758,7 @@ export function updateChartDataObj(chartDataObj, collections, rows, datasets, is
             xAxis.push(axis);
         }
     })
-    yEncodes.forEach(({ encode, seriesCollections, isCollectionType, max, min, forceMin, forceMax }) => {
+    yEncodes.forEach(({ encode, seriesCollections, isCollectionType, max, min, forceMin, forceMax, stack = false }) => {
         const [yAxisType, yAxisName] = getChartAxisTypeAndName(seriesCollections, encode, isCollectionType);
         // only two y-axis is allowed per chart.
         // if more than 2 y-axis is present, only considers the first 2 y-axis
@@ -2743,15 +2766,15 @@ export function updateChartDataObj(chartDataObj, collections, rows, datasets, is
         const axisMax = forceMax ? max : max + (max - min);
         const axisMin = forceMin ? min : min >= 0 && min - (max - min) < 0 ? 0 : min - (max - min);
         if (yAxis.length < 2) {
-            yAxis.push({
+            let axis = {
                 type: yAxisType,
                 name: yAxisName,
                 encode: encode,
                 splitNumber: 5,
-                max: axisMax,
-                interval: (axisMax - axisMin) / 5,
-                min: axisMin,
-                onZero: false,
+                // max: axisMax,
+                // interval: (axisMax - axisMin) / 5,
+                // min: axisMin,
+                // onZero: false,
                 axisLabel: {
                     formatter: (val) => tooltipFormatter(val)
                 },
@@ -2760,7 +2783,25 @@ export function updateChartDataObj(chartDataObj, collections, rows, datasets, is
                         formatter: (param) => tooltipFormatter(param.value)
                     }
                 }
-            })
+            }
+            if (!stack) {
+                const nonStackProps = {
+                    max: axisMax,
+                    interval: (axisMax - axisMin) / 5,
+                    min: axisMin,
+                    onZero: false,
+                    axisLabel: {
+                        formatter: (val) => tooltipFormatter(val)
+                    },
+                    axisPointer: {
+                        label: {
+                            formatter: (param) => tooltipFormatter(param.value)
+                        }
+                    }
+                }
+                axis = { ...axis, ...nonStackProps };
+            }
+            yAxis.push(axis);
         }
     })
     chartDataObj.xAxis = xAxis;
@@ -3619,6 +3660,7 @@ export function getDataSourcesCrudOverrideDict(dataSources) {
 }
 
 export function fastClone(obj) {
+    if (obj === undefined || obj === null) return obj;
     return JSON.parse(JSON.stringify(obj));
 }
 
@@ -3649,9 +3691,13 @@ export function getCSVFileName(modelName) {
     return `${modelName}_${new Date().toISOString()}.csv`;
 }
 
-export function isWebSocketActive(webSocket) {
-    if (webSocket) {
-        if (webSocket.readyState === WebSocket.OPEN) {
+export function isWebSocketActive(webSocket, modelName = null) {
+    let websocketToCheck = webSocket;
+    if (modelName) {
+        websocketToCheck = getWebSocketConnection(modelName);
+    }
+    if (websocketToCheck) {
+        if (websocketToCheck.readyState === WebSocket.OPEN) {
             return true;
         }
     }

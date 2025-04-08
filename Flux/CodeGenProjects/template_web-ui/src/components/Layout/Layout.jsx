@@ -8,16 +8,15 @@ import { defaultLayouts } from '../../projectSpecificUtils';
 import { actions as LayoutActions } from '../../features/uiLayoutSlice';
 import * as Selectors from '../../selectors';
 import { getModelComponent } from '../../utils/modelComponentLoader';
-import { getIconText, snakeToTitle } from '../../utils';
+import { fastClone, getIconText, snakeToTitle } from '../../utils';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 import styles from './Layout.module.css'; // Import CSS module
 import Icon, { ToggleIcon } from '../Icon';
 import { LoadLayoutPopup, SaveLayoutPopup } from '../Popup';
-import { COOKIE_NAME } from '../../config';
+import { API_ROOT_URL, COOKIE_NAME } from '../../config';
 import { DB_ID } from '../../constants';
-import { useURLParams } from '../../hooks';
-import { cloneDeep } from 'lodash';
+import { useURLParams, useWebSocketWorker } from '../../hooks';
 
 const defaultGridProps = {
   className: 'layout',
@@ -53,11 +52,31 @@ const Layout = ({ projectName, theme, onThemeToggle }) => {
   const [isNavbarVisible, setIsNavbarVisible] = useState(true);
   const [isSaveLayoutPopupOpen, setIsSaveLayoutPopupOpen] = useState(false);
   const [isLoadLayoutPopupOpen, setIsLoadLayoutPopupOpen] = useState(false);
+  const [reconnectCounter, setReconnectCounter] = useState(0);
   const [searchValue, setSearchValue] = useState(''); // load layout by profile search input
   const [profileId, setProfileId] = useState(''); // save layout by profile input
   const dispatch = useDispatch();
 
   const urlParams = useURLParams();
+
+  const handleWorkerUpdate = (updatedArray) => {
+    dispatch(LayoutActions.setStoredArray(updatedArray));
+  }
+
+  const handleReconnect = () => {
+    setReconnectCounter((prev) => prev + 1);
+  }
+
+  useWebSocketWorker({
+    url: API_ROOT_URL,
+    modelName: 'ui_layout',
+    isDisabled: false,
+    reconnectCounter,
+    isAbbreviationSource: false,
+    selector: Selectors.selectUILayout,
+    onWorkerUpdate: handleWorkerUpdate,
+    onReconnect: handleReconnect
+  })
 
   /**
    * Fetch the layout data on mount and update the loading state.
@@ -79,7 +98,7 @@ const Layout = ({ projectName, theme, onThemeToggle }) => {
 
     // Check if we have an active layout in the stored array.
     if (activeLayoutId) {
-      const activeLayout = cloneDeep(storedArray?.find(o => o.profile_id === activeLayoutId));
+      const activeLayout = fastClone(storedArray?.find(o => o.profile_id === activeLayoutId));
       if (activeLayout) {
         const updatedDataElememts = activeLayout.widget_ui_data_elements.map((item) => {
           const { x, y, w, h, widget_ui_data, chart_data, filters, join_sort } = item;
@@ -227,34 +246,41 @@ const Layout = ({ projectName, theme, onThemeToggle }) => {
     }, {});
 
     // Retrieve an existing profile from storedArray, or use storedObj as a fallback.
-    // let profileData = storedArray.find((item) => item.profile_id === profileId);
-    // if (!profileData) {
-    //   profileData = {
-    //     profile_id: profileId,
-    //     widget_ui_data_elements: storedObj?.widget_ui_data_elements || [],
-    //   };
-    // }
+    let profileData;
+    const existingObj = storedArray.find((o) => o.profile_id === profileId);
+    if (existingObj) {
+      // override existing profile with current layout
+      profileData = {
+        ...existingObj,
+        widget_ui_data_elements: storedObj?.widget_ui_data_elements || [],
+      };
+    } else {
+      // create a new profile
+      profileData = {
+        profile_id: profileId,
+        widget_ui_data_elements: storedObj?.widget_ui_data_elements || [],
+      };
+    }
 
     // Deep clone to avoid accidental mutations of the original object.
-    let newProfileData = cloneDeep(storedObj);
-    newProfileData.profile_id = profileId;
+    profileData = fastClone(profileData);
 
     // Filter out widget elements that do not exist in the current layout,
     // then map each widget to include updated position/size properties.
-    const updatedWidgets = newProfileData.widget_ui_data_elements
+    const updatedWidgets = profileData.widget_ui_data_elements
       .filter((widget) => layoutMap[widget.i])
       .map((widget) => {
         const { x, y, w, h } = layoutMap[widget.i];
         return { ...widget, x, y, w, h };
       });
 
-    newProfileData.widget_ui_data_elements = updatedWidgets;
+    profileData.widget_ui_data_elements = updatedWidgets;
 
     // Dispatch appropriate action based on whether the profile exists in the database.
-    if (newProfileData[DB_ID]) {
-      dispatch(LayoutActions.update({ data: newProfileData }));
+    if (profileData[DB_ID]) {
+      dispatch(LayoutActions.update({ data: profileData }));
     } else {
-      dispatch(LayoutActions.create({ data: newProfileData }));
+      dispatch(LayoutActions.create({ data: profileData }));
     }
 
     // Persist the active profile ID in session storage.
@@ -282,6 +308,8 @@ const Layout = ({ projectName, theme, onThemeToggle }) => {
   const handleReset = () => {
     sessionStorage.removeItem(COOKIE_NAME);
     setLayout(defaultLayouts);
+    const newVisibleComponents = defaultLayouts.map(item => item.i);
+    setVisibleComponents(newVisibleComponents);
     dispatch(LayoutActions.setStoredObj({ profile_id: 'default', widget_ui_data_elements: defaultLayouts }));
     handleLoadLayoutPopupToggle();
   }

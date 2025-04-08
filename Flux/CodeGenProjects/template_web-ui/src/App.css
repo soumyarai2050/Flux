@@ -99,3 +99,8 @@ code {
 .MuiButtonBase-root {
   text-transform: none !important;
 }
+
+div.MuiModal-root:has(> div[style*="opacity: 0"]) {
+  pointer-events: none;
+  z-index: -1;
+}

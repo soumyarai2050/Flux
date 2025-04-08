@@ -408,7 +408,7 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
             output_str = " " * 4 + f"def {query_name}_query_client(self, {params_str}) -> " \
                                     f"List[{container_model_name}]:\n"
             params_dict_str = \
-                ', '.join([f'"{aggregate_param}": {aggregate_param}' for aggregate_param in query_params])
+                ', '.join([f'"{query_param}": {query_param}' for query_param in query_params])
             if route_type is None or route_type == FastapiHttpClientFileHandler.flux_json_query_route_get_type_field_val:
                 output_str += " " * 4 + "    query_params_dict = {" + f"{params_dict_str}" + "}\n"
                 output_str += " " * 4 + ("    query_params_data = generic_encoder(query_params_dict, "
@@ -417,10 +417,21 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
                 output_str += " " * 4 + f"    return generic_http_get_query_client(self.query_{query_name}_url, " \
                                         f"query_params_data, {container_model_name})\n\n"
             else:
-                output_str += " " * 4 + "    query_params_dict = {" + f"{params_dict_str}" + "}\n"
-                output_str += " " * 4 + ("    query_params_data = generic_encoder(query_params_dict, "
-                                         f"{message_name}.enc_hook, "
-                                         "exclude_none=True)   # removes none values from dict\n")
+                if route_type in [FastapiHttpClientFileHandler.flux_json_query_route_post_all_type_field_val,
+                                  FastapiHttpClientFileHandler.flux_json_query_route_patch_all_type_field_val]:
+                    if len(query_params) > 1:
+                        raise Exception("POST-ALL or PATCH-ALL route type query must only have single list type "
+                                        f"param, found {query_params}")
+
+                    query_param = query_params[0]
+                    output_str += " " * 4 + (f"    query_params_data = generic_encoder({query_param}, "
+                                             f"{message_name}.enc_hook, "
+                                             "exclude_none=True)   # removes none values from dict\n")
+                else:
+                    output_str += " " * 4 + "    query_params_dict = {" + f"{params_dict_str}" + "}\n"
+                    output_str += " " * 4 + ("    query_params_data = generic_encoder(query_params_dict, "
+                                             f"{message_name}.enc_hook, "
+                                             "exclude_none=True)   # removes none values from dict\n")
                 if route_type == FastapiHttpClientFileHandler.flux_json_query_route_patch_type_field_val:
                     output_str += " " * 4 + (f"    return generic_http_patch_query_client(self.query_{query_name}"
                                              f"_url, query_params_data, {container_model_name})\n\n")
@@ -453,8 +464,11 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
                                                  f"_url, query_params_data)\n\n")
             # else not required: not adding df related clients if option val is not set
         else:
-            if route_type == FastapiHttpClientFileHandler.flux_json_query_route_patch_type_field_val:
-                err_str = f"Patch web client can't be generated without payload parameters, query_name: {query_name} " \
+            if route_type in [FastapiHttpClientFileHandler.flux_json_query_route_patch_type_field_val,
+                              FastapiHttpClientFileHandler.flux_json_query_route_post_type_field_val,
+                              FastapiHttpClientFileHandler.flux_json_query_route_patch_all_type_field_val,
+                              FastapiHttpClientFileHandler.flux_json_query_route_post_all_type_field_val]:
+                err_str = f"{route_type} web client can't be generated without payload parameters, query_name: {query_name} " \
                           f"in message {message_name} has no query_params"
                 logging.exception(err_str)
                 raise Exception(err_str)
@@ -509,9 +523,16 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
             message_name = message.proto.name
 
             if query_type is None or query_type == "http" or query_type == "both":
-                output_str += self._handle_client_http_query_output(message_name, query_name, query_params_name_list,
-                                                                    params_str, query_route_type,
-                                                                    include_dataframe_clients)
+                if query_route_type in [FastapiHttpClientFileHandler.flux_json_query_route_post_all_type_field_val,
+                                        FastapiHttpClientFileHandler.flux_json_query_route_patch_all_type_field_val]:
+                    output_str += self._handle_client_http_query_output(message_name, query_name, query_params_name_list,
+                                                                        params_str, query_route_type,
+                                                                        include_dataframe_clients)
+                else:
+                    output_str += self._handle_client_http_query_output(message_name, query_name,
+                                                                        query_params_name_list,
+                                                                        params_str, query_route_type,
+                                                                        include_dataframe_clients)
             elif query_type == "http_file":
                 output_str += self._handle_client_http_file_query_output(message_name, query_name, query_params_name_list, params_str)
             # else not required: ws handling is done by ws client plugin

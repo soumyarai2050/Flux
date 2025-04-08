@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { WEBSOCKET_CLOSE_CODES, WEBSOCKET_RETRY_CODES } from '../constants';
+import { clearWebSocketConnection, setWebSocketConnection } from '../cache/websocketConnectionCache';
 
 function useWebSocketWorker({
   url,
@@ -19,8 +20,10 @@ function useWebSocketWorker({
   // Get the current stored array from Redux (slice can be dynamic)
   const { storedArray } = useSelector(selector);
   const connectionRef = useRef(null);
-
   const storedArrayRef = useRef(storedArray);
+
+  // State to notify UI about connection status changes
+  const [, setIsConnected] = useState(false);
 
   if (!connectionRef.current) {
     const worker = new Worker(new URL('../workers/websocket-update.worker.js', import.meta.url));
@@ -30,27 +33,23 @@ function useWebSocketWorker({
       isWorkerBusy: false,
       ws: null,
       retryCount: 0
-    }
+    };
   }
 
   useEffect(() => {
     storedArrayRef.current = storedArray;
-  }, [storedArray])
+  }, [storedArray]);
 
   // Create and manage the WebSocket connection only if url exists and is not disabled
   useEffect(() => {
     if (isAbbreviationSource) return;
+    if (!url || isDisabled) return;
 
-    if (!url || isDisabled) {
-      return;
-    }
     const wsUrl = url.replace('http', 'ws');
     let apiUrl = `${wsUrl}/get-all-${modelName}-ws`;
     if (crudOverrideDict?.GET_ALL) {
       const { endpoint, paramDict } = crudOverrideDict.GET_ALL;
-      if (!params && Object.keys(paramDict).length > 0) {
-        return;
-      }
+      if (!params && Object.keys(paramDict).length > 0) return;
       apiUrl = `${wsUrl}/ws-${endpoint}`;
       if (params) {
         const paramsStr = '?' + Object.keys(params).map((k) => `${k}=${params[k]}`).join('&');
@@ -59,39 +58,52 @@ function useWebSocketWorker({
     }
 
     const connection = connectionRef.current;
-    const { messageBuffer, retryCount } = connection;
+    const { messageBuffer } = connection;
     const ws = new WebSocket(apiUrl);
     connection.ws = ws;
+    setWebSocketConnection(modelName, ws);
+
+    // Update state when connection opens
+    ws.onopen = () => {
+      setIsConnected(true);
+    };
 
     ws.onmessage = (event) => {
       messageBuffer.push(event.data);
     };
 
     ws.onerror = (e) => {
-      console.error(`ws closed on error for ${modelName}. ${e}`)
-    }
+      console.error(`WebSocket error for ${modelName}:`, e);
+    };
+
     ws.onclose = (e) => {
       const { code, reason, wasClean } = e;
+      // Notify UI that the connection is closed
+      setIsConnected(false);
+
       if (WEBSOCKET_RETRY_CODES.includes(code)) {
-        if (retryCount <= 10) {
+        if (connection.retryCount <= 10) {
           connection.retryCount += 1;
           setTimeout(() => {
-            console.info(`reconnecting ws for ${modelName}, retryCount: ${retryCount}`);
+            console.info(`Reconnecting WebSocket for ${modelName}, retryCount: ${connection.retryCount}`);
             onReconnect();
           }, code === WEBSOCKET_CLOSE_CODES.TRY_AGAIN_LATER ? connection.retryCount * 10000 : 10000);
         } else {
-          console.error(`ws closed for ${modelName}, retryCount exhausted`);
+          console.error(`WebSocket closed for ${modelName}, retryCount exhausted`);
         }
       }
       if (code !== WEBSOCKET_CLOSE_CODES.NORMAL_CLOSURE) {
-        console.error(`ws closed for ${modelName}, code: ${code}, reason: ${reason}, wasClean: ${wasClean}`);
+        console.error(`WebSocket closed for ${modelName}, code: ${code}, reason: ${reason}, wasClean: ${wasClean}`);
       }
-    }
+    };
 
     return () => {
       if (connectionRef.current.ws) {
         connectionRef.current.ws.close(1000, 'Normal closure on useEffect cleanup');
         connectionRef.current.ws = null;
+        clearWebSocketConnection(modelName);
+        // Update state to notify UI
+        setIsConnected(false);
       }
     };
   }, [url, isDisabled, params, reconnectCounter]);
@@ -126,8 +138,8 @@ function useWebSocketWorker({
     };
   }, [onWorkerUpdate]);
 
+  // Return the WebSocket from the ref.
   return connectionRef.current?.ws;
 }
 
 export default useWebSocketWorker;
-

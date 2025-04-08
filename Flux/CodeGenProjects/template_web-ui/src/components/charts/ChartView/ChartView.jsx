@@ -35,7 +35,10 @@ function ChartView({
     onChartDataChange,
     // onChartDelete,
     onModeToggle,
-    mode
+    mode,
+    onChartSelect,
+    selectedChartName,
+    chartEnableOverride
 }) {
     // redux states
     const theme = useTheme();
@@ -43,7 +46,7 @@ function ChartView({
 
     const [storedChartObj, setStoredChartObj] = useState({});
     const [updatedChartObj, setUpdatedChartObj] = useState({});
-    const [selectedIndex, setSelectedIndex] = useState();
+    const [selectedIndex, setSelectedIndex] = useState(selectedChartName ? chartData.findIndex((o) => o.chart_name === selectedChartName) : null);
     const [isChartOptionOpen, setIsChartOptionOpen] = useState(false);
     const [isConfirmPopupOpen, setIsConfirmPopupOpen] = useState(false);
     // const [mode, setMode] = useState(MODES.READ);
@@ -88,6 +91,8 @@ function ChartView({
             if (!storedChartObj.time_series || (storedChartObj.time_series && rows.length !== updatedRows.length)) {
                 setRows(updatedRows);
             }
+        } else {  // mode is EDIT
+            setIsChartOptionOpen(true);
         }
     }, [chartRows, mode])
 
@@ -111,14 +116,17 @@ function ChartView({
 
     useEffect(() => {
         if (selectedIndex || selectedIndex === 0) {
-            setStoredChartObj(chartData[selectedIndex]);
-            setUpdatedChartObj(addxpath(cloneDeep(chartData[selectedIndex])));
-            const updatedSchema = updatePartitionFldSchema(schema, chartData[selectedIndex]);
+            const selectedChartOption = chartData[selectedIndex];
+            setStoredChartObj(selectedChartOption);
+            setUpdatedChartObj(addxpath(cloneDeep(selectedChartOption)));
+            const updatedSchema = updatePartitionFldSchema(schema, selectedChartOption);
             setSchema(updatedSchema);
+            onChartSelect(selectedChartOption.chart_name);
         } else {
             setStoredChartObj({});
             setUpdatedChartObj({});
             handleChartReset();
+            onChartSelect(null);
         }
         setChartUpdateCounter(prevCount => prevCount + 1);
     }, [selectedIndex])
@@ -359,12 +367,6 @@ function ChartView({
         }
     }
 
-    const onChangeMode = () => {
-        // setMode(MODES.EDIT);
-        onModeToggle();
-        isChartOptionOpen(true);
-    }
-
     const handleReload = () => {
         // setMode(MODES.READ);
         onReload();
@@ -431,16 +433,19 @@ function ChartView({
                         Add new chart
                     </Button>
                     <List>
-                        {chartData && chartData.map((item, index) => (
-                            <ListItem className={styles.list_item} key={index} selected={selectedIndex === index} disablePadding onClick={() => onSelect(index)}>
-                                <ListItemButton>
-                                    <ListItemText>{item.chart_name}</ListItemText>
-                                </ListItemButton>
-                                <Icon title='Delete' onClick={() => handleChartDelete(item.chart_name, index)}>
-                                    <Delete fontSize='small' />
-                                </Icon>
-                            </ListItem>
-                        ))}
+                        {chartData.map((item, index) => {
+                            if (chartEnableOverride.includes(item.chart_name)) return;
+                            return (
+                                <ListItem className={styles.list_item} key={index} selected={selectedIndex === index} disablePadding onClick={() => onSelect(index)}>
+                                    <ListItemButton>
+                                        <ListItemText>{item.chart_name}</ListItemText>
+                                    </ListItemButton>
+                                    <Icon title='Delete' onClick={() => handleChartDelete(item.chart_name, index)}>
+                                        <Delete fontSize='small' />
+                                    </Icon>
+                                </ListItem>
+                            )
+                        })}
                     </List>
                 </Box>
                 <Divider orientation='vertical' flexItem />

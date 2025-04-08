@@ -33,7 +33,8 @@ const VisibilityMenu = ({
   onShowMoreToggle,
   isPinned,
   onPinToggle,
-  menuType
+  menuType,
+  onMenuClose
 }) => {
   const [anchorEl, setAnchorEl] = useState(null);
 
@@ -47,6 +48,7 @@ const VisibilityMenu = ({
   };
 
   const handlePopoverClose = () => {
+    onMenuClose();
     setAnchorEl(null);
   };
 

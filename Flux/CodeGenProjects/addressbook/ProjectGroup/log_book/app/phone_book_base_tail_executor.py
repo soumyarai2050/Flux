@@ -11,9 +11,9 @@ import pendulum
 
 # Project imports
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.markets.market import Market, MarketID
-from FluxPythonUtils.log_book.log_book import LogDetail, get_transaction_counts_n_timeout_from_config
+from FluxPythonUtils.log_book.tail_executor import LogDetail, get_transaction_counts_n_timeout_from_config
 from FluxPythonUtils.scripts.general_utility_functions import get_last_log_line_date_time, parse_to_float, is_file_modified
-from Flux.PyCodeGenEngine.FluxCodeGenCore.app_log_book import AppLogBook
+from Flux.PyCodeGenEngine.FluxCodeGenCore.app_log_book import AppTailExecutor
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_client import (
     StreetBookServiceHttpClient)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *
@@ -52,7 +52,7 @@ class PairPlanDbUpdateDataContainer(msgspec.Struct):
     update_type: UpdateType | None = None
 
 
-class PhoneBookBaseLogBook(AppLogBook):
+class PhoneBookBaseTailExecutor(AppTailExecutor):
     underlying_partial_update_all_contact_alert_http: Callable[..., Any] | None = None
     underlying_read_contact_alert_http: Callable[..., Any] | None = None
     underlying_read_plan_alert_http: Callable[..., Any] | None = None
@@ -71,7 +71,7 @@ class PhoneBookBaseLogBook(AppLogBook):
                  simulation_mode: bool = False):
         super().__init__(log_detail, regex_file_dir_path, config_yaml_dict,
                          log_prefix_regex_pattern_to_callable_name_dict, debug_mode=debug_mode)
-        PhoneBookBaseLogBook.initialize_underlying_http_callables()
+        PhoneBookBaseTailExecutor.initialize_underlying_http_callables()
         self.market: Market = Market(MarketID.IN)
         self.simulation_mode = simulation_mode
         self.contact_alerts_model_exist: bool = False
@@ -143,7 +143,7 @@ class PhoneBookBaseLogBook(AppLogBook):
 
     def _create_alert(self, error_dict: Dict) -> Tuple[str, str, str]:
         alert_brief_n_detail_lists: List[str] = (
-            error_dict["line"].split(PhoneBookBaseLogBook.log_seperator, 1))
+            error_dict["line"].split(PhoneBookBaseTailExecutor.log_seperator, 1))
         if len(alert_brief_n_detail_lists) == 2:
             alert_brief = alert_brief_n_detail_lists[0]
             alert_details = alert_brief_n_detail_lists[1]
@@ -214,7 +214,7 @@ class PhoneBookBaseLogBook(AppLogBook):
                         if not should_retry_due_to_server_down(e):
                             alert_brief: str = f"{method_name} failed in pair_plan log analyzer"
                             alert_details: str = f"{model_basemodel_type=}, exception: {e}"
-                            logging.exception(f"{alert_brief}{PhoneBookBaseLogBook.log_seperator} "
+                            logging.exception(f"{alert_brief}{PhoneBookBaseTailExecutor.log_seperator} "
                                               f"{alert_details}")
                             alert_meta = get_alert_meta_obj(self.component_file_path, PurePath(__file__).name,
                                                             inspect.currentframe().f_lineno, DateTime.utcnow(),
@@ -226,7 +226,7 @@ class PhoneBookBaseLogBook(AppLogBook):
             except Exception as e:
                 err_str_brief = f"_pair_plan_db_update_queue_handler failed"
                 err_str_detail = f"exception: {e}"
-                logging.exception(f"{err_str_brief}{PhoneBookBaseLogBook.log_seperator} {err_str_detail}")
+                logging.exception(f"{err_str_brief}{PhoneBookBaseTailExecutor.log_seperator} {err_str_detail}")
                 alert_meta = get_alert_meta_obj(self.component_file_path, PurePath(__file__).name,
                                                 inspect.currentframe().f_lineno, DateTime.utcnow(),
                                                 err_str_detail)
@@ -249,7 +249,7 @@ class PhoneBookBaseLogBook(AppLogBook):
         err_str_brief = (f"handle_dynamic_queue_for_patch running for basemodel_type: "
                          f"{basemodel_type} and update_type: {update_type} failed")
         err_str_detail = f"exception: {err_str_}"
-        logging.exception(f"{err_str_brief}{PhoneBookBaseLogBook.log_seperator} "
+        logging.exception(f"{err_str_brief}{PhoneBookBaseTailExecutor.log_seperator} "
                           f"{err_str_detail}")
         alert_meta = get_alert_meta_obj(self.component_file_path, PurePath(__file__).name,
                                         inspect.currentframe().f_lineno, DateTime.utcnow(),
@@ -324,7 +324,7 @@ class PhoneBookBaseLogBook(AppLogBook):
         except Exception as e:
             alert_brief: str = f"_process_pair_plan_db_updates failed in log analyzer"
             alert_details: str = f"{message=}, exception: {e}"
-            logging.exception(f"{alert_brief}{PhoneBookBaseLogBook.log_seperator} "
+            logging.exception(f"{alert_brief}{PhoneBookBaseTailExecutor.log_seperator} "
                               f"{alert_details}")
             alert_meta = get_alert_meta_obj(self.component_file_path, PurePath(__file__).name,
                                             inspect.currentframe().f_lineno, DateTime.utcnow(),
@@ -432,13 +432,13 @@ class PhoneBookBaseLogBook(AppLogBook):
                                    alert_meta=alert_meta)
 
     def notify_error(self, error_msg: str, source_name: str, line_num: int, log_create_date_time: DateTime):
-        log_seperator_index: int = error_msg.find(PhoneBookBaseLogBook.log_seperator)
+        log_seperator_index: int = error_msg.find(PhoneBookBaseTailExecutor.log_seperator)
 
         msg_brief: str
         msg_detail: str | None = None
         if log_seperator_index != -1:
             msg_brief = error_msg[:log_seperator_index]
-            msg_detail = error_msg[log_seperator_index + len(PhoneBookBaseLogBook.log_seperator):]
+            msg_detail = error_msg[log_seperator_index + len(PhoneBookBaseTailExecutor.log_seperator):]
         else:
             msg_brief = error_msg
         alert_meta = get_alert_meta_obj(self.component_file_path, source_name,
@@ -536,7 +536,7 @@ class PhoneBookBaseLogBook(AppLogBook):
         # this start happens from same process of tail executor - shm is not required here - shm is used to get
         # last processed timestamp when handled from outside tail executor process
         processed_timestamp: DateTime = pendulum.parse(log_detail.processed_timestamp)
-        restart_datetime: str = PhoneBookBaseLogBook._get_restart_datetime_from_log_detail(processed_timestamp)
+        restart_datetime: str = PhoneBookBaseTailExecutor._get_restart_datetime_from_log_detail(processed_timestamp)
         logging.warning(f"Restarting tail for {log_detail.log_file_path=} from {restart_datetime=}")
         log_book_service_http_client.log_book_restart_tail_query_client(log_detail.log_file_path,
                                                                                 restart_datetime)

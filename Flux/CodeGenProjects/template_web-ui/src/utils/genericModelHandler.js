@@ -55,6 +55,21 @@ export function flipToggleHandler(config, updatedFlip) {
   layoutDataChangeHandler(config, layoutDataUpdateDict);
 }
 
+export function selectedChartNameChangeHandler(config, updatedChartName) {
+  const layoutDataUpdateDict = { selected_chart_name: updatedChartName };
+  layoutDataChangeHandler(config, layoutDataUpdateDict);
+}
+
+export function chartEnableOverrideChangeHandler(config, updatedChartEnableOverride) {
+  const layoutDataUpdateDict = { chart_enable_override: updatedChartEnableOverride };
+  layoutDataChangeHandler(config, layoutDataUpdateDict);
+}
+
+export function selectedSourceIdChangeHandler(config, updatedSelectedSourceId) {
+  const layoutDataUpdateDict = { selected_source_id: updatedSelectedSourceId };
+  layoutDataChangeHandler(config, layoutDataUpdateDict);
+}
+
 export function joinSortChangeHandler(config, updatedJoinSort) {
   const layoutOptionUpdateDict = { join_sort: updatedJoinSort };
   layoutOptionChangeHandler(config, layoutOptionUpdateDict);

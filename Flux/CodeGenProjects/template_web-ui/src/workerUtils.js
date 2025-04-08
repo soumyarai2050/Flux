@@ -721,7 +721,7 @@ const primitiveDataTypes = [
     DATA_TYPES.FLOAT
 ];
 
-export function getFilteredCells(headCells, commonKeys, showHidden, showAll, showMore, moreAll) {
+export function getFilteredCells(headCells, commonKeys, showHidden, showAll, showMore, moreAll, isAbbreviationMerge = false) {
     let updatedCells = cloneDeep(headCells);
     if (!showHidden && !showAll) {
         updatedCells = updatedCells.filter(cell => !cell.hide);
@@ -729,6 +729,7 @@ export function getFilteredCells(headCells, commonKeys, showHidden, showAll, sho
     if (!showMore && !moreAll) {
         updatedCells = updatedCells.filter(cell => !cell.showLess);
     }
-    updatedCells = updatedCells.filter(cell => commonKeys.filter(c => c.key === cell.key && c.sourceIndex === cell.sourceIndex).length === 0)
+    const fieldKey = isAbbreviationMerge ? 'key' : 'tableTitle';
+    updatedCells = updatedCells.filter(cell => commonKeys.filter(c => c[fieldKey] === cell[fieldKey] && c.sourceIndex === cell.sourceIndex).length === 0)
     return updatedCells;
 }

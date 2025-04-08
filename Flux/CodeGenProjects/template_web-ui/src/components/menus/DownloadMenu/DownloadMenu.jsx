@@ -16,7 +16,8 @@ const DownloadMenu = ({
   onDownload,
   isPinned,
   onPinToggle,
-  menuType
+  menuType,
+  onMenuClose
 }) => {
   const menuName = 'download';
 
@@ -25,12 +26,17 @@ const DownloadMenu = ({
     onPinToggle(menuName, !isPinned);
   }
 
+  const handleDownload = () => {
+    onMenuClose();
+    onDownload();
+  }
+
   const renderMenu = () => {
     switch (menuType) {
       case 'item':
         const PinCompononent = isPinned ? PushPin : PushPinOutlined;
         return (
-          <MenuItem name={menuName} onClick={onDownload}>
+          <MenuItem name={menuName} onClick={handleDownload}>
             <span>
               <FileDownload sx={{ marginRight: '5px' }} fontSize='small' />
               {menuName}
@@ -41,7 +47,7 @@ const DownloadMenu = ({
       case 'icon':
       default:
         return (
-          <Icon name={menuName} title={menuName} onClick={onDownload}>
+          <Icon name={menuName} title={menuName} onClick={handleDownload}>
             <FileDownload fontSize='small' />
           </Icon>
         );

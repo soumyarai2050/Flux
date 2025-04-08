@@ -4,10 +4,10 @@ from typing import List, Dict, Type
 import logging
 
 # Project imports
-from FluxPythonUtils.log_analyzer.log_analyzer import LogAnalyzer, LogDetail, ABC
+from FluxPythonUtils.log_analyzer.tail_executor import TailExecutor, LogDetail, ABC
 
 
-class AppLogAnalyzer(LogAnalyzer, ABC):
+class AppTailExecutor(TailExecutor, ABC):
     severity_map: Dict[str, str] = {
         "error": "Severity_ERROR",
         "critical": "Severity_CRITICAL",

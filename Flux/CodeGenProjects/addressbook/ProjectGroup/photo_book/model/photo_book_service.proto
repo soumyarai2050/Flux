@@ -77,7 +77,20 @@ message ResetAllPlanViewCountNSeverity{
       QueryName: "reset_all_plan_view_count_n_severity"
   };
   optional bool temp = 1;
+};
+
+message HandlePlanViewUpdate{
+    option (FluxMsgJsonQuery) = {
+    QueryName: "handle_plan_view_updates"
+    QueryRouteType: POST_ALL,
+    QueryParams: {
+      QueryParamName: "payload",
+      QueryParamDataType: "List[Dict]"
+    }
+  };
+  optional bool temp = 1;
 }
+
 
 // used to avoid unused import warning by using any random msg or enum from imported file causing warning
 message ImportWarningAvoidDummyMessage{

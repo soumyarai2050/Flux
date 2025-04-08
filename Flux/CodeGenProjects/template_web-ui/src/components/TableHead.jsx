@@ -56,9 +56,10 @@ const CustomHeadCell = ({
                     const sortOrder = sortOrders.find(o => o.order_by === cellKey);
                     const isSelected = copiedCellId === cellKey;
                     const iconText = isSelected ? 'Column copied!' : 'Click to copy column';
+                    const uniqueCellKey = cellKey + cell.sourceIndex;
                     return (
                         <TableCell
-                            key={cellKey}
+                            key={uniqueCellKey}
                             className={`${classes.cell}`}
                             sx={{ color: `${tableHeadColor}` }}
                             align='center'

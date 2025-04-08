@@ -11,8 +11,13 @@ export const ConfirmSavePopup = (props) => {
     const theme = useTheme();
     const jsonViewTheme = theme.palette.mode === 'dark' ? 'tube' : 'rjv-default';
 
+    const handleClose = (e, reason) => {
+        if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;
+        props.onClose();
+    }
+
     return (
-        <Dialog className={classes.backdrop} open={props.open} onClose={props.onClose}>
+        <Dialog aria-label='confirm-save-popup' className={classes.backdrop} open={props.open} onClose={handleClose}>
             <DialogTitle className={classes.dialog_title}>{props.title}</DialogTitle>
             <DialogContent className={classes.dialog_body}>
                 <DialogContentText>Review changes:</DialogContentText>
@@ -29,7 +34,7 @@ export const ConfirmSavePopup = (props) => {
                 />
             </DialogContent>
             <DialogActions>
-                <Button variant='contained' color='error' onClick={props.onClose} startIcon={<Delete />}>Discard Changes</Button>
+                <Button variant='contained' color='error' onClick={handleClose} startIcon={<Delete />}>Discard Changes</Button>
                 <Button variant='contained' color='success' onClick={props.onSave} startIcon={<Save />} autoFocus>Confirm Save</Button>
             </DialogActions>
         </Dialog>
@@ -39,8 +44,14 @@ export const ConfirmSavePopup = (props) => {
 export const WebsocketUpdatePopup = (props) => {
     const theme = useTheme();
     const jsonViewTheme = theme.palette.mode === 'dark' ? 'tube' : 'rjv-default';
+
+    const handleClose = (e, reason) => {
+        if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;
+        props.onClose();
+    }
+
     return (
-        <Dialog className={classes.backdrop} open={props.open} onClose={props.onClose}>
+        <Dialog aria-label='ws-update-popup' className={classes.backdrop} open={props.open} onClose={handleClose}>
             <DialogTitle className={classes.dialog_title}>{props.title}</DialogTitle>
             <DialogContent className={classes.dialog_body}>
                 <DialogContentText>New update detected from server. Your changes may be lost. Following unsaved changes are discarded:</DialogContentText>
@@ -57,7 +68,7 @@ export const WebsocketUpdatePopup = (props) => {
                 />
             </DialogContent>
             <DialogActions>
-                <Button variant='contained' color='success' onClick={props.onClose} startIcon={<ThumbUp />} autoFocus>Okay</Button>
+                <Button variant='contained' color='success' onClick={handleClose} startIcon={<ThumbUp />} autoFocus>Okay</Button>
             </DialogActions>
         </Dialog>
     )
@@ -67,8 +78,13 @@ export const FormValidation = (props) => {
     const theme = useTheme();
     const jsonViewTheme = theme.palette.mode === 'dark' ? 'tube' : 'rjv-default';
 
+    const handleClose = (e, reason) => {
+        if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;
+        props.onClose();
+    }
+
     return (
-        <Dialog className={classes.backdrop} open={props.open} onClose={props.onClose}>
+        <Dialog aria-label='form-val-popup' className={classes.backdrop} open={props.open} onClose={handleClose}>
             <DialogTitle className={classes.dialog_title}>{props.title}</DialogTitle>
             <DialogContent className={classes.dialog_body}>
                 <DialogContentText className={classes.dialog_text}>Form validation failed due to following errors:</DialogContentText>
@@ -85,7 +101,7 @@ export const FormValidation = (props) => {
                 />
             </DialogContent>
             <DialogActions>
-                <Button variant='contained' color='error' onClick={props.onClose} startIcon={<Delete />}>Discard Changes</Button>
+                <Button variant='contained' color='error' onClick={handleClose} startIcon={<Delete />}>Discard Changes</Button>
                 <Button variant='contained' color='success' onClick={props.onContinue} startIcon={<Edit />} autoFocus>Continue Editing</Button>
             </DialogActions>
         </Dialog>
@@ -94,14 +110,19 @@ export const FormValidation = (props) => {
 
 export const CollectionSwitchPopup = (props) => {
 
+    const handleClose = (e, reason) => {
+        if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;
+        props.onClose();
+    }
+
     return (
-        <Dialog className={classes.backdrop} open={props.open} onClose={props.onClose}>
+        <Dialog aria-label='collection-switch-popup' className={classes.backdrop} open={props.open} onClose={handleClose}>
             <DialogTitle className={classes.dialog_title}>{props.title}</DialogTitle>
             <DialogContent className={classes.dialog_body}>
                 <DialogContentText className={classes.dialog_text}>Collection switched while in EDIT mode. Your changes may be lost.</DialogContentText>
             </DialogContent>
             <DialogActions>
-                <Button variant='contained' color='error' onClick={props.onClose} startIcon={<Delete />}>Discard Changes</Button>
+                <Button variant='contained' color='error' onClick={handleClose} startIcon={<Delete />}>Discard Changes</Button>
                 <Button variant='contained' color='success' onClick={props.onContinue} startIcon={<Edit />} autoFocus>Continue Editing</Button>
             </DialogActions>
         </Dialog>
@@ -115,6 +136,11 @@ export const DataSourceHexColorPopup = (props) => {
     useEffect(() => {
         setDataSourceColors(props.dataSourceColors);
     }, [props.dataSourceColors])
+
+    const handleClose = (e, reason) => {
+        if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;
+        props.onClose();
+    }
 
     const onTextChange = (e, idx) => {
         const updatedDataSourceColors = cloneDeep(dataSourceColors);
@@ -133,7 +159,7 @@ export const DataSourceHexColorPopup = (props) => {
     }
 
     return (
-        <Dialog className={classes.backdrop} open={props.open} onClose={props.onClose}>
+        <Dialog aria-label='data-source-popup' className={classes.backdrop} open={props.open} onClose={handleClose}>
             <DialogTitle className={classes.dialog_title}>Data Source Hex Color</DialogTitle>
             <DialogContent className={classes.dialog_body}>
                 {props.maxRowSize && Array(props.maxRowSize).fill(0).map((item, index) => {
@@ -159,7 +185,7 @@ export const DataSourceHexColorPopup = (props) => {
                 })}
             </DialogContent>
             <DialogActions>
-                <Button variant='contained' color='error' onClick={props.onClose} startIcon={<Delete />}>Cancel</Button>
+                <Button variant='contained' color='error' onClick={handleClose} startIcon={<Delete />}>Cancel</Button>
                 <Button variant='contained' color='success' onClick={onSave} startIcon={<ThumbUp />}>Save</Button>
             </DialogActions>
         </Dialog>
@@ -177,10 +203,16 @@ export const SaveLayoutPopup = ({
 
     const profileExists = useMemo(() => storedArray.some((o) => o.profile_id === profileId), [storedArray, profileId]);
 
+    const handleClose = (e, reason) => {
+        if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;
+        onClose();
+    }
+
     return (
         <Dialog
+            aria-label='save-layout-popup'
             open={open}
-            onClose={onClose}>
+            onClose={handleClose}>
             <DialogTitle>Save Layout</DialogTitle>
             <DialogContent>
                 <DialogContentText className={classes.dialog_text}>
@@ -196,7 +228,7 @@ export const SaveLayoutPopup = ({
                 />
             </DialogContent>
             <DialogActions>
-                <Button color='error' variant='contained' onClick={onClose} autoFocus>Discard</Button>
+                <Button color='error' variant='contained' onClick={handleClose} autoFocus>Discard</Button>
                 <Button color='success' variant='contained' onClick={onSave} autoFocus>Save</Button>
             </DialogActions>
         </Dialog>
@@ -213,10 +245,15 @@ export const LoadLayoutPopup = ({
     onLoad
 }) => {
 
+    const handleClose = (e, reason) => {
+        if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;
+        onClose();
+    }
     return (
         <Dialog
+            aria-label='load-layout-popup'
             open={open}
-            onClose={onClose}>
+            onClose={handleClose}>
             <DialogTitle>Load Layout</DialogTitle>
             <DialogContent>
                 <DialogContentText className={classes.dialog_text}>
@@ -234,7 +271,7 @@ export const LoadLayoutPopup = ({
                 />
             </DialogContent>
             <DialogActions>
-                <Button color='error' variant='contained' onClick={onClose} autoFocus>Discard</Button>
+                <Button color='error' variant='contained' onClick={handleClose} autoFocus>Discard</Button>
                 <Button color='success' variant='contained' disabled={value ? false : true} onClick={onLoad} autoFocus>Load</Button>
             </DialogActions>
         </Dialog>

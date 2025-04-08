@@ -10,10 +10,10 @@ import sys
 import inspect
 
 # Project imports
-from FluxPythonUtils.log_book.log_book import get_transaction_counts_n_timeout_from_config
+from FluxPythonUtils.log_book.tail_executor import get_transaction_counts_n_timeout_from_config
 from FluxPythonUtils.scripts.general_utility_functions import configure_logger
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.phone_book_base_log_book import (
-    PhoneBookBaseLogBook, PlanLogDetail)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.phone_book_base_tail_executor import (
+    PhoneBookBaseTailExecutor, PlanLogDetail)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.ORMModel.street_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import *
@@ -26,7 +26,7 @@ plan_alert_bulk_update_counts_per_call, plan_alert_bulk_update_timeout = (
     get_transaction_counts_n_timeout_from_config(config_yaml_dict.get("plan_alert_config"), is_server_config=False))
 
 
-class PhoneBookLogBook(PhoneBookBaseLogBook):
+class PhoneBookTailExecutor(PhoneBookBaseTailExecutor):
     underlying_partial_update_all_contact_alert_http: Callable[..., Any] | None = None
     underlying_read_contact_alert_by_id_http: Callable[..., Any] | None = None
     underlying_read_plan_alert_by_id_http: Callable[..., Any] | None = None
@@ -47,7 +47,7 @@ class PhoneBookLogBook(PhoneBookBaseLogBook):
         self.pattern_for_pair_plan_db_updates: str = get_pattern_for_pair_plan_db_updates()
         self.symbol_side_pattern: str = get_symbol_side_pattern()
         self.reset_log_book_cache_pattern: str = get_reset_log_book_cache_wrapper_pattern()
-        PhoneBookLogBook.initialize_underlying_http_callables()
+        PhoneBookTailExecutor.initialize_underlying_http_callables()
 
         # running queue handling for pair_start_api_ops
         Thread(target=self._pair_plan_api_ops_queue_handler, daemon=True, name="db_queue_handler").start()
@@ -166,7 +166,7 @@ class PhoneBookLogBook(PhoneBookBaseLogBook):
             logging.critical(err_)
             alert_meta = get_alert_meta_obj(self.component_file_path, PurePath(__file__).name,
                                             inspect.currentframe().f_lineno, DateTime.utcnow())
-            self._send_plan_alerts(pair_plan_id, PhoneBookBaseLogBook.get_severity("critical"),
+            self._send_plan_alerts(pair_plan_id, PhoneBookBaseTailExecutor.get_severity("critical"),
                                     err_, alert_meta)
         except Exception as e:
             alert_brief: str = f"force_trigger_plan_pause failed for {pair_plan_id=}, {error_event_msg=}"
@@ -174,7 +174,7 @@ class PhoneBookLogBook(PhoneBookBaseLogBook):
             logging.critical(f"{alert_brief};;;{alert_details}")
             alert_meta = get_alert_meta_obj(self.component_file_path, PurePath(__file__).name,
                                             inspect.currentframe().f_lineno, DateTime.utcnow(), alert_details)
-            self.send_contact_alerts(severity=PhoneBookBaseLogBook.get_severity("critical"),
+            self.send_contact_alerts(severity=PhoneBookBaseTailExecutor.get_severity("critical"),
                                        alert_brief=alert_brief, alert_meta=alert_meta)
 
     def _handle_plan_pause_pattern_match(self, pair_plan_id: int, message: str, pattern: re.Pattern):
@@ -190,7 +190,7 @@ class PhoneBookLogBook(PhoneBookBaseLogBook):
                                       log_date_time: DateTime | None = None,
                                       log_source_file_name: str | None = None,
                                       line_num: int | None = None) -> None:
-        msg_brief_n_detail = message.split(PhoneBookBaseLogBook.log_seperator, 1)
+        msg_brief_n_detail = message.split(PhoneBookBaseTailExecutor.log_seperator, 1)
         msg_detail = f"_process_plan_alert_message failed with exception: {e}"
         if len(msg_brief_n_detail) == 2:
             msg_brief = msg_brief_n_detail[0]
@@ -405,7 +405,7 @@ class PhoneBookLogBook(PhoneBookBaseLogBook):
             logging.exception(f"{err_msg}{self.log_seperator}{err_detail}")
             alert_meta = get_alert_meta_obj(self.component_file_path, PurePath(__file__).name,
                                             inspect.currentframe().f_lineno, DateTime.utcnow(), err_detail)
-            self.send_contact_alerts(severity=PhoneBookBaseLogBook.get_severity("error"),
+            self.send_contact_alerts(severity=PhoneBookBaseTailExecutor.get_severity("error"),
                                        alert_brief=err_msg, alert_meta=alert_meta)
 
     def handle_pair_plan_matched_log_message(self, log_prefix: str, log_message: str,

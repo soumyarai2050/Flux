@@ -15,7 +15,7 @@ from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.ORMModel.log_book_service_msgspec_model import (
     Severity, PlanAlertBaseModel)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.phone_book_log_book import PlanLogDetail
-from FluxPythonUtils.log_book.log_book import LogBook, LogDetail
+from FluxPythonUtils.log_book.tail_executor import TailExecutor, LogDetail
 
 PAIR_STRAT_ENGINE_LOG: PurePath = PAIR_STRAT_ENGINE_DIR / "log"
 STRAT_ENGINE_LOG: PurePath = STRAT_EXECUTOR / "log"

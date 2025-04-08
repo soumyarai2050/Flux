@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { useDispatch } from 'react-redux';
 import { WEBSOCKET_CLOSE_CODES, WEBSOCKET_RETRY_CODES } from '../constants';
 import { isWebSocketAlive } from '../utils';
+import { clearWebSocketConnection, setWebSocketConnection } from '../cache/websocketConnectionCache';
 
 /**
  * Hook for managing WebSocket connections with dedicated Web Workers.
@@ -154,6 +155,7 @@ const useDataSourcesWebsocketWorker = ({
         connection.retryCount = 0; // Reset retry count for a new connection.
         const ws = new WebSocket(apiUrl);
         connection.ws = ws;
+        setWebSocketConnection(name, ws);
 
         ws.onopen = () => {
           connection.retryCount = 0;
@@ -183,10 +185,11 @@ const useDataSourcesWebsocketWorker = ({
     // Cleanup: Close all WebSocket connections on unmount or dependency change.
     return () => {
       if (!connectionByGetAll) return;
-      Object.values(connectionsRef.current).forEach(connection => {
+      Object.entries(connectionsRef.current).forEach(([name, connection]) => {
         if (connection.ws && connection.ws.readyState !== WebSocket.CLOSED) {
           connection.ws.close(WEBSOCKET_CLOSE_CODES.NORMAL_CLOSURE, 'Normal closure on cleanup');
           connection.ws = null;
+          clearWebSocketConnection(name);
         }
       });
     };
@@ -250,6 +253,7 @@ const useDataSourcesWebsocketWorker = ({
           connection.retryCount = 0;
           socket = new WebSocket(`${apiUrl}/${id}${paramsStr}`);
           ws[normalizedId] = socket;
+          setWebSocketConnection(name, socket);
 
           socket.onopen = () => {
             connection.retryCount = 0;
@@ -298,7 +302,7 @@ const useDataSourcesWebsocketWorker = ({
   useEffect(() => {
     return () => {
       if (connectionByGetAll) return;
-      Object.values(connectionsRef.current).forEach((connection) => {
+      Object.entries(connectionsRef.current).forEach(([name, connection]) => {
         Object.keys(connection.ws).forEach((id) => {
           const socket = connection.ws[id];
           if (socket && socket.readyState !== WebSocket.CLOSED) {
@@ -306,6 +310,7 @@ const useDataSourcesWebsocketWorker = ({
           }
           delete connection.ws[id];
         });
+        clearWebSocketConnection(name);
       });
     };
   }, []);

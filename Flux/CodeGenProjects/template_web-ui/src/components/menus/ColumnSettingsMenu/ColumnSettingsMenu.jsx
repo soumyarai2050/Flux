@@ -68,8 +68,8 @@ const ColumnSettingsMenu = ({
   };
 
   const handlePopoverClose = () => {
-    setAnchorEl(null);
     onMenuClose();
+    setAnchorEl(null);
   };
 
   const handlePinToggle = (e) => {

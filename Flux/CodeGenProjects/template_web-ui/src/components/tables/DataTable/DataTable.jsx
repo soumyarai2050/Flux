@@ -75,7 +75,7 @@ const DataTable = ({
       sourceIndex = 0;
     }
     const values = [columnName];
-    activeRows.forEach((groupedRow) => {
+    rows.forEach((groupedRow) => {
       const row = groupedRow[sourceIndex];
       values.push(row[column.tableTitle]);
     })
@@ -341,7 +341,7 @@ const DataTable = ({
                     }
                   }
 
-                  const isButtonDisabled = modelType === MODEL_TYPES.REPEATED_ROOT && !isSelected ? true : false;
+                  const isButtonDisabled = modelType === MODEL_TYPES.REPEATED_ROOT && (!isSelected || (isSelected && xpath?.startsWith('[')));
                   const rowIdx = modelType === MODEL_TYPES.REPEATED_ROOT ? row?.['data-id'] : row?.['data-id'] || cell.tableTitle;
                   const cellKey = `${rowIdx}_${cell.tableTitle}`
 

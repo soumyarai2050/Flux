@@ -198,7 +198,7 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
                 filters: modelLayoutOption.filters || [],
                 mode,
                 enableOverride: modelLayoutData.enable_override || [],
-                disableOverrride: modelLayoutData.disable_override || [],
+                disableOverride: modelLayoutData.disable_override || [],
                 showMore,
                 moreAll,
                 showLess: modelLayoutData.show_less || [],
@@ -624,7 +624,7 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
                     isDisabled={isLoading || isProcessingUserActions}
                     error={error}
                     onClear={handleErrorClear}
-                    isDisconnected={!isWsDisabled && !isAbbreviationSource && !isWebSocketActive(socketRef.current)}
+                    isDisconnected={!isCreating && !isWebSocketActive(socketRef.current, isAbbreviationSource ? modelName : null)}
                     onReconnect={handleReconnect}
                     isDownloading={isDownloading}
                     progress={progress}

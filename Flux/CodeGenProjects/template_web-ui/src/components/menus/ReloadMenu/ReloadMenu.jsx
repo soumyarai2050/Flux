@@ -16,7 +16,8 @@ const ReloadMenu = ({
   onReload,
   isPinned,
   onPinToggle,
-  menuType
+  menuType,
+  onMenuClose
 }) => {
   const menuName = 'reload';
 
@@ -25,12 +26,17 @@ const ReloadMenu = ({
     onPinToggle(menuName, !isPinned);
   }
 
+  const handleReload = () => {
+    onMenuClose();
+    onReload();
+  }
+
   const renderMenu = () => {
     switch (menuType) {
       case 'item':
         const PinCompononent = isPinned ? PushPin : PushPinOutlined;
         return (
-          <MenuItem name={menuName} onClick={onReload}>
+          <MenuItem name={menuName} onClick={handleReload}>
             <span>
               <Refresh sx={{ marginRight: '5px' }} fontSize='small' />
               {menuName}
@@ -41,7 +47,7 @@ const ReloadMenu = ({
       case 'icon':
       default:
         return (
-          <Icon name={menuName} title={menuName} onClick={onReload}>
+          <Icon name={menuName} title={menuName} onClick={handleReload}>
             <Refresh fontSize='small' />
           </Icon>
         );

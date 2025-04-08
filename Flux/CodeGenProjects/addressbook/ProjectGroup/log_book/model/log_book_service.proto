@@ -430,6 +430,69 @@ message EnableDisablePlanAlertCreate {
 }
 
 
+message HandleSimulateLog {
+  option (FluxMsgJsonQuery) = {
+    QueryName: "handle_simulate_log"
+    QueryParams: {
+      QueryParamName: "payload",
+      QueryParamDataType: "List[Dict]"
+    },
+    QueryRouteType: POST_ALL,
+  };
+  optional bool is_id_present = 1;  // no use case - kept as st least 1 field must be present in message
+}
+
+
+message HandleContactAlerts{
+  option (FluxMsgJsonQuery) = {
+    QueryName: "handle_contact_alerts"
+    QueryRouteType: POST_ALL,
+    QueryParams: {
+      QueryParamName: "payload",
+      QueryParamDataType: "List[Dict]"
+    }
+  };
+  optional bool is_id_present = 1;  // no use case - kept as st least 1 field must be present in message
+}
+
+
+message HandlePlanAlertsWithPlanId{
+  option (FluxMsgJsonQuery) = {
+    QueryName: "handle_plan_alerts_with_plan_id"
+    QueryRouteType: POST_ALL,
+    QueryParams: {
+      QueryParamName: "payload",
+      QueryParamDataType: "List[Dict]"
+    }
+  };
+  optional bool is_id_present = 1;  // no use case - kept as st least 1 field must be present in message
+}
+
+message HandlePlanAlertsWithSymbolSide{
+  option (FluxMsgJsonQuery) = {
+    QueryName: "handle_plan_alerts_with_symbol_side"
+    QueryRouteType: POST_ALL,
+    QueryParams: {
+      QueryParamName: "payload",
+      QueryParamDataType: "List[Dict]"
+    }
+  };
+  optional bool is_id_present = 1;  // no use case - kept as st least 1 field must be present in message
+}
+
+message HandlePerfBenchmark{
+  option (FluxMsgJsonQuery) = {
+    QueryName: "handle_perf_benchmark"
+    QueryRouteType: POST_ALL,
+    QueryParams: {
+      QueryParamName: "payload",
+      QueryParamDataType: "List[Dict]"
+    }
+  };
+  optional bool is_id_present = 1;  // no use case - kept as st least 1 field must be present in message
+}
+
+
 // used to avoid unused import warning by using any random msg or enum from imported file causing warning
 message ImportWarningAvoidDummyMessage {
   optional ButtonType temp = 1;

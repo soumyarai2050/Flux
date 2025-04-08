@@ -108,6 +108,8 @@ class BaseProtoPlugin(ABC):
     flux_json_query_route_get_type_field_val: ClassVar[str] = "GET"
     flux_json_query_route_patch_type_field_val: ClassVar[str] = "PATCH"
     flux_json_query_route_post_type_field_val: ClassVar[str] = "POST"
+    flux_json_query_route_patch_all_type_field_val: ClassVar[str] = "PATCH_ALL"
+    flux_json_query_route_post_all_type_field_val: ClassVar[str] = "POST_ALL"
     flux_json_query_require_js_slice_changes_field: ClassVar[str] = "RequireJsSliceChanges"
     flux_json_root_ts_mongo_version_field: ClassVar[str] = "MongoVersion"
     flux_json_root_ts_granularity_field: ClassVar[str] = "Granularity"

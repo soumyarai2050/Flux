@@ -28,7 +28,10 @@ import {
     joinByChangeHandler,
     centerJoinToggleHandler,
     flipToggleHandler,
-    chartDataChangeHandler
+    chartDataChangeHandler,
+    selectedChartNameChangeHandler,
+    chartEnableOverrideChangeHandler,
+    selectedSourceIdChangeHandler
 } from '../../utils/genericModelHandler';
 import CommonKeyWidget from '../../components/CommonKeyWidget';
 import { ConfirmSavePopup, FormValidation } from '../../components/Popup';
@@ -256,7 +259,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                 joinBy: modelLayoutData.join_by || {},
                 joinSort: modelLayoutOption.join_sort || null,
                 enableOverride: modelLayoutData.enable_override || [],
-                disableOverrride: modelLayoutData.disable_override || [],
+                disableOverride: modelLayoutData.disable_override || [],
                 showMore,
                 moreAll,
                 showLess: modelLayoutData.show_less || [],
@@ -340,18 +343,31 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                     dataSources.forEach(({ actions }) => {
                         dispatch(actions.setObjId(null));
                     })
+                    selectedSourceIdChangeHandler(modelHandlerConfig, null);
                     // todo - handle ws popup on edit mode if datasource id is selected
                 }
-            } else {
-                if (!dataSourcesObjIdDict[dataSources[0].name]) {
-                    const id = getIdFromAbbreviatedKey(abbreviationKey, modelAbbreviatedItems[0]);
-                    dataSources.forEach(({ actions }) => {
-                        dispatch(actions.setObjId(id));
-                    })
+            }
+            else {
+                const objId = dataSourcesObjIdDict[dataSources[0].name];
+                const sourceObjId = modelLayoutData.selected_source_id ?? null;
+                if (!sourceObjId) {
+                    if (!objId || !activeIds.includes(objId)) {
+                        const id = getIdFromAbbreviatedKey(abbreviationKey, modelAbbreviatedItems[0]);
+                        dataSources.forEach(({ actions }) => {
+                            dispatch(actions.setObjId(id));
+                        })
+                        selectedSourceIdChangeHandler(modelHandlerConfig, id);
+                    }
+                } else {
+                    if (objId !== sourceObjId) {
+                        dataSources.forEach(({ actions }) => {
+                            dispatch(actions.setObjId(sourceObjId));
+                        })
+                    }
                 }
             }
         }
-    }, [modelAbbreviatedItems, dataSourcesObjIdDict, updatedObj, mode])
+    }, [modelAbbreviatedItems, dataSourcesObjIdDict, updatedObj, mode, modelLayoutData.selected_source_id])
 
     useEffect(() => {
         // const { disable_ws_on_edit } = modelLayoutOption;
@@ -422,6 +438,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
             dataSources.forEach(({ actions }) => {
                 dispatch(actions.setObjId(id));
             })
+            selectedSourceIdChangeHandler(modelHandlerConfig, id);
             setSearchQuery('');
         } else {
             console.error(`load failed for idx: ${idx}`);
@@ -491,6 +508,14 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
 
     const handleFlipToggle = () => {
         flipToggleHandler(modelHandlerConfig, !modelLayoutData.flip);
+    }
+
+    const handleSelectedChartNameChange = (updatedChartName) => {
+        selectedChartNameChangeHandler(modelHandlerConfig, updatedChartName);
+    }
+
+    const handleChartEnableOverrideChange = (updatedChartEnableOverride) => {
+        chartEnableOverrideChangeHandler(modelHandlerConfig, updatedChartEnableOverride);
     }
 
     const handleChartDataChange = (updatedChartData) => {
@@ -629,7 +654,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
             let args = { url };
             const crudOverrideDict = dataSourcesCrudOverrideDictRef.current?.[name];
             if (crudOverrideDict?.CREATE) {
-                const { endpoint } = crudOverrideDict.GET_ALL;
+                const { endpoint } = crudOverrideDict.CREATE;
                 args = { ...args, endpoint };
             }
             dispatch(actions.create({ ...args, data: changeDict }));
@@ -699,6 +724,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         dataSources.forEach(({ actions }) => {
             dispatch(actions.setObjId(id));
         })
+        selectedSourceIdChangeHandler(modelHandlerConfig, id);
     }
 
     const cleanedRows = useMemo(() => {
@@ -757,10 +783,13 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                         fieldsMetadata={modelItemFieldsMetadata}
                         chartData={modelLayoutOption.chart_data || []}
                         modelType={MODEL_TYPES.ABBREVIATION_MERGE}
-                        onRowSelect={() => { }}
+                        onRowSelect={handleRowSelect}
                         mode={mode}
                         abbreviation={abbreviationKey}
                         onModeToggle={handleModeToggle}
+                        onChartSelect={handleSelectedChartNameChange}
+                        selectedChartName={modelLayoutData.selected_chart_name ?? null}
+                        chartEnableOverride={modelLayoutData.chart_enable_override ?? []}
                     />
                 );
             default:
@@ -835,13 +864,16 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                         pinned={modelLayoutData.pinned || []}
                         onPinToggle={handlePinnedChange}
                         onReload={handleReload}
+                        charts={modelLayoutOption.chart_data || []}
+                        onChartToggle={handleChartEnableOverrideChange}
+                        chartEnableOverride={modelLayoutData.chart_enable_override || []}
                     />
                 </ModelCardHeader>
                 <ModelCardContent
                     isDisabled={isLoading || isCreating || isProcessingUserActions}
                     error={error}
                     onClear={handleErrorClear}
-                    isDisconnected={!isWsDisabled && !isWebSocketActive(socketRef.current)}
+                    isDisconnected={!isWebSocketActive(socketRef.current)}
                     onReconnect={handleReconnect}
                     isDownloading={isDownloading}
                     progress={progress}

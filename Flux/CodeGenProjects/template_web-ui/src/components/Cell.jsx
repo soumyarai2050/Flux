@@ -226,7 +226,7 @@ const Cell = (props) => {
         } else if (type === DATA_TYPES.ENUM) {
             value = value ? value : null;
         } else if (type === DATA_TYPES.NUMBER) {
-            value = (value || value === 0) ? value : '';
+            value = (inputValue || inputValue === 0) ? inputValue : '';
             if (collection.displayType === DATA_TYPES.INTEGER) {
                 if (value !== '') {
                     value = floatToInt(value);
@@ -238,6 +238,7 @@ const Cell = (props) => {
             // if (mode === MODES.EDIT) {
             //     value = inputValue ? inputValue : inputValue;
             // }
+            value = inputValue ?? '';
         } else if (collection.abbreviated === 'JSON') {
             if (typeof value === DATA_TYPES.OBJECT) {
                 value = JSON.stringify(value);

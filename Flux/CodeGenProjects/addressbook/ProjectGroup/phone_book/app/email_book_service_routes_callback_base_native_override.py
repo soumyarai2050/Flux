@@ -27,7 +27,6 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_ser
     CURRENT_PROJECT_SCRIPTS_DIR, create_md_shell_script, MDShellEnvData, ps_host, get_new_contact_status,
     get_new_contact_limits, get_new_chore_limits, CURRENT_PROJECT_DATA_DIR, is_ongoing_plan,
     get_plan_key_from_pair_plan, get_id_from_plan_key, get_new_plan_view_obj,
-    get_reset_log_book_cache_wrapper_pattern,
     pair_plan_client_call_log_str, UpdateType,
     get_matching_plan_from_symbol_n_side, get_dismiss_filter_brokers, handle_shadow_broker_updates,
     handle_shadow_broker_creates)
@@ -46,7 +45,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.bartering_link 
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_helper import (
     photo_book_service_http_client)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.service_state import ServiceState
-
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import log_book_service_http_client
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecordManager
 
 
@@ -752,6 +751,10 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
             await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_update_plan_collection_http(
                 plan_collection_obj, return_obj_copy=False)
 
+        # setting plan alert state to False for this plan_id
+        log_book_service_http_client.enable_disable_plan_alert_create_query_client(pair_plan_obj.id,
+                                                                                        True)
+
         # starting executor server for current pair plan
         await self._start_executor_server(pair_plan_obj)
         # if fail - log error is fine - plan not active
@@ -940,10 +943,9 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
             # PlanState_READY to PlanState_ACTIVE
         if updated_pair_plan_obj.plan_state == PlanState.PlanState_DONE:
             # warning and above log level is required
-            logging.warning(f"ResetLogBookCache;;;pair_plan_log_key: "
-                            f"{get_reset_log_book_cache_wrapper_pattern()}"
-                            f"{get_pair_plan_log_key(updated_pair_plan_obj)}"
-                            f"{get_reset_log_book_cache_wrapper_pattern()}")
+            # setting plan alert state to False for this plan_id
+            log_book_service_http_client.enable_disable_plan_alert_create_query_client(stored_pair_plan_obj.id,
+                                                                                            False)
         if updated_pair_plan_obj.plan_state != PlanState.PlanState_ACTIVE:
             # if fail - log error is fine - plan not active - check does not fail due to this
             self._apply_fallback_route_check(updated_pair_plan_obj, raise_exception=False)
@@ -1292,10 +1294,9 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
             # Removing PlanView for this plan
             photo_book_service_http_client.delete_plan_view_client(pair_plan_to_be_deleted.id)
 
-            logging.warning(f"ResetLogBookCache;;;pair_plan_log_key: "
-                            f"{get_reset_log_book_cache_wrapper_pattern()}"
-                            f"{get_pair_plan_log_key(pair_plan_to_be_deleted)}"
-                            f"{get_reset_log_book_cache_wrapper_pattern()}")
+            # setting plan alert state to False for this plan_id
+            log_book_service_http_client.enable_disable_plan_alert_create_query_client(pair_plan_id,
+                                                                                            False)
         elif buffered_plan_keys is not None and plan_key in buffered_plan_keys:
             # Removing plan_key from buffered plan keys
             async with PlanCollection.reentrant_lock:
@@ -1399,10 +1400,9 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
                         logging.error(err_str_)
                         raise Exception(err_str_)
 
-                    logging.warning(f"ResetLogBookCache;;;pair_plan_log_key: "
-                                    f"{get_reset_log_book_cache_wrapper_pattern()}"
-                                    f"{get_pair_plan_log_key(pair_plan_obj)}"
-                                    f"{get_reset_log_book_cache_wrapper_pattern()}")
+                    # setting plan alert state to False for this plan_id
+                    log_book_service_http_client.enable_disable_plan_alert_create_query_client(pair_plan_id,
+                                                                                                    False)
                 # else: deleted not unloaded - nothing to do , DB will remove entry
 
     async def reload_pair_plans(self, stored_plan_collection_obj: PlanCollection,
@@ -1437,6 +1437,9 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
                         plan_alert_aggregated_severity=Severity.Severity_UNSPECIFIED.value,
                         unload_plan=False, recycle_plan=False)
                     logging.db(log_str)
+
+                    # setting plan alert state to True for this plan_id
+                    log_book_service_http_client.enable_disable_plan_alert_create_query_client(pair_plan_id, True)
 
                     # starting snoozed server
                     await self._start_executor_server(pair_plan)
@@ -1794,8 +1797,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
             logging.exception(err_str_)
             raise HTTPException(status_code=400, detail=err_str_)
 
-
-async def filter_ws_pair_plan(pair_plan_obj_json: Dict, **kwargs):
+async def filter_ws_pair_plan(pair_plan_obj_json: Dict, obj_id_or_list: int | List[int], **kwargs):
     symbols = kwargs.get("symbols")
     pair_plan_params = pair_plan_obj_json.get("pair_plan_params")
     if pair_plan_params is not None:

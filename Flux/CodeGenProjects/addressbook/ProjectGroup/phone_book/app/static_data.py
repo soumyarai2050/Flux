@@ -69,7 +69,7 @@ class SecurityRecordManager:
 
     def load_from_cache(self):
         barter_ready_record_list: List[SecurityRecord] = \
-            dict_or_list_records_csv_reader(self.cache_barter_ready_records_prefix, SecurityRecord, STATIC_DATA_DIR)  # NOQA
+            dict_or_list_records_csv_reader(self.cache_barter_ready_records_prefix, SecurityRecord, STATIC_DATA_DIR)
         barter_ready_record: SecurityRecord
         for barter_ready_record in barter_ready_record_list:
             self.barter_ready_records_by_ticker[barter_ready_record.ticker] = barter_ready_record

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-    ColumnSettingsMenu, CreateMenu, DataSourceColorMenu, DownloadMenu, DynamicMenu,
+    ChartSettingsMenu, ColumnSettingsMenu, CreateMenu, DataSourceColorMenu, DownloadMenu, DynamicMenu,
     EditSaveToggleMenu, FilterMenu, JoinMenu, LayoutSwitchMenu, MaximizeRestoreToggleMenu, ReloadMenu, VisibilityMenu
 } from './menus';
 import { MODEL_TYPES } from '../constants';
@@ -9,6 +9,8 @@ import { Menu } from '@mui/material';
 import Icon from './Icon';
 import { MenuOpen, Menu as MenuIcon } from '@mui/icons-material';
 import ButtonQuery from './ButtonQuery';
+import { FilterDialog } from './menus/FilterMenu';
+import { DataSourceHexColorPopup } from './Popup';
 
 const MenuGroup = ({
     columns,
@@ -60,9 +62,32 @@ const MenuGroup = ({
     onPinToggle,
     isAbbreviationSource,
     isCreating,
-    onReload
+    onReload,
+    charts,
+    onChartToggle,
+    chartEnableOverride
 }) => {
     const [anchorEl, setAnchorEl] = useState(null);
+    const [isFilterMenuPopupOpen, setIsFilterMenuPopupOpen] = useState(false);
+    const [isDataSourceColorMenuPopupOpen, setIsDataSourceColorMenuPopupOpen] = useState(false);
+
+    const handleFilterMenuPopupOpen = () => {
+        setIsFilterMenuPopupOpen(true);
+    }
+
+    const handleFilterMenuPopupClose = () => {
+        handleMenuClose();
+        setIsFilterMenuPopupOpen(false);
+    }
+
+    const handleDataSourceColorMenuPopupOpen = () => {
+        setIsDataSourceColorMenuPopupOpen(true);
+    }
+
+    const handleDataSourceColorMenuPopupClose = () => {
+        handleMenuClose();
+        setIsDataSourceColorMenuPopupOpen(false);
+    }
 
     const handleColumnToggle = (e, xpath, key, value, ...rest) => {
         const isHidden = value;
@@ -164,6 +189,7 @@ const MenuGroup = ({
 
     const menus = [
         'column-settings',
+        'chart-settings',
         'filter',
         'visibility',
         'data-source-color',
@@ -173,7 +199,7 @@ const MenuGroup = ({
         'edit-save',
         'layout-switch',
         'maximize-restore',
-        'reload'
+        'reload',
     ]
 
     const renderMenu = (menuName, menuType = 'icon') => {
@@ -204,13 +230,10 @@ const MenuGroup = ({
                 return (
                     <FilterMenu
                         key={menuKey}
-                        filters={filters}
+                        onOpen={handleFilterMenuPopupOpen}
                         fieldsMetadata={fieldsMetadata}
-                        isCollectionModel={modelType === MODEL_TYPES.ABBREVIATION_MERGE}
-                        onFiltersChange={onFiltersChange}
                         menuType={menuType}
                         isPinned={pinned.includes(menuName)}
-                        onMenuClose={handleMenuClose}
                         onPinToggle={handlePinToggle}
                     />
                 );
@@ -235,14 +258,10 @@ const MenuGroup = ({
                     <DataSourceColorMenu
                         key={menuKey}
                         joinBy={joinBy}
-                        maxRowSize={maxRowSize}
-                        dataSourceColors={dataSourceColors}
-                        onDataSourceColorsChange={onDataSourceColorsChange}
                         menuType={menuType}
                         isPinned={pinned.includes(menuName)}
-                        onMenuClose={handleMenuClose}
                         onPinToggle={handlePinToggle}
-                        modelType={modelType}
+                        onOpen={handleDataSourceColorMenuPopupOpen}
                     />
                 );
             case 'join':
@@ -337,6 +356,22 @@ const MenuGroup = ({
                         onPinToggle={handlePinToggle}
                     />
                 )
+            case 'chart-settings':
+                return (
+                    <ChartSettingsMenu
+                        key={menuKey}
+                        charts={charts}
+                        showAll={showAll}
+                        onShowAllToggle={onShowAllToggle}
+                        onChartToggle={onChartToggle}
+                        layout={layout}
+                        menuType={menuType}
+                        isPinned={pinned.includes(menuName)}
+                        onMenuClose={handleMenuClose}
+                        onPinToggle={handlePinToggle}
+                        chartEnableOverride={chartEnableOverride}
+                    />
+                );
         }
     }
 
@@ -367,6 +402,26 @@ const MenuGroup = ({
             >
                 {menus.map((menuName) => renderMenu(menuName, 'item'))}
             </Menu>
+            {isFilterMenuPopupOpen && (
+                <FilterDialog
+                    isOpen={isFilterMenuPopupOpen}
+                    filters={filters}
+                    fieldsMetadata={fieldsMetadata}
+                    isCollectionModel={modelType === MODEL_TYPES.ABBREVIATION_MERGE}
+                    onFiltersChange={onFiltersChange}
+                    onMenuClose={handleMenuClose}
+                    onClose={handleFilterMenuPopupClose}
+                />
+            )}
+            {isDataSourceColorMenuPopupOpen && (
+                <DataSourceHexColorPopup
+                    open={isDataSourceColorMenuPopupOpen}
+                    onClose={handleDataSourceColorMenuPopupClose}
+                    maxRowSize={maxRowSize}
+                    dataSourceColors={dataSourceColors}
+                    onSave={onDataSourceColorsChange}
+                />
+            )}
         </>
     )
 }

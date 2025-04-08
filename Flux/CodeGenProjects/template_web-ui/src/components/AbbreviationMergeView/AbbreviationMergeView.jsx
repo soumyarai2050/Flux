@@ -66,7 +66,7 @@ const BufferedView = ({
         options={modelAbbreviatedBufferItems}
         size="small"
         variant="outlined"
-        value={searchQuery}
+        value={searchQuery || null}
         onChange={onSearchQueryChange}
         renderInput={(params) => (
           <TextField {...params} label={bufferedFieldMetadata.title} />
@@ -177,7 +177,7 @@ const LoadedView = ({
       sourceIndex = 0;
     }
     const values = [columnName];
-    activeRows.forEach((groupedRow) => {
+    rows.forEach((groupedRow) => {
       const row = groupedRow[sourceIndex];
       values.push(row[columnName]);
     })

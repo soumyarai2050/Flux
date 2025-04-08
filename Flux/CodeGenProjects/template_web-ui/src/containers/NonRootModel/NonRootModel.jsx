@@ -199,7 +199,7 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
                 filters: modelLayoutOption.filters || [],
                 mode,
                 enableOverride: modelLayoutData.enable_override || [],
-                disableOverrride: modelLayoutData.disable_override || [],
+                disableOverride: modelLayoutData.disable_override || [],
                 showMore,
                 moreAll,
                 showLess: modelLayoutData.show_less || [],
@@ -626,7 +626,7 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
                     isDisabled={isLoading || isProcessingUserActions}
                     error={error}
                     onClear={handleErrorClear}
-                    isDisconnected={!isWsDisabled && !isAbbreviationSource && !isWebSocketActive(socketRef.current)}
+                    isDisconnected={!isCreating && !isWebSocketActive(socketRef.current, isAbbreviationSource ? modelRootName : null)}
                     onReconnect={handleReconnect}
                     isDownloading={isDownloading}
                     progress={progress}

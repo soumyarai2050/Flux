@@ -3928,22 +3928,35 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                 output_str += f"    return await underlying_{query_name}_query_http({query_params_str})"
             output_str += "\n\n\n"
         elif route_type in [FastapiHttpRoutesFileHandler.flux_json_query_route_patch_type_field_val,
-                            FastapiHttpRoutesFileHandler.flux_json_query_route_post_type_field_val]:
-            route_type_str = route_type.lower()
-            if route_type == FastapiHttpRoutesFileHandler.flux_json_query_route_patch_type_field_val:
+                            FastapiHttpRoutesFileHandler.flux_json_query_route_post_type_field_val,
+                            FastapiHttpRoutesFileHandler.flux_json_query_route_patch_all_type_field_val,
+                            FastapiHttpRoutesFileHandler.flux_json_query_route_post_all_type_field_val]:
+            if route_type in [FastapiHttpRoutesFileHandler.flux_json_query_route_patch_type_field_val,
+                              FastapiHttpRoutesFileHandler.flux_json_query_route_patch_all_type_field_val]:
                 status_code = 200
+                route_type_str = "patch"
             else:
                 status_code = 201
+                route_type_str = "post"
 
             output_str = f"@perf_benchmark\n"
             if model_type in [ModelType.Dataclass, ModelType.Msgspec]:
-                output_str += f"async def underlying_{query_name}_query_http(payload_dict: Dict[str, Any]):\n"
+                if route_type in [FastapiHttpRoutesFileHandler.flux_json_query_route_patch_all_type_field_val,
+                                  FastapiHttpRoutesFileHandler.flux_json_query_route_post_all_type_field_val]:
+                    output_str += f"async def underlying_{query_name}_query_http(payload: List[Dict[str, Any]]):\n"
+                else:
+                    output_str += f"async def underlying_{query_name}_query_http(payload: Dict[str, Any]):\n"
             else:
-                output_str += f"async def underlying_{query_name}_query_http(payload_dict: Dict[str, Any]) -> " \
-                              f"List[{return_type_str}]:\n"
+                if route_type in [FastapiHttpRoutesFileHandler.flux_json_query_route_patch_all_type_field_val,
+                                  FastapiHttpRoutesFileHandler.flux_json_query_route_post_all_type_field_val]:
+                    output_str += f"async def underlying_{query_name}_query_http(payload: List[Dict[str, Any]]) -> " \
+                                  f"List[{return_type_str}]:\n"
+                else:
+                    output_str += f"async def underlying_{query_name}_query_http(payload: Dict[str, Any]) -> " \
+                                  f"List[{return_type_str}]:\n"
             if query_params_str:
                 output_str += f"    {message_name_snake_cased}_obj = await " \
-                              f"callback_class.{query_name}_query_pre({message.proto.name}, payload_dict)\n"
+                              f"callback_class.{query_name}_query_pre({message.proto.name}, payload)\n"
                 output_str += f"    {message_name_snake_cased}_obj = await " \
                               f"callback_class.{query_name}_query_post({message_name_snake_cased}_obj)\n"
             else:
@@ -3954,8 +3967,12 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f"    return {message_name_snake_cased}_obj\n\n\n"
 
             if model_type == ModelType.Msgspec:
-                output_str += f"async def underlying_{query_name}_query_http_bytes(payload_dict: Dict[str, Any]):\n"
-                output_str += f"    return_val = await underlying_{query_name}_query_http(payload_dict)\n"
+                if route_type in [FastapiHttpRoutesFileHandler.flux_json_query_route_patch_all_type_field_val,
+                                  FastapiHttpRoutesFileHandler.flux_json_query_route_post_all_type_field_val]:
+                    output_str += f"async def underlying_{query_name}_query_http_bytes(payload: List[Dict[str, Any]]):\n"
+                else:
+                    output_str += f"async def underlying_{query_name}_query_http_bytes(payload: Dict[str, Any]):\n"
+                output_str += f"    return_val = await underlying_{query_name}_query_http(payload)\n"
                 output_str += f"    return_obj_bytes = msgspec.json.encode(return_val, enc_hook={message.proto.name}.enc_hook)\n"
                 output_str += (f"    return CustomFastapiResponse(content=return_obj_bytes, "
                                f"status_code={status_code})\n\n\n")
@@ -3964,21 +3981,30 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             if model_type in [ModelType.Dataclass, ModelType.Msgspec]:
                 output_str += f'@{self.api_router_app_name}.{route_type_str}("/query-{query_name}' + \
                               f'", status_code={status_code})\n'
-                output_str += f"async def {query_name}_query_http(payload_dict: Dict[str, Any]):\n"
+                if route_type in [FastapiHttpRoutesFileHandler.flux_json_query_route_patch_all_type_field_val,
+                                  FastapiHttpRoutesFileHandler.flux_json_query_route_post_all_type_field_val]:
+                    output_str += f"async def {query_name}_query_http(payload: List[Dict[str, Any]]):\n"
+                else:
+                    output_str += f"async def {query_name}_query_http(payload: Dict[str, Any]):\n"
             else:
                 output_str += f'@{self.api_router_app_name}.{route_type_str}("/query-{query_name}' + \
                               f'", response_model=List[{return_type_str}], status_code={status_code})\n'
-                output_str += f"async def {query_name}_query_http(payload_dict: Dict[str, Any]) -> " \
-                              f"List[{return_type_str}]:\n"
+                if route_type in [FastapiHttpRoutesFileHandler.flux_json_query_route_patch_all_type_field_val,
+                                  FastapiHttpRoutesFileHandler.flux_json_query_route_post_all_type_field_val]:
+                    output_str += f"async def {query_name}_query_http(payload: List[Dict[str, Any]]) -> " \
+                                  f"List[{return_type_str}]:\n"
+                else:
+                    output_str += f"async def {query_name}_query_http(payload: Dict[str, Any]) -> " \
+                                  f"List[{return_type_str}]:\n"
             output_str += f'    """\n'
             output_str += f'    {route_type} Query of {message.proto.name} with aggregate - {query_name}\n'
             output_str += f'    """\n'
 
             output_str += f"    try:\n"
             if model_type == ModelType.Msgspec:
-                output_str += f"        return await underlying_{query_name}_query_http_bytes(payload_dict)\n"
+                output_str += f"        return await underlying_{query_name}_query_http_bytes(payload)\n"
             else:
-                output_str += f"        return await underlying_{query_name}_query_http(payload_dict)\n"
+                output_str += f"        return await underlying_{query_name}_query_http(payload)\n"
             output_str += f"    except Exception as e:\n"
             output_str += (f"        logging.exception(f'{query_name}_query_http failed in "
                            "client call with exception: {e}')\n")
@@ -4062,7 +4088,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
 
         return output_str
 
-    def _get_query_params_str_n_query_params_with_type_str(self, query_params_name_n_param_type_tuple_list: List[Tuple[str, str]]):
+    def _get_query_params_str_n_query_params_with_type_str(self, query_params_name_n_param_type_tuple_list: List[Tuple[str, str]],
+                                                           route_type: str | None = None):
         query_params_str = ""
         query_params_with_type_str = ""
         if query_params_name_n_param_type_tuple_list:
@@ -4071,10 +4098,13 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             params_name_list: List[str] = []
             for param_name, param_type in query_params_name_n_param_type_tuple_list:
                 params_name_list.append(param_name)
-                if "List" not in param_type:
-                    param_to_type_str_list.append(f"{param_name}: {param_type}")
-                else:
+                if "List" in param_type and route_type not in [FastapiHttpRoutesFileHandler.flux_json_query_route_post_type_field_val,
+                                                                   FastapiHttpRoutesFileHandler.flux_json_query_route_post_all_type_field_val,
+                                                                   FastapiHttpRoutesFileHandler.flux_json_query_route_patch_type_field_val,
+                                                                   FastapiHttpRoutesFileHandler.flux_json_query_route_patch_all_type_field_val]:
                     list_type_params.append((param_name, param_type))
+                else:
+                    param_to_type_str_list.append(f"{param_name}: {param_type}")
             for param_name, param_type in list_type_params:
                 param_to_type_str_list.append(f"{param_name}: {param_type} = Query()")
             query_params_with_type_str = ", ".join(param_to_type_str_list)
@@ -4094,7 +4124,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             query_route_type = query_route_value if query_route_value is not None else None
 
             query_params_str, query_params_with_type_str = (
-                self._get_query_params_str_n_query_params_with_type_str(query_params_name_n_param_type_tuple_list))
+                self._get_query_params_str_n_query_params_with_type_str(query_params_name_n_param_type_tuple_list,
+                                                                        route_type=query_route_type))
 
             if query_type is None or query_type == "http" or query_type == "both":
                 output_str += self._handle_http_query_str(message, query_name, query_params_str,

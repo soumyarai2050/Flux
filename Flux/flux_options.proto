@@ -123,6 +123,8 @@ enum QueryRouteTypeEnum{
   GET = 0;
   PATCH = 1;
   POST = 2;
+  PATCH_ALL = 3;
+  POST_ALL = 4;
 }
 
 message QueryParamData{

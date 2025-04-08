@@ -449,9 +449,15 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
                               f"{message_name_snake_cased}_class_type: Type[{message.proto.name}]):\n"
         else:
             if agg_params_with_type_str is not None:
-                output_str = f"    async def {query_name}_query_pre(self, " \
-                              f"{message_name_snake_cased}_class_type: Type[{message.proto.name}], " \
-                              f"payload_dict: Dict[str, Any]):\n"
+                if route_type in [FastapiCallbackFileHandler.flux_json_query_route_patch_all_type_field_val,
+                                  FastapiCallbackFileHandler.flux_json_query_route_post_all_type_field_val]:
+                    output_str = f"    async def {query_name}_query_pre(self, " \
+                                  f"{message_name_snake_cased}_class_type: Type[{message.proto.name}], " \
+                                  f"payload: List[Dict[str, Any]]):\n"
+                else:
+                    output_str = f"    async def {query_name}_query_pre(self, " \
+                                 f"{message_name_snake_cased}_class_type: Type[{message.proto.name}], " \
+                                 f"payload: Dict[str, Any]):\n"
             else:
                 err_str = f"patch query can't be generated without payload query_param, query {query_name} in " \
                           f"message {message.proto.name} found without query params"
@@ -538,8 +544,7 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
                 query_params = aggregate_value[FastapiCallbackFileHandler.query_params_key]
                 query_type_value = aggregate_value[FastapiCallbackFileHandler.query_type_key]
                 query_type = str(query_type_value).lower() if query_type_value is not None else None
-                query_route_type_value = aggregate_value[FastapiCallbackFileHandler.query_route_type_key]
-                query_route_type = str(query_route_type_value).lower() if query_route_type_value is not None else "GET"
+                query_route_type = aggregate_value[FastapiCallbackFileHandler.query_route_type_key]
 
                 agg_params_with_type_str = None
                 if query_params:
@@ -557,8 +562,7 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
                 query_params = query_data.get(FastapiCallbackFileHandler.flux_json_query_params_field)
                 query_type_value = query_data.get(FastapiCallbackFileHandler.flux_json_query_type_field)
                 query_type = str(query_type_value).lower() if query_type_value is not None else None
-                query_route_type_value = query_data.get(FastapiCallbackFileHandler.flux_json_query_route_type_field)
-                query_route_type = str(query_route_type_value).lower() if query_route_type_value is not None else "GET"
+                query_route_type = query_data.get(FastapiCallbackFileHandler.flux_json_query_route_type_field)
 
                 agg_params_with_type_str = None
                 if query_params:

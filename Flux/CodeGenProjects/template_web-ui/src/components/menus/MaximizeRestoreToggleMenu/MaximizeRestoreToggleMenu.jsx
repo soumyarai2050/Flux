@@ -20,7 +20,8 @@ const MaximizeRestoreToggleMenu = ({
   onMaximizeToggle,
   isPinned,
   onPinToggle,
-  menuType
+  menuType,
+  onMenuClose
 }) => {
   const menuBaseName = 'maximize-restore';
   const menuName = isMaximized ? 'restore' : 'maximize';
@@ -31,12 +32,17 @@ const MaximizeRestoreToggleMenu = ({
     onPinToggle(menuBaseName, !isPinned);
   }
 
+  const handleMaximizeToggle = () => {
+    onMenuClose();
+    onMaximizeToggle();
+  }
+
   const renderMenu = () => {
     switch (menuType) {
       case 'item':
         const PinCompononent = isPinned ? PushPin : PushPinOutlined;
         return (
-          <MenuItem name={menuName} onClick={onMaximizeToggle}>
+          <MenuItem name={menuName} onClick={handleMaximizeToggle}>
             <span>
               <IconComponent sx={{ marginRight: '5px' }} fontSize='small' />
               {menuName}
@@ -47,7 +53,7 @@ const MaximizeRestoreToggleMenu = ({
       case 'icon':
       default:
         return (
-          <Icon name={menuName} title={menuName} onClick={onMaximizeToggle}>
+          <Icon name={menuName} title={menuName} onClick={handleMaximizeToggle}>
             <IconComponent fontSize='small' />
           </Icon>
         );

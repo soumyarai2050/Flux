@@ -22,7 +22,8 @@ const CreateMenu = ({
   isPinned,
   onPinToggle,
   menuType,
-  isAbbreviationSource
+  isAbbreviationSource,
+  onMenuClose
 }) => {
   if (mode !== MODES.READ || isAbbreviationSource) return null;
 
@@ -32,13 +33,18 @@ const CreateMenu = ({
     e.stopPropagation();
     onPinToggle(menuName, !isPinned);
   }
-  
+
+  const handleCreate = () => {
+    onMenuClose();
+    onCreate();
+  }
+
   const renderMenu = () => {
     switch (menuType) {
       case 'item':
         const PinCompononent = isPinned ? PushPin : PushPinOutlined;
         return (
-          <MenuItem name={menuName} onClick={onCreate}>
+          <MenuItem name={menuName} onClick={handleCreate}>
             <span>
               <Add sx={{ marginRight: '5px' }} fontSize='small' />
               {menuName}
@@ -49,7 +55,7 @@ const CreateMenu = ({
       case 'icon':
       default:
         return (
-          <Icon name={menuName} title={menuName} onClick={onCreate}>
+          <Icon name={menuName} title={menuName} onClick={handleCreate}>
             <Add fontSize='small' />
           </Icon>
         );

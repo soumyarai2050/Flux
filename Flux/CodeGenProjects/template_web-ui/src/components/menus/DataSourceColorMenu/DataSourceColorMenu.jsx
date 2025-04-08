@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import PropTypes from 'prop-types';
 import { ColorLens, PushPin, PushPinOutlined } from '@mui/icons-material';
-import { DataSourceHexColorPopup } from '../../Popup';
 import Icon from '../../Icon';
 import MenuItem from '../../MenuItem';
 
@@ -19,23 +18,11 @@ import MenuItem from '../../MenuItem';
  */
 const DataSourceColorMenu = ({
   joinBy,
-  maxRowSize,
-  dataSourceColors,
-  onDataSourceColorsChange,
   isPinned,
   onPinToggle,
-  menuType
+  menuType,
+  onOpen
 }) => {
-  const [isPopupOpen, setIsPopupOpen] = useState(false);
-
-  const handleDataSourcePopupOpen = () => {
-    setIsPopupOpen(true);
-  };
-
-  const handleDataSourcePopupClose = () => {
-    setIsPopupOpen(false);
-  };
-
   // Render nothing if joinBy is not provided or is empty.
   if (!joinBy || joinBy.length === 0) return null;
 
@@ -51,7 +38,7 @@ const DataSourceColorMenu = ({
       case 'item':
         const PinCompononent = isPinned ? PushPin : PushPinOutlined;
         return (
-          <MenuItem name={menuName} onClick={handleDataSourcePopupOpen}>
+          <MenuItem name={menuName} onClick={onOpen}>
             <span>
               <ColorLens sx={{ marginRight: '5px' }} fontSize='small' />
               {menuName}
@@ -65,8 +52,7 @@ const DataSourceColorMenu = ({
           <Icon
             name={menuName}
             title={menuName}
-            selected={isPopupOpen}
-            onClick={handleDataSourcePopupOpen}
+            onClick={onOpen}
           >
             <ColorLens fontSize='small' />
           </Icon>
@@ -77,13 +63,6 @@ const DataSourceColorMenu = ({
   return (
     <>
       {renderMenu()}
-      <DataSourceHexColorPopup
-        open={isPopupOpen}
-        onClose={handleDataSourcePopupClose}
-        maxRowSize={maxRowSize}
-        dataSourceColors={dataSourceColors}
-        onSave={onDataSourceColorsChange}
-      />
     </>
   );
 };
@@ -94,12 +73,6 @@ DataSourceColorMenu.propTypes = {
     PropTypes.string,
     PropTypes.arrayOf(PropTypes.string),
   ]).isRequired,
-  /** Maximum number of rows to display in the color popup. */
-  maxRowSize: PropTypes.number.isRequired,
-  /** Mapping of data source identifiers to their respective hex color codes. */
-  dataSourceColors: PropTypes.arrayOf(PropTypes.string).isRequired,
-  /** Callback function triggered when the data source colors are updated. */
-  onDataSourceColorsChange: PropTypes.func.isRequired,
 };
 
 export default DataSourceColorMenu;

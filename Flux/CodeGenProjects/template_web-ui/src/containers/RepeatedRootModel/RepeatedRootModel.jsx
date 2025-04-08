@@ -27,7 +27,9 @@ import {
     joinByChangeHandler,
     centerJoinToggleHandler,
     flipToggleHandler,
-    chartDataChangeHandler
+    chartDataChangeHandler,
+    selectedChartNameChangeHandler,
+    chartEnableOverrideChangeHandler
 } from '../../utils/genericModelHandler';
 import CommonKeyWidget from '../../components/CommonKeyWidget';
 import { ConfirmSavePopup, FormValidation } from '../../components/Popup';
@@ -206,7 +208,7 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                 joinBy: modelLayoutData.join_by || {},
                 joinSort: modelLayoutOption.join_sort || null,
                 enableOverride: modelLayoutData.enable_override || [],
-                disableOverrride: modelLayoutData.disable_override || [],
+                disableOverride: modelLayoutData.disable_override || [],
                 showMore,
                 moreAll,
                 showLess: modelLayoutData.show_less || [],
@@ -375,6 +377,14 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
 
     const handleFlipToggle = () => {
         flipToggleHandler(modelHandlerConfig, !modelLayoutData.flip);
+    }
+
+    const handleSelectedChartNameChange = (updatedChartName) => {
+        selectedChartNameChangeHandler(modelHandlerConfig, updatedChartName);
+    }
+
+    const handleChartEnableOverrideChange = (updatedChartEnableOverride) => {
+        chartEnableOverrideChangeHandler(modelHandlerConfig, updatedChartEnableOverride);
     }
 
     const handleChartDataChange = (updatedChartData) => {
@@ -576,7 +586,6 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
             case LAYOUT_TYPES.CHART:
                 return (
                     <ChartView
-                        modelName={modelName}
                         onReload={handleReload}
                         chartRows={cleanedRows}
                         onChartDataChange={handleChartDataChange}
@@ -586,6 +595,9 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                         onRowSelect={() => { }}
                         mode={mode}
                         onModeToggle={handleModeToggle}
+                        onChartSelect={handleSelectedChartNameChange}
+                        selectedChartName={modelLayoutData.selected_chart_name ?? null}
+                        chartEnableOverride={modelLayoutData.chart_enable_override ?? []}
                     />
                 );
             default:
@@ -663,13 +675,16 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                         pinned={modelLayoutData.pinned || []}
                         onPinToggle={handlePinnedChange}
                         onReload={handleReload}
+                        charts={modelLayoutOption.chart_data || []}
+                        onChartToggle={handleChartEnableOverrideChange}
+                        chartEnableOverride={modelLayoutData.chart_enable_override || []}
                     />
                 </ModelCardHeader>
                 <ModelCardContent
                     isDisabled={isLoading || isProcessingUserActions}
                     error={error}
                     onClear={handleErrorClear}
-                    isDisconnected={!isWsDisabled && !isWebSocketActive(socketRef.current)}
+                    isDisconnected={!isWebSocketActive(socketRef.current)}
                     onReconnect={handleReconnect}
                     isDownloading={isDownloading}
                     progress={progress}

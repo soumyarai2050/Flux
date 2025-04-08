@@ -322,10 +322,12 @@ class FastapiOpenapiSchema(BaseFastapiPlugin, ABC):
                 query_route_type == FastapiOpenapiSchema.flux_json_query_route_get_type_field_val):
             output_str += self._handle_get_response(message_name_snake_cased)
             output_str += self._handle_get_all_response(message_name_snake_cased)
-        elif query_route_type == FastapiOpenapiSchema.flux_json_query_route_patch_type_field_val:
+        elif query_route_type in [FastapiOpenapiSchema.flux_json_query_route_patch_type_field_val,
+                                  FastapiOpenapiSchema.flux_json_query_route_patch_all_type_field_val]:
             output_str += self._handle_get_response(message_name_snake_cased)
             output_str += self._handle_update_all_response(message_name_snake_cased)
-        elif query_route_type == FastapiOpenapiSchema.flux_json_query_route_post_type_field_val:
+        elif query_route_type in [FastapiOpenapiSchema.flux_json_query_route_post_type_field_val,
+                                  FastapiOpenapiSchema.flux_json_query_route_post_all_type_field_val]:
             output_str += self._handle_get_response(message_name_snake_cased)
             output_str += self._handle_create_all_response(message_name_snake_cased)
         return output_str
@@ -672,11 +674,21 @@ class FastapiOpenapiSchema(BaseFastapiPlugin, ABC):
             output_str += '        }'
             return output_str
         elif query_route_type in [FastapiOpenapiSchema.flux_json_query_route_patch_type_field_val,
-                            FastapiOpenapiSchema.flux_json_query_route_post_type_field_val]:
+                                  FastapiOpenapiSchema.flux_json_query_route_post_type_field_val,
+                                  FastapiOpenapiSchema.flux_json_query_route_post_all_type_field_val,
+                                  FastapiOpenapiSchema.flux_json_query_route_post_all_type_field_val]:
             output_str = f'        "/{self.proto_file_package}/query-{query_name}": ' + '{\n'
-            output_str += f'            "{query_route_type.lower()}": '+'{\n'
+
+            if query_route_type in [FastapiOpenapiSchema.flux_json_query_route_post_type_field_val,
+                                    FastapiOpenapiSchema.flux_json_query_route_post_all_type_field_val]:
+                query_route_type_str = "post"
+            else:
+                query_route_type_str = "patch"
+
+            output_str += f'            "{query_route_type_str}": '+'{\n'
             output_str += f'                "summary": "{query_route_type} query api for {query_name} query",\n'
-            if query_route_type == FastapiOpenapiSchema.flux_json_query_route_post_type_field_val:
+            if query_route_type in [FastapiOpenapiSchema.flux_json_query_route_post_type_field_val,
+                                    FastapiOpenapiSchema.flux_json_query_route_post_all_type_field_val]:
                 output_str += f'                "responses": {message_name_snake_cased}_create_list_response,\n'
             else:
                 output_str += f'                "responses": {message_name_snake_cased}_update_list_response,\n'
@@ -684,6 +696,7 @@ class FastapiOpenapiSchema(BaseFastapiPlugin, ABC):
             output_str += '                    "content": {\n'
             output_str += '                        "application/json": {\n'
             output_str += '                            "schema": {"type": "object"}\n'
+            output_str += '                            "schema": {"type": "array"}\n'
             output_str += '                        }\n'
             output_str += '                    },\n'
             output_str += '                    "required": True\n'

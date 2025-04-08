@@ -137,6 +137,8 @@ message WidgetUIData{
   optional bool highlight_update = 14 [default = false];
   optional bool truncate_date_time = 15 [default = false];
   repeated string pinned = 16;
+  optional string selected_chart_name = 17;
+  repeated string chart_enable_override = 18;
 }
 
 message UIButton{
@@ -169,8 +171,9 @@ message ChartSeries {
   optional string id = 1;
   required ChartType type = 2;
   required ChartEncode encode = 3;
-  optional float y_min = 4;
-  optional float y_max = 5;
+  optional bool stack = 4;
+  optional float y_min = 5;
+  optional float y_max = 6;
 }
 
 message ChartData {

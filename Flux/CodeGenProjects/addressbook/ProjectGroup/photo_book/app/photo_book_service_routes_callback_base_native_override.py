@@ -24,6 +24,7 @@ class PhotoBookServiceRoutesCallbackBaseNativeOverride(PhotoBookServiceRoutesCal
     underlying_partial_update_all_plan_view_http: Callable[..., Any] | None = None
     underlying_read_plan_view_http: Callable[..., Any] | None = None
     underlying_update_plan_view_http: Callable[..., Any] | None = None
+    underlying_process_plan_view_updates_query_http: Callable[..., Any] | None = None
 
     def __init__(self):
         super().__init__()
@@ -46,10 +47,11 @@ class PhotoBookServiceRoutesCallbackBaseNativeOverride(PhotoBookServiceRoutesCal
     def initialize_underlying_http_callables(cls):
         from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.FastApi.photo_book_service_http_msgspec_routes import (
             underlying_partial_update_all_plan_view_http, underlying_read_plan_view_http,
-            underlying_update_plan_view_http)
+            underlying_update_plan_view_http, underlying_process_plan_view_updates_query_http)
         cls.underlying_partial_update_all_plan_view_http = underlying_partial_update_all_plan_view_http
         cls.underlying_read_plan_view_http = underlying_read_plan_view_http
         cls.underlying_update_plan_view_http = underlying_update_plan_view_http
+        cls.underlying_process_plan_view_updates_query_http = underlying_process_plan_view_updates_query_http
 
     @except_n_log_alert()
     def _app_launch_pre_thread_func(self):
@@ -272,3 +274,27 @@ class PhotoBookServiceRoutesCallbackBaseNativeOverride(PhotoBookServiceRoutesCal
         if tasks:
             await submit_task_with_first_completed_wait(tasks, 10)
 
+    async def handle_plan_view_updates_query_pre(
+            self, handle_plan_view_update_class_type: Type[HandlePlanViewUpdate], payload: List[Dict[str, Any]]):
+
+        for log_data in payload:
+            message = log_data.get("message")
+            message: str = message[len("^^^"):]
+            args: List[str] = message.split("~~")
+            basemodel_type_name: str = args.pop(0)
+            update_type: str = args.pop(0)
+            method_name: str = args.pop(0)
+
+            # kwargs_list = []
+            kwargs: Dict[str, str] = dict()
+            # get method kwargs separated by key_val_sep if any
+            for arg in args:
+                key, value = arg.split("^^")
+                kwargs[key] = value
+                # kwargs_list.append({key: value})
+
+            data = {"kwargs": {"update_type": update_type, "basemodel_type_name": basemodel_type_name,
+                               "method_name": method_name, "update_json_list": [kwargs]}}
+
+            await PhotoBookServiceRoutesCallbackBaseNativeOverride.underlying_process_plan_view_updates_query_http(data)
+        return []

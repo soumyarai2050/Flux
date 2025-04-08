@@ -23,7 +23,8 @@ const EditSaveToggleMenu = ({
   isPinned,
   onPinToggle,
   menuType,
-  disabled
+  disabled,
+  onMenuClose
 }) => {
   if (!onModeToggle || disabled) return null;
 
@@ -32,6 +33,7 @@ const EditSaveToggleMenu = ({
   const IconComponent = mode === MODES.READ ? Edit : Save;
 
   const handleClick = () => {
+    onMenuClose();
     if (mode === MODES.READ) {
       onModeToggle();
     } else {
