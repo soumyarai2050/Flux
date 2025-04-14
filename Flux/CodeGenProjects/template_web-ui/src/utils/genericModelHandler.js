@@ -65,6 +65,16 @@ export function chartEnableOverrideChangeHandler(config, updatedChartEnableOverr
   layoutDataChangeHandler(config, layoutDataUpdateDict);
 }
 
+export function selectedPivotNameChangeHandler(config, updatedPivotName) {
+  const layoutDataUpdateDict = { selected_pivot_name: updatedPivotName };
+  layoutDataChangeHandler(config, layoutDataUpdateDict);
+}
+
+export function pivotEnableOverrideChangeHandler(config, updatedPivotEnableOverride) {
+  const layoutDataUpdateDict = { pivot_enable_override: updatedPivotEnableOverride };
+  layoutDataChangeHandler(config, layoutDataUpdateDict);
+}
+
 export function selectedSourceIdChangeHandler(config, updatedSelectedSourceId) {
   const layoutDataUpdateDict = { selected_source_id: updatedSelectedSourceId };
   layoutDataChangeHandler(config, layoutDataUpdateDict);
@@ -82,6 +92,11 @@ export function filtersChangeHandler(config, updatedFilters) {
 
 export function chartDataChangeHandler(config, updatedChartData) {
   const layoutOptionUpdateDict = { chart_data: updatedChartData };
+  layoutOptionChangeHandler(config, layoutOptionUpdateDict);
+}
+
+export function pivotDataChangeHandler(config, updatedPivotData) {
+  const layoutOptionUpdateDict = { pivot_data: updatedPivotData };
   layoutOptionChangeHandler(config, layoutOptionUpdateDict);
 }
 

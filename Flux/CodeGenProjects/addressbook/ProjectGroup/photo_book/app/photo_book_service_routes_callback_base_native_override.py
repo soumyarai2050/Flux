@@ -16,7 +16,9 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.FastApi.
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_helper import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import (
     handle_patch_db_queue_updater, get_update_obj_list_for_journal_type_update,
-    get_update_obj_for_snapshot_type_update, UpdateType, non_existing_obj_read_fail_regex_pattern)
+    get_update_obj_for_snapshot_type_update, UpdateType, non_existing_obj_read_fail_regex_pattern,
+    get_field_seperator_pattern, get_pattern_to_remove_file_from_created_cache,
+    get_key_val_seperator_pattern, get_pattern_for_plan_view_db_updates)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import CURRENT_PROJECT_DIR as PAIR_STRAT_ENGINE_DIR
 
 
@@ -24,7 +26,6 @@ class PhotoBookServiceRoutesCallbackBaseNativeOverride(PhotoBookServiceRoutesCal
     underlying_partial_update_all_plan_view_http: Callable[..., Any] | None = None
     underlying_read_plan_view_http: Callable[..., Any] | None = None
     underlying_update_plan_view_http: Callable[..., Any] | None = None
-    underlying_process_plan_view_updates_query_http: Callable[..., Any] | None = None
 
     def __init__(self):
         super().__init__()
@@ -42,16 +43,18 @@ class PhotoBookServiceRoutesCallbackBaseNativeOverride(PhotoBookServiceRoutesCal
         self.max_fetch_from_queue = config_yaml_dict.get("max_fetch_from_patch_queue_for_server")
         if self.max_fetch_from_queue is None:
             self.max_fetch_from_queue = 10  # setting default value
+        self.field_sep = get_field_seperator_pattern()
+        self.pattern_for_plan_view_db_updates: str = get_pattern_for_plan_view_db_updates()
+        self.key_val_sep = get_key_val_seperator_pattern()
 
     @classmethod
     def initialize_underlying_http_callables(cls):
         from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.FastApi.photo_book_service_http_msgspec_routes import (
             underlying_partial_update_all_plan_view_http, underlying_read_plan_view_http,
-            underlying_update_plan_view_http, underlying_process_plan_view_updates_query_http)
+            underlying_update_plan_view_http)
         cls.underlying_partial_update_all_plan_view_http = underlying_partial_update_all_plan_view_http
         cls.underlying_read_plan_view_http = underlying_read_plan_view_http
         cls.underlying_update_plan_view_http = underlying_update_plan_view_http
-        cls.underlying_process_plan_view_updates_query_http = underlying_process_plan_view_updates_query_http
 
     @except_n_log_alert()
     def _app_launch_pre_thread_func(self):
@@ -146,32 +149,6 @@ class PhotoBookServiceRoutesCallbackBaseNativeOverride(PhotoBookServiceRoutesCal
             err_str_ = f"_plan_view_patch_all_by_async_submit failed with exception: {e};;; {plan_view_list=}"
             logging.error(err_str_)
             raise Exception(err_str_)
-
-    async def process_plan_view_updates_query_pre(
-            self, process_pair_plan_api_ops_class_type: Type[ProcessPairPlanAPIOps], payload_dict: Dict[str, Any]):
-        kwargs = payload_dict.get("kwargs")
-        update_type = kwargs.get("update_type")
-        basemodel_type_name = kwargs.get("basemodel_type_name")
-        method_name = kwargs.get("method_name")
-        update_json_list = kwargs.get("update_json_list")
-
-        if method_name == "patch_all_plan_view_client":
-            # currently using passed basemodel_type_name only since in patch ultimately json is passed
-            # to method_callable so even if BaseModel variant is passed of Model, it will not affect
-            method_callable = self._plan_view_patch_all_by_async_submit
-
-            for update_json in update_json_list:
-                handle_patch_db_queue_updater(update_type, self.model_type_name_to_patch_queue_cache_dict,
-                                              basemodel_type_name, method_name, update_json,
-                                              get_update_obj_list_for_journal_type_update,
-                                              get_update_obj_for_snapshot_type_update,
-                                              method_callable, self.dynamic_queue_handler_err_handler,
-                                              self.max_fetch_from_queue, self._snapshot_type_callable_err_handler,
-                                              parse_to_model=True)
-        else:
-            logging.exception(f"Unsupported {method_name=} for process_plan_view_updates_query, currently "
-                              f"only supports 'patch_all_plan_view_client';;; {payload_dict=}")
-        return []
 
     def dynamic_queue_handler_err_handler(self, basemodel_type: str, update_type: UpdateType,
                                           err_obj: Exception, pending_updates: List[PlanViewBaseModel]):
@@ -279,22 +256,32 @@ class PhotoBookServiceRoutesCallbackBaseNativeOverride(PhotoBookServiceRoutesCal
 
         for log_data in payload:
             message = log_data.get("message")
-            message: str = message[len("^^^"):]
-            args: List[str] = message.split("~~")
+            message: str = message[len(self.pattern_for_plan_view_db_updates):]
+            args: List[str] = message.split(self.field_sep)
             basemodel_type_name: str = args.pop(0)
             update_type: str = args.pop(0)
             method_name: str = args.pop(0)
 
-            # kwargs_list = []
-            kwargs: Dict[str, str] = dict()
+            update_json: Dict[str, str] = dict()
             # get method kwargs separated by key_val_sep if any
             for arg in args:
-                key, value = arg.split("^^")
-                kwargs[key] = value
-                # kwargs_list.append({key: value})
+                key, value = arg.split(self.key_val_sep)
+                update_json[key] = value
 
-            data = {"kwargs": {"update_type": update_type, "basemodel_type_name": basemodel_type_name,
-                               "method_name": method_name, "update_json_list": [kwargs]}}
+            if method_name == "patch_all_plan_view_client":
+                # currently using passed basemodel_type_name only since in patch ultimately json is passed
+                # to method_callable so even if BaseModel variant is passed of Model, it will not affect
+                method_callable = self._plan_view_patch_all_by_async_submit
 
-            await PhotoBookServiceRoutesCallbackBaseNativeOverride.underlying_process_plan_view_updates_query_http(data)
+                handle_patch_db_queue_updater(update_type, self.model_type_name_to_patch_queue_cache_dict,
+                                              basemodel_type_name, method_name, update_json,
+                                              get_update_obj_list_for_journal_type_update,
+                                              get_update_obj_for_snapshot_type_update,
+                                              method_callable, self.dynamic_queue_handler_err_handler,
+                                              self.max_fetch_from_queue, self._snapshot_type_callable_err_handler,
+                                              parse_to_model=True)
+            else:
+                logging.exception(f"Unsupported {method_name=} for handle_plan_view_updates_query, currently "
+                                  f"only supports 'patch_all_plan_view_client';;; {log_data=}")
+
         return []

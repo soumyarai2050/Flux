@@ -11,7 +11,8 @@ import pendulum
 
 # Project imports
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.markets.market import Market, MarketID
-from FluxPythonUtils.log_book.tail_executor import LogDetail, get_transaction_counts_n_timeout_from_config
+from FluxPythonUtils.log_book.tail_executor import LogDetail
+from scripts.general_utility_functions import get_transaction_counts_n_timeout_from_config
 from FluxPythonUtils.scripts.general_utility_functions import get_last_log_line_date_time, parse_to_float, is_file_modified
 from Flux.PyCodeGenEngine.FluxCodeGenCore.app_log_book import AppTailExecutor
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_client import (
@@ -19,7 +20,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
-    email_book_service_http_client, is_ongoing_plan, Side, UpdateType)
+    email_book_service_http_client, is_ongoing_plan, Side)
 from Flux.CodeGenProjects.performance_benchmark.app.performance_benchmark_helper import (
     performance_benchmark_service_http_client, RawPerformanceDataBaseModel)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.aggregate import *
@@ -88,7 +89,7 @@ class PhoneBookBaseTailExecutor(AppTailExecutor):
         self.phone_book_snapshot_type_update_cache_dict: Dict[str, Queue] = {}
         self.field_sep = get_field_seperator_pattern()
         self.key_val_sep = get_key_val_seperator_pattern()
-        self.pattern_for_pair_plan_db_updates = get_pattern_for_pair_plan_db_updates()
+        self.pattern_for_plan_view_db_updates = get_pattern_for_plan_view_db_updates()
         self.pattern_to_restart_tail_process: str = get_pattern_to_restart_tail_process()
         self.pattern_to_force_kill_tail_process: str = get_pattern_to_force_kill_tail_process()
         self.pattern_to_remove_file_from_created_cache: str = get_pattern_to_remove_file_from_created_cache()
@@ -302,7 +303,7 @@ class PhoneBookBaseTailExecutor(AppTailExecutor):
     def process_pair_plan_api_ops(self, message: str):
         try:
             # remove pattern_for_pair_plan_db_updates from beginning of message
-            message: str = message[len(self.pattern_for_pair_plan_db_updates):]
+            message: str = message[len(self.pattern_for_plan_view_db_updates):]
             args: List[str] = message.split(self.field_sep)
             basemodel_type_name: str = args.pop(0)
             update_type: str = args.pop(0)

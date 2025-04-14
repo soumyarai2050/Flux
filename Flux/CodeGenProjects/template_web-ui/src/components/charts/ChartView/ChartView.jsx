@@ -61,7 +61,7 @@ function ChartView({
     const [tsUpdateCounter, setTsUpdateCounter] = useState(0);
     const [datasetUpdateCounter, setDatasetUpdateCounter] = useState(0);
     const [reloadCounter, setReloadCounter] = useState(0);
-    const [schema, setSchema] = useState(projectSchema);
+    const [schema, setSchema] = useState(updateChartSchema(projectSchema, fieldsMetadata, modelType === MODEL_TYPES.ABBREVIATION_MERGE));
     const [selectedData, setSelectedData] = useState();
     const socketList = useRef([]);
     const getAllWsDict = useRef({});
@@ -75,11 +75,6 @@ function ChartView({
     //    - if not time-series, apply filter on rows 
     //    - add only the necessary field in filter dropdown for time-series
     // 4. create expanded chart configuration object to be used by echart using stored chart configuration and datasets 
-
-    useEffect(() => {
-        const updatedSchema = updateChartSchema(projectSchema, fieldsMetadata, modelType === MODEL_TYPES.ABBREVIATION_MERGE);
-        setSchema(updatedSchema);
-    }, [])
 
     useEffect(() => {
         // update the local row dataset on update from parent

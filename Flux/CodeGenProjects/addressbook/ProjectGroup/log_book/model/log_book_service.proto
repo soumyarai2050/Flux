@@ -241,67 +241,6 @@ message RemovePlanAlertsForPlanId {
   optional bool temp = 1;
 }
 
-message LogBookRestartTail {
-  option (FluxMsgJsonQuery) = {
-    QueryName: "log_book_restart_tail"
-    QueryParams: {
-      QueryParamName: "log_file_name",
-      QueryParamDataType: "str"
-    }
-    QueryParams: {
-      QueryParamName: "start_timestamp",
-      QueryParamDataType: "str"
-    }
-  };
-  optional bool temp = 1;
-}
-
-message LogBookForceKillTailExecutor {
-  option (FluxMsgJsonQuery) = {
-    QueryName: "log_book_force_kill_tail_executor"
-    QueryParams: {
-      QueryParamName: "log_file_path",
-      QueryParamDataType: "str"
-    }
-  };
-  optional bool temp = 1;
-}
-
-message LogBookRemoveFileFromCreatedCache {
-    option (FluxMsgJsonQuery) = {
-      QueryName: "log_book_remove_file_from_created_cache"
-      QueryParams: {
-        QueryParamName: "log_file_path_list",
-        QueryParamDataType: "List[str]"
-      }
-  };
-  optional bool temp = 1;
-}
-
-message HandleContactAlertsFromTailExecutor {
-    option (FluxMsgJsonQuery) = {
-      QueryName: "handle_contact_alerts_from_tail_executor"
-      QueryParams: {
-        QueryParamName: "contact_alert_data_list",
-        QueryParamDataType: "List[Dict]"
-      }
-      QueryRouteType: PATCH
-  };
-  optional bool temp = 1;
-}
-
-message HandlePlanAlertsFromTailExecutor {
-    option (FluxMsgJsonQuery) = {
-      QueryName: "handle_plan_alerts_from_tail_executor"
-      QueryParams: {
-        QueryParamName: "plan_alert_data_list",
-        QueryParamDataType: "List[Dict]"
-      }
-      QueryRouteType: PATCH
-  };
-  optional bool temp = 1;
-}
-
 message ContactAlertFailLogger {
     option (FluxMsgJsonQuery) = {
       QueryName: "contact_alert_fail_logger"
@@ -422,8 +361,12 @@ message EnableDisablePlanAlertCreate {
       QueryParamDataType: "int"
     },
     QueryParams: {
+      QueryParamName: "symbol_side_key_list",
+      QueryParamDataType: "List[str]"
+    },
+    QueryParams: {
       QueryParamName: "action",
-      QueryParamDataType: "bool"    // True to enable, False to disable
+      QueryParamDataType: "bool"    // True to enable, False to disable plan alert creation for this start_id
     }
   };
   optional bool is_id_present = 1;
@@ -480,16 +423,28 @@ message HandlePlanAlertsWithSymbolSide{
   optional bool is_id_present = 1;  // no use case - kept as st least 1 field must be present in message
 }
 
-message HandlePerfBenchmark{
-  option (FluxMsgJsonQuery) = {
-    QueryName: "handle_perf_benchmark"
+message HandlePairPlanUpdatesFromLogs{
+    option (FluxMsgJsonQuery) = {
+    QueryName: "handle_pair_plan_updates_from_logs"
     QueryRouteType: POST_ALL,
     QueryParams: {
       QueryParamName: "payload",
       QueryParamDataType: "List[Dict]"
     }
   };
-  optional bool is_id_present = 1;  // no use case - kept as st least 1 field must be present in message
+  optional bool temp = 1;
+}
+
+message HandleBackgroundLogAlerts{
+    option (FluxMsgJsonQuery) = {
+    QueryName: "handle_background_logs_alert"
+    QueryRouteType: POST_ALL,
+    QueryParams: {
+      QueryParamName: "payload",
+      QueryParamDataType: "List[Dict]"
+    }
+  };
+  optional bool temp = 1;
 }
 
 

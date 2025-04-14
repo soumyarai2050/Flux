@@ -103,6 +103,11 @@ const ModelCardContent = ({
   const backgroundColor = theme.palette.primary.dark;
   const isBackdropOpen = Boolean(isDisabled || error || isDisconnected);
 
+  let backdropClass = styles.backdrop;
+  if (isDisabled) {
+    backdropClass += ` ${styles.enable_menu}`;
+  }
+
   return (
     <div className={styles.card_content_container}>
       <div
@@ -119,7 +124,7 @@ const ModelCardContent = ({
             value={progress}
           />
         )}
-        <Backdrop className={styles.backdrop} open={isBackdropOpen}>
+        <Backdrop className={backdropClass} open={isBackdropOpen}>
           {isDisabled && <BeatLoader color='yellow' />}
           {isDisconnected && (
             <>

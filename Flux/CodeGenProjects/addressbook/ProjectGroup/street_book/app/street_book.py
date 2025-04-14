@@ -780,7 +780,7 @@ class StreetBook(BaseBook):
              f"{get_pair_plan_log_key(pair_plan)};;; {pair_plan=}")
         logging.info(alert_str)
         guaranteed_call_pair_plan_client(
-            PairPlanBaseModel, email_book_service_http_client.patch_pair_plan_client,
+            PairPlanBaseModel, email_book_service_http_client.patch_all_pair_plan_client,
             _id=pair_plan.id, plan_state=PlanState.PlanState_ERROR.value)
 
     def _mark_plan_state_as_pause(self, pair_plan: PairPlanBaseModel):
@@ -789,7 +789,7 @@ class StreetBook(BaseBook):
              f"{get_pair_plan_log_key(pair_plan)};;; {pair_plan=}")
         logging.info(alert_str)
         guaranteed_call_pair_plan_client(
-            PairPlanBaseModel, email_book_service_http_client.patch_pair_plan_client,
+            PairPlanBaseModel, email_book_service_http_client.patch_all_pair_plan_client,
             _id=pair_plan.id, plan_state=PlanState.PlanState_PAUSED.value)
 
     def _set_plan_pause_when_contact_limit_check_fails(self):
@@ -799,7 +799,7 @@ class StreetBook(BaseBook):
             logging.critical("Putting Activated Plan to PAUSE, found contact_limits breached already, "
                              f"pair_plan_key: {get_pair_plan_log_key(pair_plan)};;; {pair_plan=}")
             guaranteed_call_pair_plan_client(
-                PairPlanBaseModel, email_book_service_http_client.patch_pair_plan_client,
+                PairPlanBaseModel, email_book_service_http_client.patch_all_pair_plan_client,
                 _id=pair_plan.id, plan_state=PlanState.PlanState_PAUSED.value)
         else:
             logging.error(f"Can't find pair_plan in plan_cache, found contact_limits "
@@ -1497,6 +1497,9 @@ class StreetBook(BaseBook):
                     plan_limits_tuple = self.plan_cache.get_plan_limits()
                     self.plan_limit, plan_limits_update_date_time = plan_limits_tuple
 
+                # uncomment below code to test stress perf
+                # func_for_log_book_perf_check(pair_plan_id)
+
                 # 3. check if any cxl chore is requested and send out [continue new loop after]
                 if self.process_cxl_request():
                     continue
@@ -1615,3 +1618,20 @@ class StreetBook(BaseBook):
                 return -1
         logging.info(f"exiting internal_run of {pair_plan_id=}, graceful shutdown this plan")
         return 0
+
+
+def func_for_log_book_perf_check(pair_plan_id: int):
+    """
+    This function is not a part of any code just kept for now temporarily for verifying perf of plan_view
+    updates through log analyzer
+    """
+    from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import UpdateType
+    from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import plan_view_client_call_log_str
+    from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_helper import \
+        photo_book_service_http_client, PlanViewBaseModel
+    date_time = DateTime.now()
+    log_str = plan_view_client_call_log_str(
+        PlanViewBaseModel, photo_book_service_http_client.patch_all_plan_view_client,
+        UpdateType.SNAPSHOT_TYPE,
+        _id=pair_plan_id, market_premium=float(f"{date_time.minute}.{date_time.second}"))
+    logging.db(log_str)

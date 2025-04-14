@@ -145,9 +145,9 @@ export const SHAPE_TYPES = Object.freeze({
  */
 export const HOVER_TEXT_TYPES = Object.freeze({
   NONE: 'none',
-  VALUE: 'value',
-  PERCENTAGE: 'percentage',
-  VALUE_AND_PERCENTAGE: 'valueAndPercentage'
+  VALUE: 'HoverTextType_VALUE',
+  PERCENTAGE: 'HoverTextType_PERCENTAGE',
+  VALUE_AND_PERCENTAGE: 'HoverTextType_VALUE_AND_PERCENTAGE'
 });
 
 /**

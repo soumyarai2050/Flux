@@ -22,6 +22,9 @@ dataclass_override_type: "native"
 beanie_override_type: "native"
 cache_override_type: "bare"
 
+raw_perf_data_config:
+  transaction_counts_per_call_for_server: 500
+  transaction_timeout_secs: 60  # secs
 # to be used in loop wait in script to update performance analysis data
 raw_performance_data_processor_loop_wait: 2  # sec
 

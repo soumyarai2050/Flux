@@ -107,6 +107,17 @@ message ProcessedPerformanceAnalysis{
   optional float per_90 = 15;
 }
 
+message HandlePerfBenchmark{
+  option (FluxMsgJsonQuery) = {
+    QueryName: "handle_perf_benchmark"
+    QueryRouteType: POST_ALL,
+    QueryParams: {
+      QueryParamName: "payload",
+      QueryParamDataType: "List[Dict]"
+    }
+  };
+  optional bool is_id_present = 1;  // no use case - kept as st least 1 field must be present in message
+}
 
 // used to avoid unused import warning by using any random msg or enum from imported file causing warning
 message ImportWarningAvoidDummyMessage{

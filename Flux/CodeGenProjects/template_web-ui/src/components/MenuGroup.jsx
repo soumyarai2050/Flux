@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
     ChartSettingsMenu, ColumnSettingsMenu, CreateMenu, DataSourceColorMenu, DownloadMenu, DynamicMenu,
-    EditSaveToggleMenu, FilterMenu, JoinMenu, LayoutSwitchMenu, MaximizeRestoreToggleMenu, ReloadMenu, VisibilityMenu
+    EditSaveToggleMenu, FilterMenu, JoinMenu, LayoutSwitchMenu, MaximizeRestoreToggleMenu, PivotSettingsMenu, ReloadMenu, VisibilityMenu
 } from './menus';
 import { MODEL_TYPES } from '../constants';
 import { cloneDeep } from 'lodash';
@@ -63,9 +63,12 @@ const MenuGroup = ({
     isAbbreviationSource,
     isCreating,
     onReload,
-    charts,
+    charts = [],
     onChartToggle,
-    chartEnableOverride
+    chartEnableOverride = [],
+    pivots = [],
+    onPivotToggle,
+    pivotEnableOverride = []
 }) => {
     const [anchorEl, setAnchorEl] = useState(null);
     const [isFilterMenuPopupOpen, setIsFilterMenuPopupOpen] = useState(false);
@@ -190,6 +193,7 @@ const MenuGroup = ({
     const menus = [
         'column-settings',
         'chart-settings',
+        'pivot-settings',
         'filter',
         'visibility',
         'data-source-color',
@@ -370,6 +374,22 @@ const MenuGroup = ({
                         onMenuClose={handleMenuClose}
                         onPinToggle={handlePinToggle}
                         chartEnableOverride={chartEnableOverride}
+                    />
+                );
+            case 'pivot-settings':
+                return (
+                    <PivotSettingsMenu
+                        key={menuKey}
+                        pivots={pivots}
+                        showAll={showAll}
+                        onShowAllToggle={onShowAllToggle}
+                        onPivotToggle={onPivotToggle}
+                        layout={layout}
+                        menuType={menuType}
+                        isPinned={pinned.includes(menuName)}
+                        onMenuClose={handleMenuClose}
+                        onPinToggle={handlePinToggle}
+                        pivotEnableOverride={pivotEnableOverride}
                     />
                 );
         }

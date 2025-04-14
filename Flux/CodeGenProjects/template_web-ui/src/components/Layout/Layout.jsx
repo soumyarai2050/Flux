@@ -101,9 +101,9 @@ const Layout = ({ projectName, theme, onThemeToggle }) => {
       const activeLayout = fastClone(storedArray?.find(o => o.profile_id === activeLayoutId));
       if (activeLayout) {
         const updatedDataElememts = activeLayout.widget_ui_data_elements.map((item) => {
-          const { x, y, w, h, widget_ui_data, chart_data, filters, join_sort } = item;
+          const { x, y, w, h, widget_ui_data, chart_data, filters, join_sort, pivot_data } = item;
           const defaultElement = defaultLayouts.find((o) => o.i === item.i);
-          return { ...defaultElement, x, y, w, h, widget_ui_data, chart_data, filters, join_sort };
+          return { ...defaultElement, x, y, w, h, widget_ui_data, chart_data, filters, join_sort, pivot_data };
         })
         activeLayout.widget_ui_data_elements = updatedDataElememts;
         newLayout = updatedDataElememts;

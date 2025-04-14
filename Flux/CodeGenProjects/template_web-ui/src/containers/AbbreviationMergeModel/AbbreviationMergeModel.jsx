@@ -7,7 +7,7 @@ import {
     clearxpath, getWidgetOptionById, generateObjectFromSchema,
     addxpath, compareJSONObjects, getWidgetTitle,
     getDataSourcesCrudOverrideDict, getCSVFileName, isWebSocketActive, removeRedundantFieldsFromRows,
-    getAbbreviatedCollections, getNewItem, getDataSourceObj, generateExcel,
+    getAbbreviatedCollections, getNewItem, getDataSourceObj,
     updateFormValidation
 } from '../../utils';
 import { FullScreenModalOptional } from '../../components/Modal';
@@ -31,6 +31,9 @@ import {
     chartDataChangeHandler,
     selectedChartNameChangeHandler,
     chartEnableOverrideChangeHandler,
+    selectedPivotNameChangeHandler,
+    pivotEnableOverrideChangeHandler,
+    pivotDataChangeHandler,
     selectedSourceIdChangeHandler
 } from '../../utils/genericModelHandler';
 import CommonKeyWidget from '../../components/CommonKeyWidget';
@@ -367,7 +370,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                 }
             }
         }
-    }, [modelAbbreviatedItems, dataSourcesObjIdDict, updatedObj, mode, modelLayoutData.selected_source_id])
+    }, [modelAbbreviatedItems, updatedObj, mode, modelLayoutData.selected_source_id])
 
     useEffect(() => {
         // const { disable_ws_on_edit } = modelLayoutOption;
@@ -520,6 +523,18 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
 
     const handleChartDataChange = (updatedChartData) => {
         chartDataChangeHandler(modelHandlerConfig, updatedChartData);
+    }
+
+    const handleSelectedPivotNameChange = (updatedPivotName) => {
+        selectedPivotNameChangeHandler(modelHandlerConfig, updatedPivotName);
+    }
+
+    const handlePivotEnableOverrideChange = (updatedPivotEnableOverride) => {
+        pivotEnableOverrideChangeHandler(modelHandlerConfig, updatedPivotEnableOverride);
+    }
+
+    const handlePivotDataChange = (updatedPivotData) => {
+        pivotDataChangeHandler(modelHandlerConfig, updatedPivotData);
     }
 
     const handleDownload = async () => {
@@ -773,7 +788,18 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                     </>
                 );
             case LAYOUT_TYPES.PIVOT_TABLE:
-                return <PivotTable pivotData={cleanedRows} />;
+                return (
+                    <PivotTable
+                        pivotData={modelLayoutOption.pivot_data || []}
+                        data={cleanedRows}
+                        mode={mode}
+                        onModeToggle={handleModeToggle}
+                        onPivotSelect={handleSelectedPivotNameChange}
+                        selectedPivotName={modelLayoutData.selected_pivot_name ?? null}
+                        pivotEnableOverride={modelLayoutData.pivot_enable_override ?? []}
+                        onPivotDataChange={handlePivotDataChange}
+                    />
+                );
             case LAYOUT_TYPES.CHART:
                 return (
                     <ChartView
@@ -864,9 +890,14 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                         pinned={modelLayoutData.pinned || []}
                         onPinToggle={handlePinnedChange}
                         onReload={handleReload}
+                        // chart
                         charts={modelLayoutOption.chart_data || []}
                         onChartToggle={handleChartEnableOverrideChange}
                         chartEnableOverride={modelLayoutData.chart_enable_override || []}
+                        // pivot
+                        pivots={modelLayoutOption.pivot_data || []}
+                        onPivotToggle={handlePivotEnableOverrideChange}
+                        pivotEnableOverride={modelLayoutData.pivot_enable_override || []}
                     />
                 </ModelCardHeader>
                 <ModelCardContent

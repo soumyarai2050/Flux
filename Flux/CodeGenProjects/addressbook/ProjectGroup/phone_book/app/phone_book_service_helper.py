@@ -1,20 +1,14 @@
 import copy
-import logging
-import os
-import sys
 import stat
 import math
-from threading import Lock
 import inspect
 from typing import Set
 
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.aggregate import (
-    get_ongoing_or_all_pair_plans_by_sec_id, get_ongoing_pair_plan_filter)
+    get_ongoing_pair_plan_filter)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.email_book_service_http_client import (
     EmailBookServiceHttpClient)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import (
-    get_field_seperator_pattern, get_key_val_seperator_pattern, get_pattern_for_pair_plan_db_updates, UpdateType)
 from FluxPythonUtils.scripts.general_utility_functions import (
     YAMLConfigurationManager, except_n_log_alert, parse_to_int)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.ORMModel.photo_book_service_model_imports import (
@@ -23,6 +17,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.model_extensio
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecord, SecType
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import (
     get_symbol_side_key)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import pair_plan_client_call_log_str
 
 if os.getenv("DASH_MODE"):
     from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.app.dept_book_service_helper import (
@@ -375,26 +370,7 @@ def get_id_from_plan_key(unloaded_plan_key: str) -> int:
     return parse_to_int(parts[-1])
 
 
-def pair_plan_client_call_log_str(basemodel_type: Type | None, client_callable: Callable,
-                                   update_type: UpdateType | None = None, **kwargs) -> str:
-    if update_type is None:
-        update_type = UpdateType.JOURNAL_TYPE
-
-    fld_sep: str = get_field_seperator_pattern()
-    val_sep: str = get_key_val_seperator_pattern()
-    pair_plan_db_pattern: str = get_pattern_for_pair_plan_db_updates()
-    log_str = (f"{pair_plan_db_pattern}"
-               f"{basemodel_type.__name__ if basemodel_type is not None else 'basemodel_type is None'}{fld_sep}{update_type.value}"
-               f"{fld_sep}{client_callable.__name__}{fld_sep}")
-    for k, v in kwargs.items():
-        log_str += f"{k}{val_sep}{v}"
-        if k != list(kwargs)[-1]:
-            log_str += fld_sep
-
-    return log_str
-
-
-def guaranteed_call_pair_plan_client(basemodel_type: MsgspecModel | None, client_callable: Callable,
+def guaranteed_call_pair_plan_client(basemodel_type: Type[MsgspecModel] | None, client_callable: Callable,
                                       **kwargs):
     """
     Call phone_book client call but if call fails for connection error or server not ready error logs it

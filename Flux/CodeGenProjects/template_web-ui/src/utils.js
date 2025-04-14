@@ -1577,10 +1577,11 @@ export function normalise(value, max, min) {
 
 export function getHoverTextType(value) {
     let hoverType = value.trim();
-    if (HOVER_TEXT_TYPES.hasOwnProperty(hoverType)) {
-        return HOVER_TEXT_TYPES[hoverType];
-    }
-    return HOVER_TEXT_TYPES.NONE;
+    // if (HOVER_TEXT_TYPES.hasOwnProperty(hoverType)) {
+    //     return HOVER_TEXT_TYPES[hoverType];
+    // }
+    // return HOVER_TEXT_TYPES.NONE;
+    return hoverType;
 }
 
 export function getParentSchema(schema, currentSchemaName) {
@@ -3717,4 +3718,33 @@ export function updateFormValidation(formValidationRef, xpath, validation) {
             delete formValidationRef.current[xpath];
         }
     }
+}
+
+function updatePivotAttributesInSchema(schema, currentSchema) {
+    if (currentSchema.hasOwnProperty('properties')) {
+        for (const key in currentSchema.properties) {
+            const attributes = currentSchema.properties[key];
+            if (primitiveDataTypes.includes(attributes.type)) {
+                if (key === DB_ID) {
+                    attributes.server_populate = true;
+                    attributes.hide = true;
+                    attributes.orm_no_update = true;
+                } else if (key === 'pivot_name') {
+                    attributes.orm_no_update = true;
+                } else {
+                    attributes.server_populate = true;
+                }
+            } else if ([DATA_TYPES.OBJECT, DATA_TYPES.ARRAY].includes(attributes.type)) {
+                attributes.server_populate = true;
+                attributes.hide = true;
+            }
+        }
+    }
+}
+
+export function updatePivotSchema(schema) {
+    schema = cloneDeep(schema);
+    const pivotDataSchema = get(schema, [SCHEMA_DEFINITIONS_XPATH, 'pivot_data']);
+    updatePivotAttributesInSchema(schema, pivotDataSchema);
+    return schema;
 }

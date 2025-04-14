@@ -2911,29 +2911,6 @@ def renew_plan_collection():
         email_book_service_native_web_client.put_plan_collection_client(plan_collection)
 
 
-def handle_tail_executor_terminate_n_clear_cache_for_log_file(log_file_path: str):
-    if os.path.exists(log_file_path):
-        # killing the existing tail executor if running
-        log_book_web_client.log_book_force_kill_tail_executor_query_client(log_file_path)
-
-        # changing log file names and then releasing cache in log analyzer to prevent restart of tail executor on
-        # same log file
-        datetime_str: str = datetime.datetime.now().strftime("%Y%m%d.%H%M%S")
-        os.rename(log_file_path, f"{log_file_path}.{datetime_str}")
-        log_book_web_client.log_book_remove_file_from_created_cache_query_client([log_file_path])
-    # else not required: if file doesn't exist then no tail executor must be running
-
-
-def kill_tail_executor_for_plan_id(pair_plan_id: int):
-    datetime_str = datetime.datetime.now().strftime("%Y%m%d")
-    log_simulator_log_file = str(STRAT_EXECUTOR / "log" / f"log_simulator_{pair_plan_id}_logs_{datetime_str}.log")
-    street_book_log_file = str(STRAT_EXECUTOR / "log" /
-                                  f"street_book_{pair_plan_id}_logs_{datetime_str}.log")
-
-    for log_file_path in [log_simulator_log_file, street_book_log_file]:
-        handle_tail_executor_terminate_n_clear_cache_for_log_file(log_file_path)
-
-
 def clean_executors_and_today_activated_symbol_side_lock_file():
     datetime_str = datetime.datetime.now().strftime("%Y%m%d")
     intraday_bartering_chores_file = str(STRAT_EXECUTOR / "data" / f"intraday_bartering_chores_{datetime_str}.csv")
@@ -2990,7 +2967,6 @@ def clean_executors_and_today_activated_symbol_side_lock_file():
             AdminControlBaseModel.from_kwargs(command_type=CommandType.CLEAR_STRAT,
                                               datetime=DateTime.utcnow()))
         email_book_service_native_web_client.create_admin_control_client(admin_control_obj)
-        kill_tail_executor_for_plan_id(pair_plan.id)
         time.sleep(1)
         email_book_service_native_web_client.delete_pair_plan_client(pair_plan.id)
 

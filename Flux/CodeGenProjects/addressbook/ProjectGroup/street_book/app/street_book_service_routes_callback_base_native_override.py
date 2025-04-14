@@ -39,14 +39,16 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_ser
     compute_max_single_leg_notional, get_premium)
 from FluxPythonUtils.scripts.general_utility_functions import (
     avg_of_new_val_sum_to_avg, find_free_port, except_n_log_alert, handle_http_response, HTTPRequestType,
-    handle_refresh_configurable_data_members, set_package_logger_level, parse_to_int, YAMLConfigurationManager)
+    handle_refresh_configurable_data_members, set_package_logger_level, parse_to_int, YAMLConfigurationManager,
+    find_pids_by_command, terminate_process)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import (
     SecurityRecordManager)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.service_state import ServiceState
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     create_md_shell_script, MDShellEnvData, is_ongoing_plan, guaranteed_call_pair_plan_client,
-    pair_plan_client_call_log_str, UpdateType, CURRENT_PROJECT_DIR as PAIR_STRAT_ENGINE_DIR)
+    CURRENT_PROJECT_DIR as PAIR_STRAT_ENGINE_DIR)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import plan_view_client_call_log_str
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.barter_simulator import (
     BarterSimulator, BarteringLinkBase)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.log_barter_simulator import LogBarterSimulator
@@ -79,6 +81,7 @@ from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_basket_book_core_ms
 from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_post_book_core_msgspec_model import *
 from Flux.CodeGenProjects.AddressBook.ORMModel.phone_book_n_street_book_core_msgspec_model import *
 from Flux.CodeGenProjects.AddressBook.ORMModel.dept_book_n_mobile_book_n_street_book_n_basket_book_core_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import UpdateType
 
 
 class FirstLastBarterCont(MsgspecBaseModel):
@@ -246,6 +249,10 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         super().__init__()      # super init needs pair_plan_id in set_log_simulator_file_name_n_path
         self.orig_intra_day_bot: int | None = None
         self.orig_intra_day_sld: int | None = None
+
+        # starting log file listener Fluent-bit process for this executor file
+        self.fluent_bit_process_id: int | None = None
+
         # since this init is called before db_init
         self.db_name: str = f"street_book_{self.pair_plan_id}"
         os.environ["DB_NAME"] = self.db_name
@@ -293,6 +300,54 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         with plan_cache.re_ent_lock:
             plan_cache.set_pair_plan(pair_plan)
         return plan_cache
+
+    def create_n_run_fluent_bit_for_this_executor(self):
+        temp_file_path = EXECUTOR_PROJECT_DATA_DIR / "fluent_bit_temp.conf"
+
+        with open(temp_file_path, "r") as f:
+            fluent_bit_temp_data = f.read()
+
+        lvl_filter_regex = "^(DEBUG|INFO|DB|WARNING|ERROR|CRITICAL|TIMING)$" \
+            if os.environ.get("DEBUG_MODE") == "1" else "^(DB|WARNING|ERROR|CRITICAL|TIMING)$"
+        keyword_to_data_dict = {
+            "<FLUENT_BIT_LOG_FILE>": self.log_dir_path / f"fluent_bit_{self.pair_plan_id}.log",
+            "<PARSER_FILE_PATH>": EXECUTOR_PROJECT_DATA_DIR / "parsers.conf",
+            "<FLB_HTTP_PORT>": find_free_port(),
+            "<EXECUTOR_LOG_FILE_PATH>": self.log_dir_path / f"street_book_{self.pair_plan_id}_logs_*.log",
+            "<FLB_EXECUTOR_DB_NAME>": f"flb_street_book_{self.pair_plan_id}.db",
+            "<FLB_LOG_SIM_DB_NAME>": f"flb_log_simulator_{self.pair_plan_id}.db",
+            "<FILTER_LOG_LVL>": lvl_filter_regex,
+            "<LOG_SIM_FILE_PATH>": self.log_simulator_file_path
+        }
+
+        for key, value in keyword_to_data_dict.items():
+            fluent_bit_temp_data = fluent_bit_temp_data.replace(key, str(value))
+
+        fluent_bit_conf_name = f"fluent_bit_{self.pair_plan_id}.conf"
+        fluent_bit_conf_path = EXECUTOR_PROJECT_DATA_DIR / fluent_bit_conf_name
+
+        with open(fluent_bit_conf_path, "w") as f:
+            f.write(fluent_bit_temp_data)
+
+        time.sleep(1)
+        process_cmd_list: List[str] = [f"/opt/fluent-bit/bin/fluent-bit", "-c", f"{fluent_bit_conf_path}"]
+        if self.is_crash_recovery:
+            found_ids = find_pids_by_command(" ".join(process_cmd_list))
+            if found_ids:
+                if len(found_ids) > 1:
+                    for pid in found_ids:
+                        term_status = terminate_process(pid)
+                        if not term_status:
+                            logging.error(f"Couldn't terminate (or even kill) fluent-bit process with {pid=}")
+                else:   # exact 1 instance
+                    self.fluent_bit_process_id = found_ids[0]
+            # else not required: if no process found then starting fresh instance below
+
+        if not self.fluent_bit_process_id:
+            # if fresh start or while recovery killed last processes then starting fresh instance
+            fluent_bit_process = subprocess.Popen(process_cmd_list)
+            self.fluent_bit_process_id = fluent_bit_process.pid
+        # else not required: if id was found in recovery then using that
 
     @except_n_log_alert()
     def _app_launch_pre_thread_func(self):
@@ -618,6 +673,9 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         self.port = find_free_port()
         self.web_client = StreetBookServiceHttpClient.set_or_get_if_instance_exists(host, self.port)
 
+        # starts fluent-bit process to listen logs and simluate log for this executor
+        self.create_n_run_fluent_bit_for_this_executor()
+
         app_launch_pre_thread = threading.Thread(target=self._app_launch_pre_thread_func,
                                                  name="_app_launch_pre_thread_func", daemon=True)
         app_launch_pre_thread.start()
@@ -653,6 +711,11 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                 err_str_ = f"Something went wrong while deleting so shell script, exception: {e}"
                 logging.exception(err_str_)
 
+        # stopping fluent-bit process
+        terminate_status = terminate_process(self.fluent_bit_process_id)
+        if not terminate_status:
+            logging.error(f"Couldn't terminate fluent-bit process pid:{self.fluent_bit_process_id} "
+                          f"for this executor before terminating")
 
     @staticmethod
     def create_n_run_so_shell_script(pair_plan):
@@ -746,7 +809,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         # collect pair_plan_tuple before marking it done (for today) - update plan status balance notional
         pair_plan_tuple = self.plan_cache.get_pair_plan()
         await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_partial_update_plan_status_http(
-            updated_plan_status_obj.to_json_dict(excclude_none=True))
+            updated_plan_status_obj.to_json_dict(exclude_none=True))
         if balance_notional < 0 or math.isclose(balance_notional, 0):
             if pair_plan_tuple is not None:
                 pair_plan, _ = pair_plan_tuple
@@ -3576,7 +3639,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                 return None
 
     async def _update_symbol_side_snapshot_from_fill_applied_chore_snapshot(
-            self, chore_snapshot_obj: ChoreSnapshot, received_fill_after_dod: bool) -> SymbolSideSnapshot:
+            self, chore_snapshot_obj: ChoreSnapshot, received_fill_after_dod: bool) -> SymbolSideSnapshot | None:
         async with SymbolSideSnapshot.reentrant_lock:
             symbol_side_snapshot_tuple = self.plan_cache.get_symbol_side_snapshot_from_symbol(
                 chore_snapshot_obj.chore_brief.security.sec_id)
@@ -3641,14 +3704,14 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         pair_plan = self.plan_cache.get_pair_plan_obj()
         if is_ongoing_plan(pair_plan):
             guaranteed_call_pair_plan_client(
-                PairPlanBaseModel, email_book_service_http_client.patch_pair_plan_client,
+                PairPlanBaseModel, email_book_service_http_client.patch_all_pair_plan_client,
                 _id=self.pair_plan_id, plan_state=PlanState.PlanState_PAUSED.value)
         else:
             logging.error(f"Could not pause plan, plan is not in ongoing state;;;{pair_plan=}")
 
     def unpause_plan(self):
         guaranteed_call_pair_plan_client(
-            PairPlanBaseModel, email_book_service_http_client.patch_pair_plan_client,
+            PairPlanBaseModel, email_book_service_http_client.patch_all_pair_plan_client,
             _id=self.pair_plan_id, plan_state=PlanState.PlanState_ACTIVE.value)
 
     async def handle_post_chore_snapshot_tasks_for_fills(
@@ -3967,7 +4030,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         self.bartering_data_manager.handle_plan_status_get_all_ws(updated_plan_status_obj)
 
         # updating balance_notional field in current pair_plan's PlanView using log analyzer
-        log_str = pair_plan_client_call_log_str(PlanViewBaseModel,
+        log_str = plan_view_client_call_log_str(PlanViewBaseModel,
                                                  photo_book_service_http_client.patch_all_plan_view_client,
                                                  UpdateType.SNAPSHOT_TYPE, _id=updated_plan_status_obj.id,
                                                  balance_notional=updated_plan_status_obj.balance_notional,
@@ -3984,7 +4047,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         self.bartering_data_manager.handle_plan_status_get_all_ws(updated_plan_status_obj)
 
         # updating balance_notional field in current pair_plan's PlanView using log analyzer
-        log_str = pair_plan_client_call_log_str(PlanViewBaseModel,
+        log_str = plan_view_client_call_log_str(PlanViewBaseModel,
                                                  photo_book_service_http_client.patch_all_plan_view_client,
                                                  UpdateType.SNAPSHOT_TYPE, _id=updated_plan_status_obj.id,
                                                  balance_notional=updated_plan_status_obj.balance_notional,
@@ -4029,7 +4092,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         self.bartering_data_manager.handle_plan_status_get_all_ws(plan_status_obj)
 
         # updating balance_notional field in current pair_plan's PlanView using log analyzer
-        log_str = pair_plan_client_call_log_str(PlanViewBaseModel,
+        log_str = plan_view_client_call_log_str(PlanViewBaseModel,
                                                  photo_book_service_http_client.patch_all_plan_view_client,
                                                  UpdateType.SNAPSHOT_TYPE, _id=plan_status_obj.id,
                                                  balance_notional=plan_status_obj.balance_notional,
@@ -4045,7 +4108,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         self.bartering_data_manager.handle_plan_limits_get_all_ws(plan_limits_obj)
 
         # updating max_single_leg_notional field in current pair_plan's PlanView using log analyzer
-        log_str = pair_plan_client_call_log_str(PlanViewBaseModel,
+        log_str = plan_view_client_call_log_str(PlanViewBaseModel,
                                                  photo_book_service_http_client.patch_all_plan_view_client,
                                                  UpdateType.SNAPSHOT_TYPE, _id=plan_limits_obj.id,
                                                  max_single_leg_notional=
@@ -4191,7 +4254,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         self.bartering_data_manager.handle_plan_limits_get_all_ws(updated_plan_limits_obj)
 
         # updating max_single_leg_notional field in current pair_plan's PlanView using log analyzer
-        log_str = pair_plan_client_call_log_str(PlanViewBaseModel,
+        log_str = plan_view_client_call_log_str(PlanViewBaseModel,
                                                  photo_book_service_http_client.patch_all_plan_view_client,
                                                  UpdateType.SNAPSHOT_TYPE, _id=updated_plan_limits_obj.id,
                                                  max_single_leg_notional=

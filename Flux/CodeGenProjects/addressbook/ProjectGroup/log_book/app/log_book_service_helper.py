@@ -1,4 +1,6 @@
 # project imports
+from typing import Type, Callable
+
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.ORMModel.photo_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.ORMModel.log_book_service_model_imports import *
@@ -140,10 +142,17 @@ def get_pattern_to_remove_file_from_created_cache():
     return pattern
 
 
+def get_pattern_for_plan_view_db_updates():
+    pattern = config_yaml_dict.get("pattern_for_plan_view_db_updates")
+    if pattern is None:
+        pattern = "^^^"
+    return pattern
+
+
 def get_pattern_for_pair_plan_db_updates():
     pattern = config_yaml_dict.get("pattern_for_pair_plan_db_updates")
     if pattern is None:
-        pattern = "^^^"
+        pattern = "^*^"
     return pattern
 
 
@@ -801,7 +810,7 @@ def get_alert_meta_obj(component_path: str | None = None,
                        alert_meta_type: Type[AlertMeta] | Type[AlertMetaBaseModel] | None = None
                        ) -> AlertMetaBaseModel | AlertMeta | None:
     if alert_meta_type is None:
-        alert_meta_type = AlertMetaBaseModel
+        alert_meta_type = AlertMeta
 
     alert_meta = alert_meta_type()
     alert_meta_has_update = False
@@ -841,3 +850,35 @@ def get_key_meta_data_from_obj(alert_obj: PlanAlert | ContactAlert | PlanAlertBa
         source_file_name = alert_obj.alert_meta.source_file_name
         line_num = alert_obj.alert_meta.line_num
     return component_file_path, source_file_name, line_num
+
+
+def client_call_log_str(basemodel_type: Type | None, client_callable: Callable, db_pattern: str,
+                        update_type: UpdateType | None = None, **kwargs):
+    if update_type is None:
+        update_type = UpdateType.JOURNAL_TYPE
+
+    fld_sep: str = get_field_seperator_pattern()
+    val_sep: str = get_key_val_seperator_pattern()
+    log_str = (f"{db_pattern}"
+               f"{basemodel_type.__name__ if basemodel_type is not None else 'basemodel_type is None'}{fld_sep}{update_type.value}"
+               f"{fld_sep}{client_callable.__name__}{fld_sep}")
+    for k, v in kwargs.items():
+        log_str += f"{k}{val_sep}{v}"
+        if k != list(kwargs)[-1]:
+            log_str += fld_sep
+
+    return log_str
+
+
+def plan_view_client_call_log_str(basemodel_type: Type | None, client_callable: Callable,
+                                   update_type: UpdateType | None = None, **kwargs) -> str:
+    plan_view_db_pattern: str = get_pattern_for_plan_view_db_updates()
+    log_str = client_call_log_str(basemodel_type, client_callable, plan_view_db_pattern, update_type, **kwargs)
+    return log_str
+
+
+def pair_plan_client_call_log_str(basemodel_type: Type | None, client_callable: Callable,
+                                   update_type: UpdateType | None = None, **kwargs) -> str:
+    pair_plan_db_pattern: str = get_pattern_for_pair_plan_db_updates()
+    log_str = client_call_log_str(basemodel_type, client_callable, pair_plan_db_pattern, update_type, **kwargs)
+    return log_str

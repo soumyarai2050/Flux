@@ -103,6 +103,7 @@ message WidgetUIDataElement {
   optional int32 default_rows_per_page = 24;  // supported values = 25, 50
   optional int32 server_running_status_lvl = 25;
   optional bool ws_connection_by_get_all = 26;  // for abbreviation widget
+  repeated PivotData pivot_data = 27;
 }
 
 message WidgetUIOption {
@@ -139,6 +140,9 @@ message WidgetUIData{
   repeated string pinned = 16;
   optional string selected_chart_name = 17;
   repeated string chart_enable_override = 18;
+  optional string selected_pivot_name = 19;
+  repeated string pivot_enable_override = 20;
+//  optional int32 selected_source_id = 21;
 }
 
 message UIButton{
@@ -188,4 +192,15 @@ message ChartData {
 message UIFilter {
   required string fld_name = 1;
   required string fld_value = 2;
+}
+
+message PivotData {
+  optional string id = 1;
+  optional string pivot_name = 2;
+  repeated string rows = 3;
+  repeated string cols = 4;
+  repeated string vals = 5;
+  optional string aggregator_name = 7;
+  optional string renderer_name = 8;
+  optional string value_filter = 9;
 }

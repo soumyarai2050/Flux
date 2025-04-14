@@ -1,0 +1,15 @@
+.container {
+    display: flex;
+    height: 100%;
+}
+
+.list_container {
+    display: flex;
+    flex-direction: column;
+    min-width: 150px;
+    overflow: auto;
+}
+
+.pivot_container {
+    flex: 1;
+}

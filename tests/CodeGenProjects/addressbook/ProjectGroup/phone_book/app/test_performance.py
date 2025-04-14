@@ -247,7 +247,6 @@ def test_stress_with_parallel_md_updates(
         expected_contact_limits_.max_gross_n_open_notional = 20_000_000
         email_book_service_native_web_client.put_contact_limits_client(expected_contact_limits_)
 
-
         max_loop_count_per_side = 50
         leg1_leg2_symbol_list = []
         total_plans = 40

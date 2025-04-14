@@ -1,6 +1,10 @@
 # standard imports
 import os.path
 import threading
+import re
+from typing import Set
+
+from pyarrow import supported_memory_backends
 
 # project imports
 
@@ -15,6 +19,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service
     log_book_service_http_client)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.app.post_book_service_helper import (
     post_book_service_http_client)
+from FluxPythonUtils.scripts.general_utility_functions import parse_to_int, get_symbol_side_pattern
 
 update_plan_status_lock: threading.Lock = threading.Lock()
 
@@ -205,3 +210,31 @@ def get_default_max_net_filled_notional() -> int:
 def get_simulator_config_file_path(plan_id: int) -> str:
     config_file_path = PurePath(__file__).parent.parent / "data" / f"executor_{plan_id}_simulate_config.yaml"
     return str(config_file_path)
+
+def get_plan_id_from_executor_log_file_name(file_name: str):
+    number_pattern = re.compile(r'street_book_(\d+)_logs_\d{8}\.log')
+    match = number_pattern.search(file_name)
+    plan_id: int | None = None
+    if match:
+        extracted_number = match.group(1)
+        plan_id = parse_to_int(extracted_number)
+    return plan_id
+
+def get_symbol_n_side_from_log_line(message: str) -> Set:
+    symbol_side_pattern = get_symbol_side_pattern()
+    symbol_side_match = re.compile(fr"{symbol_side_pattern}.*{symbol_side_pattern}").search(message)
+    symbol_side_match_text = symbol_side_match[0]
+
+    log_message: str = message.replace(symbol_side_pattern, "")
+
+    args: str = symbol_side_match_text.replace(symbol_side_pattern, "").strip()
+    symbol_side_set: Set = set()
+
+    # kwargs separated by "," if any
+    for arg in args.split(","):
+        key, value = [x.strip() for x in arg.split("=")]
+        symbol_side_set.add(value)
+
+    if len(symbol_side_set) == 0:
+        raise Exception("no symbol-side pair found while creating plan alert")
+    return symbol_side_set

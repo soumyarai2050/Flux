@@ -695,7 +695,6 @@ class FastapiOpenapiSchema(BaseFastapiPlugin, ABC):
             output_str += '                "requestBody": {\n'
             output_str += '                    "content": {\n'
             output_str += '                        "application/json": {\n'
-            output_str += '                            "schema": {"type": "object"}\n'
             output_str += '                            "schema": {"type": "array"}\n'
             output_str += '                        }\n'
             output_str += '                    },\n'

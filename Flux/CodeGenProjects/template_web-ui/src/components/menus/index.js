@@ -27,4 +27,5 @@ export { default as MaximizeRestoreToggleMenu } from './MaximizeRestoreToggleMen
 export { default as VisibilityMenu } from './VisibilityMenu';
 export { default as ReloadMenu } from './ReloadMenu';
 export { default as ChartSettingsMenu } from './ChartSettingsMenu';
+export { default as PivotSettingsMenu } from './PivotSettingsMenu';
 export { default as DynamicMenu } from './DynamicMenu';

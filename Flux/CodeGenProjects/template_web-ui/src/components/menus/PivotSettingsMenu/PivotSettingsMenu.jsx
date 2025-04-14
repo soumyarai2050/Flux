@@ -9,34 +9,34 @@ import ValueBasedToggleButton from '../../ValueBasedToggleButton';
 import { LAYOUT_TYPES } from '../../../constants';
 
 /**
- * ChartSettingsMenu provides a popover menu for toggling chart visibility,
+ * PivotSettingsMenu provides a popover menu for toggling pivot visibility,
  * ordering, and additional "more/less" options.
  *
  * @component
  * @param {Object} props - Component props.
- * @param {Array} props.charts - Array of chart objects. Each should include:
- *   - chart_name: string (unique identifier)
- * @param {boolean} props.showAll - Flag indicating if all charts are shown.
+ * @param {Array} props.pivots - Array of pivot objects. Each should include:
+ *   - pivot_name: string (unique identifier)
+ * @param {boolean} props.showAll - Flag indicating if all pivots are shown.
  * @param {function} props.onShowAllToggle - Callback when the showAll toggle is clicked.
- * @param {function} props.onChartToggle - Callback when an individual chart's visibility is toggled.
+ * @param {function} props.onPivotToggle - Callback when an individual pivot's visibility is toggled.
  *
  * @returns {JSX.Element} The rendered component.
  */
-const ChartSettingsMenu = ({
-  charts,
+const PivotSettingsMenu = ({
+  pivots,
   showAll,
   onShowAllToggle,
-  onChartToggle,
+  onPivotToggle,
   menuType,
   isPinned,
   onMenuClose,
   onPinToggle,
   layout,
-  chartEnableOverride
+  pivotEnableOverride
 }) => {
   const [anchorEl, setAnchorEl] = useState(null);
 
-  const menuName = 'chart-settings';
+  const menuName = 'pivot-settings';
   const isPopoverOpen = Boolean(anchorEl);
   const popoverId = isPopoverOpen ? `${menuName}-popover` : undefined;
 
@@ -54,25 +54,25 @@ const ChartSettingsMenu = ({
     onPinToggle(menuName, !isPinned);
   }
 
-  const handleChartToggle = (e, xpath, key, value, ...rest) => {
+  const handlePivotToggle = (e, xpath, key, value, ...rest) => {
     const isHidden = value;
-    const updatedChartEnableOverride = cloneDeep(chartEnableOverride);
+    const updatedPivotEnableOverride = cloneDeep(pivotEnableOverride);
     if (isHidden) {
-      if (!updatedChartEnableOverride.includes(key)) {
-        updatedChartEnableOverride.push(key);
+      if (!updatedPivotEnableOverride.includes(key)) {
+        updatedPivotEnableOverride.push(key);
       }
     } else {
-      const idx = updatedChartEnableOverride.indexOf(key);
+      const idx = updatedPivotEnableOverride.indexOf(key);
       if (idx !== -1) {
-        updatedChartEnableOverride.splice(idx, 1);
+        updatedPivotEnableOverride.splice(idx, 1);
       }
     }
-    if (onChartToggle) {
-      onChartToggle(updatedChartEnableOverride);
+    if (onPivotToggle) {
+      onPivotToggle(updatedPivotEnableOverride);
     }
   }
 
-  if (layout !== LAYOUT_TYPES.CHART) return null;
+  if (layout !== LAYOUT_TYPES.PIVOT_TABLE) return null;
 
   const renderMenu = () => {
     switch (menuType) {
@@ -129,29 +129,29 @@ const ChartSettingsMenu = ({
             }
           />
         </MenuItem>
-        {charts.map(({ chart_name }) => {
+        {pivots.map(({ pivot_name }) => {
           // Determine the toggle states and captions.
-          const show = !chartEnableOverride.includes(chart_name);
+          const show = !pivotEnableOverride.includes(pivot_name);
           const showCaption = !show ? 'Show' : 'Hide';
           const showColor = show ? 'success' : 'debug';
 
           return (
-            <MenuItem key={chart_name} dense>
+            <MenuItem key={pivot_name} dense>
               <FormControlLabel
                 sx={{ display: 'flex', flex: 1 }}
                 size='small'
-                label={chart_name}
+                label={pivot_name}
                 control={
                   <ValueBasedToggleButton
-                    name={chart_name}
+                    name={pivot_name}
                     size='small'
                     selected={show}
                     disabled={false}
                     value={show}
                     caption={showCaption}
-                    xpath={chart_name}
+                    xpath={pivot_name}
                     color={showColor}
-                    onClick={handleChartToggle}
+                    onClick={handlePivotToggle}
                   />
                 }
               />
@@ -163,21 +163,21 @@ const ChartSettingsMenu = ({
   );
 };
 
-ChartSettingsMenu.propTypes = {
-  /** Array of chart objects. Each chart should include:
-   * - chart_name: string (unique identifier)
+PivotSettingsMenu.propTypes = {
+  /** Array of pivot objects. Each pivot should include:
+   * - pivot_name: string (unique identifier)
    */
-  charts: PropTypes.arrayOf(
+  pivots: PropTypes.arrayOf(
     PropTypes.shape({
-      chart_name: PropTypes.string.isRequired,
+      pivot_name: PropTypes.string.isRequired,
     })
   ).isRequired,
-  /** Flag indicating if all charts are shown */
+  /** Flag indicating if all pivots are shown */
   showAll: PropTypes.bool.isRequired,
   /** Callback to toggle the showAll state */
   onShowAllToggle: PropTypes.func.isRequired,
-  /** Callback to toggle an individual chart's visibility */
-  onChartToggle: PropTypes.func,
+  /** Callback to toggle an individual pivot's visibility */
+  onPivotToggle: PropTypes.func,
 };
 
-export default ChartSettingsMenu;
+export default PivotSettingsMenu;

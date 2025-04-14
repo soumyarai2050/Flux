@@ -25,20 +25,15 @@ cache_override_type: "bare"
 # to be used in pair_plan_log_book to take out counts of created from waiting queue to execute create in db
 contact_alert_configs:
   transaction_counts_per_call_for_server: 200
-  transaction_counts_per_call_for_tail_ex: 100
   transaction_timeout_secs: 2  # secs
 plan_alert_config:
   transaction_counts_per_call_for_server: 200
-  transaction_counts_per_call_for_tail_ex: 100
   transaction_timeout_secs: 2  # secs
-raw_perf_data_config:
-  transaction_counts_per_call_for_server: 500
-  transaction_counts_per_call_for_tail_ex: 200
-  transaction_timeout_secs: 60  # secs
-max_fetch_from_patch_queue_for_tail_ex: 50
+max_fetch_from_patch_queue_for_db_updates: 20
 max_fetch_from_patch_queue_for_server: 500
 # to be used in loop wait in script to update performance analysis data
 raw_performance_data_processor_loop_wait: 2  # sec
+no_activity_timeout_secs: 60  # sec
 
 perf_bench_client_connection_fail_retry_secs: 300  # 5 minutes
 regex_list_refresh_time_wait: 30
@@ -51,7 +46,8 @@ simulate_log_book: True
 field_seperator: "~~"
 key_val_seperator: "^^"
 pattern_for_log_simulator: "$$$"
-pattern_for_pair_plan_db_updates: "^^^"
+pattern_for_pair_plan_db_updates: "^*^"
+pattern_for_plan_view_db_updates: "^^^"
 pattern_to_restart_tail_process: "---"
 pattern_to_force_kill_tail_process: "-@-"
 pattern_to_remove_file_from_created_cache: "-*-"

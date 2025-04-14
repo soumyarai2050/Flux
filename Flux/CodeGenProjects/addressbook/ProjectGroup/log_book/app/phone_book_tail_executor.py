@@ -10,7 +10,7 @@ import sys
 import inspect
 
 # Project imports
-from FluxPythonUtils.log_book.tail_executor import get_transaction_counts_n_timeout_from_config
+from scripts.general_utility_functions import get_transaction_counts_n_timeout_from_config
 from FluxPythonUtils.scripts.general_utility_functions import configure_logger
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.phone_book_base_tail_executor import (
     PhoneBookBaseTailExecutor, PlanLogDetail)
@@ -44,7 +44,7 @@ class PhoneBookTailExecutor(PhoneBookBaseTailExecutor):
 
         super().__init__(log_detail, regex_file_dir_path,
                          log_prefix_regex_pattern_to_callable_name_dict, simulation_mode)
-        self.pattern_for_pair_plan_db_updates: str = get_pattern_for_pair_plan_db_updates()
+        self.pattern_for_pair_plan_db_updates: str = get_pattern_for_plan_view_db_updates()
         self.symbol_side_pattern: str = get_symbol_side_pattern()
         self.reset_log_book_cache_pattern: str = get_reset_log_book_cache_wrapper_pattern()
         PhoneBookTailExecutor.initialize_underlying_http_callables()

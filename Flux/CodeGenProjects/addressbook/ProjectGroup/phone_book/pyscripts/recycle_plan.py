@@ -7,8 +7,9 @@ from FluxPythonUtils.scripts.general_utility_functions import configure_logger
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.pyscripts.utility_functions import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_helper import (
     photo_book_service_http_client)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
-    pair_plan_client_call_log_str, UpdateType)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import (
+    UpdateType)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import plan_view_client_call_log_str
 
 
 def main():
@@ -36,7 +37,7 @@ def main():
         logging.error(err_str_)
     finally:
         # updating recycle_plan field back to default state in current PlanView using log analyzer
-        log_str = pair_plan_client_call_log_str(PlanViewBaseModel,
+        log_str = plan_view_client_call_log_str(PlanViewBaseModel,
                                                  photo_book_service_http_client.patch_all_plan_view_client,
                                                  UpdateType.SNAPSHOT_TYPE, _id=plan_id,
                                                  recycle_plan=False)

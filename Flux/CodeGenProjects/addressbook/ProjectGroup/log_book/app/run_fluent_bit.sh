@@ -16,4 +16,4 @@ fi
 
 echo "FLUX_CODEGEN_BASE_DIR=$FLUX_CODEGEN_BASE_DIR"
 echo "FILTER_LOG_LVL=$FILTER_LOG_LVL"
-sudo -E /opt/fluent-bit/bin/fluent-bit -c ./../data/fluent-bit.conf
+/opt/fluent-bit/bin/fluent-bit -c ./../data/fluent-bit.conf

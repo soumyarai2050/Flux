@@ -60,18 +60,6 @@ message PlanView{
   }];
 }
 
-message ProcessPairPlanAPIOps{
-    option (FluxMsgJsonQuery) = {
-      QueryName: "process_plan_view_updates"
-      QueryParams: {
-        QueryParamName: "kwargs",
-        QueryParamDataType: "List[Dict]"
-      }
-      QueryRouteType: PATCH
-  };
-  optional bool temp = 1;
-}
-
 message ResetAllPlanViewCountNSeverity{
       option (FluxMsgJsonQuery) = {
       QueryName: "reset_all_plan_view_count_n_severity"
