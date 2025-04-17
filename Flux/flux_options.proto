@@ -190,6 +190,7 @@ extend google.protobuf.MessageOptions
   optional string FluxMsgPrefixPrepend = 51153;//Inline expansion will cause prefix prepend(tion)
   optional int64 FluxMsgStringLength = 51154;
   optional bool FluxMsgIsCppWebServerModel = 51155;
+  optional bool FluxMsgIsShmModel = 51156;
 
   //DB Options - 52
   optional string FluxMsgTbl = 52151;

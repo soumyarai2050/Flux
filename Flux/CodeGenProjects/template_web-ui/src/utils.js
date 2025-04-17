@@ -2245,9 +2245,9 @@ export function removeRedundantFieldsFromRows(rows) {
             if (key.includes('xpath')) {
                 delete row[key];
             }
-            if (key === 'data-id') {
-                delete row[key];
-            }
+            // if (key === 'data-id') {
+            //     delete row[key];
+            // }
         })
         return row;
     })

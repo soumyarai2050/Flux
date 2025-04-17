@@ -1866,8 +1866,9 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
         for log_data in payload:
             message = log_data.get("message")
             source_file = log_data.get("source_file")
+            file_name_regex = log_data.get("file_name_regex")
 
-            plan_id = get_plan_id_from_executor_log_file_name(source_file)
+            plan_id = get_plan_id_from_executor_log_file_name(file_name_regex, source_file)
 
             if plan_id is None:
                 err_str_ = (f"Can't find plan id in {source_file=} from payload passed to "
@@ -1943,9 +1944,9 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
 
             plan_id_n_msg_tuple_list: List[Tuple[int, str]] = []
             for data in data_list:
-                message, source_file = data
+                message, source_file, file_name_regex = data
 
-                plan_id = get_plan_id_from_executor_log_file_name(source_file)
+                plan_id = get_plan_id_from_executor_log_file_name(file_name_regex, source_file)
 
                 if plan_id is None:
                     err_str_ = (f"Can't find plan id in {source_file=} from payload passed to "
@@ -1976,7 +1977,8 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
         for log_data in payload:
             message = log_data.get("message")
             source_file = log_data.get("source_file")
-            message_n_source_file_tuple_list.append((message, source_file))
+            file_name_regex = log_data.get("file_name_regex")
+            message_n_source_file_tuple_list.append((message, source_file, file_name_regex))
         self.pos_disable_from_plan_id_log_queue.put(message_n_source_file_tuple_list)
         return []
 

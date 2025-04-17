@@ -1704,12 +1704,6 @@ def test_plan_gets_deleted_even_when_symbol_overview_is_not_found(
     assert delete_res == expected_delete_res, \
         f"Mismatch: expected delete response: {expected_delete_res}, got {delete_res}"
 
-    # cleanup before leaving this test - since plan is deleted any test after this will not be able to know that
-    # its tail executor also needs to be handled to handling it now
-    # force killing all tails
-    time.sleep(2)
-    kill_tail_executor_for_plan_id(created_pair_plan.id)
-
 
 @pytest.mark.nightly1
 def test_buy_sell_chore_multi_pair_serialized(static_data_, clean_and_set_limits, pair_securities_with_sides_,
@@ -6688,20 +6682,21 @@ def test_alert_agg_sequence_in_contact_alerts(clean_and_set_limits, sample_alert
 
     sev = [Severity.Severity_CRITICAL, Severity.Severity_ERROR, Severity.Severity_WARNING,
            Severity.Severity_INFO, Severity.Severity_DEBUG]
+    level = ["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"]
     counter = 0
     for i in range(5):
         alert = ContactAlertBaseModel()
         alert.last_update_analyzer_time = DateTime.utcnow()
         alert.alert_brief = f"Sample Alert: {i + 1}"
         alert.severity = sev[counter]
+        payload = [{"message": f"{alert.alert_brief};;;Sample detail", "level": level[counter],
+                    "source_file": str(PAIR_STRAT_ENGINE_DIR / "log" / "phone_book.log")}]
         counter += 1
         if counter > 4:
             counter = 0
 
         contact_alerts.append(alert)
-        log_book_web_client.handle_contact_alerts_from_tail_executor_query_client(
-            [{"severity": alert.severity, "alert_brief": alert.alert_brief,
-                          "alert_meta": AlertMetaBaseModel(first_detail="Sample detail").to_dict(exclude_none=True)}])
+        log_book_web_client.handle_contact_alerts_query_client(payload)
 
     # sorting alert list for this test comparison
     contact_alerts.sort(key=lambda x: x.last_update_analyzer_time, reverse=False)
@@ -6741,21 +6736,24 @@ def test_alert_agg_sequence_in_plan_alert(static_data_, clean_and_set_limits, le
 
     sev = [Severity.Severity_CRITICAL, Severity.Severity_ERROR, Severity.Severity_WARNING,
            Severity.Severity_INFO, Severity.Severity_DEBUG]
+    level = ["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"]
     counter = 0
+    frmt_date = datetime.datetime.now().strftime("%Y%m%d")
+
     for i in range(5):
         alert = PlanAlertBaseModel()
         alert.last_update_analyzer_time = DateTime.utcnow()
         alert.alert_brief = f"Sample Alert: {i + 1}"
         alert.severity = sev[counter]
+        payload = [{"message": f"{alert.alert_brief};;;Sample detail", "level": level[counter],
+                    "source_file": str(STRAT_EXECUTOR / "log" / f"street_book_{active_pair_plan.id}_logs_{frmt_date}.log"), 
+                    "file_name_regex": "street_book_(\d+)_logs_\d{8}\.log"}]
         counter += 1
         if counter > 4:
             counter = 0
 
         new_plan_alerts.append(alert)
-        log_book_web_client.handle_plan_alerts_from_tail_executor_query_client(
-            [{"plan_id": active_pair_plan.id, "severity": alert.severity, "alert_brief": alert.alert_brief,
-                          "alert_meta": AlertMetaBaseModel(first_detail="Sample detail").to_dict(exclude_none=True)}])
-
+        log_book_web_client.handle_plan_alerts_with_plan_id_query_client(payload)
     time.sleep(5)
 
     agg_sorted_alerts: List[PlanAlertBaseModel] = log_book_web_client.filtered_plan_alert_by_plan_id_query_client(active_pair_plan.id)
@@ -7423,12 +7421,6 @@ def test_unload_multiple_plans_from_plan_view_unload_ui_button(
             f"Mismatch: plan_state must be {PlanState.PlanState_SNOOZED}, found {pair_plan.plan_state=}"
         assert pair_plan.port is None, \
             f"Mismatch: pair_plan.port must be None, found {pair_plan.port=}"
-
-    # cleanup before leaving this test - since plans are unloaded any test after this will not be able to know that
-    # its tail executors also needs to be handled to handling them now
-    # force killing all tails
-    for pair_plan in pair_plans:
-        kill_tail_executor_for_plan_id(pair_plan.id)
     
 
 @pytest.mark.nightly

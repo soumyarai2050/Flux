@@ -5,7 +5,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.ORMModel
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.ORMModel.log_book_service_model_imports import *
 from FluxPythonUtils.scripts.general_utility_functions import (
-    YAMLConfigurationManager, parse_to_int)
+    YAMLConfigurationManager, parse_to_int, is_first_param_list_type)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.FastApi.log_book_service_http_client import (
     LogBookServiceHttpClient)
 
@@ -393,6 +393,8 @@ def handle_dynamic_queue_for_patch_n_patch_all(basemodel_type: str, method_name:
     try:
         basemodel_class_type: Type[MsgspecBaseModel] = eval(basemodel_type)
 
+        is_param_list_type = is_first_param_list_type(update_handler_callable)
+
         pending_updates = []
         while 1:
             try:
@@ -414,9 +416,16 @@ def handle_dynamic_queue_for_patch_n_patch_all(basemodel_type: str, method_name:
 
                 while 1:
                     try:
-                        update_handler_callable(pending_updates)
-                        logging.info(f"called {update_handler_callable.__name__} with {pending_updates=} in "
-                                     f"handle_dynamic_queue_for_patch_n_patch_all")
+                        if is_param_list_type:
+                            update_handler_callable(pending_updates)
+                            logging.info(f"called {update_handler_callable.__name__} with {pending_updates=} in "
+                                         f"handle_dynamic_queue_for_patch_n_patch_all")
+                        else:
+                            for pending_update in pending_updates:
+                                update_handler_callable(pending_update)
+                                logging.info(f"called {update_handler_callable.__name__} with {pending_update=} in "
+                                             f"handle_dynamic_queue_for_patch_n_patch_all")
+                                pending_updates.remove(pending_update)     # cleaning all updates that went fine
                         # only gets cleared if client call was successful else keeps data for further updates
                         pending_updates = []
                         break

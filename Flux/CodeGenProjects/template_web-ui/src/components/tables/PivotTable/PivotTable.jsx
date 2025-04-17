@@ -15,6 +15,7 @@ import DataTree from '../../trees/DataTree/DataTree';
 import { ModelCard, ModelCardContent, ModelCardHeader } from '../../cards';
 import FullScreenModal from '../../Modal';
 import { cloneDeep } from 'lodash';
+import BasicTable from '../BasicTable';
 
 const PlotlyRenderers = createPlotlyRenderer(Plot);
 
@@ -28,7 +29,9 @@ function PivotTable({
     mode,
     onModeToggle,
     onPivotSelect,
-    pivotEnableOverride
+    pivotEnableOverride,
+    fieldsMetadata,
+    onRowSelect
 }) {
     const { schema: projectSchema } = useSelector(state => state.schema);
 
@@ -37,6 +40,7 @@ function PivotTable({
     const [storedPivotObj, setStoredPivotObj] = useState({});
     const [updatedPivotObj, setUpdatedPivotObj] = useState({});
     const [isPivotOptionOpen, setIsPivotOptionOpen] = useState(false);
+    const [groupedRows, setGroupedRows] = useState([]);
 
     useEffect(() => {
         const updatedIndex = selectedPivotName ? pivotData.findIndex((o) => o.pivot_name === selectedPivotName) : null;
@@ -144,6 +148,15 @@ function PivotTable({
         }
     }
 
+    const clickCallback = function (e, value, filters, pivotData) {
+        const matchingRows = [];
+
+        pivotData.forEachMatchingRecord(filters, (record) => {
+            matchingRows.push(record);
+        });
+        setGroupedRows(matchingRows);
+    };
+
     return (
         <Box className={styles.container}>
             <Box className={styles.list_container}>
@@ -175,16 +188,28 @@ function PivotTable({
             <Divider orientation='vertical' flexItem />
             <Box className={styles.pivot_container}>
                 {updatedPivotObj && Object.keys(updatedPivotObj).length > 0 && (
-                    <PivotTableUI
-                        {...updatedPivotObj}
-                        data={data}
-                        aggregatorName={updatedPivotObj.aggregator_name}
-                        rendererName={updatedPivotObj.renderer_name}
-                        valueFilter={updatedPivotObj.value_filter ? JSON.parse(updatedPivotObj.value_filter) : {}}
-                        onChange={handlePivotTableChange}
-                        renderers={Object.assign({}, TableRenderers, PlotlyRenderers)}
-                        unusedOrientationCutoff={Infinity}
-                    />
+                    <>
+                        <PivotTableUI
+                            {...updatedPivotObj}
+                            data={data}
+                            aggregatorName={updatedPivotObj.aggregator_name}
+                            rendererName={updatedPivotObj.renderer_name}
+                            valueFilter={updatedPivotObj.value_filter ? JSON.parse(updatedPivotObj.value_filter) : {}}
+                            onChange={handlePivotTableChange}
+                            renderers={Object.assign({}, TableRenderers, PlotlyRenderers)}
+                            unusedOrientationCutoff={Infinity}
+                            tableOptions={{
+                                clickCallback: clickCallback
+                            }}
+                        />
+                        {groupedRows.length > 0 && (
+                            <BasicTable
+                                rows={groupedRows}
+                                columns={fieldsMetadata}
+                                onSelect={onRowSelect}
+                            />
+                        )}
+                    </>
                 )}
             </Box>
             <FullScreenModal

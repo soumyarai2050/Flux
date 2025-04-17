@@ -10,7 +10,7 @@ import sys
 import inspect
 
 # Project imports
-from scripts.general_utility_functions import get_transaction_counts_n_timeout_from_config
+from FluxPythonUtils.scripts.general_utility_functions import get_transaction_counts_n_timeout_from_config
 from FluxPythonUtils.scripts.general_utility_functions import configure_logger
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.phone_book_base_tail_executor import (
     PhoneBookBaseTailExecutor, PlanLogDetail)

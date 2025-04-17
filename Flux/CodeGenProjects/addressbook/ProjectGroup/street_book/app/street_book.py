@@ -780,7 +780,7 @@ class StreetBook(BaseBook):
              f"{get_pair_plan_log_key(pair_plan)};;; {pair_plan=}")
         logging.info(alert_str)
         guaranteed_call_pair_plan_client(
-            PairPlanBaseModel, email_book_service_http_client.patch_all_pair_plan_client,
+            PairPlanBaseModel, email_book_service_http_client.patch_pair_plan_client,
             _id=pair_plan.id, plan_state=PlanState.PlanState_ERROR.value)
 
     def _mark_plan_state_as_pause(self, pair_plan: PairPlanBaseModel):
@@ -789,7 +789,7 @@ class StreetBook(BaseBook):
              f"{get_pair_plan_log_key(pair_plan)};;; {pair_plan=}")
         logging.info(alert_str)
         guaranteed_call_pair_plan_client(
-            PairPlanBaseModel, email_book_service_http_client.patch_all_pair_plan_client,
+            PairPlanBaseModel, email_book_service_http_client.patch_pair_plan_client,
             _id=pair_plan.id, plan_state=PlanState.PlanState_PAUSED.value)
 
     def _set_plan_pause_when_contact_limit_check_fails(self):
@@ -799,7 +799,7 @@ class StreetBook(BaseBook):
             logging.critical("Putting Activated Plan to PAUSE, found contact_limits breached already, "
                              f"pair_plan_key: {get_pair_plan_log_key(pair_plan)};;; {pair_plan=}")
             guaranteed_call_pair_plan_client(
-                PairPlanBaseModel, email_book_service_http_client.patch_all_pair_plan_client,
+                PairPlanBaseModel, email_book_service_http_client.patch_pair_plan_client,
                 _id=pair_plan.id, plan_state=PlanState.PlanState_PAUSED.value)
         else:
             logging.error(f"Can't find pair_plan in plan_cache, found contact_limits "

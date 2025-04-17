@@ -338,7 +338,7 @@ class BasketBook(BaseBook):
                 system_symbol, system_symbol))
         eligible_brokers: List[BrokerBaseModel] = []
         if dismiss_filter_contact_limit_broker_obj_list:
-            eligible_brokers = dismiss_filter_contact_limit_broker_obj_list[0].brokers
+            eligible_brokers = dismiss_filter_contact_limit_broker_obj_list[0].broker
 
         sod_n_intraday_pos_dict: Dict[str, Dict[str, List[Position]]] | None = None
         if hasattr(self.bartering_link, "load_positions_by_symbols_dict"):

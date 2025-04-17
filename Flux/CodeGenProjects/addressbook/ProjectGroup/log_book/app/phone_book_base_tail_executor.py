@@ -12,7 +12,7 @@ import pendulum
 # Project imports
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.markets.market import Market, MarketID
 from FluxPythonUtils.log_book.tail_executor import LogDetail
-from scripts.general_utility_functions import get_transaction_counts_n_timeout_from_config
+from FluxPythonUtils.scripts.general_utility_functions import get_transaction_counts_n_timeout_from_config
 from FluxPythonUtils.scripts.general_utility_functions import get_last_log_line_date_time, parse_to_float, is_file_modified
 from Flux.PyCodeGenEngine.FluxCodeGenCore.app_log_book import AppTailExecutor
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_client import (

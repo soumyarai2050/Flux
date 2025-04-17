@@ -211,8 +211,8 @@ def get_simulator_config_file_path(plan_id: int) -> str:
     config_file_path = PurePath(__file__).parent.parent / "data" / f"executor_{plan_id}_simulate_config.yaml"
     return str(config_file_path)
 
-def get_plan_id_from_executor_log_file_name(file_name: str):
-    number_pattern = re.compile(r'street_book_(\d+)_logs_\d{8}\.log')
+def get_plan_id_from_executor_log_file_name(file_name_regex: str, file_name: str):
+    number_pattern = re.compile(file_name_regex)
     match = number_pattern.search(file_name)
     plan_id: int | None = None
     if match:

@@ -435,18 +435,6 @@ message HandlePairPlanUpdatesFromLogs{
   optional bool temp = 1;
 }
 
-message HandleBackgroundLogAlerts{
-    option (FluxMsgJsonQuery) = {
-    QueryName: "handle_background_logs_alert"
-    QueryRouteType: POST_ALL,
-    QueryParams: {
-      QueryParamName: "payload",
-      QueryParamDataType: "List[Dict]"
-    }
-  };
-  optional bool temp = 1;
-}
-
 
 // used to avoid unused import warning by using any random msg or enum from imported file causing warning
 message ImportWarningAvoidDummyMessage {

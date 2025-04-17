@@ -1128,7 +1128,12 @@ async def get_obj_list(msgspec_class_type: Type[MsgspecModel], find_ids: List[An
             # Read the file's content
             data_bytes = grid_out.read()
             data_json = orjson.loads(data_bytes)
-            json_data_list.append(data_json)
+            if find_ids:
+                if data_json.get("_id") in find_ids:
+                    json_data_list.append(data_json)
+                #else not required: avoiding passing any value that doesn't exist in find_ids if find_ids is passed
+            else:
+                json_data_list.append(data_json)
         return json_data_list
     else:
         if filter_agg_pipeline is None:

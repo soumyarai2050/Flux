@@ -798,6 +798,8 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                         selectedPivotName={modelLayoutData.selected_pivot_name ?? null}
                         pivotEnableOverride={modelLayoutData.pivot_enable_override ?? []}
                         onPivotDataChange={handlePivotDataChange}
+                        fieldsMetadata={modelItemFieldsMetadata}
+                        onRowSelect={handleRowSelect}
                     />
                 );
             case LAYOUT_TYPES.CHART:

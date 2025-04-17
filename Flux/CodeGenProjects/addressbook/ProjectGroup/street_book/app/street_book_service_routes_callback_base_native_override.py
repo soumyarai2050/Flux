@@ -18,6 +18,7 @@ import requests
 import posix_ipc
 from sqlalchemy.testing.plugin.plugin_base import logging
 from filelock import FileLock
+from pathlib import Path
 
 # project imports
 # below import is required to symbol_cache to work - SymbolCacheContainer must import from base_plan_cache
@@ -317,7 +318,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             "<FLB_EXECUTOR_DB_NAME>": f"flb_street_book_{self.pair_plan_id}.db",
             "<FLB_LOG_SIM_DB_NAME>": f"flb_log_simulator_{self.pair_plan_id}.db",
             "<FILTER_LOG_LVL>": lvl_filter_regex,
-            "<LOG_SIM_FILE_PATH>": self.log_simulator_file_path
+            "<LOG_SIM_FILE_PATH>": self.log_simulator_file_path,
+            "<HOST>": host
         }
 
         for key, value in keyword_to_data_dict.items():
@@ -342,6 +344,14 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                 else:   # exact 1 instance
                     self.fluent_bit_process_id = found_ids[0]
             # else not required: if no process found then starting fresh instance below
+
+        # ensuring fluent-bit db store dir exists before starting fluent-bit
+        # Get the HOME directory path
+        home_dir = os.environ.get('HOME')
+        # Create the full path
+        directory_path = os.path.join(home_dir, 'fluent-bit', 'state')
+        # Create the directory and any necessary parent directories
+        Path(directory_path).mkdir(parents=True, exist_ok=True)
 
         if not self.fluent_bit_process_id:
             # if fresh start or while recovery killed last processes then starting fresh instance
@@ -686,7 +696,6 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
 
         # making pair_plan server_ready_state field to 0
         try:
-            # email_book_service_http_client.update_pair_plan_to_non_running_state_query_client(self.pair_plan_id)
             guaranteed_call_pair_plan_client(
                 None, email_book_service_http_client.update_pair_plan_to_non_running_state_query_client,
                 pair_plan_id=self.pair_plan_id)
@@ -3704,14 +3713,14 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         pair_plan = self.plan_cache.get_pair_plan_obj()
         if is_ongoing_plan(pair_plan):
             guaranteed_call_pair_plan_client(
-                PairPlanBaseModel, email_book_service_http_client.patch_all_pair_plan_client,
+                PairPlanBaseModel, email_book_service_http_client.patch_pair_plan_client,
                 _id=self.pair_plan_id, plan_state=PlanState.PlanState_PAUSED.value)
         else:
             logging.error(f"Could not pause plan, plan is not in ongoing state;;;{pair_plan=}")
 
     def unpause_plan(self):
         guaranteed_call_pair_plan_client(
-            PairPlanBaseModel, email_book_service_http_client.patch_all_pair_plan_client,
+            PairPlanBaseModel, email_book_service_http_client.patch_pair_plan_client,
             _id=self.pair_plan_id, plan_state=PlanState.PlanState_ACTIVE.value)
 
     async def handle_post_chore_snapshot_tasks_for_fills(

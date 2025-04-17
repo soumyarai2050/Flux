@@ -125,8 +125,9 @@ def test_filtered_plan_alert_by_plan_id_query_covers_all_plans(
     counter = 0
     for i in range(1, 6):
         for sev in ["debug", "info", "warning", "error", "critical"]:
-            plan_alert = {"source_file": f"street_book_{i}_logs_{frmt_date}.log", "level": sev,
-                           "message": f"Sample-{counter}"}
+            plan_alert = {"source_file": str(STRAT_EXECUTOR / "log" / f"street_book_{i}_logs_{frmt_date}.log"),
+                           "file_name_regex": "street_book_(\d+)_logs_\d{8}\.log",
+                           "level": sev, "message": f"Sample-{counter}"}
 
             if plan_alert_dict.get(i) is None:
                 plan_alert_dict[i] = [plan_alert]

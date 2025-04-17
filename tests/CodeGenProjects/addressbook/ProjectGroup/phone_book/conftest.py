@@ -506,7 +506,7 @@ def sample_quote_df():
 @pytest.fixture
 def sample_top_of_book_df():
     return polars.DataFrame({
-        'id': [1],
+        '_id': [1],
         'symbol': ['AAPL'],
         'total_bartering_security_size': [10000],
         'last_update_date_time': [pendulum.now('UTC')]

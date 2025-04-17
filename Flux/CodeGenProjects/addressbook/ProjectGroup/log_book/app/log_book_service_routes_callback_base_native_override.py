@@ -13,6 +13,7 @@ import inspect
 # 3rd party modules
 import pendulum
 import setproctitle
+import pendulum.parsing.exceptions
 
 # project imports
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.FastApi.log_book_service_routes_msgspec_callback import LogBookServiceRoutesCallback
@@ -25,7 +26,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.aggregate import
 from FluxPythonUtils.scripts.general_utility_functions import (
     except_n_log_alert, create_logger, is_file_modified, handle_refresh_configurable_data_members,
     get_pid_from_port, is_process_running, parse_to_float, get_symbol_side_pattern,
-    get_transaction_counts_n_timeout_from_config)
+    get_transaction_counts_n_timeout_from_config, find_files_with_regex)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_helper import (
     photo_book_service_http_client)
 from Flux.CodeGenProjects.performance_benchmark.app.performance_benchmark_helper import performance_benchmark_service_http_client, RawPerformanceDataBaseModel
@@ -35,6 +36,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book_s
     get_plan_id_from_executor_log_file_name, get_symbol_n_side_from_log_line)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import symbol_side_key
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.app.basket_book_helper import be_port, basket_book_service_http_client
+from Flux.PyCodeGenEngine.FluxCodeGenCore.log_book_utils import *
 
 # standard imports
 from datetime import datetime
@@ -79,6 +81,14 @@ class PlanAlertIDCont(MsgspecBaseModel):
     plan_alert_ids: List[int]
 
 
+class LogNoActivityData(MsgspecBaseModel, kw_only=True):
+    source_file: str
+    service_name: str
+    critical_start_time: DateTime | None = None
+    critical_end_time: DateTime | None = None
+    last_modified_timestamp: float | None = None
+
+
 class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallback):
     log_seperator: str = ';;;'
     max_str_size_in_bytes: int = 2048
@@ -87,7 +97,8 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         "info": Severity.Severity_INFO,
         "error": Severity.Severity_ERROR,
         "critical": Severity.Severity_CRITICAL,
-        "warning": Severity.Severity_WARNING
+        "warning": Severity.Severity_WARNING,
+        "exception": Severity.Severity_ERROR
     }
     debug_prefix_regex_pattern: str = r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} : (" \
                                                r"DEBUG|INFO|DB|WARNING|ERROR|CRITICAL) : \[[a-zA-Z._]* : \d*\] : "
@@ -175,8 +186,7 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         self.last_timeout_event_datetime: DateTime | None = None
         self.symbol_side_pattern: str = get_symbol_side_pattern()
         self.plan_id_by_symbol_side_dict: Dict[str, int] = {}
-        self.log_file_no_activity_dict: Dict[str, float | None] = {}
-        self.log_file_to_log_fluent_bit_data: Dict[str, Dict] = {}
+        self.log_file_no_activity_dict: Dict[str, LogNoActivityData] = {}
         self.no_activity_timeout_secs: int | None = config_yaml_dict.get("no_activity_timeout_secs")
         self.market: Market = Market(MarketID.IN)
         self.model_type_name_to_patch_queue_cache_dict: Dict[str, Queue] = {}
@@ -188,11 +198,14 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         self.field_sep = get_field_seperator_pattern()
         self.key_val_sep = get_key_val_seperator_pattern()
         self.port_to_executor_web_client: Dict[int, StreetBookServiceHttpClient] = {}
+        self.critical_log_regex_file_names: Dict = config_yaml_dict.get("critical_log_regex_file_names")
 
         if self.min_refresh_interval is None:
             self.min_refresh_interval = 30
         self.contact_alert_fail_logger = create_logger("contact_alert_fail_logger", logging.DEBUG,
                                                          str(CURRENT_PROJECT_LOG_DIR), contact_alert_fail_log)
+        self.no_activity_init_timeout = config_yaml_dict.get("no_activity_init_timeout")
+
         # dict to hold realtime configurable data members and their respective keys in config_yaml_dict
         self.config_key_to_data_member_name_dict: Dict[str, str] = {
             "min_refresh_interval": "min_refresh_interval"
@@ -237,10 +250,17 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         error_prefix = "_app_launch_pre_thread_func: "
         service_up_no_error_retry_count = 3  # minimum retries that shouldn't raise error on UI dashboard
         should_sleep: bool = False
+        start_up_datetime = DateTime.utcnow()
+        no_activity_setup_timeout = False
         while True:
             if should_sleep:
                 time.sleep(self.min_refresh_interval)
             service_up_flag_env_var = os.environ.get(f"log_book_{la_port}")
+
+            if not no_activity_setup_timeout:
+                if (DateTime.utcnow() - start_up_datetime).total_seconds() > self.no_activity_init_timeout:
+                    no_activity_setup_timeout = True
+                    logging.info("No activity setup timed-out - Starting no activity notify monitoring")
 
             if service_up_flag_env_var == "1":
                 # validate essential services are up, if so, set service ready state to true
@@ -284,7 +304,10 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                     # any periodic refresh code goes here
 
                     # sending no activity notifications for log files
-                    self.notify_no_activity()
+                    if no_activity_setup_timeout:
+                        self.notify_no_activity()
+                    else:
+                        self.init_no_activity_set_up()
 
                     last_modified_timestamp = os.path.getmtime(config_yaml_path)
                     if self.config_yaml_last_modified_timestamp != last_modified_timestamp:
@@ -419,15 +442,47 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                                     f"this id - verify if happened due to some bug")
         return []
 
+    def init_no_activity_set_up(self):
+        project_group_path = PurePath(__file__).parent.parent.parent
+        for regex_log_file_name, regex_log_file_dict in self.critical_log_regex_file_names.items():
+            if log_path:=regex_log_file_dict.get("path"):
+                log_dir_path = f"{project_group_path}/{log_path}"
+                matching_files = find_files_with_regex(log_dir_path, regex_log_file_name)
+                for matching_file in matching_files:
+                    self._update_no_activity_monitor_related_cache(matching_file, regex_log_file_dict)
+
+
     def notify_no_activity(self):
-        update_log_file_no_activity_dict = {}
         delete_file_path_list = []
-        for file_path, last_modified_timestamp in self.log_file_no_activity_dict.items():
+        for file_path, non_activity_data in self.log_file_no_activity_dict.items():
             if os.path.exists(file_path):
-                _, last_modified_timestamp = is_file_modified(file_path, last_modified_timestamp)
+                _, last_modified_timestamp = is_file_modified(file_path, non_activity_data.last_modified_timestamp)
+                non_activity_data.last_modified_timestamp = last_modified_timestamp
+
+                current_datetime = DateTime.utcnow()
+                if non_activity_data.critical_start_time is not None and non_activity_data.critical_end_time is not None:
+                    if non_activity_data.critical_start_time < current_datetime < non_activity_data.critical_end_time:
+                        # allowing if time is between critical start and end time
+                        pass
+                    else:
+                        # avoiding if time is not between critical start and end time
+                        continue
+                else:
+                    if (non_activity_data.critical_start_time is not None and
+                            non_activity_data.critical_end_time is None and
+                            current_datetime < non_activity_data.critical_start_time):
+                        # avoiding if time is before critical start time
+                        continue
+                    elif (non_activity_data.critical_end_time is not None and
+                              non_activity_data.critical_start_time is None and
+                              current_datetime > non_activity_data.critical_end_time):
+                        # avoiding if time is after critical end time
+                        continue
+                    # else not required: if both critical start and end times are not present then assuming
+                    # everytime is critical
+
                 last_modified_date_time: DateTime = pendulum.from_timestamp(last_modified_timestamp, tz="UTC")
-                update_log_file_no_activity_dict[file_path] = last_modified_timestamp
-                non_activity_secs: int = int((DateTime.utcnow() - last_modified_date_time).total_seconds())
+                non_activity_secs: int = int((current_datetime - last_modified_date_time).total_seconds())
                 if non_activity_secs > self.no_activity_timeout_secs:
                     if non_activity_secs >= 60:
                         non_activity_mins = int(non_activity_secs / 60)
@@ -435,9 +490,8 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                     else:
                         non_activity_period_description = f"{non_activity_secs} seconds"
 
-                    log_fluent_bit_data = self.log_file_to_log_fluent_bit_data.get(file_path)
-                    source_file = log_fluent_bit_data.get("source_file")
-                    service = log_fluent_bit_data.get("component_name")
+                    source_file = file_path
+                    service = non_activity_data.service_name
 
                     alert_brief: str = (f"No new logs found for {service} for last "
                                         f"{non_activity_period_description}")
@@ -455,8 +509,6 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         # deleting any case found in above iteration
         for file_path in delete_file_path_list:
             del self.log_file_no_activity_dict[file_path]
-        # updating self.log_file_no_activity_dict
-        self.log_file_no_activity_dict.update(update_log_file_no_activity_dict)
 
     def _force_kill_street_book(self, plan_id: int):
         pair_plan = email_book_service_http_client.get_pair_plan_client(plan_id)
@@ -999,6 +1051,41 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             text += f"...check the component file to see the entire log"
         return text
 
+    def _update_no_activity_monitor_related_cache(self, source_file: str, file_regex_pattern_dict: Dict):
+        if source_file not in self.log_file_no_activity_dict:
+            critical_start_time_str: str | None = file_regex_pattern_dict.get("start_time")
+            critical_start_time = None
+            if critical_start_time_str and critical_start_time_str != "None":
+                try:
+                    critical_start_time = pendulum.parse(critical_start_time_str)
+                except pendulum.parsing.exceptions.ParserError:
+                    # keeping critical_start_time = None
+                    pass
+
+            critical_end_time_str = file_regex_pattern_dict.get("end_time")
+            critical_end_time = None
+            if critical_end_time_str and critical_end_time_str != "None":
+                try:
+                    critical_end_time = pendulum.parse(critical_end_time_str)
+                except pendulum.parsing.exceptions.ParserError:
+                    # keeping critical_end_time = None
+                    pass
+
+            service_name = get_service_name_from_component_path(source_file)
+            self.log_file_no_activity_dict[source_file] = (
+                LogNoActivityData.from_kwargs(source_file=source_file, service_name=service_name,
+                                              critical_start_time=critical_start_time,
+                                              critical_end_time=critical_end_time))
+            logging.info(f"Critical monitoring setup for {source_file=}, {service_name=}, "
+                         f"{critical_start_time=}, {critical_end_time=}")
+
+    def update_no_activity_monitor_related_cache(self, source_file: str):
+        # verifying if this file is critical
+        for file_regex_pattern, file_regex_pattern_dict in self.critical_log_regex_file_names.items():
+            if re.search(file_regex_pattern, source_file):
+                self._update_no_activity_monitor_related_cache(source_file, file_regex_pattern_dict)
+                break
+
     async def handle_contact_alerts_query_pre(self, handle_contact_alerts_class_type: Type[HandleContactAlerts],
                                                 payload: List[Dict[str, Any]]):
         for log_data in payload:
@@ -1010,9 +1097,7 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             level = log_data.get("level")
 
             # updating cache - used for no activity checks
-            if source_file not in self.log_file_no_activity_dict:
-                self.log_file_no_activity_dict[source_file] = None
-            self.log_file_to_log_fluent_bit_data[source_file] = log_data
+            self.update_no_activity_monitor_related_cache(source_file)
 
             alert_brief_n_detail_lists: List[str] = (
                 message.split(LogBookServiceRoutesCallbackBaseNativeOverride.log_seperator, 1))
@@ -1035,26 +1120,6 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                 err_str_ = ("handle_contact_alerts_query_pre failed - contact_alert data "
                             "found with missing data, can't create plan alert;;; "
                             f"received: {severity=}, {alert_brief=}, {alert_meta=}")
-                self.contact_alert_fail_logger.error(err_str_)
-        return []
-
-    async def handle_background_logs_alert_query_pre(
-            self, handle_background_log_alerts_class_type: Type[HandleBackgroundLogAlerts],
-            payload: List[Dict[str, Any]]):
-        for log_data in payload:
-            message = log_data.get("message")
-            log_date_time = log_data.get("timestamp")
-            source_file = log_data.get("source_file")
-
-            alert_meta = get_alert_meta_obj(source_file, log_date_time, alert_meta_type=AlertMeta)
-            severity: Severity = LogBookServiceRoutesCallbackBaseNativeOverride.severity_map.get("error")
-
-            if severity is not None and message is not None:
-                self.send_contact_alerts(severity, message, alert_meta)
-            else:
-                err_str_ = ("handle_contact_alerts_query_pre failed - contact_alert data "
-                            "found with missing data, can't create plan alert;;; "
-                            f"received: {severity=}, alert_brief={message}, {alert_meta=}")
                 self.contact_alert_fail_logger.error(err_str_)
         return []
 
@@ -1151,17 +1216,16 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             log_date_time = log_data.get("timestamp")
             log_source_file_name = log_data.get("file")
             level = log_data.get("level")
+            file_name_regex = log_data.get("file_name_regex")
 
             # updating cache - used for no activity checks
-            if source_file not in self.log_file_no_activity_dict:
-                self.log_file_no_activity_dict[source_file] = None
-            self.log_file_to_log_fluent_bit_data[source_file] = log_data
+            self.update_no_activity_monitor_related_cache(source_file)
 
             severity, alert_brief, alert_details = self._create_alert(message, level, source_file)
             alert_meta = get_alert_meta_obj(source_file, log_source_file_name,
                                             line_num, log_date_time, alert_details, alert_meta_type=AlertMeta)
 
-            plan_id = get_plan_id_from_executor_log_file_name(source_file)
+            plan_id = get_plan_id_from_executor_log_file_name(file_name_regex, source_file)
 
             # handling pause and pos_disable
             await self.handle_msg_pattern_checks(message, plan_id, source_file)
@@ -1193,9 +1257,8 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             level = log_data.get("level")
 
             # updating cache - used for no activity checks
-            if source_file not in self.log_file_no_activity_dict:
-                self.log_file_no_activity_dict[source_file] = None
-            self.log_file_to_log_fluent_bit_data[source_file] = log_data
+            self.update_no_activity_monitor_related_cache(source_file)
+
             log_message: str = message.replace(self.symbol_side_pattern, "")
             severity, alert_brief, alert_details = self._create_alert(log_message, level, source_file)
 

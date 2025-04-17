@@ -56,7 +56,6 @@ class CppSharedDataStructure(BaseProtoPlugin):
             file, self.flux_file_import_dependency_model, True)
         import_file_msg: List[str] = []
         import_msg_name_list: List[str] = []
-        cache_model_name_list: List[str] = ["LastTrade", "MarketDepth"]
         for _ in flux_import_models:
             import_file_msg.append(_.get("ImportFileName"))
             msg_list = _.get("ImportModelName")
@@ -78,25 +77,28 @@ class CppSharedDataStructure(BaseProtoPlugin):
 
         for msg in file.messages:
             if not msg.proto.name.endswith("List") and struct_depend_dict.get(msg.proto.name) is None:
-                struct_dict[msg.proto.name] = msg
-                for fld in msg.fields:
-                    if (fld.message is not None and not fld.message.proto.name.endswith("List") and
-                            struct_dict.get(fld.message.proto.name) is None):
-                        struct_depend_dict[fld.message.proto.name] = fld.message
+                if self.is_bool_option_enabled(msg, self.flux_msg_is_shm_model):
+                    struct_dict[msg.proto.name] = msg
+                    for fld in msg.fields:
+                        if (fld.message is not None and not fld.message.proto.name.endswith("List") and
+                                struct_dict.get(fld.message.proto.name) is None):
+                            struct_depend_dict[fld.message.proto.name] = fld.message
 
         for f in self.dependency_file_list:
             if f.proto.name in import_file_msg:
                 for msg in f.messages:
                     if (not msg.proto.name.endswith("List") and msg.proto.name in import_msg_name_list
                             and struct_depend_dict.get(msg.proto.name) is None):
-                        struct_dict[msg.proto.name] = msg
-                        for fld in msg.fields:
-                            if (fld.message is not None and not fld.message.proto.name.endswith("List")
-                                    and struct_dict.get(fld.message.proto.name) is None):
-                                struct_depend_dict[fld.message.proto.name] = fld.message
+                        if self.is_bool_option_enabled(msg, self.flux_msg_is_shm_model):
+                            struct_dict[msg.proto.name] = msg
+                            for fld in msg.fields:
+                                if (fld.message is not None and not fld.message.proto.name.endswith("List")
+                                        and struct_dict.get(fld.message.proto.name) is None):
+                                    struct_depend_dict[fld.message.proto.name] = fld.message
 
         # Output the struct definitions
         for name, message in struct_dict.items():
+            # if self.is_bool_option_enabled(message, self.flux_msg_is_shm_model):
             output_content += f"struct {name}QueueElement;\n\n"
 
         for i in struct_depend_dict.values():
@@ -149,6 +151,7 @@ class CppSharedDataStructure(BaseProtoPlugin):
             output_content += "};\n\n"
 
         for i in struct_dict.values():
+            # if self.is_bool_option_enabled(i, self.flux_msg_is_shm_model):
             str_val = CppSharedDataStructure.get_simple_option_value_from_proto(
                 i, CppSharedDataStructure.flux_msg_string_length)
             char_size = str_val if str_val is not None else 64

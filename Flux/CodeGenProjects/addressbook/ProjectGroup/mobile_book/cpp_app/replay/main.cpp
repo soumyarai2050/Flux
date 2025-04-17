@@ -13,10 +13,8 @@ int main(int argc, char *argv[]) {
 	}
 	std::string config_file = argv[1];
 	Config config(config_file); // Use std::string directly
-	std::shared_ptr<FluxCppCore::MongoDBHandler> mongo_db_handler = std::make_shared<FluxCppCore::MongoDBHandler>(config.m_mongodb_uri_, config.m_db_name_);
-	MobileBookPublisher mobile_book_publisher(config, mongo_db_handler);
+	MobileBookPublisher mobile_book_publisher(config);
 	mobile_book_consumer = std::make_unique<MobileBookConsumer>(config, mobile_book_publisher);
-
 
 	mobile_book_consumer->init_shm();
 	mobile_book_consumer->go();

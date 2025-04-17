@@ -17,6 +17,7 @@ from Flux.PyCodeGenEngine.FluxCodeGenCore.perf_benchmark_decorators import (get_
                                                                             get_timeit_field_separator)
 from Flux.CodeGenProjects.TradeEngine.ProjectGroup.log_analyzer.app.log_analyzer_service_helper import (
     alert_queue_handler_for_create_only)
+from Flux.PyCodeGenEngine.FluxCodeGenCore.log_analyzer_utils import *
 
 class PerformanceBenchmarkServiceRoutesCallbackBaseNativeOverride(PerformanceBenchmarkServiceRoutesCallback):
     underlying_read_raw_performance_data_http: Callable[..., Any] | None = None
@@ -192,7 +193,8 @@ class PerformanceBenchmarkServiceRoutesCallbackBaseNativeOverride(PerformanceBen
             self, handle_perf_benchmark_class_type: Type[HandlePerfBenchmark], payload: List[Dict[str, Any]]):
         for log_data in payload:
             log_message = log_data.get("message")
-            service = log_data.get("component_name")
+            source_file = log_data.get("source_file")
+            service = get_service_name_from_component_path(source_file)
 
             pattern = re.compile(f"{self.timeit_pattern}.*{self.timeit_pattern}")
             if search_obj := re.search(pattern, log_message):

@@ -44,6 +44,7 @@ message SymbolOverview {
       }
   };
   option (FluxMsgStringLength) = 128;
+  option (FluxMsgIsShmModel) = true;
 
   required int32 id = 1;
   required string symbol = 2 [(FluxFldPk) = "true", (FluxFldIndex) = true, (FluxFldFilterEnable) = true];
@@ -106,6 +107,7 @@ message TopOfBook {
       QueryName: "get_tob_of_book_from_cache"
   };
   option (FluxMsgStringLength) = 128;
+  option (FluxMsgIsShmModel) = true;
 
   required int32 id = 1;
   required string symbol = 2 [(FluxFldPk) = "true", (FluxFldIndex) = true, (FluxFldFilterEnable) = true];
@@ -169,6 +171,7 @@ message MarketDepth {
     QueryRouteType: PATCH
   };
   option (FluxMsgStringLength) = 128;
+  option (FluxMsgIsShmModel) = true;
 
   required int32 id = 1;
   required string symbol = 2 [(FluxFldPk) = "true", (FluxFldIndex) = true, (FluxFldFilterEnable) = true];
@@ -220,6 +223,7 @@ message LastBarter {
   };
   option (FluxMsgUIGetAllLimit) = "-100";
   option (FluxMsgStringLength) = 128;
+  option (FluxMsgIsShmModel) = true;
 
   required int32 id = 1;
   required SymbolNExchId symbol_n_exch_id = 2 [(FluxFldValMetaField) = true, (FluxFldPk) = "symbol", (FluxFldFilterEnable) = true];
