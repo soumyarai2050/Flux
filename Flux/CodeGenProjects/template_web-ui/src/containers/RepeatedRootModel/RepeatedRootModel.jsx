@@ -23,6 +23,7 @@ import {
     overrideChangeHandler,
     pinnedChangeHandler,
     filtersChangeHandler,
+    absoluteSortOverrideChangeHandler,
     dataSourceColorsChangeHandler,
     joinByChangeHandler,
     centerJoinToggleHandler,
@@ -68,6 +69,7 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
     const [url, setUrl] = useState(modelDataSource.url);
     const [isProcessingUserActions, setIsProcessingUserActions] = useState(false);
     const [reconnectCounter, setReconnectCounter] = useState(0);
+    const [rowIds, setRowIds] = useState(null);
     const [params, setParams] = useState(null);
     const modelLayoutData = useMemo(() => getWidgetOptionById(modelLayoutOption.widget_ui_data, objId), [modelLayoutOption, objId]);
     // layout type initial only available after getting modelLayoutOption
@@ -217,9 +219,11 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                 showLess: modelLayoutData.show_less || [],
                 showHidden,
                 showAll,
+                absoluteSortOverride: modelLayoutData.absolute_sort_override || [],
                 columnOrders: modelLayoutData.column_orders || [],
                 centerJoin: modelLayoutData.joined_at_center,
-                flip: modelLayoutData.flip
+                flip: modelLayoutData.flip,
+                rowIds
             }
 
             const updatedOptionsRef = {
@@ -230,7 +234,8 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                 showHidden,
                 showAll,
                 modelLayoutOption,
-                modelLayoutData
+                modelLayoutData,
+                rowIds,
             }
 
             if (!isEqual(optionsRef.current, updatedOptionsRef)) {
@@ -253,7 +258,7 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
         }
     }, [
         storedArray, updatedObj, fieldsMetadata, modelLayoutData, modelLayoutOption, page, mode,
-        showMore, moreAll, showHidden, showAll
+        showMore, moreAll, showHidden, showAll, rowIds
     ])
 
     const handleModelDataSourceUpdate = (updatedArray) => {
@@ -364,6 +369,11 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
 
     const handleFiltersChange = (updatedFilters) => {
         filtersChangeHandler(modelHandlerConfig, updatedFilters);
+    }
+
+    const handleAbsoluteSortChange = (updatedAbsoluteSort, updatedColumns) => {
+        setHeadCells(updatedColumns);
+        absoluteSortOverrideChangeHandler(modelHandlerConfig, updatedAbsoluteSort);
     }
 
     const handleDataSourceColorsChange = (updatedDataSourceColors) => {
@@ -564,71 +574,81 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
 
     // A helper function to decide which content to render based on layoutType
     const renderContent = () => {
+        let Wrapper = React.Fragment;
+        let wrapperProps = {};
+        let wrapperMode = mode;
+        let isReadOnly = modelLayoutOption.is_read_only ?? false;
         switch (layoutType) {
-            case LAYOUT_TYPES.TABLE:
-                return (
-                    <>
-                        <CommonKeyWidget mode={mode} commonkeys={commonKeys} />
-                        <DataTable
-                            rows={rows}
-                            activeRows={activeRows}
-                            cells={sortedCells}
-                            mode={mode}
-                            sortOrders={modelLayoutData.sort_orders || []}
-                            onSortOrdersChange={handleSortOrdersChange}
-                            page={page}
-                            rowsPerPage={modelLayoutData.rows_per_page || 25}
-                            dataSourceColors={modelLayoutData.data_source_colors || []}
-                            selectedId={objId}
-                            onPageChange={handlePageChange}
-                            onRowsPerPageChange={handleRowsPerPageChange}
-                            onRowSelect={handleRowSelect}
-                            onModeToggle={handleModeToggle}
-                            onUpdate={handleUpdate}
-                            onUserChange={handleUserChange}
-                            onButtonToggle={handleButtonToggle}
-                            modelType={MODEL_TYPES.REPEATED_ROOT}
-                            storedData={storedArray}
-                            updatedData={rows}
-                            modelName={modelName}
-                            fieldsMetadata={fieldsMetadata}
-                            isReadOnly={modelLayoutOption.is_read_only}
-                        />
-                    </>
-                );
             case LAYOUT_TYPES.PIVOT_TABLE:
-                return (
-                    <PivotTable
-                        pivotData={modelLayoutOption.pivot_data || []}
-                        data={cleanedRows}
-                        mode={mode}
-                        onModeToggle={handleModeToggle}
-                        onPivotSelect={handleSelectedPivotNameChange}
-                        selectedPivotName={modelLayoutData.selected_pivot_name ?? null}
-                        pivotEnableOverride={modelLayoutData.pivot_enable_override ?? []}
-                        onPivotDataChange={handlePivotDataChange}
-                    />
-                );
+                Wrapper = PivotTable;
+                wrapperProps = {
+                    pivotData: modelLayoutOption.pivot_data || [],
+                    data: cleanedRows,
+                    mode: mode,
+                    onModeToggle: handleModeToggle,
+                    onPivotSelect: handleSelectedPivotNameChange,
+                    selectedPivotName: modelLayoutData.selected_pivot_name ?? null,
+                    pivotEnableOverride: modelLayoutData.pivot_enable_override ?? [],
+                    onPivotDataChange: handlePivotDataChange,
+                    onPivotCellSelect: setRowIds,
+                };
+                wrapperMode = MODES.READ;
+                isReadOnly = true;
+                break;
             case LAYOUT_TYPES.CHART:
-                return (
-                    <ChartView
-                        onReload={handleReload}
-                        chartRows={cleanedRows}
-                        onChartDataChange={handleChartDataChange}
-                        fieldsMetadata={fieldsMetadata}
-                        chartData={modelLayoutOption.chart_data || []}
-                        modelType={MODEL_TYPES.REPEATED_ROOT}
-                        onRowSelect={() => { }}
-                        mode={mode}
-                        onModeToggle={handleModeToggle}
-                        onChartSelect={handleSelectedChartNameChange}
-                        selectedChartName={modelLayoutData.selected_chart_name ?? null}
-                        chartEnableOverride={modelLayoutData.chart_enable_override ?? []}
-                    />
-                );
+                Wrapper = ChartView
+                wrapperProps = {
+                    onReload: handleReload,
+                    chartRows: cleanedRows,
+                    onChartDataChange: handleChartDataChange,
+                    fieldsMetadata: fieldsMetadata,
+                    chartData: modelLayoutOption.chart_data || [],
+                    modelType: MODEL_TYPES.REPEATED_ROOT,
+                    onRowSelect: handleRowSelect,
+                    mode: mode,
+                    onModeToggle: handleModeToggle,
+                    onChartSelect: handleSelectedChartNameChange,
+                    selectedChartName: modelLayoutData.selected_chart_name ?? null,
+                    chartEnableOverride: modelLayoutData.chart_enable_override ?? [],
+                    onChartPointSelect: setRowIds,
+                };
+                wrapperMode = MODES.READ;
+                isReadOnly = true;
+                break;
             default:
-                return null;
+                break;
         }
+
+        return (
+            <Wrapper {...wrapperProps}>
+                <CommonKeyWidget mode={wrapperMode} commonkeys={commonKeys} />
+                <DataTable
+                    rows={rows}
+                    activeRows={activeRows}
+                    cells={sortedCells}
+                    mode={wrapperMode}
+                    sortOrders={modelLayoutData.sort_orders || []}
+                    onSortOrdersChange={handleSortOrdersChange}
+                    page={page}
+                    rowsPerPage={modelLayoutData.rows_per_page || 25}
+                    dataSourceColors={modelLayoutData.data_source_colors || []}
+                    selectedId={objId}
+                    onPageChange={handlePageChange}
+                    onRowsPerPageChange={handleRowsPerPageChange}
+                    onRowSelect={handleRowSelect}
+                    onModeToggle={handleModeToggle}
+                    onUpdate={handleUpdate}
+                    onUserChange={handleUserChange}
+                    onButtonToggle={handleButtonToggle}
+                    modelType={MODEL_TYPES.REPEATED_ROOT}
+                    storedData={storedArray}
+                    updatedData={rows}
+                    modelName={modelName}
+                    fieldsMetadata={fieldsMetadata}
+                    isReadOnly={isReadOnly}
+                />
+            </Wrapper>
+        )
     };
 
     return (
@@ -650,6 +670,8 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                         onColumnsChange={handleOverrideChange}
                         onColumnOrdersChange={handleColumnOrdersChange}
                         onShowLessChange={handleShowLessChange}
+                        absoluteSortOverride={modelLayoutData.absolute_sort_override ?? []}
+                        onAbsoluteSortChange={handleAbsoluteSortChange}
                         // filter
                         filters={modelLayoutOption.filters || []}
                         fieldsMetadata={fieldsMetadata || []}

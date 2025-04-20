@@ -75,8 +75,8 @@ export function pivotEnableOverrideChangeHandler(config, updatedPivotEnableOverr
   layoutDataChangeHandler(config, layoutDataUpdateDict);
 }
 
-export function selectedSourceIdChangeHandler(config, updatedSelectedSourceId) {
-  const layoutDataUpdateDict = { selected_source_id: updatedSelectedSourceId };
+export function absoluteSortOverrideChangeHandler(config, updatedAbsoluteSortOverride) {
+  const layoutDataUpdateDict = { absolute_sort_override: updatedAbsoluteSortOverride };
   layoutDataChangeHandler(config, layoutDataUpdateDict);
 }
 

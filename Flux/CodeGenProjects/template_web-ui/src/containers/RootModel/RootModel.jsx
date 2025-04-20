@@ -23,6 +23,7 @@ import {
     overrideChangeHandler,
     pinnedChangeHandler,
     filtersChangeHandler,
+    absoluteSortOverrideChangeHandler,
 } from '../../utils/genericModelHandler';
 import CommonKeyWidget from '../../components/CommonKeyWidget';
 import { ConfirmSavePopup, FormValidation } from '../../components/Popup';
@@ -204,6 +205,7 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
                 showLess: modelLayoutData.show_less || [],
                 showHidden,
                 showAll,
+                absoluteSortOverride: modelLayoutData.absolute_sort_override || [],
                 columnOrders: modelLayoutData.column_orders || [],
             }
 
@@ -350,6 +352,11 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
 
     const handleFiltersChange = (updatedFilters) => {
         filtersChangeHandler(modelHandlerConfig, updatedFilters);
+    }
+
+    const handleAbsoluteSortChange = (updatedAbsoluteSort, updatedColumns) => {
+        setHeadCells(updatedColumns);
+        absoluteSortOverrideChangeHandler(modelHandlerConfig, updatedAbsoluteSort);
     }
 
     const handleDownload = async () => {
@@ -565,6 +572,8 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
                         onColumnsChange={handleOverrideChange}
                         onColumnOrdersChange={handleColumnOrdersChange}
                         onShowLessChange={handleShowLessChange}
+                        absoluteSortOverride={modelLayoutData.absolute_sort_override ?? []}
+                        onAbsoluteSortChange={handleAbsoluteSortChange}
                         // filter
                         filters={modelLayoutOption.filters || []}
                         fieldsMetadata={fieldsMetadata || []}
@@ -590,6 +599,7 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
                         // create
                         mode={mode}
                         onCreate={handleCreate}
+                        disableCreate={rows.length > 0}
                         // download
                         onDownload={handleDownload}
                         // edit save

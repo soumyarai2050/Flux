@@ -499,22 +499,26 @@ const AbbreviationMergeView = ({
   onModeToggle,
   onUpdate,
   onUserChange,
-  onButtonToggle
+  onButtonToggle,
 }) => {
   return (
     <>
-      <BufferedView
-        bufferedFieldMetadata={bufferedFieldMetadata}
-        loadedFieldMetadata={loadedFieldMetadata}
-        dataSourceStoredArray={dataSourceStoredArray}
-        modelAbbreviatedBufferItems={modelAbbreviatedBufferItems}
-        searchQuery={searchQuery}
-        onSearchQueryChange={onSearchQueryChange}
-        onLoad={onLoad}
-      />
-      <Divider textAlign='left'>
-        <Chip label={loadedFieldMetadata.title} />
-      </Divider>
+      {!isReadOnly && (
+        <>
+          <BufferedView
+            bufferedFieldMetadata={bufferedFieldMetadata}
+            loadedFieldMetadata={loadedFieldMetadata}
+            dataSourceStoredArray={dataSourceStoredArray}
+            modelAbbreviatedBufferItems={modelAbbreviatedBufferItems}
+            searchQuery={searchQuery}
+            onSearchQueryChange={onSearchQueryChange}
+            onLoad={onLoad}
+          />
+          <Divider textAlign='left'>
+            <Chip label={loadedFieldMetadata.title} />
+          </Divider>
+        </>
+      )}
       <LoadedView
         mode={mode}
         rows={rows}

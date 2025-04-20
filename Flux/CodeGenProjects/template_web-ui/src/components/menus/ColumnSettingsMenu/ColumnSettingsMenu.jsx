@@ -1,12 +1,13 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { debounce } from 'lodash';
 import PropTypes from 'prop-types';
-import { Popover, FormControlLabel, Select } from '@mui/material';
+import { Popover, Select, Box, Tabs, Tab, TextField } from '@mui/material';
 import { PushPin, PushPinOutlined, Settings } from '@mui/icons-material';
 import Icon from '../../Icon';
 import MenuItem from '../../MenuItem';
 import ValueBasedToggleButton from '../../ValueBasedToggleButton';
 import { LAYOUT_TYPES, MODEL_TYPES } from '../../../constants';
-// import styles from './ColumnSettingsMenu.module.css'; // Uncomment if you plan to use the styles
+import styles from './ColumnSettingsMenu.module.css';
 
 /**
  * ColumnSettingsMenu provides a popover menu for toggling column visibility,
@@ -37,10 +38,10 @@ import { LAYOUT_TYPES, MODEL_TYPES } from '../../../constants';
 const ColumnSettingsMenu = ({
   columns,
   columnOrders,
-  showAll,
-  moreAll,
-  onShowAllToggle,
-  onMoreAllToggle,
+  // showAll,
+  // moreAll,
+  // onShowAllToggle,
+  // onMoreAllToggle,
   onColumnToggle,
   onColumnOrdersChange,
   onShowLessToggle,
@@ -49,9 +50,37 @@ const ColumnSettingsMenu = ({
   onMenuClose,
   onPinToggle,
   modelType,
-  layout
+  layout,
+  onAbsoluteSortToggle
 }) => {
   const [anchorEl, setAnchorEl] = useState(null);
+  const [tabIndex, setTabIndex] = useState(0);
+  const [searchValue, setSearchValue] = useState('');
+  const [filteredColumns, setFilteredColumns] = useState(columns);
+
+  const fieldKey = modelType === MODEL_TYPES.ABBREVIATION_MERGE ? 'key' : 'tableTitle';
+
+  useEffect(() => {
+    if (searchValue) {
+      const lowerCasedValue = searchValue.toLowerCase();
+      const updatedColumns = columns.filter((column) => column[fieldKey].toLowerCase().includes(lowerCasedValue));
+      setFilteredColumns(updatedColumns);
+    } else {
+      setFilteredColumns(columns);
+    }
+  }, [columns])
+
+  const debouncedTransform = useRef(
+    debounce((value) => {
+      if (value) {
+        const lowerCasedValue = value.toLowerCase();
+        const updatedColumns = columns.filter((column) => column[fieldKey].toLowerCase().includes(lowerCasedValue));
+        setFilteredColumns(updatedColumns);
+      } else {
+        setFilteredColumns(columns);
+      }
+    }, 300)
+  ).current;
 
   const menuName = 'column-settings';
   const isPopoverOpen = Boolean(anchorEl);
@@ -77,7 +106,21 @@ const ColumnSettingsMenu = ({
     onPinToggle(menuName, !isPinned);
   }
 
-  if (![LAYOUT_TYPES.TABLE, LAYOUT_TYPES.ABBREVIATION_MERGE].includes(layout)) return null;
+  const handleSearchValueChange = (e) => {
+    setSearchValue(e.target.value);
+    debouncedTransform(e.target.value);
+  }
+
+  const handleKeyDown = (e) => {
+    if (e.key.length === 1 || e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === 'Escape') {
+      // Let Escape still close the popover/menu potentially? Maybe not stop propagation for Escape.
+      if (e.key !== 'Escape') {
+        e.stopPropagation();
+      }
+    }
+  }
+
+  if (![LAYOUT_TYPES.TABLE, LAYOUT_TYPES.ABBREVIATION_MERGE, LAYOUT_TYPES.PIVOT_TABLE].includes(layout)) return null;
 
   const renderMenu = () => {
     switch (menuType) {
@@ -115,107 +158,151 @@ const ColumnSettingsMenu = ({
         }}
         onClose={handlePopoverClose}
       >
-        <MenuItem dense>
-          <FormControlLabel
-            sx={{ display: 'flex', flex: 1 }}
-            size='small'
-            control={
-              <ValueBasedToggleButton
-                name='HideShowAll'
+        <Box sx={{ display: 'flex', width: 400, maxHeight: 600 }}>
+          <Tabs
+            orientation='vertical'
+            value={tabIndex}
+            onChange={(e, newValue) => setTabIndex(newValue)}
+            sx={{ borderRight: 1, borderColor: 'divider', minWidth: 100 }}
+          >
+            <Tab label='Show/More' />
+            <Tab label='Sequence' />
+            <Tab label='Absolute Sort' />
+          </Tabs>
+          {/* Tab Content */}
+          <Box className={styles.content}>
+            {columns.length > 5 && (
+              <TextField
                 size='small'
-                selected={showAll}
-                value={showAll}
-                caption={showAll ? 'Show Default' : 'Show All'}
-                xpath='HideShowAll'
-                color={showAll ? 'debug' : 'success'}
-                onClick={onShowAllToggle}
+                label='Column Name'
+                value={searchValue}
+                onChange={handleSearchValueChange}
+                onKeyDown={handleKeyDown}
+                autoFocus
+                inputProps={{
+                  style: { padding: '6px 10px' }
+                }}
               />
-            }
-          />
-          <ValueBasedToggleButton
-            name='MoreLessAll'
-            size='small'
-            selected={moreAll}
-            value={moreAll}
-            caption={moreAll ? 'More Default' : 'More All'}
-            xpath='MoreLessAll'
-            color={moreAll ? 'debug' : 'info'}
-            onClick={onMoreAllToggle}
-          />
-        </MenuItem>
-        {columns.map((column) => {
-          // Only render columns with a sourceIndex of 0.
-          if (column.sourceIndex !== 0) return null;
+            )}
+            {tabIndex === 0 && (
+              <>
+                {filteredColumns.map((column) => {
+                  // Only render columns with a sourceIndex of 0.
+                  if (column.sourceIndex !== 0) return null;
 
-          // Determine the column's order.
-          let sequence = column.sequenceNumber;
-          const fieldKey = modelType === MODEL_TYPES.ABBREVIATION_MERGE ? 'key' : 'tableTitle';
-          const columnLabel = column.elaborateTitle ? column[fieldKey] : column.key;
-          if (columnOrders) {
-            const columnOrder = columnOrders.find(
-              (o) => o.column_name === column[fieldKey]
-            );
-            if (columnOrder) {
-              sequence = columnOrder.sequence;
-            }
-          }
+                  const columnLabel = column.elaborateTitle ? column[fieldKey] : column.key;
 
-          // Determine the toggle states and captions.
-          const show = !column.hide;
-          const showCaption = column.hide ? 'Show' : 'Hide';
-          const showColor = show ? 'success' : 'debug';
-          const more = !column.showLess;
-          const moreDisabled = column.hide;
-          const moreCaption = more ? 'Less' : 'More';
-          const moreColor = more ? 'info' : 'debug';
+                  // Determine the toggle states and captions.
+                  const show = !column.hide;
+                  const showCaption = column.hide ? 'Show' : 'Hide';
+                  const showColor = show ? 'success' : 'debug';
+                  const more = !column.showLess;
+                  const moreDisabled = column.hide;
+                  const moreCaption = more ? 'Less' : 'More';
+                  const moreColor = more ? 'info' : 'debug';
 
-          return (
-            <MenuItem key={column[fieldKey]} dense>
-              <FormControlLabel
-                sx={{ display: 'flex', flex: 1 }}
-                size='small'
-                label={columnLabel}
-                control={
-                  <ValueBasedToggleButton
-                    name={column[fieldKey]}
-                    size='small'
-                    selected={show}
-                    disabled={false}
-                    value={show}
-                    caption={showCaption}
-                    xpath={column[fieldKey]}
-                    color={showColor}
-                    onClick={onColumnToggle}
-                  />
-                }
-              />
-              <Select
-                size='small'
-                value={sequence}
-                onChange={(e) =>
-                  onColumnOrdersChange(column[fieldKey], parseInt(e.target.value, 10))
-                }
-              >
-                {[...Array(maxSequence).keys()].map((_, index) => (
-                  <MenuItem key={index} value={index + 1}>
-                    {index + 1}
-                  </MenuItem>
-                ))}
-              </Select>
-              <ValueBasedToggleButton
-                name={column[fieldKey]}
-                size='small'
-                selected={more}
-                disabled={moreDisabled}
-                value={more}
-                caption={moreCaption}
-                xpath={column[fieldKey]}
-                color={moreColor}
-                onClick={onShowLessToggle}
-              />
-            </MenuItem>
-          );
-        })}
+                  return (
+                    <Box key={column[fieldKey]} className={styles.item}>
+                      <span className={styles.item_label}>{columnLabel}</span>
+                      <ValueBasedToggleButton
+                        name={column[fieldKey]}
+                        size='small'
+                        selected={show}
+                        disabled={false}
+                        value={show}
+                        caption={showCaption}
+                        xpath={column[fieldKey]}
+                        color={showColor}
+                        onClick={onColumnToggle}
+                      />
+                      <ValueBasedToggleButton
+                        name={column[fieldKey]}
+                        size='small'
+                        selected={more}
+                        disabled={moreDisabled}
+                        value={more}
+                        caption={moreCaption}
+                        xpath={column[fieldKey]}
+                        color={moreColor}
+                        onClick={onShowLessToggle}
+                      />
+                    </Box>
+                  )
+                })}
+              </>
+            )}
+            {tabIndex === 1 && (
+              <>
+                {filteredColumns.map((column) => {
+                  // Only render columns with a sourceIndex of 0.
+                  if (column.sourceIndex !== 0) return null;
+
+                  // Determine the column's order.
+                  let sequence = column.sequenceNumber;
+                  const columnLabel = column.elaborateTitle ? column[fieldKey] : column.key;
+                  if (columnOrders) {
+                    const columnOrder = columnOrders.find(
+                      (o) => o.column_name === column[fieldKey]
+                    );
+                    if (columnOrder) {
+                      sequence = columnOrder.sequence;
+                    }
+                  }
+
+                  return (
+                    <Box key={column[fieldKey]} className={styles.item}>
+                      <span className={styles.item_label}>{columnLabel}</span>
+                      <Select
+                        size='small'
+                        value={sequence}
+                        onChange={(e) =>
+                          onColumnOrdersChange(column[fieldKey], parseInt(e.target.value, 10))
+                        }
+                      >
+                        {[...Array(maxSequence).keys()].map((_, index) => (
+                          <MenuItem key={index} value={index + 1} dense>
+                            {index + 1}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </Box>
+                  )
+                })}
+              </>
+            )}
+            {tabIndex === 2 && (
+              <>
+                {filteredColumns.map((column) => {
+                  // Only render columns with a sourceIndex of 0.
+                  if (column.sourceIndex !== 0) return null;
+
+                  const columnLabel = column.elaborateTitle ? column[fieldKey] : column.key;
+                  // Determine the toggle states and captions.
+                  const absoluteSort = column.absoluteSort ?? false;
+                  const showCaption = absoluteSort ? 'Disable' : 'Enable';
+                  const showColor = absoluteSort ? 'success' : 'debug';
+
+                  return (
+                    <Box key={column[fieldKey]} className={styles.item}>
+                      <span className={styles.item_label}>{columnLabel}</span>
+                      <ValueBasedToggleButton
+                        name={column[fieldKey]}
+                        size='small'
+                        selected={absoluteSort}
+                        disabled={false}
+                        value={absoluteSort}
+                        caption={showCaption}
+                        xpath={column[fieldKey]}
+                        color={showColor}
+                        onClick={onAbsoluteSortToggle}
+                      />
+                    </Box>
+                  )
+                })}
+              </>
+            )}
+          </Box>
+        </Box>
       </Popover>
     </>
   );

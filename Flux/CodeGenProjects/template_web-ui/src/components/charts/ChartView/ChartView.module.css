@@ -6,10 +6,16 @@
 .list_container {
     display: flex;
     flex-direction: column;
-    min-width: 200px;
+    min-width: 150px;
     overflow: auto;
 }
 
 .chart_container {
     flex: 1;
+    height: 100%;
+}
+
+.chart {
+    height: 85%;
+    overflow: auto;
 }

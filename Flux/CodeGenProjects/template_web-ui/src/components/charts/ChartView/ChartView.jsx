@@ -5,7 +5,7 @@ import {
     Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Divider, List, ListItem, ListItemButton, ListItemText
 } from '@mui/material';
 import { cloneDeep, get, isEqual } from 'lodash';
-import { Add, Close, Delete, SaveAlt } from '@mui/icons-material';
+import { Add, Close, Delete, Save } from '@mui/icons-material';
 // project constants and common utility function imports
 import { DATA_TYPES, MODES, API_ROOT_URL, MODEL_TYPES } from '../../../constants';
 import {
@@ -38,7 +38,9 @@ function ChartView({
     mode,
     onChartSelect,
     selectedChartName,
-    chartEnableOverride
+    chartEnableOverride,
+    onChartPointSelect,
+    children
 }) {
     // redux states
     const theme = useTheme();
@@ -299,6 +301,7 @@ function ChartView({
                                 id = getIdFromAbbreviatedKey(abbreviation, id);
                             }
                             onRowSelect(id);
+                            onChartPointSelect([id]);
                         }
                     }
                 }
@@ -308,6 +311,7 @@ function ChartView({
                     id = getIdFromAbbreviatedKey(abbreviation, id);
                 }
                 onRowSelect(id);
+                onChartPointSelect([id]);
             }
         }
     }, [selectedData, queryDict])
@@ -400,7 +404,7 @@ function ChartView({
         setSchema(updatedSchema);
     }
 
-    const onSelect = (index) => {
+    const handleSelect = (index) => {
         if (index !== selectedIndex) {
             setSelectedIndex(index);
             handleChartReset();
@@ -414,6 +418,14 @@ function ChartView({
             setSelectedIndex();
             setStoredChartObj({});
             setUpdatedChartObj({});
+        }
+    }
+
+    const handleDoubleClick = (index) => {
+        handleSelect(index);
+        if (mode === MODES.READ) {
+            onModeToggle();
+            setIsChartOptionOpen(true);
         }
     }
 
@@ -431,7 +443,13 @@ function ChartView({
                         {chartData.map((item, index) => {
                             if (chartEnableOverride.includes(item.chart_name)) return;
                             return (
-                                <ListItem className={styles.list_item} key={index} selected={selectedIndex === index} disablePadding onClick={() => onSelect(index)}>
+                                <ListItem 
+                                    className={styles.list_item} 
+                                    key={index} 
+                                    selected={selectedIndex === index} 
+                                    disablePadding 
+                                    onClick={() => handleSelect(index)}
+                                    onDoubleClick={() => handleDoubleClick(index)}>
                                     <ListItemButton>
                                         <ListItemText>{item.chart_name}</ListItemText>
                                     </ListItemButton>
@@ -445,6 +463,7 @@ function ChartView({
                 </Box>
                 <Divider orientation='vertical' flexItem />
                 <Box className={styles.chart_container}>
+                    <Box className={styles.chart}>
                     {storedChartObj.chart_name && (
                         <EChart
                             loading={false}
@@ -487,6 +506,8 @@ function ChartView({
                             isCollectionType={modelType === MODEL_TYPES.ABBREVIATION_MERGE}
                         />
                     )}
+                    </Box>
+                    {children}
                 </Box>
             </Box>
             <FullScreenModal
@@ -496,7 +517,7 @@ function ChartView({
             >
                 <ModelCard>
                     <ModelCardHeader name={CHART_SCHEMA_NAME} >
-                        <Icon name='save' title='save' onClick={handleSave}><SaveAlt fontSize='small' /></Icon>
+                        <Icon name='save' title='save' onClick={handleSave}><Save fontSize='small' /></Icon>
                         <Icon name='close' title='close' onClick={handleChartOptionClose}><Close fontSize='small' /></Icon>
                     </ModelCardHeader>
                     <ModelCardContent>

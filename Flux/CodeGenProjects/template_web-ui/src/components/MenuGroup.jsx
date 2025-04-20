@@ -68,29 +68,12 @@ const MenuGroup = ({
     chartEnableOverride = [],
     pivots = [],
     onPivotToggle,
-    pivotEnableOverride = []
+    pivotEnableOverride = [],
+    absoluteSortOverride = [],
+    onAbsoluteSortChange,
+    disableCreate = false
 }) => {
     const [anchorEl, setAnchorEl] = useState(null);
-    const [isFilterMenuPopupOpen, setIsFilterMenuPopupOpen] = useState(false);
-    const [isDataSourceColorMenuPopupOpen, setIsDataSourceColorMenuPopupOpen] = useState(false);
-
-    const handleFilterMenuPopupOpen = () => {
-        setIsFilterMenuPopupOpen(true);
-    }
-
-    const handleFilterMenuPopupClose = () => {
-        handleMenuClose();
-        setIsFilterMenuPopupOpen(false);
-    }
-
-    const handleDataSourceColorMenuPopupOpen = () => {
-        setIsDataSourceColorMenuPopupOpen(true);
-    }
-
-    const handleDataSourceColorMenuPopupClose = () => {
-        handleMenuClose();
-        setIsDataSourceColorMenuPopupOpen(false);
-    }
 
     const handleColumnToggle = (e, xpath, key, value, ...rest) => {
         const isHidden = value;
@@ -171,6 +154,28 @@ const MenuGroup = ({
         onJoinByChange(updatedJoinBy);
     }
 
+    const handleAbsoluteSortToggle = (e, xpath, key, value, ...rest) => {
+        const isAbsoluteSort = !value;
+        const fieldKey = modelType === MODEL_TYPES.ABBREVIATION_MERGE ? 'key' : 'tableTitle';
+        const updatedColumns = columns.map((o) => o[fieldKey] === key ? { ...o, absoluteSort: isAbsoluteSort } : o);
+        const meta = fieldsMetadata.find((o) => o[fieldKey] === key);
+        if (!meta) return;
+        const updatedAbsoluteSortOverride = cloneDeep(absoluteSortOverride);
+        if (isAbsoluteSort) {
+            if (!updatedAbsoluteSortOverride.includes(key)) {
+                updatedAbsoluteSortOverride.push(key);
+            }
+        } else {
+            const idx = updatedAbsoluteSortOverride.indexOf(key);
+            if (idx !== -1) {
+                updatedAbsoluteSortOverride.splice(idx, 1);
+            }
+        }
+        if (onAbsoluteSortChange) {
+            onAbsoluteSortChange(updatedAbsoluteSortOverride, updatedColumns);
+        }
+    }
+
     const isMenuOpen = Boolean(anchorEl);
     const IconComponent = isMenuOpen ? MenuOpen : MenuIcon;
 
@@ -215,10 +220,10 @@ const MenuGroup = ({
                         key={menuKey}
                         columns={columns}
                         columnOrders={columnOrders}
-                        showAll={showAll}
-                        moreAll={moreAll}
-                        onShowAllToggle={onShowAllToggle}
-                        onMoreAllToggle={onMoreAllToggle}
+                        // showAll={showAll}
+                        // moreAll={moreAll}
+                        // onShowAllToggle={onShowAllToggle}
+                        // onMoreAllToggle={onMoreAllToggle}
                         onColumnToggle={handleColumnToggle}
                         onColumnOrdersChange={handleColumnOrdersChange}
                         onShowLessToggle={handleShowLessToggle}
@@ -228,17 +233,21 @@ const MenuGroup = ({
                         isPinned={pinned.includes(menuName)}
                         onMenuClose={handleMenuClose}
                         onPinToggle={handlePinToggle}
+                        onAbsoluteSortToggle={handleAbsoluteSortToggle}
                     />
                 );
             case 'filter':
                 return (
                     <FilterMenu
                         key={menuKey}
-                        onOpen={handleFilterMenuPopupOpen}
+                        filters={filters}
                         fieldsMetadata={fieldsMetadata}
                         menuType={menuType}
+                        modelType={modelType}
                         isPinned={pinned.includes(menuName)}
                         onPinToggle={handlePinToggle}
+                        onMenuClose={handleMenuClose}
+                        onFiltersChange={onFiltersChange}
                     />
                 );
             case 'visibility':
@@ -263,9 +272,12 @@ const MenuGroup = ({
                         key={menuKey}
                         joinBy={joinBy}
                         menuType={menuType}
+                        dataSourceColors={dataSourceColors}
+                        maxRowSize={maxRowSize}
+                        onDataSourceColorsChange={onDataSourceColorsChange}
                         isPinned={pinned.includes(menuName)}
                         onPinToggle={handlePinToggle}
-                        onOpen={handleDataSourceColorMenuPopupOpen}
+                        onMenuClose={handleMenuClose}
                     />
                 );
             case 'join':
@@ -297,6 +309,7 @@ const MenuGroup = ({
                         onMenuClose={handleMenuClose}
                         onPinToggle={handlePinToggle}
                         isAbbreviationSource={isAbbreviationSource}
+                        disableCreate={disableCreate}
                     />
                 );
             case 'download':
@@ -419,29 +432,10 @@ const MenuGroup = ({
                 anchorEl={anchorEl}
                 open={isMenuOpen}
                 onClose={handleMenuClose}
+                disableRestoreFocus
             >
                 {menus.map((menuName) => renderMenu(menuName, 'item'))}
             </Menu>
-            {isFilterMenuPopupOpen && (
-                <FilterDialog
-                    isOpen={isFilterMenuPopupOpen}
-                    filters={filters}
-                    fieldsMetadata={fieldsMetadata}
-                    isCollectionModel={modelType === MODEL_TYPES.ABBREVIATION_MERGE}
-                    onFiltersChange={onFiltersChange}
-                    onMenuClose={handleMenuClose}
-                    onClose={handleFilterMenuPopupClose}
-                />
-            )}
-            {isDataSourceColorMenuPopupOpen && (
-                <DataSourceHexColorPopup
-                    open={isDataSourceColorMenuPopupOpen}
-                    onClose={handleDataSourceColorMenuPopupClose}
-                    maxRowSize={maxRowSize}
-                    dataSourceColors={dataSourceColors}
-                    onSave={onDataSourceColorsChange}
-                />
-            )}
         </>
     )
 }

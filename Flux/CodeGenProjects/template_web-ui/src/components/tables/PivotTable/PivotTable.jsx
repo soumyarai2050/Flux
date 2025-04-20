@@ -5,7 +5,7 @@ import TableRenderers from 'react-pivottable/TableRenderers';
 import Plot from 'react-plotly.js';
 import createPlotlyRenderer from 'react-pivottable/PlotlyRenderers';
 import { Box, Button, Divider, List, ListItem, ListItemButton, ListItemText } from '@mui/material';
-import { Add, Close, Delete, Save } from '@mui/icons-material';
+import { Add, Close, Delete, Done, Save } from '@mui/icons-material';
 import Icon from '../../Icon';
 import 'react-pivottable/pivottable.css';
 import styles from './PivotTable.module.css';
@@ -15,7 +15,6 @@ import DataTree from '../../trees/DataTree/DataTree';
 import { ModelCard, ModelCardContent, ModelCardHeader } from '../../cards';
 import FullScreenModal from '../../Modal';
 import { cloneDeep } from 'lodash';
-import BasicTable from '../BasicTable';
 
 const PlotlyRenderers = createPlotlyRenderer(Plot);
 
@@ -30,8 +29,8 @@ function PivotTable({
     onModeToggle,
     onPivotSelect,
     pivotEnableOverride,
-    fieldsMetadata,
-    onRowSelect
+    onPivotCellSelect,
+    children
 }) {
     const { schema: projectSchema } = useSelector(state => state.schema);
 
@@ -40,7 +39,7 @@ function PivotTable({
     const [storedPivotObj, setStoredPivotObj] = useState({});
     const [updatedPivotObj, setUpdatedPivotObj] = useState({});
     const [isPivotOptionOpen, setIsPivotOptionOpen] = useState(false);
-    const [groupedRows, setGroupedRows] = useState([]);
+    const [isCellActive, setIsCellActive] = useState(false);
 
     useEffect(() => {
         const updatedIndex = selectedPivotName ? pivotData.findIndex((o) => o.pivot_name === selectedPivotName) : null;
@@ -76,7 +75,13 @@ function PivotTable({
                 onPivotSelect(null);
             }
         }
-    }, [selectedIndex, pivotData])
+        onPivotCellSelect(null);
+        setIsCellActive(false);
+        const prev = document.querySelector(`.${styles.selected}`);
+        if (prev) {
+            prev.classList.remove(styles.selected);
+        }
+    }, [selectedIndex])
 
     const handlePivotTableChange = (updatedPivotProps) => {
         if (mode === MODES.READ) {
@@ -94,6 +99,7 @@ function PivotTable({
         updatedObj.vals = [];
         updatedObj.aggregator_name = 'Count';
         updatedObj.renderer_name = 'Table';
+        updatedObj.value_filter = {};
         setUpdatedPivotObj(updatedObj);
         setStoredPivotObj({});
         onModeToggle();
@@ -148,13 +154,25 @@ function PivotTable({
         }
     }
 
-    const clickCallback = function (e, value, filters, pivotData) {
-        const matchingRows = [];
+    const handleDiscard = () => {
+        setUpdatedPivotObj(addxpath(cloneDeep(storedPivotObj)));
+        onModeToggle();
+    }
 
+    const clickCallback = function (e, value, filters, pivotData) {
+        const prev = document.querySelector(`.${styles.selected}`);
+        if (prev) {
+            prev.classList.remove(styles.selected);
+        }
+
+        // 2. Add the module‐scoped `selected` class to the clicked cell
+        e.target.classList.add(styles.selected);
+        const ids = [];
         pivotData.forEachMatchingRecord(filters, (record) => {
-            matchingRows.push(record);
+            ids.push(record['data-id']);
         });
-        setGroupedRows(matchingRows);
+        onPivotCellSelect(ids);
+        setIsCellActive(true);
     };
 
     return (
@@ -173,9 +191,15 @@ function PivotTable({
                                     <ListItemText>{item.pivot_name}</ListItemText>
                                 </ListItemButton>
                                 {mode === MODES.EDIT && index === selectedIndex && (
-                                    <Icon title='Save' onClick={handleSave}>
-                                        <Save fontSize='small' />
-                                    </Icon>
+                                    <>
+                                        <Icon title='Apply' onClick={handleSave}>
+                                            <Done color='success' fontSize='small' />
+
+                                        </Icon>
+                                        <Icon title='Discard' onClick={handleDiscard}>
+                                            <Close color='error' fontSize='small' />
+                                        </Icon>
+                                    </>
                                 )}
                                 <Icon title='Delete' onClick={() => handlePivotDelete(item.pivot_name, index)}>
                                     <Delete fontSize='small' />
@@ -189,26 +213,22 @@ function PivotTable({
             <Box className={styles.pivot_container}>
                 {updatedPivotObj && Object.keys(updatedPivotObj).length > 0 && (
                     <>
-                        <PivotTableUI
-                            {...updatedPivotObj}
-                            data={data}
-                            aggregatorName={updatedPivotObj.aggregator_name}
-                            rendererName={updatedPivotObj.renderer_name}
-                            valueFilter={updatedPivotObj.value_filter ? JSON.parse(updatedPivotObj.value_filter) : {}}
-                            onChange={handlePivotTableChange}
-                            renderers={Object.assign({}, TableRenderers, PlotlyRenderers)}
-                            unusedOrientationCutoff={Infinity}
-                            tableOptions={{
-                                clickCallback: clickCallback
-                            }}
-                        />
-                        {groupedRows.length > 0 && (
-                            <BasicTable
-                                rows={groupedRows}
-                                columns={fieldsMetadata}
-                                onSelect={onRowSelect}
+                        <Box className={styles.pivot_table}>
+                            <PivotTableUI
+                                {...updatedPivotObj}
+                                data={data}
+                                aggregatorName={updatedPivotObj.aggregator_name}
+                                rendererName={updatedPivotObj.renderer_name}
+                                valueFilter={updatedPivotObj.value_filter ? JSON.parse(updatedPivotObj.value_filter) : {}}
+                                onChange={handlePivotTableChange}
+                                renderers={Object.assign({}, TableRenderers, PlotlyRenderers)}
+                                unusedOrientationCutoff={Infinity}
+                                tableOptions={{
+                                    clickCallback: clickCallback
+                                }}
                             />
-                        )}
+                        </Box>
+                        {isCellActive && children}
                     </>
                 )}
             </Box>

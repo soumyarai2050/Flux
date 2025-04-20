@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import { ColorLens, PushPin, PushPinOutlined } from '@mui/icons-material';
 import Icon from '../../Icon';
 import MenuItem from '../../MenuItem';
+import { DataSourceHexColorPopup } from '../../Popup';
 
 /**
  * DataSourceColorMenu renders an icon that opens a popup for managing data source colors.
@@ -21,8 +22,22 @@ const DataSourceColorMenu = ({
   isPinned,
   onPinToggle,
   menuType,
-  onOpen
+  dataSourceColors,
+  maxRowSize,
+  onDataSourceColorsChange,
+  onMenuClose
 }) => {
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+
+  const handlePopoverOpen = () => {
+    setIsPopoverOpen(true);
+  }
+
+  const handlePopoverClose = () => {
+    setIsPopoverOpen(false);
+    onMenuClose();
+  }
+
   // Render nothing if joinBy is not provided or is empty.
   if (!joinBy || joinBy.length === 0) return null;
 
@@ -38,7 +53,7 @@ const DataSourceColorMenu = ({
       case 'item':
         const PinCompononent = isPinned ? PushPin : PushPinOutlined;
         return (
-          <MenuItem name={menuName} onClick={onOpen}>
+          <MenuItem name={menuName} onClick={handlePopoverOpen}>
             <span>
               <ColorLens sx={{ marginRight: '5px' }} fontSize='small' />
               {menuName}
@@ -52,7 +67,7 @@ const DataSourceColorMenu = ({
           <Icon
             name={menuName}
             title={menuName}
-            onClick={onOpen}
+            onClick={handlePopoverOpen}
           >
             <ColorLens fontSize='small' />
           </Icon>
@@ -63,6 +78,13 @@ const DataSourceColorMenu = ({
   return (
     <>
       {renderMenu()}
+      <DataSourceHexColorPopup
+        open={isPopoverOpen}
+        dataSourceColors={dataSourceColors}
+        maxRowSize={maxRowSize}
+        onClose={handlePopoverClose}
+        onSave={onDataSourceColorsChange}
+      />
     </>
   );
 };

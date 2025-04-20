@@ -12,4 +12,15 @@
 
 .pivot_container {
     flex: 1;
+    height: 100%;
+}
+
+.selected {
+    background-color: #d0eaff;
+    outline: 2px solid #3399ff;
+}
+
+.pivot_table {
+    height: 80%;
+    overflow: auto;
 }

@@ -23,6 +23,7 @@ import {
     overrideChangeHandler,
     pinnedChangeHandler,
     filtersChangeHandler,
+    absoluteSortOverrideChangeHandler,
 } from '../../utils/genericModelHandler';
 import CommonKeyWidget from '../../components/CommonKeyWidget';
 import { ConfirmSavePopup, FormValidation } from '../../components/Popup';
@@ -205,6 +206,7 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
                 showLess: modelLayoutData.show_less || [],
                 showHidden,
                 showAll,
+                absoluteSortOverride: modelLayoutData.absolute_sort_override || [],
                 columnOrders: modelLayoutData.column_orders || [],
                 xpath: modelName
             }
@@ -352,6 +354,11 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
 
     const handleFiltersChange = (updatedFilters) => {
         filtersChangeHandler(modelHandlerConfig, updatedFilters);
+    }
+
+    const handleAbsoluteSortChange = (updatedAbsoluteSort, updatedColumns) => {
+        setHeadCells(updatedColumns);
+        absoluteSortOverrideChangeHandler(modelHandlerConfig, updatedAbsoluteSort);
     }
 
     const handleDownload = async () => {
@@ -567,6 +574,8 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
                         onColumnsChange={handleOverrideChange}
                         onColumnOrdersChange={handleColumnOrdersChange}
                         onShowLessChange={handleShowLessChange}
+                        absoluteSortOverride={modelLayoutData.absolute_sort_override ?? []}
+                        onAbsoluteSortChange={handleAbsoluteSortChange}
                         // filter
                         filters={modelLayoutOption.filters || []}
                         fieldsMetadata={fieldsMetadata || []}
@@ -592,6 +601,7 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
                         // create
                         mode={mode}
                         onCreate={handleCreate}
+                        disableCreate={rows.length > 0}
                         // download
                         onDownload={handleDownload}
                         // edit save

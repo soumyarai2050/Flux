@@ -142,7 +142,7 @@ message WidgetUIData{
   repeated string chart_enable_override = 18;
   optional string selected_pivot_name = 19;
   repeated string pivot_enable_override = 20;
-//  optional int32 selected_source_id = 21;
+  repeated string absolute_sort_override = 21;
 }
 
 message UIButton{

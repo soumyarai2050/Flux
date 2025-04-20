@@ -1,8 +1,10 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import { FilterAlt, PushPin, PushPinOutlined } from '@mui/icons-material';
+import { MODEL_TYPES } from '../../../constants';
 import Icon from '../../Icon';
 import MenuItem from '../../MenuItem';
+import FilterDialog from './FilterDialog';
 import styles from './FilterMenu.module.css';
 
 /**
@@ -28,13 +30,26 @@ const FilterMenu = ({
   isPinned,
   onPinToggle,
   menuType,
-  onOpen
+  modelType,
+  filters,
+  onFiltersChange,
+  onMenuClose
 }) => {
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const menuName = 'filter';
 
   const filterFieldsMetadata = useMemo(() => fieldsMetadata.filter(meta => meta.filterEnable), []);
 
   if (filterFieldsMetadata.length === 0) return null;
+
+  const handlePopoverOpen = () => {
+    setIsPopoverOpen(true);
+  }
+
+  const handlePopoverClose = () => {
+    setIsPopoverOpen(false);
+    onMenuClose();
+  }
 
   const handlePinToggle = (e) => {
     e.stopPropagation();
@@ -46,7 +61,7 @@ const FilterMenu = ({
       case 'item':
         const PinCompononent = isPinned ? PushPin : PushPinOutlined;
         return (
-          <MenuItem name={menuName} onClick={onOpen}>
+          <MenuItem name={menuName} onClick={handlePopoverOpen}>
             <span>
               <FilterAlt sx={{ marginRight: '5px' }} fontSize='small' />
               {menuName}
@@ -57,7 +72,7 @@ const FilterMenu = ({
       case 'icon':
       default:
         return (
-          <Icon name={menuName} title={menuName} onClick={onOpen}>
+          <Icon name={menuName} title={menuName} onClick={handlePopoverOpen}>
             <FilterAlt fontSize='small' />
           </Icon>
         );
@@ -67,6 +82,14 @@ const FilterMenu = ({
   return (
     <>
       {renderMenu()}
+      <FilterDialog
+        isOpen={isPopoverOpen}
+        filters={filters}
+        fieldsMetadata={fieldsMetadata}
+        isCollectionModel={modelType === MODEL_TYPES.ABBREVIATION_MERGE}
+        onFiltersChange={onFiltersChange}
+        onClose={handlePopoverClose}
+      />
     </>
   );
 };

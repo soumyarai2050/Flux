@@ -38,7 +38,7 @@ const DataTable = ({
   onUserChange,
   onRowSelect,
   onButtonToggle,
-  onModeToggle
+  onModeToggle,
 }) => {
   const { schema: projectSchema } = useSelector((state) => state.schema);
   const [clipboardText, setClipboardText] = useState(null);

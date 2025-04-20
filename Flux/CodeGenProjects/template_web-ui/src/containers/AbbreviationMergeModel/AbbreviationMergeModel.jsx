@@ -24,6 +24,7 @@ import {
     overrideChangeHandler,
     pinnedChangeHandler,
     filtersChangeHandler,
+    absoluteSortOverrideChangeHandler,
     dataSourceColorsChangeHandler,
     joinByChangeHandler,
     centerJoinToggleHandler,
@@ -34,7 +35,6 @@ import {
     selectedPivotNameChangeHandler,
     pivotEnableOverrideChangeHandler,
     pivotDataChangeHandler,
-    selectedSourceIdChangeHandler
 } from '../../utils/genericModelHandler';
 import CommonKeyWidget from '../../components/CommonKeyWidget';
 import { ConfirmSavePopup, FormValidation } from '../../components/Popup';
@@ -89,10 +89,12 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     const [url, setUrl] = useState(modelDataSource.url);
     const [isProcessingUserActions, setIsProcessingUserActions] = useState(false);
     const [reconnectCounter, setReconnectCounter] = useState(0);
+    const [rowIds, setRowIds] = useState(null);
     const [dataSourcesParams, setDataSourcesParams] = useState(null);
     const modelLayoutData = useMemo(() => getWidgetOptionById(modelLayoutOption.widget_ui_data, objId, modelLayoutOption.bind_id_fld), [modelLayoutOption, objId]);
     // layout type initial only available after getting modelLayoutOption
     const [layoutType, setLayoutType] = useState(modelLayoutData.view_layout);
+    const [objIdToSourceIdDict, setObjIdToSourceIdDict] = useState({});
 
     const dispatch = useDispatch();
     const [, startTransition] = useTransition();
@@ -268,9 +270,11 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                 showLess: modelLayoutData.show_less || [],
                 showHidden,
                 showAll,
+                absoluteSortOverride: modelLayoutData.absolute_sort_override || [],
                 columnOrders: modelLayoutData.column_orders || [],
                 centerJoin: modelLayoutData.joined_at_center,
-                flip: modelLayoutData.flip
+                flip: modelLayoutData.flip,
+                rowIds
             }
 
             const updatedOptionsRef = {
@@ -282,7 +286,12 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                 showAll,
                 modelLayoutOption,
                 modelLayoutData,
+                rowIds,
                 objId
+            }
+
+            if (optionsRef.current?.objId !== objId) {
+                setRowIds(null);
             }
 
             if (!isEqual(optionsRef.current, updatedOptionsRef)) {
@@ -305,7 +314,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         }
     }, [
         modelAbbreviatedItems, dataSourcesUpdatedArrayDict, modelItemFieldsMetadata, abbreviationKey,
-        loadedFieldMetadata, modelLayoutData, modelLayoutOption, page, mode, showMore, moreAll, showHidden, showAll, objId
+        loadedFieldMetadata, modelLayoutData, modelLayoutOption, page, mode, showMore, moreAll, showHidden, showAll, rowIds, objId
     ])
 
     const handleModelDataSourceUpdate = (updatedArray) => {
@@ -339,30 +348,30 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     });
 
     useEffect(() => {
-        if (modelAbbreviatedItems) {
+        if (modelAbbreviatedItems && !isCreating) {
             if (modelAbbreviatedItems.length === 0) {
                 const updatedAbbreviatedItems = get(updatedObj, loadedFieldMetadata.key);
                 if (updatedAbbreviatedItems && updatedAbbreviatedItems.length === 0) {
                     dataSources.forEach(({ actions }) => {
                         dispatch(actions.setObjId(null));
                     })
-                    selectedSourceIdChangeHandler(modelHandlerConfig, null);
+                    handleSelectedSourceIdChangeHandler(null);
                     // todo - handle ws popup on edit mode if datasource id is selected
                 }
             }
             else {
-                const objId = dataSourcesObjIdDict[dataSources[0].name];
-                const sourceObjId = modelLayoutData.selected_source_id ?? null;
+                const dsObjId = dataSourcesObjIdDict[dataSources[0].name];
+                const sourceObjId = objIdToSourceIdDict[String(objId)] ?? null;
                 if (!sourceObjId) {
-                    if (!objId || !activeIds.includes(objId)) {
+                    if (!dsObjId || !activeIds.includes(dsObjId)) {
                         const id = getIdFromAbbreviatedKey(abbreviationKey, modelAbbreviatedItems[0]);
                         dataSources.forEach(({ actions }) => {
                             dispatch(actions.setObjId(id));
                         })
-                        selectedSourceIdChangeHandler(modelHandlerConfig, id);
+                        handleSelectedSourceIdChangeHandler(id);
                     }
                 } else {
-                    if (objId !== sourceObjId) {
+                    if (dsObjId !== sourceObjId) {
                         dataSources.forEach(({ actions }) => {
                             dispatch(actions.setObjId(sourceObjId));
                         })
@@ -370,7 +379,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                 }
             }
         }
-    }, [modelAbbreviatedItems, updatedObj, mode, modelLayoutData.selected_source_id])
+    }, [modelAbbreviatedItems, updatedObj, mode, objId, JSON.stringify(objIdToSourceIdDict)])
 
     useEffect(() => {
         // const { disable_ws_on_edit } = modelLayoutOption;
@@ -441,7 +450,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
             dataSources.forEach(({ actions }) => {
                 dispatch(actions.setObjId(id));
             })
-            selectedSourceIdChangeHandler(modelHandlerConfig, id);
+            handleSelectedSourceIdChangeHandler(id);
             setSearchQuery('');
         } else {
             console.error(`load failed for idx: ${idx}`);
@@ -497,6 +506,11 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         filtersChangeHandler(modelHandlerConfig, updatedFilters);
     }
 
+    const handleAbsoluteSortChange = (updatedAbsoluteSort, updatedColumns) => {
+        setHeadCells(updatedColumns);
+        absoluteSortOverrideChangeHandler(modelHandlerConfig, updatedAbsoluteSort);
+    }
+
     const handleDataSourceColorsChange = (updatedDataSourceColors) => {
         dataSourceColorsChangeHandler(modelHandlerConfig, updatedDataSourceColors);
     }
@@ -535,6 +549,10 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
 
     const handlePivotDataChange = (updatedPivotData) => {
         pivotDataChangeHandler(modelHandlerConfig, updatedPivotData);
+    }
+
+    const handleSelectedSourceIdChangeHandler = (updatedSelectedSourceId) => {
+        setObjIdToSourceIdDict((prev) => ({ ...prev, [String(objId)]: updatedSelectedSourceId }));
     }
 
     const handleDownload = async () => {
@@ -739,7 +757,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         dataSources.forEach(({ actions }) => {
             dispatch(actions.setObjId(id));
         })
-        selectedSourceIdChangeHandler(modelHandlerConfig, id);
+        handleSelectedSourceIdChangeHandler(id);
     }
 
     const cleanedRows = useMemo(() => {
@@ -751,78 +769,87 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
 
     // A helper function to decide which content to render based on layoutType
     const renderContent = () => {
+        let Wrapper = React.Fragment;
+        let wrapperProps = {};
+        let wrapperMode = mode;
+        let isReadOnly = modelLayoutOption.is_read_only ?? false;
         switch (layoutType) {
-            case LAYOUT_TYPES.ABBREVIATION_MERGE:
-                return (
-                    <>
-                        <CommonKeyWidget mode={mode} commonkeys={commonKeys} />
-                        <AbbreviationMergeView
-                            bufferedFieldMetadata={bufferedFieldMetadata}
-                            loadedFieldMetadata={loadedFieldMetadata}
-                            dataSourceStoredArray={dataSourcesStoredArrayDict[dataSources[0].name]}
-                            modelAbbreviatedBufferItems={modelAbbreviatedBufferItems}
-                            searchQuery={searchQuery}
-                            onSearchQueryChange={handleSearchQueryChange}
-                            onLoad={handleLoad}
-                            mode={mode}
-                            rows={groupedRows}
-                            activeRows={activeRows}
-                            cells={sortedCells}
-                            sortOrders={modelLayoutData.sort_orders || []}
-                            onSortOrdersChange={handleSortOrdersChange}
-                            dataSourcesStoredArrayDict={dataSourcesStoredArrayDict}
-                            dataSourcesUpdatedArrayDict={dataSourcesUpdatedArrayDict}
-                            selectedId={dataSourcesObjIdDict[dataSources[0].name]}
-                            onForceSave={() => { }}
-                            dataSourceColors={modelLayoutData.data_source_colors || []}
-                            page={page}
-                            rowsPerPage={modelLayoutData.rows_per_page || 25}
-                            onPageChange={handlePageChange}
-                            onRowsPerPageChange={handleRowsPerPageChange}
-                            onRowSelect={handleRowSelect}
-                            onModeToggle={handleModeToggle}
-                            onUpdate={handleUpdate}
-                            onUserChange={handleUserChange}
-                            onButtonToggle={handleButtonToggle}
-                        />
-                    </>
-                );
             case LAYOUT_TYPES.PIVOT_TABLE:
-                return (
-                    <PivotTable
-                        pivotData={modelLayoutOption.pivot_data || []}
-                        data={cleanedRows}
-                        mode={mode}
-                        onModeToggle={handleModeToggle}
-                        onPivotSelect={handleSelectedPivotNameChange}
-                        selectedPivotName={modelLayoutData.selected_pivot_name ?? null}
-                        pivotEnableOverride={modelLayoutData.pivot_enable_override ?? []}
-                        onPivotDataChange={handlePivotDataChange}
-                        fieldsMetadata={modelItemFieldsMetadata}
-                        onRowSelect={handleRowSelect}
-                    />
-                );
+                Wrapper = PivotTable;
+                wrapperProps = {
+                    pivotData: modelLayoutOption.pivot_data || [],
+                    data: cleanedRows,
+                    mode: mode,
+                    onModeToggle: handleModeToggle,
+                    onPivotSelect: handleSelectedPivotNameChange,
+                    selectedPivotName: modelLayoutData.selected_pivot_name ?? null,
+                    pivotEnableOverride: modelLayoutData.pivot_enable_override ?? [],
+                    onPivotDataChange: handlePivotDataChange,
+                    onPivotCellSelect: setRowIds,
+                };
+                wrapperMode = MODES.READ;
+                isReadOnly = true;
+                break;
             case LAYOUT_TYPES.CHART:
-                return (
-                    <ChartView
-                        onReload={handleReload}
-                        chartRows={cleanedRows}
-                        onChartDataChange={handleChartDataChange}
-                        fieldsMetadata={modelItemFieldsMetadata}
-                        chartData={modelLayoutOption.chart_data || []}
-                        modelType={MODEL_TYPES.ABBREVIATION_MERGE}
-                        onRowSelect={handleRowSelect}
-                        mode={mode}
-                        abbreviation={abbreviationKey}
-                        onModeToggle={handleModeToggle}
-                        onChartSelect={handleSelectedChartNameChange}
-                        selectedChartName={modelLayoutData.selected_chart_name ?? null}
-                        chartEnableOverride={modelLayoutData.chart_enable_override ?? []}
-                    />
-                );
+                Wrapper = ChartView
+                wrapperProps = {
+                    onReload: handleReload,
+                    chartRows: cleanedRows,
+                    onChartDataChange: handleChartDataChange,
+                    fieldsMetadata: modelItemFieldsMetadata,
+                    chartData: modelLayoutOption.chart_data || [],
+                    modelType: MODEL_TYPES.ABBREVIATION_MERGE,
+                    onRowSelect: handleRowSelect,
+                    mode: mode,
+                    abbreviation: abbreviationKey,
+                    onModeToggle: handleModeToggle,
+                    onChartSelect: handleSelectedChartNameChange,
+                    selectedChartName: modelLayoutData.selected_chart_name ?? null,
+                    chartEnableOverride: modelLayoutData.chart_enable_override ?? [],
+                    onChartPointSelect: setRowIds,
+                };
+                wrapperMode = MODES.READ;
+                isReadOnly = true;
+                break;
             default:
-                return null;
+                break;
         }
+
+        return (
+            <Wrapper {...wrapperProps} >
+                <CommonKeyWidget mode={wrapperMode} commonkeys={commonKeys} />
+                <AbbreviationMergeView
+                    bufferedFieldMetadata={bufferedFieldMetadata}
+                    loadedFieldMetadata={loadedFieldMetadata}
+                    dataSourceStoredArray={dataSourcesStoredArrayDict[dataSources[0].name]}
+                    modelAbbreviatedBufferItems={modelAbbreviatedBufferItems}
+                    searchQuery={searchQuery}
+                    onSearchQueryChange={handleSearchQueryChange}
+                    onLoad={handleLoad}
+                    mode={wrapperMode}
+                    rows={groupedRows}
+                    activeRows={activeRows}
+                    cells={sortedCells}
+                    sortOrders={modelLayoutData.sort_orders || []}
+                    onSortOrdersChange={handleSortOrdersChange}
+                    dataSourcesStoredArrayDict={dataSourcesStoredArrayDict}
+                    dataSourcesUpdatedArrayDict={dataSourcesUpdatedArrayDict}
+                    selectedId={dataSourcesObjIdDict[dataSources[0].name]}
+                    onForceSave={() => { }}
+                    dataSourceColors={modelLayoutData.data_source_colors || []}
+                    page={page}
+                    rowsPerPage={modelLayoutData.rows_per_page || 25}
+                    onPageChange={handlePageChange}
+                    onRowsPerPageChange={handleRowsPerPageChange}
+                    onRowSelect={handleRowSelect}
+                    onModeToggle={handleModeToggle}
+                    onUpdate={handleUpdate}
+                    onUserChange={handleUserChange}
+                    onButtonToggle={handleButtonToggle}
+                    isReadOnly={isReadOnly}
+                />
+            </Wrapper>
+        )
     };
 
     return (
@@ -844,6 +871,8 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                         onColumnsChange={handleOverrideChange}
                         onColumnOrdersChange={handleColumnOrdersChange}
                         onShowLessChange={handleShowLessChange}
+                        absoluteSortOverride={modelLayoutData.absolute_sort_override ?? []}
+                        onAbsoluteSortChange={handleAbsoluteSortChange}
                         // filter
                         filters={modelLayoutOption.filters || []}
                         fieldsMetadata={modelItemFieldsMetadata || []}

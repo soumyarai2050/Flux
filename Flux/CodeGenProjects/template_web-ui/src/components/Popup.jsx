@@ -158,6 +158,15 @@ export const DataSourceHexColorPopup = (props) => {
         props.onClose();
     }
 
+    const handleKeyDown = (e) => {
+        if (e.key.length === 1 || e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === 'Escape') {
+          // Let Escape still close the popover/menu potentially? Maybe not stop propagation for Escape.
+          if (e.key !== 'Escape') {
+            e.stopPropagation();
+          }
+        }
+      }
+
     return (
         <Dialog aria-label='data-source-popup' className={classes.backdrop} open={props.open} onClose={handleClose}>
             <DialogTitle className={classes.dialog_title}>Data Source Hex Color</DialogTitle>
@@ -179,6 +188,7 @@ export const DataSourceHexColorPopup = (props) => {
                                 inputProps={{
                                     style: { padding: '6px 10px' }
                                 }}
+                                onKeyDown={handleKeyDown}
                             />
                         </Box>
                     )

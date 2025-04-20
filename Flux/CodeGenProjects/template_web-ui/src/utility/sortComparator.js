@@ -17,9 +17,9 @@ export class SortComparator {
         index += 1;
         let retVal;
         if (sortOrder.sort_type === SortType.DESCENDING) {
-            retVal = SortComparator.descendingSort(a, b, sortOrder.order_by, nestedArray);
+            retVal = SortComparator.descendingSort(a, b, sortOrder, nestedArray);
         } else { // order is asc
-            retVal = -SortComparator.descendingSort(a, b, sortOrder.order_by, nestedArray);
+            retVal = -SortComparator.descendingSort(a, b, sortOrder, nestedArray);
         }
         if (retVal === 0) {
             retVal = SortComparator.comparator(a, b, sortOrders, index, nestedArray);
@@ -27,22 +27,29 @@ export class SortComparator {
         return retVal;
     }
 
-    static descendingSort(a, b, orderBy, nestedArray = false) {
+    static descendingSort(a, b, sortOrder, nestedArray = false) {
         let updatedA = a;
         let updatedB = b;
+
+        const orderBy = sortOrder.order_by;
+        const useAbs = sortOrder.abs;
         if (nestedArray) {
             updatedA = a[0];
             updatedB = b[0];
         }
-        if (updatedA[orderBy] === undefined || updatedA[orderBy] === null) {
-            return -1;
-        } else if (updatedB[orderBy] === undefined || updatedB[orderBy] === null) {
-            return 1;
-        } else if (updatedB[orderBy] < updatedA[orderBy]) {
-            return -1;
-        } else if (updatedB[orderBy] > updatedA[orderBy]) {
-            return 1;
+        let valA = updatedA[orderBy];
+        let valB = updatedB[orderBy];
+
+        if (valA === undefined || valA === null) return -1;
+        if (valB === undefined || valB === null) return 1;
+
+        if (useAbs) {
+            valA = Math.abs(valA);
+            valB = Math.abs(valB);
         }
+        
+        if (valB < valA) return -1;
+        if (valB > valA) return 1;
         return 0;
     }
 }

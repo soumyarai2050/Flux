@@ -1,0 +1,17 @@
+.content {
+    padding: 16px;
+    width: 100%;
+    max-height: 600px;
+    min-width: 200px;
+}
+
+.item {
+    display: flex;
+    align-items: center;
+    margin: 5px 0px;
+}
+
+.item_label {
+    display: flex;
+    flex: 1;
+}

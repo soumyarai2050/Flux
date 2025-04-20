@@ -3217,6 +3217,9 @@ export function getAbbreviatedCollections(widgetCollectionsDict, loadListFieldAt
                     }
                 })
             })
+            if (xpath === DB_ID) {
+                collection.noCommonKey = true;
+            }
             // create a custom collection object
             collection.sequenceNumber = sequenceNumber;
             collection.source = widgetName;
@@ -3747,4 +3750,22 @@ export function updatePivotSchema(schema) {
     const pivotDataSchema = get(schema, [SCHEMA_DEFINITIONS_XPATH, 'pivot_data']);
     updatePivotAttributesInSchema(schema, pivotDataSchema);
     return schema;
+}
+
+export function applyRowIdsFilter(rows, rowIds) {
+    if (rowIds) {
+        const updatedRows = rows.filter((row) => rowIds.includes(row['data-id']));
+        return updatedRows;
+    }
+    return rows;
+}
+
+export function getSortOrdersWithAbs(sortOrders, absoluteSorts) {
+    const sortOrdersWithAbs = sortOrders.map((sortOrder) => {
+        if (absoluteSorts.includes(sortOrder.order_by)) {
+            sortOrder.abs = true;
+        }
+        return sortOrder;
+    })
+    return sortOrdersWithAbs;
 }

@@ -79,6 +79,15 @@ const FilterDialog = ({
     onClose();
   };
 
+  const handleKeyDown = (e) => {
+    if (e.key.length === 1 || e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === 'Escape') {
+      // Let Escape still close the popover/menu potentially? Maybe not stop propagation for Escape.
+      if (e.key !== 'Escape') {
+        e.stopPropagation();
+      }
+    }
+  }
+
   const filterFieldsMetadata = useMemo(() => fieldsMetadata.filter(meta => meta.filterEnable), []);
   const fieldKey = isCollectionModel ? 'key' : 'path';
 
@@ -111,6 +120,7 @@ const FilterDialog = ({
                   }}
                   fullWidth
                   margin='dense'
+                  onKeyDown={handleKeyDown}
                 />
               </Box>
             );

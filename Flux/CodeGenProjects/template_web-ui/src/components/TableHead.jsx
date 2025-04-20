@@ -77,7 +77,9 @@ const CustomHeadCell = ({
                                 direction={sortOrder ? sortOrder.sort_type : 'asc'}
                                 onClick={createSortHandler(cellKey)}
                                 onDoubleClick={() => removeSortHandler(cellKey)}>
+                                {cell.absoluteSort && '│ '}
                                 {cell.elaborateTitle ? cell.tableTitle : cell.title ? cell.title : cell.key}
+                                {cell.absoluteSort && ' │'}
                                 {sortOrder && sortOrder.order_by === cellKey ? (
                                     <Box component='span' sx={visuallyHidden}>
                                         {sortOrder.sort_type === 'desc' ? 'sorted descending' : 'sorted ascending'}

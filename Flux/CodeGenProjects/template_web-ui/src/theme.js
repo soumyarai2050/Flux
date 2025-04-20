@@ -269,6 +269,17 @@ const darkThemeComponents = {
                 }
             }
         }
+    },
+    MuiTab: {
+        styleOverrides: {
+            root: {
+                '&.Mui-selected': {
+                    color: cssVar('--blue-accent-400'),
+                    fontWeight: 'bold',
+                    
+                }
+            }
+        }
     }
 }
 
