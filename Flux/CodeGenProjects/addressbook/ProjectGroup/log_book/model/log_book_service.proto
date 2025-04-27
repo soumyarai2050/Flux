@@ -233,12 +233,13 @@ message ExecutorEventJournal {
 message RemovePlanAlertsForPlanId {
   option (FluxMsgJsonQuery) = {
     QueryName: "remove_plan_alerts_for_plan_id"
+    QueryRouteType: POST_ALL,
     QueryParams: {
-      QueryParamName: "plan_id",
-      QueryParamDataType: "int"
+      QueryParamName: "payload",
+      QueryParamDataType: "List[Dict]"
     }
   };
-  optional bool temp = 1;
+  optional bool is_id_present = 1;  // no use case - kept as st least 1 field must be present in message
 }
 
 message ContactAlertFailLogger {
@@ -356,20 +357,13 @@ message PlanStateUpdateMatcher {
 message EnableDisablePlanAlertCreate {
   option (FluxMsgJsonQuery) = {
     QueryName: "enable_disable_plan_alert_create"
+    QueryRouteType: POST_ALL,
     QueryParams: {
-      QueryParamName: "plan_id",
-      QueryParamDataType: "int"
-    },
-    QueryParams: {
-      QueryParamName: "symbol_side_key_list",
-      QueryParamDataType: "List[str]"
-    },
-    QueryParams: {
-      QueryParamName: "action",
-      QueryParamDataType: "bool"    // True to enable, False to disable plan alert creation for this start_id
+      QueryParamName: "payload",
+      QueryParamDataType: "List[Dict]"
     }
   };
-  optional bool is_id_present = 1;
+  optional bool is_id_present = 1;  // no use case - kept as st least 1 field must be present in message
 }
 
 
@@ -435,6 +429,53 @@ message HandlePairPlanUpdatesFromLogs{
   optional bool temp = 1;
 }
 
+message HandlePosDisableFromPlanIdLog{
+  option (FluxMsgJsonQuery) = {
+    QueryName: "handle_pos_disable_from_plan_id_log"
+    QueryRouteType: POST_ALL,
+    QueryParams: {
+      QueryParamName: "payload",
+      QueryParamDataType: "List[Dict]"
+    }
+  };
+  optional bool is_id_present = 1;  // no use case - kept as st least 1 field must be present in message
+}
+
+message HandlePosDisableFromSymbolSideLog{
+  option (FluxMsgJsonQuery) = {
+    QueryName: "handle_pos_disable_from_symbol_side_log"
+    QueryRouteType: POST_ALL,
+    QueryParams: {
+      QueryParamName: "payload",
+      QueryParamDataType: "List[Dict]"
+    }
+  };
+  optional bool is_id_present = 1;  // no use case - kept as st least 1 field must be present in message
+}
+
+message HandlePlanPauseFromPlanIdLog{
+  option (FluxMsgJsonQuery) = {
+    QueryName: "handle_plan_pause_from_plan_id_log"
+    QueryRouteType: POST_ALL,
+    QueryParams: {
+      QueryParamName: "payload",
+      QueryParamDataType: "List[Dict]"
+    }
+  };
+  optional bool is_id_present = 1;  // no use case - kept as at least 1 field must be present in message
+}
+
+message HandlePlanPauseFromSymbolSideLog{
+  option (FluxMsgJsonQuery) = {
+    QueryName: "handle_plan_pause_from_symbol_side_log"
+    QueryRouteType: POST_ALL,
+    QueryParams: {
+      QueryParamName: "payload",
+      QueryParamDataType: "List[Dict]"
+    }
+  };
+  optional bool is_id_present = 1;  // no use case - kept as at least 1 field must be present in message
+}
 
 // used to avoid unused import warning by using any random msg or enum from imported file causing warning
 message ImportWarningAvoidDummyMessage {

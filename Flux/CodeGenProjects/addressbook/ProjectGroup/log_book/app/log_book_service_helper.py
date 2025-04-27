@@ -632,7 +632,6 @@ def alert_queue_handler_for_create_n_update(
                     logging.info(f"Exiting alert_queue_handler")
                     return
 
-                logging.info(f"taking {alerts_cache_cont.name} lock in alert_queue_handler_for_create_n_update -2  - {threading.current_thread().name}")
                 run_coro = update_alert_caches(alerts_cache_cont, alert_obj)
                 future = asyncio.run_coroutine_threadsafe(run_coro, asyncio_loop)
                 # block for task to finish
@@ -891,3 +890,23 @@ def pair_plan_client_call_log_str(basemodel_type: Type | None, client_callable: 
     pair_plan_db_pattern: str = get_pattern_for_pair_plan_db_updates()
     log_str = client_call_log_str(basemodel_type, client_callable, pair_plan_db_pattern, update_type, **kwargs)
     return log_str
+
+
+def enable_disable_log_str_start_pattern() -> str:
+    return "*^*"
+
+
+def enable_disable_plan_alerts_log_str(plan_id: int, symbol_side_key_list: List[str], action: bool):
+    enable_disable_start_pattern = enable_disable_log_str_start_pattern()
+    val_sep: str = get_key_val_seperator_pattern()
+    log_str = f"{enable_disable_start_pattern}{plan_id}{val_sep}{symbol_side_key_list}{val_sep}{action}"
+    return log_str
+
+
+def remove_plan_alert_by_start_id_pattern() -> str:
+    return "-***-"
+
+
+def remove_plan_alert_by_start_id_log_str(plan_id: int) -> str:
+    remove_plan_alert_by_start_id_pattern_str = remove_plan_alert_by_start_id_pattern()
+    return f"{remove_plan_alert_by_start_id_pattern_str}{plan_id}"

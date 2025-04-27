@@ -9,6 +9,7 @@ import sys
 import signal
 import threading
 import inspect
+import ast
 
 # 3rd party modules
 import pendulum
@@ -42,6 +43,8 @@ from Flux.PyCodeGenEngine.FluxCodeGenCore.log_book_utils import *
 from datetime import datetime
 
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import get_plan_key_from_pair_plan
+from ProjectGroup.phone_book.generated.FastApi.email_book_service_http_msgspec_routes import \
+    underlying_read_pair_plan_http
 
 LOG_ANALYZER_DATA_DIR = (
     PurePath(__file__).parent.parent / "data"
@@ -164,6 +167,8 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
     underlying_delete_plan_alert_http: Callable[..., Any] | None = None
     underlying_delete_by_id_list_plan_alert_http: Callable[..., Any] | None = None
     underlying_plan_state_update_matcher_query_http: Callable[..., Any] | None = None
+    underlying_handle_plan_alerts_with_symbol_side_query_http: Callable[..., Any] | None = None
+    underlying_handle_plan_alerts_with_plan_id_query_http: Callable[..., Any] | None = None
 
     def __init__(self):
         super().__init__()
@@ -173,6 +178,7 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         self.service_up: bool = False
         self.service_ready = False
         self.plan_alert_cache_dict_by_plan_id_dict: Dict[int, Dict[str, PlanAlert]] = {}     # updates in main thread only
+        self.plan_id_by_symbol_side_dict: Dict[str, int] = {}
         self.contact_alerts_cache_dict: Dict[str, ContactAlert] = {}    # updates in main thread only
         self.plan_alerts_cache_cont: AlertsCacheCont = AlertsCacheCont(name="plan")
         self.contact_alerts_cache_cont: AlertsCacheCont = AlertsCacheCont(name="contact")
@@ -185,7 +191,6 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         self.pause_plan_trigger_dict: Dict[int, DateTime] = {}
         self.last_timeout_event_datetime: DateTime | None = None
         self.symbol_side_pattern: str = get_symbol_side_pattern()
-        self.plan_id_by_symbol_side_dict: Dict[str, int] = {}
         self.log_file_no_activity_dict: Dict[str, LogNoActivityData] = {}
         self.no_activity_timeout_secs: int | None = config_yaml_dict.get("no_activity_timeout_secs")
         self.market: Market = Market(MarketID.IN)
@@ -211,6 +216,13 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             "min_refresh_interval": "min_refresh_interval"
         }
 
+        self.pos_disable_from_plan_id_log_queue: queue.Queue = queue.Queue()
+        self.pos_disable_from_plan_id_log_queue_timeout_sec: int = 2
+        threading.Thread(target=self.handle_pos_disable_from_plan_id_log_queue, daemon=True).start()
+        self.pos_disable_from_symbol_side_log_queue: queue.Queue = queue.Queue()
+        self.pos_disable_from_symbol_side_log_queue_timeout_sec: int = 2
+        threading.Thread(target=self.handle_pos_disable_from_symbol_side_log_queue, daemon=True).start()
+
     def initialize_underlying_http_callables(self):
         from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.FastApi.log_book_service_http_msgspec_routes import (
             underlying_read_contact_alert_http, underlying_create_all_contact_alert_http,
@@ -218,7 +230,9 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             underlying_update_all_contact_alert_http, underlying_create_all_plan_alert_http,
             underlying_update_all_plan_alert_http,
             underlying_filtered_plan_alert_by_plan_id_query_http, underlying_delete_plan_alert_http,
-            underlying_plan_state_update_matcher_query_http)
+            underlying_plan_state_update_matcher_query_http,
+            underlying_handle_plan_alerts_with_symbol_side_query_http,
+            underlying_handle_plan_alerts_with_plan_id_query_http)
         LogBookServiceRoutesCallbackBaseNativeOverride.underlying_read_contact_alert_http = (
             underlying_read_contact_alert_http)
         LogBookServiceRoutesCallbackBaseNativeOverride.underlying_create_all_contact_alert_http = (
@@ -239,6 +253,10 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             underlying_delete_by_id_list_plan_alert_http)
         LogBookServiceRoutesCallbackBaseNativeOverride.underlying_plan_state_update_matcher_query_http = (
             underlying_plan_state_update_matcher_query_http)
+        LogBookServiceRoutesCallbackBaseNativeOverride.underlying_handle_plan_alerts_with_symbol_side_query_http = (
+            underlying_handle_plan_alerts_with_symbol_side_query_http)
+        LogBookServiceRoutesCallbackBaseNativeOverride.underlying_handle_plan_alerts_with_plan_id_query_http = (
+            underlying_handle_plan_alerts_with_plan_id_query_http)
 
     @except_n_log_alert()
     def _app_launch_pre_thread_func(self):
@@ -412,34 +430,47 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
 
     async def enable_disable_plan_alert_create_query_pre(
             self, enable_disable_plan_alert_create_class_type: Type[EnableDisablePlanAlertCreate],
-            plan_id: int, symbol_side_key_list: List[str], action: bool):
+            payload: List[Dict[str, Any]]):
         with self.active_plan_id_list_mutex:
             if action:
                 if plan_id not in self.active_plan_id_list:
                     self.active_plan_id_list.append(plan_id)
                     logging.debug(f"Added {plan_id=} in self.active_plan_id_list")
+            for log_data in payload:
+                message: str = log_data.get("message")
+                # cleaning enable_disable_pattern_str
+                message = message[len(enable_disable_log_str_start_pattern()):]
+                data_list = message.split(self.key_val_sep)
+                plan_id: int = parse_to_int(data_list.pop(0))
+                symbol_side_key_list: List[str] = ast.literal_eval(data_list.pop(0))
+                action: bool = bool(data_list.pop(0))
 
-                    for symbol_side_key in symbol_side_key_list:
-                        self.plan_id_by_symbol_side_dict[symbol_side_key] = plan_id
-                        logging.debug(f"Added symbol_side: {symbol_side_key} to "
-                                      f"self.plan_id_by_symbol_side_dict with {plan_id=}")
-                else:
-                    logging.warning(f"{plan_id=} already exists in active_plan_id_list - "
-                                    f"enable_disable_plan_alert_create_query was called to enable plan_alerts for "
-                                    f"this id - verify if happened due to some bug")
-            else:
-                if plan_id in self.active_plan_id_list:
-                    self.active_plan_id_list.remove(plan_id)
-                    logging.debug(f"Removed {plan_id=} from self.active_plan_id_list")
+                if action:
+                    if plan_id not in self.active_plan_id_list:
+                        self.active_plan_id_list.append(plan_id)
+                        logging.debug(f"Added {plan_id=} in self.active_plan_id_list")
 
-                    for symbol_side_key in symbol_side_key_list:
-                        self.plan_id_by_symbol_side_dict.pop(symbol_side_key, None)
-                        logging.debug(f"Removed {symbol_side_key=} from "
-                                      f"self.plan_id_by_symbol_side_dict with {plan_id=}")
+                        for symbol_side_key in symbol_side_key_list:
+                            self.plan_id_by_symbol_side_dict[symbol_side_key] = plan_id
+                            logging.debug(f"Added symbol_side: {symbol_side_key} to "
+                                          f"self.plan_id_by_symbol_side_dict with {plan_id=}")
+                    else:
+                        logging.warning(f"{plan_id=} already exists in active_plan_id_list - "
+                                        f"enable_disable_plan_alert_create_query was called to enable plan_alerts for "
+                                        f"this id - verify if happened due to some bug")
                 else:
-                    logging.warning(f"{plan_id=} doesn't exist in active_plan_id_list - "
-                                    f"enable_disable_plan_alert_create_query was called to disable plan_alerts for "
-                                    f"this id - verify if happened due to some bug")
+                    if plan_id in self.active_plan_id_list:
+                        self.active_plan_id_list.remove(plan_id)
+                        logging.debug(f"Removed {plan_id=} from self.active_plan_id_list")
+
+                        for symbol_side_key in symbol_side_key_list:
+                            self.plan_id_by_symbol_side_dict.pop(symbol_side_key, None)
+                            logging.debug(f"Removed {symbol_side_key=} from "
+                                          f"self.plan_id_by_symbol_side_dict with {plan_id=}")
+                    else:
+                        logging.warning(f"{plan_id=} doesn't exist in active_plan_id_list - "
+                                        f"enable_disable_plan_alert_create_query was called to disable plan_alerts for "
+                                        f"this id - verify if happened due to some bug")
         return []
 
     def init_no_activity_set_up(self):
@@ -721,31 +752,12 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             self.contact_alert_fail_logger.critical(err_str_)
             raise HTTPException(detail=err_str_, status_code=500)
 
-    def handle_diversion_of_plan_alerts_to_contact_alerts_if_plan_is_unloaded(
-            self, plan_alert_obj_list: List[PlanAlert]):
-        alert_id_list = []
-        with self.active_plan_id_list_mutex:
-            for plan_alert_obj in plan_alert_obj_list:
-                if plan_alert_obj.plan_id not in self.active_plan_id_list:
-                    alert_id_list.append(plan_alert_obj.id)
-
-        if alert_id_list:
-            # using error pattern which is raised by update_fail so that in error handling of create_all_plan_alert
-            # or update_all_plan_alert in handle_alert_create_n_update_using_async_submit diverts alerts of plan ids
-            # of unloaded plans to contact alerts
-            err_str_ = (f"Some plan alert objects with ids: {set(alert_id_list)} "
-                        f"out of requested found having plan ids of unloaded plan")
-            logging.warning(err_str_)
-            raise HTTPException(detail=err_str_, status_code=400)
-
     async def update_all_plan_alert_pre(self, updated_plan_alert_obj_list: List[PlanAlert]):
         if not self.service_ready:
             # raise service unavailable 503 exception, let the caller retry
             err_str_ = f"update_all_plan_alert_pre not ready - service is not initialized yet"
             self.contact_alert_fail_logger.error(err_str_)
             raise HTTPException(status_code=503, detail=err_str_)
-
-        self.handle_diversion_of_plan_alerts_to_contact_alerts_if_plan_is_unloaded(updated_plan_alert_obj_list)
 
         return updated_plan_alert_obj_list
 
@@ -755,8 +767,6 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             err_str_ = f"update_plan_alert_pre not ready - service is not initialized yet"
             self.contact_alert_fail_logger.error(err_str_)
             raise HTTPException(status_code=503, detail=err_str_)
-
-        self.handle_diversion_of_plan_alerts_to_contact_alerts_if_plan_is_unloaded([updated_plan_alert_obj])
 
         return updated_plan_alert_obj
 
@@ -768,9 +778,6 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             self.contact_alert_fail_logger.error(err_str_)
             raise HTTPException(status_code=503, detail=err_str_)
 
-        # passed obj is only used for extracting and checking plan_id - updated obj is not required
-        self.handle_diversion_of_plan_alerts_to_contact_alerts_if_plan_is_unloaded([stored_plan_alert_obj])
-
         return updated_plan_alert_obj_json
 
     async def partial_update_all_plan_alert_pre(self, stored_plan_alert_obj_list: List[PlanAlert],
@@ -781,9 +788,6 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             self.contact_alert_fail_logger.error(err_str_)
             raise HTTPException(status_code=503, detail=err_str_)
 
-        # passed obj list is only used for extracting and checking plan_id - updated list is not required
-        self.handle_diversion_of_plan_alerts_to_contact_alerts_if_plan_is_unloaded(stored_plan_alert_obj_list)
-
         return updated_plan_alert_obj_json_list
 
     async def create_all_plan_alert_pre(self, plan_alert_obj_list: List[PlanAlert]):
@@ -792,8 +796,6 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             err_str_ = f"create_all_plan_alert_pre not ready - service is not initialized yet"
             self.contact_alert_fail_logger.error(err_str_)
             raise HTTPException(status_code=503, detail=err_str_)
-
-        self.handle_diversion_of_plan_alerts_to_contact_alerts_if_plan_is_unloaded(plan_alert_obj_list)
 
     async def delete_contact_alert_post(self, delete_web_response):
         async with self.contact_alerts_cache_cont.re_mutex:
@@ -818,7 +820,8 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         component_file_path, source_file_name, line_num = get_key_meta_data_from_obj(plan_alert)
         alert_key = get_alert_cache_key(plan_alert.severity, plan_alert.alert_brief,
                                         component_file_path, source_file_name, line_num)
-        plan_alert_cache_dict.pop(alert_key, None)
+        if plan_alert_cache_dict:
+            plan_alert_cache_dict.pop(alert_key, None)
         self.plan_alerts_cache_cont.alert_id_to_obj_dict.pop(plan_alert_id, None)
 
         # Below pops are required to avoid race_condition with alert_queue_handler_for_create_n_update
@@ -943,34 +946,42 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         return filtered_plan_alert_by_plan_id_query_callable, filter_agg_pipeline
 
     async def remove_plan_alerts_for_plan_id_query_pre(
-            self, remove_plan_alerts_for_plan_id_class_type: Type[RemovePlanAlertsForPlanId], plan_id: int):
-        try:
-            async with PlanAlert.reentrant_lock:
-                # getting projection model object having plan_ids as list, if no object is passed then empty
-                # list is passed
-                plan_alert_id_cont: PlanAlertIDCont | List = (
-                    await LogBookServiceRoutesCallbackBaseNativeOverride.
-                    underlying_read_plan_alert_http(get_projection_plan_alert_id_by_plan_id(plan_id),
-                                                     projection_read_http, PlanAlertIDCont))
+            self, remove_plan_alerts_for_plan_id_class_type: Type[RemovePlanAlertsForPlanId],
+            payload: List[Dict[str, Any]]):
+        for payload_dict in payload:
 
-                if plan_alert_id_cont:
-                    await (LogBookServiceRoutesCallbackBaseNativeOverride.
-                           underlying_delete_by_id_list_plan_alert_http(plan_alert_id_cont.plan_alert_ids))
+            message = payload_dict.get("message")
+            # removing the starting pattern
+            message = message[len(remove_plan_alert_by_start_id_pattern()):]
+            # remaining is plan_id
+            plan_id: int = parse_to_int(message)
 
-            # releasing cache for plan id
-            self.plan_alert_cache_dict_by_plan_id_dict.pop(plan_id, None)
+            try:
+                # releasing cache for plan id
+                self.plan_alert_cache_dict_by_plan_id_dict.pop(plan_id, None)
 
-            # updating plan_view fields
-            log_str = plan_view_client_call_log_str(
-                PlanViewBaseModel, photo_book_service_http_client.patch_all_plan_view_client,
-                UpdateType.SNAPSHOT_TYPE, _id=plan_id,
-                plan_alert_aggregated_severity=Severity.Severity_UNSPECIFIED.value,
-                plan_alert_count=0)
-            payload = [{"message": log_str}]
-            photo_book_service_http_client.handle_plan_view_updates_query_client(payload)
-        except Exception as e_:
-            logging.exception(e_)
-            raise HTTPException(detail=str(e_), status_code=500)
+                async with PlanAlert.reentrant_lock:
+                    # getting projection model object having plan_ids as list, if no object is passed then empty
+                    # list is passed
+                    plan_alert_id_cont: PlanAlertIDCont | List = (
+                        await LogBookServiceRoutesCallbackBaseNativeOverride.
+                        underlying_read_plan_alert_http(get_projection_plan_alert_id_by_plan_id(plan_id),
+                                                         projection_read_http, PlanAlertIDCont))
+
+                    if plan_alert_id_cont:
+                        await (LogBookServiceRoutesCallbackBaseNativeOverride.
+                               underlying_delete_by_id_list_plan_alert_http(plan_alert_id_cont.plan_alert_ids))
+
+                # updating plan_view fields
+                log_str = plan_view_client_call_log_str(
+                    PlanViewBaseModel, photo_book_service_http_client.patch_all_plan_view_client,
+                    UpdateType.SNAPSHOT_TYPE, _id=plan_id,
+                    plan_alert_aggregated_severity=Severity.Severity_UNSPECIFIED.value,
+                    plan_alert_count=0)
+                payload = [{"message": log_str}]
+                photo_book_service_http_client.handle_plan_view_updates_query_client(payload)
+            except Exception as e_:
+                logging.exception(e_)
 
         return []
 
@@ -1206,6 +1217,14 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                                             alert_meta.first_detail, err_details, alert_meta_type=AlertMeta)
             self.send_contact_alerts(err_severity, err_brief, alert_meta)
 
+    def plan_is_unloaded(self, plan_id: int, severity: Severity, alert_brief: str, alert_meta: AlertMeta):
+        if plan_id not in self.active_plan_id_list:
+            logging.error(f"No plan_id found for active pair_plan {plan_id=}, "
+                          f"sending plan alert to contact alert;;; {severity=}, {alert_brief=}, {alert_meta=}")
+            self.send_contact_alerts(severity, alert_brief, alert_meta)
+            return True
+        return False
+
     async def handle_plan_alerts_with_plan_id_query_pre(
             self, handle_plan_alerts_with_plan_id_class_type: Type[HandlePlanAlertsWithPlanId],
             payload: List[Dict[str, Any]]):
@@ -1226,6 +1245,8 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                                             line_num, log_date_time, alert_details, alert_meta_type=AlertMeta)
 
             plan_id = get_plan_id_from_executor_log_file_name(file_name_regex, source_file)
+            if self.plan_is_unloaded(plan_id, severity, alert_brief, alert_meta):    # sends contact alert internally
+                continue
 
             # handling pause and pos_disable
             await self.handle_msg_pattern_checks(message, plan_id, source_file)
@@ -1273,6 +1294,9 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                 logging.error(f"No plan_id found for symbol_side: {symbol_side} in self.plan_id_by_symbol_side_dict, "
                               f"sending plan alert to contact alert;;; {severity=}, {alert_brief=}, {alert_meta=}")
                 self.send_contact_alerts(severity, alert_brief, alert_meta)
+                continue
+
+            if self.plan_is_unloaded(plan_id, severity, alert_brief, alert_meta):    # sends contact alert internally
                 continue
 
             # handling pause and pos_disable
@@ -1337,6 +1361,211 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                                           method_callable, self.dynamic_queue_handler_err_handler,
                                           self.max_fetch_from_queue, self._snapshot_type_callable_err_handler,
                                           parse_to_model=True)
+        return []
+
+    def handle_pos_disable_from_symbol_side_log_queue(self):
+        while True:
+            try:
+                data_list = self.pos_disable_from_symbol_side_log_queue.get(timeout=self.pos_disable_from_symbol_side_log_queue_timeout_sec)      # event based block
+            except queue.Empty:
+                # Handle the empty queue condition
+                continue
+            plan_id_n_msg_tuple_list: List[Tuple[int, str]] = []
+            for data in data_list:
+                message, source_file = data
+
+                symbol_side_set = get_symbol_n_side_from_log_line(message)
+                symbol_side: str = list(symbol_side_set)[0]
+                symbol, side = symbol_side.split("-")
+
+                plan_id: int | None = self.plan_id_by_symbol_side_dict.get(symbol_side)
+
+                if plan_id is None:
+                    pair_plan_obj: PairPlanBaseModel = self._get_pair_plan_obj_from_symbol_side(symbol, Side(side))
+                    if pair_plan_obj is None:
+                        raise HTTPException(detail=f"No Ongoing pair plan found for symbol_side: {symbol_side}",
+                                            status_code=400)
+
+                    plan_id = pair_plan_obj.id
+                    for symbol_side in symbol_side_set:
+                        self.plan_id_by_symbol_side_dict[symbol_side] = plan_id
+
+                plan_id_n_msg_tuple_list.append((plan_id, message))
+
+            if plan_id_n_msg_tuple_list:
+                # coro needs public method
+                run_coro = self.handle_pos_disable_tasks(plan_id_n_msg_tuple_list)
+                future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
+                # block for task to finish
+                try:
+                    future.result()
+                except Exception as e:
+                    logging.exception(f"handle_pos_disable_tasks failed with exception: {e}")
+
+    async def handle_pos_disable_from_symbol_side_log_query_pre(
+            self, handle_pos_disable_from_symbol_side_log_class_type: Type[HandlePosDisableFromSymbolSideLog],
+            payload: List[Dict[str, Any]]):
+        # Adding alert for original payload
+        await LogBookServiceRoutesCallbackBaseNativeOverride.underlying_handle_plan_alerts_with_symbol_side_query_http(payload)
+
+        message_n_source_file_tuple_list = []
+        for log_data in payload:
+            message = log_data.get("message")
+            source_file = log_data.get("source_file")
+            message_n_source_file_tuple_list.append((message, source_file))
+        self.pos_disable_from_symbol_side_log_queue.put(message_n_source_file_tuple_list)
+        return []
+
+    async def dummy_pos_disable_check(self, plan_id: int):
+        pair_plan = email_book_service_http_client.get_pair_plan_client(plan_id)
+        port = pair_plan.port
+        host = pair_plan.host
+        executor_client = self._get_executor_http_client_from_pair_plan(port, host)
+
+        plan_limits = executor_client.get_plan_limits_client(pair_plan.id)
+        logging.info(f"{plan_limits=}")
+        updated_plan_limits = executor_client.patch_plan_limits_client({"_id": plan_id,
+                                                                          "max_open_chores_per_side": plan_limits.max_open_chores_per_side+1})
+        logging.info(f"{updated_plan_limits=}")
+
+    async def handle_pos_disable_task(self, plan_id, message):
+        # Note: uncomment below function call to call dummy pos disable code - OS side not impl but used to verify impl
+        await self.dummy_pos_disable_check(plan_id)
+        pass
+
+    async def handle_pos_disable_tasks(self, plan_id_n_msg_tuple_list: List[Tuple[int, str]]):
+        task_list = []
+        for plan_id_n_msg_tuple in plan_id_n_msg_tuple_list:
+            plan_id, msg = plan_id_n_msg_tuple
+
+            task = asyncio.create_task(self.handle_pos_disable_task(plan_id, msg))
+            task_list.append(task)
+
+        await execute_tasks_list_with_all_completed(task_list)
+
+    def handle_pos_disable_from_plan_id_log_queue(self):
+        while True:
+            try:
+                data_list = self.pos_disable_from_plan_id_log_queue.get(timeout=self.pos_disable_from_plan_id_log_queue_timeout_sec)      # event based block
+
+            except queue.Empty:
+                # Handle the empty queue condition
+                continue
+
+            plan_id_n_msg_tuple_list: List[Tuple[int, str]] = []
+            for data in data_list:
+                message, source_file, file_name_regex = data
+
+                plan_id = get_plan_id_from_executor_log_file_name(file_name_regex, source_file)
+
+                if plan_id is None:
+                    err_str_ = (f"Can't find plan id in {source_file=} from payload passed to "
+                                f"handle_pos_disable_by_log_query - "
+                                f"Can't disable positions intended to be disabled;;; "
+                                f"log_message: {message}")
+                    logging.critical(err_str_)
+                    continue
+                # else not required: using found plan_id
+
+                plan_id_n_msg_tuple_list.append((plan_id, message))
+
+            if plan_id_n_msg_tuple_list:
+                # coro needs public method
+                run_coro = self.handle_pos_disable_tasks(plan_id_n_msg_tuple_list)
+                future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
+                # block for task to finish
+                try:
+                    future.result()
+                except Exception as e:
+                    logging.exception(f"handle_pos_disable_tasks failed with exception: {e}")
+
+
+    async def handle_pos_disable_from_plan_id_log_query_pre(
+            self, handle_pos_disable_from_plan_id_log_class_type: Type[HandlePosDisableFromPlanIdLog],
+            payload: List[Dict[str, Any]]):
+        # Adding alert for original payload
+        await LogBookServiceRoutesCallbackBaseNativeOverride.underlying_handle_plan_alerts_with_plan_id_query_http(payload)
+
+        message_n_source_file_tuple_list = []
+        for log_data in payload:
+            message = log_data.get("message")
+            source_file = log_data.get("source_file")
+            file_name_regex = log_data.get("file_name_regex")
+            message_n_source_file_tuple_list.append((message, source_file, file_name_regex))
+        self.pos_disable_from_plan_id_log_queue.put(message_n_source_file_tuple_list)
+        return []
+
+    async def handle_plan_pause_from_plan_id_log_query_pre(
+            self, handle_plan_pause_from_plan_id_log_class_type: Type[HandlePlanPauseFromPlanIdLog],
+            payload: List[Dict[str, Any]]):
+        # Adding alert for original payload
+        await LogBookServiceRoutesCallbackBaseNativeOverride.underlying_handle_plan_alerts_with_plan_id_query_http(payload)
+
+        update_pair_plan_json_list = []
+        plan_id_list = []
+        for log_data in payload:
+            message = log_data.get("message")
+            source_file = log_data.get("source_file")
+            file_name_regex = log_data.get("file_name_regex")
+
+            plan_id = get_plan_id_from_executor_log_file_name(file_name_regex, source_file)
+
+            if plan_id is None:
+                err_str_ = (f"Can't find plan id in {source_file=} from payload passed to "
+                            f"handle_plan_pause_from_log_query - Can't pause plan intended to be paused;;; "
+                            f"payload: {log_data}")
+                logging.critical(err_str_)
+                raise HTTPException(status_code=400, detail=err_str_)
+            # else not required: using found plan_id
+
+            msg_brief: str = message.split(";;;")[0]
+            err_: str = f"pausing pattern matched for plan with {plan_id=};;;{msg_brief=}"
+            logging.critical(err_)
+
+            update_pair_plan_json = {"_id": plan_id, "plan_state": PlanState.PlanState_PAUSED}
+            update_pair_plan_json_list.append(update_pair_plan_json)
+            plan_id_list.append(plan_id)
+        email_book_service_http_client.patch_all_pair_plan_client(update_pair_plan_json_list)
+        err_ = f"Force paused {plan_id_list=}"
+        logging.critical(err_)
+        return []
+
+    async def handle_plan_pause_from_symbol_side_log_query_pre(
+            self, handle_plan_pause_from_symbol_side_log_class_type: Type[HandlePlanPauseFromSymbolSideLog],
+            payload: List[Dict[str, Any]]):
+        # Adding alert for original payload
+        await LogBookServiceRoutesCallbackBaseNativeOverride.underlying_handle_plan_alerts_with_symbol_side_query_http(payload)
+
+        update_pair_plan_json_list = []
+        plan_id_list = []
+        for log_data in payload:
+            message = log_data.get("message")
+
+            symbol_side_set = get_symbol_n_side_from_log_line(message)
+            symbol_side: str = list(symbol_side_set)[0]
+            symbol, side = symbol_side.split("-")
+
+            plan_id: int | None = self.plan_id_by_symbol_side_dict.get(symbol_side)
+
+            if plan_id is None:
+                pair_plan_obj: PairPlanBaseModel = self._get_pair_plan_obj_from_symbol_side(symbol, Side(side))
+                if pair_plan_obj is None:
+                    raise HTTPException(detail=f"No Ongoing pair plan found for symbol_side: {symbol_side}",
+                                        status_code=400)
+
+                plan_id = pair_plan_obj.id
+                for symbol_side in symbol_side_set:
+                    self.plan_id_by_symbol_side_dict[symbol_side] = plan_id
+
+            msg_brief: str = message.split(";;;")[0]
+            err_: str = f"pausing pattern matched for plan with {plan_id=};;;{msg_brief=}"
+            logging.critical(err_)
+
+            update_pair_plan_json = {"_id": plan_id, "plan_state": PlanState.PlanState_PAUSED}
+            update_pair_plan_json_list.append(update_pair_plan_json)
+        email_book_service_http_client.patch_all_pair_plan_client(update_pair_plan_json_list)
+        err_ = f"Force paused {plan_id_list=}"
+        logging.critical(err_)
         return []
 
 def _handle_plan_alert_ids_list_update_for_start_id_in_filter_callable(

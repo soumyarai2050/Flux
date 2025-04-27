@@ -3,6 +3,8 @@
   # if server port is 8020 then ui_port should be 3020
 ui_port: "3050"
 
+DEBUG_MODEL: True
+
 # server specific configs
 server_host: "127.0.0.1"
 main_server_beanie_port: "8040"

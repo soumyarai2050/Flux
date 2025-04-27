@@ -618,54 +618,6 @@ message ReloadBarteringData{
   required bool resp = 1;
 }
 
-message HandlePlanPauseFromPlanIdLog{
-  option (FluxMsgJsonQuery) = {
-    QueryName: "handle_plan_pause_from_plan_id_log"
-    QueryRouteType: POST_ALL,
-    QueryParams: {
-      QueryParamName: "payload",
-      QueryParamDataType: "List[Dict]"
-    }
-  };
-  optional bool is_id_present = 1;  // no use case - kept as at least 1 field must be present in message
-}
-
-message HandlePlanPauseFromSymbolSideLog{
-  option (FluxMsgJsonQuery) = {
-    QueryName: "handle_plan_pause_from_symbol_side_log"
-    QueryRouteType: POST_ALL,
-    QueryParams: {
-      QueryParamName: "payload",
-      QueryParamDataType: "List[Dict]"
-    }
-  };
-  optional bool is_id_present = 1;  // no use case - kept as at least 1 field must be present in message
-}
-
-message HandlePosDisableFromPlanIdLog{
-  option (FluxMsgJsonQuery) = {
-    QueryName: "handle_pos_disable_from_plan_id_log"
-    QueryRouteType: POST_ALL,
-    QueryParams: {
-      QueryParamName: "payload",
-      QueryParamDataType: "List[Dict]"
-    }
-  };
-  optional bool is_id_present = 1;  // no use case - kept as st least 1 field must be present in message
-}
-
-message HandlePosDisableFromSymbolSideLog{
-  option (FluxMsgJsonQuery) = {
-    QueryName: "handle_pos_disable_from_symbol_side_log"
-    QueryRouteType: POST_ALL,
-    QueryParams: {
-      QueryParamName: "payload",
-      QueryParamDataType: "List[Dict]"
-    }
-  };
-  optional bool is_id_present = 1;  // no use case - kept as st least 1 field must be present in message
-}
-
 // used to avoid unused import warning by using any random msg or enum from imported file causing warning
 message ImportWarningAvoidDummyMessage{
   optional ButtonType temp = 1;

@@ -29,7 +29,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book_s
     get_symbol_side_key, get_symbol_side_snapshot_log_key, all_service_up_check,
     email_book_service_http_client, get_consumable_participation_qty,
     get_plan_brief_log_key, get_new_plan_limits, get_new_plan_status,
-    log_book_service_http_client, post_book_service_http_client, get_default_max_notional,
+    post_book_service_http_client, get_default_max_notional,
     get_default_max_open_single_leg_notional, get_default_max_net_filled_notional,
     get_simulator_config_file_path)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.executor_config_loader import ( EXECUTOR_PROJECT_DIR,
@@ -49,7 +49,6 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     create_md_shell_script, MDShellEnvData, is_ongoing_plan, guaranteed_call_pair_plan_client,
     CURRENT_PROJECT_DIR as PAIR_STRAT_ENGINE_DIR)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import plan_view_client_call_log_str
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.barter_simulator import (
     BarterSimulator, BarteringLinkBase)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.log_barter_simulator import LogBarterSimulator
@@ -82,8 +81,11 @@ from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_basket_book_core_ms
 from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_post_book_core_msgspec_model import *
 from Flux.CodeGenProjects.AddressBook.ORMModel.phone_book_n_street_book_core_msgspec_model import *
 from Flux.CodeGenProjects.AddressBook.ORMModel.dept_book_n_mobile_book_n_street_book_n_basket_book_core_msgspec_model import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import UpdateType
-
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import (
+    UpdateType, plan_view_client_call_log_str, enable_disable_plan_alerts_log_str,
+    remove_plan_alert_by_start_id_log_str)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import (
+    symbol_side_key)
 
 class FirstLastBarterCont(MsgspecBaseModel):
     id: int | None = msgspec.field(default=None)
@@ -309,7 +311,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             fluent_bit_temp_data = f.read()
 
         lvl_filter_regex = "^(DEBUG|INFO|DB|WARNING|ERROR|CRITICAL|TIMING)$" \
-            if os.environ.get("DEBUG_MODE") == "1" else "^(DB|WARNING|ERROR|CRITICAL|TIMING)$"
+            if executor_config_yaml_dict.get("DEBUG_MODEL") else "^(DB|WARNING|ERROR|CRITICAL|TIMING)$"
         keyword_to_data_dict = {
             "<FLUENT_BIT_LOG_FILE>": self.log_dir_path / f"fluent_bit_{self.pair_plan_id}.log",
             "<PARSER_FILE_PATH>": EXECUTOR_PROJECT_DATA_DIR / "parsers.conf",
@@ -4573,7 +4575,16 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
 
             # removing plan_alert
             try:
-                log_book_service_http_client.remove_plan_alerts_for_plan_id_query_client(self.pair_plan_id)
+                symbol_side1 = symbol_side_key(self.plan_leg_1.sec.sec_id,
+                                               self.plan_leg_1.side)
+                symbol_side2 = symbol_side_key(self.plan_leg_2.sec.sec_id,
+                                               self.plan_leg_2.side)
+                log_str = enable_disable_plan_alerts_log_str(
+                    self.pair_plan_id, [symbol_side1, symbol_side2], False)
+                logging.warning(log_str)
+
+                log_str = remove_plan_alert_by_start_id_log_str(self.pair_plan_id)
+                logging.warning(log_str)
             except Exception as e:
                 err_str_ = f"Some Error occurred while removing plan_alerts in snoozing plan process, exception: {e}"
                 raise HTTPException(detail=err_str_, status_code=500)

@@ -24,4 +24,4 @@ cache_override_type: "bare"
 
 log_level: "debug"  # log lvl in int or basic log lvl name
 
-max_fetch_from_patch_queue_for_server: 50
+max_fetch_from_patch_queue_for_server: 200

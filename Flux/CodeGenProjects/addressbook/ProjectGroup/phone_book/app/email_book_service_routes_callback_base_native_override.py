@@ -52,8 +52,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_hel
     photo_book_service_http_client)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.service_state import ServiceState
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import (
-    log_book_service_http_client, UpdateType, get_pattern_for_pair_plan_db_updates,
-    get_field_seperator_pattern, get_key_val_seperator_pattern)
+    UpdateType, enable_disable_plan_alerts_log_str)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecordManager
 
 
@@ -171,7 +170,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
         self.usd_fx: float | None = None
         self.pair_plan_id_to_executor_process_id_dict: Dict[int, int] = {}
         self.port_to_executor_http_client_dict: Dict[int, StreetBookServiceHttpClient] = {}
-
+        self.plan_id_by_symbol_side_dict: Dict[str, int] = {}
         self.config_yaml_dict = config_yaml_dict
         self.config_yaml_last_modified_timestamp = os.path.getmtime(config_yaml_path)
         # dict to hold realtime configurable data members and their respective keys in config_yaml_dict
@@ -183,13 +182,6 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
             self.min_refresh_interval = 30
         self.pos_standby: bool = self.config_yaml_dict.get("pos_standby", False)
         self.bartering_link = get_bartering_link()
-        self.pos_disable_from_plan_id_log_queue: queue.Queue = queue.Queue()
-        self.pos_disable_from_plan_id_log_queue_timeout_sec: int = 2
-        threading.Thread(target=self.handle_pos_disable_from_plan_id_log_queue, daemon=True).start()
-        self.plan_id_by_symbol_side_dict: Dict[str, int] = {}
-        self.pos_disable_from_symbol_side_log_queue: queue.Queue = queue.Queue()
-        self.pos_disable_from_symbol_side_log_queue_timeout_sec: int = 2
-        threading.Thread(target=self.handle_pos_disable_from_symbol_side_log_queue, daemon=True).start()
 
         super().__init__()
 
@@ -775,10 +767,8 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
                                        pair_plan_obj.pair_plan_params.plan_leg1.side)
         symbol_side2 = symbol_side_key(pair_plan_obj.pair_plan_params.plan_leg2.sec.sec_id,
                                        pair_plan_obj.pair_plan_params.plan_leg2.side)
-        log_book_service_http_client.enable_disable_plan_alert_create_query_client(pair_plan_obj.id,
-                                                                                        [symbol_side1,
-                                                                                         symbol_side2],
-                                                                                        True)
+        log_str = enable_disable_plan_alerts_log_str(pair_plan_obj.id, [symbol_side1, symbol_side2], True)
+        logging.warning(log_str)
 
         # starting executor server for current pair plan
         await self._start_executor_server(pair_plan_obj)
@@ -966,17 +956,6 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
                         pass
             # else not required: create plan lock file only if moving the plan state from
             # PlanState_READY to PlanState_ACTIVE
-        if updated_pair_plan_obj.plan_state == PlanState.PlanState_DONE:
-            # warning and above log level is required
-            # setting plan alert state to False for this plan_id
-            symbol_side1 = symbol_side_key(stored_pair_plan_obj.pair_plan_params.plan_leg1.sec.sec_id,
-                                           stored_pair_plan_obj.pair_plan_params.plan_leg1.side)
-            symbol_side2 = symbol_side_key(stored_pair_plan_obj.pair_plan_params.plan_leg2.sec.sec_id,
-                                           stored_pair_plan_obj.pair_plan_params.plan_leg2.side)
-            log_book_service_http_client.enable_disable_plan_alert_create_query_client(stored_pair_plan_obj.id,
-                                                                                            [symbol_side1,
-                                                                                             symbol_side2],
-                                                                                            False)
 
         if updated_pair_plan_obj.plan_state != PlanState.PlanState_ACTIVE:
             # if fail - log error is fine - plan not active - check does not fail due to this
@@ -1326,15 +1305,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
             # Removing PlanView for this plan
             photo_book_service_http_client.delete_plan_view_client(pair_plan_to_be_deleted.id)
 
-            # setting plan alert state to False for this plan_id
-            symbol_side1 = symbol_side_key(pair_plan_to_be_deleted.pair_plan_params.plan_leg1.sec.sec_id,
-                                           pair_plan_to_be_deleted.pair_plan_params.plan_leg1.side)
-            symbol_side2 = symbol_side_key(pair_plan_to_be_deleted.pair_plan_params.plan_leg2.sec.sec_id,
-                                           pair_plan_to_be_deleted.pair_plan_params.plan_leg2.side)
-            log_book_service_http_client.enable_disable_plan_alert_create_query_client(pair_plan_to_be_deleted.id,
-                                                                                            [symbol_side1,
-                                                                                             symbol_side2],
-                                                                                            False)
+            self.clean_plan_id_by_symbol_side_dict_for_plan(pair_plan_to_be_deleted)
         elif buffered_plan_keys is not None and plan_key in buffered_plan_keys:
             # Removing plan_key from buffered plan keys
             async with PlanCollection.reentrant_lock:
@@ -1431,21 +1402,23 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
                             underlying_partial_update_pair_plan_http(pair_plan_json))
 
                         self._close_executor_server(pair_plan.id)    # closing executor
+                        self.clean_plan_id_by_symbol_side_dict_for_plan(pair_plan)
+
                     else:
                         err_str_ = (f"Unloading plan with plan_state: {pair_plan.plan_state} is not supported,"
                                     f"try unloading when start is READY or DONE, pair_plan_key: "
                                     f"{get_pair_plan_log_key(pair_plan)};;; {pair_plan=}")
                         logging.error(err_str_)
                         raise Exception(err_str_)
-
-                    # setting plan alert state to False for this plan_id
-                    symbol_side1 = symbol_side_key(pair_plan.pair_plan_params.plan_leg1.sec.sec_id,
-                                                   pair_plan.pair_plan_params.plan_leg1.side)
-                    symbol_side2 = symbol_side_key(pair_plan.pair_plan_params.plan_leg2.sec.sec_id,
-                                                   pair_plan.pair_plan_params.plan_leg2.side)
-                    log_book_service_http_client.enable_disable_plan_alert_create_query_client(
-                        pair_plan.id, [symbol_side1, symbol_side2], False)
                 # else: deleted not unloaded - nothing to do , DB will remove entry
+
+    def clean_plan_id_by_symbol_side_dict_for_plan(self, pair_plan: PairPlan):
+        symbol_side1 = symbol_side_key(pair_plan.pair_plan_params.plan_leg1.sec.sec_id,
+                                       pair_plan.pair_plan_params.plan_leg1.side)
+        self.plan_id_by_symbol_side_dict.pop(symbol_side1, None)
+        symbol_side2 = symbol_side_key(pair_plan.pair_plan_params.plan_leg2.sec.sec_id,
+                                       pair_plan.pair_plan_params.plan_leg2.side)
+        self.plan_id_by_symbol_side_dict.pop(symbol_side2, None)
 
     async def reload_pair_plans(self, stored_plan_collection_obj: PlanCollection,
                                  updated_plan_collection_obj: PlanCollection) -> None:
@@ -1464,7 +1437,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
             for reloaded_plan_key in reloaded_plan_keys_frozenset:
                 if reloaded_plan_key in updated_plan_collection_obj.loaded_plan_keys:  # loaded not deleted
                     pair_plan_id: int = get_id_from_plan_key(reloaded_plan_key)
-                    pair_plan = \
+                    pair_plan: PairPlan = \
                         await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_pair_plan_by_id_http(
                             pair_plan_id)
 
@@ -1485,10 +1458,9 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
                                                    pair_plan.pair_plan_params.plan_leg1.side)
                     symbol_side2 = symbol_side_key(pair_plan.pair_plan_params.plan_leg2.sec.sec_id,
                                                    pair_plan.pair_plan_params.plan_leg2.side)
-                    log_book_service_http_client.enable_disable_plan_alert_create_query_client(pair_plan_id,
-                                                                                                    [symbol_side1,
-                                                                                                     symbol_side2],
-                                                                                                    True)
+                    log_str = enable_disable_plan_alerts_log_str(pair_plan.id,
+                                                                 [symbol_side1, symbol_side2], True)
+                    logging.warning(log_str)
 
                     # starting snoozed server
                     await self._start_executor_server(pair_plan)
@@ -1859,209 +1831,6 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
                         pair_plan = await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_pair_plan_by_id_http(pair_plan_id)
                         pair_plan_list.append(pair_plan)
         return pair_plan_list
-
-    async def handle_plan_pause_from_plan_id_log_query_pre(
-            self, handle_plan_pause_from_plan_id_log_class_type: Type[HandlePlanPauseFromPlanIdLog],
-            payload: List[Dict[str, Any]]):
-        for log_data in payload:
-            message = log_data.get("message")
-            source_file = log_data.get("source_file")
-            file_name_regex = log_data.get("file_name_regex")
-
-            plan_id = get_plan_id_from_executor_log_file_name(file_name_regex, source_file)
-
-            if plan_id is None:
-                err_str_ = (f"Can't find plan id in {source_file=} from payload passed to "
-                            f"handle_plan_pause_from_log_query - Can't pause plan intended to be paused;;; "
-                            f"payload: {log_data}")
-                logging.critical(err_str_)
-                raise HTTPException(status_code=400, detail=err_str_)
-            # else not required: using found plan_id
-
-            msg_brief: str = message.split(";;;")[0]
-            err_: str = f"pausing pattern matched for plan with {plan_id=};;;{msg_brief=}"
-
-            update_pair_plan_json = {"_id": plan_id, "plan_state": PlanState.PlanState_PAUSED}
-            await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_partial_update_pair_plan_http(
-                update_pair_plan_json)
-            err_ = f"Force paused {plan_id=}, {err_}"
-            logging.critical(err_)
-        return []
-
-    async def handle_plan_pause_from_symbol_side_log_query_pre(
-            self, handle_plan_pause_from_symbol_side_log_class_type: Type[HandlePlanPauseFromSymbolSideLog],
-            payload: List[Dict[str, Any]]):
-        for log_data in payload:
-            message = log_data.get("message")
-
-            symbol_side_set = get_symbol_n_side_from_log_line(message)
-            symbol_side: str = list(symbol_side_set)[0]
-            symbol, side = symbol_side.split("-")
-
-            plan_id: int | None = self.plan_id_by_symbol_side_dict.get(symbol_side)
-
-            if plan_id is None:
-                pair_plan_obj: PairPlan = await self._get_pair_plan_obj_from_symbol_side_async(symbol, Side(side))
-                if pair_plan_obj is None:
-                    raise HTTPException(detail=f"No Ongoing pair plan found for symbol_side: {symbol_side}",
-                                        status_code=400)
-
-                plan_id = pair_plan_obj.id
-                for symbol_side in symbol_side_set:
-                    self.plan_id_by_symbol_side_dict[symbol_side] = plan_id
-
-            msg_brief: str = message.split(";;;")[0]
-            err_: str = f"pausing pattern matched for plan with {plan_id=};;;{msg_brief=}"
-
-            update_pair_plan_json = {"_id": plan_id, "plan_state": PlanState.PlanState_PAUSED}
-            await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_partial_update_pair_plan_http(
-                update_pair_plan_json)
-            err_ = f"Force paused {plan_id=}, {err_}"
-            logging.critical(err_)
-        return []
-
-    async def handle_pos_disable_task(self, plan_id, message):
-        pass
-
-    async def handle_pos_disable_tasks(self, plan_id_n_msg_tuple_list: List[Tuple[int, str]]):
-        task_list = []
-        for plan_id_n_msg_tuple in plan_id_n_msg_tuple_list:
-            plan_id, msg = plan_id_n_msg_tuple
-
-            task = asyncio.create_task(self.handle_pos_disable_task(plan_id, msg))
-            task_list.append(task)
-
-        await execute_tasks_list_with_all_completed(task_list)
-
-    def handle_pos_disable_from_plan_id_log_queue(self):
-        while True:
-            try:
-                data_list = self.pos_disable_from_plan_id_log_queue.get(timeout=self.pos_disable_from_plan_id_log_queue_timeout_sec)      # event based block
-
-            except queue.Empty:
-                # Handle the empty queue condition
-                continue
-
-            plan_id_n_msg_tuple_list: List[Tuple[int, str]] = []
-            for data in data_list:
-                message, source_file, file_name_regex = data
-
-                plan_id = get_plan_id_from_executor_log_file_name(file_name_regex, source_file)
-
-                if plan_id is None:
-                    err_str_ = (f"Can't find plan id in {source_file=} from payload passed to "
-                                f"handle_pos_disable_by_log_query - "
-                                f"Can't disable positions intended to be disabled;;; "
-                                f"log_message: {message}")
-                    logging.critical(err_str_)
-                    continue
-                # else not required: using found plan_id
-
-                plan_id_n_msg_tuple_list.append((plan_id, message))
-
-            if plan_id_n_msg_tuple_list:
-                # coro needs public method
-                run_coro = self.handle_pos_disable_tasks(plan_id_n_msg_tuple_list)
-                future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
-                # block for task to finish
-                try:
-                    future.result()
-                except Exception as e:
-                    logging.exception(f"handle_pos_disable_tasks failed with exception: {e}")
-
-
-    async def handle_pos_disable_from_plan_id_log_query_pre(
-            self, handle_pos_disable_from_plan_id_log_class_type: Type[HandlePosDisableFromPlanIdLog],
-            payload: List[Dict[str, Any]]):
-        message_n_source_file_tuple_list = []
-        for log_data in payload:
-            message = log_data.get("message")
-            source_file = log_data.get("source_file")
-            file_name_regex = log_data.get("file_name_regex")
-            message_n_source_file_tuple_list.append((message, source_file, file_name_regex))
-        self.pos_disable_from_plan_id_log_queue.put(message_n_source_file_tuple_list)
-        return []
-
-    async def _get_pair_plan_obj_from_symbol_side_async(self, symbol: str, side: Side) -> PairPlan | None:
-        pair_plan_list: List[PairPlan] = await (EmailBookServiceRoutesCallbackBaseNativeOverride.
-                    underlying_get_ongoing_or_single_exact_non_ongoing_pair_plan_from_symbol_side_query_http(
-                        sec_id=symbol, side=side))
-        if len(pair_plan_list) == 0:
-            return None
-        elif len(pair_plan_list) == 1:
-            pair_plan_obj: PairPlan = pair_plan_list[0]
-            return pair_plan_obj
-
-    def _get_pair_plan_obj_from_symbol_side(self, symbol: str, side: Side) -> PairPlan | None:
-        # coro needs public method
-        run_coro = (EmailBookServiceRoutesCallbackBaseNativeOverride.
-                    underlying_get_ongoing_or_single_exact_non_ongoing_pair_plan_from_symbol_side_query_http(
-                        sec_id=symbol, side=side))
-        future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
-        # block for task to finish
-        try:
-            pair_plan_list: List[PairPlan] = future.result()
-        except Exception as e:
-            logging.exception(
-                f"underlying_get_ongoing_or_single_exact_non_ongoing_pair_plan_from_symbol_side_query_http "
-                f"failed with exception: {e}")
-            return None
-        else:
-            if len(pair_plan_list) == 0:
-                return None
-            elif len(pair_plan_list) == 1:
-                pair_plan_obj: PairPlan = pair_plan_list[0]
-                return pair_plan_obj
-
-    def handle_pos_disable_from_symbol_side_log_queue(self):
-        while True:
-            try:
-                data_list = self.pos_disable_from_symbol_side_log_queue.get(timeout=self.pos_disable_from_symbol_side_log_queue_timeout_sec)      # event based block
-            except queue.Empty:
-                # Handle the empty queue condition
-                continue
-            plan_id_n_msg_tuple_list: List[Tuple[int, str]] = []
-            for data in data_list:
-                message, source_file = data
-
-                symbol_side_set = get_symbol_n_side_from_log_line(message)
-                symbol_side: str = list(symbol_side_set)[0]
-                symbol, side = symbol_side.split("-")
-
-                plan_id: int | None = self.plan_id_by_symbol_side_dict.get(symbol_side)
-
-                if plan_id is None:
-                    pair_plan_obj: PairPlan = self._get_pair_plan_obj_from_symbol_side(symbol, Side(side))
-                    if pair_plan_obj is None:
-                        raise HTTPException(detail=f"No Ongoing pair plan found for symbol_side: {symbol_side}",
-                                            status_code=400)
-
-                    plan_id = pair_plan_obj.id
-                    for symbol_side in symbol_side_set:
-                        self.plan_id_by_symbol_side_dict[symbol_side] = plan_id
-
-                plan_id_n_msg_tuple_list.append((plan_id, message))
-
-            if plan_id_n_msg_tuple_list:
-                # coro needs public method
-                run_coro = self.handle_pos_disable_tasks(plan_id_n_msg_tuple_list)
-                future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
-                # block for task to finish
-                try:
-                    future.result()
-                except Exception as e:
-                    logging.exception(f"handle_pos_disable_tasks failed with exception: {e}")
-
-    async def handle_pos_disable_from_symbol_side_log_query_pre(
-            self, handle_pos_disable_from_symbol_side_log_class_type: Type[HandlePosDisableFromSymbolSideLog],
-            payload: List[Dict[str, Any]]):
-        message_n_source_file_tuple_list = []
-        for log_data in payload:
-            message = log_data.get("message")
-            source_file = log_data.get("source_file")
-            message_n_source_file_tuple_list.append((message, source_file))
-        self.pos_disable_from_symbol_side_log_queue.put(message_n_source_file_tuple_list)
-        return []
 
 
 async def filter_ws_pair_plan(pair_plan_obj_json: Dict, obj_id_or_list: int | List[int], **kwargs):
