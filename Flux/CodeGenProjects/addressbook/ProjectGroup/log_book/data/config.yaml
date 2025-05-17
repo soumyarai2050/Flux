@@ -65,27 +65,33 @@ pos_disable_regex_pattern:
 no_activity_init_timeout: 60   # secs
 # those with path and component_name will be assumed to exist within log analyzer's no_activity_init_timeout
 # also below regex values need to have path starting after ProjectGroup dir
+# todo: LAZY: test for critical time ranges
 critical_log_regex_file_names:
   phone_book_.*\.log:
     path: "phone_book/log/"
-    start_time: NONE
-    end_time: NONE
+    critical_time_ranges:
+      - start_time: NONE
+        end_time: NONE
     component_name: "phone_book"
   post_book_.*\.log:
     path: "post_book/log/"
-    start_time: NONE
-    end_time: NONE
+    critical_time_ranges:
+      - start_time: NONE
+        end_time: NONE
     component_name: "post_book"
   photo_book_.*\.log:
     path: "photo_book/log/"
-    start_time: NONE
-    end_time: NONE
+    critical_time_ranges:
+      - start_time: NONE
+        end_time: NONE
     component_name: "photo_book"
   basket_book_.*\.log:
     path: "basket_book/log/"
-    start_time: NONE
-    end_time: NONE
+    critical_time_ranges:
+      - start_time: NONE
+        end_time: NONE
     component_name: "basket_book"
   street_book.*\.log:
-    start_time: NONE
-    end_time: NONE
+    critical_time_ranges:
+      - start_time: NONE
+        end_time: NONE

@@ -2892,9 +2892,6 @@ def wait_for_get_new_chore_placed_from_tob(wait_stop_px: int | float, symbol_to_
 
 
 def clean_log_book_alerts():
-    # removing all plan_alerts
-    log_book_web_client.delete_all_plan_alert_client()
-
     contact_alert_list = log_book_web_client.get_all_contact_alert_client()
     for alert in contact_alert_list:
         if "Log analyzer running in simulation mode" not in alert.alert_brief:

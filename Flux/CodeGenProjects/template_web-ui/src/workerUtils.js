@@ -290,31 +290,54 @@ export function applyGetAllWebsocketUpdate(storedArray, updatedObj, uiLimit, isA
 }
 
 export function sortAlertArray(alertArray) {
-    const stabilized = alertArray.map((el, index) => [el, index]);
+    alertArray.sort((a, b) => {
+        const severityA = SEVERITY_TYPES[a.severity];
+        const severityB = SEVERITY_TYPES[b.severity];
+        if (severityA > severityB) {
+            return -1;
+        } else if (severityB > severityA) {
+            return 1;
+        } else {  // same severity
+            if (a.last_update_analyzer_time > b.last_update_analyzer_time) {
+                return -1;
+            } else if (b.last_update_analyzer_time > a.last_update_analyzer_time) {
+                return 1;
+            } else {  // same last update date time
+                if (a.alert_count >= b.alert_count) {
+                    return -1;
+                }
+                return 1;
+            }
+        }
+    })
+    return alertArray;
 
-    stabilized.sort((a, b) => {
-        const alertA = a[0];
-        const alertB = b[0];
+    // reverted as not stable
+    // const stabilized = alertArray.map((el, index) => [el, index]);
 
-        const severityA = SEVERITY_TYPES[alertA.severity];
-        const severityB = SEVERITY_TYPES[alertB.severity];
+    // stabilized.sort((a, b) => {
+    //     const alertA = a[0];
+    //     const alertB = b[0];
 
-        if (severityA > severityB) return -1;
-        if (severityB > severityA) return 1;
+    //     const severityA = SEVERITY_TYPES[alertA.severity];
+    //     const severityB = SEVERITY_TYPES[alertB.severity];
 
-        // same severity
-        if (alertA.last_update_analyzer_time > alertB.last_update_analyzer_time) return -1;
-        if (alertB.last_update_analyzer_time > alertA.last_update_analyzer_time) return 1;
+    //     if (severityA > severityB) return -1;
+    //     if (severityB > severityA) return 1;
 
-        // same timestamp
-        if (alertA.alert_count > alertB.alert_count) return -1;
-        if (alertB.alert_count > alertA.alert_count) return 1;
+    //     // same severity
+    //     if (alertA.last_update_analyzer_time > alertB.last_update_analyzer_time) return -1;
+    //     if (alertB.last_update_analyzer_time > alertA.last_update_analyzer_time) return 1;
 
-        // fallback to original index for stability
-        return a[1] - b[1];
-    });
+    //     // same timestamp
+    //     if (alertA.alert_count > alertB.alert_count) return -1;
+    //     if (alertB.alert_count > alertA.alert_count) return 1;
 
-    return stabilized.map(pair => pair[0]);
+    //     // fallback to original index for stability
+    //     return a[1] - b[1];
+    // });
+
+    // return stabilized.map(pair => pair[0]);
 }
 
 export function getColorTypeFromValue(collection, value, separator = '-') {
@@ -348,7 +371,7 @@ function ensureSymmetry(arr, joinSort) {
     // Step 1: Calculate max counts for the specified field dynamically
     const field = joinSort.sort_order.order_by;
     const sortType = joinSort.sort_order.sort_type;
-    const maxCounts = {};
+    let maxCounts = {};
 
     arr.forEach(innerArr => {
         let innerArrMaxCounts = {};

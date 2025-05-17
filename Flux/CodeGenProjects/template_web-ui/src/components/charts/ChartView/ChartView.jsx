@@ -79,6 +79,11 @@ function ChartView({
     // 4. create expanded chart configuration object to be used by echart using stored chart configuration and datasets 
 
     useEffect(() => {
+        const updatedIndex = selectedChartName ? chartData.findIndex((o) => o.chart_name === selectedChartName) : null;
+        setSelectedIndex(updatedIndex);
+    }, [selectedChartName, chartEnableOverride])
+
+    useEffect(() => {
         // update the local row dataset on update from parent
         if (mode === MODES.READ) {
             let updatedRows = chartRows;

@@ -2079,7 +2079,7 @@ export function compareJSONObjects(obj1, obj2, fieldsMetadata, isCreate = false)
                 continue;
             }
 
-            if (metadata.serverPopulate || (!isCreate && metadata.ormNoUpdate)) {
+            if (metadata.serverPopulate) {
                 const err_ = `CRITICAL: Update request discarded, unmodifiable field found in patch update for path: ${path}, likely UI bug. Please send screenshot to DEV for investigation`;
                 console.error(err_);
                 alert(err_);

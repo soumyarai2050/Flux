@@ -45,6 +45,7 @@ message SymbolOverview {
   };
   option (FluxMsgStringLength) = 128;
   option (FluxMsgIsShmModel) = true;
+  option (FluxMsgIsShmContainer) = true;
 
   required int32 id = 1;
   required string symbol = 2 [(FluxFldPk) = "true", (FluxFldIndex) = true, (FluxFldFilterEnable) = true];

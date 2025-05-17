@@ -18,7 +18,7 @@ const useDownload = (modelName, fieldsMetadata, xpath, modelType = null) => {
     const downloadCSV = (storedData = null, args = {}) => {
         return new Promise(async (resolve, reject) => {
             if (isDownloading) {
-                console.warn('Download already is progress. ignoring this request');
+                console.warn('Download already in progress. ignoring this request');
                 reject();
                 return;
             }

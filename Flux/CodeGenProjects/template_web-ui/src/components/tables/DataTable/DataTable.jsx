@@ -3,7 +3,7 @@ import { ListItemIcon, ListItemText, Menu, MenuItem, Table, TableBody, TableCont
 import TableHead from '../../TableHead';
 import Cell from '../../Cell';
 import styles from './DataTable.module.css';
-import { ClearAll } from '@mui/icons-material';
+import { ClearAll, Save } from '@mui/icons-material';
 import { getDataxpath, generateRowTrees } from '../../../utils';
 import { cloneDeep, get, set } from 'lodash';
 import { DB_ID, MODES, DATA_TYPES, MODEL_TYPES } from '../../../constants';
@@ -13,6 +13,7 @@ import { ModelCard, ModelCardHeader, ModelCardContent } from '../../cards';
 import { useSelector } from 'react-redux';
 import DataTree from '../../trees/DataTree/DataTree';
 import ClipboardCopier from '../../ClipboardCopier';
+import Icon from '../../Icon';
 
 const DataTable = ({
   rows,
@@ -255,7 +256,8 @@ const DataTable = ({
     onRowsPerPageChange(updatedRowsPerPage);
   }
 
-  const handleModalToggle = () => {
+  const handleModalToggle = (e, reason) => {
+    if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;
     setIsModalOpen((prev) => !prev);
   }
 
@@ -293,7 +295,7 @@ const DataTable = ({
                     modelType === MODEL_TYPES.ROOT
                       ? selectedRows.includes(row['data-id'])
                       : selectedRows.includes(row['data-id']) || selectedId === row['data-id']);
-                  const isNullCell = row && Object.keys(row).length === 0 && !cell.commonGroupKey;
+                  const isNullCell = !row || (row && Object.keys(row).length === 0 && !cell.commonGroupKey);
 
                   let xpath = row?.['xpath_' + cell.key];
                   if (row && cell.tableTitle && cell.tableTitle.indexOf('.') > -1) {
@@ -365,7 +367,7 @@ const DataTable = ({
                       onButtonClick={handleButtonClick}
                       onTextChange={handleTextChange}
                       index={selectedId}
-                      forceUpdate={mode === MODES.READ}
+                      forceUpdate={isModalOpen}
                       truncateDateTime={false}
                       modelType={modelType}
                       onForceSave={() => { }}
@@ -417,7 +419,7 @@ const DataTable = ({
       >
         <ModelCard>
           <ModelCardHeader name={modelName}>
-
+            <Icon name='save' title='save' onClick={handleModalToggle}><Save fontSize='small' /></Icon>
           </ModelCardHeader>
           <ModelCardContent>
             <DataTree

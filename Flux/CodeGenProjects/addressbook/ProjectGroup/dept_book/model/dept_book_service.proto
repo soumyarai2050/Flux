@@ -16,6 +16,8 @@ option (FluxFileDateTimePrintTimezone) = "LOCAL";
 enum BarType {
   OneDay = 1;
   OneHour = 2;
+  OneMin = 3;
+  FiveMin = 4;
 }
 
 message RTDash {
@@ -222,6 +224,54 @@ message BarData {
     Granularity: Sec,
     ExpireAfterSeconds: 31536000,  // one year worth of seconds
     IncludeDataframeClients: true
+  };
+  option (FluxMsgJsonQuery) = {
+    QueryName: "get_latest_bar_data",
+    QueryParams: {
+      QueryParamName: "exch_id_list",
+      QueryParamDataType: "List[str] | None = None"
+    },
+    QueryParams: {
+      QueryParamName: "bar_type_list",
+      QueryParamDataType: "List[BarType] | None = None"
+    },
+    QueryParams: {
+      QueryParamName: "start_time",
+      QueryParamDataType: "pendulum.DateTime | None = None"
+    },
+    QueryParams: {
+      QueryParamName: "end_time",
+      QueryParamDataType: "pendulum.DateTime | None = None"
+    },
+    QueryRouteType: PATCH
+  };
+    option (FluxMsgJsonQuery) = {
+    QueryName: "get_aggregated_bar_data",
+    QueryParams: {
+      QueryParamName: "target_bar_type",
+      QueryParamDataType: "str"
+    },
+    QueryParams: {
+      QueryParamName: "end_time",
+      QueryParamDataType: "pendulum.DateTime | None = None"
+    },
+    QueryParams: {
+      QueryParamName: "start_time",
+      QueryParamDataType: "pendulum.DateTime | None = None"
+    },
+    QueryParams: {
+      QueryParamName: "target_bar_counts",
+      QueryParamDataType: "int | None = None"
+    },
+    QueryParams: {
+      QueryParamName: "exch_id_list",
+      QueryParamDataType: "List[str] | None = None"
+    },
+    QueryParams: {
+      QueryParamName: "symbol_list",
+      QueryParamDataType: "List[str] | None = None"
+    },
+    QueryRouteType: PATCH
   };
   option (FluxMsgStringLength) = 128;
   required int32 id = 1;

@@ -31,6 +31,8 @@ option (FluxFileImportDependencyModel) = {
     ImportFileName: "street_book_n_post_book_n_basket_book_core.proto",
     ImportModelName: "ChoreJournal",
     ImportModelName: "ChoreJournalList",
+    ImportModelName: "ChoreSnapshot",
+    ImportModelName: "ChoreSnapshotList",
 
 };
 

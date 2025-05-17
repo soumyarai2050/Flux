@@ -82,13 +82,7 @@ const Cell = (props) => {
 
     useEffect(() => {
         setInputValue(currentValue);
-    }, [props.index, mode])
-
-    // useEffect(() => {
-    //     if (props.forceUpdate) {
-    //         setInputValue(currentValue);
-    //     }
-    // }, [props.forceUpdate])
+    }, [props.index, mode, props.forceUpdate])
 
     useEffect(() => {
         if (mode === MODES.READ) {
@@ -145,7 +139,7 @@ const Cell = (props) => {
     }
 
     const handleTextChange = (e, type, xpath, value, dataxpath, validationRes, dataSourceId, source) => {
-        cursorPos.current = e.target.selectionStart;
+        cursorPos.current = e?.target.selectionStart ?? null;
         setInputValue(value);
         debouncedTransform(e, type, xpath, value, dataxpath, validationRes, dataSourceId, source);
     }

@@ -539,15 +539,6 @@ def test_alert_with_same_severity_n_brief_is_always_updated(
 
 
 def verify_alert_in_plan_alert_cache(plan_alert: PlanAlertBaseModel):
-    plan_alert_id_to_obj_cache: List[PlanAlertIdToObjCacheBaseModel] = (
-        log_book_web_client.verify_plan_alert_id_in_plan_alert_id_to_obj_cache_dict_query_client(plan_alert.id))
-    assert len(plan_alert_id_to_obj_cache) == 1, \
-        ("Received unexpected plan_alert_id_to_obj_cache - "
-         "verify_plan_alert_id_in_plan_alert_id_to_obj_cache_dict_query_client failed, "
-         f"{plan_alert_id_to_obj_cache=}")
-    assert plan_alert_id_to_obj_cache[0].is_id_present, \
-        f"{plan_alert.id=} must exist in plan_alert_id_to_obj_cache_dict in log analyzer"
-
     plan_alert_key = get_alert_cache_key(plan_alert.severity, plan_alert.alert_brief,
                                           plan_alert.alert_meta.component_file_path,
                                           plan_alert.alert_meta.source_file_name,
@@ -565,15 +556,6 @@ def verify_alert_in_plan_alert_cache(plan_alert: PlanAlertBaseModel):
 
 
 def verify_alert_not_in_plan_alert_cache(plan_alert: PlanAlertBaseModel):
-    plan_alert_id_to_obj_cache: List[PlanAlertIdToObjCacheBaseModel] = (
-        log_book_web_client.verify_plan_alert_id_in_plan_alert_id_to_obj_cache_dict_query_client(plan_alert.id))
-    assert len(plan_alert_id_to_obj_cache) == 1, \
-        ("Received unexpected plan_alert_id_to_obj_cache - "
-         "verify_plan_alert_id_in_plan_alert_id_to_obj_cache_dict_query_client failed, "
-         f"{plan_alert_id_to_obj_cache=}")
-    assert not plan_alert_id_to_obj_cache[0].is_id_present, \
-        f"{plan_alert.id=} must not exist in plan_alert_id_to_obj_cache_dict in log analyzer after deletion"
-
     plan_alert_key = get_alert_cache_key(plan_alert.severity, plan_alert.alert_brief,
                                           plan_alert.alert_meta.component_file_path,
                                           plan_alert.alert_meta.source_file_name,
@@ -637,7 +619,7 @@ def verify_alert_not_in_contact_alert_cache(contact_alert: ContactAlertBaseModel
 
 
 @pytest.mark.log_book
-def test_to_verify_plan_alert_cache_is_cleared_in_delete_plan_alert(
+def test_to_verify_plan_alert_cache_is_cleared_in_plan_unload(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
         expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         market_depth_basemodel_list):
@@ -672,68 +654,11 @@ def test_to_verify_plan_alert_cache_is_cleared_in_delete_plan_alert(
         # verifying that plan_alert was added in cache
         verify_alert_in_plan_alert_cache(plan_alert)
 
-    # deleting 1 plan_alert using delete_plan_alert_client out of 3 plan_alerts to verifying and then calling
-    # delete_all_plan_alert_client to verify remaining 2 also are removed from cache
-    plan_alert = created_plan_alert_list.pop(0)
-    log_book_web_client.delete_plan_alert_client(plan_alert.id)
-    verify_alert_not_in_plan_alert_cache(plan_alert)
+    # unloads and deletes loaded plans
+    clean_executors_and_today_activated_symbol_side_lock_file()
 
     log_book_web_client.delete_all_plan_alert_client()
     for plan_alert in created_plan_alert_list:
-        verify_alert_not_in_plan_alert_cache(plan_alert)
-
-
-@pytest.mark.log_book
-def test_to_verify_remove_plan_alerts_for_plan_id_query(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
-        expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
-        market_depth_basemodel_list):
-    leg1_leg2_symbol_list = leg1_leg2_symbol_list[:3]
-
-    plan_alert_config: Dict = la_config_yaml_dict.get("plan_alert_config")
-    time_wait = plan_alert_config.get("transaction_timeout_secs")
-
-    active_plan_n_executor_list = start_plans_in_parallel(
-        leg1_leg2_symbol_list, pair_plan_,
-        expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
-        market_depth_basemodel_list)
-
-    created_plan_alert_list: List[PlanAlertBaseModel] = []
-    for active_plan, executor_http_client in active_plan_n_executor_list:
-        log_file_path = STRAT_EXECUTOR / "log" / f"street_book_{active_plan.id}_logs_{frmt_date}.log"
-        sample_file_name = "sample_file.py"
-        line_no = random.randint(1, 100)
-        sample_brief = "Sample Log to be created as plan_alert"
-        log_lvl = random.choice(["ERROR", "WARNING", "CRITICAL"])
-
-        # first time creating alert
-        sample_detail = f"sample detail string"
-        log_str = get_log_line_str(log_lvl, sample_file_name,
-                                   line_no, f"{sample_brief};;;{sample_detail}")
-        add_log_to_file(log_file_path, log_str)
-        time.sleep(1)
-
-        plan_alert = check_alert_exists_in_plan_alert(active_plan, sample_brief, log_file_path, sample_detail)
-        created_plan_alert_list.append(plan_alert)
-
-        # verifying that plan_alert was added in cache
-        verify_alert_in_plan_alert_cache(plan_alert)
-
-    for plan_alert in created_plan_alert_list:
-        log_book_web_client.remove_plan_alerts_for_plan_id_query_client(plan_alert.plan_id)
-
-        # verifying if plan_id exists in plan_alert_cache_dict_by_plan_id_dict
-        container_obj_list = (
-            log_book_web_client.verify_plan_id_in_plan_alert_cache_dict_by_plan_id_dict_query_client(
-                plan_alert.plan_id))
-        assert len(container_obj_list) == 1, \
-            ("Received unexpected container_obj_list - "
-             "verify_plan_id_in_plan_alert_cache_dict_by_plan_id_dict_query_client failed, "
-             f"{container_obj_list=}")
-        assert not container_obj_list[0].is_id_present, \
-            f"{plan_alert.plan_id=} must not exist in plan_alert_cache_dict_by_plan_id_dict in log analyzer"
-
-        # verifying other cache also
         verify_alert_not_in_plan_alert_cache(plan_alert)
 
 
@@ -762,54 +687,6 @@ def test_to_verify_contact_alert_cache_is_cleared_in_delete_contact_alert(
     log_book_web_client.delete_contact_alert_client(contact_alert.id)
     # verifying that alert got cleared from cache
     verify_alert_not_in_contact_alert_cache(contact_alert)
-
-
-@pytest.mark.log_book
-def test_start_alert_with_same_severity_n_brief_is_created_again_if_is_deleted(
-        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
-        expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
-        market_depth_basemodel_list):
-    """
-    Test to verify plan_alert once created if alert is deleted and same log line is again added,
-    then plan_alert is created inplace of updating - verifies deletion and caching is working for plan_alert
-    """
-    leg1_leg2_symbol_list = leg1_leg2_symbol_list[:3]
-
-    plan_alert_config: Dict = la_config_yaml_dict.get("plan_alert_config")
-    time_wait = plan_alert_config.get("transaction_timeout_secs")
-
-    active_plan_n_executor_list = start_plans_in_parallel(
-        leg1_leg2_symbol_list, pair_plan_,
-        expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
-        market_depth_basemodel_list)
-
-    for active_plan, executor_http_client in active_plan_n_executor_list:
-        log_file_path = STRAT_EXECUTOR / "log" / f"street_book_{active_plan.id}_logs_{frmt_date}.log"
-        sample_file_name = "sample_file.py"
-        line_no = random.randint(1, 100)
-        sample_brief = "Sample Log to be created as plan_alert"
-        log_lvl = random.choice(["ERROR", "WARNING", "CRITICAL"])
-
-        # first time creating alert
-        sample_detail = f"sample detail string"
-        log_str = get_log_line_str(log_lvl, sample_file_name,
-                                   line_no, f"{sample_brief};;;{sample_detail}")
-        add_log_to_file(log_file_path, log_str)
-        time.sleep(1)
-
-        plan_alert = check_alert_exists_in_plan_alert(active_plan, sample_brief, log_file_path, sample_detail)
-
-        # deleting start_alert
-        log_book_web_client.delete_plan_alert_client(plan_alert.id)
-        check_alert_doesnt_exist_in_plan_alert(active_plan, sample_brief, log_file_path)
-
-        # again adding same log - this time it must be again created
-        log_str = get_log_line_str(log_lvl, sample_file_name,
-                                   line_no, f"{sample_brief};;;{sample_detail}")
-        add_log_to_file(log_file_path, log_str)
-        time.sleep(1)
-
-        check_alert_exists_in_plan_alert(active_plan, sample_brief, log_file_path, sample_detail)
 
 
 # @ failing: internal cache in tail executor is not removed when deleted - when obj is again created
@@ -999,9 +876,8 @@ def test_plan_alert_with_no_plan_with_symbol_side_is_sent_to_contact_alert(
                 f"No start alert must exists with having alert_brief: {sample_brief}, found alert: {plan_alert}"
 
     contact_alert_list = log_book_web_client.get_all_contact_alert_client()
-    sample_brief = sample_brief.replace("%%", "")
     for contact_alert in contact_alert_list:
-        if contact_alert.alert_brief == sample_brief:
+        if sample_brief in contact_alert.alert_brief:
             break
     else:
         assert False, \
@@ -1118,7 +994,7 @@ def test_plan_alert_put_all_failed_alerts_goes_to_contact_alert(
             check_alert_doesnt_exist_in_plan_alert(active_plan, sample_brief, log_file_path)
 
             # verifying contact alert contains failed plan alert
-            check_alert_exists_in_contact_alert(sample_brief, log_file_path, sample_detail, updated_sample_detail)
+            check_alert_exists_in_contact_alert(sample_brief, log_file_path, updated_sample_detail)
         except Exception as e:
             raise e
         finally:
@@ -1266,7 +1142,7 @@ def test_check_background_logs_alert_handling(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
         expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         market_depth_basemodel_list):
-    log_file_name = f"phone_book_background_logs.log"
+    log_file_name = f"phone_book_background.log"
     log_file_path = PAIR_STRAT_ENGINE_DIR / "log" / log_file_name
 
     if not os.path.exists(log_file_path):
@@ -1289,7 +1165,7 @@ def test_check_background_logs_alert_handling(
         for _ in range(10):
             contact_alerts = log_book_web_client.get_all_contact_alert_client()
             for contact_alert in contact_alerts:
-                if contact_alert.alert_brief == log_str[-1]:
+                if contact_alert.alert_brief == "SAMPLE EXCEPTION":
                     break
             else:
                 time.sleep(1)

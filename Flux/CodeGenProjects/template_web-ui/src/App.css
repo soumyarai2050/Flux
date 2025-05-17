@@ -113,4 +113,5 @@ div.MuiModal-root:has(> div[style*="opacity: 0"]) {
   background: yellow;
   border-radius: 5px;
   box-shadow: -2px -2px 3px rgba(0, 0, 0, 0.4);
+  z-index: 1000;
 }

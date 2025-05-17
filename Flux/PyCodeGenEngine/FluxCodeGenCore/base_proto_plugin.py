@@ -223,6 +223,7 @@ class BaseProtoPlugin(ABC):
     flux_msg_is_cpp_web_server_model: ClassVar[str] = 'FluxMsgIsCppWebServerModel'
     flux_msg_string_length: ClassVar[str] = "FluxMsgStringLength"
     flux_msg_is_shm_model: ClassVar[str] = "FluxMsgIsShmModel"
+    flux_msg_is_shm_container: ClassVar[str] = "FluxMsgIsShmContainer"
     flux_enum_cmnt: ClassVar[str] = "FluxEnumCmnt"
     default_id_field_name: ClassVar[str] = "id"
     default_id_type_var_name: ClassVar[str] = "DefaultIdType"  # to be used in models as default type variable name

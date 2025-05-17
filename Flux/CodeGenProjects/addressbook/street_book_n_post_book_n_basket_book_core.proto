@@ -172,3 +172,7 @@ message ChoreSnapshot {
   optional int64 last_update_date_time = 22 [(FluxFldValIsDateTime) = true];
   optional int64 last_n_sec_total_qty = 23 [(FluxFldHide) = "True"];   // used to get aggregated value of last n sec chore qty
 }
+
+message ChoreSnapshotList {
+  repeated ChoreSnapshot chore_snapshot = 1;
+}

@@ -27,24 +27,19 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.aggregate import
 from FluxPythonUtils.scripts.general_utility_functions import (
     except_n_log_alert, create_logger, is_file_modified, handle_refresh_configurable_data_members,
     get_pid_from_port, is_process_running, parse_to_float, get_symbol_side_pattern,
-    get_transaction_counts_n_timeout_from_config, find_files_with_regex)
+    get_transaction_counts_n_timeout_from_config, find_files_with_regex, ClientError)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_helper import (
     photo_book_service_http_client)
-from Flux.CodeGenProjects.performance_benchmark.app.performance_benchmark_helper import performance_benchmark_service_http_client, RawPerformanceDataBaseModel
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_client import StreetBookServiceHttpClient
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.markets.market import Market, MarketID
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book_service_helper import (
     get_plan_id_from_executor_log_file_name, get_symbol_n_side_from_log_line)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import symbol_side_key
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import symbol_side_key, get_symbol_side_key
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.app.basket_book_helper import be_port, basket_book_service_http_client
 from Flux.PyCodeGenEngine.FluxCodeGenCore.log_book_utils import *
 
 # standard imports
 from datetime import datetime
-
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import get_plan_key_from_pair_plan
-from ProjectGroup.phone_book.generated.FastApi.email_book_service_http_msgspec_routes import \
-    underlying_read_pair_plan_http
 
 LOG_ANALYZER_DATA_DIR = (
     PurePath(__file__).parent.parent / "data"
@@ -87,8 +82,9 @@ class PlanAlertIDCont(MsgspecBaseModel):
 class LogNoActivityData(MsgspecBaseModel, kw_only=True):
     source_file: str
     service_name: str
-    critical_start_time: DateTime | None = None
-    critical_end_time: DateTime | None = None
+    # critical_start_time: DateTime | None = None
+    # critical_end_time: DateTime | None = None
+    critical_duration_list: List[Tuple[DateTime | None, DateTime | None]] = field(default_factory=list)
     last_modified_timestamp: float | None = None
 
 
@@ -103,57 +99,12 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         "warning": Severity.Severity_WARNING,
         "exception": Severity.Severity_ERROR
     }
-    debug_prefix_regex_pattern: str = r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} : (" \
-                                               r"DEBUG|INFO|DB|WARNING|ERROR|CRITICAL) : \[[a-zA-Z._]* : \d*\] : "
-    pair_plan_log_prefix_regex_pattern: str = r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} : (DB|WARNING|ERROR|CRITICAL) : \[[a-zA-Z._]* : \d*\] : "
-    background_log_prefix_regex_pattern: str = (r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} : )?(.*(?:Error|Exception|WARNING|ERROR|CRITICAL))(\s*:\s*)?")
-    log_simulator_log_prefix_regex_pattern: str = r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} : (INFO|WARNING|ERROR|CRITICAL) : \[[a-zA-Z._]* : \d*] : "
-    perf_benchmark_log_prefix_regex_pattern: str = r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3} : (" \
-                                                   r"TIMING) : \[[a-zA-Z._]* : \d*] : "
-    log_prefix_regex_pattern_to_callable_name_dict = {
-        pair_plan_log_prefix_regex_pattern: "handle_pair_plan_matched_log_message",
-        perf_benchmark_log_prefix_regex_pattern: "handle_perf_benchmark_matched_log_message"
-    }
-    log_prefix_regex_pattern_to_log_date_time_regex_pattern = {
-        pair_plan_log_prefix_regex_pattern: r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})',
-        perf_benchmark_log_prefix_regex_pattern: r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})'
-    }
-    log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern = {
-        pair_plan_log_prefix_regex_pattern: r'\[([^:]+)\s*:\s*(\d+)\]',
-        perf_benchmark_log_prefix_regex_pattern: r'\[([^:]+)\s*:\s*(\d+)\]'
-    }
-    debug_log_prefix_regex_pattern_to_callable_name_dict = {
-        debug_prefix_regex_pattern: "handle_pair_plan_matched_log_message",
-        perf_benchmark_log_prefix_regex_pattern: "handle_perf_benchmark_matched_log_message"
-    }
-    debug_log_prefix_regex_pattern_to_log_date_time_regex_pattern = {
-        debug_prefix_regex_pattern: r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})',
-        perf_benchmark_log_prefix_regex_pattern: r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})'
-    }
-    debug_log_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern = {
-        debug_prefix_regex_pattern: r'\[([^:]+)\s*:\s*(\d+)\]',
-        perf_benchmark_log_prefix_regex_pattern: r'\[([^:]+)\s*:\s*(\d+)\]'
-    }
-    log_perf_benchmark_pattern_to_callable_name_dict = {
-        perf_benchmark_log_prefix_regex_pattern: "handle_perf_benchmark_matched_log_message"
-    }
-    log_perf_benchmark_pattern_to_log_date_time_regex_pattern = {
-        perf_benchmark_log_prefix_regex_pattern: r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})'
-    }
-    log_perf_benchmark_pattern_to_log_source_patter_n_line_num_regex_pattern = {
-        perf_benchmark_log_prefix_regex_pattern: r'\[([^:]+)\s*:\s*(\d+)\]'
-    }
-    log_simulator_prefix_regex_pattern_to_callable_name_dict = {
-        log_simulator_log_prefix_regex_pattern: "handle_log_simulator_matched_log_message"
-    }
-    log_simulator_prefix_regex_pattern_to_log_date_time_regex_pattern = {
-        log_simulator_log_prefix_regex_pattern: r'^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3})'
-    }
-    log_simulator_prefix_regex_pattern_to_log_source_patter_n_line_num_regex_pattern = {
-        log_simulator_log_prefix_regex_pattern: r'\[([^:]+)\s*:\s*(\d+)\]'
-    }
-    background_log_prefix_regex_pattern_to_callable_name_dict = {
-        background_log_prefix_regex_pattern: "handle_pair_plan_matched_log_message"
+    severity_to_log_lvl_map: Dict[Severity, str] = {
+        Severity.Severity_DEBUG: "debug",
+        Severity.Severity_INFO: "info",
+        Severity.Severity_ERROR: "error",
+        Severity.Severity_CRITICAL: "critical",
+        Severity.Severity_WARNING: "warning"
     }
     datetime_str: str = datetime.now().strftime("%Y%m%d")
     plan_id_to_start_alert_obj_list_dict: Dict[int, List[int]] = {}
@@ -166,7 +117,6 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
     underlying_filtered_plan_alert_by_plan_id_query_http: Callable[..., Any] | None = None
     underlying_delete_plan_alert_http: Callable[..., Any] | None = None
     underlying_delete_by_id_list_plan_alert_http: Callable[..., Any] | None = None
-    underlying_plan_state_update_matcher_query_http: Callable[..., Any] | None = None
     underlying_handle_plan_alerts_with_symbol_side_query_http: Callable[..., Any] | None = None
     underlying_handle_plan_alerts_with_plan_id_query_http: Callable[..., Any] | None = None
 
@@ -177,13 +127,15 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         self.min_refresh_interval: int = parse_to_int(config_yaml_dict.get("min_refresh_interval"))
         self.service_up: bool = False
         self.service_ready = False
-        self.plan_alert_cache_dict_by_plan_id_dict: Dict[int, Dict[str, PlanAlert]] = {}     # updates in main thread only
-        self.plan_id_by_symbol_side_dict: Dict[str, int] = {}
-        self.contact_alerts_cache_dict: Dict[str, ContactAlert] = {}    # updates in main thread only
-        self.plan_alerts_cache_cont: AlertsCacheCont = AlertsCacheCont(name="plan")
-        self.contact_alerts_cache_cont: AlertsCacheCont = AlertsCacheCont(name="contact")
-        self.active_plan_id_list_mutex: threading.Lock = threading.Lock()
-        self.active_plan_id_list: List[int] = []
+        self.contact_alerts_service_ready = False
+        self.plan_alerts_service_ready = False
+        self.loaded_unload_plan_list_async_rlock: AsyncRLock = AsyncRLock()
+        self.loaded_plan_id_list: List[int] = []
+        self.loaded_plan_id_by_symbol_side_dict: Dict[str, int] = {}
+        self.plan_alert_cache_dict_by_plan_id_dict: Dict[int, Dict[str, PlanAlert]] = {}
+        self.contact_alerts_cache_dict_async_rlock: AsyncRLock = AsyncRLock()
+        self.contact_alerts_id_to_obj_cache_dict: Dict[int, ContactAlert] = {}
+        self.contact_alerts_cache_dict: Dict[str, ContactAlert] = {}
         self.contact_alert_queue: Queue = Queue()
         self.plan_alert_queue: Queue = Queue()
         # timeout event
@@ -230,7 +182,6 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             underlying_update_all_contact_alert_http, underlying_create_all_plan_alert_http,
             underlying_update_all_plan_alert_http,
             underlying_filtered_plan_alert_by_plan_id_query_http, underlying_delete_plan_alert_http,
-            underlying_plan_state_update_matcher_query_http,
             underlying_handle_plan_alerts_with_symbol_side_query_http,
             underlying_handle_plan_alerts_with_plan_id_query_http)
         LogBookServiceRoutesCallbackBaseNativeOverride.underlying_read_contact_alert_http = (
@@ -251,8 +202,6 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             underlying_delete_plan_alert_http)
         LogBookServiceRoutesCallbackBaseNativeOverride.underlying_delete_by_id_list_plan_alert_http = (
             underlying_delete_by_id_list_plan_alert_http)
-        LogBookServiceRoutesCallbackBaseNativeOverride.underlying_plan_state_update_matcher_query_http = (
-            underlying_plan_state_update_matcher_query_http)
         LogBookServiceRoutesCallbackBaseNativeOverride.underlying_handle_plan_alerts_with_symbol_side_query_http = (
             underlying_handle_plan_alerts_with_symbol_side_query_http)
         LogBookServiceRoutesCallbackBaseNativeOverride.underlying_handle_plan_alerts_with_plan_id_query_http = (
@@ -299,16 +248,6 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                         if is_log_book_service_up(ignore_error=(service_up_no_error_retry_count > 0)):
                             self.service_up = True
                             should_sleep = False
-
-                            # updating alert cache
-                            run_coro = self.load_alerts_n_update_cache()
-                            future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
-                            # block to finish task
-                            try:
-                                future.result()
-                            except Exception as e:
-                                logging.exception(f"load_alerts_n_update_cache failed with exception: {e}")
-
                         else:
                             should_sleep = True
                             service_up_no_error_retry_count -= 1
@@ -320,6 +259,27 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                 else:
                     should_sleep = True
                     # any periodic refresh code goes here
+
+                    if not self.contact_alerts_service_ready:
+                        # updating alert cache - updates self.contact_alerts_service_ready implicitly
+                        run_coro = self.load_contact_alerts_n_update_cache()
+                        future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
+                        # block to finish task
+                        try:
+                            future.result()
+                        except Exception as e:
+                            logging.exception(f"load_contact_alerts_n_update_cache failed with exception: {e}")
+
+                    if not self.plan_alerts_service_ready:
+                        # updating alert cache - updates self.plan_alerts_service_ready implicitly
+                        run_coro = self.load_plan_alerts_n_update_cache()
+                        future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
+                        # block to finish task
+                        try:
+                            future.result()
+                        except Exception as e:
+                            logging.exception(f"load_plan_alerts_n_update_cache failed with exception: {e}")
+
 
                     # sending no activity notifications for log files
                     if no_activity_setup_timeout:
@@ -335,14 +295,6 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                                                                  str(config_yaml_path))
             else:
                 should_sleep = True
-
-    async def load_alerts_n_update_cache(self):
-        # updating contact alert cache
-        await self.load_contact_alerts_n_update_cache()
-        # updating plan alert cache
-        await self.load_plan_alerts_n_update_cache()
-        # loading ongoing plan's cache data
-        self.load_loaded_plans_cache_data()
 
     def get_generic_read_route(self):
         pass
@@ -431,46 +383,72 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
     async def enable_disable_plan_alert_create_query_pre(
             self, enable_disable_plan_alert_create_class_type: Type[EnableDisablePlanAlertCreate],
             payload: List[Dict[str, Any]]):
-        with self.active_plan_id_list_mutex:
-            if action:
-                if plan_id not in self.active_plan_id_list:
-                    self.active_plan_id_list.append(plan_id)
-                    logging.debug(f"Added {plan_id=} in self.active_plan_id_list")
-            for log_data in payload:
-                message: str = log_data.get("message")
-                # cleaning enable_disable_pattern_str
-                message = message[len(enable_disable_log_str_start_pattern()):]
-                data_list = message.split(self.key_val_sep)
-                plan_id: int = parse_to_int(data_list.pop(0))
-                symbol_side_key_list: List[str] = ast.literal_eval(data_list.pop(0))
-                action: bool = bool(data_list.pop(0))
+        async with self.loaded_unload_plan_list_async_rlock:
+            async with PlanAlert.reentrant_lock:
+                for log_data in payload:
+                    message: str = log_data.get("message")
+                    # cleaning enable_disable_pattern_str
+                    message = message[len(enable_disable_log_str_start_pattern()):]
+                    data_list = message.split(self.key_val_sep)
+                    plan_id: int = parse_to_int(data_list.pop(0))
+                    symbol_side_key_list: List[str] = ast.literal_eval(data_list.pop(0))
+                    action: bool = True if data_list.pop(0).lower() == "true" else False
 
-                if action:
-                    if plan_id not in self.active_plan_id_list:
-                        self.active_plan_id_list.append(plan_id)
-                        logging.debug(f"Added {plan_id=} in self.active_plan_id_list")
+                    if action:
+                        # if action is True then enabling plan alert creation for this plan id
+                        if plan_id not in self.loaded_plan_id_list:
+                            self.loaded_plan_id_list.append(plan_id)
+                            logging.debug(f"Added {plan_id=} in self.active_plan_id_list")
 
-                        for symbol_side_key in symbol_side_key_list:
-                            self.plan_id_by_symbol_side_dict[symbol_side_key] = plan_id
-                            logging.debug(f"Added symbol_side: {symbol_side_key} to "
-                                          f"self.plan_id_by_symbol_side_dict with {plan_id=}")
+                            for symbol_side_key in symbol_side_key_list:
+                                self.loaded_plan_id_by_symbol_side_dict[symbol_side_key] = plan_id
+                                logging.debug(f"Added symbol_side: {symbol_side_key} to "
+                                              f"self.plan_id_by_symbol_side_dict with {plan_id=}")
+                        else:
+                            logging.warning(f"{plan_id=} already exists in active_plan_id_list - "
+                                            f"enable_disable_plan_alert_create_query was called to enable plan_alerts for "
+                                            f"this id - verify if happened due to some bug")
+
+                        # adding dict for plan_id
+                        self.plan_alert_cache_dict_by_plan_id_dict[plan_id] = {}
+
                     else:
-                        logging.warning(f"{plan_id=} already exists in active_plan_id_list - "
-                                        f"enable_disable_plan_alert_create_query was called to enable plan_alerts for "
-                                        f"this id - verify if happened due to some bug")
-                else:
-                    if plan_id in self.active_plan_id_list:
-                        self.active_plan_id_list.remove(plan_id)
-                        logging.debug(f"Removed {plan_id=} from self.active_plan_id_list")
+                        # if action is False then disabling plan alert creation for this plan id
+                        if plan_id in self.loaded_plan_id_list:
+                            self.loaded_plan_id_list.remove(plan_id)
+                            logging.debug(f"Removed {plan_id=} from self.active_plan_id_list")
 
-                        for symbol_side_key in symbol_side_key_list:
-                            self.plan_id_by_symbol_side_dict.pop(symbol_side_key, None)
-                            logging.debug(f"Removed {symbol_side_key=} from "
-                                          f"self.plan_id_by_symbol_side_dict with {plan_id=}")
-                    else:
-                        logging.warning(f"{plan_id=} doesn't exist in active_plan_id_list - "
-                                        f"enable_disable_plan_alert_create_query was called to disable plan_alerts for "
-                                        f"this id - verify if happened due to some bug")
+                            for symbol_side_key in symbol_side_key_list:
+                                self.loaded_plan_id_by_symbol_side_dict.pop(symbol_side_key, None)
+                                logging.debug(f"Removed {symbol_side_key=} from "
+                                              f"self.plan_id_by_symbol_side_dict with {plan_id=}")
+                        else:
+                            logging.warning(f"{plan_id=} doesn't exist in active_plan_id_list - "
+                                            f"enable_disable_plan_alert_create_query was called to disable plan_alerts for "
+                                            f"this id - verify if happened due to some bug")
+
+                        # getting projection model object having plan_ids as list, if no object is passed then empty
+                        # list is passed
+                        plan_alert_id_cont: PlanAlertIDCont | List = (
+                            await LogBookServiceRoutesCallbackBaseNativeOverride.
+                            underlying_read_plan_alert_http(get_projection_plan_alert_id_by_plan_id(plan_id),
+                                                             projection_read_http, PlanAlertIDCont))
+
+                        if plan_alert_id_cont:
+                            await (LogBookServiceRoutesCallbackBaseNativeOverride.
+                                   underlying_delete_by_id_list_plan_alert_http(plan_alert_id_cont.plan_alert_ids))
+
+                        self.plan_alert_cache_dict_by_plan_id_dict.pop(plan_id, None)
+
+                        # updating plan_view fields
+                        log_str = plan_view_client_call_log_str(
+                            PlanViewBaseModel, photo_book_service_http_client.patch_all_plan_view_client,
+                            UpdateType.SNAPSHOT_TYPE, _id=plan_id,
+                            plan_alert_aggregated_severity=Severity.Severity_UNSPECIFIED.value,
+                            plan_alert_count=0)
+                        payload = [{"message": log_str}]
+                        photo_book_service_http_client.handle_plan_view_updates_query_client(payload)
+
         return []
 
     def init_no_activity_set_up(self):
@@ -480,7 +458,8 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                 log_dir_path = f"{project_group_path}/{log_path}"
                 matching_files = find_files_with_regex(log_dir_path, regex_log_file_name)
                 for matching_file in matching_files:
-                    self._update_no_activity_monitor_related_cache(matching_file, regex_log_file_dict)
+                    if matching_file not in self.log_file_no_activity_dict:
+                        self._update_no_activity_monitor_related_cache(matching_file, regex_log_file_dict)
 
 
     def notify_no_activity(self):
@@ -491,26 +470,35 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                 non_activity_data.last_modified_timestamp = last_modified_timestamp
 
                 current_datetime = DateTime.utcnow()
-                if non_activity_data.critical_start_time is not None and non_activity_data.critical_end_time is not None:
-                    if non_activity_data.critical_start_time < current_datetime < non_activity_data.critical_end_time:
-                        # allowing if time is between critical start and end time
-                        pass
+
+                # loops each critical range duration and if allows only if current time is found within duration
+                for critical_duration in non_activity_data.critical_duration_list:
+                    critical_start_time, critical_end_time = critical_duration
+                    if critical_start_time is not None and critical_end_time is not None:
+                        if critical_start_time < current_datetime < critical_end_time:
+                            # allowing if time is between critical start and end time
+                            break
+                        else:
+                            # avoiding if time is not between critical start and end time
+                            pass
                     else:
-                        # avoiding if time is not between critical start and end time
-                        continue
+                        if (critical_start_time is not None and
+                                critical_end_time is None and
+                                current_datetime < critical_start_time):
+                            # avoiding if time is before critical start time and only start time is available
+                            pass
+                        elif (critical_end_time is not None and
+                                  critical_start_time is None and
+                                  current_datetime > critical_end_time):
+                            # avoiding if time is after critical end time and only end time is available
+                            pass
+                        else:
+                            # if both critical start and end times are not present then assuming
+                            # everytime is critical
+                            break
                 else:
-                    if (non_activity_data.critical_start_time is not None and
-                            non_activity_data.critical_end_time is None and
-                            current_datetime < non_activity_data.critical_start_time):
-                        # avoiding if time is before critical start time
-                        continue
-                    elif (non_activity_data.critical_end_time is not None and
-                              non_activity_data.critical_start_time is None and
-                              current_datetime > non_activity_data.critical_end_time):
-                        # avoiding if time is after critical end time
-                        continue
-                    # else not required: if both critical start and end times are not present then assuming
-                    # everytime is critical
+                    # ignoring no activity handling if out of critical time range
+                    continue
 
                 last_modified_date_time: DateTime = pendulum.from_timestamp(last_modified_timestamp, tz="UTC")
                 non_activity_secs: int = int((current_datetime - last_modified_date_time).total_seconds())
@@ -524,15 +512,13 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                     source_file = file_path
                     service = non_activity_data.service_name
 
-                    alert_brief: str = (f"No new logs found for {service} for last "
-                                        f"{non_activity_period_description}")
-                    alert_details: str = f"{service} log file path: {source_file}"
-                    alert_meta = get_alert_meta_obj(source_file, PurePath(__file__).name,
-                                                    inspect.currentframe().f_lineno, DateTime.utcnow(), alert_details)
-                    severity = LogBookServiceRoutesCallbackBaseNativeOverride.severity_map.get("warning") if (
-                        self.market.is_bartering_session_not_started()) else (
-                        LogBookServiceRoutesCallbackBaseNativeOverride.severity_map.get("error"))
-                    self.send_contact_alerts(severity, alert_brief, alert_meta)
+                    log_msg: str = (f"No new logs found for {service} for last "
+                                    f"{non_activity_period_description} "
+                                    f"{LogBookServiceRoutesCallbackBaseNativeOverride.log_seperator}"
+                                    f"{service} log file path: {source_file}")
+                    log_lvl = "warning" if (self.market.is_bartering_session_not_started()) else "error"
+                    self.send_contact_alert(log_msg, log_lvl, inspect.currentframe().f_lineno,
+                                              source_file, PurePath(__file__).name, DateTime.now())
                 # else not required: new logs are generated but filtered out
             else:
                 delete_file_path_list.append(file_path)
@@ -545,15 +531,17 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         pair_plan = email_book_service_http_client.get_pair_plan_client(plan_id)
         pid = get_pid_from_port(pair_plan.port)
         if pid is not None:
-            alert_brief: str = f"Triggering force kill executor for {plan_id=}, killing {pid=}"
-            alert_details: str = f"{pair_plan=}"
-            logging.critical(f"{alert_brief};;;{alert_details}")
+            symbol_side_key_ = get_symbol_side_key([(pair_plan.pair_plan_params.plan_leg1.sec.sec_id,
+                                                    pair_plan.pair_plan_params.plan_leg1.side),
+                                                   (pair_plan.pair_plan_params.plan_leg2.sec.sec_id,
+                                                    pair_plan.pair_plan_params.plan_leg2.side)])
+            log_msg: str = (f"Triggering force kill executor for {plan_id=}, killing {pid=}, {symbol_side_key_} "
+                            f"{LogBookServiceRoutesCallbackBaseNativeOverride.log_seperator}{pair_plan=}")
+            logging.critical(log_msg)
             component_file_path = PurePath(__file__)
-            alert_meta = get_alert_meta_obj(str(component_file_path), component_file_path.name,
-                                            inspect.currentframe().f_lineno, DateTime.utcnow(), alert_details)
-            self._send_plan_alerts(
-                plan_id, LogBookServiceRoutesCallbackBaseNativeOverride.severity_map.get("critical"), alert_brief,
-                alert_meta)
+            self.send_plan_alert(log_msg, "critical", inspect.currentframe().f_lineno,
+                                  str(component_file_path), component_file_path.name)
+
             os.kill(pid, signal.SIGKILL)
         else:
             logging.exception(f"_force_kill_street_book failed, no pid found for pair_plan with {plan_id=};;;"
@@ -577,14 +565,18 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
 
     async def load_contact_alerts_n_update_cache(self):
         try:
-            contact_alerts: List[ContactAlert] = await LogBookServiceRoutesCallbackBaseNativeOverride.underlying_read_contact_alert_http()
-            async with self.contact_alerts_cache_cont.re_mutex:
-                for contact_alert in contact_alerts:
-                    component_file_path, source_file_name, line_num = get_key_meta_data_from_obj(contact_alert)
-                    alert_key = get_alert_cache_key(contact_alert.severity, contact_alert.alert_brief,
-                                                    component_file_path, source_file_name, line_num)
-                    self.contact_alerts_cache_dict[alert_key] = contact_alert
-                    self.contact_alerts_cache_cont.alert_id_to_obj_dict[contact_alert.id] = contact_alert
+            async with ContactAlert.reentrant_lock:
+                contact_alerts: List[ContactAlert] = await LogBookServiceRoutesCallbackBaseNativeOverride.underlying_read_contact_alert_http()
+                async with self.contact_alerts_cache_dict_async_rlock:
+                    for contact_alert in contact_alerts:
+                        component_file_path, source_file_name, line_num = get_key_meta_data_from_obj(contact_alert)
+                        alert_key = get_alert_cache_key(contact_alert.severity, contact_alert.alert_brief,
+                                                        component_file_path, source_file_name, line_num)
+                        self.contact_alerts_cache_dict[alert_key] = contact_alert
+                        self.contact_alerts_id_to_obj_cache_dict[contact_alert.id] = contact_alert
+
+                    # setting contact_alerts_service_up
+                    self.contact_alerts_service_ready = True
 
         except Exception as e:
             err_str_ = f"load_contact_alerts_n_update_cache failed with exception: {e}"
@@ -592,8 +584,29 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             raise Exception(err_str_)
 
     async def load_plan_alerts_n_update_cache(self):
-        plan_alerts: List[PlanAlert] = await LogBookServiceRoutesCallbackBaseNativeOverride.underlying_read_plan_alert_http()
-        async with self.plan_alerts_cache_cont.re_mutex:
+        async with self.loaded_unload_plan_list_async_rlock:
+            try:
+                loaded_plans = email_book_service_http_client.get_loaded_plans_query_client()
+            except ClientError as e:
+                if "requests.exceptions.ConnectionError" in str(e):
+                    # returning since cache can't be updated and leaving self.plan_alerts_service_ready
+                    # as False - will be checked again in next loop cycle
+                    return
+                else:
+                    raise e
+
+            for plan in loaded_plans:
+                self.loaded_plan_id_list.append(plan.id)
+
+                symbol_side = symbol_side_key(plan.pair_plan_params.plan_leg1.sec.sec_id,
+                                              plan.pair_plan_params.plan_leg1.side)
+                self.loaded_plan_id_by_symbol_side_dict[symbol_side] = plan.id
+                symbol_side = symbol_side_key(plan.pair_plan_params.plan_leg2.sec.sec_id,
+                                              plan.pair_plan_params.plan_leg2.side)
+                self.loaded_plan_id_by_symbol_side_dict[symbol_side] = plan.id
+
+            plan_alerts: List[
+                PlanAlert] = await LogBookServiceRoutesCallbackBaseNativeOverride.underlying_read_plan_alert_http()
             for plan_alert in plan_alerts:
                 plan_alert_cache = self.plan_alert_cache_dict_by_plan_id_dict.get(plan_alert.plan_id)
                 component_file_path, source_file_name, line_num = get_key_meta_data_from_obj(plan_alert)
@@ -603,7 +616,6 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                     self.plan_alert_cache_dict_by_plan_id_dict[plan_alert.plan_id] = {alert_key: plan_alert}
                 else:
                     plan_alert_cache[alert_key] = plan_alert
-                self.plan_alerts_cache_cont.alert_id_to_obj_dict[plan_alert.id] = plan_alert
 
                 plan_id_to_start_alert_obj_list = (
                     LogBookServiceRoutesCallbackBaseNativeOverride.plan_id_to_start_alert_obj_list_dict.get(
@@ -616,47 +628,143 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                         plan_id_to_start_alert_obj_list.append(plan_alert.id)
                     # else not required: avoiding duplicate entry
 
-    def load_loaded_plans_cache_data(self):
-        loaded_plans = email_book_service_http_client.get_loaded_plans_query_client()
-        for plan in loaded_plans:
-            self.active_plan_id_list.append(plan.id)
+            # setting plan_alerts_service_ready since all cache is updated
+            self.plan_alerts_service_ready = True
 
-            symbol_side = symbol_side_key(plan.pair_plan_params.plan_leg1.sec.sec_id,
-                                          plan.pair_plan_params.plan_leg1.side)
-            self.plan_id_by_symbol_side_dict[symbol_side] = plan.id
-            symbol_side = symbol_side_key(plan.pair_plan_params.plan_leg2.sec.sec_id,
-                                          plan.pair_plan_params.plan_leg2.side)
-            self.plan_id_by_symbol_side_dict[symbol_side] = plan.id
+    def update_create_n_update_contact_alerts_list_for_payload(
+            self, log_payload: Dict, create_contact_alert_list: List[PlanAlert],
+            upload_contact_alert_list: List[PlanAlert]):
+        message = log_payload.get("message")
+        source_file = log_payload.get("source_file")
+        line_num = log_payload.get("line")
+        log_date_time = log_payload.get("timestamp")
+        log_source_file_name = log_payload.get("file")
+        level = log_payload.get("level")
 
-    async def plan_alert_create_n_update_using_async_submit_callable(
-            self, alerts_cache_cont, queue_obj, err_handling_callable,
-            client_connection_fail_retry_secs):
-        await handle_alert_create_n_update_using_async_submit(
-            alerts_cache_cont,
-            LogBookServiceRoutesCallbackBaseNativeOverride.underlying_create_all_plan_alert_http,
-            LogBookServiceRoutesCallbackBaseNativeOverride.underlying_update_all_plan_alert_http,
-            queue_obj, err_handling_callable, PlanAlert, client_connection_fail_retry_secs)
+        # updating cache - used for no activity checks
+        self.update_no_activity_monitor_related_cache(source_file)
 
-    async def contact_alert_create_n_update_using_async_submit_callable(
-            self, alerts_cache_cont, queue_obj, err_handling_callable,
-            client_connection_fail_retry_secs):
-        await handle_alert_create_n_update_using_async_submit(
-            alerts_cache_cont,
-            LogBookServiceRoutesCallbackBaseNativeOverride.underlying_create_all_contact_alert_http,
-            LogBookServiceRoutesCallbackBaseNativeOverride.underlying_update_all_contact_alert_http,
-            queue_obj, err_handling_callable, ContactAlert, client_connection_fail_retry_secs)
+        alert_brief_n_detail_lists: List[str] = (
+            message.split(LogBookServiceRoutesCallbackBaseNativeOverride.log_seperator, 1))
+        if len(alert_brief_n_detail_lists) == 2:
+            alert_brief = alert_brief_n_detail_lists[0]
+            alert_details = alert_brief_n_detail_lists[1]
+        else:
+            alert_brief = alert_brief_n_detail_lists[0]
+            alert_details = ". ".join(alert_brief_n_detail_lists[1:])
+
+        alert_brief = self._truncate_str(alert_brief).strip()
+        alert_details = self._truncate_str(alert_details).strip()
+        alert_meta = get_alert_meta_obj(source_file, log_source_file_name,
+                                        line_num, log_date_time, alert_details, alert_meta_type=AlertMeta)
+        severity: Severity = LogBookServiceRoutesCallbackBaseNativeOverride.severity_map.get(level.lower())
+
+        if severity is not None and alert_brief is not None:
+            self.update_create_n_update_contact_alert_list(create_contact_alert_list,
+                                                             upload_contact_alert_list,
+                                                             severity, alert_brief, alert_meta)
+        else:
+            err_str_ = ("handle_contact_alerts_query_pre failed - contact_alert data "
+                        "found with missing data, can't create plan alert;;; "
+                        f"received: {severity=}, {alert_brief=}, {alert_meta=}")
+            self.contact_alert_fail_logger.error(err_str_)
+
+    async def create_n_update_contact_alerts_from_payload_list(
+            self, log_payload_list: List[Dict]):
+        async with ContactAlert.reentrant_lock:
+            async with self.contact_alerts_cache_dict_async_rlock:
+                create_contact_alert_list: List[PlanAlert] = []
+                update_contact_alert_list: List[PlanAlert] = []
+                for log_payload in log_payload_list:
+                    self.update_create_n_update_contact_alerts_list_for_payload(
+                        log_payload, create_contact_alert_list, update_contact_alert_list)
+
+                if create_contact_alert_list:
+
+                    # handling create list
+                    try:
+                        contact_alerts_list = await LogBookServiceRoutesCallbackBaseNativeOverride.underlying_create_all_contact_alert_http(create_contact_alert_list)
+                        for contact_alert in contact_alerts_list:
+                            self.contact_alerts_id_to_obj_cache_dict[contact_alert.id] = contact_alert
+                    except HTTPException as http_e:
+                        alert_queue_handler_err_handler(http_e.detail, create_contact_alert_list, self.contact_alert_queue,
+                                                         self._handle_contact_alert_queue_err_handler,
+                                                         LogBookServiceRoutesCallbackBaseNativeOverride.underlying_create_all_contact_alert_http)
+                    except Exception as e:
+                        alert_queue_handler_err_handler(e, create_contact_alert_list, self.contact_alert_queue, self._handle_contact_alert_queue_err_handler,
+                                                         LogBookServiceRoutesCallbackBaseNativeOverride.underlying_create_all_contact_alert_http)
+                    create_contact_alert_list.clear()  # cleaning dict to start fresh cycle
+
+                if update_contact_alert_list:
+
+                    # handling create list
+                    try:
+                        contact_alerts_list = await LogBookServiceRoutesCallbackBaseNativeOverride.underlying_update_all_contact_alert_http(update_contact_alert_list)
+                        for contact_alert in contact_alerts_list:
+                            self.contact_alerts_id_to_obj_cache_dict[contact_alert.id] = contact_alert
+                    except HTTPException as http_e:
+                        alert_queue_handler_err_handler(http_e.detail, update_contact_alert_list, self.contact_alert_queue,
+                                                         self._handle_contact_alert_queue_err_handler,
+                                                         LogBookServiceRoutesCallbackBaseNativeOverride.underlying_update_all_contact_alert_http)
+                    except Exception as e:
+                        alert_queue_handler_err_handler(e, update_contact_alert_list, self.contact_alert_queue, self._handle_contact_alert_queue_err_handler,
+                                                         LogBookServiceRoutesCallbackBaseNativeOverride.underlying_update_all_contact_alert_http)
+                    update_contact_alert_list.clear()  # cleaning dict to start fresh cycle
 
     def _handle_contact_alert_queue(self):
-        alert_queue_handler_for_create_n_update(
-            self.asyncio_loop, self.contact_alert_queue, contact_alert_bulk_update_counts_per_call,
-            contact_alert_bulk_update_timeout,
-            self.contact_alert_create_n_update_using_async_submit_callable,
-            self._handle_contact_alert_queue_err_handler,
-            self.contact_alerts_cache_cont, asyncio_loop=self.asyncio_loop)
+        oldest_entry_time: DateTime = DateTime.utcnow()
+        log_payload_cache_list: List[Dict] = []
+        while True:
+            remaining_timeout_secs = get_remaining_timeout_secs(log_payload_cache_list,
+                                                                contact_alert_bulk_update_timeout, oldest_entry_time)
+            if not remaining_timeout_secs < 1:
+                try:
+                    alert_payload = self.contact_alert_queue.get(
+                        timeout=remaining_timeout_secs)  # timeout based blocking call
+
+                    if alert_payload == "EXIT":
+                        logging.info(f"Exiting alert_queue_handler")
+                        return
+
+                    if not self.contact_alerts_service_ready:
+                        err_str_ = (f"contact_alerts service is not initialized yet: {alert_payload=}")
+                        self.contact_alert_fail_logger.error(err_str_)
+                    else:
+                        # All good if contact_alerts_service_ready is set
+                        log_payload_cache_list.extend(alert_payload)
+
+                except queue.Empty:
+                    # since bulk update timeout limit has breached, will call update
+                    pass
+                else:
+                    if len(log_payload_cache_list) < contact_alert_bulk_update_counts_per_call:
+                        continue
+                    # else, since bulk update count limit has breached, will call update
+            # since bulk update remaining timeout limit <= 0, will call update
+
+            if not self.asyncio_loop:
+                # Exiting this function if self.asyncio_loop is removed
+                logging.info(f"Found {self.asyncio_loop=} in alert_queue_handler - Exiting while loop")
+                return
+
+            if log_payload_cache_list:
+                run_coro = self.create_n_update_contact_alerts_from_payload_list(log_payload_cache_list)
+                future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
+                # block for task to finish
+                try:
+                    future.result()
+                except Exception as e_:
+                    logging.exception(f"alert_create_n_update_using_async_submit_callable failed with exception: {e_}")
+                    continue
+            # else not required: avoid if timeout hits with empty queue data
+
+            oldest_entry_time = DateTime.utcnow()
+            log_payload_cache_list: List[Dict] = []
+            # else not required since even after timeout no data found
 
     def _handle_plan_alert_queue_err_handler(self, *args):
         try:
-            model_obj_list: List[PlanAlertBaseModel] = args[0]  # single unprocessed basemodel object is passed
+            model_obj_list: List[PlanAlert] = args[0]  # single unprocessed basemodel object is passed
             for model_obj in model_obj_list:
                 component_file_path = None
                 source_file_name = None
@@ -671,21 +779,183 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                     alert_create_date_time = model_obj.alert_meta.alert_create_date_time
                     first_detail = model_obj.alert_meta.first_detail
                     latest_detail = model_obj.alert_meta.latest_detail
-                alert_meta = get_alert_meta_obj(component_file_path, source_file_name, line_num,
-                                                alert_create_date_time, first_detail, latest_detail,
-                                                alert_meta_type=AlertMeta)
-                self.send_contact_alerts(model_obj.severity.value, model_obj.alert_brief, alert_meta)
+                alert_detail = latest_detail if latest_detail else first_detail
+                if alert_detail is None:
+                    alert_detail = ""
+
+                log_msg = f"{model_obj.alert_brief};;;{alert_detail}"
+                log_lvl = LogBookServiceRoutesCallbackBaseNativeOverride.severity_to_log_lvl_map.get(model_obj.severity.value)
+                self.send_contact_alert(log_msg, log_lvl, line_num, component_file_path, source_file_name, alert_create_date_time)
+
         except Exception as e:
             err_str_ = f"_handle_plan_alert_queue_err_handler failed, passed args: {args};;; exception: {e}"
             self.contact_alert_fail_logger.exception(err_str_)
 
+    def update_create_n_update_plan_alerts_list_for_start_id_payload(
+            self, log_payload: Dict, create_plan_alert_list: List[PlanAlert],
+            upload_plan_alert_list: List[PlanAlert]):
+        message = log_payload.get("message")
+        source_file = log_payload.get("source_file")
+        line_num = log_payload.get("line")
+        log_date_time = log_payload.get("timestamp")
+        log_source_file_name = log_payload.get("file")
+        level = log_payload.get("level")
+        file_name_regex = log_payload.get("file_name_regex")
+
+        # updating cache - used for no activity checks
+        self.update_no_activity_monitor_related_cache(source_file)
+
+        severity, alert_brief, alert_details = self._create_alert(message, level, source_file)
+        alert_meta = get_alert_meta_obj(source_file, log_source_file_name,
+                                        line_num, log_date_time, alert_details, alert_meta_type=AlertMeta)
+
+        plan_id = get_plan_id_from_executor_log_file_name(file_name_regex, source_file)
+
+        if self.plan_is_unloaded(plan_id, log_payload):  # sends contact alert internally
+            return None
+
+        self.create_n_update_plan_alerts_list_update(plan_id, severity, alert_brief, alert_meta,
+                                                      create_plan_alert_list, upload_plan_alert_list)
+
+    def update_create_n_update_plan_alerts_list_for_symbol_side_payload(
+            self, log_payload: Dict, create_plan_alert_list: List[PlanAlert],
+            upload_plan_alert_list: List[PlanAlert]):
+        message = log_payload.get("message")
+        source_file = log_payload.get("source_file")
+        line_num = log_payload.get("line")
+        log_date_time = log_payload.get("timestamp")
+        log_source_file_name = log_payload.get("file")
+        level = log_payload.get("level")
+
+        # updating cache - used for no activity checks
+        self.update_no_activity_monitor_related_cache(source_file)
+
+        log_message: str = message.replace(self.symbol_side_pattern, "")
+        severity, alert_brief, alert_details = self._create_alert(log_message, level, source_file)
+
+        alert_meta = get_alert_meta_obj(source_file, log_source_file_name,
+                                        line_num, log_date_time, alert_details, alert_meta_type=AlertMeta)
+
+        symbol_side_set = get_symbol_n_side_from_log_line(message)
+        symbol_side: str = list(symbol_side_set)[0]
+        plan_id: int | None = self.loaded_plan_id_by_symbol_side_dict.get(symbol_side)
+
+        if plan_id is None:
+            msg_ = (f"No plan_id found for symbol_side: {symbol_side} in loaded cache, "
+                    f"sending plan alert to contact alert, orginial log msg: {message}")
+            self.send_contact_alert(msg_, level, line_num, source_file, log_source_file_name, log_date_time)
+            return None
+
+        if self.plan_is_unloaded(plan_id, log_payload):    # sends contact alert internally
+            return None
+
+        self.create_n_update_plan_alerts_list_update(plan_id, severity, alert_brief, alert_meta,
+                                                      create_plan_alert_list, upload_plan_alert_list)
+
+    async def create_n_update_plan_alerts_from_payload_list(
+            self, log_payload_list: List[Dict]):
+        async with self.loaded_unload_plan_list_async_rlock:
+            create_plan_alert_list: List[PlanAlert] = []
+            update_plan_alert_list: List[PlanAlert] = []
+            for log_payload in log_payload_list:
+                if "file_name_regex" in log_payload:
+                    self.update_create_n_update_plan_alerts_list_for_start_id_payload(
+                        log_payload, create_plan_alert_list, update_plan_alert_list)
+                else:
+                    self.update_create_n_update_plan_alerts_list_for_symbol_side_payload(
+                        log_payload, create_plan_alert_list, update_plan_alert_list)
+
+            if create_plan_alert_list:
+
+                # handling create list
+                try:
+                    res = await LogBookServiceRoutesCallbackBaseNativeOverride.underlying_create_all_plan_alert_http(create_plan_alert_list)
+                except HTTPException as http_e:
+                    alert_queue_handler_err_handler(http_e.detail, create_plan_alert_list, self.plan_alert_queue,
+                                                     self._handle_plan_alert_queue_err_handler,
+                                                     LogBookServiceRoutesCallbackBaseNativeOverride.underlying_create_all_plan_alert_http)
+                except Exception as e:
+                    alert_queue_handler_err_handler(e, create_plan_alert_list, self.plan_alert_queue, self._handle_plan_alert_queue_err_handler,
+                                                     LogBookServiceRoutesCallbackBaseNativeOverride.underlying_create_all_plan_alert_http)
+                create_plan_alert_list.clear()  # cleaning dict to start fresh cycle
+
+            if update_plan_alert_list:
+
+                # handling create list
+                try:
+                    res = await LogBookServiceRoutesCallbackBaseNativeOverride.underlying_update_all_plan_alert_http(update_plan_alert_list)
+                except HTTPException as http_e:
+                    alert_queue_handler_err_handler(http_e.detail, update_plan_alert_list, self.plan_alert_queue,
+                                                     self._handle_plan_alert_queue_err_handler,
+                                                     LogBookServiceRoutesCallbackBaseNativeOverride.underlying_update_all_plan_alert_http)
+                except Exception as e:
+                    alert_queue_handler_err_handler(e, update_plan_alert_list, self.plan_alert_queue, self._handle_plan_alert_queue_err_handler,
+                                                     LogBookServiceRoutesCallbackBaseNativeOverride.underlying_update_all_plan_alert_http)
+                update_plan_alert_list.clear()  # cleaning dict to start fresh cycle
+
+    def send_plan_alert(self, message: str, sev_lvl: str, line_num: int, component_path: str,
+                         source_file: str, time_stamp: DateTime | None = None):
+        if time_stamp is None:
+            time_stamp = DateTime.now()
+        log_payload = {"message": message, "source_file":component_path, "line": line_num,
+                       "level": sev_lvl, "file": source_file, "timestamp": time_stamp}
+        self.plan_alert_queue.put([log_payload])
+
     def _handle_plan_alert_queue(self):
-        alert_queue_handler_for_create_n_update(
-            self.asyncio_loop, self.plan_alert_queue, plan_alert_bulk_update_counts_per_call,
-            plan_alert_bulk_update_timeout,
-            self.plan_alert_create_n_update_using_async_submit_callable,
-            self._handle_plan_alert_queue_err_handler,
-            self.plan_alerts_cache_cont, asyncio_loop=self.asyncio_loop)
+        oldest_entry_time: DateTime = DateTime.utcnow()
+        log_payload_cache_list: List[Dict] = []
+        while True:
+            remaining_timeout_secs = get_remaining_timeout_secs(log_payload_cache_list,
+                                                                plan_alert_bulk_update_timeout, oldest_entry_time)
+
+            if not remaining_timeout_secs < 1:
+                try:
+                    alert_payload = self.plan_alert_queue.get(timeout=remaining_timeout_secs)  # timeout based blocking call
+
+                    if alert_payload == "EXIT":
+                        logging.info(f"Exiting alert_queue_handler")
+                        return
+
+                    if not self.plan_alerts_service_ready:
+                        if self.contact_alerts_service_ready:
+                            # sending to contact alerts if plan alerts service is not up
+                            self.contact_alert_queue.put(alert_payload)
+                        else:
+                            # raise service unavailable 503 exception, let the caller retry
+                            err_str_ = (f"plan_alerts service is not initialized yet: {alert_payload=}")
+                            self.contact_alert_fail_logger.error(err_str_)
+                    else:
+                        # All good if plan_alerts_service_ready is set
+                        log_payload_cache_list.extend(alert_payload)
+
+                except queue.Empty:
+                    # since bulk update timeout limit has breached, will call update
+                    pass
+                else:
+                    if len(log_payload_cache_list) < plan_alert_bulk_update_counts_per_call:
+                        continue
+                    # else, since bulk update count limit has breached, will call update
+            # since bulk update remaining timeout limit <= 0, will call update
+
+            if not self.asyncio_loop:
+                # Exiting this function if self.asyncio_loop is removed
+                logging.info(f"Found {self.asyncio_loop=} in alert_queue_handler - Exiting while loop")
+                return
+
+            if log_payload_cache_list:
+                run_coro = self.create_n_update_plan_alerts_from_payload_list(log_payload_cache_list)
+                future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
+                # block for task to finish
+                try:
+                    future.result()
+                except Exception as e_:
+                    logging.exception(f"alert_create_n_update_using_async_submit_callable failed with exception: {e_}")
+                    continue
+            # else not required: avoid if timeout hits with empty queue data
+
+            oldest_entry_time = DateTime.utcnow()
+            log_payload_cache_list: List[Dict] = []
+            # else not required since even after timeout no data found
 
     def run_queue_handler(self):
         contact_alert_handler_thread = Thread(target=self._handle_contact_alert_queue, daemon=True)
@@ -693,49 +963,67 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         contact_alert_handler_thread.start()
         plan_alert_handler_thread.start()
 
-    def send_contact_alerts(self, severity: str, alert_brief: str,
-                              alert_meta: AlertMeta | None = None) -> None:
-        logging.debug(f"sending contact alert with {severity=}, {alert_brief=}")
+    def send_contact_alert(self, message: str, log_lvl: str, line_num: int, component_path: str,
+                             source_file: str, time_stamp: DateTime):
+        log_payload = {"message": message, "source_file":component_path, "line": line_num,
+                       "level": log_lvl, "file": source_file, "timestamp": time_stamp}
+        self.contact_alert_queue.put([log_payload])
+
+    def update_create_n_update_contact_alert_list(
+            self, create_contact_alert_list: List[PlanAlert],
+            upload_contact_alert_list: List[PlanAlert], severity: str, alert_brief: str,
+            alert_meta: AlertMeta | None = None) -> None:
+        logging.debug(f"sending contact alert with {severity=}, {alert_brief=}, {alert_meta=}")
         try:
             severity: Severity = get_severity_type_from_severity_str(severity_str=severity)
-            create_or_update_alert(self.contact_alerts_cache_dict, self.contact_alert_queue,
+            create_or_update_alert(create_contact_alert_list, upload_contact_alert_list,
+                                   self.contact_alerts_cache_dict,
                                    PlanAlert, ContactAlert, severity, alert_brief,
                                    alert_meta=alert_meta)
         except Exception as e:
             self.contact_alert_fail_logger.exception(
-                f"send_contact_alerts failed{LogBookServiceRoutesCallbackBaseNativeOverride.log_seperator} exception: {e};;; "
+                f"update_create_n_update_contact_alert_list failed{LogBookServiceRoutesCallbackBaseNativeOverride.log_seperator} exception: {e};;; "
                 f"received: {severity=}, {alert_brief=}, {alert_meta=}")
 
-    def _send_plan_alerts(self, plan_id: int, severity_str: str, alert_brief: str,
-                           alert_meta: AlertMeta | None = None) -> None:
+    def _create_n_update_plan_alerts_list_update(
+            self, create_plan_alert_list: List[PlanAlert], upload_plan_alert_list: List[PlanAlert],
+            plan_id: int, severity_str: str, alert_brief: str, alert_meta: AlertMeta | None = None) -> None:
         logging.debug(f"sending plan alert with {plan_id=}, {severity_str=}, "
                       f"{alert_brief=}, {alert_meta=}")
         try:
             severity: Severity = get_severity_type_from_severity_str(severity_str=severity_str)
             plan_alert_cache_dict = self.plan_alert_cache_dict_by_plan_id_dict.get(plan_id)
             if plan_alert_cache_dict is not None:
-                create_or_update_alert(plan_alert_cache_dict,
-                                       self.plan_alert_queue, PlanAlert, ContactAlert, severity,
+                create_or_update_alert(create_plan_alert_list, upload_plan_alert_list, plan_alert_cache_dict,
+                                       PlanAlert, ContactAlert, severity,
                                        alert_brief, plan_id, alert_meta)
             else:
                 # happens when _send_plan_alerts is called post plan_id is cleaned from cache on delete for
                 # this plan_id - expected when called from _force_trigger_plan_pause
                 logging.info(f"Can't find {plan_id=} in plan_alert_cache_dict_by_plan_id_dict, likely "
-                             f"_send_plan_alerts called later cache got removed for plan_id in delete operation;;; "
+                             f"_update_create_n_update_plan_alerts_list called later cache got removed for plan_id in delete operation;;; "
                              f"{self.plan_alert_cache_dict_by_plan_id_dict}")
-                self.send_contact_alerts(severity=severity_str, alert_brief=alert_brief, alert_meta=alert_meta)
+                log_detail = alert_meta.latest_detail if alert_meta.latest_detail else alert_meta.first_detail
+                log_msg = (f"{alert_brief}{LogBookServiceRoutesCallbackBaseNativeOverride.log_seperator}"
+                           f"{log_detail if log_detail else ''}")
+                log_lvl = LogBookServiceRoutesCallbackBaseNativeOverride.severity_to_log_lvl_map.get(Severity(severity_str))
+                self.send_contact_alert(log_msg, log_lvl, alert_meta.line_num,
+                                          alert_meta.component_file_path, alert_meta.source_file_name,
+                                          alert_meta.alert_create_date_time)
+
 
         except Exception as e:
-            err_msg: str = (f"_send_plan_alerts failed, exception: {e}, "
+            err_msg: str = (f"_update_create_n_update_plan_alerts_list failed, exception: {e}, "
                             f"received {plan_id=}, {severity_str=}, {alert_brief=}")
             if alert_meta is not None:
-                err_msg += f", {alert_meta=}"
-                alert_meta = get_alert_meta_obj(alert_meta.component_file_path, alert_meta.source_file_name,
-                                                alert_meta.line_num, alert_meta.alert_create_date_time,
-                                                alert_meta.first_detail, err_msg, alert_meta_type=AlertMeta)
-
+                alert_detail = alert_meta.latest_detail if alert_meta.latest_detail else alert_meta.first_detail
+                if alert_detail is not None:
+                    err_msg += f"{LogBookServiceRoutesCallbackBaseNativeOverride.log_seperator} original {alert_detail=}"
             logging.exception(err_msg)
-            self.send_contact_alerts(severity=severity_str, alert_brief=alert_brief, alert_meta=alert_meta)
+            log_lvl = LogBookServiceRoutesCallbackBaseNativeOverride.severity_to_log_lvl_map.get(Severity(severity_str))
+            self.send_contact_alert(err_msg, log_lvl, alert_meta.line_num,
+                                      alert_meta.component_file_path, alert_meta.source_file_name,
+                                      alert_meta.alert_create_date_time)
 
     async def read_all_ui_layout_pre(self):
         # Setting asyncio_loop in ui_layout_pre since it called to check current service up
@@ -798,90 +1086,40 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             raise HTTPException(status_code=503, detail=err_str_)
 
     async def delete_contact_alert_post(self, delete_web_response):
-        async with self.contact_alerts_cache_cont.re_mutex:
-            contact_alert = self.contact_alerts_cache_cont.alert_id_to_obj_dict.get(delete_web_response.id)
+        async with self.contact_alerts_cache_dict_async_rlock:
+            contact_alert = self.contact_alerts_id_to_obj_cache_dict.get(delete_web_response.id)
             component_file_path, source_file_name, line_num = get_key_meta_data_from_obj(contact_alert)
             alert_key = get_alert_cache_key(contact_alert.severity, contact_alert.alert_brief,
                                             component_file_path, source_file_name, line_num)
             self.contact_alerts_cache_dict.pop(alert_key, None)
-            self.contact_alerts_cache_cont.alert_id_to_obj_dict.pop(delete_web_response.id, None)
-
-            # Below pops are required to avoid race_condition with alert_queue_handler_for_create_n_update
-            # running for contact_alerts in separate thread
-            self.contact_alerts_cache_cont.update_alert_obj_dict.pop(delete_web_response.id, None)
-            self.contact_alerts_cache_cont.create_alert_obj_dict.pop(delete_web_response.id, None)
-
-    def handle_cache_clean_up_for_plan_alert_id(self, plan_alert_id: int):
-        """
-        Important: caller must take self.plan_alerts_cache_cont.re_mutex lock before calling this function
-        """
-        plan_alert = self.plan_alerts_cache_cont.alert_id_to_obj_dict.get(plan_alert_id)
-        plan_alert_cache_dict = self.plan_alert_cache_dict_by_plan_id_dict.get(plan_alert.plan_id)
-        component_file_path, source_file_name, line_num = get_key_meta_data_from_obj(plan_alert)
-        alert_key = get_alert_cache_key(plan_alert.severity, plan_alert.alert_brief,
-                                        component_file_path, source_file_name, line_num)
-        if plan_alert_cache_dict:
-            plan_alert_cache_dict.pop(alert_key, None)
-        self.plan_alerts_cache_cont.alert_id_to_obj_dict.pop(plan_alert_id, None)
-
-        # Below pops are required to avoid race_condition with alert_queue_handler_for_create_n_update
-        # running for plan_alerts in separate thread
-        self.plan_alerts_cache_cont.update_alert_obj_dict.pop(plan_alert_id, None)
-        self.plan_alerts_cache_cont.create_alert_obj_dict.pop(plan_alert_id, None)
-
-    async def delete_plan_alert_post(self, delete_web_response):
-        async with self.plan_alerts_cache_cont.re_mutex:
-            self.handle_cache_clean_up_for_plan_alert_id(delete_web_response.id)
-
-    async def delete_by_id_list_plan_alert_post(self, delete_web_response):
-        async with self.plan_alerts_cache_cont.re_mutex:
-            for plan_alert_id in delete_web_response.id:
-                self.handle_cache_clean_up_for_plan_alert_id(plan_alert_id)
+            self.contact_alerts_id_to_obj_cache_dict.pop(delete_web_response.id)
 
     async def delete_all_plan_alert_post(self, delete_web_response):
-        self.plan_alert_cache_dict_by_plan_id_dict.clear()
-        async with self.plan_alerts_cache_cont.re_mutex:
-            self.plan_alerts_cache_cont.alert_id_to_obj_dict.clear()
-
-            # Below pops are required to avoid race_condition with alert_queue_handler_for_create_n_update
-            # running for plan_alerts in separate thread
-            self.plan_alerts_cache_cont.update_alert_obj_dict.clear()
-            self.plan_alerts_cache_cont.create_alert_obj_dict.clear()
-
         # updating plan_view fields
         photo_book_service_http_client.reset_all_plan_view_count_n_severity_query_client()
-
-    async def verify_plan_alert_id_in_plan_alert_id_to_obj_cache_dict_query_pre(
-            self, plan_alert_id_to_obj_cache_class_type: Type[PlanAlertIdToObjCache], plan_alert_id: int):
-        async with self.plan_alerts_cache_cont.re_mutex:
-            is_id_present = plan_alert_id in self.plan_alerts_cache_cont.alert_id_to_obj_dict
-            return [PlanAlertIdToObjCache(is_id_present=is_id_present)]
 
     async def verify_contact_alert_id_in_get_contact_alert_id_to_obj_cache_dict_query_pre(
             self, contact_alert_id_to_obj_cache_class_type: Type[ContactAlertIdToObjCache],
             contact_alert_id: int):
-        async with self.contact_alerts_cache_cont.re_mutex:
-            is_id_present = contact_alert_id in self.contact_alerts_cache_cont.alert_id_to_obj_dict
+        async with self.contact_alerts_cache_dict_async_rlock:
+            is_id_present = contact_alert_id in self.contact_alerts_id_to_obj_cache_dict
             return [ContactAlertIdToObjCache(is_id_present=is_id_present)]
-
-    async def verify_plan_id_in_plan_alert_cache_dict_by_plan_id_dict_query_pre(
-            self, _: Type[PlanIdInPlanAlertCacheDictByPlanIdDict], plan_id: int):
-        is_id_present = plan_id in self.plan_alert_cache_dict_by_plan_id_dict
-        return [PlanIdInPlanAlertCacheDictByPlanIdDict(is_id_present=is_id_present)]
 
     async def verify_plan_alert_id_in_plan_alert_cache_dict_by_plan_id_dict_query_pre(
             self, plan_alert_cache_dict_by_plan_id_dict_class_type: Type[PlanAlertCacheDictByPlanIdDict],
             plan_id: int, plan_cache_key: str):
         is_key_present = False
-        plan_alert_cache_dict = self.plan_alert_cache_dict_by_plan_id_dict.get(plan_id)
-        if plan_alert_cache_dict is not None:
-            is_key_present = plan_cache_key in plan_alert_cache_dict
-        return [PlanAlertCacheDictByPlanIdDict(is_key_present=is_key_present)]
+        async with self.loaded_unload_plan_list_async_rlock:
+            plan_alert_cache_dict = self.plan_alert_cache_dict_by_plan_id_dict.get(plan_id)
+            if plan_alert_cache_dict is not None:
+                is_key_present = plan_cache_key in plan_alert_cache_dict
+            return [PlanAlertCacheDictByPlanIdDict(is_key_present=is_key_present)]
 
     async def verify_contact_alerts_cache_dict_query_pre(
             self, contact_alert_cache_dict_class_type: Type[ContactAlertCacheDict], plan_cache_key: str):
-        is_key_present = plan_cache_key in self.contact_alerts_cache_dict
-        return [ContactAlertCacheDict(is_key_present=is_key_present)]
+        async with self.contact_alerts_cache_dict_async_rlock:
+            is_key_present = plan_cache_key in self.contact_alerts_cache_dict
+            return [ContactAlertCacheDict(is_key_present=is_key_present)]
 
     async def plan_view_update_handling(self, plan_alert_obj_list: List[PlanAlert]):
         updated_plan_id_set = set()
@@ -945,46 +1183,6 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         filter_agg_pipeline = sort_alerts_based_on_severity_n_last_update_analyzer_time(args[0], args[-1])
         return filtered_plan_alert_by_plan_id_query_callable, filter_agg_pipeline
 
-    async def remove_plan_alerts_for_plan_id_query_pre(
-            self, remove_plan_alerts_for_plan_id_class_type: Type[RemovePlanAlertsForPlanId],
-            payload: List[Dict[str, Any]]):
-        for payload_dict in payload:
-
-            message = payload_dict.get("message")
-            # removing the starting pattern
-            message = message[len(remove_plan_alert_by_start_id_pattern()):]
-            # remaining is plan_id
-            plan_id: int = parse_to_int(message)
-
-            try:
-                # releasing cache for plan id
-                self.plan_alert_cache_dict_by_plan_id_dict.pop(plan_id, None)
-
-                async with PlanAlert.reentrant_lock:
-                    # getting projection model object having plan_ids as list, if no object is passed then empty
-                    # list is passed
-                    plan_alert_id_cont: PlanAlertIDCont | List = (
-                        await LogBookServiceRoutesCallbackBaseNativeOverride.
-                        underlying_read_plan_alert_http(get_projection_plan_alert_id_by_plan_id(plan_id),
-                                                         projection_read_http, PlanAlertIDCont))
-
-                    if plan_alert_id_cont:
-                        await (LogBookServiceRoutesCallbackBaseNativeOverride.
-                               underlying_delete_by_id_list_plan_alert_http(plan_alert_id_cont.plan_alert_ids))
-
-                # updating plan_view fields
-                log_str = plan_view_client_call_log_str(
-                    PlanViewBaseModel, photo_book_service_http_client.patch_all_plan_view_client,
-                    UpdateType.SNAPSHOT_TYPE, _id=plan_id,
-                    plan_alert_aggregated_severity=Severity.Severity_UNSPECIFIED.value,
-                    plan_alert_count=0)
-                payload = [{"message": log_str}]
-                photo_book_service_http_client.handle_plan_view_updates_query_client(payload)
-            except Exception as e_:
-                logging.exception(e_)
-
-        return []
-
     async def contact_alert_fail_logger_query_pre(
             self, contact_alert_fail_logger_class_type: Type[ContactAlertFailLogger], log_msg: str):
         # logs msg to contact alert fail logs - listener mails if any log is found
@@ -999,10 +1197,34 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         Thread(target=self.trigger_self_terminate, daemon=True).start()
         return []
 
-    async def plan_state_update_matcher_query_pre(
-            self, plan_state_update_matcher_class_type: Type[PlanStateUpdateMatcher], plan_id: int,
-            message: str, log_file_path: str):
-        self._handle_plan_state_update_mismatch(plan_id, message, log_file_path)
+    async def plan_state_update_matcher_for_symbol_side_log_query_pre(
+            self,
+            plan_state_update_matcher_for_symbol_side_log_class_type: Type[PlanStateUpdateMatcherForSymbolSideLog],
+            payload: List[Dict[str, Any]]):
+        for log_payload in payload:
+            message = log_payload.get("message")
+            source_file = log_payload.get("source_file")
+
+            symbol_side_set = get_symbol_n_side_from_log_line(message)
+            symbol_side: str = list(symbol_side_set)[0]
+            plan_id: int | None = self.loaded_plan_id_by_symbol_side_dict.get(symbol_side)
+            logging.info(f"found active to pause log line for {plan_id=}")
+
+            self._handle_plan_state_update_mismatch(plan_id, message, source_file)
+        return []
+
+    async def plan_state_update_matcher_for_plan_id_log_query_pre(
+            self,
+            plan_state_update_matcher_for_plan_id_log_class_type: Type[PlanStateUpdateMatcherForPlanIdLog],
+            payload: List[Dict[str, Any]]):
+        for log_payload in payload:
+            message = log_payload.get("message")
+            source_file = log_payload.get("source_file")
+            file_name_regex = log_payload.get("file_name_regex")
+            plan_id = get_plan_id_from_executor_log_file_name(file_name_regex, source_file)
+            logging.info(f"found active to pause log line for {plan_id=}")
+
+            self._handle_plan_state_update_mismatch(plan_id, message, source_file)
         return []
 
     async def dismiss_all_contact_alerts_query_pre(self, contact_alert_class_type: Type[ContactAlert]):
@@ -1063,75 +1285,50 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         return text
 
     def _update_no_activity_monitor_related_cache(self, source_file: str, file_regex_pattern_dict: Dict):
-        if source_file not in self.log_file_no_activity_dict:
-            critical_start_time_str: str | None = file_regex_pattern_dict.get("start_time")
-            critical_start_time = None
-            if critical_start_time_str and critical_start_time_str != "None":
-                try:
-                    critical_start_time = pendulum.parse(critical_start_time_str)
-                except pendulum.parsing.exceptions.ParserError:
-                    # keeping critical_start_time = None
-                    pass
+        critical_time_range_tuple_list: List[Tuple[DateTime | None, DateTime | None]] = []
+        critical_time_ranges: List[Dict[str, str]] | None = file_regex_pattern_dict.get("critical_time_ranges")
 
-            critical_end_time_str = file_regex_pattern_dict.get("end_time")
-            critical_end_time = None
-            if critical_end_time_str and critical_end_time_str != "None":
-                try:
-                    critical_end_time = pendulum.parse(critical_end_time_str)
-                except pendulum.parsing.exceptions.ParserError:
-                    # keeping critical_end_time = None
-                    pass
+        if critical_time_ranges is not None:
+            for critical_time_range in critical_time_ranges:
+                start_time_str = critical_time_range.get("start_time")
+                critical_start_time = None
+                if start_time_str and start_time_str != "None":
+                    try:
+                        critical_start_time = pendulum.parse(start_time_str)
+                    except pendulum.parsing.exceptions.ParserError:
+                        # keeping critical_start_time = None
+                        pass
 
-            service_name = get_service_name_from_component_path(source_file)
-            self.log_file_no_activity_dict[source_file] = (
-                LogNoActivityData.from_kwargs(source_file=source_file, service_name=service_name,
-                                              critical_start_time=critical_start_time,
-                                              critical_end_time=critical_end_time))
-            logging.info(f"Critical monitoring setup for {source_file=}, {service_name=}, "
-                         f"{critical_start_time=}, {critical_end_time=}")
+                end_time_str = critical_time_range.get("end_time")
+                critical_end_time = None
+                if end_time_str and end_time_str != "None":
+                    try:
+                        critical_end_time = pendulum.parse(end_time_str)
+                    except pendulum.parsing.exceptions.ParserError:
+                        # keeping critical_end_time = None
+                        pass
+
+                critical_time_range_tuple_list.append((critical_start_time, critical_end_time))
+
+        service_name = get_service_name_from_component_path(source_file)
+        self.log_file_no_activity_dict[source_file] = (
+            LogNoActivityData.from_kwargs(source_file=source_file, service_name=service_name,
+                                          critical_duration_list=critical_time_range_tuple_list))
+        logging.info(f"Critical monitoring setup for {source_file=}, {service_name=}, "
+                     f"{critical_time_range_tuple_list=}")
 
     def update_no_activity_monitor_related_cache(self, source_file: str):
-        # verifying if this file is critical
-        for file_regex_pattern, file_regex_pattern_dict in self.critical_log_regex_file_names.items():
-            if re.search(file_regex_pattern, source_file):
-                self._update_no_activity_monitor_related_cache(source_file, file_regex_pattern_dict)
-                break
+        if source_file not in self.log_file_no_activity_dict:
+            # verifying if this file is critical
+            for file_regex_pattern, file_regex_pattern_dict in self.critical_log_regex_file_names.items():
+                if re.search(file_regex_pattern, source_file):
+                    self._update_no_activity_monitor_related_cache(source_file, file_regex_pattern_dict)
+                    break
+        # else not required: avoid no notify set-up if already got set-up
 
     async def handle_contact_alerts_query_pre(self, handle_contact_alerts_class_type: Type[HandleContactAlerts],
                                                 payload: List[Dict[str, Any]]):
-        for log_data in payload:
-            message = log_data.get("message")
-            source_file = log_data.get("source_file")
-            line_num = log_data.get("line")
-            log_date_time = log_data.get("timestamp")
-            log_source_file_name = log_data.get("file")
-            level = log_data.get("level")
-
-            # updating cache - used for no activity checks
-            self.update_no_activity_monitor_related_cache(source_file)
-
-            alert_brief_n_detail_lists: List[str] = (
-                message.split(LogBookServiceRoutesCallbackBaseNativeOverride.log_seperator, 1))
-            if len(alert_brief_n_detail_lists) == 2:
-                alert_brief = alert_brief_n_detail_lists[0]
-                alert_details = alert_brief_n_detail_lists[1]
-            else:
-                alert_brief = alert_brief_n_detail_lists[0]
-                alert_details = ". ".join(alert_brief_n_detail_lists[1:])
-
-            alert_brief = self._truncate_str(alert_brief).strip()
-            alert_details = self._truncate_str(alert_details).strip()
-            alert_meta = get_alert_meta_obj(source_file, log_source_file_name,
-                                            line_num, log_date_time, alert_details, alert_meta_type=AlertMeta)
-            severity: Severity = LogBookServiceRoutesCallbackBaseNativeOverride.severity_map.get(level.lower())
-
-            if severity is not None and alert_brief is not None:
-                self.send_contact_alerts(severity, alert_brief, alert_meta)
-            else:
-                err_str_ = ("handle_contact_alerts_query_pre failed - contact_alert data "
-                            "found with missing data, can't create plan alert;;; "
-                            f"received: {severity=}, {alert_brief=}, {alert_meta=}")
-                self.contact_alert_fail_logger.error(err_str_)
+        self.contact_alert_queue.put(payload)
         return []
 
     def _create_alert(self, message: str, level: str, source_file: str) -> Tuple[Severity, str, str]:
@@ -1156,153 +1353,59 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                 _id=pair_plan_id, plan_state=PlanState.PlanState_PAUSED)
             email_book_service_http_client.patch_pair_plan_client(
                 updated_pair_plan.to_json_dict(exclude_none=True))
-            err_ = f"Force paused {pair_plan_id=}, {error_event_msg}"
+
+            symbol_side_key_ = get_symbol_side_key([(updated_pair_plan.pair_plan_params.plan_leg1.sec.sec_id,
+                                                     updated_pair_plan.pair_plan_params.plan_leg1.side),
+                                                    (updated_pair_plan.pair_plan_params.plan_leg2.sec.sec_id,
+                                                     updated_pair_plan.pair_plan_params.plan_leg2.side)])
+            err_ = f"Force paused {pair_plan_id=}, {symbol_side_key_}, {error_event_msg}"
             logging.critical(err_)
-            alert_meta = get_alert_meta_obj(component_file_name, PurePath(__file__).name,
-                                            inspect.currentframe().f_lineno, DateTime.utcnow())
-            self._send_plan_alerts(pair_plan_id, LogBookServiceRoutesCallbackBaseNativeOverride.severity_map.get("critical"),
-                                    err_, alert_meta)
+
+            self.send_plan_alert(err_, "critical", inspect.currentframe().f_lineno,
+                                  str(component_file_name), PurePath(__file__).name)
         except Exception as e:
-            alert_brief: str = f"force_trigger_plan_pause failed for {pair_plan_id=}, {error_event_msg=}"
-            alert_details: str = f"exception: {e}"
-            logging.critical(f"{alert_brief};;;{alert_details}")
-            alert_meta = get_alert_meta_obj(component_file_name, PurePath(__file__).name,
-                                            inspect.currentframe().f_lineno, DateTime.utcnow(), alert_details)
-            self.send_contact_alerts(severity=LogBookServiceRoutesCallbackBaseNativeOverride.severity_map.get("critical"),
-                                       alert_brief=alert_brief, alert_meta=alert_meta)
+            err_msg: str = (f"force_trigger_plan_pause failed for {pair_plan_id=}, {error_event_msg=}"
+                            f"{LogBookServiceRoutesCallbackBaseNativeOverride.log_seperator} exception: {e}")
+            self.send_contact_alert(err_msg, "critical", inspect.currentframe().f_lineno,
+                                      str(component_file_name), PurePath(__file__).name, DateTime.utcnow())
 
-    async def handle_msg_pattern_checks(self, message: str, plan_id: int, component_file_name: str):
-        # handle plan_state update mismatch
-        if "Plan state changed from PlanState_ACTIVE to PlanState_PAUSED" in message:
-            logging.info(f"found active to pause log line for {plan_id=}")
-            await LogBookServiceRoutesCallbackBaseNativeOverride.underlying_plan_state_update_matcher_query_http(
-                plan_id, message, component_file_name)
-
-    async def _handle_plan_alerts_using_data_from_log_line(self, plan_id: int, severity: Severity,
-                                                            alert_brief: str, alert_meta: AlertMeta):
+    def create_n_update_plan_alerts_list_update(
+            self, plan_id: int, severity: Severity, alert_brief: str, alert_meta: AlertMeta,
+            create_plan_alert_list: List[PlanAlert], upload_plan_alert_list: List[PlanAlert]):
         if plan_id is not None and severity is not None and alert_brief is not None:
-            if plan_id not in self.plan_alert_cache_dict_by_plan_id_dict:
-                # verifying if plan exists
-                try:
-                    pair_plan: PairPlanBaseModel = email_book_service_http_client.get_pair_plan_client(plan_id)
-                except Exception as e:
-                    logging.exception(f"get_pair_plan_client failed: Can't find pair_start "
-                                      f"with id: {plan_id}, exception={e}")
-                    self.send_contact_alerts(severity, alert_brief, alert_meta)
-                else:
-                    # checking if plan is not unloaded
-                    plan_key = get_plan_key_from_pair_plan(pair_plan)
-                    plan_collections = email_book_service_http_client.get_all_plan_collection_client()
-                    plan_collection = plan_collections[0]
-                    if plan_key in plan_collection.buffered_plan_keys:
-                        logging.exception(f"pair_plan with {pair_plan.id=} found to be unloaded - sending alert"
-                                          f"for this plan as contact alert")
-                        self.send_contact_alerts(severity, alert_brief, alert_meta)
-                        if pair_plan.id in self.active_plan_id_list:
-                            # precautionary step: removing plan from active if not active and not removed yet
-                            self.active_plan_id_list.remove(pair_plan.id)
-                        # else not required: good if not already present
-
-            await async_update_plan_alert_cache(plan_id, self.plan_alert_cache_dict_by_plan_id_dict,
-                                                 LogBookServiceRoutesCallbackBaseNativeOverride.
-                                                 underlying_filtered_plan_alert_by_plan_id_query_http)
-            self._send_plan_alerts(plan_id, severity, alert_brief, alert_meta)
+            self._create_n_update_plan_alerts_list_update(create_plan_alert_list, upload_plan_alert_list,
+                                                           plan_id, severity, alert_brief, alert_meta)
         else:
-            err_severity = LogBookServiceRoutesCallbackBaseNativeOverride.severity_map.get("error")
-            err_brief = ("handle_plan_alerts_with_plan_id_query_pre failed - start_alert data found with "
-                         "missing data, can't create plan alert")
-            err_details = f"received: {plan_id=}, {severity=}, {alert_brief=}, {alert_meta=}"
-            alert_meta = get_alert_meta_obj(alert_meta.component_file_path, alert_meta.source_file_name,
-                                            alert_meta.line_num, alert_meta.alert_create_date_time,
-                                            alert_meta.first_detail, err_details, alert_meta_type=AlertMeta)
-            self.send_contact_alerts(err_severity, err_brief, alert_meta)
+            err_detail = alert_meta.latest_detail if alert_meta.latest_detail is not None else alert_meta.first_detail
+            if err_detail is None:
+                err_detail = ""
+            err_msg = ("handle_plan_alerts_with_plan_id_query_pre failed - start_alert data found with "
+                         f"missing data, can't create plan alert for {plan_id=}, original {alert_brief=}, "
+                         f"{LogBookServiceRoutesCallbackBaseNativeOverride.log_seperator}"
+                         f"{err_detail}")
+            self.send_contact_alert(err_msg, "error", alert_meta.line_num,
+                                      alert_meta.component_file_path, alert_meta.source_file_name,
+                                      alert_meta.alert_create_date_time)
 
-    def plan_is_unloaded(self, plan_id: int, severity: Severity, alert_brief: str, alert_meta: AlertMeta):
-        if plan_id not in self.active_plan_id_list:
-            logging.error(f"No plan_id found for active pair_plan {plan_id=}, "
-                          f"sending plan alert to contact alert;;; {severity=}, {alert_brief=}, {alert_meta=}")
-            self.send_contact_alerts(severity, alert_brief, alert_meta)
+    def plan_is_unloaded(self, plan_id: int, log_payload: Dict):
+        if plan_id not in self.loaded_plan_id_list:
+            # updating contact alert detail
+            log_payload['message'] = (f"Plan with {plan_id=} was unloaded, sending as contact alert, "
+                                      f"original log msg: {log_payload.get('message')}")
+            self.contact_alert_queue.put([log_payload])
             return True
         return False
 
     async def handle_plan_alerts_with_plan_id_query_pre(
             self, handle_plan_alerts_with_plan_id_class_type: Type[HandlePlanAlertsWithPlanId],
             payload: List[Dict[str, Any]]):
-        for log_data in payload:
-            message = log_data.get("message")
-            source_file = log_data.get("source_file")
-            line_num = log_data.get("line")
-            log_date_time = log_data.get("timestamp")
-            log_source_file_name = log_data.get("file")
-            level = log_data.get("level")
-            file_name_regex = log_data.get("file_name_regex")
-
-            # updating cache - used for no activity checks
-            self.update_no_activity_monitor_related_cache(source_file)
-
-            severity, alert_brief, alert_details = self._create_alert(message, level, source_file)
-            alert_meta = get_alert_meta_obj(source_file, log_source_file_name,
-                                            line_num, log_date_time, alert_details, alert_meta_type=AlertMeta)
-
-            plan_id = get_plan_id_from_executor_log_file_name(file_name_regex, source_file)
-            if self.plan_is_unloaded(plan_id, severity, alert_brief, alert_meta):    # sends contact alert internally
-                continue
-
-            # handling pause and pos_disable
-            await self.handle_msg_pattern_checks(message, plan_id, source_file)
-
-            await self._handle_plan_alerts_using_data_from_log_line(plan_id, severity, alert_brief, alert_meta)
+        self.plan_alert_queue.put(payload)
         return []
-
-    def _get_pair_plan_obj_from_symbol_side(self, symbol: str, side: Side) -> PairPlanBaseModel | None:
-        pair_plan_list: List[PairPlanBaseModel] = \
-            (email_book_service_http_client.
-             get_ongoing_or_single_exact_non_ongoing_pair_plan_from_symbol_side_query_client(
-                sec_id=symbol, side=side))
-
-        if len(pair_plan_list) == 0:
-            return None
-        elif len(pair_plan_list) == 1:
-            pair_plan_obj: PairPlanBaseModel = pair_plan_list[0]
-            return pair_plan_obj
 
     async def handle_plan_alerts_with_symbol_side_query_pre(
             self, handle_plan_alerts_with_symbol_side_class_type: Type[HandlePlanAlertsWithSymbolSide],
             payload: List[Dict[str, Any]]):
-        for log_data in payload:
-            message = log_data.get("message")
-            source_file = log_data.get("source_file")
-            line_num = log_data.get("line")
-            log_date_time = log_data.get("timestamp")
-            log_source_file_name = log_data.get("file")
-            level = log_data.get("level")
-
-            # updating cache - used for no activity checks
-            self.update_no_activity_monitor_related_cache(source_file)
-
-            log_message: str = message.replace(self.symbol_side_pattern, "")
-            severity, alert_brief, alert_details = self._create_alert(log_message, level, source_file)
-
-            alert_meta = get_alert_meta_obj(source_file, log_source_file_name,
-                                            line_num, log_date_time, alert_details, alert_meta_type=AlertMeta)
-
-            symbol_side_set = get_symbol_n_side_from_log_line(message)
-            symbol_side: str = list(symbol_side_set)[0]
-            plan_id: int | None = self.plan_id_by_symbol_side_dict.get(symbol_side)
-
-            if plan_id is None:
-                logging.error(f"No plan_id found for symbol_side: {symbol_side} in self.plan_id_by_symbol_side_dict, "
-                              f"sending plan alert to contact alert;;; {severity=}, {alert_brief=}, {alert_meta=}")
-                self.send_contact_alerts(severity, alert_brief, alert_meta)
-                continue
-
-            if self.plan_is_unloaded(plan_id, severity, alert_brief, alert_meta):    # sends contact alert internally
-                continue
-
-            # handling pause and pos_disable
-            await self.handle_msg_pattern_checks(message, plan_id, source_file)
-
-            await self._handle_plan_alerts_using_data_from_log_line(plan_id, severity, alert_brief, alert_meta)
+        self.plan_alert_queue.put(payload)
         return []
 
     def dynamic_queue_handler_err_handler(self, basemodel_type: str, update_type: UpdateType,
@@ -1370,37 +1473,15 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             except queue.Empty:
                 # Handle the empty queue condition
                 continue
-            plan_id_n_msg_tuple_list: List[Tuple[int, str]] = []
-            for data in data_list:
-                message, source_file = data
 
-                symbol_side_set = get_symbol_n_side_from_log_line(message)
-                symbol_side: str = list(symbol_side_set)[0]
-                symbol, side = symbol_side.split("-")
-
-                plan_id: int | None = self.plan_id_by_symbol_side_dict.get(symbol_side)
-
-                if plan_id is None:
-                    pair_plan_obj: PairPlanBaseModel = self._get_pair_plan_obj_from_symbol_side(symbol, Side(side))
-                    if pair_plan_obj is None:
-                        raise HTTPException(detail=f"No Ongoing pair plan found for symbol_side: {symbol_side}",
-                                            status_code=400)
-
-                    plan_id = pair_plan_obj.id
-                    for symbol_side in symbol_side_set:
-                        self.plan_id_by_symbol_side_dict[symbol_side] = plan_id
-
-                plan_id_n_msg_tuple_list.append((plan_id, message))
-
-            if plan_id_n_msg_tuple_list:
-                # coro needs public method
-                run_coro = self.handle_pos_disable_tasks(plan_id_n_msg_tuple_list)
-                future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
-                # block for task to finish
-                try:
-                    future.result()
-                except Exception as e:
-                    logging.exception(f"handle_pos_disable_tasks failed with exception: {e}")
+            # coro needs public method
+            run_coro = self.handle_pos_disable_tasks_for_symbol_side_log(data_list)
+            future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
+            # block for task to finish
+            try:
+                future.result()
+            except Exception as e:
+                logging.exception(f"handle_pos_disable_tasks_for_symbol_side_log failed with exception: {e}")
 
     async def handle_pos_disable_from_symbol_side_log_query_pre(
             self, handle_pos_disable_from_symbol_side_log_class_type: Type[HandlePosDisableFromSymbolSideLog],
@@ -1433,12 +1514,47 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         await self.dummy_pos_disable_check(plan_id)
         pass
 
-    async def handle_pos_disable_tasks(self, plan_id_n_msg_tuple_list: List[Tuple[int, str]]):
-        task_list = []
-        for plan_id_n_msg_tuple in plan_id_n_msg_tuple_list:
-            plan_id, msg = plan_id_n_msg_tuple
+    async def handle_pos_disable_tasks_for_symbol_side_log(self, data_list: Tuple[str, str]):
 
-            task = asyncio.create_task(self.handle_pos_disable_task(plan_id, msg))
+        task_list = []
+        async with self.loaded_unload_plan_list_async_rlock:
+            for data in data_list:
+                message, source_file = data
+
+                symbol_side_set = get_symbol_n_side_from_log_line(message)
+                symbol_side: str = list(symbol_side_set)[0]
+                symbol, side = symbol_side.split("-")
+
+                plan_id: int | None = self.loaded_plan_id_by_symbol_side_dict.get(symbol_side)
+
+                if plan_id is None:
+                    logging.error(f"No Loaded plan found for {symbol_side=}, can't fulfill pos disable request for "
+                                  f"this symbol-side")
+                    continue
+
+                task = asyncio.create_task(self.handle_pos_disable_task(plan_id, message))
+                task_list.append(task)
+
+            await execute_tasks_list_with_all_completed(task_list)
+
+    async def handle_pos_disable_tasks_for_plan_id_logs(self, data_list: Tuple[str, str, str]):
+
+        task_list = []
+        for data in data_list:
+            message, source_file, file_name_regex = data
+
+            plan_id = get_plan_id_from_executor_log_file_name(file_name_regex, source_file)
+
+            if plan_id is None:
+                err_str_ = (f"Can't find plan id in {source_file=} from payload passed to "
+                            f"handle_pos_disable_by_log_query - "
+                            f"Can't disable positions intended to be disabled;;; "
+                            f"log_message: {message}")
+                logging.critical(err_str_)
+                continue
+            # else not required: using found plan_id
+
+            task = asyncio.create_task(self.handle_pos_disable_task(plan_id, message))
             task_list.append(task)
 
         await execute_tasks_list_with_all_completed(task_list)
@@ -1452,32 +1568,14 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
                 # Handle the empty queue condition
                 continue
 
-            plan_id_n_msg_tuple_list: List[Tuple[int, str]] = []
-            for data in data_list:
-                message, source_file, file_name_regex = data
-
-                plan_id = get_plan_id_from_executor_log_file_name(file_name_regex, source_file)
-
-                if plan_id is None:
-                    err_str_ = (f"Can't find plan id in {source_file=} from payload passed to "
-                                f"handle_pos_disable_by_log_query - "
-                                f"Can't disable positions intended to be disabled;;; "
-                                f"log_message: {message}")
-                    logging.critical(err_str_)
-                    continue
-                # else not required: using found plan_id
-
-                plan_id_n_msg_tuple_list.append((plan_id, message))
-
-            if plan_id_n_msg_tuple_list:
-                # coro needs public method
-                run_coro = self.handle_pos_disable_tasks(plan_id_n_msg_tuple_list)
-                future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
-                # block for task to finish
-                try:
-                    future.result()
-                except Exception as e:
-                    logging.exception(f"handle_pos_disable_tasks failed with exception: {e}")
+            # coro needs public method
+            run_coro = self.handle_pos_disable_tasks_for_plan_id_logs(data_list)
+            future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
+            # block for task to finish
+            try:
+                future.result()
+            except Exception as e:
+                logging.exception(f"handle_pos_disable_tasks failed with exception: {e}")
 
 
     async def handle_pos_disable_from_plan_id_log_query_pre(
@@ -1533,40 +1631,37 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
     async def handle_plan_pause_from_symbol_side_log_query_pre(
             self, handle_plan_pause_from_symbol_side_log_class_type: Type[HandlePlanPauseFromSymbolSideLog],
             payload: List[Dict[str, Any]]):
-        # Adding alert for original payload
-        await LogBookServiceRoutesCallbackBaseNativeOverride.underlying_handle_plan_alerts_with_symbol_side_query_http(payload)
+        async with self.loaded_unload_plan_list_async_rlock:
 
-        update_pair_plan_json_list = []
-        plan_id_list = []
-        for log_data in payload:
-            message = log_data.get("message")
+            # Adding alert for original payload
+            await LogBookServiceRoutesCallbackBaseNativeOverride.underlying_handle_plan_alerts_with_symbol_side_query_http(payload)
 
-            symbol_side_set = get_symbol_n_side_from_log_line(message)
-            symbol_side: str = list(symbol_side_set)[0]
-            symbol, side = symbol_side.split("-")
+            update_pair_plan_json_list = []
+            plan_id_list = []
+            for log_data in payload:
+                message = log_data.get("message")
 
-            plan_id: int | None = self.plan_id_by_symbol_side_dict.get(symbol_side)
+                symbol_side_set = get_symbol_n_side_from_log_line(message)
+                symbol_side: str = list(symbol_side_set)[0]
+                symbol, side = symbol_side.split("-")
 
-            if plan_id is None:
-                pair_plan_obj: PairPlanBaseModel = self._get_pair_plan_obj_from_symbol_side(symbol, Side(side))
-                if pair_plan_obj is None:
-                    raise HTTPException(detail=f"No Ongoing pair plan found for symbol_side: {symbol_side}",
-                                        status_code=400)
+                plan_id: int | None = self.loaded_plan_id_by_symbol_side_dict.get(symbol_side)
 
-                plan_id = pair_plan_obj.id
-                for symbol_side in symbol_side_set:
-                    self.plan_id_by_symbol_side_dict[symbol_side] = plan_id
+                if plan_id is None:
+                    logging.error(f"No Loaded plan found for {symbol_side=}, can't fulfill pause plan request for "
+                                  f"this symbol-side")
+                    continue
 
-            msg_brief: str = message.split(";;;")[0]
-            err_: str = f"pausing pattern matched for plan with {plan_id=};;;{msg_brief=}"
+                msg_brief: str = message.split(";;;")[0]
+                err_: str = f"pausing pattern matched for plan with {plan_id=};;;{msg_brief=}"
+                logging.critical(err_)
+
+                update_pair_plan_json = {"_id": plan_id, "plan_state": PlanState.PlanState_PAUSED}
+                update_pair_plan_json_list.append(update_pair_plan_json)
+            email_book_service_http_client.patch_all_pair_plan_client(update_pair_plan_json_list)
+            err_ = f"Force paused {plan_id_list=}"
             logging.critical(err_)
-
-            update_pair_plan_json = {"_id": plan_id, "plan_state": PlanState.PlanState_PAUSED}
-            update_pair_plan_json_list.append(update_pair_plan_json)
-        email_book_service_http_client.patch_all_pair_plan_client(update_pair_plan_json_list)
-        err_ = f"Force paused {plan_id_list=}"
-        logging.critical(err_)
-        return []
+            return []
 
 def _handle_plan_alert_ids_list_update_for_start_id_in_filter_callable(
         plan_alert_obj_json: Dict, plan_id: int, plan_id_to_start_alert_obj_list_dict: Dict, res_json_list: List):

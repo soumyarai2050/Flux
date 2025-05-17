@@ -1,3 +1,5 @@
+// g++ -std=c++20 -o shared_memory_manager shared_memory_snapshot.cpp -lpthread -I../../../../../../FluxCppCore/include/
+
 
 #include <iostream>
 #include <cstring>
@@ -110,62 +112,66 @@ protected:
 
 
 int main(int argc, char* argv[]) {
-    if (argc != 3) {
+    if (argc != 4) {
         std::cout << "Usage: " << argv[0] << " no. of level(1, 5, 10, 15, 20), /street_book_1_shm /street_book_1_sem\n";
         return 0;
     }
 
     int level = std::stoi(argv[1]);
-    if (level != 1 or level != 5 or level != 10 or level != 15 or level != 20) {
+    std::cout << level << "\n";
+    if (level != 1 && level != 5 && level != 10 && level != 15 && level != 20) {
         std::cout << "Invalid level provided. Supported levels are 1, 5, 10, 15, 20.\n";
         throw std::runtime_error("Invalid level provided. Supported levels are 1, 5, 10, 15, 20.\n");
         return 0;
     }
 
+    std::string shm_name = argv[2];
+    std::string sem_name = argv[3];
+
     try {
         switch (level) {
             case 1: {
-                SharedMemoryManager<ShmSymbolCache<1>> shmManager(argv[1], argv[2]);
+                SharedMemoryManager<ShmSymbolCache<1>> shmManager(shm_name, sem_name);
                 while (1) {
                     std::cout << "------------------------------------ S N A P S H O T ------------------------------------\n";
                     auto shm_cache =shmManager.read_from_shared_memory();
-                    mobile_book_handler::shm_snapshot(shm_cache);
+                    std::cout << mobile_book_handler::shm_snapshot(shm_cache);
                 }
                 break;
             }
             case 5: {
-                SharedMemoryManager<ShmSymbolCache<5>> shmManager(argv[1], argv[2]);
+                SharedMemoryManager<ShmSymbolCache<5>> shmManager(shm_name, sem_name);
                 while (1) {
                     std::cout << "------------------------------------ S N A P S H O T ------------------------------------\n";
                     auto shm_cache =shmManager.read_from_shared_memory();
-                    mobile_book_handler::shm_snapshot(shm_cache);
+                    std::cout << mobile_book_handler::shm_snapshot(shm_cache);
                 }
                 break;
             }
             case 10: {
-                SharedMemoryManager<ShmSymbolCache<10>> shmManager(argv[1], argv[2]);
+                SharedMemoryManager<ShmSymbolCache<10>> shmManager(shm_name, sem_name);
                 while (1) {
                     std::cout << "------------------------------------ S N A P S H O T ------------------------------------\n";
                     auto shm_cache =shmManager.read_from_shared_memory();
-                    mobile_book_handler::shm_snapshot(shm_cache);
+                    std::cout << mobile_book_handler::shm_snapshot(shm_cache);
                 }
                 break;
             }
             case 15: {
-                SharedMemoryManager<ShmSymbolCache<15>> shmManager(argv[1], argv[2]);
+                SharedMemoryManager<ShmSymbolCache<15>> shmManager(shm_name, sem_name);
                 while (1) {
                     std::cout << "------------------------------------ S N A P S H O T ------------------------------------\n";
                     auto shm_cache =shmManager.read_from_shared_memory();
-                    mobile_book_handler::shm_snapshot(shm_cache);
+                    std::cout << mobile_book_handler::shm_snapshot(shm_cache);
                 }
                 break;
             }
             case 20: {
-                SharedMemoryManager<ShmSymbolCache<20>> shmManager(argv[1], argv[2]);
+                SharedMemoryManager<ShmSymbolCache<20>> shmManager(shm_name, sem_name);
                 while (1) {
                     std::cout << "------------------------------------ S N A P S H O T ------------------------------------\n";
                     auto shm_cache =shmManager.read_from_shared_memory();
-                    mobile_book_handler::shm_snapshot(shm_cache);
+                    std::cout << mobile_book_handler::shm_snapshot(shm_cache);
                 }
                 break;
             }

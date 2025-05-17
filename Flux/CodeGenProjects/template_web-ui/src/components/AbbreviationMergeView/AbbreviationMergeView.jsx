@@ -281,7 +281,7 @@ const LoadedView = ({
                 {cells.map((cell, cellIndex) => {
                   // Get row data based on the cell's source index.
                   const row = groupedRow[cell.sourceIndex];
-                  const isNullCell = row && Object.keys(row).length === 0 && !cell.commonGroupKey;
+                  const isNullCell = !row || (row && Object.keys(row).length === 0 && !cell.commonGroupKey);
 
                   // Update stored objects for this row.
                   if (row) {

@@ -99,7 +99,7 @@ function PivotTable({
         updatedObj.vals = [];
         updatedObj.aggregator_name = 'Count';
         updatedObj.renderer_name = 'Table';
-        updatedObj.value_filter = {};
+        updatedObj.value_filter = JSON.stringify({});
         setUpdatedPivotObj(updatedObj);
         setStoredPivotObj({});
         onModeToggle();
@@ -165,7 +165,7 @@ function PivotTable({
             prev.classList.remove(styles.selected);
         }
 
-        // 2. Add the module‐scoped `selected` class to the clicked cell
+        // 2. Add the module-scoped `selected` class to the clicked cell
         e.target.classList.add(styles.selected);
         const ids = [];
         pivotData.forEachMatchingRecord(filters, (record) => {

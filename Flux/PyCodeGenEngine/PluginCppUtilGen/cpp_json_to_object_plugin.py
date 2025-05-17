@@ -149,7 +149,7 @@ class CppJsonToObjectPlugin(BaseProtoPlugin):
 
                 if fld_kind != "message":
                     # Non-message types (handle optional/repeated cases)
-                    if self.is_option_enabled(fld, self.flux_fld_val_is_datetime):
+                    if self.is_option_enabled(fld, self.flux_fld_val_is_datetime) and fld_cardinality != "optional":
                         output.append(f'{tab}if ({name_lower}_json.if_contains("{fld_name}")) {{')
                         output.append(f'{tab}\ttry {{')
                         output.append(f'{tab}\t\tr_{name_lower}.{fld_name}_ = {name_lower}_json["{fld_name}"].as_{kind}();')
@@ -160,6 +160,20 @@ class CppJsonToObjectPlugin(BaseProtoPlugin):
                         output.append(f"{tab}}} else {{")
                         output.append(f"{tab}\tr_{name_lower}.{fld_name}_ = FluxCppCore::get_local_time_microseconds<"
                                       f"int64_t>();\n")
+                        output.append(f"{tab}}}\n")
+                    elif self.is_option_enabled(fld, self.flux_fld_val_is_datetime) and fld_cardinality == "optional":
+                        output.append(f'{tab}if ({name_lower}_json.if_contains("{fld_name}")) {{')
+                        output.append(f'{tab}\ttry {{')
+                        output.append(f'{tab}\t\tr_{name_lower}.{fld_name}_ = {name_lower}_json["{fld_name}"].as_{kind}();')
+                        output.append(f'{tab}\t\tr_{name_lower}.is_{fld_name}_set_ = true;')
+                        # output.append(f'{tab}\t\tr_{name_lower}.is_{fld_name}_set_ = true;')
+                        output.append(f'{tab}\t}} catch (std::exception& e) {{')
+                        output.append(f'{tab}\t\tthrow std::invalid_argument(std::format("Error processing `{fld_name}`: {{}}", e.what()));')
+                        output.append(f'{tab}\t}}')
+                        output.append(f"{tab}}} else {{")
+                        output.append(f"{tab}\tr_{name_lower}.{fld_name}_ = FluxCppCore::get_local_time_microseconds<"
+                                      f"int64_t>();\n")
+                        output.append(f'{tab}\t\tr_{name_lower}.is_{fld_name}_set_ = true;')
                         output.append(f"{tab}}}\n")
                     else:
                         if fld_cardinality in {"optional", "repeated"}:

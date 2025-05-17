@@ -191,6 +191,7 @@ extend google.protobuf.MessageOptions
   optional int64 FluxMsgStringLength = 51154;
   optional bool FluxMsgIsCppWebServerModel = 51155;
   optional bool FluxMsgIsShmModel = 51156;
+  optional bool FluxMsgIsShmContainer = 51157;
 
   //DB Options - 52
   optional string FluxMsgTbl = 52151;

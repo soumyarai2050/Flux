@@ -35,7 +35,7 @@ contact_alert_fail_log = f"contact_alert_fail_logs_{datetime_str}.log"
 simulator_contact_alert_fail_log = f"simulator_contact_alert_fail_logs_{datetime_str}.log"
 
 # pattern to find non-existing ids of objects which were not found while patch-all
-non_existing_obj_read_fail_regex_pattern: Final[str] = ".*objects with ids: {(.*)} out of requested .*"
+non_existing_obj_read_fail_regex_pattern: Final[str] = r".*objects with ids: \{(.*?)\} out of requested .*"
 
 
 class UpdateType(StrEnum):
@@ -52,10 +52,10 @@ class AlertsCacheCont(MsgspecBaseModel, kw_only=True):
 
 
 def create_alert(
-        plan_alert_type: Type[PlanAlert] | Type[PlanAlertBaseModel],
-        contact_alert_type: Type[ContactAlert] | Type[ContactAlertBaseModel],
+        plan_alert_type: Type[PlanAlert],
+        contact_alert_type: Type[ContactAlert],
         alert_brief: str, severity: Severity = Severity.Severity_ERROR, plan_id: int | None = None,
-        alert_meta: AlertMeta | None = None) -> PlanAlertBaseModel | ContactAlertBaseModel:
+        alert_meta: AlertMeta | None = None) -> PlanAlert | ContactAlert:
     """
     Handles plan alerts if plan id is passed else handles contact alerts
     """
@@ -440,15 +440,15 @@ def handle_dynamic_queue_for_patch_n_patch_all(basemodel_type: str, method_name:
         raise Exception(e)
 
 
-def _alert_queue_handler_err_handler(e, model_obj_list, queue_obj, err_handling_callable,
-                                     web_client_callable, client_connection_fail_retry_secs):
+def alert_queue_handler_err_handler(e, model_obj_list, queue_obj, err_handling_callable,
+                                    web_client_callable, client_connection_fail_retry_secs: int | None = None):
     # Handling patch-all race-condition if some obj got removed before getting updated due to wait
     # pattern1: happens in patch_all and in put_all when stored_obj is fetched before update operation and hence
     #           error is raised before updating obj
     match_list1: List[str] = re.findall(non_existing_obj_read_fail_regex_pattern, str(e))
 
     # pattern2: happens in put_all when obj is updated and then missing ids are found and error is raised
-    pattern2 = "Can't find document objects with ids: [(.*)] to update"
+    pattern2 = r"Can't find document objects with ids: \[(.*?)\] to update"
     match_list2: List[str] = re.findall(pattern2, str(e))
 
     if match_list1:
@@ -466,7 +466,7 @@ def _alert_queue_handler_err_handler(e, model_obj_list, queue_obj, err_handling_
     elif match_list2:
         # taking first occurrence
         non_existing_id_list: List[int] = [parse_to_int(_id.strip())
-                                           for _id in match_list1[0].split(",")]
+                                           for _id in match_list2[0].split(",")]
         non_existing_obj = []
         for model_obj in model_obj_list:
             if model_obj.id in non_existing_id_list:
@@ -536,12 +536,12 @@ def alert_queue_handler_for_create_only(
             try:
                 res = create_web_client_callable(create_model_obj_list)
             except HTTPException as http_e:
-                _alert_queue_handler_err_handler(http_e.detail, create_model_obj_list, queue_obj,
-                                                 err_handling_callable,
-                                                 create_web_client_callable, client_connection_fail_retry_secs)
+                alert_queue_handler_err_handler(http_e.detail, create_model_obj_list, queue_obj,
+                                                err_handling_callable,
+                                                create_web_client_callable, client_connection_fail_retry_secs)
             except Exception as e:
-                _alert_queue_handler_err_handler(e, create_model_obj_list, queue_obj, err_handling_callable,
-                                                 create_web_client_callable, client_connection_fail_retry_secs)
+                alert_queue_handler_err_handler(e, create_model_obj_list, queue_obj, err_handling_callable,
+                                                create_web_client_callable, client_connection_fail_retry_secs)
             create_model_obj_list.clear()  # cleaning list to start fresh cycle
 
         queue_fetch_counts = 0
@@ -549,127 +549,24 @@ def alert_queue_handler_for_create_only(
         # else not required since even after timeout no data found
 
 
-async def handle_alert_create_n_update_using_async_submit(
-        alerts_cache_cont: AlertsCacheCont, underlying_create_all_web_client_callable,
-        underlying_update_all_web_client_callable, queue_obj:
-        queue.Queue, err_handling_callable, model_class_type: Type[PlanAlert | ContactAlert],
-        client_connection_fail_retry_secs: int | None = None):
-    async with model_class_type.reentrant_lock:
-        async with alerts_cache_cont.re_mutex:
-            if alerts_cache_cont.create_alert_obj_dict:
-
-                # handling create list
-                try:
-                    create_model_obj_list = list(alerts_cache_cont.create_alert_obj_dict.values())
-                    res = await underlying_create_all_web_client_callable(create_model_obj_list)
-                except HTTPException as http_e:
-                    _alert_queue_handler_err_handler(http_e.detail, create_model_obj_list, queue_obj,
-                                                     err_handling_callable,
-                                                     underlying_create_all_web_client_callable, client_connection_fail_retry_secs)
-                except Exception as e:
-                    _alert_queue_handler_err_handler(e, create_model_obj_list, queue_obj, err_handling_callable,
-                                                     underlying_create_all_web_client_callable, client_connection_fail_retry_secs)
-                alerts_cache_cont.create_alert_obj_dict.clear()  # cleaning dict to start fresh cycle
-
-        async with alerts_cache_cont.re_mutex:
-            if alerts_cache_cont.update_alert_obj_dict:
-                # handling update list
-                try:
-                    update_model_obj_list = list(alerts_cache_cont.update_alert_obj_dict.values())
-                    res = await underlying_update_all_web_client_callable(update_model_obj_list)
-                except HTTPException as http_e:
-                    _alert_queue_handler_err_handler(http_e.detail, update_model_obj_list, queue_obj,
-                                                     err_handling_callable,
-                                                     underlying_update_all_web_client_callable, client_connection_fail_retry_secs)
-                except Exception as e:
-                    _alert_queue_handler_err_handler(e, update_model_obj_list, queue_obj, err_handling_callable,
-                                                     underlying_update_all_web_client_callable, client_connection_fail_retry_secs)
-                alerts_cache_cont.update_alert_obj_dict.clear()  # cleaning list to start fresh cycle
+def get_remaining_timeout_secs(log_payload_cache_list: List[Dict],
+                               bulk_transaction_timeout: int, oldest_entry_time: DateTime.utcnow()) -> int:
+    if not log_payload_cache_list:
+        remaining_timeout_secs = bulk_transaction_timeout
+    else:
+        remaining_timeout_secs = (
+                bulk_transaction_timeout - (DateTime.utcnow() - oldest_entry_time).total_seconds())
+    return remaining_timeout_secs
 
 
-async def get_remaining_timeout_secs(alerts_cache_cont: AlertsCacheCont, bulk_transaction_timeout: int,
-                                     oldest_entry_time: DateTime.utcnow()) -> int:
+async def update_alert_caches(alerts_cache_cont: AlertsCacheCont, alert_obj: PlanAlert | ContactAlert,
+                              is_new_object: bool) -> None:
     async with alerts_cache_cont.re_mutex:
-        if not alerts_cache_cont.create_alert_obj_dict and not alerts_cache_cont.update_alert_obj_dict:
-            remaining_timeout_secs = bulk_transaction_timeout
-        else:
-            remaining_timeout_secs = (
-                    bulk_transaction_timeout - (DateTime.utcnow() - oldest_entry_time).total_seconds())
-        return remaining_timeout_secs
-
-
-async def update_alert_caches(alerts_cache_cont: AlertsCacheCont, alert_obj: PlanAlert | ContactAlert) -> None:
-    async with alerts_cache_cont.re_mutex:
-        if alerts_cache_cont.alert_id_to_obj_dict.get(alert_obj.id) is not None:
-            alerts_cache_cont.update_alert_obj_dict[alert_obj.id] = alert_obj
-        else:
+        if is_new_object:
             alerts_cache_cont.create_alert_obj_dict[alert_obj.id] = alert_obj
+        else:
+            alerts_cache_cont.update_alert_obj_dict[alert_obj.id] = alert_obj
         alerts_cache_cont.alert_id_to_obj_dict[alert_obj.id] = alert_obj
-
-
-def alert_queue_handler_for_create_n_update(
-        run_state: bool, queue_obj: queue.Queue, bulk_transactions_counts_per_call: int,
-        bulk_transaction_timeout: int, alert_create_n_update_using_async_submit_callable: Callable[..., Any],
-        err_handling_callable, alerts_cache_cont: AlertsCacheCont, asyncio_loop: asyncio.AbstractEventLoop,
-        client_connection_fail_retry_secs: int | None = None):
-    queue_fetch_counts: int = 0
-    oldest_entry_time: DateTime = DateTime.utcnow()
-    while True:
-        run_coro = get_remaining_timeout_secs(alerts_cache_cont, bulk_transaction_timeout, oldest_entry_time)
-        future = asyncio.run_coroutine_threadsafe(run_coro, asyncio_loop)
-        # block for task to finish
-        try:
-            remaining_timeout_secs = future.result()
-        except Exception as e_:
-            logging.exception(f"get_remaining_timeout_secs failed with exception: {e_}")
-            continue
-
-        if not remaining_timeout_secs < 1:
-            try:
-                alert_obj = queue_obj.get(timeout=remaining_timeout_secs)  # timeout based blocking call
-
-                if alert_obj == "EXIT":
-                    logging.info(f"Exiting alert_queue_handler")
-                    return
-
-                run_coro = update_alert_caches(alerts_cache_cont, alert_obj)
-                future = asyncio.run_coroutine_threadsafe(run_coro, asyncio_loop)
-                # block for task to finish
-                try:
-                    future.result()
-                except Exception as e_:
-                    logging.exception(f"update_alert_caches failed with exception: {e_}")
-                    continue
-
-                queue_fetch_counts += 1
-            except queue.Empty:
-                # since bulk update timeout limit has breached, will call update
-                pass
-            else:
-                if queue_fetch_counts < bulk_transactions_counts_per_call:
-                    continue
-                # else, since bulk update count limit has breached, will call update
-        # since bulk update remaining timeout limit <= 0, will call update
-
-        if not run_state:
-            # Exiting this function if run state is turned False
-            logging.info(f"Found {run_state=} in alert_queue_handler - Exiting while loop")
-            return
-
-        run_coro = alert_create_n_update_using_async_submit_callable(
-                       alerts_cache_cont, queue_obj, err_handling_callable,
-                       client_connection_fail_retry_secs)
-        future = asyncio.run_coroutine_threadsafe(run_coro, asyncio_loop)
-        # block for task to finish
-        try:
-            future.result()
-        except Exception as e_:
-            logging.exception(f"alert_create_n_update_using_async_submit_callable failed with exception: {e_}")
-            continue
-
-        queue_fetch_counts = 0
-        oldest_entry_time = DateTime.utcnow()
-        # else not required since even after timeout no data found
 
 
 def clean_alert_str(alert_str: str) -> str:
@@ -697,9 +594,10 @@ def get_alert_cache_key(severity: Severity, alert_brief: str, component_path: st
     return alert_key
 
 
-def create_or_update_alert(alerts_cache_dict: Dict[str, PlanAlertBaseModel | PlanAlert] |
+def create_or_update_alert(create_alert_list: List[PlanAlert | ContactAlert],
+                           upload_alert_list: List[PlanAlert | ContactAlert],
+                           alerts_cache_dict: Dict[str, PlanAlertBaseModel | PlanAlert] |
                                                Dict[str, PlanAlertBaseModel | PlanAlert] | None,
-                           alert_queue: queue.Queue,
                            plan_alert_type: Type[PlanAlert] | Type[PlanAlertBaseModel],
                            contact_alert_type: Type[ContactAlert] | Type[ContactAlertBaseModel],
                            severity: Severity, alert_brief: str, plan_id: int | None = None,
@@ -747,7 +645,7 @@ def create_or_update_alert(alerts_cache_dict: Dict[str, PlanAlertBaseModel | Pla
             else:
                 stored_alert.alert_meta = alert_meta
 
-        alert_queue.put(stored_alert)
+        upload_alert_list.append(stored_alert)
 
     else:
         if alert_meta is not None:
@@ -763,12 +661,12 @@ def create_or_update_alert(alerts_cache_dict: Dict[str, PlanAlertBaseModel | Pla
                 alert_meta.latest_detail = None
 
         # create a new stored_alert
-        alert_obj: PlanAlertBaseModel | ContactAlertBaseModel = (
+        alert_obj: PlanAlert | ContactAlert = (
             create_alert(alert_brief=alert_brief, severity=severity, plan_id=plan_id,
                          plan_alert_type=plan_alert_type, contact_alert_type=contact_alert_type,
                          alert_meta=alert_meta))
         alerts_cache_dict[cache_key] = alert_obj
-        alert_queue.put(alert_obj)
+        create_alert_list.append(alert_obj)
 
 
 def update_plan_alert_cache(
@@ -778,26 +676,6 @@ def update_plan_alert_cache(
         try:
             # block for task to finish
             plan_alert_list: List[PlanAlertBaseModel] = filter_query_callable(plan_id)
-        except Exception as e:
-            err_str_ = f"{filter_query_callable.__name__} failed with exception: {e}"
-            logging.error(err_str_)
-            raise Exception(err_str_)
-        else:
-            plan_alert_cache_by_plan_id_dict[plan_id] = {}
-            for plan_alert in plan_alert_list:
-                component_file_path, source_file_name, line_num = get_key_meta_data_from_obj(plan_alert)
-                alert_key = get_alert_cache_key(plan_alert.severity, plan_alert.alert_brief,
-                                                component_file_path, source_file_name, line_num)
-                plan_alert_cache_by_plan_id_dict[plan_id][alert_key] = plan_alert
-
-
-async def async_update_plan_alert_cache(
-        plan_id: int, plan_alert_cache_by_plan_id_dict: Dict[int, Dict[str, PlanAlertBaseModel | PlanAlert]],
-        filter_query_callable: Callable[..., Any]) -> None:
-    if plan_id not in plan_alert_cache_by_plan_id_dict:
-        try:
-            # block for task to finish
-            plan_alert_list: List[PlanAlertBaseModel] = await filter_query_callable(plan_id)
         except Exception as e:
             err_str_ = f"{filter_query_callable.__name__} failed with exception: {e}"
             logging.error(err_str_)

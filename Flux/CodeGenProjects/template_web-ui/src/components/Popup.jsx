@@ -259,6 +259,7 @@ export const LoadLayoutPopup = ({
         if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;
         onClose();
     }
+    
     return (
         <Dialog
             aria-label='load-layout-popup'

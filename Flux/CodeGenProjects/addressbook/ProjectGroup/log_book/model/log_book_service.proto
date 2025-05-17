@@ -230,18 +230,6 @@ message ExecutorEventJournal {
   required string event_detail = 5;
 }
 
-message RemovePlanAlertsForPlanId {
-  option (FluxMsgJsonQuery) = {
-    QueryName: "remove_plan_alerts_for_plan_id"
-    QueryRouteType: POST_ALL,
-    QueryParams: {
-      QueryParamName: "payload",
-      QueryParamDataType: "List[Dict]"
-    }
-  };
-  optional bool is_id_present = 1;  // no use case - kept as st least 1 field must be present in message
-}
-
 message ContactAlertFailLogger {
     option (FluxMsgJsonQuery) = {
       QueryName: "contact_alert_fail_logger"
@@ -273,17 +261,6 @@ message ShutDownLogBook {
       QueryName: "shutdown_log_book"
   };
   optional bool temp = 1;
-}
-
-message PlanAlertIdToObjCache {
-  option (FluxMsgJsonQuery) = {
-    QueryName: "verify_plan_alert_id_in_plan_alert_id_to_obj_cache_dict"
-    QueryParams: {
-      QueryParamName: "plan_alert_id",
-      QueryParamDataType: "int"
-    }
-  };
-  optional bool is_id_present = 1;
 }
 
 message ContactAlertIdToObjCache {
@@ -323,36 +300,29 @@ message ContactAlertCacheDict {
   optional bool is_key_present = 1;
 }
 
-message PlanIdInPlanAlertCacheDictByPlanIdDict {
+message PlanStateUpdateMatcherForSymbolSideLog {
   option (FluxMsgJsonQuery) = {
-    QueryName: "verify_plan_id_in_plan_alert_cache_dict_by_plan_id_dict"
+    QueryName: "plan_state_update_matcher_for_symbol_side_log"
+    QueryRouteType: POST_ALL,
     QueryParams: {
-      QueryParamName: "plan_id",
-      QueryParamDataType: "int"
+      QueryParamName: "payload",
+      QueryParamDataType: "List[Dict]"
     }
   };
-  optional bool is_id_present = 1;
+  optional bool temp = 1;  // no use case - kept as st least 1 field must be present in message
 }
 
-message PlanStateUpdateMatcher {
+message PlanStateUpdateMatcherForPlanIdLog {
   option (FluxMsgJsonQuery) = {
-    QueryName: "plan_state_update_matcher"
+    QueryName: "plan_state_update_matcher_for_plan_id_log"
+    QueryRouteType: POST_ALL,
     QueryParams: {
-      QueryParamName: "plan_id",
-      QueryParamDataType: "int"
-    },
-    QueryParams: {
-      QueryParamName: "message",
-      QueryParamDataType: "str"
-    },
-    QueryParams: {
-      QueryParamName: "log_file_path",
-      QueryParamDataType: "str"
+      QueryParamName: "payload",
+      QueryParamDataType: "List[Dict]"
     }
   };
-  optional bool temp = 1;
+  optional bool temp = 1;  // no use case - kept as st least 1 field must be present in message
 }
-
 
 message EnableDisablePlanAlertCreate {
   option (FluxMsgJsonQuery) = {
