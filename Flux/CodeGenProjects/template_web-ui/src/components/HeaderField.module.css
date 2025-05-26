@@ -39,3 +39,37 @@
     margin-left: 2px;
     border-radius: 5px;
 }
+
+ul{
+    list-style: none;
+    padding: 2px 2px 2px 3px ;
+}
+
+
+.paginationControls {
+    /* Common styles for all pagination */
+    display: flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-top: 1px solid rgba(0,0,0,0.1);
+    background-color: rgba(238, 87, 87, 0.02);
+  }
+  
+  .containerPagination {
+    justify-content: center; 
+    background-color: rgba(225, 208, 49, 0.541);
+    border-radius: 15px;/* Center controls for carousel feel */
+  }
+  
+  .containerPagination button {
+    /* Maybe different button styling for containers */
+    background-color: lightblue;
+  }
+  
+  .childPagination {
+    justify-content: flex-end; /* Default for child items */
+  }
+  
+  .childPagination typography { 
+    /* Maybe different typography for child items */
+  }

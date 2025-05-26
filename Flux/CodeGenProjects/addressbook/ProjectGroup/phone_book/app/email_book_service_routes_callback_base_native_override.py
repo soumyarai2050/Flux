@@ -1215,97 +1215,11 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
         buffered_plan_keys = plan_collection_dict.get("buffered_plan_keys")
 
         if loaded_plan_keys is not None and plan_key in loaded_plan_keys:
-            if pair_plan_to_be_deleted.port is not None:
-                plan_web_client: StreetBookServiceHttpClient = (
-                    StreetBookServiceHttpClient.set_or_get_if_instance_exists(pair_plan_to_be_deleted.host,
-                                                                                 pair_plan_to_be_deleted.port))
-            else:
-                err_str_ = f"pair_plan object has no port;;; {pair_plan_to_be_deleted=}"
-                logging.error(err_str_)
-                raise HTTPException(detail=err_str_, status_code=500)
-
-            if plan_web_client is None:
-                err_str_ = ("Can't find any web_client present in server cache dict for ongoing plan of "
-                            f"{port=}, ignoring this plan delete, likely bug in server cache dict handling, "
-                            f"symbol_side_key: {get_symbol_side_key([(sec_id, side)])};;; "
-                            f"{pair_plan_to_be_deleted=}")
-                logging.error(err_str_)
-                raise HTTPException(status_code=500, detail=err_str_)
-
-            if is_ongoing_plan(pair_plan_to_be_deleted):
-                err_str_ = ("This plan is ongoing: Deletion of ongoing plan is not supported, "
-                            "ignoring this plan delete, try again once it is"
-                            f"not ongoing, symbol_side_key: {get_symbol_side_key([(sec_id, side)])}")
-                logging.error(err_str_)
-                raise HTTPException(status_code=500, detail=err_str_)
-
-            # removing and updating relative models
-            try:
-                plan_web_client.put_plan_to_snooze_query_client()
-            except Exception as e:
-                err_str_ = ("Some error occurred in executor while setting plan to SNOOZED state, ignoring "
-                            f"delete of this plan, symbol_side_key: {get_symbol_side_key([(sec_id, side)])}, "
-                            f"exception: {e}, ;;; {pair_plan_to_be_deleted=}")
-                logging.error(err_str_)
-                raise HTTPException(status_code=500, detail=err_str_)
-            self._close_executor_server(pair_plan_to_be_deleted.id)  # closing executor
-
-            # Dropping database for this plan
-            code_gen_projects_dir = PurePath(__file__).parent.parent.parent
-            executor_config_file_path = (code_gen_projects_dir / "street_book" /
-                                         "data" / f"config.yaml")
-            if os.path.exists(executor_config_file_path):
-                server_config_yaml_dict = (
-                    YAMLConfigurationManager.load_yaml_configurations(str(executor_config_file_path)))
-                mongo_server_uri = server_config_yaml_dict.get("mongo_server")
-                if mongo_server_uri is not None:
-                    self._drop_executor_db_for_deleting_pair_plan(mongo_server_uri, pair_plan_to_be_deleted.id,
-                                                                   sec_id, side)
-                else:
-                    err_str_ = (f"key 'mongo_server' missing in street_book/data/config.yaml, ignoring this"
-                                f"plan delete, symbol_side_key: {get_symbol_side_key([(sec_id, side)])}")
-                    logging.error(err_str_)
-                    raise HTTPException(detail=err_str_, status_code=400)
-            else:
-                err_str_ = (f"Config file for {port=} missing, must exists since executor is running from this"
-                            f"config, ignoring this plan delete, symbol_side_key: "
-                            f"{get_symbol_side_key([(sec_id, side)])}")
-                logging.error(err_str_)
-                raise HTTPException(detail=err_str_, status_code=400)
-
-            # Removing plan_key from loaded plan keys
-            async with PlanCollection.reentrant_lock:
-                plan_key = get_plan_key_from_pair_plan(pair_plan_to_be_deleted)
-                obj_id = 1
-                plan_collection: PlanCollection = (
-                    await EmailBookServiceRoutesCallbackBaseNativeOverride.
-                    underlying_read_plan_collection_by_id_http(obj_id))
-
-                loaded_plan_keys = plan_collection.loaded_plan_keys
-                if loaded_plan_keys is not None:
-                    try:
-                        loaded_plan_keys.remove(plan_key)
-                    except ValueError as val_err:
-                        if "x not in list" in str(val_err):
-                            logging.error(f"Unexpected: Can't find {plan_key=} in plan_collection's loaded"
-                                          f"keys while deleting plan;;; {plan_collection=}")
-                        else:
-                            logging.error(f"Something unexpected happened while removing {plan_key=} from "
-                                          f"loaded plan_keys in plan_collection - ignoring this plan_key removal;;; "
-                                          f"{plan_collection=}")
-                        return
-                else:
-                    logging.error(f"Unexpected: Can't find {plan_key=} in plan_collection's loaded"
-                                  f"keys while deleting plan - loaded_plan_keys found None;;; {plan_collection}")
-                    return
-
-                await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_update_plan_collection_http(
-                    plan_collection, return_obj_copy=False)
-
-            # Removing PlanView for this plan
-            photo_book_service_http_client.delete_plan_view_client(pair_plan_to_be_deleted.id)
-
-            self.clean_plan_id_by_symbol_side_dict_for_plan(pair_plan_to_be_deleted)
+            err_str_ = ("This plan is ongoing: Deletion of ongoing plan is not supported, "
+                        "ignoring this plan delete, try again once it is"
+                        f"not ongoing, symbol_side_key: {get_symbol_side_key([(sec_id, side)])}")
+            logging.error(err_str_)
+            raise HTTPException(status_code=500, detail=err_str_)
         elif buffered_plan_keys is not None and plan_key in buffered_plan_keys:
             # Removing plan_key from buffered plan keys
             async with PlanCollection.reentrant_lock:
@@ -1332,9 +1246,33 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
 
             # Removing PlanView for this plan
             photo_book_service_http_client.delete_plan_view_client(pair_plan_to_be_deleted.id)
+            self.clean_plan_id_by_symbol_side_dict_for_plan(pair_plan_to_be_deleted)
 
             # removing log key cache value form pair_plan_id_key cache
             pair_plan_id_key.pop(pair_plan_to_be_deleted.id, None)
+
+            # Dropping database for this plan
+            code_gen_projects_dir = PurePath(__file__).parent.parent.parent
+            executor_config_file_path = (code_gen_projects_dir / "street_book" /
+                                         "data" / f"config.yaml")
+            if os.path.exists(executor_config_file_path):
+                server_config_yaml_dict = (
+                    YAMLConfigurationManager.load_yaml_configurations(str(executor_config_file_path)))
+                mongo_server_uri = server_config_yaml_dict.get("mongo_server")
+                if mongo_server_uri is not None:
+                    self._drop_executor_db_for_deleting_pair_plan(mongo_server_uri, pair_plan_to_be_deleted.id,
+                                                                   sec_id, side)
+                else:
+                    err_str_ = (f"key 'mongo_server' missing in street_book/data/config.yaml, ignoring this"
+                                f"plan delete, symbol_side_key: {get_symbol_side_key([(sec_id, side)])}")
+                    logging.error(err_str_)
+                    raise HTTPException(detail=err_str_, status_code=400)
+            else:
+                err_str_ = (f"Config file for {port=} missing, must exists since executor is running from this"
+                            f"config, ignoring this plan delete, symbol_side_key: "
+                            f"{get_symbol_side_key([(sec_id, side)])}")
+                logging.error(err_str_)
+                raise HTTPException(detail=err_str_, status_code=400)
 
         else:
             err_str_ = ("Unexpected: Plan is not found in loaded or buffer list, ignoring this plan delete, "

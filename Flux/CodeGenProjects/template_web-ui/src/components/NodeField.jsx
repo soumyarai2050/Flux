@@ -17,7 +17,6 @@ dayjs.extend(utc);
 dayjs.extend(timezone);
 const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-
 const NodeField = (props) => {
     // const state = useSelector(state => state);
     const reducerArray = useMemo(() => getReducerArrrayFromCollections([props.data]), [props.data]);
@@ -51,12 +50,6 @@ const NodeField = (props) => {
         setInputValue(props.data.value);
     }, [props.data.index])
 
-    // useEffect(() => {
-    //     if (props.data.forceUpdate) {
-    //         setInputValue(props.data.value);
-    //     }
-    // }, [props.data.forceUpdate])
-
     useEffect(() => {
         if (props.data.mode === MODES.READ) {
             setInputValue(props.data.value);
@@ -70,17 +63,6 @@ const NodeField = (props) => {
             }
         }
     }, [inputValue])
-
-    // useEffect(() => {
-    //     if (props.data.onFormUpdate) {
-    //         props.data.onFormUpdate(props.data.xpath, validationError.current);
-    //     }
-    //     return () => {
-    //         if (props.data.onFormUpdate) {
-    //             props.data.onFormUpdate(props.data.xpath, null);
-    //         }
-    //     }
-    // }, [props.data.onFormUpdate])
 
     // Debounced transformation to update rows from the source JSON.
     const debouncedTransform = useRef(
@@ -122,10 +104,6 @@ const NodeField = (props) => {
         if (props.data.ormNoUpdate && !props.data['data-add']) {
             disabled = true;
         }
-        // disabled to allow object with ui update only to be created and edited
-        // else if (props.data.uiUpdateOnly && props.data['data-add']) {
-        //    disabled = true;
-        // }
         else if (props.data['data-remove']) {
             disabled = true;
         } else {
@@ -161,7 +139,6 @@ const NodeField = (props) => {
                 isOptionEqualToValue={(option, value) => (
                     option == value || (option === 0 && value === 0)
                 )}
-                // disableClearable
                 disabled={disabled}
                 forcePopupIcon={false}
                 variant='outlined'
@@ -180,7 +157,6 @@ const NodeField = (props) => {
                     props.data.onAutocompleteOptionChange(e, v, props.data.dataxpath, props.data.xpath);
                     setAutocompleteInputValue('');
                 }}
-                // componentsProps={{ popper: { style: { minWidth: 'fit-content', width: 'parent' } } }}
                 renderInput={(params) => {
                     const filteredOptions = props.data.options.filter(option => String(option).toLowerCase().includes(autocompleteInputValue.toLowerCase()));
                     return (
@@ -189,7 +165,12 @@ const NodeField = (props) => {
                             name={props.data.key}
                             error={validationError.current !== null}
                             placeholder={placeholder}
-                            onKeyDown={(e) => handleKeyDown(e, filteredOptions)}
+                            onKeyDown={(e) => {
+                                handleKeyDown(e, filteredOptions);
+                                if (!['Tab', 'Enter', 'Escape', 'Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) {
+                                    e.stopPropagation();
+                                }
+                            }}
                             inputRef={autocompleteRef}
                             InputProps={{
                                 ...params.InputProps,
@@ -224,6 +205,7 @@ const NodeField = (props) => {
         )
     } else if (props.data.type === DATA_TYPES.ENUM) {
         let value = props.data.value ? props.data.value : null;
+
         validationError.current = validateConstraints(props.data, value);
         const endAdornment = validationError.current ? (
             <InputAdornment position='end'><Tooltip title={validationError.current} disableInteractive><Error color='error' /></Tooltip></InputAdornment>
@@ -234,12 +216,33 @@ const NodeField = (props) => {
                 name={props.data.key}
                 className={`${classes.select} ${nodeFieldRemove} ${colorClass}`}
                 value={value}
-                onChange={(e) => props.data.onSelectItemChange(e, props.data.dataxpath, props.data.xpath)}
+                onChange={(e) => {
+                    e.stopPropagation();  // Stop event propagation
+                    props.data.onSelectItemChange(e, props.data.dataxpath, props.data.xpath);
+                }}
+                onClick={(e) => e.stopPropagation()} // Prevent click from propagating to parent
+                onOpen={(e) => e.stopPropagation()} // Prevent open event from propagating
+                MenuProps={{
+                    anchorOrigin: {
+                        vertical: 'bottom',
+                        horizontal: 'left',
+                    },
+                    transformOrigin: {
+                        vertical: 'top',
+                        horizontal: 'left',
+                    },
+                    PaperProps: {
+                        style: {
+                            maxHeight: 200
+                        }
+                    }
+                }}
                 size='small'
                 endAdornment={endAdornment}
                 error={validationError.current !== null}
                 required={props.data.required}
                 disabled={disabled}>
+        
                 {props.data.dropdowndataset && props.data.dropdowndataset.map((val) => {
                     return <MenuItem key={val} value={val}>
                         {val}
@@ -319,9 +322,15 @@ const NodeField = (props) => {
                 onBlur={handleBlur}
                 InputProps={inputProps}
                 inputProps={{
+                    ref: inputRef,
                     style: { padding: '6px 10px' },
                     dataxpath: props.data.dataxpath,
-                    underlyingtype: props.data.underlyingtype
+                    underlyingtype: props.data.underlyingtype,
+                    onKeyDown: (e) => {
+                        if (!['Tab', 'Enter', 'Escape', 'Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) {
+                            e.stopPropagation();
+                        }
+                    }
                 }}
             />
         )
@@ -365,11 +374,6 @@ const NodeField = (props) => {
                         newDate.setSeconds(0, 0);
                         props.data.onDateTimeChange(props.data.dataxpath, props.data.xpath, newDate.toISOString());
                     }}
-                    inputProps={{
-                        style: { padding: '6px 10px' },
-                        dataxpath: props.data.dataxpath,
-                        underlyingtype: props.data.underlyingtype
-                    }}
                     hideTabs={false}
                     disablePast
                     openTo='hours'
@@ -387,6 +391,7 @@ const NodeField = (props) => {
                                 setIsDateTimePickerOpen(true);
                             }}
                             InputProps={{
+                                ...dateTimePickerProps.InputProps,
                                 readOnly: true,
                                 endAdornment: (
                                     <InputAdornment position='end'>
@@ -401,6 +406,14 @@ const NodeField = (props) => {
                                         </IconButton>
                                     </InputAdornment>
                                 )
+                            }}
+                            inputProps={{
+                                ...dateTimePickerProps.inputProps,
+                                onKeyDown: (e) => {
+                                    if (!['Tab', 'Enter', 'Escape', 'Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) {
+                                        e.stopPropagation();
+                                    }
+                                }
                             }}
                         />
                     }
@@ -440,7 +453,12 @@ const NodeField = (props) => {
                     ref: inputRef,
                     style: { padding: '6px 10px' },
                     dataxpath: props.data.dataxpath,
-                    underlyingtype: props.data.underlyingtype
+                    underlyingtype: props.data.underlyingtype,
+                    onKeyDown: (e) => {
+                        if (!['Tab', 'Enter', 'Escape', 'Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) {
+                            e.stopPropagation();
+                        }
+                    }
                 }}
             />
         )

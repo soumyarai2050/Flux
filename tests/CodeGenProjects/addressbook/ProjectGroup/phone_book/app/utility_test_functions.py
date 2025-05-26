@@ -2325,7 +2325,7 @@ def cpp_create_last_barter_client(cpp_port: int, last_barter: LastBarterBaseMode
     json_data["exch_time"] = get_epoch_from_pendulum_dt(json_data["exch_time"])
     json_data["arrival_time"] = get_epoch_from_pendulum_dt(json_data["arrival_time"])
 
-    last_barter_url = f"http://127.0.0.1:{cpp_port}/" + "create-last_barter"
+    last_barter_url = f"http://{HOST}:{cpp_port}/" + "create-last_barter"
     response = requests.post(last_barter_url, json=json_data)
     status_code, response_json = handle_http_response(response)
     expected_status_code = 201
@@ -3311,7 +3311,7 @@ def handle_market_depth_json(market_depth_json: Dict):
 
 
 def cpp_get_all_market_depth_client(cpp_port: int):
-    market_depth_url = f"http://127.0.0.1:{cpp_port}/" + "get-all-market_depth"
+    market_depth_url = f"http://{HOST}:{cpp_port}/" + "get-all-market_depth"
     response = requests.get(market_depth_url)
     status_code, response_json_list = handle_http_response(response)
     expected_status_code = 200
@@ -3322,7 +3322,7 @@ def cpp_get_all_market_depth_client(cpp_port: int):
 
 
 def cpp_create_market_depth_client(cpp_port: int, market_depth: MarketDepthBaseModel):
-    market_depth_url = f"http://127.0.0.1:{cpp_port}/" + "create-market_depth"
+    market_depth_url = f"http://{HOST}:{cpp_port}/" + "create-market_depth"
     market_depth_json = generic_encoder(market_depth, MarketDepth.enc_hook, by_alias=True)
     handle_market_depth_json(market_depth_json)
     if "_id" in market_depth_json:
@@ -3342,7 +3342,7 @@ def cpp_create_all_market_depth_client(cpp_port: int, market_depth_list: List[Ma
 
 
 def cpp_put_market_depth_client(cpp_port: int, market_depth: MarketDepthBaseModel):
-    market_depth_url = f"http://127.0.0.1:{cpp_port}/" + "put-market_depth"
+    market_depth_url = f"http://{HOST}:{cpp_port}/" + "put-market_depth"
     market_depth_json = generic_encoder(market_depth, MarketDepth.enc_hook, by_alias=True)
     handle_market_depth_json(market_depth_json)
     response = requests.put(market_depth_url, json=market_depth_json)
@@ -3354,7 +3354,7 @@ def cpp_put_market_depth_client(cpp_port: int, market_depth: MarketDepthBaseMode
     return MarketDepthBaseModel.from_dict(response_json)
 
 def cpp_patch_market_depth_client(cpp_port: int, market_depth_json: Dict):
-    market_depth_url = f"http://127.0.0.1:{cpp_port}/" + "patch-market_depth"
+    market_depth_url = f"http://{HOST}:{cpp_port}/" + "patch-market_depth"
 
     # handling datetime fields
     exch_time: DateTime | int = market_depth_json.get("exch_time")

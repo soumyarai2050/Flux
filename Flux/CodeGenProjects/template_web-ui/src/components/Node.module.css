@@ -116,3 +116,8 @@
     margin: 1px 0px;
     margin-left: 2px;
 }
+
+ul{
+    list-style: none;
+    padding: 2px 2px 2px 3px ;
+}
