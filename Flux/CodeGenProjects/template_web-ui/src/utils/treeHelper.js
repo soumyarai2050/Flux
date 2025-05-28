@@ -21,8 +21,11 @@ export function generateTreeStructure(schema, currentSchemaName, callerProps) {
         
         const metadataProp = currentSchema.properties[propname];
         metadataProp.required = currentSchema.required.includes(propname) ? metadataProp.required : [];
-        
-        if (metadataProp.type && primitiveDataTypes.includes(metadataProp.type)) {
+
+        // Always treat object-with-items as a container, even if optional/null
+        if (metadataProp.type === DATA_TYPES.OBJECT && metadataProp.items) {
+            addNode(childNode, schema, metadataProp, propname, callerProps, propname, null, propname);
+        } else if (metadataProp.type && primitiveDataTypes.includes(metadataProp.type)) {
             addSimpleNode(childNode, schema, currentSchema, propname, callerProps);
         } else {
             addNode(childNode, schema, metadataProp, propname, callerProps, propname, null, propname);
@@ -51,85 +54,68 @@ function addNode(tree, schema, currentSchema, propname, callerProps, dataxpath, 
 }
 
 function handleObjectWithItems(tree, schema, currentSchema, propname, callerProps, dataxpath, xpath) {
-    // const { data, originalData, mode } = callerProps; // These are now unused due to direct callerProps access
-
-    //If there's no data for this object in either the current data or original data, it does nothing.
-    
-    if (get(callerProps.data, dataxpath) === undefined && get(callerProps.originalData, xpath) === undefined) return;
-    
-    const headerState = determineHeaderState(callerProps.data, callerProps.originalData, xpath, currentSchema);
-    
-    if (callerProps.mode === MODES.EDIT && currentSchema.server_populate) return;
-    
-    // Resolve the actual schema for the item if currentSchema is an array definition with items.$ref
+    // Always create the container node
     let schemaForHeaderNode = currentSchema;
-    let itemRefForHeaderNode = currentSchema.items?.$ref; // Use array's items ref if available
-    let effectivePropName = propname; // Usually the array name
+    let itemRefForHeaderNode = currentSchema.items?.$ref;
+    let effectivePropName = propname;
+    const headerState = determineHeaderState(callerProps.data, callerProps.originalData, xpath, currentSchema);
 
     if (currentSchema.type === DATA_TYPES.ARRAY && currentSchema.items && currentSchema.items.$ref) {
-        // This happens when handleObjectWithItems is called for an item of an array
-        // currentSchema is the array's schema. propname is the array's name.
-        // We want the header for the *item* to use the item's schema for its title.
         const ref = currentSchema.items.$ref.split('/');
         schemaForHeaderNode = ref.length === 2 ? cloneDeep(schema[ref[1]]) : cloneDeep(schema[ref[1]][ref[2]]);
-        // Process/inherit relevant properties from array schema to item schema if necessary
-        // For example, 'orm_no_update' might be on the array but apply to items.
-        // The existing processMetadata call later might handle this, or we might need a specific merge here.
-        // For now, primarily focusing on getting the title right.
-        // We keep propname as the array's name for keying, title will come from schemaForHeaderNode.title
-
-        // Let's ensure schemaForHeaderNode has necessary top-level fields if they were on currentSchema (array)
-        // like 'required' status for the object itself, if applicable (though items in array are usually not "required" individually in same way)
-         if (currentSchema.required) { // If array schema had 'required' array
-            schemaForHeaderNode.required = schemaForHeaderNode.required || []; // Initialize if not present on item schema
-         }
-         // Copy other relevant top-level attributes from array schema to item schema if they make sense
-         const arrayLevelPropsToConsider = ['orm_no_update', 'server_populate', 'ui_update_only', 'help'];
-         arrayLevelPropsToConsider.forEach(p => {
-             if (currentSchema.hasOwnProperty(p) && !schemaForHeaderNode.hasOwnProperty(p)) {
-                 schemaForHeaderNode[p] = currentSchema[p];
-             }
-         });
-
-
+        const propertiesToInherit = ['orm_no_update', 'server_populate', 'ui_update_only', 'help'];
+        propertiesToInherit.forEach(p => {
+            if (currentSchema.hasOwnProperty(p) && !schemaForHeaderNode.hasOwnProperty(p)) {
+                schemaForHeaderNode[p] = currentSchema[p];
+            }
+        });
+        if (currentSchema.required) {
+            schemaForHeaderNode.required = schemaForHeaderNode.required || [];
+        }
     } else if (currentSchema.items && currentSchema.type === DATA_TYPES.OBJECT && currentSchema.items.$ref) {
-        // This is for an object that itself has items (like a map/dictionary an object with $ref items)
-        // The header for this object itself should use currentSchema.
-        // The ref for its children will be currentSchema.items.$ref
         itemRefForHeaderNode = currentSchema.items.$ref;
     }
 
-
-    const childNode = addHeaderNode(
+    // Create the header node and add it to the tree. addHeaderNode pushes the node into 'tree'.
+    addHeaderNode(
         tree, 
-        schemaForHeaderNode, // Use potentially overridden schema (item schema for array items)
-        effectivePropName,   // Usually the original propname (array name or object field name)
-        DATA_TYPES.OBJECT, // The type of the node being added (the item is an object)
-        callerProps, 
-        dataxpath, 
-        xpath, 
-        itemRefForHeaderNode, // Pass the ref for the item's type, or object's items
+        schemaForHeaderNode,
+        effectivePropName,
+        DATA_TYPES.OBJECT,
+        callerProps,
+        dataxpath,
+        xpath,
+        itemRefForHeaderNode,
         headerState
     );
 
-    if (get(callerProps.data, dataxpath) === null && (!get(callerProps.originalData, xpath) || get(callerProps.originalData, xpath) === null)) return;
+    // Get the actual header node that was just added (it's the last one in the 'tree' array)
+    const actualHeaderNode = tree[tree.length - 1];
 
-    // Metadata for properties *within* this object/item
-    let metadata;
-    if (schemaForHeaderNode.properties) { // If the item schema itself has properties directly
-        metadata = processMetadata(cloneDeep(schemaForHeaderNode), currentSchema); // Process with original array schema for context
-    } else if (currentSchema.items && currentSchema.items.$ref) { // Fallback to array's item ref if item schema itself didn't have props (e.g. direct $ref)
-        const ref = currentSchema.items.$ref.split('/');
-        metadata = ref.length === 2 ? schema[ref[1]] : schema[ref[1]][ref[2]];
-        metadata = processMetadata(cloneDeep(metadata), currentSchema); // currentSchema is the array schema
-    } else {
-        // Should not happen if items.$ref was present
-        return;
+    const isNull = (get(callerProps.data, dataxpath) === undefined || get(callerProps.data, dataxpath) === null) &&
+                   (get(callerProps.originalData, xpath) === undefined || get(callerProps.originalData, xpath) === null);
+
+    if (isNull) {
+        // Set properties on the actualHeaderNode itself, not its children array
+        actualHeaderNode.canInitialize = true;
+        actualHeaderNode.schemaRef = itemRefForHeaderNode; 
+        // actualHeaderNode.children is already initialized as [] by addHeaderNode and should remain empty
+        return; // No children properties processed if null
     }
 
+    // If not null, then process its properties and add them to actualHeaderNode.children
+    let metadata;
+    if (schemaForHeaderNode.properties) {
+        metadata = processMetadata(cloneDeep(schemaForHeaderNode), currentSchema);
+    } else if (currentSchema.items && currentSchema.items.$ref) { // Fallback for direct $ref items like object with items pointing to a definition
+        const ref = currentSchema.items.$ref.split('/');
+        metadata = ref.length === 2 ? schema[ref[1]] : schema[ref[1]][ref[2]];
+        metadata = processMetadata(cloneDeep(metadata), currentSchema);
+    }
 
-    if (metadata.properties) {
-        processMetadataProperties(metadata, childNode, schema, callerProps, dataxpath, xpath);
+    if (metadata && metadata.properties) {
+        // Pass actualHeaderNode.children to processMetadataProperties, as it expects an array to push child nodes into
+        processMetadataProperties(metadata, actualHeaderNode.children, schema, callerProps, dataxpath, xpath);
     }
 }
 
@@ -139,28 +125,29 @@ function handleArrayWithItems(tree, schema, currentSchema, propname, callerProps
     const { data, originalData } = callerProps;
     const hasEmptyData = isEmptyArrayData(data, originalData, dataxpath, xpath);
 
-    // Create a container node for the array
-    const containerNode = addHeaderNode(
+    // Create a container node for the array (e.g., "eligible brokers")
+    // addHeaderNode pushes the main array container node into the 'tree' array.
+    addHeaderNode(
         tree, 
         currentSchema, 
         propname, 
-        DATA_TYPES.ARRAY, // Type as object for the container
+        DATA_TYPES.ARRAY, 
         callerProps, 
         dataxpath, 
         xpath, 
-        currentSchema.items?.$ref,
-       
+        currentSchema.items?.$ref
     );
 
+    // If the array is empty, we've added its container.
+    // The container itself (via HeaderField UI) will show the "+" to add items.
     if (hasEmptyData) {
-        const childxpath = `${dataxpath}[-1]`;
-        const updatedxpath = `${xpath}[-1]`;
-        addHeaderNode(containerNode, currentSchema, propname, currentSchema.type, callerProps, childxpath, updatedxpath, currentSchema.items.$ref);
-        return;
+        return; 
     }
 
-    // Call processArrayItems with the container node instead of the tree
-    processArrayItems(containerNode, schema, currentSchema, propname, callerProps, dataxpath, xpath);
+    // If data is not empty, process the actual items.
+    // Get the children array of the main array container node that was just added.
+    const mainArrayContainerNode_Children = tree[tree.length - 1].children;
+    processArrayItems(mainArrayContainerNode_Children, schema, currentSchema, propname, callerProps, dataxpath, xpath);
 }
 
 function handleSimpleArray(tree, schema, currentSchema, propname, callerProps, dataxpath, xpath) {
@@ -248,7 +235,7 @@ function handleSimpleArray(tree, schema, currentSchema, propname, callerProps, d
 
 function addHeaderNode(node, currentSchema, propname, type, callerProps, dataxpath, xpath, ref, objectState) {
     const headerNode = {
-        id: Math.random(),
+        id: xpath,
         key: propname,
         title: currentSchema.title,
         name: propname,
@@ -275,13 +262,12 @@ function addHeaderNode(node, currentSchema, propname, type, callerProps, dataxpa
         }
     });
 
-    // Check if this node represents an array container
+    // Set specific container flags
     if (type === DATA_TYPES.ARRAY) {
-        // We can refine this condition if needed, e.g., by checking if currentSchema.items exist
-        // For now, if it's explicitly typed as ARRAY in addHeaderNode, we mark it as a container.
-        // This is particularly true for nodes created by handleArrayWithItems and handleSimpleArray
-        // as the *container* node.
-        headerNode.isContainer = true;
+        headerNode.isArrayContainer = true;
+    } else if (type === DATA_TYPES.OBJECT) {
+
+        headerNode.isObjectContainer = true;
     }
 
     headerNode.required = !ref ? true : currentSchema.required ? currentSchema.required.includes(propname) : true;
@@ -310,6 +296,15 @@ function addHeaderNode(node, currentSchema, propname, type, callerProps, dataxpa
 }
 
 function addSimpleNode(tree, schema, currentSchema, propname, callerProps, dataxpath, xpath, additionalProps = {}) {
+    // If this is an object with items, always treat as container
+    if (currentSchema.properties && currentSchema.properties[propname]) {
+        const attributes = currentSchema.properties[propname];
+        if (attributes.type === DATA_TYPES.OBJECT && attributes.items) {
+            addNode(tree, schema, attributes, propname, callerProps, dataxpath, attributes.type, xpath);
+            return;
+        }
+    }
+
     const { data, originalData /*, mode*/ } = callerProps; // mode is unused, callerProps.mode is used
 
     // Skip if data not present in both modified and original data
@@ -366,12 +361,15 @@ function addPrimitiveNode(tree, type, dataxpath, xpath, callerProps, additionalP
 }
 
 function createSimpleNode(attributes, propname, dataxpath, xpath, data, currentSchema, callerProps) {
+    const nodeXpath = xpath ? `${xpath}.${propname}` : propname;
+    const nodeDataXpath = dataxpath ? `${dataxpath}.${propname}` : propname;
+
     return {
-        id: propname,
+        id: nodeXpath,
         key: propname,
         required: currentSchema.required.includes(propname),
-        xpath: xpath ? `${xpath}.${propname}` : propname,
-        dataxpath: dataxpath ? `${dataxpath}.${propname}` : propname,
+        xpath: nodeXpath,
+        dataxpath: nodeDataXpath,
         parentcollection: currentSchema.title,
         onTextChange: callerProps.onTextChange,
         onFormUpdate: callerProps.onFormUpdate,
@@ -379,10 +377,8 @@ function createSimpleNode(attributes, propname, dataxpath, xpath, data, currentS
         showDataType: callerProps.showDataType,
         index: callerProps.index,
         forceUpdate: callerProps.forceUpdate,
-        value: dataxpath ? 
-            hasxpath(data, dataxpath) ? 
-                get(data, dataxpath)[propname] : 
-                undefined : 
+        value: dataxpath ?
+            (hasxpath(data, dataxpath) ? get(data, dataxpath)[propname] : undefined) :
             data[propname]
     };
 }
@@ -516,7 +512,7 @@ function processMetadata(metadata, currentSchema) {
     return metadata;
 }
 
-function processMetadataProperties(metadata, childNode, schema, callerProps, dataxpath, xpath) {
+function processMetadataProperties(metadata, childNodes, schema, callerProps, dataxpath, xpath) {
     Object.keys(metadata.properties).forEach((prop) => {
         let metadataProp = metadata.properties[prop];
         if (!metadata.required.includes(prop)) {
@@ -534,11 +530,11 @@ function processMetadataProperties(metadata, childNode, schema, callerProps, dat
         const updatedxpath = `${xpath}.${prop}`;
 
         if (metadataProp.type === DATA_TYPES.OBJECT) {
-            addNode(childNode, schema, metadataProp, prop, callerProps, childxpath, null, updatedxpath);
+            addNode(childNodes, schema, metadataProp, prop, callerProps, childxpath, null, updatedxpath);
         } else if (primitiveDataTypes.includes(metadataProp.type)) {
-            addSimpleNode(childNode, schema, metadata, prop, callerProps, dataxpath, xpath);
+            addSimpleNode(childNodes, schema, metadata, prop, callerProps, dataxpath, xpath);
         } else {
-            addNode(childNode, schema, metadataProp, prop, callerProps, childxpath, null, updatedxpath);
+            addNode(childNodes, schema, metadataProp, prop, callerProps, childxpath, null, updatedxpath);
         }
     });
 }

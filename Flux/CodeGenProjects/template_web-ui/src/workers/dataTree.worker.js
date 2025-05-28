@@ -10,7 +10,7 @@ import { DATA_TYPES as DATA_TYPES_CONSTANT, ITEMS_PER_PAGE as ITEMS_PER_PAGE_CON
  * and flattens it for the TreeView component, handling pagination.
  * This is an adaptation of the processNode logic from DataTree.jsx.
  */
-function workerProcessNode(node, parentId, paginatedNodes, ITEMS_PER_PAGE, allFlattenedNodes) {
+function workerProcessNode(node, parentId, paginatedNodes, ITEMS_PER_PAGE, allFlattenedNodes, enableObjectPagination) {
     // Use xpath as ID, ensure it's a string and handle null/undefined
     // Nodes from generateTreeStructure should have an xpath.
     const currentId = node.xpath || String(Math.random()); 
@@ -25,35 +25,46 @@ function workerProcessNode(node, parentId, paginatedNodes, ITEMS_PER_PAGE, allFl
 
     allFlattenedNodes.push(treeNode);
 
-    if (node.children && node.children.length > ITEMS_PER_PAGE) {
+    const metadataFromGenTree = node; // This is the node object from generateTreeStructure
+
+    let applyPagination = false;
+    if (metadataFromGenTree.isArrayContainer) {
+        applyPagination = true; // Always apply for array containers
+    } else if (metadataFromGenTree.isObjectContainer && enableObjectPagination) {
+        applyPagination = true; // Apply for object containers if prop is true
+    }
+
+    if (applyPagination && metadataFromGenTree.children && metadataFromGenTree.children.length > ITEMS_PER_PAGE) {
         const nodePaginationState = paginatedNodes[currentId] || { page: 0 };
-        const totalPages = Math.ceil(node.children.length / ITEMS_PER_PAGE);
+        const totalPages = Math.ceil(metadataFromGenTree.children.length / ITEMS_PER_PAGE);
         // Ensure page is within bounds
         const currentPage = Math.max(0, Math.min(nodePaginationState.page, totalPages - 1));
 
-        if (treeNode.metadata) {
+        if (treeNode.metadata) { // treeNode.metadata is the same as metadataFromGenTree here
             treeNode.metadata.pagination = {
                 currentPage: currentPage,
                 totalPages: totalPages,
-                totalItems: node.children.length,
+                totalItems: metadataFromGenTree.children.length,
                 // onPageChange is not set here; main thread handles interactions
             };
         }
         
         const startIndex = currentPage * ITEMS_PER_PAGE;
-        const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, node.children.length);
-        const visibleChildren = node.children.slice(startIndex, endIndex);
+        const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, metadataFromGenTree.children.length);
+        const visibleChildren = metadataFromGenTree.children.slice(startIndex, endIndex);
         
         visibleChildren.forEach(childNode => {
-            const childId = workerProcessNode(childNode, currentId, paginatedNodes, ITEMS_PER_PAGE, allFlattenedNodes);
+            // Pass enableObjectPagination down recursively
+            const childId = workerProcessNode(childNode, currentId, paginatedNodes, ITEMS_PER_PAGE, allFlattenedNodes, enableObjectPagination);
             if (childId) { // Ensure childId is valid before pushing
                 treeNode.children.push(childId);
             }
         });
 
-    } else if (node.children && node.children.length > 0) {
-        node.children.forEach(childNode => {
-            const childId = workerProcessNode(childNode, currentId, paginatedNodes, ITEMS_PER_PAGE, allFlattenedNodes);
+    } else if (metadataFromGenTree.children && metadataFromGenTree.children.length > 0) {
+        metadataFromGenTree.children.forEach(childNode => {
+            // Pass enableObjectPagination down recursively
+            const childId = workerProcessNode(childNode, currentId, paginatedNodes, ITEMS_PER_PAGE, allFlattenedNodes, enableObjectPagination);
             if (childId) { // Ensure childId is valid before pushing
                  treeNode.children.push(childId);
             }
@@ -68,7 +79,8 @@ function workerProcessNode(node, parentId, paginatedNodes, ITEMS_PER_PAGE, allFl
 onmessage = (e) => {
     const {
         projectSchema, modelName, updatedData, storedData, subtree, mode, xpath,
-        selectedId, showHidden, paginatedNodes 
+        selectedId, showHidden, paginatedNodes,
+        enableObjectPagination // Destructure the new prop
     } = e.data.payload;
 
     // Use constants from payload if provided, otherwise use imported ones.
@@ -110,7 +122,8 @@ onmessage = (e) => {
     generatedTree.forEach(node => {
         // Ensure 'node' is a valid object before processing
         if (node && typeof node === 'object') {
-            const nodeId = workerProcessNode(node, rootId, paginatedNodes, ITEMS_PER_PAGE, flattenedNodes);
+            // Pass enableObjectPagination to workerProcessNode
+            const nodeId = workerProcessNode(node, rootId, paginatedNodes, ITEMS_PER_PAGE, flattenedNodes, enableObjectPagination);
             // Ensure the root's children array exists before pushing
             if (flattenedNodes[0] && flattenedNodes[0].children && nodeId) {
                  flattenedNodes[0].children.push(nodeId);

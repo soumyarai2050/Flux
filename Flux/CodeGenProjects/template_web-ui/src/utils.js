@@ -591,10 +591,16 @@ export function generateObjectFromSchema(schema, currentSchema, additionalProps,
             // default date-time is null (unassigned)
             object[propname] = null;
         } else if (metadata.type === DATA_TYPES.ENUM) {
-            let ref = metadata.items.$ref.split('/')
-            let enumdata = getEnumValues(schema, ref, metadata.type)
-            object[propname] = metadata.hasOwnProperty('default') ? metadata.default : enumdata ? enumdata[0] : null;
+            // Ensure 'default' is prioritized for ENUMs
+            if (metadata.hasOwnProperty('default')) {
+                object[propname] = metadata.default;
+            } else {
+                let ref = metadata.items.$ref.split('/')
+                let enumdata = getEnumValues(schema, ref, metadata.type)
+                object[propname] = enumdata && enumdata.length > 0 ? enumdata[0] : null;
+            }
 
+            // Autocomplete logic for ENUM (can override the default or first enum value)
             if (currentSchema.hasOwnProperty('auto_complete') || metadata.hasOwnProperty('auto_complete')) {
                 let autocomplete = metadata.auto_complete ? metadata.auto_complete : currentSchema.auto_complete;
                 let autocompleteDict = getAutocompleteDict(autocomplete);
@@ -604,9 +610,9 @@ export function generateObjectFromSchema(schema, currentSchema, additionalProps,
                     if (propname === path || xpath.endsWith(path)) {
                         const value = autocompleteDict[pathNIndicator];
                         if (indicator === 'server_populate') {
-                            delete object[propname];
+                            delete object[propname]; // Remove if server_populate indicates it shouldn't exist yet
                         } else if (indicator === 'assign') {
-                            // TODO: check if value is present in available options
+                            // TODO: check if value is present in available options from enumdata
                             object[propname] = value;
                         }
                     }

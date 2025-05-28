@@ -10,10 +10,8 @@ import { get } from 'lodash';
 const HeaderField = (props) => {
     const [showOptions, setShowOptions] = useState(false);
 
-    // const onClick = (e) => {
-    //     setShowOptions(false);
-    //     props.onClick(e);
-    // }
+    // onClick is now passed from DataTree's nodeRenderer
+    const { onClick } = props;
 
     const onToggle = (val) => {
         if (val) {
@@ -87,29 +85,23 @@ const HeaderField = (props) => {
     }
 
     return (
-        <Box className={classes.container} data-xpath={props.data.xpath}>
-            <Box className={classes.header} data-xpath={props.data.xpath} bgcolor={bgColor} sx={{color: 'white'}}>
+        <Box className={classes.container} data-xpath={props.data.xpath} onClick={onClick}>
+            <Box className={classes.header} data-xpath={props.data.xpath} bgcolor={bgColor} sx={{color: 'white'}} >
             <span className={classes.icon}>
     {props.isOpen ? (
         <ArrowDropUpSharp 
             fontSize='small' 
             data-close={props.data.xpath} 
-            // onClick={(e) => {
-            //     e.stopPropagation();  
-            //     props.onClick(e);
-            // }} 
+            // The main onClick handler in DataTree now manages arrow clicks via data-attributes
         />
     ) : (
         <ArrowDropDownSharp 
             data-open={props.data.xpath} 
-            // onClick={(e) => {
-            //     e.stopPropagation();  
-            //     props.onClick(e);
-            // }} 
+            // The main onClick handler in DataTree now manages arrow clicks via data-attributes
         />
     )}
 </span>
-                <Typography variant="subtitle1" sx={{ display: 'flex', flex: '1' }} /* onClick={props.onClick} */ data-header-title="true">
+                <Typography variant="subtitle1" sx={{ display: 'flex', flex: '1' }} data-header-title="true"> {/* data-header-title is used by DataTree's handleClick */}
                     {title}
                 </Typography>
                 {
@@ -184,7 +176,8 @@ HeaderField.propTypes = {
     updatedDataForColor: PropTypes.object,
     storedDataForColor: PropTypes.object,
     visualState: PropTypes.string,
-    isParentMarkedForDeletion: PropTypes.bool
+    isParentMarkedForDeletion: PropTypes.bool,
+    onClick: PropTypes.func // Added onClick to propTypes
 };
 
 const HeaderOptions = ({ add, remove, show, metadata, onToggle, updatedData, storedData }) => {
@@ -225,6 +218,7 @@ const HeaderOptions = ({ add, remove, show, metadata, onToggle, updatedData, sto
                                 data-add={xpath}
                                 data-ref={ref}
                                 data-prop={JSON.stringify(metadata)}
+                                // onClick={(e) => e.stopPropagation()} // Stop propagation
                             >
                                 <AddOutlined fontSize='small' />
                             </IconButton>
@@ -236,6 +230,7 @@ const HeaderOptions = ({ add, remove, show, metadata, onToggle, updatedData, sto
                                 data-duplicate={xpath}
                                 data-ref={ref}
                                 data-prop={JSON.stringify(metadata)}
+                                // onClick={(e) => e.stopPropagation()} // Stop propagation
                             >
                                 <ContentCopy fontSize='small' />
                             </IconButton>
@@ -245,6 +240,7 @@ const HeaderOptions = ({ add, remove, show, metadata, onToggle, updatedData, sto
                                 size='small'
                                 title='Remove'
                                 data-remove={xpath}
+                                // onClick={(e) => e.stopPropagation()} // Stop propagation
                             >
                                 <RemoveOutlined fontSize='small' />
                             </IconButton>
@@ -254,7 +250,8 @@ const HeaderOptions = ({ add, remove, show, metadata, onToggle, updatedData, sto
             );
         } else {
             return (
-                <Box className={classes.option} bgcolor='background.secondary'>
+                <Box className={classes.option} bgcolor='background.secondary'
+                >
                     <Icon title="More Options" onClick={(e) => { e.stopPropagation(); onToggle(); }}>
                         <Menu />
                     </Icon>

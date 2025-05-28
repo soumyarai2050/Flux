@@ -24,7 +24,8 @@ const DataTree = ({
     onUpdate,
     onUserChange,
     selectedId,
-    showHidden
+    showHidden,
+    enableObjectPagination = false
 }) => {
     const [treeData, setTreeData] = useState([]);
     const [originalTree, setOriginalTree] = useState([]);
@@ -69,12 +70,13 @@ const DataTree = ({
         latestPropsRef.current = {
             projectSchema, modelName, updatedData, storedData, subtree, mode, xpath,
             selectedId, showHidden, paginatedNodes,
-            ITEMS_PER_PAGE, DATA_TYPES
+            ITEMS_PER_PAGE, DATA_TYPES,
+            enableObjectPagination
             // expandedNodeXPaths is managed locally, no need to send to worker for basic tree generation
         };
     }, [
         projectSchema, modelName, updatedData, storedData, subtree, mode, xpath,
-        selectedId, showHidden, paginatedNodes
+        selectedId, showHidden, paginatedNodes, enableObjectPagination
     ]);
 
     // Main effect to communicate with the worker when props change.
@@ -123,7 +125,7 @@ const DataTree = ({
         // isWorkerProcessing is NOT in the dependency array to avoid loops.
     }, [
         projectSchema, modelName, updatedData, storedData, subtree, mode, xpath,
-        selectedId, showHidden, paginatedNodes // Key data props that should trigger processing
+        selectedId, showHidden, paginatedNodes, enableObjectPagination
     ]);
 
     // Effect to update previous prop refs *after* all other effects for the render cycle.
@@ -289,107 +291,152 @@ const DataTree = ({
             return <div {...nodeProps} style={{ paddingLeft: `${(level - 1) * 20}px` }}>Loading...</div>;
         }
 
-        const Component = originalNode.children && Array.isArray(originalNode.children) && originalNode.children.length > 0 ? HeaderField : Node;
+        // Determine if the node should be rendered as a HeaderField (container) or a Node (simple field)
+        // Prioritize isObjectContainer and isArrayContainer flags from treeHelper
+        let ComponentToRender;
+        if (originalNode.isObjectContainer || originalNode.isArrayContainer) {
+            ComponentToRender = HeaderField;
+        } else {
+            // Fallback for primitive types or other simple nodes
+            ComponentToRender = Node;
+        }
 
         const handleClick = (e) => {
             const nodeXPath = originalNode?.xpath;
-            if (!nodeXPath) return; // Should not happen if originalNode is valid
+            if (!nodeXPath) return; 
 
-            // Determine what was clicked using data attributes by checking e.target and its parents
-            const clickedArrow = e.target.closest('[data-open], [data-close]');
-            const clickedTitle = e.target.closest('[data-header-title="true"]');
+            // 1. Handle Action Clicks (add, duplicate, remove)
             const clickedAdd = e.target.closest('[data-add]');
             const clickedDuplicate = e.target.closest('[data-duplicate]');
             const clickedRemove = e.target.closest('[data-remove]');
 
-            if (clickedArrow) {
-                e.stopPropagation();
-                if (clickedArrow.hasAttribute('data-open')) {
-                    handleNodeToggle(nodeXPath, true);
-                } else if (clickedArrow.hasAttribute('data-close')) {
-                    handleNodeToggle(nodeXPath, false);
-                }
-                return;
-            }
-
-            if (clickedTitle) {
-                e.stopPropagation();
-                if (isBranch) {
-                    handleNodeToggle(nodeXPath, !expandedNodeXPaths[nodeXPath]);
-                }
-                return;
-            }
-
-            // Handle Action Clicks (add, duplicate, remove)
-            // These actions should have their own specific data attributes on the clickable elements (e.g., IconButton in HeaderOptions)
             if (clickedAdd) {
                 e.stopPropagation();
-                const xpathAttr = clickedAdd.getAttribute('data-add');
-                const ref = clickedAdd.getAttribute('data-ref');
-                const additionalPropsStr = clickedAdd.getAttribute('data-prop');
-                if (!xpathAttr || xpathAttr.endsWith(']')) return; 
-                
-                let updatedObj = cloneDeep(updatedData);
-                let containerXpath = getDataxpath(updatedObj, xpathAttr);
-                let additionalProps = additionalPropsStr ? JSON.parse(additionalPropsStr) : {};
+                const xpathAttr = clickedAdd.getAttribute('data-add'); // Schema path of the container (e.g., pair_strat_params.strat_leg2)
+                const schemaRefString = clickedAdd.getAttribute('data-ref'); // Schema ref for item OR for object's own structure
+                const containerPropsStr = clickedAdd.getAttribute('data-prop'); // Full props of the container node (originalNode)
 
-                if (!containerXpath) {
-                    set(updatedObj, xpathAttr, []);
-                    containerXpath = xpathAttr;
-                }
-                let parentObject = get(updatedObj, containerXpath);
-                if (!parentObject || !Array.isArray(parentObject)) {
-                    set(updatedObj, containerXpath, []);
-                    parentObject = get(updatedObj, containerXpath);
-                }
+                const isObjectInitialization = originalNode.isObjectContainer && 
+                                             originalNode.canInitialize && 
+                                             originalNode.schemaRef && // For object container, this is ref to its own item's schema (e.g. #/definitions/strat_leg)
+                                             (get(updatedData, xpathAttr) === null || get(updatedData, xpathAttr) === undefined);
 
-                const itemsInUpdatedData = parentObject || [];
-                let maxIndexInUpdatedData = -1;
-                itemsInUpdatedData.forEach(item => {
-                    if (item && typeof item === 'object') {
-                        const xpathProp = Object.keys(item).find(key => key.startsWith('xpath_'));
-                        if (xpathProp && item[xpathProp]) {
-                            const itemIndexPath = item[xpathProp];
-                            try {
-                                const extractedIndex = parseInt(itemIndexPath.substring(itemIndexPath.lastIndexOf('[') + 1, itemIndexPath.lastIndexOf(']')));
-                                if (!isNaN(extractedIndex)) {
-                                    maxIndexInUpdatedData = Math.max(maxIndexInUpdatedData, extractedIndex);
-                                }
-                            } catch (err) { /* ignore */ }
+                const isArrayItemAddition = originalNode.isArrayContainer && schemaRefString; // For array, schemaRefString is for the *type* of item in array
+
+                if (isObjectInitialization) {
+                    console.log('[DataTree] Attempting OBJECT INITIALIZATION for:', xpathAttr, 'Node:', originalNode);
+                    try {
+                        let updatedObj = cloneDeep(updatedData);
+                        const objectSchemaDefinitionPath = originalNode.schemaRef.split('/');
+                        
+                        if (objectSchemaDefinitionPath.length < 2) {
+                            console.error('[DataTree] Invalid schemaRef for object initialization:', originalNode.schemaRef);
+                            return;
                         }
-                    }
-                });
-                 if (maxIndexInUpdatedData === -1 && itemsInUpdatedData.length > 0 && !itemsInUpdatedData.some(i => typeof i === 'object' && Object.keys(i).find(key => key.startsWith('xpath_')))) {
-                    maxIndexInUpdatedData = itemsInUpdatedData.length - 1;
-                }
-                const itemsInStoredData = get(storedData, xpathAttr);
-                let maxIndexInStoredData = -1;
-                if (Array.isArray(itemsInStoredData)) {
-                    maxIndexInStoredData = itemsInStoredData.length > 0 ? itemsInStoredData.length - 1 : -1;
-                }
-                let nextIndex = Math.max(maxIndexInUpdatedData, maxIndexInStoredData) + 1;
 
-                if ([DATA_TYPES.NUMBER, DATA_TYPES.STRING].includes(ref)) {
-                    parentObject.push(null);
-                } else {
-                    const refParts = ref.split('/');
-                    let currentItemSchema = refParts.length === 2 ? projectSchema[refParts[1]] : projectSchema[refParts[1]][refParts[2]];
-                    if (currentItemSchema.hasOwnProperty('enum') && Object.keys(currentItemSchema).length === 1) {
-                        parentObject.push(currentItemSchema.enum[0]);
-                    } else {
-                        let emptyObject = generateObjectFromSchema(projectSchema, cloneDeep(currentItemSchema), additionalProps);
-                        emptyObject = addxpath(emptyObject, containerXpath + '[' + nextIndex + ']');
-                        const schemaXpathForNewItem = xpathAttr + '[' + nextIndex + ']'; 
-                        setItemVisualStates(prev => ({ ...prev, [schemaXpathForNewItem]: 'added' }));
-                        parentObject.push(emptyObject);
-                        handleNodeToggle(containerXpath, true); // Expand parent
-                        const totalItems = parentObject.length; 
-                        const newItemPageIndex = Math.floor((totalItems - 1) / ITEMS_PER_PAGE);
-                        setPaginatedNodes(prev => ({ ...prev, [containerXpath]: { page: newItemPageIndex } }));
+                        const itemSchemaForObject = objectSchemaDefinitionPath.length === 2 ? 
+                                                    projectSchema[objectSchemaDefinitionPath[1]] : 
+                                                    projectSchema[objectSchemaDefinitionPath[1]][objectSchemaDefinitionPath[2]];
+                        
+                        if (!itemSchemaForObject) {
+                            console.error('[DataTree] Could not find itemSchema for object ref:', originalNode.schemaRef, projectSchema);
+                            return;
+                        }
+                        
+                        const containerOwnProps = containerPropsStr ? JSON.parse(containerPropsStr) : {};
+                        console.log('[DataTree] Container own props for GOS:', containerOwnProps);
+
+                        let newObjectInstance = generateObjectFromSchema(
+                            projectSchema, 
+                            cloneDeep(itemSchemaForObject), 
+                            containerOwnProps, 
+                            xpathAttr 
+                        );
+                        console.log('[DataTree] New object instance from GOS:', newObjectInstance);
+                        
+                        set(updatedObj, xpathAttr, newObjectInstance); 
+                        console.log('[DataTree] Data after setting new object:', updatedObj);
+
+                        setItemVisualStates(prev => ({ ...prev, [xpathAttr]: 'added' }));
+                        handleNodeToggle(xpathAttr, true); 
+                        onUpdate(updatedObj, 'add');
+                        return;
+                    } catch (err) {
+                        console.error('[DataTree] ERROR during OBJECT INITIALIZATION for:', xpathAttr, err);
+                        return;
                     }
+                } else if (isArrayItemAddition) {
+                    // ARRAY ITEM ADDITION LOGIC
+                    let updatedObj = cloneDeep(updatedData);
+                    // xpathAttr is the schema path of the array itself (e.g. pair_strat_params.some_array_field)
+                    // schemaRefString is the $ref for the items within that array (e.g. #/definitions/array_item_type)
+                    let arrayDataPath = getDataxpath(updatedObj, xpathAttr); 
+                    let currentArray = get(updatedObj, arrayDataPath);
+
+                    if (!Array.isArray(currentArray)) {
+                        // This case should ideally not be hit if originalNode.isArrayContainer is true and data is consistent
+                        // However, as a fallback, initialize it as an empty array.
+                        currentArray = [];
+                        set(updatedObj, arrayDataPath, currentArray);
+                    }
+                    
+                    const arrayItemSchemaPathParts = schemaRefString.split('/');
+                    const arrayItemSchema = arrayItemSchemaPathParts.length === 2 ? 
+                                            projectSchema[arrayItemSchemaPathParts[1]] : 
+                                            projectSchema[arrayItemSchemaPathParts[1]][arrayItemSchemaPathParts[2]];
+                    
+                    let nextIndex = 0;
+                    const itemsInUpdatedDataForIdx = currentArray || [];
+                    let maxIndexInUpdatedData = -1;
+                    itemsInUpdatedDataForIdx.forEach(item => {
+                        if (item && typeof item === 'object') {
+                            const itemXpathProp = Object.keys(item).find(key => key.startsWith('xpath_'));
+                            if (itemXpathProp && item[itemXpathProp]) {
+                                const itemIndexPath = item[itemXpathProp];
+                                try {
+                                    const extractedIndex = parseInt(itemIndexPath.substring(itemIndexPath.lastIndexOf('[') + 1, itemIndexPath.lastIndexOf(']')));
+                                    if (!isNaN(extractedIndex)) {
+                                        maxIndexInUpdatedData = Math.max(maxIndexInUpdatedData, extractedIndex);
+                                    }
+                                } catch (err) { /* ignore */ }
+                            }
+                        }
+                    });
+                    if (maxIndexInUpdatedData === -1 && itemsInUpdatedDataForIdx.length > 0 && 
+                        !itemsInUpdatedDataForIdx.some(i => typeof i === 'object' && Object.keys(i).find(key => key.startsWith('xpath_')))) {
+                        maxIndexInUpdatedData = itemsInUpdatedDataForIdx.length - 1;
+                    }
+                    const itemsInStoredData = get(storedData, xpathAttr); 
+                    let maxIndexInStoredData = -1;
+                    if (Array.isArray(itemsInStoredData)) {
+                        maxIndexInStoredData = itemsInStoredData.length > 0 ? itemsInStoredData.length - 1 : -1;
+                    }
+                    nextIndex = Math.max(maxIndexInUpdatedData, maxIndexInStoredData) + 1;
+
+                    const propsForArrayItemContext = containerPropsStr ? JSON.parse(containerPropsStr) : {}; 
+
+                    let newArrayItem = generateObjectFromSchema(
+                        projectSchema, 
+                        cloneDeep(arrayItemSchema), 
+                        propsForArrayItemContext, 
+                        `${arrayDataPath}[${nextIndex}]`
+                    );
+                    newArrayItem = addxpath(newArrayItem, `${arrayDataPath}[${nextIndex}]`); 
+
+                    currentArray.push(newArrayItem);
+                    
+                    const schemaXpathForNewItem = `${xpathAttr}[${nextIndex}]`;
+                    setItemVisualStates(prev => ({ ...prev, [schemaXpathForNewItem]: 'added' }));
+                    handleNodeToggle(xpathAttr, true); 
+                    const totalItems = currentArray.length;
+                    const newItemPageIndex = Math.floor((totalItems - 1) / ITEMS_PER_PAGE);
+                    setPaginatedNodes(prev => ({ ...prev, [xpathAttr]: { page: newItemPageIndex } })); 
+                    onUpdate(updatedObj, 'add');
+                    return;
+                } else {
+                    // Fallback or error: Unhandled add click scenario
+                    console.warn("Unhandled add click for node:", originalNode, "with xpathAttr:", xpathAttr, "and schemaRef:", schemaRefString);
                 }
-                onUpdate(updatedObj, 'add');
-                return;
             }
 
             if (clickedDuplicate) {
@@ -446,8 +493,7 @@ const DataTree = ({
                 let currentItemSchema = refParts.length === 2 ? projectSchema[refParts[1]] : projectSchema[refParts[1]][refParts[2]];
                 let duplicatedObject = generateObjectFromSchema(projectSchema, cloneDeep(currentItemSchema), additionalProps, null, objectToCopy);
 
-                // Post-processing: Ensure nested 'positions' arrays within sec_positions are initialized as empty arrays.
-                // This guarantees consistency with newly added items, even if generateObjectFromSchema or overrides resulted in null/undefined.
+               
                 if (duplicatedObject.sec_positions && Array.isArray(duplicatedObject.sec_positions)) {
                     duplicatedObject.sec_positions.forEach(secPos => {
                         if (secPos && (secPos.positions === undefined || secPos.positions === null)) {
@@ -465,29 +511,24 @@ const DataTree = ({
                 const newItemPageIndex = Math.floor((totalItems - 1) / ITEMS_PER_PAGE);
                 setPaginatedNodes(prev => ({ ...prev, [parentDataXpath]: { page: newItemPageIndex } }));
                 onUpdate(updatedObj, 'add'); 
-                return;
+                return; // Action handled
             }
 
             if (clickedRemove) {
                 e.stopPropagation();
-                const xpathAttr = clickedRemove.getAttribute('data-remove');
-                if (!xpathAttr || !xpathAttr.endsWith(']')) return;
+                const xpathAttr = clickedRemove.getAttribute('data-remove'); // Schema path of the item/object to remove
 
-                let updatedObj = cloneDeep(updatedData);
-                let itemXpath = getDataxpath(updatedObj, xpathAttr);
-                if (!itemXpath) return;
+                // Handle removal of an object (setting it to null)
+                if (originalNode.isObjectContainer && !xpathAttr.endsWith(']')) {
+                    let updatedObj = cloneDeep(updatedData);
+                    set(updatedObj, xpathAttr, null); // Set the object to null
 
-                let index = parseInt(itemXpath.substring(itemXpath.lastIndexOf('[') + 1, itemXpath.lastIndexOf(']')));
-                let parentXpath = itemXpath.substring(0, itemXpath.lastIndexOf('['));
-                let parentObject = get(updatedObj, parentXpath);
-
-                if (parentObject && typeof parentObject.splice === 'function') {
-                    parentObject.splice(index, 1);
+                    // Clear visual states and expansion for the nulled object and its potential children
                     setItemVisualStates(prev => {
                         const newState = { ...prev };
                         delete newState[xpathAttr];
                         Object.keys(newState).forEach(key => {
-                            if (key && key.startsWith(xpathAttr)) delete newState[key];
+                            if (key && key.startsWith(xpathAttr + '.')) delete newState[key];
                         });
                         return newState;
                     });
@@ -495,22 +536,84 @@ const DataTree = ({
                         const newExpandedPaths = { ...prevExpandedPaths };
                         let changed = false;
                         for (const key in newExpandedPaths) {
-                            if (key === xpathAttr || key.startsWith(xpathAttr + '[') || key.startsWith(xpathAttr + '.')) {
+                            if (key === xpathAttr || key.startsWith(xpathAttr + '.')) {
                                 delete newExpandedPaths[key];
                                 changed = true;
                             }
                         }
+                        // Keep root expanded
+                        if (!newExpandedPaths["root"] && expandedNodeXPaths["root"]) newExpandedPaths["root"] = true;
                         return changed ? newExpandedPaths : prevExpandedPaths;
                     });
-                    onUpdate(updatedObj, 'remove');
+
+                    onUpdate(updatedObj, 'remove'); // 'remove' might signify data changed to null
+                    return; // Action handled
                 }
-                return;
+                // Handle removal of an array item (existing logic)
+                else if (xpathAttr && xpathAttr.endsWith(']')) { 
+                    let updatedObj = cloneDeep(updatedData);
+                    let itemDataPath = getDataxpath(updatedObj, xpathAttr); // Get data path for the array item
+                    if (!itemDataPath) return; // Should not happen if UI shows remove for a valid item
+
+                    let arrayItemIndex = parseInt(itemDataPath.substring(itemDataPath.lastIndexOf('[') + 1, itemDataPath.lastIndexOf(']')));
+                    let parentArrayDataPath = itemDataPath.substring(0, itemDataPath.lastIndexOf('['));
+                    let parentArrayObject = get(updatedObj, parentArrayDataPath);
+
+                    if (parentArrayObject && typeof parentArrayObject.splice === 'function') {
+                        parentArrayObject.splice(arrayItemIndex, 1);
+                        // Clear visual states and expansion for the removed item and its children
+                        setItemVisualStates(prev => {
+                            const newState = { ...prev };
+                            delete newState[xpathAttr]; // xpathAttr is the schema path of the removed item
+                            Object.keys(newState).forEach(key => {
+                                if (key && key.startsWith(xpathAttr + '.') || key.startsWith(xpathAttr + '[')) delete newState[key];
+                            });
+                            return newState;
+                        });
+                        setExpandedNodeXPaths(prevExpandedPaths => {
+                            const newExpandedPaths = { ...prevExpandedPaths };
+                            let changed = false;
+                            for (const key in newExpandedPaths) {
+                                if (key === xpathAttr || key.startsWith(xpathAttr + '.') || key.startsWith(xpathAttr + '[')) {
+                                    delete newExpandedPaths[key];
+                                    changed = true;
+                                }
+                            }
+                            if (!newExpandedPaths["root"] && expandedNodeXPaths["root"]) newExpandedPaths["root"] = true;
+                            return changed ? newExpandedPaths : prevExpandedPaths;
+                        });
+                        onUpdate(updatedObj, 'remove');
+                    }
+                    return; // Action handled
+                }
             }
             
-            // If no specific interactive element was clicked, do nothing.
-            // This prevents clicks on padding or background from toggling the node.
-        };
+            const clickedArrow = e.target.closest('[data-open], [data-close]');
+            if (clickedArrow) {
+                e.stopPropagation();
+                if (clickedArrow.hasAttribute('data-open')) {
+                    handleNodeToggle(nodeXPath, true);
+                } else if (clickedArrow.hasAttribute('data-close')) {
+                    handleNodeToggle(nodeXPath, false);
+                }
+                return; 
+            }
 
+            const clickedTitle = e.target.closest('[data-header-title="true"]');
+            if (clickedTitle) {
+                e.stopPropagation();
+                if (isBranch) { // isBranch is from react-accessible-treeview, refers to having children in the view model
+                    handleNodeToggle(nodeXPath, !expandedNodeXPaths[nodeXPath]);
+                }
+                return; 
+            }
+
+            // Fallback for general click on the component itself if it's a branch
+            if (isBranch) {
+                handleNodeToggle(nodeXPath, !expandedNodeXPaths[nodeXPath]);
+            }
+        };
+        
         const nodeIsOpen = !!expandedNodeXPaths[originalNode?.xpath];
 
         const dataPayload = {
@@ -541,10 +644,9 @@ const DataTree = ({
         return (
             <div 
                 {...nodeProps} 
-                style={{ paddingLeft: `${(level - 1) * 20}px` }}
-                onClick={handleClick}
+                style={{ paddingLeft: `${(level - 1) * 20}px`, width: 'max-content' }}
             >
-                <Component {...commonProps} />
+                <ComponentToRender {...commonProps} onClick={handleClick} />
             </div>
         );
     }; 
