@@ -105,7 +105,6 @@ FilterMenu.propTypes = {
       title: PropTypes.string,
     })
   ).isRequired,
-  onOpen: PropTypes.func.isRequired
 };
 
 export default FilterMenu;

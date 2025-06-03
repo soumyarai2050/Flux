@@ -548,6 +548,7 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
                         onUserChange={handleUserChange}
                         selectedId={objId}
                         showHidden={showHidden}
+                        filters={modelLayoutOption.filters || []}
                     />
                 );
             default:

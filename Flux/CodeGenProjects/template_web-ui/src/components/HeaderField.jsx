@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Typography, Box, ClickAwayListener, Tooltip, IconButton } from "@mui/material";
 import { Menu, HelpOutline, ArrowDropDownSharp, ArrowDropUpSharp, ContentCopy, AddOutlined, RemoveOutlined } from "@mui/icons-material";
 import { DATA_TYPES, MODES } from '../constants';
@@ -49,40 +49,16 @@ const HeaderField = (props) => {
     }
 
     let bgColor = 'background.nodeHeader'; // Default
-    const dataValue = get(props.updatedDataForColor, props.data.dataxpath);
-    const storedDataValueForOriginalPath = get(props.storedDataForColor, props.data.xpath); // Use original xpath for stored data
+    let textDecoration = 'none';
 
-    let isSelfEffectivelyDeleted = false;
-    // Check if the item itself is marked for deletion or its data has vanished due to an ancestor deletion.
-    if (props.data['data-remove'] && props.data.xpath.endsWith(']')) { // Array item explicitly marked for removal
-        isSelfEffectivelyDeleted = true;
-    } else if ((dataValue === null || dataValue === undefined) && 
-               (storedDataValueForOriginalPath !== null && storedDataValueForOriginalPath !== undefined)) {
-        // Data for this node is missing in updatedData but existed in storedData, implies ancestor deletion or self-deletion for objects.
-        // This covers objects set to null, or any node (including containers like 'security') whose path leads to null/undefined data.
-        if (props.data.type === DATA_TYPES.OBJECT && !passToRemoveActiveContext && props.data.required) {
-            // If it's a required object that cannot be nulled out (no passToRemoveActiveContext), 
-            // and it's missing, it must be due to an ancestor.
-            isSelfEffectivelyDeleted = true;
-        } else if (props.data.type === DATA_TYPES.OBJECT && passToRemoveActiveContext && props.data.mode === MODES.EDIT) {
-            // Optional object explicitly set to null
-            isSelfEffectivelyDeleted = true;
-        } else if (props.data.type !== DATA_TYPES.OBJECT) {
-            // For non-objects (arrays, primitives within objects that might become part of a deleted structure)
-            isSelfEffectivelyDeleted = true;
-        }
+    // Determine background color and text decoration based on data flags and visualState
+    if (props.data['data-add'] || props.visualState === 'added' || props.visualState === 'duplicated') {
+        bgColor = 'var(--green-400)'; // Green for new or explicitly added/duplicated
+    } else if (props.data['data-remove']) {
+        bgColor = '#ffc7ce'; // Light red for deleted
+        textDecoration = 'line-through';
     }
-
-    // Determine background color
-    if (props.isParentMarkedForDeletion) { // If parent is deleted, this node also turns red (cascading)
-        bgColor = 'var(--red-800)'; 
-    } else if (isSelfEffectivelyDeleted) { // Else, if self is deleted
-        bgColor = '#ffc7ce';
-    } else if (props.visualState === 'added') { 
-        bgColor = 'var(--green-400)'; 
-    } else if (props.visualState === 'duplicated') { 
-        bgColor = 'var(--green-400)'; 
-    }
+    // No special styling for 'data-modified' in HeaderField as per requirement
 
     return (
         <Box className={classes.container} data-xpath={props.data.xpath} onClick={onClick}>
@@ -101,7 +77,7 @@ const HeaderField = (props) => {
         />
     )}
 </span>
-                <Typography variant="subtitle1" sx={{ display: 'flex', flex: '1' }} data-header-title="true"> {/* data-header-title is used by DataTree's handleClick */}
+                <Typography variant="subtitle1" sx={{ display: 'flex', flex: '1', textDecoration: textDecoration }} data-header-title="true"> {/* data-header-title is used by DataTree's handleClick */}
                     {title}
                 </Typography>
                 {
@@ -139,7 +115,7 @@ const HeaderField = (props) => {
                         <Typography variant="caption" sx={{ fontWeight: 'bold' }}>◄</Typography>
                     </IconButton>
                     <Typography variant="caption" sx={{ margin: '0 8px' }}>
-                        {props.data.pagination.currentPage + 1}/{props.data.pagination.totalPages} 
+                        Page: {props.data.pagination.currentPage + 1}/{props.data.pagination.totalPages}
                         {!props.data.isContainer && `(${props.data.pagination.totalItems} items)`}
                     </Typography>
                     <IconButton 
@@ -165,6 +141,7 @@ const HeaderField = (props) => {
                 updatedData={props.updatedDataForColor}
                 storedData={props.storedDataForColor}
                 isOpen = {props.isOpen}
+                bgColor={bgColor}
             />
         </Box>
     )
@@ -177,40 +154,48 @@ HeaderField.propTypes = {
     storedDataForColor: PropTypes.object,
     visualState: PropTypes.string,
     isParentMarkedForDeletion: PropTypes.bool,
-    onClick: PropTypes.func // Added onClick to propTypes
+    onClick: PropTypes.func,
 };
 
-const HeaderOptions = ({ add, remove, show, metadata, onToggle, updatedData, storedData }) => {
-    const { xpath, ref, type, dataxpath, mode, required } = metadata;
+const HeaderOptions = ({ add, remove, show, metadata, onToggle, updatedData, storedData, bgColor }) => {
+    const { xpath, ref, type, dataxpath, mode, required, dataStatus } = metadata; 
     const isChildArrayItem = xpath.endsWith(']');
 
     let isEffectivelyDeleted = false;
     const currentValue = get(updatedData, dataxpath);
     const originalValue = get(storedData, xpath);
 
-    if (isChildArrayItem && metadata['data-remove']) {
+    // Use direct data flags from metadata for showing/hiding options
+    const isAdded = metadata['data-add'] || metadata.visualState === 'added' || metadata.visualState === 'duplicated';
+    const isRemoved = metadata['data-remove'];
+    // const isModified = metadata['data-modified']; // Not used for option visibility
+
+    // Logic to determine if an item is considered "effectively deleted" for UI options, based on its current data or explicit flags.
+    if (isChildArrayItem && isRemoved) { // Array item marked for removal
         isEffectivelyDeleted = true;
     } else if ((currentValue === null || currentValue === undefined) && 
                (originalValue !== null && originalValue !== undefined)) {
-        if (type === DATA_TYPES.OBJECT && metadata.passToRemoveActiveContext !== false && mode === MODES.EDIT && !required) {
-             // Optional object explicitly set to null (passToRemoveActiveContext might not be on metadata directly, infer from 'remove' prop of HeaderOptions)
+        // Data for this node is missing in updatedData but existed in storedData.
+        // This covers objects set to null or any node whose path leads to null/undefined data.
+        if (type === DATA_TYPES.OBJECT && metadata['object-remove'] && mode === MODES.EDIT && !required) {
+            // Optional object explicitly set to null. 'object-remove' indicates it has a remove control.
             isEffectivelyDeleted = true;
-        } else if (type !== DATA_TYPES.OBJECT) {
-            // For non-objects (arrays, primitives that became null/undefined due to ancestor)
+        } else if (type !== DATA_TYPES.OBJECT && !isAdded) {
+            // For non-objects (like array containers or primitive wrappers that became null/undefined).
+            // If it's not marked as new/added, and its data is gone, it's effectively deleted.
             isEffectivelyDeleted = true;
         }
     }
-
-    const showAdd = add && !isChildArrayItem && !isEffectivelyDeleted; // Hide Add if container is deleted
-    const showCopy = add && isChildArrayItem && !isEffectivelyDeleted; 
-    const showRemove = remove && ((isChildArrayItem && !isEffectivelyDeleted) || 
-                                 (type === DATA_TYPES.OBJECT && !isChildArrayItem && metadata['object-remove'] && !isEffectivelyDeleted));
+    
+    const showAdd = add && !isChildArrayItem && !isEffectivelyDeleted && !isRemoved;
+    const showCopy = add && isChildArrayItem && !isEffectivelyDeleted && !isRemoved;
+    const showRemove = remove && !isEffectivelyDeleted && !isRemoved; 
 
     if (showAdd || showCopy || showRemove) {
         if (show) {
             return (
                 <ClickAwayListener onClickAway={() => onToggle(false)}>
-                    <Box className={classes.menu} bgcolor='background.secondary'>
+                    <Box className={classes.menu} bgcolor={isAdded?"var(--green-400)": "background.secondary"}>
                         {showAdd && (
                             <IconButton
                                 size='small'
@@ -250,7 +235,7 @@ const HeaderOptions = ({ add, remove, show, metadata, onToggle, updatedData, sto
             );
         } else {
             return (
-                <Box className={classes.option} bgcolor='background.secondary'
+                <Box className={classes.option} bgcolor={bgColor}
                 >
                     <Icon title="More Options" onClick={(e) => { e.stopPropagation(); onToggle(); }}>
                         <Menu />

@@ -121,3 +121,28 @@ ul{
     list-style: none;
     padding: 2px 2px 2px 3px ;
 }
+
+
+@keyframes temporaryGlowBorder {
+    0% {
+      background-color: rgba(var(--green-400-rgb), 0.2); /* low-opacity background */
+      border-radius: 4px;
+    }
+    90% {
+      background-color: rgba(var(--green-400-rgb), 0.2);
+    }
+    100% {
+      background-color: transparent;
+      border-radius: 4px;
+    }
+  }
+
+/* 
+  The CSS Modules system will hash .datanodeNewlyAddedGlowTarget.
+  We use :global() for li.tree-branch-wrapper as it's a class from an external library.
+  The > selector ensures we target the li only if its *direct child div* has our target class.
+*/
+:global(li.tree-branch-wrapper):has(> .datanodeNewlyAddedGlowTarget) {
+    animation: temporaryGlowBorder 3s ease-out forwards;
+    border-radius: 4px; /* Ensure border radius is consistent if not part of animation keyframes fully */
+}

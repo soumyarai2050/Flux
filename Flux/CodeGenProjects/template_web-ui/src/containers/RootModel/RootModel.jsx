@@ -546,6 +546,7 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
                         onUserChange={handleUserChange}
                         selectedId={objId}
                         showHidden={showHidden}
+                        filters={modelLayoutOption.filters || []}
                     />
                 );
             default:

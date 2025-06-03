@@ -1,4 +1,4 @@
-import { cloneDeep, get } from 'lodash';
+import { cloneDeep, get, isEqual } from 'lodash';
 import { MODES, DATA_TYPES ,ITEMS_PER_PAGE} from '../constants';
 import {
     getEnumValues, getModelSchema, hasxpath, setAutocompleteValue, primitiveDataTypes, getDataxpath,
@@ -6,23 +6,221 @@ import {
     getMappingSrcDict, compareNodes
 } from '../utils';
 
+// New helper function to determine data status
+function determineDataStatus(oldValue, newValue, oldExists, newExists) {
+    if (newExists && !oldExists) {
+        return 'new';
+    } else if (!newExists && oldExists) {
+        return 'deleted';
+    } else if (newExists && oldExists) {
+        // Special case for objects/arrays that become null (effectively deleted/cleared)
+        if (newValue === null && oldValue !== null && (typeof oldValue === 'object' || Array.isArray(oldValue))) {
+            return 'deleted'; // Or 'cleared', depending on desired visual distinction
+        }
+        if (!isEqual(oldValue, newValue)) {
+            return 'modified';
+        }
+    }
+    return 'unchanged';
+}
+
+// Helper function to strip array indices from an XPath
+// e.g., "eligible_brokers[0].sec_positions[1].security.sec_id" -> "eligible_brokers.sec_positions.security.sec_id"
+function stripIndices(xpath) {
+    if (!xpath) return '';
+    return xpath.replace(/\[\d+\]/g, '');
+}
+
+// Helper function to get the schema definition for a specific path, handling arrays and $refs.
+function getSchemaForPath(projectSchema, modelName, path) {
+    if (!path || !projectSchema || !modelName) return null;
+
+    const parts = path.split('.');
+    let currentSchema = getModelSchema(modelName, projectSchema);
+
+    for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
+        if (!currentSchema || !currentSchema.properties) return null;
+
+        const propertyName = part.replace(/\[\d+\]$/, ''); // Remove potential trailing index for direct property lookup
+        currentSchema = currentSchema.properties[propertyName];
+
+        if (!currentSchema) return null;
+
+        // If it's an array and we're not at the last part, we need to look into its items' schema.
+        if (currentSchema.type === DATA_TYPES.ARRAY && currentSchema.items && currentSchema.items.$ref && i < parts.length - 1) {
+            const refParts = currentSchema.items.$ref.split('/');
+            if (refParts.length < 2) return null;
+            const refSchemaName = refParts.length === 2 ? refParts[1] : refParts[2]; // e.g. "Broker" or "SecPosition"
+            const mainSchemaContainer = refParts.length === 3 ? refParts[1] : null; // e.g. "definitions"
+
+            if (mainSchemaContainer && projectSchema[mainSchemaContainer] && projectSchema[mainSchemaContainer][refSchemaName]) {
+                 currentSchema = projectSchema[mainSchemaContainer][refSchemaName];
+            } else if (projectSchema[refSchemaName]) {
+                 currentSchema = projectSchema[refSchemaName];
+            } else {
+                return null; // Referenced schema not found
+            }
+        } else if (currentSchema.type === DATA_TYPES.OBJECT && currentSchema.items && currentSchema.items.$ref && i < parts.length -1) {
+            // This handles objects that are defined by a $ref in their 'items' property (uncommon but possible)
+             const refParts = currentSchema.items.$ref.split('/');
+            if (refParts.length < 2) return null;
+            const refSchemaName = refParts.length === 2 ? refParts[1] : refParts[2];
+            const mainSchemaContainer = refParts.length === 3 ? refParts[1] : null;
+
+            if (mainSchemaContainer && projectSchema[mainSchemaContainer] && projectSchema[mainSchemaContainer][refSchemaName]) {
+                 currentSchema = projectSchema[mainSchemaContainer][refSchemaName];
+            } else if (projectSchema[refSchemaName]) {
+                 currentSchema = projectSchema[refSchemaName];
+            } else {
+                return null;
+            }
+        }
+    }
+    return currentSchema;
+}
+
+// Helper function to check if a node's value matches any of the comma-separated filter values (partial, case-insensitive).
+function checkMatch(nodeValue, filterValuesString) {
+    if (filterValuesString === null || filterValuesString === undefined || filterValuesString.trim() === '') {
+        return false; // An empty filter string means no active filter criteria from this source.
+    }
+    if (nodeValue === null || nodeValue === undefined) {
+        return false; // Node has no value, cannot match.
+    }
+    const filterTokens = filterValuesString.split(',').map(fv => fv.trim().toLowerCase()).filter(token => token !== ''); // Ensure tokens are not empty strings
+    if (filterTokens.length === 0) {
+        return false; // No valid filter tokens after trimming and filtering empty ones.
+    }
+    const valueStr = String(nodeValue).toLowerCase();
+
+    // Return true if any non-empty filter token is included in the node's value string.
+    return filterTokens.some(token => valueStr.includes(token));
+}
+
+// Recursive function to filter a single node based on the new requirements.
+function filterNodeRecursive(node, projectSchema, modelName, filters) {
+    if (!node) return null;
+
+    // Clone the node to avoid modifying the original tree structure during the filter check iteration.
+    const newNode = cloneDeep(node);
+
+    let isDirectFieldMatch = false;
+    if (!(node.isObjectContainer || node.isArrayContainer) && node.xpath && node.value !== undefined) {
+        const genericPath = stripIndices(node.xpath);
+        const fieldSchema = getSchemaForPath(projectSchema, modelName, genericPath);
+        if (fieldSchema && fieldSchema.filter_enable) {
+            const relevantFilter = filters.find(f => f.fld_name === genericPath && f.fld_value && f.fld_value.trim() !== '');
+            if (relevantFilter && checkMatch(node.value, relevantFilter.fld_value)) {
+                isDirectFieldMatch = true;
+            }
+        }
+    }
+
+    if (node.isObjectContainer) {
+        let hasMatchingDescendant = false;
+        const processedChildren = [];
+        for (const child of (node.children || [])) {
+            const filteredChild = filterNodeRecursive(child, projectSchema, modelName, filters);
+            if (filteredChild) {
+                hasMatchingDescendant = true; // Indicates that some descendant (primitive, object, or array item) matched.
+                processedChildren.push(filteredChild);
+            }
+        }
+
+        // An object is kept if one of its direct primitive fields matched OR if it has any kept children (recursively).
+        // Check direct primitive children of the *original* node for matches.
+        let hasDirectPrimitiveChildMatch = false;
+        if (node.children) {
+            for (const originalChild of node.children) {
+                if (!(originalChild.isObjectContainer || originalChild.isArrayContainer) && originalChild.xpath && originalChild.value !== undefined) {
+                    const genericChildPath = stripIndices(originalChild.xpath);
+                    const childSchema = getSchemaForPath(projectSchema, modelName, genericChildPath);
+                    if (childSchema && childSchema.filter_enable) {
+                        const relevantChildFilter = filters.find(f => f.fld_name === genericChildPath && f.fld_value && f.fld_value.trim() !== '');
+                        if (relevantChildFilter && checkMatch(originalChild.value, relevantChildFilter.fld_value)) {
+                            hasDirectPrimitiveChildMatch = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (hasDirectPrimitiveChildMatch || hasMatchingDescendant) {
+            // If the object itself is kept, reconstruct its children:
+            const finalChildren = [];
+            (node.children || []).forEach(originalChild => {
+                if (!(originalChild.isObjectContainer || originalChild.isArrayContainer)) {
+                    finalChildren.push(cloneDeep(originalChild)); // Keep all original primitive fields
+                } else { // originalChild is a container (object or array)
+                    const correspondingFilteredChild = processedChildren.find(pc => pc.id === originalChild.id);
+
+                    if (correspondingFilteredChild) {
+                        // This child container (or its descendants) matched some filter(s).
+                        finalChildren.push(correspondingFilteredChild);
+                    } else {
+                        // This child container (originalChild) and its descendants did NOT match ANY active filters.
+                        // If the parent object (node) was kept due to a direct primitive match,
+                        // then we should include this originalChild container as it was (unfiltered by this pass).
+                        if (hasDirectPrimitiveChildMatch) { 
+                            finalChildren.push(cloneDeep(originalChild));
+                        } else if (originalChild.isArrayContainer) {
+                            // Parent was kept due to *other* descendants, not its own primitives.
+                            // This array child didn't match anything, so it becomes an empty array.
+                            const emptyArray = cloneDeep(originalChild);
+                            emptyArray.children = [];
+                            finalChildren.push(emptyArray);
+                        }
+                        // If originalChild is an object and we are in this 'else' block (no correspondingFilteredChild)
+                        // and the parent was NOT kept due to hasDirectPrimitiveChildMatch (i.e., parent was kept due to other descendants),
+                        // then this object child (which didn't match anything) is pruned.
+                    }
+                }
+            });
+            newNode.children = finalChildren;
+            return newNode;
+        }
+        return null; // Object not kept
+
+    } else if (node.isArrayContainer) {
+        const itemMatches = [];
+        if (node.children) {
+            for (const item of node.children) {
+                const filteredItem = filterNodeRecursive(item, projectSchema, modelName, filters);
+                if (filteredItem) {
+                    itemMatches.push(filteredItem);
+                }
+            }
+        }
+        if (itemMatches.length > 0) {
+            newNode.children = itemMatches;
+            return newNode; // Array kept with only matching items
+        }
+        return null; // Array not kept (no items matched)
+
+    } else { // Simple Field Node
+        if (isDirectFieldMatch) {
+            return newNode; // Keep the matching field
+        }
+        return null; // Field not kept
+    }
+}
+
 export function generateTreeStructure(schema, currentSchemaName, callerProps) {
     if (!schema || Object.keys(schema).length === 0) return [];
 
     const currentSchema = getModelSchema(currentSchemaName, schema);
-    const tree = [];
+    let tree = [];
     
-    // Add root header node
     const childNode = addHeaderNode(tree, currentSchema, currentSchemaName, DATA_TYPES.OBJECT, callerProps, currentSchemaName, currentSchemaName);
     
-    // Process all properties
     Object.keys(currentSchema.properties).forEach(propname => {
         if (callerProps.xpath && callerProps.xpath !== propname) return;
         
         const metadataProp = currentSchema.properties[propname];
         metadataProp.required = currentSchema.required.includes(propname) ? metadataProp.required : [];
 
-        // Always treat object-with-items as a container, even if optional/null
         if (metadataProp.type === DATA_TYPES.OBJECT && metadataProp.items) {
             addNode(childNode, schema, metadataProp, propname, callerProps, propname, null, propname);
         } else if (metadataProp.type && primitiveDataTypes.includes(metadataProp.type)) {
@@ -31,6 +229,23 @@ export function generateTreeStructure(schema, currentSchemaName, callerProps) {
             addNode(childNode, schema, metadataProp, propname, callerProps, propname, null, propname);
         }
     });
+
+    // Apply filtering if filters are provided and at least one filter is active
+    if (callerProps.filters && callerProps.filters.length > 0 && 
+        callerProps.filters.some(f => f.fld_value && f.fld_value.trim() !== '')) {
+        
+        const filteredResultTree = [];
+        for (const topLevelNode of tree) { // Assuming `tree` contains the root(s) of your generated structure
+            const filteredNode = filterNodeRecursive(topLevelNode, schema, currentSchemaName, callerProps.filters);
+            if (filteredNode) {
+                filteredResultTree.push(filteredNode);
+            }
+        }
+        tree = filteredResultTree;
+    } else {
+        // No active filters, or no filters array, return the original tree.
+        // This path is implicitly handled as `tree` remains unchanged.
+    }
 
     return tree;
 }
@@ -58,7 +273,7 @@ function handleObjectWithItems(tree, schema, currentSchema, propname, callerProp
     let schemaForHeaderNode = currentSchema;
     let itemRefForHeaderNode = currentSchema.items?.$ref;
     let effectivePropName = propname;
-    const headerState = determineHeaderState(callerProps.data, callerProps.originalData, xpath, currentSchema);
+    const headerState = determineHeaderState(callerProps.data, callerProps.originalData, xpath, currentSchema); // We'll use dataStatus instead
 
     if (currentSchema.type === DATA_TYPES.ARRAY && currentSchema.items && currentSchema.items.$ref) {
         const ref = currentSchema.items.$ref.split('/');
@@ -76,6 +291,8 @@ function handleObjectWithItems(tree, schema, currentSchema, propname, callerProp
         itemRefForHeaderNode = currentSchema.items.$ref;
     }
 
+    if (get(callerProps.data, dataxpath) === undefined && get(callerProps.originalData, xpath) === undefined) return;
+
     // Create the header node and add it to the tree. addHeaderNode pushes the node into 'tree'.
     addHeaderNode(
         tree, 
@@ -86,14 +303,13 @@ function handleObjectWithItems(tree, schema, currentSchema, propname, callerProp
         dataxpath,
         xpath,
         itemRefForHeaderNode,
-        headerState
+        headerState // Removed: will be handled by dataStatus logic within addHeaderNode
     );
 
     // Get the actual header node that was just added (it's the last one in the 'tree' array)
     const actualHeaderNode = tree[tree.length - 1];
 
-    const isNull = (get(callerProps.data, dataxpath) === undefined || get(callerProps.data, dataxpath) === null) &&
-                   (get(callerProps.originalData, xpath) === undefined || get(callerProps.originalData, xpath) === null);
+    const isNull = (get(callerProps.data, dataxpath) === null || get(callerProps.originalData, xpath) === null);
 
     if (isNull) {
         // Set properties on the actualHeaderNode itself, not its children array
@@ -124,6 +340,8 @@ function handleArrayWithItems(tree, schema, currentSchema, propname, callerProps
 
     const { data, originalData } = callerProps;
     const hasEmptyData = isEmptyArrayData(data, originalData, dataxpath, xpath);
+
+    if (get(callerProps.data, dataxpath) === undefined && get(callerProps.originalData, xpath) === undefined) return;
 
     // Create a container node for the array (e.g., "eligible brokers")
     // addHeaderNode pushes the main array container node into the 'tree' array.
@@ -170,7 +388,7 @@ function handleSimpleArray(tree, schema, currentSchema, propname, callerProps, d
     
     const childxpath = `${dataxpath}[-1]`;
     const updatedxpath = `${xpath}[-1]`;
-    const objectState = { add: true, remove: false };
+    const objectState = { add: true, remove: false }; // Replaced by dataStatus logic
     
     const childNode = addHeaderNode(
         containerNode, // Add to container node instead of tree
@@ -180,8 +398,8 @@ function handleSimpleArray(tree, schema, currentSchema, propname, callerProps, d
         callerProps, 
         childxpath, 
         updatedxpath, 
-        arrayDataType, 
-        objectState
+        arrayDataType,
+        objectState // Replaced by dataStatus logic
     );
 
     if (get(callerProps.data, dataxpath)) {
@@ -247,6 +465,21 @@ function addHeaderNode(node, currentSchema, propname, type, callerProps, dataxpa
         dataxpath,
         children: []
     };
+    
+    // Determine dataStatus for the header node itself - REPLACED by data-add/remove/modified flags
+    const oldValue = get(callerProps.originalData, xpath);
+    const newValue = get(callerProps.data, dataxpath);
+    const oldExists = oldValue !== undefined;
+    const newExists = newValue !== undefined;
+
+    if (newExists && !oldExists) {
+        headerNode['data-add'] = true;
+    } else if ((newValue === null || !newExists) && oldExists && oldValue !== null) {
+        headerNode['data-remove'] = true;
+        // headerNode.value = oldValue; // Storing oldValue on headerNode might not be standard, usually for fields
+    } else if (newExists && oldExists && !isEqual(oldValue, newValue)) {
+        headerNode['data-modified'] = true;
+    }
 
     // Add field properties
     fieldProps.forEach(({ propertyName, usageName }) => {
@@ -273,15 +506,34 @@ function addHeaderNode(node, currentSchema, propname, type, callerProps, dataxpa
     headerNode.required = !ref ? true : currentSchema.required ? currentSchema.required.includes(propname) : true;
     headerNode.uiUpdateOnly = currentSchema.ui_update_only;
 
-    if (!dataxpath) {
-        headerNode['data-remove'] = true;
-    }
-
-    if (objectState) {
+    // if (!dataxpath) { // This seems problematic, dataxpath can be valid but point to null
+    //     headerNode['data-remove'] = true;
+    // }
+    // The 'data-remove', 'object-add', 'object-remove' flags relate to UI interaction capabilities,
+    // distinct from dataStatus which is about data comparison. Retain them if they drive UI buttons.
+    // For simplicity, let's assume objectState (add/remove capability) is still determined by schema props mostly.
+    // This part might need further refinement based on how these flags are used for action buttons.
+    if (objectState) { // This was passed for array item template node, maybe not for general headers.
         const { add, remove } = objectState;
         if (add) headerNode['object-add'] = true;
         if (remove) headerNode['object-remove'] = true;
+    } else {
+        // Simplified logic for add/remove capabilities on containers based on type
+        // This is for UI action buttons, not the dataStatus color.
+        if (type === DATA_TYPES.ARRAY) {
+            headerNode['object-add'] = true; // Can add items to array
+        } else if (type === DATA_TYPES.OBJECT) {
+            // If object exists, can it be removed (set to null)? If null, can it be initialized?
+            const isCurrentlyNull = get(callerProps.data, dataxpath) === null;
+            if (isCurrentlyNull && !currentSchema.required && ref) { // Optional and has a schema to initialize from
+                 headerNode['object-add'] = true; // Can initialize
+            }
+            if (!isCurrentlyNull && !currentSchema.required) {
+                 headerNode['object-remove'] = true; // Can remove (set to null)
+            }
+        }
     }
+
 
     // Handle tree state
     if (treeState.hasOwnProperty(xpath)) {
@@ -308,13 +560,29 @@ function addSimpleNode(tree, schema, currentSchema, propname, callerProps, datax
     const { data, originalData /*, mode*/ } = callerProps; // mode is unused, callerProps.mode is used
 
     // Skip if data not present in both modified and original data
-    if ((Object.keys(data).length === 0 && Object.keys(originalData).length === 0) || 
-        (dataxpath && get(data, dataxpath) === undefined && get(originalData, xpath) === undefined)) {
+    if ((Object.keys(data).length === 0 && Object.keys(originalData).length === 0)) { // General check
+        return;
+    }
+    // More specific check for the current property path:
+    const nodeSchemaPath = xpath ? `${xpath}.${propname}` : propname;
+    const nodeDataPath = dataxpath ? `${dataxpath}.${propname}` : propname;
+
+    if (propname !== null && // For array items where propname might be null
+        get(data, nodeDataPath) === undefined && 
+        get(originalData, nodeSchemaPath) === undefined) {
         return;
     }
 
+
     if (primitiveDataTypes.includes(currentSchema)) {
-        addPrimitiveNode(tree, currentSchema, dataxpath, xpath, callerProps, additionalProps);
+        // For primitive arrays, currentSchema is the type string (e.g., "string")
+        // propname is null. xpath is like "path.to.array[i]", dataxpath is also "path.to.array[i]"
+        const val = dataxpath ? get(callerProps.data, dataxpath) : undefined;
+        const oldVal = xpath ? get(callerProps.originalData, xpath) : undefined;
+        const valExists = val !== undefined;
+        const oldValExists = oldVal !== undefined;
+        const status = determineDataStatus(oldVal, val, valExists, oldValExists);
+        addPrimitiveNode(tree, currentSchema, dataxpath, xpath, callerProps, additionalProps, status, oldVal);
         return;
     }
 
@@ -326,7 +594,7 @@ function addSimpleNode(tree, schema, currentSchema, propname, callerProps, datax
     // Add field properties
     addNodeProperties(node, attributes, currentSchema, schema, data, callerProps);
 
-    // Compare with original data
+    // Compare with original data - replaced by dataStatus
     const comparedProps = compareNodes(originalData, data, dataxpath, propname, xpath);
     Object.assign(node, comparedProps);
 
@@ -337,20 +605,30 @@ function addSimpleNode(tree, schema, currentSchema, propname, callerProps, datax
 }
 
 // Helper functions for addSimpleNode
-function addPrimitiveNode(tree, type, dataxpath, xpath, callerProps, additionalProps) {
+function addPrimitiveNode(tree, type, dataxpath, xpath, callerProps, additionalProps, dataStatus, originalValueForDeleted) {
     const node = {
-        id: dataxpath,
-        required: true,
-        xpath,
-        dataxpath,
+        id: dataxpath, // For primitive array items, dataxpath is the direct path like "array[0]"
+        required: true, // Primitive items in an array are part of the array structure
+        xpath, // Schema path
+        dataxpath, // Data path
         onTextChange: callerProps.onTextChange,
         onFormUpdate: callerProps.onFormUpdate,
         mode: callerProps.mode,
         showDataType: callerProps.showDataType,
         type,
         underlyingtype: additionalProps.underlyingtype,
-        value: dataxpath ? get(callerProps.data, dataxpath) : undefined
+        value: dataxpath ? get(callerProps.data, dataxpath) : undefined,
     };
+
+    if (dataStatus === 'new') {
+        node['data-add'] = true;
+    } else if (dataStatus === 'deleted') {
+        node['data-remove'] = true;
+        node.value = originalValueForDeleted; // Set original value if deleted
+    } else if (dataStatus === 'modified') {
+        node['data-modified'] = true;
+    }
+
 
     if (type === DATA_TYPES.ENUM) {
             node.dropdowndataset = additionalProps.options;
@@ -476,12 +754,15 @@ function addNodeProperties(node, attributes, currentSchema, schema, data, caller
 function determineHeaderState(data, originalData, xpath, currentSchema) {
     let headerState = {};
     if (get(originalData, xpath) === undefined) {
-        if (get(data, xpath) === null) {
+        if (get(data, xpath) === null) { // Check data path for current value
             headerState.add = true;
             headerState.remove = false;
-        } else {
+        } else if (get(data, xpath) !== undefined) { // Only allow remove if it exists in current data
             headerState.add = false;
             headerState.remove = true;
+        } else { // Doesn't exist in original or current (potentially)
+            headerState.add = true; // Default to add if it's an optional field not yet present
+            headerState.remove = false;
         }
     } else if (currentSchema.hasOwnProperty('orm_no_update')) {
         if (get(originalData, xpath) !== undefined) {
@@ -492,10 +773,17 @@ function determineHeaderState(data, originalData, xpath, currentSchema) {
         if (get(data, xpath) === null) {
             headerState.add = true;
             headerState.remove = false;
-        } else {
+        } else if (get(data, xpath) !== undefined) {
             headerState.add = false;
             headerState.remove = true;
+        } else { // Existed in original, but not in current (and not null) -> implies removed by parent action
+            headerState.add = false; // Cannot add back directly if structure removed
+            headerState.remove = false; // Cannot remove if not there
         }
+    }
+    // Ensure required fields that are null (but shouldn't be if not optional) don't show 'add'
+    if (currentSchema.required && currentSchema.required.includes(xpath.split('.').pop()) && get(data, xpath) === null) {
+      // This logic might be too simplistic for complex paths
     }
     return headerState;
 }

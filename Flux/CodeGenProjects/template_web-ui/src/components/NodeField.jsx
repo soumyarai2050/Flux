@@ -18,6 +18,7 @@ dayjs.extend(timezone);
 const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 const NodeField = (props) => {
+     
     // const state = useSelector(state => state);
     const reducerArray = useMemo(() => getReducerArrrayFromCollections([props.data]), [props.data]);
     const reducerDict = useSelector(state => {
@@ -71,13 +72,19 @@ const NodeField = (props) => {
         }, 300)
     ).current;
 
-    const handleBlur = () => {
+    const handleBlur = (e) => {
+        e.stopPropagation();
         debouncedTransform.flush();
         setFocus(false);
     }
 
-    const handleFocus = () => {
+    const handleFocus = (e) => {
+        e.stopPropagation();
         setFocus(true);
+    }
+
+    const handleClick = (e) => {
+        e.stopPropagation();
     }
 
     const handleTextChange = (e, type, xpath, value, dataxpath, validationRes) => {
@@ -116,6 +123,15 @@ const NodeField = (props) => {
         color = getColorTypeFromValue(props.data, props.data.value);
     }
     let colorClass = classes[color];
+
+    // Add classes based on dataStatus
+    if (props.data.dataStatus === 'new') {
+        colorClass = `${colorClass} ${classes.new_node_field}`.trim();
+    } else if (props.data.dataStatus === 'modified') {
+        colorClass = `${colorClass} ${classes.modified_node_field}`.trim();
+    }
+    // dataStatus === 'deleted' might not be relevant for NodeField as deleted nodes are typically not rendered as fields.
+    // If they are (e.g. grayed out), you would add a class for it here.
 
     let nodeFieldRemove = props.data['data-remove'] ? classes.remove : '';
     const placeholder = props.data.placeholder ? props.data.placeholder : !props.data.required ? 'optional' : null;
@@ -165,6 +181,7 @@ const NodeField = (props) => {
                             name={props.data.key}
                             error={validationError.current !== null}
                             placeholder={placeholder}
+                            onClick={handleClick}
                             onKeyDown={(e) => {
                                 handleKeyDown(e, filteredOptions);
                                 if (!['Tab', 'Enter', 'Escape', 'Shift', 'Control', 'Alt', 'Meta'].includes(e.key)) {
@@ -194,6 +211,7 @@ const NodeField = (props) => {
             <Checkbox
                 id={props.data.key}
                 name={props.data.key}
+                onClick={handleClick}
                 className={`${classes.checkbox} ${nodeFieldRemove} ${colorClass}`}
                 defaultValue={false}
                 required={props.data.required}
@@ -216,12 +234,12 @@ const NodeField = (props) => {
                 name={props.data.key}
                 className={`${classes.select} ${nodeFieldRemove} ${colorClass}`}
                 value={value}
+                onClick={handleClick}
                 onChange={(e) => {
                     e.stopPropagation();  // Stop event propagation
                     props.data.onSelectItemChange(e, props.data.dataxpath, props.data.xpath);
                 }}
-                onClick={(e) => e.stopPropagation()} // Prevent click from propagating to parent
-                onOpen={(e) => e.stopPropagation()} // Prevent open event from propagating
+                onOpen={handleClick} // Prevent open event from propagating
                 MenuProps={{
                     anchorOrigin: {
                         vertical: 'bottom',
@@ -311,6 +329,7 @@ const NodeField = (props) => {
                 required={props.data.required}
                 error={validationError.current !== null}
                 value={value}
+                onClick={handleClick}
                 disabled={disabled}
                 thousandSeparator=','
                 // isAllowed={(values) => isAllowedNumericValue(values.value, min, max)}
@@ -368,6 +387,7 @@ const NodeField = (props) => {
                     value={value}
                     required={props.data.required}
                     inputFormat={inputFormat}
+                    onClick={handleClick}
                     InputProps={inputProps}
                     onChange={(newValue) => {
                         const newDate = new Date(newValue);
@@ -440,6 +460,7 @@ const NodeField = (props) => {
                 focused={focus}
                 onFocus={handleFocus}
                 onBlur={handleBlur}
+                onClick={handleClick}
                 value={value}
                 disabled={disabled}
                 onChange={(e) => handleTextChange(e, props.data.type, props.data.xpath, e.target.value, props.data.dataxpath,

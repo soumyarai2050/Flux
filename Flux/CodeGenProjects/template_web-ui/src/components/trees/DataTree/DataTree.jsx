@@ -5,13 +5,9 @@ import { generateObjectFromSchema, addxpath, getDataxpath, /* setTreeState, */ c
 import { DATA_TYPES, ITEMS_PER_PAGE } from '../../../constants';
 import Node from '../../Node';
 import HeaderField from '../../HeaderField';
+import NodeBaseClasses from '../../Node.module.css'; // Added for glow effect
+import PropTypes from 'prop-types';
 
-// Worker instantiation
-let dataTreeWorker;
-if (typeof Worker !== 'undefined') {
-    dataTreeWorker = new Worker(new URL('../../../workers/dataTree.worker.js', import.meta.url), { type: 'module' });
-}
-//
 
 const DataTree = ({
     projectSchema,
@@ -25,15 +21,37 @@ const DataTree = ({
     onUserChange,
     selectedId,
     showHidden,
-    enableObjectPagination = false
+    enableObjectPagination = false,
+    treeLevel,
+    filters
 }) => {
+
     const [treeData, setTreeData] = useState([]);
     const [originalTree, setOriginalTree] = useState([]);
     const [paginatedNodes, setPaginatedNodes] = useState({});
     const [itemVisualStates, setItemVisualStates] = useState({});
     const [isWorkerProcessing, setIsWorkerProcessing] = useState(false);
     const [expandedNodeXPaths, setExpandedNodeXPaths] = useState({ "root": true }); // Initialize with "root": true
+    const [counter, setCounter] = useState(0);
+    const [newlyAddedOrDuplicatedXPath, setNewlyAddedOrDuplicatedXPath] = useState(null); // Added state for scroll target
     const initialExpansionSetForCurrentTreeRef = useRef(false); // Ref to track initial expansion
+    const workerRef = useRef(null);
+    const levelRef = useRef(treeLevel ? treeLevel : xpath ? 3 : 2);
+
+    useEffect(() => {
+        levelRef.current = treeLevel ? treeLevel : xpath ? 3 : 2;
+    }, [treeLevel, xpath]);
+
+    useEffect(() => {
+        if (!workerRef.current) {
+            workerRef.current = new Worker(new URL('../../../workers/dataTree.worker.js', import.meta.url));
+        }
+
+        return () => {
+            workerRef.current?.terminate();
+            workerRef.current = null;
+        }
+    }, [])
 
     // useEffect to clear transient visual states like 'added' or 'duplicated' from itemVisualStates
     // when storedData prop changes, implying these items are now persisted.
@@ -71,17 +89,17 @@ const DataTree = ({
             projectSchema, modelName, updatedData, storedData, subtree, mode, xpath,
             selectedId, showHidden, paginatedNodes,
             ITEMS_PER_PAGE, DATA_TYPES,
-            enableObjectPagination
+            enableObjectPagination, filters
             // expandedNodeXPaths is managed locally, no need to send to worker for basic tree generation
         };
     }, [
         projectSchema, modelName, updatedData, storedData, subtree, mode, xpath,
-        selectedId, showHidden, paginatedNodes, enableObjectPagination
+        selectedId, showHidden, paginatedNodes, enableObjectPagination, filters
     ]);
 
     // Main effect to communicate with the worker when props change.
     useEffect(() => {
-        if (!dataTreeWorker) return;
+        if (!workerRef.current) return;
 
         let isReloadScenario = false;
         // Detect reload: updatedData changed and now matches storedData, after being different from storedData
@@ -93,7 +111,7 @@ const DataTree = ({
         }
         // Detect reload: storedData changed, and updatedData matches the new storedData
         else if (storedData !== prevStoredDataRef.current &&
-                 updatedData === storedData) {
+            updatedData === storedData) {
             isReloadScenario = true;
             console.log("DataTree: Reload Scenario 2 detected (storedData changed, updatedData aligned).");
         }
@@ -110,7 +128,7 @@ const DataTree = ({
             console.log("Posting to worker with props:", latestPropsRef.current);
             setIsWorkerProcessing(true);
             pendingRequestRef.current = false; // Reset pending flag as we are processing now
-            dataTreeWorker.postMessage({ type: 'PROCESS_TREE', payload: latestPropsRef.current });
+            workerRef.current.postMessage({ type: 'PROCESS_TREE', payload: latestPropsRef.current });
         };
 
         if (isWorkerProcessing) {
@@ -125,7 +143,7 @@ const DataTree = ({
         // isWorkerProcessing is NOT in the dependency array to avoid loops.
     }, [
         projectSchema, modelName, updatedData, storedData, subtree, mode, xpath,
-        selectedId, showHidden, paginatedNodes, enableObjectPagination
+        selectedId, showHidden, paginatedNodes, enableObjectPagination, filters
     ]);
 
     // Effect to update previous prop refs *after* all other effects for the render cycle.
@@ -136,7 +154,7 @@ const DataTree = ({
 
     // Setup worker message handler once on component mount
     useEffect(() => {
-        if (!dataTreeWorker) return;
+        if (!workerRef.current) return;
 
         const messageHandler = (event) => {
             const { type, payload } = event.data;
@@ -145,36 +163,36 @@ const DataTree = ({
                 setOriginalTree(payload.originalTree || []);
                 const newTreeData = payload.treeData || [];
                 setTreeData(newTreeData);
+                setCounter((prev) => prev + 1);
 
-                // Prune expandedNodeXPaths to only include xpaths present in the newTreeData
-                const validNodeIds = new Set(newTreeData.map(node => node.id));
+                // Prune expandedNodeXPaths: Addressed Issue 1 here.
+                // The old pruning was too aggressive, removing states for paginated-away items.
+                // Actual pruning for deleted items is handled by specific 'remove' action handlers.
+                // We primarily ensure 'root' consistency here, and preserve other user-set expansions.
                 setExpandedNodeXPaths(prevExpandedPaths => {
-                    const newExpandedPaths = {};
+                    const newExpandedState = { ...prevExpandedPaths }; // Start with a copy
                     let changed = false;
-                    for (const xpathKey in prevExpandedPaths) {
-                        if (validNodeIds.has(xpathKey) && prevExpandedPaths[xpathKey]) {
-                            newExpandedPaths[xpathKey] = true;
-                        } else {
-                            changed = true; // Indicates an xpath was removed
-                        }
-                    }
-                    // Ensure root is always expanded if it exists (it should always be in newTreeData if data is present)
-                    if (validNodeIds.has("root")) {
-                        if (!newExpandedPaths["root"]) {
-                            newExpandedPaths["root"] = true;
+                    const rootNodePresentInNewTree = newTreeData.some(node => node.id === "root");
+
+                    if (rootNodePresentInNewTree) {
+                        if (newExpandedState.root !== true) {
+                            newExpandedState.root = true;
                             changed = true;
                         }
-                    } else if (Object.keys(newExpandedPaths).length > 0) {
-                        // This case should ideally not happen if treeData always has a root when it's not empty.
-                        // If root is missing but other nodes are expanded, it's an inconsistent state.
-                        // For safety, clear expansions if root is gone but other expansions exist.
-                        // Or, ensure 'root' is always added by the worker if there's any data.
-                        // Based on current worker logic, root is always present.
+                    } else {
+                        // If root is not in the new tree (e.g., tree becomes empty)
+                        // and 'root' was in the expanded state, we might clear it.
+                        // However, other useEffects (e.g., on originalTree) often reset
+                        // expandedNodeXPaths to {"root": true} when tree is empty or reloaded.
+                        // To avoid conflicting logic, we can be conservative here.
+                        // If root was true and is now gone, perhaps remove it from this state.
+                        if (newExpandedState.hasOwnProperty('root')) {
+                            delete newExpandedState.root; // Or set to false, depending on desired behavior for absent root.
+                            changed = true;
+                        }
                     }
-
-                    return changed || Object.keys(prevExpandedPaths).length !== Object.keys(newExpandedPaths).length 
-                           ? newExpandedPaths 
-                           : prevExpandedPaths;
+                    // No other paths are pruned here. This fixes pagination issue.
+                    return changed ? newExpandedState : prevExpandedPaths;
                 });
 
                 // Prune itemVisualStates to only include xpaths present in the newTreeData
@@ -182,15 +200,15 @@ const DataTree = ({
                     const nextStates = {};
                     let changed = false;
                     for (const xpathKey in prevStates) {
-                        if (validNodeIds.has(xpathKey)) {
+                        if (newTreeData.some(node => node.id === xpathKey)) {
                             nextStates[xpathKey] = prevStates[xpathKey];
                         } else {
                             changed = true; // Indicates an xpath was removed
                         }
                     }
                     return changed || Object.keys(prevStates).length !== Object.keys(nextStates).length
-                           ? nextStates
-                           : prevStates;
+                        ? nextStates
+                        : prevStates;
                 });
 
                 setIsWorkerProcessing(false); // Worker is now free
@@ -201,14 +219,14 @@ const DataTree = ({
                     // Directly call the processing logic again
                     setIsWorkerProcessing(true); // Mark as busy again for the new request
                     pendingRequestRef.current = false; // Reset pending flag
-                    dataTreeWorker.postMessage({ type: 'PROCESS_TREE', payload: latestPropsRef.current });
+                    workerRef.current.postMessage({ type: 'PROCESS_TREE', payload: latestPropsRef.current });
                 } else {
                     console.log("No pending requests, worker is idle.");
                 }
             }
         };
 
-        dataTreeWorker.onmessage = messageHandler;
+        workerRef.current.onmessage = messageHandler;
 
         return () => {
             // Optional: Clean up worker message handler if component unmounts
@@ -217,19 +235,80 @@ const DataTree = ({
         };
     }, []); // Empty dependency array: setup message handler only once
 
+    // Effect to scroll to newly added/duplicated item and manage glow timing
+    useEffect(() => {
+        if (newlyAddedOrDuplicatedXPath) {
+            // Timer for scrolling (short delay)
+            const scrollTimer = setTimeout(() => {
+                let finalTargetXPath = newlyAddedOrDuplicatedXPath; // Default target
+
+                // Helper to find a node by its ID (XPath) in the current treeData
+                const findNodeById = (id) => treeData.find(node => node.id === id);
+
+                const parentNode = findNodeById(newlyAddedOrDuplicatedXPath);
+
+                if (parentNode && parentNode.children && parentNode.children.length > 0) {
+                    // Try to go one level down
+                    const firstChildId = parentNode.children[0];
+                    const firstChildNode = findNodeById(firstChildId);
+
+                    if (firstChildNode) {
+                        finalTargetXPath = firstChildId; // Target the first child
+
+                        // Try to go two levels down (grandchild)
+                        if (firstChildNode.children && firstChildNode.children.length > 0) {
+                            const grandChildId = firstChildNode.children[0];
+                            const grandChildNode = findNodeById(grandChildId);
+                            if (grandChildNode) {
+                                finalTargetXPath = grandChildId; // Target the grandchild
+                            }
+                        }
+                    }
+                }
+
+                const elementToScrollTo = document.querySelector(`[data-xpath="${finalTargetXPath}"]`);
+                if (elementToScrollTo) {
+                    elementToScrollTo.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                } else {
+                    // Fallback: if the deeper target isn't found, try original XPath
+                    if (finalTargetXPath !== newlyAddedOrDuplicatedXPath) {
+                        const originalElement = document.querySelector(`[data-xpath="${newlyAddedOrDuplicatedXPath}"]`);
+                        if (originalElement) {
+                            originalElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        } else {
+                            console.warn(`Scroll Warning: Target element not found for primary XPath: ${newlyAddedOrDuplicatedXPath} nor deeper XPath: ${finalTargetXPath}.`);
+                        }
+                    } else {
+                         console.warn(`Scroll Warning: Target element not found for XPath: ${finalTargetXPath}.`);
+                    }
+                }
+                // DO NOT reset newlyAddedOrDuplicatedXPath here; it's for the glow timer
+            }, 150); // Short delay for DOM updates before scrolling
+
+            // Timer for clearing the glow (long delay)
+            const glowClearTimer = setTimeout(() => {
+                setNewlyAddedOrDuplicatedXPath(null); // Reset after 5 seconds to stop the glow
+            }, 5000); // 5-second glow duration
+
+            return () => {
+                clearTimeout(scrollTimer);
+                clearTimeout(glowClearTimer);
+            };
+        }
+    }, [newlyAddedOrDuplicatedXPath, treeData, setNewlyAddedOrDuplicatedXPath]); // Dependencies
 
     // Handle page change for a paginated node
     const handlePageChange = useCallback((nodeId, direction, totalPagesForNode) => {
         setPaginatedNodes(prev => {
             const currentPage = prev[nodeId]?.page || 0;
             let newPage = currentPage;
-            
+
             if (direction === 'next') {
                 newPage = Math.min(currentPage + 1, totalPagesForNode - 1);
             } else if (direction === 'prev') {
                 newPage = Math.max(currentPage - 1, 0);
             }
-            
+
             return {
                 ...prev,
                 [nodeId]: { page: newPage }
@@ -245,7 +324,7 @@ const DataTree = ({
         if (type === DATA_TYPES.STRING || (type === DATA_TYPES.NUMBER && !isNaN(value))) {
             handleFormUpdate(xpath, dataxpath, value, validationRes);
         }
-    }, [onUpdate, onUserChange]); 
+    }, [onUpdate, onUserChange]);
 
     const handleDateTimeChange = useCallback((dataxpath, xpath, value) => {
         handleFormUpdate(xpath, dataxpath, value);
@@ -257,12 +336,12 @@ const DataTree = ({
 
     const handleCheckboxToggle = useCallback((e, dataxpath, xpath) => {
         handleFormUpdate(xpath, dataxpath, e.target.checked);
-    }, [onUpdate,onUserChange]);
+    }, [onUpdate, onUserChange]);
 
     const handleAutocompleteChange = useCallback((e, value, dataxpath, xpath) => {
         handleFormUpdate(xpath, dataxpath, value);
     }, [onUpdate, onUserChange]);
-    
+
     const handleFormUpdate = (xpath, dataxpath, value, validationRes = null) => {
         const updatedObj = cloneDeep(updatedData);
         set(updatedObj, dataxpath, value);
@@ -279,12 +358,70 @@ const DataTree = ({
         }));
     }, []);
 
+    const expandNodeAndAllChildren = useCallback((baseSchemaPathOfNewNode, newDataInstance, schemaOfNewNodeInstance, currentProjectSchema) => {
+        const pathsToExpandRecursively = {};
+
+        function discoverPaths(currentData, currentPathPrefix, currentSchemaDef) {
+            // Allow null/undefined currentData to still discover structure if schema defines children
+            // If currentData is primitive, no children to discover from it.
+            if (!currentSchemaDef) return;
+
+            const properties = currentSchemaDef.properties;
+            if (!properties) return;
+
+            for (const propName in properties) {
+                const propSchema = properties[propName];
+                if (!propSchema) continue;
+
+                const childNodeSchemaPath = `${currentPathPrefix}.${propName}`;
+                pathsToExpandRecursively[childNodeSchemaPath] = true; // Expand the child node itself
+
+                // Determine childData, can be undefined if not present in currentData
+                const childData = (currentData && typeof currentData === 'object' && currentData !== null) ? currentData[propName] : undefined;
+
+                if (propSchema.type === DATA_TYPES.OBJECT) {
+                    let subSchemaDefToRecurse = propSchema;
+                    if (propSchema.items && propSchema.items.$ref) { // Object defined by $ref under items
+                         const refParts = propSchema.items.$ref.split('/');
+                         subSchemaDefToRecurse = refParts.length === 2 ? currentProjectSchema[refParts[1]] : currentProjectSchema[refParts[1]][refParts[2]];
+                    }
+                    // Only recurse if there's a schema definition for children
+                    if ((subSchemaDefToRecurse && subSchemaDefToRecurse.properties) || (subSchemaDefToRecurse && subSchemaDefToRecurse.items && subSchemaDefToRecurse.items.$ref)) {
+                        discoverPaths(childData, childNodeSchemaPath, subSchemaDefToRecurse);
+                    }
+                } else if (propSchema.type === DATA_TYPES.ARRAY && propSchema.items && propSchema.items.$ref) {
+                    const itemRefParts = propSchema.items.$ref.split('/');
+                    const itemSchemaDef = itemRefParts.length === 2 ? currentProjectSchema[itemRefParts[1]] : currentProjectSchema[itemRefParts[1]][itemRefParts[2]];
+                    
+                    if (Array.isArray(childData)) {
+                        childData.forEach((itemData, index) => {
+                            const itemSchemaPath = `${childNodeSchemaPath}[${index}]`;
+                            pathsToExpandRecursively[itemSchemaPath] = true;
+                            discoverPaths(itemData, itemSchemaPath, itemSchemaDef);
+                        });
+                    }
+                    // Even if array is empty, its container (childNodeSchemaPath) is marked.
+                }
+            }
+        }
+
+        // Start discovery from the children of the new node.
+        discoverPaths(newDataInstance, baseSchemaPathOfNewNode, schemaOfNewNodeInstance);
+        
+        setExpandedNodeXPaths(prevExpanded => ({
+            ...prevExpanded,
+            [baseSchemaPathOfNewNode]: true, // Ensure the base node itself is expanded
+            ...pathsToExpandRecursively
+        }));
+    }, [setExpandedNodeXPaths, projectSchema, DATA_TYPES]); // projectSchema and DATA_TYPES are dependencies
+
     const nodeRenderer = ({ element, isBranch, isExpanded, getNodeProps, level, handleExpand }) => {
         if (element.id === "root") return null;
 
         const nodeProps = getNodeProps();
         const originalNode = element.metadata;
         const visualState = itemVisualStates[originalNode?.xpath];
+        const nodeXPath = originalNode?.xpath; // Get node's XPath
 
         if (!originalNode) {
             console.warn("Node metadata is missing for element:", element);
@@ -303,7 +440,7 @@ const DataTree = ({
 
         const handleClick = (e) => {
             const nodeXPath = originalNode?.xpath;
-            if (!nodeXPath) return; 
+            if (!nodeXPath) return;
 
             // 1. Handle Action Clicks (add, duplicate, remove)
             const clickedAdd = e.target.closest('[data-add]');
@@ -314,12 +451,13 @@ const DataTree = ({
                 e.stopPropagation();
                 const xpathAttr = clickedAdd.getAttribute('data-add'); // Schema path of the container (e.g., pair_strat_params.strat_leg2)
                 const schemaRefString = clickedAdd.getAttribute('data-ref'); // Schema ref for item OR for object's own structure
+
                 const containerPropsStr = clickedAdd.getAttribute('data-prop'); // Full props of the container node (originalNode)
 
-                const isObjectInitialization = originalNode.isObjectContainer && 
-                                             originalNode.canInitialize && 
-                                             originalNode.schemaRef && // For object container, this is ref to its own item's schema (e.g. #/definitions/strat_leg)
-                                             (get(updatedData, xpathAttr) === null || get(updatedData, xpathAttr) === undefined);
+                const isObjectInitialization = originalNode.isObjectContainer &&
+                    originalNode.canInitialize &&
+                    originalNode.schemaRef && // For object container, this is ref to its own item's schema (e.g. #/definitions/strat_leg)
+                    (get(updatedData, xpathAttr) === null || get(updatedData, xpathAttr) === undefined);
 
                 const isArrayItemAddition = originalNode.isArrayContainer && schemaRefString; // For array, schemaRefString is for the *type* of item in array
 
@@ -328,38 +466,39 @@ const DataTree = ({
                     try {
                         let updatedObj = cloneDeep(updatedData);
                         const objectSchemaDefinitionPath = originalNode.schemaRef.split('/');
-                        
+
                         if (objectSchemaDefinitionPath.length < 2) {
                             console.error('[DataTree] Invalid schemaRef for object initialization:', originalNode.schemaRef);
                             return;
                         }
 
-                        const itemSchemaForObject = objectSchemaDefinitionPath.length === 2 ? 
-                                                    projectSchema[objectSchemaDefinitionPath[1]] : 
-                                                    projectSchema[objectSchemaDefinitionPath[1]][objectSchemaDefinitionPath[2]];
-                        
+                        const itemSchemaForObject = objectSchemaDefinitionPath.length === 2 ?
+                            projectSchema[objectSchemaDefinitionPath[1]] :
+                            projectSchema[objectSchemaDefinitionPath[1]][objectSchemaDefinitionPath[2]];
+
                         if (!itemSchemaForObject) {
                             console.error('[DataTree] Could not find itemSchema for object ref:', originalNode.schemaRef, projectSchema);
                             return;
                         }
-                        
+
                         const containerOwnProps = containerPropsStr ? JSON.parse(containerPropsStr) : {};
                         console.log('[DataTree] Container own props for GOS:', containerOwnProps);
 
                         let newObjectInstance = generateObjectFromSchema(
-                            projectSchema, 
-                            cloneDeep(itemSchemaForObject), 
-                            containerOwnProps, 
-                            xpathAttr 
+                            projectSchema,
+                            cloneDeep(itemSchemaForObject),
+                            containerOwnProps,
+                            xpathAttr
                         );
                         console.log('[DataTree] New object instance from GOS:', newObjectInstance);
-                        
-                        set(updatedObj, xpathAttr, newObjectInstance); 
+
+                        set(updatedObj, xpathAttr, newObjectInstance);
                         console.log('[DataTree] Data after setting new object:', updatedObj);
 
                         setItemVisualStates(prev => ({ ...prev, [xpathAttr]: 'added' }));
-                        handleNodeToggle(xpathAttr, true); 
+                        expandNodeAndAllChildren(xpathAttr, newObjectInstance, itemSchemaForObject, projectSchema);
                         onUpdate(updatedObj, 'add');
+                        setNewlyAddedOrDuplicatedXPath(xpathAttr); // Scroll to the initialized object
                         return;
                     } catch (err) {
                         console.error('[DataTree] ERROR during OBJECT INITIALIZATION for:', xpathAttr, err);
@@ -370,7 +509,7 @@ const DataTree = ({
                     let updatedObj = cloneDeep(updatedData);
                     // xpathAttr is the schema path of the array itself (e.g. pair_strat_params.some_array_field)
                     // schemaRefString is the $ref for the items within that array (e.g. #/definitions/array_item_type)
-                    let arrayDataPath = getDataxpath(updatedObj, xpathAttr); 
+                    let arrayDataPath = getDataxpath(updatedObj, xpathAttr);
                     let currentArray = get(updatedObj, arrayDataPath);
 
                     if (!Array.isArray(currentArray)) {
@@ -379,12 +518,12 @@ const DataTree = ({
                         currentArray = [];
                         set(updatedObj, arrayDataPath, currentArray);
                     }
-                    
+
                     const arrayItemSchemaPathParts = schemaRefString.split('/');
-                    const arrayItemSchema = arrayItemSchemaPathParts.length === 2 ? 
-                                            projectSchema[arrayItemSchemaPathParts[1]] : 
-                                            projectSchema[arrayItemSchemaPathParts[1]][arrayItemSchemaPathParts[2]];
-                    
+                    const arrayItemSchema = arrayItemSchemaPathParts.length === 2 ?
+                        projectSchema[arrayItemSchemaPathParts[1]] :
+                        projectSchema[arrayItemSchemaPathParts[1]][arrayItemSchemaPathParts[2]];
+
                     let nextIndex = 0;
                     const itemsInUpdatedDataForIdx = currentArray || [];
                     let maxIndexInUpdatedData = -1;
@@ -402,36 +541,38 @@ const DataTree = ({
                             }
                         }
                     });
-                    if (maxIndexInUpdatedData === -1 && itemsInUpdatedDataForIdx.length > 0 && 
+                    if (maxIndexInUpdatedData === -1 && itemsInUpdatedDataForIdx.length > 0 &&
                         !itemsInUpdatedDataForIdx.some(i => typeof i === 'object' && Object.keys(i).find(key => key.startsWith('xpath_')))) {
                         maxIndexInUpdatedData = itemsInUpdatedDataForIdx.length - 1;
                     }
-                    const itemsInStoredData = get(storedData, xpathAttr); 
+                    const itemsInStoredData = get(storedData, xpathAttr);
                     let maxIndexInStoredData = -1;
                     if (Array.isArray(itemsInStoredData)) {
                         maxIndexInStoredData = itemsInStoredData.length > 0 ? itemsInStoredData.length - 1 : -1;
                     }
                     nextIndex = Math.max(maxIndexInUpdatedData, maxIndexInStoredData) + 1;
 
-                    const propsForArrayItemContext = containerPropsStr ? JSON.parse(containerPropsStr) : {}; 
+                    const propsForArrayItemContext = containerPropsStr ? JSON.parse(containerPropsStr) : {};
 
                     let newArrayItem = generateObjectFromSchema(
-                        projectSchema, 
-                        cloneDeep(arrayItemSchema), 
-                        propsForArrayItemContext, 
+                        projectSchema,
+                        cloneDeep(arrayItemSchema),
+                        propsForArrayItemContext,
                         `${arrayDataPath}[${nextIndex}]`
                     );
-                    newArrayItem = addxpath(newArrayItem, `${arrayDataPath}[${nextIndex}]`); 
+                    newArrayItem = addxpath(newArrayItem, `${arrayDataPath}[${nextIndex}]`);
 
                     currentArray.push(newArrayItem);
-                    
+
                     const schemaXpathForNewItem = `${xpathAttr}[${nextIndex}]`;
                     setItemVisualStates(prev => ({ ...prev, [schemaXpathForNewItem]: 'added' }));
-                    handleNodeToggle(xpathAttr, true); 
+                    handleNodeToggle(xpathAttr, true);
+                    expandNodeAndAllChildren(schemaXpathForNewItem, newArrayItem, arrayItemSchema, projectSchema);
                     const totalItems = currentArray.length;
                     const newItemPageIndex = Math.floor((totalItems - 1) / ITEMS_PER_PAGE);
-                    setPaginatedNodes(prev => ({ ...prev, [xpathAttr]: { page: newItemPageIndex } })); 
+                    setPaginatedNodes(prev => ({ ...prev, [xpathAttr]: { page: newItemPageIndex } }));
                     onUpdate(updatedObj, 'add');
+                    setNewlyAddedOrDuplicatedXPath(schemaXpathForNewItem); // Scroll to the new array item
                     return;
                 } else {
                     // Fallback or error: Unhandled add click scenario
@@ -454,13 +595,13 @@ const DataTree = ({
                 if (!objectToCopy) return;
                 objectToCopy = clearxpath(objectToCopy);
                 clearId(objectToCopy);
-                
+
                 let parentDataXpath = itemXpath.substring(0, itemXpath.lastIndexOf('['));
                 let parentOriginalXpath = xpathAttr.substring(0, xpathAttr.lastIndexOf('['));
                 let parentObject = get(updatedObj, parentDataXpath);
                 if (!parentObject || !Array.isArray(parentObject)) {
-                     set(updatedObj, parentDataXpath, []);
-                     parentObject = get(updatedObj, parentDataXpath);
+                    set(updatedObj, parentDataXpath, []);
+                    parentObject = get(updatedObj, parentDataXpath);
                 }
 
                 const itemsInUpdatedData = parentObject || [];
@@ -480,7 +621,7 @@ const DataTree = ({
                     }
                 });
                 if (maxIndexInUpdatedData === -1 && itemsInUpdatedData.length > 0 && !itemsInUpdatedData.some(i => typeof i === 'object' && Object.keys(i).find(key => key.startsWith('xpath_')))) {
-                     maxIndexInUpdatedData = itemsInUpdatedData.length - 1;
+                    maxIndexInUpdatedData = itemsInUpdatedData.length - 1;
                 }
                 const itemsInStoredData = get(storedData, parentOriginalXpath);
                 let maxIndexInStoredData = -1;
@@ -488,12 +629,12 @@ const DataTree = ({
                     maxIndexInStoredData = itemsInStoredData.length > 0 ? itemsInStoredData.length - 1 : -1;
                 }
                 let nextIndex = Math.max(maxIndexInUpdatedData, maxIndexInStoredData) + 1;
-                
+
                 const refParts = ref.split('/');
                 let currentItemSchema = refParts.length === 2 ? projectSchema[refParts[1]] : projectSchema[refParts[1]][refParts[2]];
                 let duplicatedObject = generateObjectFromSchema(projectSchema, cloneDeep(currentItemSchema), additionalProps, null, objectToCopy);
 
-               
+
                 if (duplicatedObject.sec_positions && Array.isArray(duplicatedObject.sec_positions)) {
                     duplicatedObject.sec_positions.forEach(secPos => {
                         if (secPos && (secPos.positions === undefined || secPos.positions === null)) {
@@ -506,11 +647,13 @@ const DataTree = ({
                 const schemaXpathForDuplicatedItem = parentOriginalXpath + '[' + nextIndex + ']';
                 setItemVisualStates(prev => ({ ...prev, [schemaXpathForDuplicatedItem]: 'duplicated' }));
                 parentObject.push(duplicatedObject);
-                handleNodeToggle(parentDataXpath, true); // Expand parent
+                handleNodeToggle(parentOriginalXpath, true); // Expand parent
+                expandNodeAndAllChildren(schemaXpathForDuplicatedItem, duplicatedObject, currentItemSchema, projectSchema);
                 const totalItems = parentObject.length;
                 const newItemPageIndex = Math.floor((totalItems - 1) / ITEMS_PER_PAGE);
                 setPaginatedNodes(prev => ({ ...prev, [parentDataXpath]: { page: newItemPageIndex } }));
-                onUpdate(updatedObj, 'add'); 
+                onUpdate(updatedObj, 'add');
+                setNewlyAddedOrDuplicatedXPath(schemaXpathForDuplicatedItem); // Scroll to the duplicated item
                 return; // Action handled
             }
 
@@ -550,7 +693,7 @@ const DataTree = ({
                     return; // Action handled
                 }
                 // Handle removal of an array item (existing logic)
-                else if (xpathAttr && xpathAttr.endsWith(']')) { 
+                else if (xpathAttr && xpathAttr.endsWith(']')) {
                     let updatedObj = cloneDeep(updatedData);
                     let itemDataPath = getDataxpath(updatedObj, xpathAttr); // Get data path for the array item
                     if (!itemDataPath) return; // Should not happen if UI shows remove for a valid item
@@ -587,7 +730,7 @@ const DataTree = ({
                     return; // Action handled
                 }
             }
-            
+
             const clickedArrow = e.target.closest('[data-open], [data-close]');
             if (clickedArrow) {
                 e.stopPropagation();
@@ -596,7 +739,7 @@ const DataTree = ({
                 } else if (clickedArrow.hasAttribute('data-close')) {
                     handleNodeToggle(nodeXPath, false);
                 }
-                return; 
+                return;
             }
 
             const clickedTitle = e.target.closest('[data-header-title="true"]');
@@ -605,7 +748,7 @@ const DataTree = ({
                 if (isBranch) { // isBranch is from react-accessible-treeview, refers to having children in the view model
                     handleNodeToggle(nodeXPath, !expandedNodeXPaths[nodeXPath]);
                 }
-                return; 
+                return;
             }
 
             // Fallback for general click on the component itself if it's a branch
@@ -613,8 +756,46 @@ const DataTree = ({
                 handleNodeToggle(nodeXPath, !expandedNodeXPaths[nodeXPath]);
             }
         };
-        
-        const nodeIsOpen = !!expandedNodeXPaths[originalNode?.xpath];
+
+        let nodeIsOpen = false;
+        let isChanged = false; // True if a default expansion decision is made AND can be persisted
+
+        if (nodeXPath) {
+            // Node has an XPath: check for explicit state or apply XPath-based default level
+            const explicitState = expandedNodeXPaths[nodeXPath];
+            if (explicitState === true) { // Explicitly expanded by user or previous default
+                nodeIsOpen = true;
+            } else if (explicitState === false) { // Explicitly collapsed by user
+                nodeIsOpen = false;
+            } else { // No explicit state (undefined)
+                // Use levelRef.current for the comparison
+                // Only expand if it's a container and within the default expansion level
+                if (level <= levelRef.current && (originalNode?.isObjectContainer || originalNode?.isArrayContainer)) { 
+                    nodeIsOpen = true;
+                    isChanged = true; // Mark to persist this default decision
+                }
+                // else, if level > levelRef.current or not a container, and no explicit state, nodeIsOpen remains false (default collapsed)
+            }
+        } else {
+            // Node does NOT have an XPath: apply no-XPath-based default level
+            // Cannot have an explicit state in expandedNodeXPaths as it's keyed by XPath.
+            // This default decision cannot be persisted in expandedNodeXPaths.
+            //   if (level <= 2) { // Default expansion for nodes WITHOUT XPath up to level 2
+            //       nodeIsOpen = true;
+            //   }
+            // isChanged remains false, as we can't persist state without an XPath key.
+            // else, if level > 2, nodeIsOpen remains false (default collapsed)
+            console.error('something went wrong. nodexpath found null' + xpath);
+        }
+
+        // This part is existing: if a default expansion was made FOR A NODE WITH AN XPATH, persist it.
+        // isChanged will only be true if nodeXPath was defined and a default expansion (level <=3) was applied.
+        if (isChanged) {
+            handleNodeToggle(nodeXPath, true);
+        }
+
+        // Glow logic added here
+        const shouldGlow = newlyAddedOrDuplicatedXPath && newlyAddedOrDuplicatedXPath === nodeXPath;
 
         const dataPayload = {
             ...originalNode,
@@ -624,11 +805,15 @@ const DataTree = ({
             onCheckboxChange: handleCheckboxToggle,
             onAutocompleteOptionChange: handleAutocompleteChange,
             onDateTimeChange: handleDateTimeChange,
+            updatedDataForColor: updatedData,
+            storedDataForColor: storedData,
+            visualState: visualState,
+            // triggerGlowForXPath: newlyAddedOrDuplicatedXPath // This prop is now removed as HeaderField won't use it
         };
 
-        if (originalNode.pagination) { 
+        if (originalNode.pagination) {
             dataPayload.pagination = {
-                ...originalNode.pagination, 
+                ...originalNode.pagination,
                 onPageChange: (direction) => handlePageChange(element.id, direction, originalNode.pagination.totalPages)
             };
         }
@@ -638,20 +823,27 @@ const DataTree = ({
             isOpen: nodeIsOpen,
             updatedDataForColor: updatedData,
             storedDataForColor: storedData,
-            visualState: visualState
+            visualState: visualState,
+            // triggerGlowForXPath: newlyAddedOrDuplicatedXPath // This prop can be conditionally removed or 
         };
+        
+        // If HeaderField no longer needs triggerGlowForXPath, this prop can be conditionally removed or 
+        // HeaderField can be updated to not expect it. For now, let's assume it might still be there
+        // or will be cleaned up in the next step when editing HeaderField.jsx.
 
         return (
-            <div 
-                {...nodeProps} 
+            <div
+                {...nodeProps}
                 style={{ paddingLeft: `${(level - 1) * 20}px`, width: 'max-content' }}
+                className={shouldGlow ? NodeBaseClasses.datanodeNewlyAddedGlowTarget : ''} // Apply new glow target class
+                data-xpath={nodeXPath} // Ensure data-xpath is on the outermost div for scrolling
             >
                 <ComponentToRender {...commonProps} onClick={handleClick} />
             </div>
         );
-    }; 
+    };
 
-     const calculatedDefaultExpandedIds = React.useMemo(() => {
+    const calculatedDefaultExpandedIds = React.useMemo(() => {
         // This is now less critical as we manage expansion in `expandedNodeXPaths` state.
         // We can use it to set the initial state of `expandedNodeXPaths`.
         const ids = ["root"];
@@ -683,7 +875,7 @@ const DataTree = ({
                     }));
                 } else {
                     // First node might not have an xpath or originalTree[0] is null/undefined
-                     setExpandedNodeXPaths(prevExpandedPaths => ({
+                    setExpandedNodeXPaths(prevExpandedPaths => ({
                         ...prevExpandedPaths,
                         "root": true
                     }));
@@ -692,29 +884,66 @@ const DataTree = ({
             } else {
                 // Initial expansion already done for this tree instance, ensure "root" is still set
                 // This helps if something else inadvertently removes "root" from expandedNodeXPaths
-                setExpandedNodeXPaths(prevExpandedPaths => ({
-                    ...prevExpandedPaths,
-                    "root": true
-                }));
+                setExpandedNodeXPaths(prevExpandedPaths => {
+                    if (prevExpandedPaths.root !== true) {
+                        return { ...prevExpandedPaths, "root": true }
+                    }
+                    return prevExpandedPaths;
+                });
             }
         } else if (!originalTree || originalTree.length === 0) {
             // Tree is empty or not yet loaded, reset the flag
             initialExpansionSetForCurrentTreeRef.current = false;
             // Ensure "root" is still in the base state for when tree loads
-            setExpandedNodeXPaths({ "root": true });
+            setExpandedNodeXPaths(prevPaths => { // Changed to functional update
+                if (Object.keys(prevPaths).length === 1 && prevPaths.root === true) return prevPaths; // Already minimal state
+                return { "root": true }; // Reset to just root expanded if tree is empty
+            });
         }
     }, [originalTree]);
 
-    return treeData.length > 0 ? (
+    if (!treeData || treeData.length === 0) return null;
+
+    const activeNodeIdsSet = new Set(treeData.map((node) => node.id));
+    const updatedExpandedIds = Object.keys(expandedNodeXPaths)
+        .filter(xpath => expandedNodeXPaths[xpath] && activeNodeIdsSet.has(xpath));
+
+    return (
         <TreeView
+            key={counter}
             data={treeData}
             aria-label={modelName}
             nodeRenderer={nodeRenderer}
-            expandedIds={Object.keys(expandedNodeXPaths).filter(xpath => expandedNodeXPaths[xpath])} // Control TreeView expansion
+            expandedIds={updatedExpandedIds} // Control TreeView expansion
             multiSelect={false}
             disableKeyboardNavigation={false}
         />
-    ) : null;
+    );
+};
+
+DataTree.propTypes = {
+    projectSchema: PropTypes.object.isRequired,
+    modelName: PropTypes.string.isRequired,
+    updatedData: PropTypes.object.isRequired,
+    storedData: PropTypes.object.isRequired,
+    subtree: PropTypes.object.isRequired,
+    mode: PropTypes.string.isRequired,
+    xpath: PropTypes.string,
+    onUpdate: PropTypes.func.isRequired,
+    onUserChange: PropTypes.func.isRequired,
+    selectedId: PropTypes.string,
+    showHidden: PropTypes.bool,
+    enableObjectPagination: PropTypes.bool,
+    treeLevel: PropTypes.number,
+    filters: PropTypes.array
+};
+
+DataTree.defaultProps = {
+    selectedId: null,
+    showHidden: false,
+    enableObjectPagination: false,
+    treeLevel: null,
+    filters: []
 };
 
 export default DataTree;

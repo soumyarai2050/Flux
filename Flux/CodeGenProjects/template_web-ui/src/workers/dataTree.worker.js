@@ -79,8 +79,8 @@ function workerProcessNode(node, parentId, paginatedNodes, ITEMS_PER_PAGE, allFl
 onmessage = (e) => {
     const {
         projectSchema, modelName, updatedData, storedData, subtree, mode, xpath,
-        selectedId, showHidden, paginatedNodes,
-        enableObjectPagination // Destructure the new prop
+        selectedId, showHidden, paginatedNodes, filters,
+        enableObjectPagination
     } = e.data.payload;
 
     // Use constants from payload if provided, otherwise use imported ones.
@@ -101,9 +101,8 @@ onmessage = (e) => {
         'mode': mode,
         'xpath': xpath, // Root xpath for this tree generation context
         'index': selectedId,
-        'forceUpdate': false, // Likely UI-specific, may not be needed for worker's generation
-        // 'expandedNodeXPaths': expandedNodeXPaths, // Not directly used by generateTreeStructure unless it's modified
-                                                  // The global treeState within the worker will manage expansions internally.
+        'forceUpdate': false,
+        'filters': filters
     };
 
     const generatedTree = generateTreeStructure(cloneDeep(projectSchema), modelName, callerPropsForWorker);
