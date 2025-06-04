@@ -80,7 +80,7 @@ class LogBarterSimulator(BarteringLinkBase):
             return broker_sec_pos_dict
 
         with FileLock(str(cls.intraday_bartering_chores_lock_file)):
-            intraday_chore_fills: List[FillsJournalCont] = dict_or_list_records_csv_reader(
+            intraday_chore_fills: List[FillsJournalCont] = dict_or_list_records_csv_reader(  # noqa
                 cls.intraday_bartering_chores_csv_file_name, FillsJournalCont, EXECUTOR_PROJECT_DATA_DIR)
 
             if not intraday_chore_fills:
@@ -202,7 +202,9 @@ class LogBarterSimulator(BarteringLinkBase):
         return True
 
     @classmethod
-    async def place_amend_chore(cls, chore_id: str, px: float | None = None, qty: int | None = None) -> bool:
+    async def place_amend_chore(cls, chore_id: str, px: float | None = None, qty: int | None = None,
+                                bartering_sec_id: str | None = None, system_sec_id: str | None = None,
+                                bartering_sec_type: str | None = None) -> bool:
         raise NotImplementedError
 
     @classmethod
@@ -210,8 +212,10 @@ class LogBarterSimulator(BarteringLinkBase):
         raise NotImplementedError
 
     @classmethod
-    async def get_chore_status(cls, chore_id: str) -> Tuple[ChoreStatusType | None, str | None, int | None]:
+    async def get_chore_status(cls, chore_id: str) -> Tuple[ChoreStatusType | None, str | None, int | None, float | None, int | None] | None:
         """
-        returns chore_status (ChoreStatusType), any_chore_text, filled-Qty
+        returns chore_status (ChoreStatusType), any_chore_text, filled-Qty, chore-px and chore-qty as seen by bartering
+        link, caller may use these for reconciliation
+        returns None if chore not found by Bartering Link
         """
         raise NotImplementedError

@@ -84,7 +84,10 @@ class SymbolCache:
             logging.error(f"Unsupported depth: {position} - must be between 0-9")
             return None
 
-    def get_so(self, symbol: str | None = None):  # so getter need to get breach_px
+    def has_tob_n_so(self):
+        return (self.top_of_book is not None) and (self.so is not None)
+
+    def get_so(self, _: str):  # so getter need to get breach_px
         return self.so
 
 

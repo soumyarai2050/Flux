@@ -27,7 +27,10 @@ def get_time_it_log_pattern(callable_name: str, start_time: DateTime, delta: flo
 
 
 # Decorator Function
-lvl_names_mapping = logging.getLevelNamesMapping()
+if hasattr(logging, "getLevelNamesMapping"):
+    lvl_names_mapping = logging.getLevelNamesMapping()
+else:  # python <= 3.10
+    lvl_names_mapping = []
 is_timing_logging_enabled = False
 if "TIMING" in lvl_names_mapping:
     logger = logging.getLogger()

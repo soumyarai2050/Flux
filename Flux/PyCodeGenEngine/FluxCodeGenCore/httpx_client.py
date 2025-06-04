@@ -1,6 +1,7 @@
 import requests
 from typing import Dict, Any, Optional
 import logging
+from requests.adapters import HTTPAdapter
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -25,6 +26,9 @@ class APIClient:
         self.base_url = base_url.rstrip('/')
         self.timeout = timeout
         self.session = requests.Session()
+        self.adapter = HTTPAdapter(pool_connections=20, pool_maxsize=20)
+        self.session.mount('http://', self.adapter)
+        self.session.mount('https://', self.adapter)
 
         # Set default headers
         self.session.headers.update({

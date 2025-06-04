@@ -13,7 +13,8 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.bartering_link_
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.executor_config_loader import (
     executor_config_yaml_dict, EXECUTOR_PROJECT_DATA_DIR)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import get_symbol_side_key
-from FluxPythonUtils.scripts.file_utility_functions import dict_or_list_records_csv_writer
+from FluxPythonUtils.scripts.file_utility_functions import (
+    dict_or_list_records_csv_writer, get_fieldnames_from_record_type)
 from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_post_book_n_basket_book_core_msgspec_model import *
 from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_basket_book_core_msgspec_model import *
 
@@ -261,7 +262,7 @@ class BarterSimulator(BarteringLinkBase):
             if not os.path.exists(f"{str(cls.intraday_bartering_chores_csv_file)}.csv"):
                 include_header = True
             # file already exists, don't include headers
-            fieldnames = list(FillsJournal.__annotations__.keys())
+            fieldnames = get_fieldnames_from_record_type(FillsJournal)
             dict_or_list_records_csv_writer(cls.intraday_bartering_chores_csv_file_name, intraday_chore_fills,
                                             fieldnames, FillsJournal, EXECUTOR_PROJECT_DATA_DIR, append_mode=True,
                                             include_header=include_header, by_alias=True)
@@ -456,12 +457,9 @@ class BarterSimulator(BarteringLinkBase):
         return True
 
     @classmethod
-    async def revoke_kill_switch_n_resume_bartering(cls) -> bool:
-        logging.critical("Called BarteringLink.revoke_kill_switch_n_resume_bartering from BarterSimulator")
-        return True
-
-    @classmethod
-    async def place_amend_chore(cls, chore_id: str, px: float | None = None, qty: int | None = None) -> bool:
+    async def place_amend_chore(cls, chore_id: str, px: float | None = None, qty: int | None = None,
+                                bartering_sec_id: str | None = None, system_sec_id: str | None = None,
+                                bartering_sec_type: str | None = None) -> bool:
         raise NotImplementedError
 
     @classmethod
@@ -469,8 +467,10 @@ class BarterSimulator(BarteringLinkBase):
         raise NotImplementedError
 
     @classmethod
-    async def get_chore_status(cls, chore_id: str) -> Tuple[ChoreStatusType | None, str | None, int | None]:
+    async def get_chore_status(cls, chore_id: str) -> Tuple[ChoreStatusType | None, str | None, int | None, float | None, int | None] | None:
         """
-        returns chore_status (ChoreStatusType), any_chore_text, filled-Qty
+        returns chore_status (ChoreStatusType), any_chore_text, filled-Qty, chore-px and chore-qty as seen by bartering
+        link, caller may use these for reconciliation
+        returns None if chore not found by Bartering Link
         """
         raise NotImplementedError

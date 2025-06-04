@@ -33,6 +33,7 @@ else:
         logging.exception(err_str)
         raise Exception(err_str)
 
+
 @log_n_except
 def generic_http_get_all_client(url: str, model_type, limit_obj_count: int | None = None):
     params = None
@@ -255,6 +256,7 @@ async def generic_ws_get_client(url: str, query_param: Any, model_type,
                     logging.debug(f"Update: {model_type_obj}")
                 except KeyError:
                     continue
+
 
 @log_n_except
 def generic_http_index_client(url: str, query_params: List[Any], model_type):

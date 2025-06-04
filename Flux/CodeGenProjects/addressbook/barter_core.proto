@@ -21,6 +21,7 @@ enum InstrumentType {
   CB = 6;
   FOP = 7;
   INDEX = 8;
+  ETF = 9;
 }
 
 enum Side {
@@ -198,14 +199,15 @@ message Position {
   optional float incurred_cost = 11;
   // T+1 and onwards recurring daily cost
   optional float carry_cost = 12;
+  optional string contact = 13 [(FluxFldFilterEnable) = true, (FluxFldHide) = "True"];
   // Micro Planegy (Sub Plan within a plan)
-  optional string mplan = 13 [(FluxFldFilterEnable) = true];
-  optional int32 priority = 14 [default = 10, (FluxFldHelp) = "default priority: 10, chores to respect specified priority (lower value is higher priority), duplicates allowed"];
-  optional float premium_percentage = 15 [default = 2, (FluxFldNumberFormat) = "%"];
-  optional float benchmark_rate = 16 [(FluxFldNumberFormat) = "%", (FluxFldHide) = "True", (FluxFldHelp) = "obfr"];
-  optional float accrual_local = 17 [(FluxFldNumberFormat) = "%", (FluxFldHide) = "True"];
-  optional float accrual_usd = 18 [(FluxFldNumberFormat) = "%", (FluxFldHide) = "True"];
-  optional float prev_mark_usd = 19 [(FluxFldNumberFormat) = "%", (FluxFldHide) = "True"];
+  optional string mplan = 14 [(FluxFldFilterEnable) = true];
+  optional int32 priority = 15 [default = 10, (FluxFldHelp) = "default priority: 10, chores to respect specified priority (lower value is higher priority), duplicates allowed"];
+  optional float premium_percentage = 16 [default = 2, (FluxFldNumberFormat) = "%"];
+  optional float benchmark_rate = 17 [(FluxFldNumberFormat) = "%", (FluxFldHide) = "True", (FluxFldHelp) = "obfr"];
+  optional float accrual_local = 18 [(FluxFldNumberFormat) = "%", (FluxFldHide) = "True"];
+  optional float accrual_usd = 19 [(FluxFldNumberFormat) = "%", (FluxFldHide) = "True"];
+  optional float prev_mark_usd = 20 [(FluxFldNumberFormat) = "%", (FluxFldHide) = "True"];
 }
 
 message SecPosition {
@@ -235,7 +237,7 @@ message Broker {
   // per security positions
   repeated SecPosition sec_positions = 3;
   // broker identifier
-  required string broker = 4;
+  required string broker = 4 [(FluxFldFilterEnable) = true];
   optional int32 bkr_priority = 5 [default = 10, (FluxFldHelp) = "default priority 10, embedded position priorities are relative within broker priority level group; chores respect specified priority (lower value is higher priority), duplicates allowed"];
 }
 
@@ -251,7 +253,7 @@ message Security {
 message Quote {
   option (FluxMsgStringLength) = 128;
 
-  optional float px = 1;
+  optional float px = 1 [(FluxFldNumberFormat) = ".3"];
   optional int64 qty = 2 [(FluxFldNoCommonKey) = true];
   optional float premium = 3;
   optional int64 last_update_date_time = 4[(FluxFldNoCommonKey) = true, (FluxFldValIsDateTime) = true];
@@ -264,7 +266,7 @@ message ChoreBrief {
   required Security security = 2 [(FluxFldHelp) = "system security"];
   optional Security bartering_security = 3 [(FluxFldHelp) = "bartering security"];
   required Side side = 4;
-  optional float px = 5;
+  optional float px = 5 [(FluxFldNumberFormat) = ".3"];
   optional int64 qty = 6;
   optional float chore_notional = 7 [(FluxFldDisplayType) = "int", (FluxFldServerPopulate) = true, (FluxFldTitle) = "chore $", (FluxFldNumberFormat) = "$"];
   required string underlying_account = 8;

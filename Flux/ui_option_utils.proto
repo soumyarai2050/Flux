@@ -120,6 +120,11 @@ message SortOrder {
   required string sort_type = 2;
 }
 
+message QuickFilter {
+    required string chart_name = 1;
+    required string filters = 2;
+}
+
 message WidgetUIData{
   // for UI to store the bounded id value
   optional string bind_id_val = 1;
@@ -143,6 +148,11 @@ message WidgetUIData{
   optional string selected_pivot_name = 19;
   repeated string pivot_enable_override = 20;
   repeated string absolute_sort_override = 21;
+  repeated QuickFilter quick_filters = 22;
+  optional bool sticky_header = 23 [default = true];
+  optional bool common_key_collapse = 24 [default = false];
+  repeated string frozen_columns = 25;
+  repeated string column_name_override = 26;
 }
 
 message UIButton{
@@ -167,6 +177,7 @@ message UIProgressBar{
 }
 
 message ChartEncode {
+  // Optional if time-series and field on y-axis has projection, else required
   optional string x = 1;
   required string y = 2;
 }
@@ -175,6 +186,7 @@ message ChartSeries {
   optional string id = 1;
   required ChartType type = 2;
   required ChartEncode encode = 3;
+  // Enable stack for all series if creating stack chart
   optional bool stack = 4;
   optional float y_min = 5;
   optional float y_max = 6;
@@ -183,6 +195,7 @@ message ChartSeries {
 message ChartData {
   optional string id = 1;
   required string chart_name = 2;
+  // Enable time-series if using projection to show time series graph
   optional bool time_series = 3 [default = false];
   repeated UIFilter filters = 4;
   optional string partition_fld = 5;

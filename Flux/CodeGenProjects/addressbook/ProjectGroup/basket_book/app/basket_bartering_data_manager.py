@@ -1,4 +1,5 @@
 # standard imports
+import logging
 from threading import Thread
 from queue import Queue
 
@@ -34,8 +35,6 @@ class BasketBarteringDataManager(BaseBarteringDataManager, BasketBookServiceData
         EmailBookServiceDataManager.__init__(self, ps_host, ps_port, plan_cache)
         self.bartering_cache: BasketBarteringCache = BasketBarteringCache()
         self.plan_cache: BasketCache = plan_cache
-        self.id_to_new_chore_dict: Dict[int, NewChore] = {}
-        self.non_cached_basket_chore_queue: Queue[BasketChore | BasketChoreOptional] = Queue()
 
         if market.is_test_run:
             err_str_: str = f"basket executor running in test mode, {market.is_test_run=}"
@@ -44,36 +43,20 @@ class BasketBarteringDataManager(BaseBarteringDataManager, BasketBookServiceData
 
         self.chore_limits_ws_get_all_cont.register_to_run()
         self.system_control_ws_get_all_cont.register_to_run()
-        self.basket_chore_ws_get_all_cont.register_to_run()
         self.fx_symbol_overview_ws_get_all_cont.register_to_run()
 
         self.executor_trigger_method = executor_trigger_method
         self.ws_thread = Thread(target=WSReader.start, daemon=True).start()
-        self.basket_id: int | None = None
 
-    def handle_basket_chore_get_all_ws_(self, basket_chore_: BasketChoreBaseModel | BasketChore, **kwargs):
-        # setting basket_chore_exists to True when basket_chore exists
-        if self.basket_id is None:
-            self.basket_id = basket_chore_.id
+    def handle_basket_chore_get_all_ws_(self, basket_chore_: BasketChoreBaseModel | BasketChore | None, **kwargs):
+        if self.street_book is None:
             # Triggering executor when basket_chore is created
             self.street_book, self.street_book_thread = (
                 self.executor_trigger_method(self, self.plan_cache))
-
+        if basket_chore_ is None:  # startup case - no basket chore is present
+            return
         self.plan_cache.set_basket_chore(basket_chore_)
-        non_cached_new_chore_list: List[NewChore] = []
-        new_chore_obj: NewChore
-        for new_chore_obj in basket_chore_.new_chores:
-            if self.id_to_new_chore_dict.get(new_chore_obj.id) is None:
-                # this is new / recovered chore entry - add to non_cached_new_chore_list
-                non_cached_new_chore_list.append(new_chore_obj)
-                self.id_to_new_chore_dict[new_chore_obj.id] = new_chore_obj
-                logging.info(f"Added to non_cached_new_chore_list chore: {new_chore_obj.security.sec_id} "
-                             f"{new_chore_obj.side} {new_chore_obj.chore_id};;;{new_chore_obj}")
-
-        if non_cached_new_chore_list:
-            basket_chore_ = BasketChore.from_kwargs(_id=basket_chore_.id,
-                                                    new_chores=non_cached_new_chore_list)
-            self.non_cached_basket_chore_queue.put(basket_chore_)
+        logging.debug(f"Updated basket_chore;;; {basket_chore_=}")
 
     def handle_unack_state(self, is_unack: bool, chore_snapshot: ChoreSnapshotBaseModel | ChoreSnapshot):
         self.plan_cache.set_unack(is_unack, chore_snapshot.chore_brief.security.sec_id,

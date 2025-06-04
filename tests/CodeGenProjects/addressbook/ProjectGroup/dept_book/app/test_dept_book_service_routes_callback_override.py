@@ -10,8 +10,8 @@ os.environ['ModelType'] = "msgspec"
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.generated.ORMModel.dept_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.generated.FastApi.dept_book_service_http_client import (
     DeptBookServiceHttpClient)
-from tests.CodeGenProjects.AddressBook.ProjectGroup.dept_book.conftest import *
-from tests.CodeGenProjects.AddressBook.ProjectGroup.conftest import *
+from AddressBook.ProjectGroup.dept_book.conftest import *
+from AddressBook.ProjectGroup.conftest import *
 
 dept_book_service_web_client: DeptBookServiceHttpClient = \
     DeptBookServiceHttpClient.set_or_get_if_instance_exists("127.0.0.1", 8010)
@@ -1375,3 +1375,197 @@ def test_aggregation_volume_null_handling(sample_bar_data_2_set_up):
     # Direct comparison of the single expected item with the single result item
     assert result == expected_output_list, "Aggregated bar data does not match expected output for null volume handling."
     assert result[0].volume == expected_volume_sum, f"Aggregated volume incorrect. Expected {expected_volume_sum}, got {result[0].volume}"
+
+
+def test_dynamic_target_bar_type_word_number(sample_bar_data_2_set_up):
+    """
+    Verify aggregation with a dynamic target_bar_type using a number word, e.g., "TwoMin".
+    This will aggregate SAMPLE_BAR_DATA2 into 2-minute intervals.
+    """
+    dynamic_target_bar_type = "TwoMin" # Expects 2-minute aggregation
+
+    # Focus on the first few minutes for Symbol A, Exch X
+    # Docs 1 (09:00), 2 (09:01), 3 (09:05)
+    # Interval 1: 09:00 - 09:01 (docs 1, 2)
+    # Interval 2: 09:02 - 09:03 (empty for A/X in sample)
+    # Interval 3: 09:04 - 09:05 (doc 3, if start_time for doc 3 is 09:05:00 it would be start of new bar)
+    # For sample data for A/X:
+    # Doc 1: 09:00:00 - 09:00:59 (source SRC1)
+    # Doc 2: 09:01:00 - 09:01:59 (source SRC1_XYZ)
+    # --> These two should form one 2-min bar starting 09:00:00
+
+    # Doc 3: 09:05:00 - 09:05:59 (source SRC1)
+    # --> This should form one 2-min bar starting 09:04:00 (if we truncate to 2 mins)
+    #     OR starting 09:05:00 if $dateTrunc with binSize uses the exact start.
+    #     Let's verify $dateTrunc behavior:
+    #     $dateTrunc with date=09:05:00, unit="minute", binSize=2, timezone="UTC"
+    #     will truncate to 09:04:00.
+
+    start_time = pendulum.datetime(2023, 10, 26, 9, 0, 0, tz="UTC")
+    end_time = pendulum.datetime(2023, 10, 26, 9, 6, 0, tz="UTC") # Include up to 09:05
+
+    result = dept_book_service_web_client.get_aggregated_bar_data_query_client(
+        target_bar_type=dynamic_target_bar_type,
+        start_time=start_time,
+        end_time=end_time,
+        symbol_list=["A"],
+        exch_id_list=["X"]
+    )
+
+    # Expected result for A/X:
+    # Bar 1 (09:00 - 09:01 bucket): Docs 1, 2
+    vwap_ax_1 = ((100.2 * 1000) + (100.8 * 1200)) / (1000 + 1200) # ~100.527
+    # Bar 2 (09:04 - 09:05 bucket, $dateTrunc of 09:05 with binSize 2 is 09:04): Doc 3
+    vwap_ax_2 = 101.0
+
+    expected_output = BarDataBaseModel.from_dict_list([
+        {
+            "bar_meta_data": {"symbol": "A", "exch_id": "X", "bar_type": "TwoMin"},
+            "start_time": "2023-10-26T09:00:00Z", # Doc 1 start
+            "end_time": "2023-10-26T09:01:59Z",   # Doc 2 end
+            "open": 100.0, "high": 101.5, "low": 99.5, "close": 101.0,
+            "volume": 2200, "vwap": vwap_ax_1, "cum_volume": 2200, "bar_count": 2,
+            "source": "Mixed: SRC1 + SRC1_XYZ" # Sorted
+        },
+        {
+            "bar_meta_data": {"symbol": "A", "exch_id": "X", "bar_type": "TwoMin"},
+            # $dateTrunc for 09:05:00 with unit minute, binSize 2 results in 09:04:00
+            # The actual start_time in the bar is from the first document in that bucket.
+            "start_time": "2023-10-26T09:05:00Z", # Doc 3 start
+            "end_time": "2023-10-26T09:05:59Z",   # Doc 3 end
+            "open": 101.0, "high": 101.2, "low": 100.8, "close": 101.1,
+            "volume": 500, "vwap": vwap_ax_2, "cum_volume": 2700, "bar_count": 1,
+            "source": "SRC1"
+        }
+    ])
+    expected_output.sort(key=lambda x: (x.bar_meta_data.exch_id, x.bar_meta_data.symbol, x.start_time))
+    for obj in result: obj.id = None
+    assert result == expected_output
+
+
+def test_dynamic_target_bar_type_digit_number(sample_bar_data_2_set_up):
+    """
+    Verify aggregation with a dynamic target_bar_type using digits, e.g., "3Min".
+    This will aggregate SAMPLE_BAR_DATA2 into 3-minute intervals.
+    """
+    dynamic_target_bar_type = "3Min"
+
+    # Focus on Symbol A, Exch X (Docs 1, 2, 3)
+    # Doc 1: 09:00:00 (SRC1)
+    # Doc 2: 09:01:00 (SRC1_XYZ)
+    # Doc 3: 09:05:00 (SRC1)
+    #
+    # Interval 1 (09:00 - 09:02 bucket from $dateTrunc): Docs 1, 2
+    # Interval 2 (09:03 - 09:05 bucket from $dateTrunc): Doc 3 ($dateTrunc of 09:05 with bin 3 is 09:03)
+    # However, the actual start_time of the aggregated bar comes from the $first document.
+
+    start_time = pendulum.datetime(2023, 10, 26, 9, 0, 0, tz="UTC")
+    end_time = pendulum.datetime(2023, 10, 26, 9, 6, 0, tz="UTC")
+
+    result = dept_book_service_web_client.get_aggregated_bar_data_query_client(
+        target_bar_type=dynamic_target_bar_type,
+        start_time=start_time,
+        end_time=end_time,
+        symbol_list=["A"],
+        exch_id_list=["X"]
+    )
+
+    vwap_ax_1 = ((100.2 * 1000) + (100.8 * 1200)) / (1000 + 1200)
+    vwap_ax_2 = 101.0
+
+    expected_output = BarDataBaseModel.from_dict_list([
+        {
+            "bar_meta_data": {"symbol": "A", "exch_id": "X", "bar_type": "3Min"},
+            "start_time": "2023-10-26T09:00:00Z", # Doc 1 start
+            "end_time": "2023-10-26T09:01:59Z",   # Doc 2 end
+            "open": 100.0, "high": 101.5, "low": 99.5, "close": 101.0,
+            "volume": 2200, "vwap": vwap_ax_1, "cum_volume": 2200, "bar_count": 2,
+            "source": "Mixed: SRC1 + SRC1_XYZ"
+        },
+        {
+            "bar_meta_data": {"symbol": "A", "exch_id": "X", "bar_type": "3Min"},
+            # $dateTrunc of 09:05 with unit minute, binSize 3 is 09:03
+            "start_time": "2023-10-26T09:05:00Z", # Doc 3 start
+            "end_time": "2023-10-26T09:05:59Z",   # Doc 3 end
+            "open": 101.0, "high": 101.2, "low": 100.8, "close": 101.1,
+            "volume": 500, "vwap": vwap_ax_2, "cum_volume": 2700, "bar_count": 1,
+            "source": "SRC1"
+        }
+    ])
+    expected_output.sort(key=lambda x: (x.bar_meta_data.exch_id, x.bar_meta_data.symbol, x.start_time))
+    for obj in result: obj.id = None
+    assert result == expected_output
+
+
+def test_dynamic_target_bar_type_implied_one(sample_bar_data_2_set_up):
+    """
+    Verify aggregation with a dynamic target_bar_type implying "One", e.g., "Hour".
+    This reuses the logic from the original test_aggregation_one_hour.
+    """
+    dynamic_target_bar_type = "Hour" # Should be treated as "OneHour"
+
+    start_time = pendulum.datetime(2023, 10, 26, 9, 0, 0, tz="UTC")
+    end_time = pendulum.datetime(2023, 10, 26, 10, 30, 0, tz="UTC")
+
+    result = dept_book_service_web_client.get_aggregated_bar_data_query_client(
+        target_bar_type=dynamic_target_bar_type,
+        start_time=start_time,
+        end_time=end_time
+    )
+
+    vol_ax_h1 = 3500; vwap_num_ax_h1 = (100.2*1000) + (100.8*1200) + (101.0*500) + (102.1*800); vwap_ax_h1 = vwap_num_ax_h1 / vol_ax_h1
+    vol_ax_h2 = 1500; vwap_ax_h2 = 102.5
+    vol_by_h1 = 300; vwap_by_h1 = 50.2
+    vol_cx_h1 = 0; vwap_cx_h1 = None
+
+    expected_output = BarDataBaseModel.from_dict_list([
+         {"bar_meta_data": {"symbol": "A", "exch_id": "X", "bar_type": "Hour"}, "start_time": "2023-10-26T09:00:00Z", "end_time": "2023-10-26T09:58:59Z", "open": 100.0, "high": 102.5, "low": 99.5, "close": 102.2, "volume": vol_ax_h1, "vwap": vwap_ax_h1, "cum_volume": 3500, "bar_count": 4, "source": "Mixed: SRC1 + SRC1_XYZ"},
+         {"bar_meta_data": {"symbol": "A", "exch_id": "X", "bar_type": "Hour"}, "start_time": "2023-10-26T10:00:00Z", "end_time": "2023-10-26T10:00:59Z", "open": 102.2, "high": 103.0, "low": 102.0, "close": 102.8, "volume": vol_ax_h2, "vwap": vwap_ax_h2, "cum_volume": 5000, "bar_count": 1, "source": "SRC1"},
+         {"bar_meta_data": {"symbol": "B", "exch_id": "Y", "bar_type": "Hour"}, "start_time": "2023-10-26T09:02:00Z", "end_time": "2023-10-26T09:03:59Z", "open": 50.0, "high": 50.8, "low": 49.8, "close": 50.7, "volume": vol_by_h1, "vwap": vwap_by_h1, "cum_volume": 300, "bar_count": 2, "source": "SRC2"},
+         {"bar_meta_data": {"symbol": "C", "exch_id": "X", "bar_type": "Hour"}, "start_time": "2023-10-26T09:00:00Z", "end_time": "2023-10-26T09:01:59Z", "open": 20.0, "high": 20.1, "low": 19.9, "close": 20.0, "volume": vol_cx_h1, "vwap": vwap_cx_h1, "cum_volume": 0, "bar_count": 2, "source": "SRC3"},
+    ])
+    expected_output.sort(key=lambda x: (x.bar_meta_data.exch_id, x.bar_meta_data.symbol, x.start_time))
+    for obj in result: obj.id = None
+    assert result == expected_output
+
+
+def test_dynamic_target_bar_type_case_variations(sample_bar_data_2_set_up):
+    """
+    Verify specific case variations if the parser is designed to handle them.
+    The current parser is case-sensitive for unit suffixes by default.
+    This test demonplanes "Onehour" from the prompt.
+    To make it pass for "onehour", the UNIT_SUFFIX_TO_STANDARD_MAP would need "onehour"
+    or the parsing logic in _parse_dynamic_target_bar_type would need to use .lower().
+    Assuming "Onehour" is the test case based on the prompt.
+    """
+    dynamic_target_bar_type = "Onehour" # From prompt example
+
+    start_time = pendulum.datetime(2023, 10, 26, 9, 0, 0, tz="UTC")
+    end_time = pendulum.datetime(2023, 10, 26, 9, 59, 59, tz="UTC") # First hour
+
+    # We expect this to work IF "Onehour" is correctly parsed to (1, "hour", "hours")
+    # which requires "hour" to be a key in UNIT_SUFFIX_TO_STANDARD_MAP and "One" in NUMBER_WORD_MAP.
+    # And also the parser correctly isolates "One" and "hour".
+
+    result = dept_book_service_web_client.get_aggregated_bar_data_query_client(
+        target_bar_type=dynamic_target_bar_type,
+        start_time=start_time,
+        end_time=end_time,
+        symbol_list=["A"],
+        exch_id_list=["X"]
+    )
+
+    vol_ax_h1 = 3500
+    vwap_num_ax_h1 = (100.2*1000) + (100.8*1200) + (101.0*500) + (102.1*800)
+    vwap_ax_h1 = vwap_num_ax_h1 / vol_ax_h1
+
+    expected_output = BarDataBaseModel.from_dict_list([
+        {"bar_meta_data": {"symbol": "A", "exch_id": "X", "bar_type": "Onehour"}, # Note: bar_type in output matches input
+         "start_time": "2023-10-26T09:00:00Z", "end_time": "2023-10-26T09:58:59Z",
+         "open": 100.0, "high": 102.5, "low": 99.5, "close": 102.2,
+         "volume": vol_ax_h1, "vwap": vwap_ax_h1, "cum_volume": 3500, "bar_count": 4,
+         "source": "Mixed: SRC1 + SRC1_XYZ"},
+    ])
+    for obj in result: obj.id = None
+    assert result == expected_output
+

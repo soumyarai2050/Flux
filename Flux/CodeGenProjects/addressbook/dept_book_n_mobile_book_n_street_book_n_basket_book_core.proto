@@ -49,20 +49,21 @@ message SymbolOverview {
 
   required int32 id = 1;
   required string symbol = 2 [(FluxFldPk) = "true", (FluxFldIndex) = true, (FluxFldFilterEnable) = true];
-  optional string  company = 3;
-  optional string status = 4;
-  optional int64 lot_size = 5;
-  optional float limit_up_px = 6;
-  optional float limit_dn_px = 7;
-  optional float conv_px = 8;
-  optional float closing_px = 9;
-  optional float open_px = 10;
-  optional float high = 11;
-  optional float low = 12;
-  optional int64 volume = 13;
-  optional float tick_size = 14 [(FluxFldNumberFormat) = ".3"];
-  optional int64 last_update_date_time = 15 [(FluxFldNoCommonKey) = true, (FluxFldValIsDateTime) = true];
-  optional bool force_publish = 16 [(FluxFldHide) = "True"];
+  optional string company = 3;
+  optional string exchange_code = 4;
+  optional string status = 5;
+  optional int64 lot_size = 6;
+  optional float limit_up_px = 7 [(FluxFldNumberFormat) = ".3"];
+  optional float limit_dn_px = 8 [(FluxFldNumberFormat) = ".3"];
+  optional float conv_px = 9 [(FluxFldNumberFormat) = ".3"];
+  optional float closing_px = 10 [(FluxFldNumberFormat) = ".3"];
+  optional float open_px = 11 [(FluxFldNumberFormat) = ".3"];
+  optional float high = 12;
+  optional float low = 13;
+  optional int64 volume = 14;
+  optional float tick_size = 15 [(FluxFldNumberFormat) = ".3"];
+  optional int64 last_update_date_time = 16 [(FluxFldNoCommonKey) = true, (FluxFldValIsDateTime) = true];
+  optional bool force_publish = 17 [(FluxFldHide) = "True"];
 }
 
 message TopOfBook {
@@ -179,14 +180,14 @@ message MarketDepth {
   required int64 exch_time = 3 [(FluxFldNoCommonKey) = true, (FluxFldValIsDateTime) = true];
   required int64 arrival_time = 4 [(FluxFldValIsDateTime) = true];
   required TickType side = 5 [(FluxFldPk) = "true"];
-  optional float px = 6;
+  optional float px = 6 [(FluxFldNumberFormat) = ".3"];
   optional int64 qty = 7;
   required int32 position = 8 [(FluxFldPk) = "true"];
   optional string market_maker = 9;
   optional bool is_smart_depth = 10;
   optional float cumulative_notional = 11 [(FluxFldDynamicAggUpdate)=true, (FluxFldTitle) = "cumulative $", (FluxFldNumberFormat) = "$"];
   optional int64 cumulative_qty = 12 [(FluxFldDynamicAggUpdate)=true];
-  optional float cumulative_avg_px = 13 [(FluxFldDynamicAggUpdate)=true];
+  optional float cumulative_avg_px = 13 [(FluxFldDynamicAggUpdate)=true, (FluxFldNumberFormat) = ".3"];
 }
 
 message LastBarter {
@@ -230,7 +231,7 @@ message LastBarter {
   required SymbolNExchId symbol_n_exch_id = 2 [(FluxFldValMetaField) = true, (FluxFldPk) = "symbol", (FluxFldFilterEnable) = true];
   required int64 exch_time = 3 [(FluxFldValTimeField) = true, (FluxFldValIsDateTime) = true];
   required int64 arrival_time = 4 [(FluxFldValIsDateTime) = true];
-  required float px = 5;
+  required float px = 5 [(FluxFldNumberFormat) = ".3"];
   required int64 qty = 6;
   optional float premium = 7;
   optional MarketBarterVolume market_barter_volume = 11;
@@ -253,7 +254,7 @@ message RawLastBarterHistory {
   required SymbolNExchId symbol_n_exch_id = 2 [(FluxFldValMetaField) = true, (FluxFldPk) = "symbol", (FluxFldFilterEnable) = true];
   required int64 exch_time = 3 [(FluxFldValTimeField) = true, (FluxFldValIsDateTime) = true];
   required int64 arrival_time = 4 [(FluxFldValIsDateTime) = true];
-  required float px = 5;
+  required float px = 5 [(FluxFldNumberFormat) = ".3"];
   required int64 qty = 6;
   optional float premium = 7;
   optional MarketBarterVolume market_barter_volume = 11;

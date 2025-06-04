@@ -1,16 +1,22 @@
 # standard imports
+import asyncio
+import logging
+import os
 import time
 from threading import Thread
+import math
 
-
+import pendulum
 # 3rd party imports
+import polars as pl
+from fastapi import UploadFile
 
 # project imports
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.generated.FastApi.basket_book_service_routes_msgspec_callback import (
     BasketBookServiceRoutesCallback)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.app.basket_book_helper import (
-    config_yaml_path, parse_to_int, config_yaml_dict, be_port, is_all_service_up, CURRENT_PROJECT_DIR,
-    CURRENT_PROJECT_DATA_DIR, basket_book_service_http_client)
+    config_yaml_path, parse_to_int, config_yaml_dict, be_host, be_port, is_all_service_up, CURRENT_PROJECT_DIR,
+    CURRENT_PROJECT_DATA_DIR, get_new_chores_from_pl_df, get_figi_to_sec_rec_dict)
 from FluxPythonUtils.scripts.general_utility_functions import (
     except_n_log_alert, handle_refresh_configurable_data_members, set_package_logger_level, create_logger)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *
@@ -28,7 +34,8 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.aggregate imp
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.aggregate import get_objs_from_symbol
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.app.basket_book import BasketBook
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.app.basket_cache import BasketCache
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.app.basket_bartering_data_manager import BasketBarteringDataManager
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.app.basket_bartering_data_manager import (
+    BasketBarteringDataManager)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.markets.market import Market, MarketID
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book_service_routes_callback_base_native_override import BaseBookServiceRoutesCallbackBaseNativeOverride
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.generated.StreetBook.basket_book_service_key_handler import BasketBookServiceKeyHandler
@@ -39,7 +46,8 @@ from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_basket_book_core_ms
 from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_post_book_core_msgspec_model import *
 from Flux.CodeGenProjects.AddressBook.ORMModel.phone_book_n_street_book_core_msgspec_model import *
 from Flux.CodeGenProjects.AddressBook.ORMModel.dept_book_n_mobile_book_n_street_book_n_basket_book_core_msgspec_model import *
-
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.symbol_cache import (
+    SymbolCacheContainer, SymbolCache)
 
 class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCallbackBaseNativeOverride,
                                                             BasketBookServiceRoutesCallback):
@@ -51,6 +59,10 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
     underlying_get_top_of_book_from_symbol_query_http: Callable[..., Any] | None = None
     underlying_create_chore_journal_http: Callable[..., Any] | None = None
     underlying_create_fills_journal_http: Callable[..., Any] | None = None
+    underlying_read_basket_chore_http: Callable[..., Any] | None = None
+    underlying_create_basket_chore_http: Callable[..., Any] | None = None
+    underlying_partial_update_basket_chore_http: Callable[..., Any] | None = None
+    shared_md_lock: AsyncRLock = AsyncRLock()
 
     def __init__(self):
         super().__init__()
@@ -88,7 +100,9 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             get_underlying_account_cumulative_fill_qty_query_http, underlying_update_chore_snapshot_http,
             underlying_read_chore_journal_http, underlying_read_symbol_overview_by_id_http,
             underlying_get_symbol_side_underlying_account_cumulative_fill_qty_query_http,
-            underlying_read_fills_journal_http, underlying_read_top_of_book_http)
+            underlying_read_fills_journal_http,
+            underlying_partial_update_basket_chore_http, underlying_read_basket_chore_http,
+            underlying_create_basket_chore_http)
         cls.residual_compute_shared_lock = residual_compute_shared_lock
         cls.journal_shared_lock = journal_shared_lock
         cls.underlying_read_symbol_overview_http = underlying_read_symbol_overview_http
@@ -106,6 +120,9 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         cls.underlying_read_fills_journal_http = underlying_read_fills_journal_http
         cls.underlying_read_top_of_book_http = underlying_read_top_of_book_http
         cls.underlying_create_fills_journal_http = underlying_create_fills_journal_http
+        cls.underlying_partial_update_basket_chore_http = underlying_partial_update_basket_chore_http
+        cls.underlying_read_basket_chore_http = underlying_read_basket_chore_http
+        cls.underlying_create_basket_chore_http = underlying_create_basket_chore_http
 
     def static_data_periodic_refresh(self):
         # no action required if refreshed
@@ -135,6 +152,18 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                             self.bartering_data_manager is not None):
                         if not self.service_ready:
                             self.service_ready = True
+                            run_coro = (BasketBookServiceRoutesCallbackBaseNativeOverride.
+                                        underlying_read_basket_chore_http())
+                            future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
+                            try:
+                                res = future.result()
+                                if res:  # recovery case
+                                    self.bartering_data_manager.handle_basket_chore_get_all_ws_(res[0])
+                                else:  # no basket chore exists to recover
+                                    self.bartering_data_manager.handle_basket_chore_get_all_ws_(None)
+                            except Exception as exp:
+                                logging.exception(f"underlying_read_basket_chore_http failed, exception: {exp}")
+                                self.service_ready = False
                             # print is just to manually check if this server is ready - useful when we run
                             # multiple servers and before running any test we want to make sure servers are up
                             print(f"INFO: basket executor service is ready: {datetime.datetime.now().time()}")
@@ -171,7 +200,8 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                                   f"in phone_book service, retrying in next periodic cycle",
                                                   exc_info=True)
                             except Exception as e:
-                                logging.exception(f"update_fx_symbol_overview_dict_from_http failed with exception: {e}")
+                                logging.exception(f"update_fx_symbol_overview_dict_from_http failed with "
+                                                  f"exception: {e}")
 
                         # service loop: manage all sub-services within their private try-catch to allow high level
                         # service to remain partially operational even if some sub-service is not available for any reason
@@ -180,6 +210,10 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                 self.static_data = SecurityRecordManager.get_loaded_instance(from_cache=True)
                                 BasketCache.static_data = self.static_data
                                 if self.static_data is not None:
+                                    static_dir: PurePath = PurePath(
+                                        __file__).parent.parent / "scripts" / be_host / "static"
+                                    self.static_data.refresh_autocomplete_list(static_dir, "schema")
+                                    self.plan_cache.figi_to_sec_rec_dict = get_figi_to_sec_rec_dict(self.static_data)
                                     static_data_service_state.ready = True
                                     logging.debug("Marked static_data_service_state.ready True")
                                     # we just got static data - no need to sleep - force no sleep
@@ -280,24 +314,26 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             logging.error(err_str_)
             raise HTTPException(status_code=503, detail=err_str_)
 
-        if self.bartering_data_manager.basket_id is not None:
-            err_: str = (f"failed to create basket_chore_obj, {self.bartering_data_manager.basket_id=} "
-                         f"exists!;;;recvd: {basket_chore_obj}")
+        if self.plan_cache.basket_id is not None:
+            err_: str = (f"failed to create basket_chore_obj, {self.plan_cache.basket_id=} "
+                         f"exists!;;;received: {basket_chore_obj}")
             logging.error(err_)
-            raise HTTPException(detail=err_, status_code=500)
-        # else not required: if basket_bartering_data_manager.basket_id exists that means basket chore already exists
-        # Also basket_bartering_data_manager.basket_id is set in handle_basket_chore_get_by_id_ws called in
+            raise HTTPException(detail=err_, status_code=400)
+        # else not required: if basket_cache.basket_id exists that means basket chore already exists
+        # Also basket_cache.basket_id is set in handle_basket_chore_get_by_id_ws called in
         # create_basket_chore_post
 
         new_chore_list: List[NewChore] = basket_chore_obj.new_chores
         if not new_chore_list:
-            logging.warning("create_basket_chore_pre failed - no new chores found")
-            return
+            err_: str = "create_basket_chore_pre failed - no new chores found"
+            logging.error(err_)
+            raise HTTPException(detail=err_, status_code=400)
 
         new_chore_obj: NewChore
         for new_chore_obj in new_chore_list:
             # to start with setting state to pending
             new_chore_obj.chore_submit_state = ChoreSubmitType.ORDER_SUBMIT_PENDING
+            new_chore_obj.ord_entry_time = pendulum.DateTime.utcnow()
 
     async def create_basket_chore_post(self, basket_chore_obj: BasketChore):
         self.bartering_data_manager.handle_basket_chore_get_all_ws_(basket_chore_obj)
@@ -310,13 +346,71 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             logging.error(err_str_)
             raise HTTPException(status_code=503, detail=err_str_)
 
+        # recovery run;
+        if updated_basket_chore_obj_json.get("processing_level") == 1:  # recovery run / internal handled update
+            # no further processing needed - we just need persistence in DB - let it through
+            updated_basket_chore_obj_json["processing_level"] = 3
+            return updated_basket_chore_obj_json
+        elif not self.plan_cache.is_recovered_n_reconciled:  # non-internal updates allowed only after is is_recovered_n_reconciled
+            err_ = (f"partial_update_basket_chore_pre failed; waiting for state recovered_n_reconciled to be True, "
+                    f"found: {self.plan_cache.is_recovered_n_reconciled}")
+            raise HTTPException(detail=err_, status_code=400)
+        # else continue as normal # TODO: Remove Mkt Suffix if sent from UI [processing_level == 0|3]
+        # reverts any prior DB saved level 3 back to level 0 - helps post to continue as normal
+        updated_basket_chore_obj_json["processing_level"] = 0
         new_chore_list: List[Dict] = updated_basket_chore_obj_json.get("new_chores")
+        id_to_stored_new_chore_dicts: Dict[int, Dict] = {}
+        if (stored_new_chore_dict_list := stored_basket_chore_obj_json.get("new_chores")) and len(
+                stored_new_chore_dict_list) > 0:
+            for stored_new_chore_dict in stored_new_chore_dict_list:
+                id_to_stored_new_chore_dicts[stored_new_chore_dict.get("_id")] = stored_new_chore_dict
         if new_chore_list:
             new_chore_dict: Dict
-            for new_chore_dict in new_chore_list:
-                if new_chore_dict.get("chore_submit_state") is None:
-                    # setting state to pending
-                    new_chore_dict["chore_submit_state"] = ChoreSubmitType.ORDER_SUBMIT_PENDING
+            for idx, new_chore_dict in enumerate(new_chore_list):
+                if id_ := new_chore_dict.get("_id"):
+                    stored_chore_obj_json = id_to_stored_new_chore_dicts.get(id_)
+                    if stored_chore_obj_json is not None and (amend_tuple := self.plan_cache.is_amend(
+                            stored_chore_obj_json, new_chore_dict)):
+                        err_: str | None = None
+                        chore_submit_state = stored_chore_obj_json.get("chore_submit_state")
+                        if chore_submit_state in ["ORDER_SUBMIT_NA", "ORDER_SUBMIT_FAILED"]:
+                            err_ = (f"partial_update_basket_chore_pre failed; {amend_tuple=} found for chore with "
+                                    f"{chore_submit_state=} indicating closed chore ")
+                        stored_pending_amd_qty = stored_chore_obj_json.get("pending_amd_qty")
+                        stored_pending_amd_px = stored_chore_obj_json.get("pending_amd_px")
+                        if stored_pending_amd_qty is not None and stored_pending_amd_qty != 0 and \
+                                stored_pending_amd_qty != new_chore_dict.get("qty"):
+                            err_ = (err_ or "")
+                            err_ += (f"system has pending Amend QTY on {id_=}, {new_chore_dict.get('chore_id')=}, amend"
+                                     f" sent to this chore can't be handled;;;{amend_tuple=}; {new_chore_dict=}; "
+                                     f"{stored_chore_obj_json} ")
+                        if stored_pending_amd_px is not None and math.isclose(stored_pending_amd_px, 0) and not \
+                                math.isclose(stored_pending_amd_qty, new_chore_dict.get("px")):
+                            err_ = (err_ or "")
+                            err_ += (f"system has pending Amend PX on {id_=}, {new_chore_dict.get('chore_id')=}, amend"
+                                     f" sent to this chore can't be handled;;;{amend_tuple=}; {new_chore_dict=}; "
+                                     f"{stored_chore_obj_json} ")
+
+                        if err_ is not None:
+                            logging.error(err_)
+                            raise HTTPException(status_code=400, detail=err_)
+
+                        # no existing amend - validate amend_tuple and disallow via throw if invalid
+                        amd_qty, amd_px = amend_tuple
+                        if (amd_qty is not None and 0 == amd_qty) or (amd_px is not None and math.isclose(0, amd_px)):
+                            err_ = (f"amend sent to this chore can't be handled; invalid {amd_qty=} or {amd_px=} "
+                                    f"for {id_=}, of {new_chore_dict.get('chore_id')=};;;{new_chore_dict=}")
+                            logging.error(err_)
+                            raise HTTPException(status_code=400, detail=err_)
+                    else:  # either stored_chore_obj_json is None or amend is None
+                        if stored_chore_obj_json is None:
+                            if new_chore_dict.get("chore_submit_state") is None:
+                                # setting state to pending
+                                new_chore_dict["chore_submit_state"] = ChoreSubmitType.ORDER_SUBMIT_PENDING
+                                new_chore_dict["ord_entry_time"] = pendulum.DateTime.utcnow()
+                                new_chore_dict["pending_cxl"] = False
+                        # else: update with no amend, let it through
+                # else not required - _id is always present
         return updated_basket_chore_obj_json
 
     async def partial_update_basket_chore_post(self, stored_basket_chore_obj_json: Dict[str, Any],
@@ -328,7 +422,8 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         return create_symbol_overview_pre_helper(self.static_data, symbol_overview_obj)
 
     async def create_symbol_overview_post(self, symbol_overview_obj: SymbolOverview):
-        await self.handle_create_symbol_overview_post(symbol_overview_obj)
+        async with BasketBookServiceRoutesCallbackBaseNativeOverride.shared_md_lock:
+            await self.handle_create_symbol_overview_post(symbol_overview_obj)
 
     async def update_symbol_overview_pre(self, updated_symbol_overview_obj: SymbolOverview):
         stored_symbol_overview_obj = await (
@@ -338,7 +433,8 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                                  updated_symbol_overview_obj)
 
     async def update_symbol_overview_post(self, updated_symbol_overview_obj: SymbolOverview):
-        await self.handle_update_symbol_overview_post(updated_symbol_overview_obj)
+        async with BasketBookServiceRoutesCallbackBaseNativeOverride.shared_md_lock:
+            await self.handle_update_symbol_overview_post(updated_symbol_overview_obj)
 
     async def partial_update_symbol_overview_pre(self, stored_symbol_overview_obj_json: Dict[str, Any],
                                                  updated_symbol_overview_obj_json: Dict[str, Any]):
@@ -346,16 +442,20 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                                          updated_symbol_overview_obj_json)
 
     async def partial_update_symbol_overview_post(self, updated_symbol_overview_obj_json: Dict[str, Any]):
-        await self.handle_partial_update_symbol_overview_post(updated_symbol_overview_obj_json)
+        async with BasketBookServiceRoutesCallbackBaseNativeOverride.shared_md_lock:
+            await self.handle_partial_update_symbol_overview_post(updated_symbol_overview_obj_json)
 
     async def create_top_of_book_post(self, top_of_book_obj: TopOfBook):
-        await self.handle_create_top_of_book_post(top_of_book_obj)
+        async with BasketBookServiceRoutesCallbackBaseNativeOverride.shared_md_lock:
+            await self.handle_create_top_of_book_post(top_of_book_obj)
 
     async def update_top_of_book_post(self, updated_top_of_book_obj: TopOfBook):
-        await self.handle_update_top_of_book_post(updated_top_of_book_obj)
+        async with BasketBookServiceRoutesCallbackBaseNativeOverride.shared_md_lock:
+            await self.handle_update_top_of_book_post(updated_top_of_book_obj)
 
     async def partial_update_top_of_book_post(self, updated_top_of_book_obj_json: Dict[str, Any]):
-        await self.handle_partial_update_top_of_book_post(updated_top_of_book_obj_json)
+        async with BasketBookServiceRoutesCallbackBaseNativeOverride.shared_md_lock:
+            await self.handle_partial_update_top_of_book_post(updated_top_of_book_obj_json)
 
     async def barter_simulator_place_new_chore_query_pre(
             self, barter_simulator_process_new_chore_class_type: Type[BarterSimulatorProcessNewChore],
@@ -375,7 +475,7 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         self.bartering_data_manager.handle_chore_journal_get_all_ws(chore_journal_obj)
 
         async with BasketBookServiceRoutesCallbackBaseNativeOverride.journal_shared_lock:
-            res = await self._update_chore_snapshot_from_chore_journal(chore_journal_obj)
+            _ = await self._update_chore_snapshot_from_chore_journal(chore_journal_obj)
 
     async def partial_update_chore_journal_post(self, updated_chore_journal_obj_json: Dict[str, Any]):
         await self.handle_partial_update_chore_journal_post(updated_chore_journal_obj_json)
@@ -388,7 +488,7 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         self.bartering_data_manager.handle_fills_journal_get_all_ws(fills_journal_obj)
 
         async with BasketBookServiceRoutesCallbackBaseNativeOverride.journal_shared_lock:
-            res = await self._apply_fill_update_in_chore_snapshot(fills_journal_obj)
+            await self._apply_fill_update_in_chore_snapshot(fills_journal_obj)
 
     async def partial_update_fills_journal_post(self, updated_fills_journal_obj_json: Dict[str, Any]):
         await self.handle_partial_update_fills_journal_post(updated_fills_journal_obj_json)
@@ -404,3 +504,29 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
 
     async def partial_update_chore_snapshot_post(self, updated_chore_snapshot_obj_json: Dict[str, Any]):
         await self.handle_partial_update_chore_snapshot_post(updated_chore_snapshot_obj_json)
+
+    async def cancel_all_basket_chores(self) -> bool:
+        """
+        check and cancel all open chores in the basket
+        """
+        pass
+
+    async def cancel_all_basket_chores_query_pre(self, cancel_all_basket_chores_cls_type: Type[CancelAllBasketChores]):
+        # resp: bool await self.cancel_all_basket_chores()
+        # cxl_basket_chore: CancelAllBasketChores = CancelAllBasketChores.from_kwargs(resp=resp)
+        # return [cxl_basket_chore]
+        pass
+
+    async def create_or_update_basket_chore(self, new_chores: List[NewChore]):
+        pass
+
+    async def basket_chore_file_upload_query_pre(self, upload_file: UploadFile,
+                                                 disallow_duplicate_file_upload: bool = False):
+        pass
+
+    def get_residual_mark_secs(self):
+        pass
+
+    async def update_pos_cache_by_ticker_query_pre(self, update_pos_cache_class_type: Type[UpdatePosCache],
+                                                   ticker: str):
+        pass

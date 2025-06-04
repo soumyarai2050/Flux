@@ -334,6 +334,7 @@ extend google.protobuf.FieldOptions
   optional bool FluxFldServerReadyStatus = 55277;
   optional float FluxFldDiffThreshold = 55278;  // Use this to allow direct save if diff is below the threshold
   optional bool FluxFldZeroAsNone = 55279;  // Use this to treat 0 value as None for UI aggregation
+  optional string FluxFldVisibleIf = 55280;  // Use this to conditionally render field on UI
 
   //Complexity Option - 56
   optional string FluxFldCmplxHigh = 56151;

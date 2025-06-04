@@ -8,6 +8,8 @@ enum ChoreSubmitType{
   ORDER_SUBMIT_DONE = 1;
   ORDER_SUBMIT_FAILED = 2;
   ORDER_SUBMIT_PENDING = 3;
+  ORDER_SUBMIT_NA = 4;
+  ORDER_SUBMIT_RETRY = 5;
 }
 
 message NewChore{
@@ -48,18 +50,19 @@ message NewChore{
   optional int64 ord_entry_time = 18 [(FluxFldServerPopulate) = true, (FluxFldValIsDateTime) = true, (FluxFldTitle) = "Chore Entry", (FluxFldHide) = "True"];
   optional string text = 19 [(FluxFldTitle) = "Text", (FluxFldAbbreviated) = "JSON", (FluxFldServerPopulate) = true];
   optional int64 pending_amd_qty = 20 [(FluxFldServerPopulate) = true, (FluxFldHide) = "True", (FluxFldHelp) = "used internally for amend qty support - also helps prevent second amend trigger unless prior is completed - px and qty simultaneous amend is allowed"];
-  optional float pending_amd_px = 21 [(FluxFldServerPopulate) = true, (FluxFldHide) = "True", (FluxFldHelp) = "used internally for amend px support - also helps prevent second amend trigger unless prior amend is completed - px and qty simultaneous amend is allowed"];
-  optional bool pending_cxl = 22 [default=false, (FluxFldNoCommonKey) = true, (FluxFldUIUpdateOnly) = true, (FluxFldButton) = {
+  optional float pending_amd_px = 21 [(FluxFldServerPopulate) = true, (FluxFldHide) = "True", (FluxFldNumberFormat) = ".3", (FluxFldHelp) = "used internally for amend px support - also helps prevent second amend trigger unless prior amend is completed - px and qty simultaneous amend is allowed"];
+  optional bool pending_cxl = 22 [default=false, (FluxFldTitle) = "X", (FluxFldColor) = "ERROR", (FluxFldNoCommonKey) = true, (FluxFldUIUpdateOnly) = true, (FluxFldButton) = {
     unpressed_caption: "Cxl",
-    pressed_caption: "Cxl Submitted",
-    disabled_captions: "true=REMOVED"
+    pressed_caption: "Removed",
+    disabled_captions: "true=Removed"
     value_color_map: "true=DEBUG,false=ERROR"
     button_type: BUTTON_TYPE_RECTANGLE,
     button_size: BUTTON_SIZE_MEDIUM,
     action: "flux_toggle",
     pressed_value_as_text: "true",
     button_icon_name: "Clear",
-    allow_force_update: true
+    allow_force_update: true,
+    hide_caption: true
   }];
 }
 
@@ -84,7 +87,7 @@ message CancelChore{
   required string chore_id = 2 [(FluxFldServerPopulate) = true];
   optional Security security = 3 [(FluxFldOrmNoUpdate) = true, (FluxFldHide) = "True"];
   optional string ticker = 4 [(FluxFldOrmNoUpdate) = true];
-  required Side side = 5;
+  required Side side = 5 [(FluxFldOrmNoUpdate) = true];
   optional bool cxl_confirmed = 6 [(FluxFldHide) = "True"];
   optional bool force_cancel = 7 [(FluxFldHide) = "True", (FluxFldHelp) = "allows cancel even if plan not active"];
 }
@@ -185,7 +188,7 @@ message FillsJournal{
 
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional string chore_id = 2;
-  optional float fill_px = 3;
+  optional float fill_px = 3 [(FluxFldNumberFormat) = ".3"];
   optional int64 fill_qty = 4;
   optional float fill_notional = 5 [(FluxFldDisplayType) = "int", (FluxFldTitle) = "Fill $", (FluxFldNumberFormat) = "$"];
   optional string fill_symbol = 6 [(FluxFldIndex) = true, (FluxFldFilterEnable) = true, (FluxFldHelp) = "System Symbol"];

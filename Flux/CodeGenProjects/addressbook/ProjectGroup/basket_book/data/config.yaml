@@ -20,8 +20,8 @@ multi_project_plugin:
   - log_book:
       - "ContactAlert"
   - phone_book:
-      - "SystemControl"
       - "ChoreLimits"
+      - "SystemControl"
 
 # below 2 configs are used to check types of override files to be initialized by fastapi launch script
 # supported values: "native" or "bare"
@@ -32,4 +32,4 @@ cache_override_type: "bare"
 
 log_level: "debug"  # log lvl in int or basic log lvl name
 
-fetch_md_data_wait_sec: 10
+md_trigger_wait_sec: 60  # secs to wait before re-trigger md-so script

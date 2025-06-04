@@ -125,7 +125,8 @@ class BasePlanCache:
 
     def get_open_chore_count_from_cache(self) -> int:
         """caller to ensure this call is made only after both _plan_limits and _plan_brief are initialized"""
-        return len(self._chore_id_to_open_chore_snapshot_cont_dict)
+        with self._chore_id_to_open_chore_snapshot_cont_dict_n_chore_id_has_fill_set_lock:
+            return len(self._chore_id_to_open_chore_snapshot_cont_dict)
 
     def check_has_open_chore_with_no_fill_from_cache(self) -> bool:
         """caller to ensure this call is made only after both _plan_limits and _plan_brief are initialized"""

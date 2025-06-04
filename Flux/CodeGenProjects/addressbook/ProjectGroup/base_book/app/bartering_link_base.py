@@ -97,15 +97,9 @@ class BarteringLinkBase(ABC):
 
     @classmethod
     @abstractmethod
-    async def place_amend_chore(cls, chore_id: str, px: float | None = None, qty: int | None = None) -> bool:
-        """
-        derived to implement connector to underlying link provider
-        """
-
-    @classmethod
-    @abstractmethod
-    async def place_cxl_chore(cls, chore_id: str, side: Side | None = None, bartering_sec_id: str | None = None,
-                              system_sec_id: str | None = None, underlying_account: str | None = None) -> bool:
+    async def place_amend_chore(cls, chore_id: str, px: float | None = None, qty: int | None = None,
+                                bartering_sec_id: str | None = None, system_sec_id: str | None = None,
+                                bartering_sec_type: str | None = None) -> bool:
         """
         derived to implement connector to underlying link provider
         """
@@ -120,11 +114,12 @@ class BarteringLinkBase(ABC):
 
     @classmethod
     @abstractmethod
-    async def get_chore_status(cls, chore_id: str) -> Tuple[ChoreStatusType | None, str | None, int | None]:
+    async def get_chore_status(cls, chore_id: str) -> Tuple[ChoreStatusType | None, str | None, int | None, float | None, int | None] | None:
         """
         derived to implement connector to underlying link provider
-        return appropriate returns chore_status (ChoreStatusType), any_chore_text, filled-Qty if chore found otherwise:
-            return None, None, None [indicating no chore found for this chore_id]
+        returns chore_status (ChoreStatusType), any_chore_text, filled-Qty, chore-px and chore-qty as seen by bartering
+        link, caller may use these for reconciliation
+        returns None [indicating no chore found for this chore_id]
         throws exception if found chore state is unsupported
         """
 
