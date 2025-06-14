@@ -6,6 +6,8 @@ import { Icon } from './Icon';
 import PropTypes from 'prop-types';
 import classes from './HeaderField.module.css';
 import { get } from 'lodash';
+import { useTheme } from '@emotion/react';
+
 
 const HeaderField = (props) => {
     const [showOptions, setShowOptions] = useState(false);
@@ -20,6 +22,7 @@ const HeaderField = (props) => {
             setShowOptions((show) => !show);
         }
     }
+    const theme = useTheme();
 
     const title = props.data.title ? props.data.title : props.name;
 
@@ -48,14 +51,14 @@ const HeaderField = (props) => {
         }
     }
 
-    let bgColor = 'background.nodeHeader'; // Default
+    let bgColor = theme.palette.primary.dark; // Default
     let textDecoration = 'none';
 
     // Determine background color and text decoration based on data flags and visualState
     if (props.data['data-add'] || props.visualState === 'added' || props.visualState === 'duplicated') {
-        bgColor = 'var(--green-400)'; // Green for new or explicitly added/duplicated
+        bgColor = 'var(--green-success)'; // Changed from '--green-accent-400:' to 'var(--green-dark)'
     } else if (props.data['data-remove']) {
-        bgColor = '#ffc7ce'; // Light red for deleted
+        bgColor = 'var(--red-error)'; // Light red for deleted
         textDecoration = 'line-through';
     }
     // No special styling for 'data-modified' in HeaderField as per requirement
@@ -110,11 +113,24 @@ const HeaderField = (props) => {
                             props.data.pagination.onPageChange('prev'); 
                         }} 
                         disabled={props.data.pagination.currentPage === 0}
-                        sx={{ padding: '2px' }}
+                        sx={{ 
+                            padding: '2px',
+                            '&.Mui-disabled': {
+                                '& .MuiTypography-root': {
+                                    color: theme.palette.text.disabled
+                                }
+                            }
+                        }}
                     >
-                        <Typography variant="caption" sx={{ fontWeight: 'bold' }}>◄</Typography>
+                        <Typography variant="caption" sx={{ 
+                            fontWeight: 'bold', 
+                            color: theme.palette.mode === 'light' ? theme.palette.text.default : theme.palette.text.primary 
+                        }}>◄</Typography>
                     </IconButton>
-                    <Typography variant="caption" sx={{ margin: '0 8px' }}>
+                    <Typography variant="caption" sx={{ 
+                        margin: '0 8px', 
+                        color: theme.palette.mode === 'light' ? theme.palette.text.default : theme.palette.text.primary 
+                    }}>
                         Page: {props.data.pagination.currentPage + 1}/{props.data.pagination.totalPages}
                         {!props.data.isContainer && `(${props.data.pagination.totalItems} items)`}
                     </Typography>
@@ -125,9 +141,19 @@ const HeaderField = (props) => {
                             props.data.pagination.onPageChange('next'); 
                         }} 
                         disabled={props.data.pagination.currentPage >= props.data.pagination.totalPages - 1}
-                        sx={{ padding: '2px' }}
+                        sx={{ 
+                            padding: '2px',
+                            '&.Mui-disabled': {
+                                '& .MuiTypography-root': {
+                                    color: theme.palette.text.disabled
+                                }
+                            }
+                        }}
                     >
-                        <Typography variant="caption" sx={{ fontWeight: 'bold' }}>►</Typography>
+                        <Typography variant="caption" sx={{ 
+                            fontWeight: 'bold', 
+                            color: theme.palette.mode === 'light' ? theme.palette.text.default : theme.palette.text.primary 
+                        }}>►</Typography>
                     </IconButton>
                 </Box>
             )}
@@ -195,7 +221,7 @@ const HeaderOptions = ({ add, remove, show, metadata, onToggle, updatedData, sto
         if (show) {
             return (
                 <ClickAwayListener onClickAway={() => onToggle(false)}>
-                    <Box className={classes.menu} bgcolor={isAdded?"var(--green-400)": "background.secondary"}>
+                    <Box className={classes.menu} bgcolor={isAdded?"var(--green-success)": "background.secondary"}>
                         {showAdd && (
                             <IconButton
                                 size='small'
@@ -237,8 +263,11 @@ const HeaderOptions = ({ add, remove, show, metadata, onToggle, updatedData, sto
             return (
                 <Box className={classes.option} bgcolor={bgColor}
                 >
-                    <Icon title="More Options" onClick={(e) => { e.stopPropagation(); onToggle(); }}>
-                        <Menu />
+                    <Icon title="More Options" onClick={(e) => { e.stopPropagation(); onToggle(); }}
+                        
+                        >
+                        <Menu 
+                        sx={{ color: 'white !important' }}/>
                     </Icon>
                 </Box>
             );

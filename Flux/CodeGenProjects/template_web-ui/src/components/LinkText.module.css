@@ -1,10 +1,15 @@
+/* Link text styling */
 .link {
     max-width: 150px;
     display: inline-flex;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: var(--blue-400) !important;
-    text-decoration: underline;
+    color: var(--blue-info) !important;
+    text-decoration: none !important;
     cursor: pointer;
+}
+
+.link:hover {
+    color: var(--blue-info) !important;
 }

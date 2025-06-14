@@ -53,33 +53,33 @@
 }
 
 .critical {
-    background-color: var(--red-800) !important;
+    background-color: var(--red-critical) !important;
     /* background-color: #ffc7ce; */
     animation: blink 0.5s step-start infinite;
 }
 
 .error {
-    background-color: var(--red-600) !important;
+    background-color: var(--red-error) !important;
     /* background-color: #ffc7ce; */
 }
 
 .warning {
-    background-color: var(--yellow-800) !important;
+    background-color: var(--yellow-warning) !important;
     /* background-color: #ffeb9c; */
 }
 
 .info {
-    background-color: var(--blue-400) !important;
+    background-color: var(--blue-info) !important;
     /* background-color: #c2d1ff; */
 }
 
 .debug {
-    background-color: var(--grey-600) !important;
+    background-color: var(--grey-debug) !important;
     /* background-color: #ccc; */
 }
 
 .success {
-    background-color: var(--green-400) !important;
+    background-color: var(--green-success) !important;
     /* background-color: aquamarine; */
 }
 

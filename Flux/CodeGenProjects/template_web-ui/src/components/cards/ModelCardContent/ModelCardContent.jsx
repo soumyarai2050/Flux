@@ -100,7 +100,7 @@ const ModelCardContent = ({
   //   cardContentClass += ` ${styles.bounce}`;
   // }
 
-  const backgroundColor = theme.palette.primary.dark;
+  // const backgroundColor = 'var(--grey-light)';
   const isBackdropOpen = Boolean(isDisabled || error || isDisconnected);
 
   let backdropClass = styles.backdrop;
@@ -112,7 +112,7 @@ const ModelCardContent = ({
     <div className={styles.card_content_container}>
       <div
         className={`${cardContentClass} card-content`}
-        style={{ background: backgroundColor }}
+        style={{ background : theme.palette.background.primary}}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
         // ref={cardRef}

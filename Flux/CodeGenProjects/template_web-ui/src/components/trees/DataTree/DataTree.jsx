@@ -5,7 +5,7 @@ import { generateObjectFromSchema, addxpath, getDataxpath, /* setTreeState, */ c
 import { DATA_TYPES, ITEMS_PER_PAGE } from '../../../constants';
 import Node from '../../Node';
 import HeaderField from '../../HeaderField';
-import NodeBaseClasses from '../../Node.module.css'; // Added for glow effect
+import NodeBaseClasses from '../../Node.module.css'; 
 import PropTypes from 'prop-types';
 
 
@@ -37,6 +37,9 @@ const DataTree = ({
     const initialExpansionSetForCurrentTreeRef = useRef(false); // Ref to track initial expansion
     const workerRef = useRef(null);
     const levelRef = useRef(treeLevel ? treeLevel : xpath ? 3 : 2);
+
+    // Add ref to track when full regeneration is needed
+    const needsFullRegenerationRef = useRef(true);
 
     useEffect(() => {
         levelRef.current = treeLevel ? treeLevel : xpath ? 3 : 2;
@@ -122,6 +125,9 @@ const DataTree = ({
             initialExpansionSetForCurrentTreeRef.current = false; // Allow re-application of initial expansion rules
             // Note: setPaginatedNodes({}); // Not resetting paginatedNodes for now, to keep it minimal
             // Note: setItemVisualStates({}); // Not resetting itemVisualStates for now
+            
+            // Mark that full regeneration is needed for reload scenarios
+            needsFullRegenerationRef.current = true;
         }
 
         const processWithWorker = () => {
@@ -130,6 +136,18 @@ const DataTree = ({
             pendingRequestRef.current = false; // Reset pending flag as we are processing now
             workerRef.current.postMessage({ type: 'PROCESS_TREE', payload: latestPropsRef.current });
         };
+
+        // Check if this is a major change requiring full regeneration
+        const majorChanges = [
+            projectSchema !== prevUpdatedDataRef.current?.projectSchema,
+            modelName !== prevUpdatedDataRef.current?.modelName,
+            mode !== prevUpdatedDataRef.current?.mode,
+            JSON.stringify(filters) !== JSON.stringify(prevUpdatedDataRef.current?.filters)
+        ];
+        
+        if (majorChanges.some(Boolean) || isReloadScenario) {
+            needsFullRegenerationRef.current = true;
+        }
 
         if (isWorkerProcessing) {
             console.log("Worker is busy, flagging a pending request.");
@@ -164,6 +182,9 @@ const DataTree = ({
                 const newTreeData = payload.treeData || [];
                 setTreeData(newTreeData);
                 setCounter((prev) => prev + 1);
+
+                // Mark that full regeneration is complete
+                needsFullRegenerationRef.current = false;
 
                 // Prune expandedNodeXPaths: Addressed Issue 1 here.
                 // The old pruning was too aggressive, removing states for paginated-away items.
@@ -296,6 +317,47 @@ const DataTree = ({
             };
         }
     }, [newlyAddedOrDuplicatedXPath, treeData, setNewlyAddedOrDuplicatedXPath]); // Dependencies
+
+    // Add local tree update function for optimized operations
+    const updateTreeLocally = useCallback((parentXPath, action, newItem = null, index = null) => {
+        setTreeData(prevTree => {
+            const newTree = cloneDeep(prevTree);
+            const findAndUpdateNode = (nodes) => {
+                for (let i = 0; i < nodes.length; i++) {
+                    if (nodes[i].id === parentXPath) {
+                        switch (action) {
+                            case 'add':
+                                if (newItem) {
+                                    nodes[i].children = nodes[i].children || [];
+                                    nodes[i].children.push({
+                                        ...newItem,
+                                        id: newItem.id || `${parentXPath}_${Date.now()}`
+                                    });
+                                }
+                                break;
+                            case 'remove':
+                                if (index !== null && nodes[i].children) {
+                                    nodes[i].children.splice(index, 1);
+                                }
+                                break;
+                            case 'update':
+                                if (index !== null && nodes[i].children && newItem) {
+                                    nodes[i].children[index] = newItem;
+                                }
+                                break;
+                        }
+                        return true;
+                    }
+                    if (nodes[i].children && findAndUpdateNode(nodes[i].children)) {
+                        return true;
+                    }
+                }
+                return false;
+            };
+            findAndUpdateNode(newTree);
+            return newTree;
+        });
+    }, []);
 
     // Handle page change for a paginated node
     const handlePageChange = useCallback((nodeId, direction, totalPagesForNode) => {
@@ -499,6 +561,10 @@ const DataTree = ({
                         expandNodeAndAllChildren(xpathAttr, newObjectInstance, itemSchemaForObject, projectSchema);
                         onUpdate(updatedObj, 'add');
                         setNewlyAddedOrDuplicatedXPath(xpathAttr); // Scroll to the initialized object
+                        
+                        // Mark that full regeneration is needed for structural changes
+                        needsFullRegenerationRef.current = true;
+                        setCounter(prev => prev + 1);
                         return;
                     } catch (err) {
                         console.error('[DataTree] ERROR during OBJECT INITIALIZATION for:', xpathAttr, err);
@@ -573,6 +639,10 @@ const DataTree = ({
                     setPaginatedNodes(prev => ({ ...prev, [xpathAttr]: { page: newItemPageIndex } }));
                     onUpdate(updatedObj, 'add');
                     setNewlyAddedOrDuplicatedXPath(schemaXpathForNewItem); // Scroll to the new array item
+                    
+                    // Mark that full regeneration is needed for structural changes
+                    needsFullRegenerationRef.current = true;
+                    setCounter(prev => prev + 1);
                     return;
                 } else {
                     // Fallback or error: Unhandled add click scenario
@@ -654,6 +724,10 @@ const DataTree = ({
                 setPaginatedNodes(prev => ({ ...prev, [parentDataXpath]: { page: newItemPageIndex } }));
                 onUpdate(updatedObj, 'add');
                 setNewlyAddedOrDuplicatedXPath(schemaXpathForDuplicatedItem); // Scroll to the duplicated item
+                
+                // Mark that full regeneration is needed for structural changes
+                needsFullRegenerationRef.current = true;
+                setCounter(prev => prev + 1);
                 return; // Action handled
             }
 
@@ -690,6 +764,10 @@ const DataTree = ({
                     });
 
                     onUpdate(updatedObj, 'remove'); // 'remove' might signify data changed to null
+                    
+                    // Mark that full regeneration is needed for structural changes
+                    needsFullRegenerationRef.current = true;
+                    setCounter(prev => prev + 1);
                     return; // Action handled
                 }
                 // Handle removal of an array item (existing logic)
@@ -726,6 +804,10 @@ const DataTree = ({
                             return changed ? newExpandedPaths : prevExpandedPaths;
                         });
                         onUpdate(updatedObj, 'remove');
+                        
+                        // Mark that full regeneration is needed for structural changes
+                        needsFullRegenerationRef.current = true;
+                        setCounter(prev => prev + 1);
                     }
                     return; // Action handled
                 }
@@ -891,7 +973,7 @@ const DataTree = ({
                     return prevExpandedPaths;
                 });
             }
-        } else if (!originalTree || originalTree.length === 0) {
+        } else {
             // Tree is empty or not yet loaded, reset the flag
             initialExpansionSetForCurrentTreeRef.current = false;
             // Ensure "root" is still in the base state for when tree loads
@@ -902,6 +984,109 @@ const DataTree = ({
         }
     }, [originalTree]);
 
+    // Effect to automatically expand newly created objects (data-add status)
+    useEffect(() => {
+        if (originalTree && originalTree.length > 0) {
+            const expandNewlyCreatedObjects = (node) => {
+                let shouldExpand = false;
+                let expansionReason = '';
+                
+                // Check if this node has data-add status (newly created via + button)
+                if (node['data-add'] === true && node.xpath) {
+                    shouldExpand = true;
+                    expansionReason = 'data-add status';
+                }
+                
+                // Additional check: if object exists in updatedData but not in storedData
+                // This catches objects created via Strat Collection create button
+                if (!shouldExpand && node.xpath && (node.isObjectContainer || node.isArrayContainer)) {
+                    const nodeDataInUpdated = get(updatedData, node.xpath);
+                    const nodeDataInStored = get(storedData, node.xpath);
+                    
+                    // If object exists in updated but not in stored, it's newly created
+                    if (nodeDataInUpdated && !nodeDataInStored && 
+                        typeof nodeDataInUpdated === 'object' && nodeDataInUpdated !== null) {
+                        shouldExpand = true;
+                        expansionReason = 'exists in updated but not in stored data';
+                    }
+                    
+                    // Additional check for nested objects: if stored data is null/undefined but updated has object
+                    if (!shouldExpand && nodeDataInUpdated && 
+                        (nodeDataInStored === null || nodeDataInStored === undefined) &&
+                        typeof nodeDataInUpdated === 'object' && nodeDataInUpdated !== null) {
+                        shouldExpand = true;
+                        expansionReason = 'stored data is null but updated has object';
+                    }
+                }
+                
+                if (shouldExpand) {
+                    console.log('[DataTree] Auto-expanding newly created object:', node.xpath, 'Reason:', expansionReason, 'Node:', node);
+                    
+                    // Get the data for this newly created object
+                    const nodeData = get(updatedData, node.xpath);
+                    
+                    if (nodeData) {
+                        let objectSchema = null;
+                        
+                        // Try to get schema from ref first
+                        if (node.ref) {
+                            const schemaRefParts = node.ref.split('/');
+                            objectSchema = schemaRefParts.length === 2 ? 
+                                projectSchema[schemaRefParts[1]] : 
+                                projectSchema[schemaRefParts[1]][schemaRefParts[2]];
+                        }
+                        
+                        // If no ref or no schema found via ref, try to infer from the data structure
+                        if (!objectSchema && typeof nodeData === 'object' && nodeData !== null) {
+                            // For nested objects, we can try to expand based on the data structure itself
+                            console.log('[DataTree] No schema ref found, using data structure for expansion:', node.xpath);
+                            
+                            // Create a minimal schema-like object from the data
+                            objectSchema = {
+                                properties: {}
+                            };
+                            
+                            Object.keys(nodeData).forEach(key => {
+                                if (!key.startsWith('xpath_') && key !== 'data-id') {
+                                    objectSchema.properties[key] = {
+                                        type: Array.isArray(nodeData[key]) ? 'array' : 
+                                              typeof nodeData[key] === 'object' && nodeData[key] !== null ? 'object' : 
+                                              typeof nodeData[key]
+                                    };
+                                }
+                            });
+                        }
+                        
+                        if (objectSchema) {
+                            console.log('[DataTree] Expanding newly created object with schema:', objectSchema);
+                            // Use the same expansion logic as the + button
+                            expandNodeAndAllChildren(node.xpath, nodeData, objectSchema, projectSchema);
+                        } else {
+                            console.log('[DataTree] Could not find schema for newly created object:', node.xpath);
+                            // Even without schema, we can still try to expand the node itself
+                            setExpandedNodeXPaths(prevExpanded => ({
+                                ...prevExpanded,
+                                [node.xpath]: true
+                            }));
+                        }
+                    }
+                }
+                
+                // Recursively check children
+                if (node.children && Array.isArray(node.children)) {
+                    node.children.forEach(child => {
+                        expandNewlyCreatedObjects(child);
+                    });
+                }
+            };
+
+            // Check all nodes in the tree
+            originalTree.forEach(node => {
+                expandNewlyCreatedObjects(node);
+            });
+        }
+    }, [originalTree, updatedData, storedData, projectSchema, expandNodeAndAllChildren]);
+
     if (!treeData || treeData.length === 0) return null;
 
     const activeNodeIdsSet = new Set(treeData.map((node) => node.id));
@@ -910,13 +1095,16 @@ const DataTree = ({
 
     return (
         <TreeView
-            key={counter}
+            key={needsFullRegenerationRef.current ? counter : 'stable'}
             data={treeData}
             aria-label={modelName}
             nodeRenderer={nodeRenderer}
             expandedIds={updatedExpandedIds} // Control TreeView expansion
             multiSelect={false}
-            disableKeyboardNavigation={false}
+            onKeyDown={(e) => {
+            e.stopPropagation();
+            e.preventDefault(); // Fully disables default keyboard behavior
+  }}
         />
     );
 };

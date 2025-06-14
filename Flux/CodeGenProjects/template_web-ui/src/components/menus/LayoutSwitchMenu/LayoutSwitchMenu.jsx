@@ -109,6 +109,10 @@ const LayoutSwitchMenu = ({
         id={popoverId}
         open={isPopoverOpen}
         anchorEl={anchorEl}
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'center',
+        }}
         onClose={handlePopoverClose}
       >
         <ToggleButtonGroup value={layout} size='small'>

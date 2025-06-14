@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { Box, Tooltip } from '@mui/material';
 import { capitalizeFirstLetter } from '../utils';
-import { HelpOutline, HelpSharp, LiveHelp, RemoveCircle } from '@mui/icons-material';
+import { HelpOutline, HelpSharp, LiveHelp, NotListedLocationOutlined, RemoveCircle } from '@mui/icons-material';
 import { Icon } from './Icon';
 import NodeField from './NodeField';
 import PropTypes from 'prop-types';
@@ -10,12 +10,9 @@ import { MODES } from '../constants';
 import { useTheme } from '@emotion/react';
 
 const Node = (props) => {
-    const theme = useTheme();
+    const theme = useTheme(); 
     const rootRef = useRef(null);
     const glowTimerIdRef = useRef(null);
-    
-    
-    
 
     let nodeClass = '';
     if (props.data['data-add']) {
@@ -26,7 +23,7 @@ const Node = (props) => {
         nodeClass = classes.modified;
     }
 
-    let nodeTitleColor = theme.palette.text.primary;
+    let nodeTitleColor = theme.palette.mode === "dark" ? theme.palette.common.white:theme.palette.common.black;
     if (props.data.nameColor) {
         let nameColor = props.data.nameColor.toLowerCase();
         nodeTitleColor = theme.palette.text[nameColor];

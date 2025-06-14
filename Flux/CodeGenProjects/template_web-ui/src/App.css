@@ -51,13 +51,13 @@ code {
 /* Handle */
 ::-webkit-scrollbar-thumb {
   /* background: #888; */
-  background-color: var(--grey-800);
+  background-color: var(--dark-bg-secondary);
 }
 
 /* Handle on hover */
 ::-webkit-scrollbar-thumb:hover {
   /* background: #555; */
-  background-color: var(--grey-900);
+  background-color: var(--dark-bg-primary);
 }
 
 @keyframes blink {

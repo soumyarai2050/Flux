@@ -5,3 +5,11 @@
     padding: 0 10px;
     justify-content: space-between;
 }
+
+.card_header span button svg path {
+    fill: white !important;
+}
+
+.card_title {
+    color: var(--dark-text-primary);
+}

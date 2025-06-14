@@ -2,8 +2,8 @@ import React, { useEffect, useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { useSelector, useDispatch } from 'react-redux';
 import { Responsive, WidthProvider } from 'react-grid-layout';
-import { Grid, Popover } from '@mui/material';
-import { Brightness4, Brightness7, DashboardCustomize, DoNotTouch, PanTool, SaveAs, ViewComfy } from '@mui/icons-material';
+import { Grid, Popover, Select, MenuItem, FormControl, InputLabel } from '@mui/material';
+import { Brightness4, Brightness7, DashboardCustomize, DoNotTouch, PanTool, SaveAs, ViewComfy, Palette } from '@mui/icons-material';
 import { defaultLayouts } from '../../projectSpecificUtils';
 import { actions as LayoutActions } from '../../features/uiLayoutSlice';
 import * as Selectors from '../../selectors';
@@ -11,12 +11,15 @@ import { getModelComponent } from '../../utils/modelComponentLoader';
 import { fastClone, getIconText, snakeToTitle } from '../../utils';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
-import styles from './Layout.module.css'; // Import CSS module
+import styles from './Layout.module.css';
 import Icon, { ToggleIcon } from '../Icon';
-import { LoadLayoutPopup, SaveLayoutPopup } from '../Popup';
+import { SaveLayoutPopup } from '../Popup';
 import { API_ROOT_URL, COOKIE_NAME } from '../../config';
 import { DB_ID } from '../../constants';
 import { useURLParams, useWebSocketWorker } from '../../hooks';
+import { BaseColor, cssVar, baseColorPalettes, Theme, DEFAULT_BASE_COLOR } from '../../theme';
+import GlobalScrollbarStyle from '../GlobalScrollbarStyle';
+import DropdownButton from '../DropdownButton';
 
 const defaultGridProps = {
   className: 'layout',
@@ -33,6 +36,25 @@ const defaultGridProps = {
 const ResponsiveGridLayout = WidthProvider(Responsive);
 
 /**
+ * Enhanced Layout component with per-profile base color support.
+ * 
+ * Base Color Behavior:
+ * - Each saved layout profile stores its own base color preference (base_color)
+ * - When saving a layout, the current selected base color is saved with the profile
+ * - When loading a profile, if it has a base_color, that color is applied; otherwise DEFAULT_BASE_COLOR is used
+ * - On app startup, the layout loading process will apply the appropriate base color from the loaded profile
+ * - Switching between profiles will automatically apply each profile's saved base color
+ * - The Default profile always uses DEFAULT_BASE_COLOR
+ * - Admin control allows changing base color, which gets saved when the layout is saved
+ * 
+ * Usage Flow:
+ * 1. Load profile → applies saved base color (or default if none saved)
+ * 2. Change base color via admin control → updates current color
+ * 3. Save layout → saves current base color with profile
+ * 4. Switch profiles → each profile loads with its own saved color
+ */
+
+/**
  * Layout component renders a responsive grid layout with draggable and resizable items.
  * It uses a navbar to display the project logo (with project name)
  * and a toggle button that opens a popover for selecting visible components.
@@ -41,9 +63,13 @@ const ResponsiveGridLayout = WidthProvider(Responsive);
  * @component
  * @param {Object} props - Component properties.
  * @param {string} props.projectName - The name of the project to display as a logo.
+ * @param {string} props.theme - The current theme mode ('light' or 'dark').
+ * @param {Function} props.onThemeToggle - Callback to toggle the theme mode.
+ * @param {string} props.baseColor - The current base color name.
+ * @param {Function} props.onBaseColorChange - Callback to change the base color.
  * @returns {JSX.Element} The Layout component.
  */
-const Layout = ({ projectName, theme, onThemeToggle }) => {
+const Layout = ({ projectName, theme, onThemeToggle, baseColor, onBaseColorChange }) => {
   const { storedArray, storedObj, isLoading } = useSelector(Selectors.selectUILayout);
   const [layout, setLayout] = useState(null);
   const [visibleComponents, setVisibleComponents] = useState([]);
@@ -51,13 +77,17 @@ const Layout = ({ projectName, theme, onThemeToggle }) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const [isNavbarVisible, setIsNavbarVisible] = useState(true);
   const [isSaveLayoutPopupOpen, setIsSaveLayoutPopupOpen] = useState(false);
-  const [isLoadLayoutPopupOpen, setIsLoadLayoutPopupOpen] = useState(false);
   const [reconnectCounter, setReconnectCounter] = useState(0);
-  const [searchValue, setSearchValue] = useState(''); // load layout by profile search input
   const [profileId, setProfileId] = useState(''); // save layout by profile input
   const dispatch = useDispatch();
 
+  // internal state for selected base color, synced with prop
+  const [selectedBaseColor, setSelectedBaseColor] = useState(baseColor || DEFAULT_BASE_COLOR);
+
   const urlParams = useURLParams();
+
+  // Check if admin_control parameter exists in URL
+  const showAdminControl = urlParams && urlParams.admin_control === 'true';
 
   const handleWorkerUpdate = (updatedArray) => {
     dispatch(LayoutActions.setStoredArray(updatedArray));
@@ -93,6 +123,10 @@ const Layout = ({ projectName, theme, onThemeToggle }) => {
 
     // Retrieve the active layout ID from sessionStorage.
     const activeLayoutId = urlParams?.layout ?? sessionStorage.getItem(COOKIE_NAME);
+    if (!activeLayoutId) {
+      handleReset(); // Reset to default if no layout parameter
+      return;
+    }
     let newLayout;
     let newVisibleComponents;
 
@@ -110,6 +144,14 @@ const Layout = ({ projectName, theme, onThemeToggle }) => {
         newVisibleComponents = newLayout.map(item => item.i);
         dispatch(LayoutActions.setStoredObj(activeLayout));
         setProfileId(activeLayout.profile_id);
+
+        // Apply saved base color if it exists, otherwise use default
+        const baseColor = activeLayout.base_color || DEFAULT_BASE_COLOR;
+
+        setSelectedBaseColor(baseColor);
+        if (onBaseColorChange) {
+          onBaseColorChange(baseColor);
+        }
       }
     }
 
@@ -119,6 +161,12 @@ const Layout = ({ projectName, theme, onThemeToggle }) => {
       if (activeLayoutId) sessionStorage.removeItem(COOKIE_NAME);
       newLayout = defaultLayouts;
       newVisibleComponents = defaultLayouts.map(item => item.i);
+
+      // Use default base color when falling back to default layout
+      setSelectedBaseColor(DEFAULT_BASE_COLOR);
+      if (onBaseColorChange) {
+        onBaseColorChange(DEFAULT_BASE_COLOR);
+      }
     }
 
     // Update state if a new layout is determined.
@@ -203,13 +251,34 @@ const Layout = ({ projectName, theme, onThemeToggle }) => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Sync internal selectedBaseColor with prop baseColor only on mount
+  // Profile loading will handle setting the color after that
+  useEffect(() => {
+    setSelectedBaseColor(baseColor || DEFAULT_BASE_COLOR);
+  }, []); // Empty dependency array - only run on mount
+
+  // Apply global CSS variables to document root
+  useEffect(() => {
+    // Determine navbar colors
+    const currentSelectedPalette = baseColorPalettes[selectedBaseColor] || baseColorPalettes[DEFAULT_BASE_COLOR];
+    const isLightMode = theme === Theme.LIGHT;
+    const navbarBgColorVarName = currentSelectedPalette.dark;
+    const navbarTextColorValue = cssVar('--dark-text-primary');
+    const cellSelectedColorVarName = isLightMode ? currentSelectedPalette.lighter : currentSelectedPalette.darkest;
+
+    const root = document.documentElement;
+    root.style.setProperty('--dynamic-navbar-bg', `var(${navbarBgColorVarName})`);
+    root.style.setProperty('--dynamic-navbar-text', navbarTextColorValue);
+    root.style.setProperty('--dynamic-cell-selected', `var(${cellSelectedColorVarName})`);
+  }, [selectedBaseColor, theme]);
+
   if (isLoading) return <div>Loading layout...</div>;
   if (!layout && !storedObj.widget_ui_data_elements) return null;
 
   const popoverId = Boolean(anchorEl) ? 'toggle-popover' : undefined;
 
   const DraggableIcon = isDraggable ? DoNotTouch : PanTool;
-  const ThemeIcon = theme === 'light' ? Brightness7 : Brightness4;
+  const MuiThemeIcon = theme === Theme.LIGHT ? Brightness7 : Brightness4;
 
   const handleDraggableToggle = () => {
     setIsDraggable((prev) => !prev);
@@ -219,21 +288,52 @@ const Layout = ({ projectName, theme, onThemeToggle }) => {
     onThemeToggle();
   }
 
+  const handleBaseColorSelectorChange = (value) => {
+    const newColor = value;
+    setSelectedBaseColor(newColor);
+    if (onBaseColorChange) {
+      onBaseColorChange(newColor);
+    }
+  };
+
   const handleSaveLayoutPopupToggle = () => {
     setIsSaveLayoutPopupOpen((prev) => !prev);
   }
 
-  const handleLoadLayoutPopupToggle = () => {
-    setIsLoadLayoutPopupOpen((prev) => !prev);
-  }
+  const handleProfileDropdownChange = (event) => {
+    const selectedValue = event.target.value;
+    if (selectedValue === 'reset') {
+      handleReset();
+    } else {
+      const loadedObj = storedArray.find((o) => o.profile_id === selectedValue);
+      if (loadedObj) {
+        dispatch(LayoutActions.setObjId(loadedObj[DB_ID]));
+        dispatch(LayoutActions.setStoredObj(loadedObj));
+        setLayout(loadedObj.widget_ui_data_elements);
+        const newVisibleComponents = loadedObj.widget_ui_data_elements.map(item => item.i);
+        setVisibleComponents(newVisibleComponents);
+        setProfileId(loadedObj.profile_id);
+        sessionStorage.setItem(COOKIE_NAME, loadedObj.profile_id);
+
+        // Apply saved base color if it exists, otherwise use default
+        const baseColor = loadedObj.base_color || DEFAULT_BASE_COLOR;
+
+        setSelectedBaseColor(baseColor);
+        if (onBaseColorChange) {
+          onBaseColorChange(baseColor);
+        }
+
+        // Update URL to reflect the selected profile
+        const currentUrl = new URL(window.location);
+        currentUrl.searchParams.set('layout', loadedObj.profile_id);
+        window.history.pushState({}, '', currentUrl.toString());
+      }
+    }
+  };
 
   const handleProfileIdChange = (e) => {
     setProfileId(e.target.value);
-  }
-
-  const handleSearchValueChange = (_, value) => {
-    setSearchValue(value);
-  }
+  };
 
   const handleSave = () => {
     // Ensure profileId exists (add additional checks if needed)
@@ -276,6 +376,10 @@ const Layout = ({ projectName, theme, onThemeToggle }) => {
 
     profileData.widget_ui_data_elements = updatedWidgets;
 
+    // Save the current base color with the profile
+    profileData.base_color = selectedBaseColor;
+
+
     // Dispatch appropriate action based on whether the profile exists in the database.
     if (profileData[DB_ID]) {
       dispatch(LayoutActions.update({ data: profileData }));
@@ -290,32 +394,32 @@ const Layout = ({ projectName, theme, onThemeToggle }) => {
     handleSaveLayoutPopupToggle();
   };
 
-  const handleLoad = () => {
-    const loadedObj = storedArray.find((o) => o[DB_ID] === searchValue[DB_ID]);
-    if (loadedObj) {
-      dispatch(LayoutActions.setObjId(loadedObj[DB_ID]));
-      dispatch(LayoutActions.setStoredObj(loadedObj));
-      setLayout(loadedObj.widget_ui_data_elements);
-      const newVisibleComponents = loadedObj.widget_ui_data_elements.map(item => item.i);
-      setVisibleComponents(newVisibleComponents);
-      setProfileId(loadedObj.profile_id);
-      sessionStorage.setItem(COOKIE_NAME, loadedObj.profile_id);
-    }
-    setSearchValue(null);
-    handleLoadLayoutPopupToggle();
-  }
-
   const handleReset = () => {
     sessionStorage.removeItem(COOKIE_NAME);
     setLayout(defaultLayouts);
     const newVisibleComponents = defaultLayouts.map(item => item.i);
     setVisibleComponents(newVisibleComponents);
-    dispatch(LayoutActions.setStoredObj({ profile_id: 'default', widget_ui_data_elements: defaultLayouts }));
-    handleLoadLayoutPopupToggle();
+    dispatch(LayoutActions.setStoredObj({ profile_id: 'default', widget_ui_data_elements: defaultLayouts, base_color: DEFAULT_BASE_COLOR }));
+    setProfileId('');
+
+    // Reset base color to default
+    setSelectedBaseColor(DEFAULT_BASE_COLOR);
+    if (onBaseColorChange) {
+      onBaseColorChange(DEFAULT_BASE_COLOR);
+    }
+
+    // Clear the layout parameter from URL
+    const currentUrl = new URL(window.location);
+    currentUrl.searchParams.delete('layout');
+    window.history.pushState({}, '', currentUrl.toString());
   }
+
+  // Calculate navbar styling values for render
+  const navbarTextColorValue = cssVar('--dark-text-primary');
 
   return (
     <div>
+      <GlobalScrollbarStyle selectedBaseColorName={selectedBaseColor} />
       {/* Enhanced Navbar with hide-on-scroll functionality */}
       <nav className={`${styles.navbar} ${!isNavbarVisible ? styles.hidden : ''}`}>
         <div className={styles.navbarLogo}>{snakeToTitle(projectName)}</div>
@@ -323,11 +427,68 @@ const Layout = ({ projectName, theme, onThemeToggle }) => {
           <DraggableIcon fontSize='medium' />
         </Icon>
         <Icon name='theme' title='theme' onClick={handleThemeToggle}>
-          <ThemeIcon fontSize='medium' />
+          <MuiThemeIcon fontSize='medium' />
         </Icon>
-        <Icon name='load' title='load' onClick={handleLoadLayoutPopupToggle}>
-          <ViewComfy fontSize='medium' />
-        </Icon>
+        {/* Base Color Selector - only show if admin_control URL param exists */}
+        {showAdminControl && (
+          // <FormControl variant="outlined" size="small" sx={{ m: 1, width: 65, '& .MuiOutlinedInput-root': {color: navbarTextColorValue }, '& .MuiSelect-icon': {color: navbarTextColorValue }, '& .MuiOutlinedInput-notchedOutline': {borderColor: cssVar('--light-border-default')} }}>
+          //   <Select
+          //     labelId="base-color-select-label"
+          //     id="base-color-select"
+          //     value={selectedBaseColor}
+          //     onChange={handleBaseColorSelectorChange}
+          //     sx={{fontSize: '0.875rem', '.MuiSelect-select': {paddingTop: '6px', paddingBottom: '6px'}}}
+          //   >
+          //     <MenuItem value={BaseColor.GREEN}>🟩</MenuItem>
+          //     <MenuItem value={BaseColor.BLUE}> 🟦</MenuItem>
+          //     <MenuItem value={BaseColor.BROWN}>🟫</MenuItem>
+          //   </Select>
+          // </FormControl>
+          <DropdownButton
+            options={Object.values(BaseColor)}
+            renderButtonContent={(color) => (
+              <span>
+                {color === BaseColor.GREEN ? '🟩' : color === BaseColor.BLUE ? '🟦' : '🟫'}
+              </span>
+            )}
+            renderOption={(color) => (
+              <MenuItem value={color}>
+                {color === BaseColor.GREEN ? '🟩' : color === BaseColor.BLUE ? '🟦' : '🟫'}
+              </MenuItem>
+            )}
+            initialSelectedIndex={Object.values(BaseColor).indexOf(selectedBaseColor)}
+            onOptionSelect={handleBaseColorSelectorChange}
+          />
+        )}
+        {/* Profile Dropdown - replacing load popup */}
+        <FormControl variant="outlined" size="small" sx={{
+          m: 1,
+          width: 150,
+          '& .MuiOutlinedInput-root': {
+            color: navbarTextColorValue,
+            fontSize: '0.875rem',
+            '& .MuiOutlinedInput-notchedOutline': {
+              borderColor: cssVar('--light-border-default')
+            }
+          },
+          '& .MuiSelect-icon': {
+            color: navbarTextColorValue
+          }
+        }}>
+          <Select
+            value={profileId || 'reset'}
+            onChange={handleProfileDropdownChange}
+            displayEmpty
+            sx={{ fontSize: '0.75rem' }}
+          >
+            <MenuItem value="reset">Default</MenuItem>
+            {(storedArray || []).map((profile) => (
+              <MenuItem key={profile[DB_ID]} value={profile.profile_id}>
+                {profile.profile_id}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
         <Icon name='save' title='save' onClick={handleSaveLayoutPopupToggle}>
           <SaveAs fontSize='medium' />
         </Icon>
@@ -392,15 +553,7 @@ const Layout = ({ projectName, theme, onThemeToggle }) => {
         onProfileIdChange={handleProfileIdChange}
         onSave={handleSave}
       />
-      <LoadLayoutPopup
-        open={isLoadLayoutPopupOpen}
-        onClose={handleLoadLayoutPopupToggle}
-        storedArray={storedArray}
-        onReset={handleReset}
-        value={searchValue}
-        onSearchValueChange={handleSearchValueChange}
-        onLoad={handleLoad}
-      />
+
     </div>
   );
 };
@@ -409,7 +562,23 @@ Layout.propTypes = {
   /**
    * The project name to display in the navbar logo.
    */
-  projectName: PropTypes.string.isRequired
+  projectName: PropTypes.string.isRequired,
+  /**
+   * The current theme mode ('light' or 'dark').
+   */
+  theme: PropTypes.string.isRequired,
+  /**
+   * Callback to toggle the theme mode.
+   */
+  onThemeToggle: PropTypes.func.isRequired,
+  /**
+   * The current base color name.
+   */
+  baseColor: PropTypes.string.isRequired,
+  /**
+   * Callback to change the base color.
+   */
+  onBaseColorChange: PropTypes.func.isRequired,
 };
 
 export default React.memo(Layout);

@@ -87,6 +87,24 @@ onmessage = (e) => {
     const ITEMS_PER_PAGE = e.data.payload.ITEMS_PER_PAGE || ITEMS_PER_PAGE_CONSTANT;
     const DATA_TYPES = e.data.payload.DATA_TYPES || DATA_TYPES_CONSTANT; // Not directly used in this snippet but good practice
 
+    // Handle subtree processing for optimized updates
+    if (e.data.type === 'PROCESS_SUBTREE') {
+        const subtreeData = e.data.payload.subtreeData;
+        const flattenedNodes = [];
+        
+        if (subtreeData && typeof subtreeData === 'object') {
+            const nodeId = workerProcessNode(subtreeData, "root", paginatedNodes, ITEMS_PER_PAGE, flattenedNodes, enableObjectPagination);
+            postMessage({
+                type: 'SUBTREE_GENERATED',
+                payload: {
+                    subtree: flattenedNodes,
+                    nodeId: nodeId
+                }
+            });
+        }
+        return;
+    }
+
     // CallerProps for generateTreeStructure.
     // IMPORTANT: Event handlers (onTextChange, etc.) are NOT included.
     // The 'isOpen' logic: generateTreeStructure uses an internal global 'treeState'.

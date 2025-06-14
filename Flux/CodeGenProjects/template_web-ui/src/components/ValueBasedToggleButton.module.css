@@ -10,39 +10,32 @@
 }
 
 .critical {
-    /* background-color: #9C0006 !important; */
-    background-color: var(--red-800) !important;
+    background-color: var(--red-critical) !important;
     animation: blink 0.5s step-start infinite;
 }
 
 .error {
-    background-color: var(--red-600) !important;
-    /* background-color: #9C0006 !important; */
+    background-color: var(--red-error) !important;
 }
 
 .warning {
-    /* background-color: #99943c !important; */
-    background-color: var(--yellow-800) !important;
+    background-color: var(--yellow-warning) !important;
 }
 
 .info {
-    /* background-color: blue !important; */
-    background-color: var(--blue-700) !important;
+    background-color: var(--blue-info) !important;
 }
 
 .debug {
-    /* background-color: #444 !important; */
-    background-color: var(--grey-600) !important;
+    background-color: var(--grey-debug) !important;
 }
 
 .success {
-    /* background-color: green !important; */
-    background-color: var(--green-700) !important;
+    background-color: var(--green-success) !important;
 }
 
 .default {
-    /* background-color: #999 !important; */
-    background-color: var(--grey-800) !important;
+    background-color: var(--dark-bg-secondary) !important;
 }
 
 @keyframes blink {

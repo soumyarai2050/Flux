@@ -2,7 +2,7 @@ import { getTableRowsFromData } from '../utils';
 import { DATA_TYPES, MODEL_TYPES } from '../constants';
 
 onmessage = (e) => {
-  const { fieldsMetadata, data, xpath = null, modelType = null } = e.data;
+  const { fieldsMetadata, data, xpath = null, modelType = null, downloadId } = e.data;
 
   // Generate the entire rows dataset (CPU intensive)
   let rows;
@@ -44,13 +44,13 @@ onmessage = (e) => {
 
     // When the chunk reaches the specified size, post it and reset the buffer.
     if ((i + 1) % chunkSize === 0) {
-      postMessage({ csvChunk, currentRow: i + 1, totalRows, done: false });
+      postMessage({ csvChunk, currentRow: i + 1, totalRows, done: false, downloadId });
       csvChunk = "";
     }
   }
 
   // Send any remaining CSV content and mark as done.
-  postMessage({ csvChunk, currentRow: totalRows, totalRows, done: true });
+  postMessage({ csvChunk, currentRow: totalRows, totalRows, done: true, downloadId });
 };
 
 export { };

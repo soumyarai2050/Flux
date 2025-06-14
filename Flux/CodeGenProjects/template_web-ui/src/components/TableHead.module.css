@@ -15,32 +15,32 @@
 }
 
 .critical {
-    color: #9C0006 !important;
+    color: var(--red-critical) !important;
     animation: blink 0.5s step-start infinite;
 }
 
 .error {
-    color: #9C0006 !important;
+    color: var(--red-error) !important;
 }
 
 .warning {
-    color: #9c6500 !important;
+    color: var(--yellow-warning) !important;
 }
 
 .info {
-    color: blue !important;
+    color: var(--blue-info) !important;
 }
 
 .debug {
-    color: #444 !important;
+    color: var(--grey-debug) !important;
 }
 
 .success {
-    color: green !important;
+    color: var(--green-success) !important;
 }
 
 .default {
-    color: black !important;
+    color: var(--light-text-primary) !important;
 }
 
 @keyframes blink {

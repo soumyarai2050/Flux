@@ -8,7 +8,7 @@ const ModelCardHeader = ({ name, children }) => {
     const backgroundColor = theme.palette.primary.dark;
     return (
         <div className={styles.card_header} style={{ background: backgroundColor }}>
-            <span>{name}</span>
+            <span className={styles.card_title}>{name}</span>
             <span>{children}</span>
         </div>
     )

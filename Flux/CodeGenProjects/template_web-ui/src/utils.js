@@ -732,7 +732,7 @@ function sortSchemaProperties(properties) {
 
 
 export function isNodeInSubtree(callerProps, xpath, dataxpath) {
-    xpath = xpath.replace(/\[.\]/g, '[0]');
+    xpath = xpath.replace(/\[\d+\]/g, '[0]');
     if (callerProps.subtree) {
         if (callerProps.xpath) {
             xpath = xpath.substring(xpath.indexOf('.') + 1);

@@ -4,7 +4,7 @@
 }
 
 .icon_selected {
-    color: var(--blue-accent-400) !important;
+    color: var(--dynamic-cell-selected) !important;
 }
 
 .toggle_icon {
@@ -28,5 +28,5 @@
 }
 
 .selected_avatar {
-    background-color: var(--blue-accent-400) !important;
+    background-color: var(--dynamic-cell-selected) !important;
 }

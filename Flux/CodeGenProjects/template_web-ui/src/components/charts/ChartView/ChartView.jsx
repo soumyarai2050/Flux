@@ -536,6 +536,7 @@ function ChartView({
                             xpath={null}
                             onUpdate={handleUpdate}
                             onUserChange={handleUserChange}
+                            treeLevel={4}
                         />
                     </ModelCardContent>
                 </ModelCard>

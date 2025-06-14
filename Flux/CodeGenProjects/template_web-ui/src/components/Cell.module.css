@@ -1,3 +1,21 @@
+/* .cell {
+    padding: 2px 4px !important;
+    line-height: 1.2;
+    background-color: transparent;
+    overflow: hidden;
+    color: var(--red-error);
+    /* color: #212121; 
+*/
+
+
+/* .cell_positive {
+    padding: 2px 4px !important;
+    line-height: 1.2;
+    background-color: transparent;
+    overflow: hidden;
+    color: var(--green-success);
+} */
+
 .cell {
     padding: 6px 2px !important;
     padding-right: 24px !important;
@@ -5,74 +23,74 @@
 
 .previous {
     /* color: red; */
-    color: var(--red-600);
+    color: var(--red-error);
     text-decoration: line-through;
     margin-right: 10px;
 }
 
 .modified {
     /* color: green; */
-    color: var(--green-400);
+    color: var(--green-success);
 }
 
 .critical {
-    color: white !important;
     /* color: #9C0006 !important; */
-    background-color: var(--red-800);
+    background-color: var(--red-critical);
+    /* color: #fff !important; */
     animation: blink 0.5s step-start infinite;
 }
 
 .error {
     /* color: #9C0006 !important; */
-    color: white !important;
-    background-color: var(--red-600);
+    background-color: var(--red-error);
+    /* color: #fff !important; */
 }
 
 .warning {
-    color: white !important;
-    background-color: var(--yellow-800);
-    /* color: #9c6500 !important; */
-    /* background-color: #ffeb9c; */
+    background-color: var(--yellow-warning);
+    /* color: #fff !important; */
 }
 
 .info {
-    color: white !important;
-    background-color: var(--blue-400);
-    /* color: blue !important;
-    background-color: #c2d1ff; */
+    /* color: blue !important; */
+    /* background-color: #c2d1ff; */
+    background-color: var(--blue-info);
+    /* color: #fff !important; */
 }
 
 .debug {
-    color: white !important;
-    background-color: var(--grey-600);
-    /* color: black !important;
-    background-color: #ccc; */
+    /* color: #444 !important; */
+    /* background-color: #ccc; */
+    background-color: var(--grey-debug);
+    /* color: #fff !important; */
 }
 
 .success {
-    color: white !important;
-    background-color: var(--green-400);
-    /* color: darkgreen !important;
-    background-color: aquamarine; */
+    /* color: green !important; */
+    /* background-color: aquamarine; */
+    background-color: var(--green-success);
+    /* color: #fff !important; */
 }
 
 .disabled {
     /* background-color: #ccc; */
     /* color: var(--grey-200) !important; */
-    background-color: var(--grey-700);
+    background-color: var(--grey-debug);
     cursor: not-allowed;
 }
 
 .add {
     /* background-color: #ffc7ce !important; */
-    color: var(--green-400) !important;
+    /* color: var(--green-success) !important; */
     /* background-color: var(--green-400) !important; */
+    color: var(--green-success) !important;
 }
 
 .remove {
     /* background-color: #ffc7ce !important; */
-    color: red !important;
+    /* color: var(--red-error) !important; */
     /* background-color: var(--red-600) !important; */
+    color: var(--red-error) !important;
     text-decoration: line-through;
 }
 
@@ -101,7 +119,8 @@
 }
 
 .default {
-    /* color: black; */
+    /* color: var(--grey-200) !important; */
+    /* color: #fff; */
 }
 
 .abbreviated_json_cell {
@@ -110,7 +129,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     text-decoration: underline;
-    color: var(--blue-400) !important;
+    color: var(--blue-info) !important;
     font-weight: bold !important;
 }
 
@@ -129,7 +148,7 @@
 }
 
 .new_update {
-    color: maroon !important;
+    color: var(--red-critical) !important;
     animation: blink 0.5s step-start infinite;
 }
 
@@ -193,5 +212,21 @@
 }
 
 .cell_selected {
-    background-color: var(--indigo-300) !important;
+    background-color: var(--dynamic-cell-selected) !important;
+}
+
+.positive {
+    color: var(--green-success) !important;
+    /* background-color: var(--green-400) !important; */
+}
+
+.negative {
+    /* color: red !important; */
+    /* background-color: var(--red-600) !important; */
+}
+
+.link {
+    color: var(--blue-info) !important;
+    text-decoration: underline;
+    cursor: pointer;
 }

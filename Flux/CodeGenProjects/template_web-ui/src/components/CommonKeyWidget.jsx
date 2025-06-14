@@ -22,6 +22,7 @@ dayjs.extend(timezone);
 const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 const CommonKeyWidget = React.forwardRef((props, ref) => {
+    const theme = useTheme();
 
     if (props.mode === MODES.EDIT || props.commonkeys.length === 0) return null;
     // filter unset or null values from common keys
@@ -47,7 +48,7 @@ const CommonKeyWidget = React.forwardRef((props, ref) => {
     commonkeys = groupCommonKeys(commonkeys);
 
     return (
-        <Box ref={ref} className={classes.container} sx={{ bgcolor: 'background.commonKey' }}>
+        <Box ref={ref} className={classes.container} sx={{ backgroundColor: theme.palette.background.commonKey }}>
             {commonkeys.map((collection, i) => {
                 return (
                     <Fragment key={i}>
@@ -144,16 +145,21 @@ const CommonKey = (props) => {
         }
     }
 
-    let commonkeyColor = theme.palette.text.white;
+    let commonkeyColor = 'var(--dark-text-primary)';
+    
     if (collection.color && !collection.progressBar && !collection.button) {
         const color = getColorTypeFromValue(collection, collection.value);
-        commonkeyColor = theme.palette.text[color];
+        if (theme.palette.text[color]) {
+            commonkeyColor = theme.palette.text[color];
+        }
     }
 
     let commonkeyTitleColor = theme.palette.text.tertiary;
     if (collection.nameColor) {
         const nameColor = collection.nameColor.toLowerCase();
-        commonkeyTitleColor = theme.palette.text[nameColor];
+        if (theme.palette.text[nameColor]) {
+            commonkeyTitleColor = theme.palette.text[nameColor];
+        }
     }
 
     let value = collection.value;

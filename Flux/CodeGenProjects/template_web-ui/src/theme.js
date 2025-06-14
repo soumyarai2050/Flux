@@ -3,10 +3,26 @@ import { createTheme } from '@mui/material/styles';
 export const Theme = {
     LIGHT: 'light',
     DARK: 'dark'
-}
+};
+
+export const BaseColor = {
+    GREEN: 'green',
+    BLUE: 'blue',
+    BROWN: 'brown'
+};
+
+// Global constant to control the default base color
+// Change this value to BaseColor.BLUE or BaseColor.BROWN to change the app-wide default
+export const DEFAULT_BASE_COLOR = BaseColor.BROWN;
 
 export function cssVar(name) {
-    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+        const value = getComputedStyle(document.documentElement).getPropertyValue(name);
+        if (value) {
+            return value.trim();
+        }
+    }
+   
 }
 
 const typography = {
@@ -15,353 +31,393 @@ const typography = {
     "fontWeightLight": 300,
     "fontWeightRegular": 500,
     "fontWeightMedium": 500
-}
+};
 
-const lightThemeComponents = {
-    MuiTooltip: {
-        styleOverrides: {
-            tooltip: {
-                fontSize: '1em',
-                maxWidth: '600px !important',
-                maxHeight: "400px !important",
-                overflow: 'auto',
-                background: cssVar('--light-primary-main'),
-                color: '#121212',
-                border: `1px solid ${cssVar('--light-primary-dark')}`
-            },
-        }
+export const baseColorPalettes = {
+    [BaseColor.GREEN]: {
+        lightest: '--green-theme-lightest',
+        lighter: '--green-theme-lighter',
+        light: '--green-theme-light',
+        medium: '--green-theme-medium',
+        dark: '--green-theme-dark',
+        darker: '--green-theme-darker',
+        darkest: '--green-theme-darkest',
+        contrasting: '--green-theme-accent',
     },
-    MuiTextField: {
-        styleOverrides: {
-            root: {
-                '& .MuiOutlinedInput-root': {
+    [BaseColor.BLUE]: {
+        lightest: '--blue-theme-lightest',
+        lighter: '--blue-theme-lighter',
+        light: '--blue-theme-light',
+        medium: '--blue-theme-medium',
+        dark: '--blue-theme-dark',
+        darker: '--blue-theme-darker',
+        darkest: '--blue-theme-darkest',
+        contrasting: '--blue-theme-accent',
+    },
+    [BaseColor.BROWN]: {
+        lightest: '--brown-theme-lightest',
+        lighter: '--brown-theme-lighter',
+        light: '--brown-theme-light',
+        medium: '--brown-theme-medium',
+        dark: '--brown-theme-dark',
+        darker: '--brown-theme-darker',
+        darkest: '--brown-theme-darkest',
+        contrasting: '--brown-theme-accent',
+    }
+};
+
+const getColorBySeverity = (colorType, isLight = true) => {
+    const colorMap = {
+        'critical': cssVar('--red-critical'),
+        'error': cssVar('--red-error'),
+        'warning': cssVar('--yellow-warning'),
+        'info': cssVar('--blue-info'),
+        'debug': cssVar('--grey-debug'),
+        'success': cssVar('--green-success'),
+        'default': cssVar('--grey-debug')
+    };
+
+    return colorMap[colorType?.toLowerCase()] || colorMap['default'];
+};
+
+const getComponents = (themeMode, selectedColorPalette) => {
+    const isLight = themeMode === Theme.LIGHT;
+
+    const headerBgColor = selectedColorPalette.medium;
+    const selectedItemBgColor = selectedColorPalette.darkest;
+    const selectedItemHoverBgColor = isLight ? selectedColorPalette.dark : selectedColorPalette.light;
+    const pinClockColor = isLight ? selectedColorPalette.dark : selectedColorPalette.medium;
+
+    return {
+        MuiTooltip: {
+            styleOverrides: {
+                tooltip: {
+                    fontSize: '1em',
+                    maxWidth: '600px !important',
+                    maxHeight: "400px !important",
+                    overflow: 'auto',
+                    background: isLight ? cssVar('--light-bg-secondary') : cssVar('--dark-bg-primary'),
+                    color: isLight ? cssVar('--light-text-primary') : cssVar('--dark-text-primary'),
+                    border: `1px solid ${isLight ? cssVar('--light-border-light') : cssVar('--dark-border-light')}`
+                },
+            }
+        },
+        MuiTextField: {
+            styleOverrides: {
+                root: {
+                    '& .MuiOutlinedInput-root': {
+                        '& fieldset': {
+                            borderColor: cssVar('--light-border-input'),
+                        },
+                        '&:hover fieldset': {
+                            borderColor: isLight ? cssVar('--light-border-hover') : cssVar('--dark-border-hover'),
+                        },
+                        '&.Mui-focused fieldset': {
+                            borderColor: cssVar(selectedColorPalette.dark),
+                        },
+                        '&.Mui-disabled fieldset': {
+                            borderColor: cssVar('--light-border-input'),
+                            background: isLight ? cssVar('--light-disabled-overlay') : cssVar('--dark-disabled-overlay'),
+                        },
+                        '& .MuiInputBase-input': {
+                            color: isLight ? cssVar('--light-text-primary') + ' !important' : cssVar('--dark-text-primary'),
+                        },
+                    }
+                },
+            },
+        },
+        MuiSelect: {
+            styleOverrides: {
+                root: {
                     '& fieldset': {
-                        borderColor: cssVar('--grey-400'),
+                        borderColor: cssVar('--light-border-input'),
                     },
                     '&:hover fieldset': {
-                        borderColor: cssVar('--grey-dark'),
+                        borderColor: isLight ? cssVar('--light-border-hover') : cssVar('--dark-border-hover'),
                     },
                     '&.Mui-focused fieldset': {
-                        borderColor: cssVar('--blue-600'),
+                        borderColor: cssVar(selectedColorPalette.dark),
                     },
                     '&.Mui-disabled fieldset': {
-                        borderColor: cssVar('--grey-400'),
-                        background: 'rgba(0, 0, 0, 0.1)',
+                        borderColor: cssVar('--light-border-input'),
+                        background: isLight ? cssVar('--light-disabled-overlay') : cssVar('--dark-disabled-overlay'),
+                    },
+                    '& .MuiSelect-select.MuiInputBase-input.MuiOutlinedInput-input': {
+                        color: isLight ? cssVar('--light-text-primary') + ' !important' : cssVar('--dark-text-primary') + ' !important',
                     },
                 }
             },
         },
-    },
-    MuiSelect: {
-        styleOverrides: {
-            root: {
-                '&.Mui-disabled fieldset': {
-                    borderColor: cssVar('--grey-400'),
-                    background: 'rgba(0, 0, 0, 0.1)',
+        MuiTableHead: {
+            styleOverrides: {
+                root: {
+                    background: cssVar(headerBgColor),
+                    '& .MuiTableCell-root': {
+                        color: cssVar('--table-header-text'),
+                    },
                 },
-            }
-        },
-    },
-    MuiTableHead: {
-        styleOverrides: {
-            root: {
-                // '& .MuiTableCell-root': {
-                //     color: 'white !important',
-                // },
-                background: cssVar('--teal-400')
             },
-        },
-    },
-    MuiTableRow: {
-        styleOverrides: {
-            root: {
-                '&:nth-of-type(even)': {
-                    // backgroundColor: cssVar('--grey-100'),
-                    // opacity: 0.85
-                },
-                '&.Mui-selected': {
-                    backgroundColor: cssVar('--blue-100'),
-                    '&:hover': {
-                        backgroundColor: cssVar('--blue-200'),
-                    }
+        },  
+        MuiListItem: {
+            styleOverrides: {
+                root: {
+                    '&.Mui-selected': {
+                        backgroundColor: cssVar(selectedItemBgColor),
+                        '&:hover': {
+                            backgroundColor: cssVar(selectedItemHoverBgColor),
+                        }
+                    },
                 },
             },
         },
-    },
-    MuiListItem: {
-        styleOverrides: {
-            root: {
-                '&.Mui-selected': {
-                    backgroundColor: cssVar('--blue-100'),
-                    '&:hover': {
-                        backgroundColor: cssVar('--blue-200'),
-                    }
-                },
-            },
-        },
-    },
-    MuiPickersDay: {
-        styleOverrides: {
-            root: {
-                '&.Mui-selected': {
-                    background: cssVar('--teal-400'),
-                    '&:hover': {
-                        backgroundColor: cssVar('--teal-400')
+        MuiPickersDay: {
+            styleOverrides: {
+                root: {
+                    '&.Mui-selected': {
+                        background: cssVar(pinClockColor),
+                        '&:hover': {
+                            backgroundColor: cssVar(pinClockColor)
+                        }
                     }
                 }
             }
-        }
-    },
-    MuiClock: {
-        styleOverrides: {
-            pin: {
-                background: cssVar('--teal-400')
+        },
+        MuiClock: {
+            styleOverrides: {
+                pin: {
+                    background: cssVar(pinClockColor)
+                }
             }
-        }
-    },
-    MuiClockPointer: {
-        styleOverrides: {
-            root: {
-                background: cssVar('--teal-400')
+        },
+        MuiClockPointer: {
+            styleOverrides: {
+                root: {
+                    background: cssVar(pinClockColor)
+                },
+                thumb: {
+                    borderColor: cssVar(pinClockColor)
+                }
             }
-        }
-    },
-    MuiClockNumber: {
-        styleOverrides: {
-            root: {
-                '&.Mui-selected': {
-                    background: cssVar('--teal-400'),
-                    '&:hover': {
-                        backgroundColor: cssVar('--teal-400')
+        },
+        MuiClockNumber: {
+            styleOverrides: {
+                root: {
+                    '&.Mui-selected': {
+                        background: cssVar(pinClockColor),
+                        color: isLight ? '#fff' : '#000',
+                        '&:hover': {
+                            backgroundColor: cssVar(pinClockColor)
+                        }
                     }
                 }
             }
-        }
-    }
-}
+        },
+        MuiTab: {
+            styleOverrides: {
+                root: {
+                    '&.Mui-selected': {
+                        color: cssVar(isLight ? selectedColorPalette.dark : selectedColorPalette.light),
+                        fontWeight: 'bold',
+                    }
+                }
+            }
+        },
+        MuiLinearProgress: {
+            styleOverrides: {
+                root: {
+                    backgroundColor: isLight ? cssVar('--progress-bg-light') : cssVar('--progress-bg-dark'),
+                    '& .MuiLinearProgress-bar': {
+                        backgroundColor: cssVar(selectedColorPalette.light),
+                    }
+                },
+            },
+        },
+        MuiTableCell: {
+            styleOverrides: {
+                root: {
+                    '&.MuiTableCell-head': {
+                        color: cssVar('--table-header-text'),
+                    },
+                },
+            },
+        },
+        MuiButton: {
+            styleOverrides: {
+                root: {
+                    color: '#fff !important'
+                }
+            }
+        },
+        MuiToolbar: {
+            styleOverrides: {
+                root: {
+                    color: isLight ? cssVar('--light-text-primary') : cssVar('--dark-text-primary'),
+                    '&.MuiTablePagination-toolbar': {
+                        color: isLight ? cssVar('--light-text-primary') : cssVar('--dark-text-primary'),
+                        '& *': {
+                            color: isLight ? cssVar('--light-text-primary') : cssVar('--dark-text-primary'),
+                        },
+                        '& .MuiIconButton-root': {
+                            color: isLight ? cssVar('--light-text-primary') : cssVar('--dark-text-primary'),
+                            '&:hover': {
+                                backgroundColor: isLight ? cssVar('--light-hover-overlay') : cssVar('--dark-hover-overlay'),
+                            },
+                            '&.Mui-disabled': {
+                                color: isLight ? cssVar('--light-text-disabled') : cssVar('--dark-text-disabled'),
+                            },
+                        },
+                    },
+                },
+            },
+        },
+        MuiTablePagination: {
+            styleOverrides: {
+                root: {
+                    color: isLight ? cssVar('--light-text-primary') : cssVar('--dark-text-primary'),
+                },
+                toolbar: {
+                    color: isLight ? cssVar('--light-text-primary') : cssVar('--dark-text-primary'),
+                },
+                actions: {
+                    color: isLight ? cssVar('--light-text-primary') : cssVar('--dark-text-primary'),
+                    '& .MuiIconButton-root': {
+                        color: isLight ? cssVar('--light-text-primary') : cssVar('--dark-text-primary'),
+                        '&:hover': {
+                            backgroundColor: isLight ? cssVar('--light-hover-overlay') : cssVar('--dark-hover-overlay'),
+                        },
+                        '&.Mui-disabled': {
+                            color: isLight ? cssVar('--light-text-disabled') : cssVar('--dark-text-disabled'),
+                        },
+                    },
+                },
+                selectIcon: {
+                    color: isLight ? cssVar('--light-text-primary') : cssVar('--dark-text-primary'),
+                },
+                displayedRows: {
+                    color: isLight ? cssVar('--light-text-primary') : cssVar('--dark-text-primary'),
+                },
+                selectLabel: {
+                    color: isLight ? cssVar('--light-text-primary') : cssVar('--dark-text-primary'),
+                },
+            },
+        },
+    };
+};
 
-const darkThemeComponents = {
-    MuiTooltip: {
-        styleOverrides: {
-            tooltip: {
-                fontSize: '1em',
-                maxWidth: '600px !important',
-                maxHeight: "400px !important",
-                overflow: 'auto',
-                background: cssVar('--dark-primary-main'),
-                border: `1px solid ${cssVar('--dark-primary-dark')}`
-            },
-        }
-    },
-    MuiTextField: {
-        styleOverrides: {
-            root: {
-                '& .MuiOutlinedInput-root': {
-                    '& fieldset': {
-                        borderColor: cssVar('--grey-400'),
-                    },
-                    '&:hover fieldset': {
-                        borderColor: cssVar('--grey-light'),
-                    },
-                    '&.Mui-focused fieldset': {
-                        borderColor: cssVar('--blue-600'),
-                    },
-                    '&.Mui-disabled fieldset': {
-                        borderColor: cssVar('--grey-400'),
-                        background: 'rgba(255, 255, 255, 0.1)',
-                    },
-                }
-            },
-        },
-    },
-    MuiSelect: {
-        styleOverrides: {
-            root: {
-                '& fieldset': {
-                    borderColor: cssVar('--grey-400'),
-                },
-                '&.Mui-disabled fieldset': {
-                    borderColor: cssVar('--grey-400'),
-                    background: 'rgba(255, 255, 255, 0.1)',
-                },
-            }
-        },
-    },
-    MuiTableHead: {
-        styleOverrides: {
-            root: {
-                // '& .MuiTableCell-root': {
-                //     color: 'white !important',
-                // },
-                background: cssVar('--blue-accent-400')
-            },
-        },
-    },
-    MuiTableRow: {
-        styleOverrides: {
-            root: {
-                '&:nth-of-type(even)': {
-                    // backgroundColor: cssVar('--grey-800'),
-                    // opacity: 0.85
-                },
-                '&.Mui-selected': {
-                    backgroundColor: cssVar('--indigo-300'),
-                    '&:hover': {
-                        backgroundColor: cssVar('--indigo-400'),
-                    }
-                },
-            },
-        },
-    },
-    MuiListItem: {
-        styleOverrides: {
-            root: {
-                '&.Mui-selected': {
-                    backgroundColor: cssVar('--indigo-300'),
-                    '&:hover': {
-                        backgroundColor: cssVar('--indigo-400'),
-                    }
-                },
-            },
-        },
-    },
-    MuiLinearProgress: {
-        styleOverrides: {
-            root: {
-                backgroundColor: cssVar('--grey-800'),
-            },
-        },
-    },
-    MuiPickersDay: {
-        styleOverrides: {
-            root: {
-                '&.Mui-selected': {
-                    background: cssVar('--blue-accent-400'),
-                    '&:hover': {
-                        backgroundColor: cssVar('--blue-accent-400')
-                    }
-                }
-            }
-        }
-    },
-    MuiClock: {
-        styleOverrides: {
-            pin: {
-                background: cssVar('--blue-accent-400')
-            }
-        }
-    },
-    MuiClockPointer: {
-        styleOverrides: {
-            root: {
-                background: cssVar('--blue-accent-400')
-            }
-        }
-    },
-    MuiClockNumber: {
-        styleOverrides: {
-            root: {
-                '&.Mui-selected': {
-                    background: cssVar('--blue-accent-400'),
-                    '&:hover': {
-                        backgroundColor: cssVar('--blue-accent-400')
-                    }
-                }
-            }
-        }
-    },
-    MuiTab: {
-        styleOverrides: {
-            root: {
-                '&.Mui-selected': {
-                    color: cssVar('--blue-accent-400'),
-                    fontWeight: 'bold',
-                    
-                }
-            }
-        }
-    }
-}
+export const getTheme = (themeMode = Theme.LIGHT, baseColorName = DEFAULT_BASE_COLOR) => {
+    const selectedPalette = baseColorPalettes[baseColorName] || baseColorPalettes[DEFAULT_BASE_COLOR];
 
-export const lightTheme = createTheme({
-    typography: typography,
-    components: lightThemeComponents,
-    palette: {
-        mode: Theme.LIGHT,
-        primary: {
-            main: cssVar('--light-primary-main'),
-            light: cssVar('--light-primary-light'),
-            dark: cssVar('--light-primary-dark')
-        },
-        secondary: {
-            main: cssVar('--light-primary-main'),
-            light: cssVar('--light-primary-light'),
-            dark: cssVar('--light-primary-dark')
-        },
-        text: {
-            primary: '#010101',
-            secondary: '#121212',
-            tertiary: cssVar('--yellow-400'),
-            quaternary: cssVar('--yellow-100'),
-            critical: cssVar('--red-800'),
-            error: cssVar('--red-600'),
-            warning: cssVar('--yellow-800'),
-            info: cssVar('--blue-400'),
-            success: cssVar('--green-400'),
-            debug: cssVar('grey-600'),
-            default: '#010101',
-            white: '#fff',
-            disabled: cssVar('--grey-600')
-        },
-        background: {
-            default: cssVar('--light-primary-dark'),
-            primary: cssVar('--light-primary-dark'),
-            secondary: cssVar('--teal-400'),
-            commonKey: cssVar('--teal-400'),
-            nodeHeader: cssVar('--teal-400'),
-            icon: cssVar('--teal-400')
-        }
+    if (themeMode === Theme.DARK) {
+        return createTheme({
+            typography: typography,
+            components: getComponents(Theme.DARK, selectedPalette),
+            palette: {
+                mode: Theme.DARK,
+                primary: {
+                    main: cssVar(selectedPalette.medium),
+                    light: cssVar(selectedPalette.light),
+                    dark: cssVar(selectedPalette.dark)
+                },
+                secondary: {
+                    main: cssVar('--dark-bg-secondary'),
+                    light: cssVar('--dark-border-default'),
+                    dark: cssVar('--dark-bg-primary')
+                },
+                error: {
+                    main: cssVar('--red-error'),
+                },
+                warning: {
+                    main: cssVar('--yellow-warning'),
+                },
+                info: {
+                    main: cssVar('--blue-info'),
+                },
+                success: {
+                    main: cssVar('--green-success'),
+                },
+                text: {
+                    primary: cssVar('--dark-text-primary'),
+                    secondary: cssVar('--dark-text-secondary'),
+                    tertiary: cssVar('--yellow-warning'),
+                    quaternary: cssVar('--yellow-warning'),
+                    critical: cssVar('--red-critical'),
+                    error: cssVar('--red-error'),
+                    warning: cssVar('--yellow-warning'),
+                    info: cssVar('--blue-info'),
+                    success: cssVar('--green-success'),
+                    debug: cssVar('--grey-debug'),
+                    default: cssVar('--dark-text-primary'),
+                    white: '#fff',
+                    black: '#000',
+                    disabled: cssVar('--dark-text-disabled')
+                },
+                background: {
+                    default: cssVar('--dark-bg-primary'),
+                    primary: cssVar('--dark-bg-primary'),
+                    secondary: cssVar('--dark-bg-secondary'),
+                    paper: cssVar('--dark-bg-secondary'),
+                    commonKey: cssVar(selectedPalette.contrasting),
+                    nodeHeader: cssVar(selectedPalette.medium),
+                    icon: cssVar(selectedPalette.light)
+                }
+            }
+        });
     }
-})
 
-export const darkTheme = createTheme({
-    typography: typography,
-    components: darkThemeComponents,
-    palette: {
-        mode: Theme.DARK,
-        primary: {
-            main: cssVar('--dark-primary-main'),
-            light: cssVar('--dark-primary-light'),
-            dark: cssVar('--dark-primary-dark')
-        },
-        secondary: {
-            main: cssVar('--dark-secondary-main'),
-            light: cssVar('--dark-secondary-light'),
-            dark: cssVar('--dark-secondary-dark')
-        },
-        text: {
-            primary: '#fff',
-            tertiary: cssVar('--yellow-400'),
-            quaternary: cssVar('--yellow-100'),
-            critical: cssVar('--red-800'),
-            error: cssVar('--red-600'),
-            warning: cssVar('--yellow-800'),
-            info: cssVar('--blue-400'),
-            success: cssVar('--green-400'),
-            debug: cssVar('grey-600'),
-            default: '#fff',
-            white: '#fff'
-        },
-        background: {
-            primary: cssVar('--dark-primary-main'),
-            secondary: cssVar('--dark-primary-light'),
-            commonKey: cssVar('--dark-primary-light'),
-            nodeHeader: cssVar('--blue-accent-400'),
-            icon: cssVar('--blue-accent-400')
+    // Light Theme
+    return createTheme({
+        typography: typography,
+        components: getComponents(Theme.LIGHT, selectedPalette),
+        palette: {
+            mode: Theme.LIGHT,
+            primary: {
+                main: cssVar(selectedPalette.medium),
+                light: cssVar(selectedPalette.light),
+                dark: cssVar(selectedPalette.dark)
+            },
+            secondary: {
+                main: cssVar('--light-border-light'),
+                light: cssVar('--light-bg-secondary'),
+                dark: cssVar('--light-border-default')
+            },
+            error: {
+                main: cssVar('--red-error'),
+            },
+            warning: {
+                main: cssVar('--yellow-warning'),
+            },
+            info: {
+                main: cssVar('--blue-info'),
+            },
+            success: {
+                main: cssVar('--green-success'),
+            },
+            text: {
+                primary: cssVar('--light-text-primary'),
+                secondary: cssVar('--light-text-secondary'),
+                tertiary: cssVar('--yellow-warning'),
+                quaternary: cssVar('--yellow-warning'),
+                critical: cssVar('--red-critical'),
+                error: cssVar('--red-error'),
+                warning: cssVar('--yellow-warning'),
+                info: cssVar('--blue-info'),
+                success: cssVar('--green-success'),
+                debug: cssVar('--grey-debug'),
+                default: cssVar('--light-text-primary'),
+                white: '#fff',
+                black: '#000',
+                disabled: cssVar('--light-text-disabled')
+            },
+            background: {
+                default: cssVar(selectedPalette.light),
+                primary: cssVar('--light-bg-primary'),
+                paper: cssVar('--light-bg-secondary'),
+                secondary: cssVar(selectedPalette.light),
+                commonKey: cssVar(selectedPalette.contrasting),
+                nodeHeader: cssVar(selectedPalette.dark),
+                icon: cssVar(selectedPalette.medium)
+            }
         }
-    }
-})
+    });
+};
 
-export const getTheme = (theme) => {
-    return theme === Theme.DARK ? darkTheme : lightTheme;
-}

@@ -27,7 +27,7 @@
     padding: 5px 10px;
     align-items: center;
     /* background-color: #2196f3; */
-    border: 1px solid var(--yellow-500);
+    border: 1px solid var(--yellow-warning);
     margin: 2px;
     margin-right: 5px;
     min-width: 150px;
@@ -39,15 +39,16 @@
 
 .node_title {
     flex: 1;
+    color: #fff;
 }
 
 .add {
-    border-color:  #26a69a;
+    border-color: var(--green-success);
     /* background-color: #b3e0e5; */
 }
 
 .remove {
-    border-color: #ef5350;
+    border-color: var(--red-error);
     /* background-color: #f27981; */
     text-decoration: line-through;
 }
@@ -63,28 +64,28 @@
 }
 
 .critical {
-    color: #9C0006 !important;
+    color: var(--red-critical) !important;
     animation: blink 0.5s step-start infinite;
 }
 
 .error {
-    color: #9C0006 !important;
+    color: var(--red-error) !important;
 }
 
 .warning {
-    color: #9c6500 !important;
+    color: var(--yellow-warning) !important;
 }
 
 .info {
-    color: blue !important;
+    color: var(--blue-info) !important;
 }
 
 .debug {
-    color: #444 !important;
+    color: var(--grey-debug) !important;
 }
 
 .success {
-    color: green !important;
+    color: var(--green-success) !important;
 }
 
 .default {
@@ -125,11 +126,11 @@ ul{
 
 @keyframes temporaryGlowBorder {
     0% {
-      background-color: rgba(var(--green-400-rgb), 0.2); /* low-opacity background */
+      background-color: rgba(var(--brand-new-node-rgb), 0.2); /* low-opacity background */
       border-radius: 4px;
     }
     90% {
-      background-color: rgba(var(--green-400-rgb), 0.2);
+              background-color: rgba(var(--brand-new-node-rgb), 0.2);
     }
     100% {
       background-color: transparent;

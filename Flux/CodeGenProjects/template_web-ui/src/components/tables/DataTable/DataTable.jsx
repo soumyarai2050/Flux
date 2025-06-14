@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ListItemIcon, ListItemText, Menu, MenuItem, Table, TableBody, TableContainer, TableRow, TablePagination } from '@mui/material';
+import { ListItemIcon, ListItemText, Menu, MenuItem, Table, TableBody, TableContainer, TableRow, TablePagination, Select, FormControl, InputLabel, Box } from '@mui/material';
 import TableHead from '../../TableHead';
 import Cell from '../../Cell';
 import styles from './DataTable.module.css';
@@ -256,6 +256,11 @@ const DataTable = ({
     onRowsPerPageChange(updatedRowsPerPage);
   }
 
+  const handlePageSelectChange = (e) => {
+    const selectedPage = parseInt(e.target.value, 10);
+    onPageChange(selectedPage);
+  }
+
   const handleModalToggle = (e, reason) => {
     if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;
     setIsModalOpen((prev) => !prev);
@@ -263,143 +268,252 @@ const DataTable = ({
 
   if (!activeRows || activeRows.length === 0) return null;
 
+  // Calculate total pages for the select dropdown
+  const totalPages = Math.ceil(rows.length / rowsPerPage);
+  const pageOptions = Array.from({ length: totalPages }, (_, i) => i);
+
   // const isContextMenuOpen = Boolean(contextMenuAnchorEl);
 
   return (
-    <TableContainer className={styles.container}>
-      <Table
-        className={styles.table}
-        size='medium'>
-        <TableHead
-          headCells={cells}
-          mode={mode}
-          sortOrders={sortOrders}
-          onRequestSort={handleSortRequest}
-          onRemoveSort={handleSortRemove}
-          copyColumnHandler={handleCopy}
-        />
-        <TableBody>
-          {activeRows.map((groupedRow, idx) => {
-            const rowKey = groupedRow[0]['data-id'] ?? idx;
+    <div className={styles.dataTableWrapper}>
+      <TableContainer className={styles.scrollableTableContainer}>
+        <Table
+          className={styles.table}
+          size='medium'>
+          <TableHead
+            headCells={cells}
+            mode={mode}
+            sortOrders={sortOrders}
+            onRequestSort={handleSortRequest}
+            onRemoveSort={handleSortRemove}
+            copyColumnHandler={handleCopy}
+          />
+          <TableBody>
+            {activeRows.map((groupedRow, idx) => {
+              const rowKey = groupedRow[0]['data-id'] ?? idx;
 
-            return (
-              <TableRow
-                key={rowKey}
-                className={styles.row}
-                onDoubleClick={handleRowDoubleClick}
-              >
-                {cells.map((cell) => {
-                  // Get row data based on the cell's source index.
-                  const row = groupedRow[cell.sourceIndex];
-                  const isSelected = row && (
-                    modelType === MODEL_TYPES.ROOT
-                      ? selectedRows.includes(row['data-id'])
-                      : selectedRows.includes(row['data-id']) || selectedId === row['data-id']);
-                  const isNullCell = !row || (row && Object.keys(row).length === 0 && !cell.commonGroupKey);
+              return (
+                <TableRow
+                  key={rowKey}
+                  className={styles.row}
+                  onDoubleClick={handleRowDoubleClick}
+                >
+                  {cells.map((cell) => {
+                    // Get row data based on the cell's source index.
+                    const row = groupedRow[cell.sourceIndex];
+                    const isSelected = row && (
+                      modelType === MODEL_TYPES.ROOT
+                        ? selectedRows.includes(row['data-id'])
+                        : selectedRows.includes(row['data-id']) || selectedId === row['data-id']);
+                    const isNullCell = !row || (row && Object.keys(row).length === 0 && !cell.commonGroupKey);
 
-                  let xpath = row?.['xpath_' + cell.key];
-                  if (row && cell.tableTitle && cell.tableTitle.indexOf('.') > -1) {
-                    xpath = row[cell.tableTitle.substring(0, cell.tableTitle.lastIndexOf('.')) + '.xpath_' + cell.key];
-                  }
+                    let xpath = row?.['xpath_' + cell.key];
+                    if (row && cell.tableTitle && cell.tableTitle.indexOf('.') > -1) {
+                      xpath = row[cell.tableTitle.substring(0, cell.tableTitle.lastIndexOf('.')) + '.xpath_' + cell.key];
+                    }
 
-                  let disabled = false;
-                  if (row) {
-                    if (row[cell.tableTitle] === undefined) {
-                      disabled = true;
-                    } else if (mode === MODES.EDIT) {
-                      if (cell && cell.ormNoUpdate && !row['data-add']) {
+                    let disabled = false;
+                    if (row) {
+                      if (row[cell.tableTitle] === undefined) {
                         disabled = true;
-                      } else if (cell.uiUpdateOnly && row['data-add']) {
-                        disabled = true;
-                      } else if (row['data-remove']) {
-                        disabled = true;
+                      } else if (mode === MODES.EDIT) {
+                        if (cell && cell.ormNoUpdate && !row['data-add']) {
+                          disabled = true;
+                        } else if (cell.uiUpdateOnly && row['data-add']) {
+                          disabled = true;
+                        } else if (row['data-remove']) {
+                          disabled = true;
+                        }
                       }
                     }
-                  }
 
-                  const dataxpath = getDataxpath(updatedData, xpath);
-                  const dataAdd = row?.['data-add'] ?? false;
-                  const dataRemove = row?.['data-remove'] ?? false;
-                  let value = row?.[cell.tableTitle];
-                  let storedValue;
-                  if (modelType === MODEL_TYPES.REPEATED_ROOT) {
-                    if (row && isSelected) {
-                      const storedObj = storedData.find((o) => o[DB_ID] === row['data-id']);
-                      if (storedObj) {
-                        storedValue = get(storedObj, xpath);
+                    const dataxpath = getDataxpath(updatedData, xpath);
+                    const dataAdd = row?.['data-add'] ?? false;
+                    const dataRemove = row?.['data-remove'] ?? false;
+                    let value = row?.[cell.tableTitle];
+                    let storedValue;
+                    if (modelType === MODEL_TYPES.REPEATED_ROOT) {
+                      if (row && isSelected) {
+                        const storedObj = storedData.find((o) => o[DB_ID] === row['data-id']);
+                        if (storedObj) {
+                          storedValue = get(storedObj, xpath);
+                        }
+                      } else {
+                        storedValue = get(storedData, xpath);
                       }
                     } else {
                       storedValue = get(storedData, xpath);
                     }
-                  } else {
-                    storedValue = get(storedData, xpath);
-                  }
-                  if (cell.joinKey || cell.commonGroupKey) {
-                    if (!value) {
-                      const joinedKeyCellRow = row.find(r => r?.[cell.tableTitle] !== null && r?.[cell.tableTitle] !== undefined);
-                      if (joinedKeyCellRow) {
-                        value = joinedKeyCellRow ? joinedKeyCellRow[cell.tableTitle] : undefined;
+                    if (cell.joinKey || cell.commonGroupKey) {
+                      if (!value) {
+                        const joinedKeyCellRow = row.find(r => r?.[cell.tableTitle] !== null && r?.[cell.tableTitle] !== undefined);
+                        if (joinedKeyCellRow) {
+                          value = joinedKeyCellRow ? joinedKeyCellRow[cell.tableTitle] : undefined;
+                        }
                       }
                     }
+
+                    const isButtonDisabled = modelType === MODEL_TYPES.REPEATED_ROOT && (!isSelected || (isSelected && xpath?.startsWith('[')));
+                    const rowIdx = modelType === MODEL_TYPES.REPEATED_ROOT ? row?.['data-id'] : row?.['data-id'] || cell.tableTitle;
+                    const cellKey = `${rowIdx}_${cell.tableTitle}`
+
+                    return (
+                      <Cell
+                        key={cellKey}
+                        mode={mode}
+                        selected={isSelected}
+                        rowindex={rowIdx}
+                        name={cell.key}
+                        elaborateTitle={cell.tableTitle}
+                        currentValue={value}
+                        previousValue={storedValue}
+                        collection={cell}
+                        xpath={xpath}
+                        dataxpath={dataxpath}
+                        dataAdd={dataAdd}
+                        dataRemove={dataRemove}
+                        disabled={disabled}
+                        buttonDisable={isButtonDisabled}
+                        onButtonClick={handleButtonClick}
+                        onTextChange={handleTextChange}
+                        index={selectedId}
+                        forceUpdate={isModalOpen}
+                        truncateDateTime={false}
+                        modelType={modelType}
+                        onForceSave={() => { }}
+                        onRowSelect={handleRowSelect}
+                        dataSourceId={modelType === MODEL_TYPES.ROOT ? selectedId : row?.['data-id']}
+                        nullCell={isNullCell}
+                        dataSourceColors={dataSourceColors}
+                        onUpdate={handleUpdate}
+                        onDoubleClick={handleCellDoubleClick}
+                        onCheckboxChange={handleCheckboxToggle}
+                        onSelectItemChange={handleSelectItemChange}
+                        onAutocompleteOptionChange={handleAutocompleteChange}
+                        onDateTimeChange={handleDateTimeChange}
+                      />
+                    );
+                  })}
+                </TableRow>
+              )
+            })}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      {rows.length > 6 && (
+        <Box sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1,
+          paddingY: 0.25,
+          paddingX: 1,
+          borderTop: '1px solid',
+          borderColor: 'divider',
+          position: 'sticky',
+          bottom: 0,
+          zIndex: 10,
+          backdropFilter: 'blur(8px)',
+          bgcolor: 'background.paper',
+          minHeight: '32px',
+
+          '@media (max-width: 768px)': {
+            flexDirection: 'column',
+            alignItems: 'stretch',
+            gap: 0.5,
+          }
+        }}>
+          <FormControl size="small" sx={{ 
+            minWidth: 100,
+            '& .MuiInputLabel-root': {
+              fontSize: '0.75rem',
+            },
+            '& .MuiSelect-select': {
+              fontSize: '0.75rem',
+              padding: '4px 8px',
+            },
+            '& .MuiOutlinedInput-root': {
+              height: '28px',
+            },
+            '@media (max-width: 768px)': {
+                width: '100%'
+            }
+          }}>
+            <InputLabel sx={{ fontSize: '0.75rem' }}>Select Page</InputLabel>
+            <Select
+              value={page}
+              onChange={handlePageSelectChange}
+              label="Select Page"
+              sx={{
+                fontSize: '0.75rem',
+                '& .MuiMenuItem-root': {
+                  fontSize: '0.75rem',
+                }
+              }}
+            >
+              {pageOptions.map((pageNum) => (
+                <MenuItem key={pageNum} value={pageNum} sx={{ fontSize: '0.75rem' }}>
+                  Page {pageNum + 1}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          
+          <Box sx={{
+            fontWeight: 400,
+            color: 'text.secondary',
+            whiteSpace: 'nowrap',
+            fontSize: '0.75rem',
+            paddingX: 0.5,
+            '@media (max-width: 768px)': {
+                textAlign: 'center'
+            }
+          }}>
+            Page {page + 1} / Page {totalPages}
+          </Box>
+          
+          <TablePagination
+            rowsPerPageOptions={[25, 50, 100]}
+            component='div'
+            count={rows.length}
+            rowsPerPage={rowsPerPage}
+            page={page}
+            onPageChange={handlePageChange}
+            onRowsPerPageChange={handleRowsPerPageChange}
+            sx={{ 
+              flex: 1, 
+              border: 'none',
+              '& .MuiTablePagination-toolbar': {
+                minHeight: '32px',
+                paddingLeft: 1,
+                paddingRight: 1,
+              },
+              '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': {
+                fontSize: '0.75rem',
+                margin: 0,
+              },
+              '& .MuiTablePagination-select': {
+                fontSize: '0.75rem',
+              },
+              '& .MuiIconButton-root': {
+                padding: '2px',
+                '& .MuiSvgIcon-root': {
+                  fontSize: '1rem',
+                },
+                '&.Mui-disabled': {
+                  color: 'text.disabled',
+                  opacity: 0.5,
+                  '& .MuiSvgIcon-root': {
+                    color: 'text.disabled',
+                    opacity: 0.5,
                   }
+                }
+              }
+            }}
+          />
+        </Box>
+      )}
 
-                  const isButtonDisabled = modelType === MODEL_TYPES.REPEATED_ROOT && (!isSelected || (isSelected && xpath?.startsWith('[')));
-                  const rowIdx = modelType === MODEL_TYPES.REPEATED_ROOT ? row?.['data-id'] : row?.['data-id'] || cell.tableTitle;
-                  const cellKey = `${rowIdx}_${cell.tableTitle}`
-
-                  return (
-                    <Cell
-                      key={cellKey}
-                      mode={mode}
-                      selected={isSelected}
-                      rowindex={rowIdx}
-                      name={cell.key}
-                      elaborateTitle={cell.tableTitle}
-                      currentValue={value}
-                      previousValue={storedValue}
-                      collection={cell}
-                      xpath={xpath}
-                      dataxpath={dataxpath}
-                      dataAdd={dataAdd}
-                      dataRemove={dataRemove}
-                      disabled={disabled}
-                      buttonDisable={isButtonDisabled}
-                      onButtonClick={handleButtonClick}
-                      onTextChange={handleTextChange}
-                      index={selectedId}
-                      forceUpdate={isModalOpen}
-                      truncateDateTime={false}
-                      modelType={modelType}
-                      onForceSave={() => { }}
-                      onRowSelect={handleRowSelect}
-                      dataSourceId={modelType === MODEL_TYPES.ROOT ? selectedId : row?.['data-id']}
-                      nullCell={isNullCell}
-                      dataSourceColors={dataSourceColors}
-                      onUpdate={handleUpdate}
-                      onDoubleClick={handleCellDoubleClick}
-                      onCheckboxChange={handleCheckboxToggle}
-                      onSelectItemChange={handleSelectItemChange}
-                      onAutocompleteOptionChange={handleAutocompleteChange}
-                      onDateTimeChange={handleDateTimeChange}
-                    />
-                  );
-                })}
-              </TableRow>
-            )
-          })}
-        </TableBody>
-      </Table>
-      {rows.length > 6 &&
-        <TablePagination
-          rowsPerPageOptions={[25, 50, 100]}
-          component='div'
-          count={rows.length}
-          rowsPerPage={rowsPerPage}
-          page={page}
-          onPageChange={handlePageChange}
-          onRowsPerPageChange={handleRowsPerPageChange}
-        />
-      }
       <ClipboardCopier text={clipboardText} />
       {/* <Menu
                 open={isContextMenuOpen}
@@ -426,18 +540,19 @@ const DataTable = ({
               projectSchema={projectSchema}
               modelName={modelName}
               updatedData={modelType === MODEL_TYPES.REPEATED_ROOT ? dataTree : updatedData}
-              storedData={modelType === MODEL_TYPES.REPEATED_ROOT ? storedData[selectedRows[0]] || {} : storedData}
+              storedData={modelType === MODEL_TYPES.REPEATED_ROOT ? (storedData.find((o) => o[DB_ID] === selectedRows[0]) || {}) : storedData}
               subtree={modelType === MODEL_TYPES.REPEATED_ROOT ? null : dataTree}
               mode={mode}
               xpath={modelRootPath}
               onUpdate={handleUpdate}
               onUserChange={handleUserChange}
               selectedId={selectedId}
+              treeLevel={10}
             />
           </ModelCardContent>
         </ModelCard>
       </FullScreenModal>
-    </TableContainer>
+    </div>
   )
 }
 

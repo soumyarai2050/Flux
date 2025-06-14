@@ -74,10 +74,3 @@ ul{
     /* Maybe different typography for child items */
   }
 
-/* // Removed for centralized glow - now handled by DataTree via Node.module.css
-.newlyAddedGlow {
-    border: 2px solid var(--green-400);
-    box-shadow: 0 0 10px var(--green-400);
-    transition: border 0.3s ease-out, box-shadow 0.3s ease-out;
-}
-*/
