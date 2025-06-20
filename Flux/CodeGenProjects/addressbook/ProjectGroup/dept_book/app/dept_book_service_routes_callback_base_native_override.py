@@ -42,7 +42,7 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
 
     @classmethod
     def initialize_underlying_http_callables(cls):
-        from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.generated.FastApi.dept_book_service_http_msgspec_routes import (
+        from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.generated.FastApi.dept_book_service_http_routes_imports import (
             underlying_read_contact_limits_http_json_dict, underlying_create_contact_limits_http,
             underlying_read_dash_filters_collection_http_json_dict, underlying_create_dash_filters_collection_http,
             underlying_read_dash_collection_by_id_http, underlying_create_dash_collection_http,
@@ -76,7 +76,7 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
         while True:
             if should_sleep:
                 time.sleep(self.min_refresh_interval)
-            service_up_flag_env_var = os.environ.get(f"dept_book_{dsb_port}")
+            service_up_flag_env_var = os.environ.get(f"dept_book_{self.port}")
 
             if service_up_flag_env_var == "1":
                 # validate essential services are up, if so, set service ready state to true
@@ -112,6 +112,59 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
             else:
                 should_sleep = True
 
+    @except_n_log_alert()
+    def _view_app_launch_pre_thread_func(self):
+        """
+        sleep wait till engine is up
+        TODO LAZY: we should invoke _apply_checks_n_alert on all active pair plans at startup/re-start
+        """
+
+        error_prefix = "_app_launch_pre_thread_func: "
+        service_up_no_error_retry_count = 3  # minimum retries that shouldn't raise error on UI dashboard
+        should_sleep: bool = False
+        mongo_stream_started = False
+        while True:
+            if should_sleep:
+                time.sleep(self.min_refresh_interval)
+            service_up_flag_env_var = os.environ.get(f"dept_book_{self.port}")
+
+            if service_up_flag_env_var == "1":
+                # validate essential services are up, if so, set service ready state to true
+                if self.service_up:
+                    if not self.service_ready:
+                        self.service_ready = True
+                        # print is just to manually check if this server is ready - useful when we run
+                        # multiple servers and before running any test we want to make sure servers are up
+                        print(f"INFO: dept_book service is ready: {datetime.datetime.now().time()}")
+
+                if not self.service_up:
+                    try:
+                        if is_all_view_service_up(ignore_error=(service_up_no_error_retry_count > 0)):
+                            self.service_up = True
+                    except Exception as e:
+                        logging.exception("unexpected: service startup threw exception, "
+                                          f"we'll retry periodically in: {self.min_refresh_interval} seconds"
+                                          f";;;exception: {e}", exc_info=True)
+                else:
+                    should_sleep = True
+                    # any periodic refresh code goes here
+
+                    if not mongo_stream_started:
+                        Thread(target=self.start_mongo_streamer, daemon=True).start()
+                        mongo_stream_started = True
+
+            else:
+                should_sleep = True
+
+    def start_mongo_streamer(self):
+        run_coro = self._start_mongo_streamer()
+        future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
+        # block for task to finish
+        try:
+            future.result()
+        except Exception as e:
+            logging.exception(f"start_mongo_streamer failed with exception: {e}")
+
     def app_launch_pre(self):
         DeptBookServiceRoutesCallbackBaseNativeOverride.initialize_underlying_http_callables()
         logging.debug("Triggered server launch pre override")
@@ -119,8 +172,18 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
         app_launch_pre_thread = Thread(target=self._app_launch_pre_thread_func, daemon=True)
         app_launch_pre_thread.start()
 
+    def view_app_launch_pre(self):
+        DeptBookServiceRoutesCallbackBaseNativeOverride.initialize_underlying_http_callables()
+        self.port = dsb_view_port
+        app_launch_pre_thread = Thread(target=self._view_app_launch_pre_thread_func, daemon=True)
+        app_launch_pre_thread.start()
+        logging.debug("Triggered view server launch pre override")
+
     def app_launch_post(self):
         logging.debug("Triggered server launch post override")
+
+    def view_app_launch_post(self):
+        logging.debug("Triggered view server launch post override")
 
     async def read_all_ui_layout_pre(self):
         # Setting asyncio_loop in ui_layout_pre since it called to check current service up

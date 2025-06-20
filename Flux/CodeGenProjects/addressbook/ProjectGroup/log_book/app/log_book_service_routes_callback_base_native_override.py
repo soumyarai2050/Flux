@@ -1,4 +1,5 @@
 # standard imports
+import asyncio
 import json
 import logging
 import multiprocessing
@@ -29,14 +30,24 @@ from FluxPythonUtils.scripts.general_utility_functions import (
     get_pid_from_port, is_process_running, parse_to_float, get_symbol_side_pattern,
     get_transaction_counts_n_timeout_from_config, find_files_with_regex, ClientError)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_helper import (
-    photo_book_service_http_client)
+    photo_book_service_http_view_client, photo_book_service_http_main_client)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_client import StreetBookServiceHttpClient
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.markets.market import Market, MarketID
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book_service_helper import (
     get_plan_id_from_executor_log_file_name, get_symbol_n_side_from_log_line)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import symbol_side_key, get_symbol_side_key
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.app.basket_book_helper import be_port, basket_book_service_http_client
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.app.basket_book_helper import (
+    be_port, basket_book_service_http_view_client, basket_book_service_http_main_client)
 from Flux.PyCodeGenEngine.FluxCodeGenCore.log_book_utils import *
+from Flux.PyCodeGenEngine.FluxCodeGenCore.generic_msgspec_routes import watch_specific_collection_with_stream
+
+
+if config_yaml_dict.get("use_view_clients"):
+    basket_book_service_http_client = basket_book_service_http_view_client
+    photo_book_service_http_client = photo_book_service_http_view_client
+else:
+    basket_book_service_http_client = basket_book_service_http_main_client
+    photo_book_service_http_client = photo_book_service_http_main_client
 
 # standard imports
 from datetime import datetime
@@ -87,6 +98,8 @@ class LogNoActivityData(MsgspecBaseModel, kw_only=True):
     critical_duration_list: List[Tuple[DateTime | None, DateTime | None]] = field(default_factory=list)
     last_modified_timestamp: float | None = None
 
+
+is_view_server = os.environ.get('IS_VIEW_SERVER', False)
 
 class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallback):
     log_seperator: str = ';;;'
@@ -159,8 +172,10 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
 
         if self.min_refresh_interval is None:
             self.min_refresh_interval = 30
-        self.contact_alert_fail_logger = create_logger("contact_alert_fail_logger", logging.DEBUG,
-                                                         str(CURRENT_PROJECT_LOG_DIR), contact_alert_fail_log)
+        if not is_view_server:
+            self.contact_alert_fail_logger = create_logger("contact_alert_fail_logger", logging.DEBUG,
+                                                             str(CURRENT_PROJECT_LOG_DIR), contact_alert_fail_log)
+        # else not required: contact fail logger is only required when creating/updating contact alerts
         self.no_activity_init_timeout = config_yaml_dict.get("no_activity_init_timeout")
 
         # dict to hold realtime configurable data members and their respective keys in config_yaml_dict
@@ -176,7 +191,7 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         threading.Thread(target=self.handle_pos_disable_from_symbol_side_log_queue, daemon=True).start()
 
     def initialize_underlying_http_callables(self):
-        from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.FastApi.log_book_service_http_msgspec_routes import (
+        from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.FastApi.log_book_service_http_routes_imports import (
             underlying_read_contact_alert_http, underlying_create_all_contact_alert_http,
             underlying_read_plan_alert_http, underlying_delete_by_id_list_plan_alert_http,
             underlying_update_all_contact_alert_http, underlying_create_all_plan_alert_http,
@@ -222,7 +237,7 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         while True:
             if should_sleep:
                 time.sleep(self.min_refresh_interval)
-            service_up_flag_env_var = os.environ.get(f"log_book_{la_port}")
+            service_up_flag_env_var = os.environ.get(f"log_book_{self.port}")
 
             if not no_activity_setup_timeout:
                 if (DateTime.utcnow() - start_up_datetime).total_seconds() > self.no_activity_init_timeout:
@@ -296,6 +311,62 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             else:
                 should_sleep = True
 
+    @except_n_log_alert()
+    def _view_app_launch_pre_thread_func(self):
+        """
+        sleep wait till engine is up, then create contact limits if required
+        TODO LAZY: we should invoke _apply_checks_n_alert on all active pair plans at startup/re-start
+        """
+
+        error_prefix = "_app_launch_pre_thread_func: "
+        service_up_no_error_retry_count = 3  # minimum retries that shouldn't raise error on UI dashboard
+        should_sleep: bool = False
+        mongo_streamer_started = False
+        while True:
+            if should_sleep:
+                time.sleep(self.min_refresh_interval)
+            service_up_flag_env_var = os.environ.get(f"log_book_{self.port}")
+
+            if service_up_flag_env_var == "1":
+                # validate essential services are up, if so, set service ready state to true
+                if self.service_up:
+                    if not self.service_ready:
+                        self.service_ready = True
+                        # print is just to manually check if this server is ready - useful when we run
+                        # multiple servers and before running any test we want to make sure servers are up
+                        print(f"INFO: log analyzer service is ready: {datetime.now().time()}")
+
+                if not self.service_up:
+                    try:
+                        if is_view_log_book_service_up(ignore_error=(service_up_no_error_retry_count > 0)):
+                            self.service_up = True
+                            should_sleep = False
+                        else:
+                            should_sleep = True
+                            service_up_no_error_retry_count -= 1
+                    except Exception as e:
+                        self.contact_alert_fail_logger.exception(
+                            "Unexpected: service startup threw exception, "
+                            f"we'll retry periodically in: {self.min_refresh_interval} seconds"
+                            f";;;exception: {e}")
+                else:
+                    should_sleep = True
+                    # any periodic refresh code goes here
+
+                    if not mongo_streamer_started:
+                        threading.Thread(target=self.start_mongo_streamer, daemon=True).start()
+                        mongo_streamer_started = True
+
+                    # update latest config file if any modification is made
+                    last_modified_timestamp = os.path.getmtime(config_yaml_path)
+                    if self.config_yaml_last_modified_timestamp != last_modified_timestamp:
+                        self.config_yaml_last_modified_timestamp = last_modified_timestamp
+
+                        handle_refresh_configurable_data_members(self, self.config_key_to_data_member_name_dict,
+                                                                 str(config_yaml_path))
+            else:
+                should_sleep = True
+
     def get_generic_read_route(self):
         pass
 
@@ -307,6 +378,15 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         app_launch_pre_thread.start()
 
         logging.debug("Triggered server launch pre override")
+
+    def view_app_launch_pre(self):
+        self.initialize_underlying_http_callables()
+
+        self.port = la_view_port
+        app_launch_pre_thread = Thread(target=self._view_app_launch_pre_thread_func, daemon=True)
+        app_launch_pre_thread.start()
+
+        logging.debug("Triggered server launch pre override for view service")
 
     def app_launch_post(self):
         logging.debug("Triggered server launch post override, killing file_watcher and tail executor processes")
@@ -326,6 +406,18 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         else:
             err_str_ = "Can't find key 'regex_lock_file_name' in config dict - can't delete regex pattern lock file"
             logging.error(err_str_)
+
+    def view_app_launch_post(self):
+        logging.debug("Triggered server launch post override for view service")
+
+    def start_mongo_streamer(self):
+        run_coro = self._start_mongo_streamer()
+        future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
+        # block for task to finish
+        try:
+            future.result()
+        except Exception as e:
+            logging.exception(f"start_mongo_streamer failed with exception: {e}")
 
     def log_book_periodic_timeout_handler(self):
         while True:
@@ -1351,7 +1443,7 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         try:
             updated_pair_plan: PairPlanBaseModel = PairPlanBaseModel.from_kwargs(
                 _id=pair_plan_id, plan_state=PlanState.PlanState_PAUSED)
-            email_book_service_http_client.patch_pair_plan_client(
+            updated_pair_plan = email_book_service_http_client.patch_pair_plan_client(
                 updated_pair_plan.to_json_dict(exclude_none=True))
 
             symbol_side_key_ = get_symbol_side_key([(updated_pair_plan.pair_plan_params.plan_leg1.sec.sec_id,
@@ -1459,7 +1551,7 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             method_callable = getattr(email_book_service_http_client, method_name)
             handle_patch_db_queue_updater(update_type, self.model_type_name_to_patch_queue_cache_dict,
                                           basemodel_type_name, method_name, update_json,
-                                          get_update_obj_list_for_journal_type_update,
+                                          get_update_obj_list_for_ledger_type_update,
                                           get_update_obj_for_snapshot_type_update,
                                           method_callable, self.dynamic_queue_handler_err_handler,
                                           self.max_fetch_from_queue, self._snapshot_type_callable_err_handler,

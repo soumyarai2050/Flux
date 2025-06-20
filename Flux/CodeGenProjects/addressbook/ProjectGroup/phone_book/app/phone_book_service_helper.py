@@ -30,9 +30,17 @@ config_yaml_path: PurePath = CURRENT_PROJECT_DATA_DIR / f"config.yaml"
 config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(config_yaml_path))
 ps_host, ps_port = (config_yaml_dict.get("server_host"),
                     parse_to_int(config_yaml_dict.get("main_server_beanie_port")))
+ps_view_port = parse_to_int(config_yaml_dict.get("view_port"))
 
-email_book_service_http_client: EmailBookServiceHttpClient = \
+email_book_service_http_view_client: EmailBookServiceHttpClient = \
+    EmailBookServiceHttpClient.set_or_get_if_instance_exists(ps_host, ps_port, view_port=ps_view_port)
+email_book_service_http_main_client: EmailBookServiceHttpClient = \
     EmailBookServiceHttpClient.set_or_get_if_instance_exists(ps_host, ps_port)
+
+if config_yaml_dict.get("use_view_clients"):
+    email_book_service_http_client = email_book_service_http_view_client
+else:
+    email_book_service_http_client = email_book_service_http_main_client
 
 # loading street_book's project's config.yaml
 ROOT_DIR = PurePath(__file__).parent.parent.parent
@@ -164,7 +172,19 @@ def create_md_subscription_script(static_data, exch_code: str,
 def is_service_up(ignore_error: bool = False, is_server: bool = False):
     try:
         ui_layout_list: List[UILayoutBaseModel] = (
-            email_book_service_http_client.get_all_ui_layout_client())
+            email_book_service_http_main_client.get_all_ui_layout_client())
+        return True
+    except Exception as e:
+        if not ignore_error:
+            logging.exception("service_up test failed - tried get_all_ui_layout_client (and maybe create);;;"
+                              f"exception: {e}")
+        # else not required - silently ignore error is true
+        return False
+
+def is_view_service_up(ignore_error: bool = False, is_server: bool = False):
+    try:
+        ui_layout_list: List[UILayoutBaseModel] = (
+            email_book_service_http_view_client.get_all_ui_layout_client())
         return True
     except Exception as e:
         if not ignore_error:
@@ -280,7 +300,7 @@ def get_match_level(pair_plan: PairPlan, sec_id: str, side: Side) -> int:
 
 # caller must take any locks as required for any read-write consistency - function operates without lock
 async def get_ongoing_plans_from_symbol_n_side(sec_id: str, side: Side) -> Tuple[List[PairPlan], List[PairPlan]]:
-    from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.email_book_service_http_msgspec_routes import \
+    from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.email_book_service_http_routes_imports import \
         underlying_read_pair_plan_http
     read_pair_plan_filter = get_ongoing_pair_plan_filter(sec_id)
     pair_plans: List[PairPlan] = await underlying_read_pair_plan_http(read_pair_plan_filter)
@@ -458,10 +478,19 @@ def create_start_cpp_md_shell_script(generation_start_file_path: str, config_fil
         fl.write("#!/bin/bash\n")
         fl.write(f"source {env_file_path}\n")
         fl.write('if [ -z "$GDB_DEBUG" ] ; then\n')
-        fl.write(f"        {md_exec_file_path} {config_file_path} "+" >>${SCRIPT_LOG_FILE_PATH} 2>&1\n")
+        fl.write(f"        {md_exec_file_path} {config_file_path} "+" >>${SCRIPT_LOG_FILE_PATH} 2>&1 &\n")
+        fl.write(f"        PID=$!\n")
+        fl.write(f'        echo "Started mobile_book_executable with PID: $PID"\n')
+        fl.write(f'        wait $PID\n')
+        fl.write(f'        EXIT_CODE=$?\n')
         fl.write("else\n")
-        fl.write(f"        {md_exec_file_path} {config_file_path}\n")
+        fl.write(f"        {md_exec_file_path} {config_file_path} &\n")
+        fl.write(f"        PID=$!\n")
+        fl.write(f'        echo "Started mobile_book_executable with PID: $PID"\n')
+        fl.write(f'        wait $PID\n')
+        fl.write(f'        EXIT_CODE=$?\n')
         fl.write("fi\n")
+        fl.write('echo "Process with PID $PID exited with code: $EXIT_CODE"\n')
 
 
 def create_stop_cpp_md_shell_script(running_process_name: str, generation_stop_file_path: str, config_file_path: str):
@@ -484,7 +513,7 @@ def create_stop_cpp_md_shell_script(running_process_name: str, generation_stop_f
 
 
 def create_md_shell_script(md_shell_env_data: MDShellEnvData, generation_start_file_path: str, mode: str,
-                           instance_id: str = ""):
+                           instance_id: str = "", is_eqt: bool = False):
     script_file_name = os.path.basename(generation_start_file_path)
     log_file_path = PurePath(generation_start_file_path).parent.parent / "log" / f"{script_file_name}.log"
     with open(generation_start_file_path, "w") as fl:

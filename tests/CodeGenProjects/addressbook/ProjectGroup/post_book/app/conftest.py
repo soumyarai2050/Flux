@@ -7,7 +7,7 @@ def single_plan_single_data():
     payload_dict = [
         {
             "plan_id": 1,
-            "chore_journal": {
+            "chore_ledger": {
                 "_id": 1,
                 "chore": {
                     "chore_id": "Type1_Sec_1-2023-10-26T21:54:59.672447+00:00",
@@ -114,7 +114,7 @@ def single_plan_multi_data(single_plan_single_data):
     payload_dict = []
     for index in range(5):
         payload = deepcopy(single_plan_single_data[0])
-        payload["chore_journal"]["chore"]["px"] = 100 * (index + 1)
+        payload["chore_ledger"]["chore"]["px"] = 100 * (index + 1)
         payload["chore_snapshot"]["chore_brief"]["px"] = 100 * (index + 1)
         payload["plan_brief"]["pair_buy_side_bartering_brief"]["open_qty"] = 5 * (index + 1)
         payload["plan_brief"]["pair_sell_side_bartering_brief"]["open_qty"] = 10 * (index + 1)
@@ -129,7 +129,7 @@ def multi_plan_single_data(single_plan_single_data):
     for index in range(5):
         payload = deepcopy(single_plan_single_data[0])
         payload["plan_id"] = index+1
-        payload["chore_journal"]["chore"]["px"] = 100 * (index+1)
+        payload["chore_ledger"]["chore"]["px"] = 100 * (index+1)
         payload["chore_snapshot"]["chore_brief"]["px"] = 100 * (index+1)
         payload["plan_brief"]["pair_buy_side_bartering_brief"]["open_qty"] = 5 * (index+1)
         payload["plan_brief"]["pair_sell_side_bartering_brief"]["open_qty"] = 10 * (index+1)
@@ -146,7 +146,7 @@ def multi_plan_multi_data(single_plan_single_data):
             payload = deepcopy(single_plan_single_data[0])
             payload["plan_id"] = i+1
             # payload["plan_id"] = (i*5)+j
-            payload["chore_journal"]["chore"]["px"] = 100 * (j+1)
+            payload["chore_ledger"]["chore"]["px"] = 100 * (j+1)
             payload["chore_snapshot"]["chore_brief"]["px"] = 100 * (j+1)
             payload["plan_brief"]["pair_buy_side_bartering_brief"]["open_qty"] = 5 * (j+1)
             payload["plan_brief"]["pair_sell_side_bartering_brief"]["open_qty"] = 10 * (j+1)

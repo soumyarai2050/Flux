@@ -161,16 +161,16 @@ class BarteringDataManager(BaseBarteringDataManager, EmailBookServiceDataManager
             logging.error(f"ignoring plan brief update - missing required pair_buy_side_bartering_brief or pair_sell_"
                           f"side_bartering_brief;;; {plan_brief_ = }")
 
-    def underlying_handle_fills_journal_ws(self, **kwargs):
-        # fills_journal_ = kwargs.get("fills_journal_")
-        # key, symbol = PlanCache.get_key_n_symbol_from_fills_journal(fills_journal_)
+    def underlying_handle_deals_ledger_ws(self, **kwargs):
+        # deals_ledger_ = kwargs.get("deals_ledger_")
+        # key, symbol = PlanCache.get_key_n_symbol_from_deals_ledger(deals_ledger_)
         # cached_pair_plan, _ = self.plan_cache.get_pair_plan()
         #
-        # symbol_side_tuple = PlanCache.chore_id_to_symbol_side_tuple_dict.get(fills_journal_.chore_id)
+        # symbol_side_tuple = PlanCache.chore_id_to_symbol_side_tuple_dict.get(deals_ledger_.chore_id)
         # if not symbol_side_tuple:
-        #     logging.error(f"Unknown chore id: {fills_journal_.chore_id} found for fill "
-        #                   f"{get_fills_journal_log_key(fills_journal_)}, avoiding set_has_unack_leg update;;;"
-        #                   f" {fills_journal_ = }")
+        #     logging.error(f"Unknown chore id: {deals_ledger_.chore_id} found for fill "
+        #                   f"{get_deals_ledger_log_key(deals_ledger_)}, avoiding set_has_unack_leg update;;;"
+        #                   f" {deals_ledger_ = }")
         #     return
         # symbol, side = symbol_side_tuple
         #
@@ -179,30 +179,30 @@ class BarteringDataManager(BaseBarteringDataManager, EmailBookServiceDataManager
         # elif symbol == cached_pair_plan.pair_plan_params.plan_leg2.sec.sec_id:
         #     self.plan_cache.set_has_unack_leg2(False)
         # else:
-        #     logging.error(f"unexpected: fills general with non-matching symbol found in pre-matched plan-cache "
-        #                   f"with {key = }, fill journal {symbol = }, fill_journal_key: "
-        #                   f"{get_fills_journal_log_key(fills_journal_)}")
+        #     logging.error(f"unexpected: deals general with non-matching symbol found in pre-matched plan-cache "
+        #                   f"with {key = }, fill ledger {symbol = }, fill_ledger_key: "
+        #                   f"{get_deals_ledger_log_key(deals_ledger_)}")
         pass
 
     # disabled - we are using chore snapshot instead - if we enable this back, ensure to remove the unack logic
-    # def underlying_handle_chore_journal_ws(self, **kwargs):
-    #     chore_journal_ = kwargs.get("chore_journal_")
+    # def underlying_handle_chore_ledger_ws(self, **kwargs):
+    #     chore_ledger_ = kwargs.get("chore_ledger_")
     #     with self.plan_cache.re_ent_lock:
     #         is_unack = False
-    #         if chore_journal_.chore_event in [ChoreEventType.OE_NEW, ChoreEventType.OE_CXL]:
+    #         if chore_ledger_.chore_event in [ChoreEventType.OE_NEW, ChoreEventType.OE_CXL]:
     #             is_unack = True
-    #             if chore_journal_.chore_event == ChoreEventType.OE_NEW:
-    #                 PlanCache.chore_id_to_symbol_side_tuple_dict[chore_journal_.chore.chore_id] = \
-    #                     (chore_journal_.chore.security.sec_id, chore_journal_.chore.side)
+    #             if chore_ledger_.chore_event == ChoreEventType.OE_NEW:
+    #                 PlanCache.chore_id_to_symbol_side_tuple_dict[chore_ledger_.chore.chore_id] = \
+    #                     (chore_ledger_.chore.security.sec_id, chore_ledger_.chore.side)
     #
     #     cached_pair_plan, _ = self.plan_cache.get_pair_plan()
-    #     if chore_journal_.chore.security.sec_id == cached_pair_plan.pair_plan_params.plan_leg1.sec.sec_id:
+    #     if chore_ledger_.chore.security.sec_id == cached_pair_plan.pair_plan_params.plan_leg1.sec.sec_id:
     #         self.plan_cache.set_has_unack_leg1(is_unack)
-    #     elif chore_journal_.chore.security.sec_id == cached_pair_plan.pair_plan_params.plan_leg2.sec.sec_id:
+    #     elif chore_ledger_.chore.security.sec_id == cached_pair_plan.pair_plan_params.plan_leg2.sec.sec_id:
     #         self.plan_cache.set_has_unack_leg2(is_unack)
     #     else:
-    #         logging.error(f"unexpected: chore journal with non-matching symbol found in pre-matched plan-cache, "
-    #                       f"chore_journal_key: {get_chore_journal_log_key(chore_journal_)}")
+    #         logging.error(f"unexpected: chore ledger with non-matching symbol found in pre-matched plan-cache, "
+    #                       f"chore_ledger_key: {get_chore_ledger_log_key(chore_ledger_)}")
 
     def handle_unack_state(self, is_unack: bool, chore_snapshot_: ChoreSnapshotBaseModel | ChoreSnapshot):
         cached_pair_plan, _ = self.plan_cache.get_pair_plan()
@@ -236,11 +236,11 @@ class BarteringDataManager(BaseBarteringDataManager, EmailBookServiceDataManager
             return  # No use-case for fx TOB at this time
         super().handle_top_of_book_get_all_ws(top_of_book_)
 
-    def handle_recovery_chore_journal(self, chore_journal_: ChoreJournal | ChoreJournalBaseModel):
-        # interface to update chore_journal in crash recovery, Must be used only if required
+    def handle_recovery_chore_ledger(self, chore_ledger_: ChoreLedger | ChoreLedgerBaseModel):
+        # interface to update chore_ledger in crash recovery, Must be used only if required
         with self.plan_cache.re_ent_lock:
-            self.plan_cache.set_chore_journal(chore_journal_)
-        logging.debug(f"Updated chore_journal cache in recovery;;; {chore_journal_ = }")
+            self.plan_cache.set_chore_ledger(chore_ledger_)
+        logging.debug(f"Updated chore_ledger cache in recovery;;; {chore_ledger_ = }")
 
     def handle_recovery_cancel_chore(self, cancel_chore_: CancelChore | CancelChoreBaseModel):
         # interface to update cancel_chore in crash recovery, Must be used only if required

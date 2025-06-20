@@ -32,6 +32,7 @@ message UILayout{
     required string profile_id = 2 [(FluxFldIndex) = true];
     repeated WidgetUIDataElement widget_ui_data_elements = 3;
     optional Theme theme = 4;
+    optional string base_color = 5;
 }
 
 message UILayoutList {

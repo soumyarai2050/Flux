@@ -4,10 +4,18 @@
   height: 100%;
 }
 
+.tableContainerWrapper {
+  position: relative;
+  flex: 1;
+  overflow: visible;
+  isolation: isolate;
+}
+
 .scrollableTableContainer {
   flex: 1;
   overflow: auto;
 }
+
 
 .table {
   /* for any future table-specific styles */
@@ -46,11 +54,7 @@
     margin: 0 5px;
     padding: 4px;
   }
-  
-  .pageSelect {
-    width: 100%;
-  }
-  
+    
   .pageIndicator {
     text-align: center;
     font-size: 0.75rem;

@@ -34,7 +34,7 @@ pandas==2.2.2
 pendulum==3.0.0
 pexpect==4.9.0
 pluggy==1.4.0
-polars==1.6.0
+polars==1.19.0
 posix_ipc==1.1.1
 protobuf==5.26.1
 protogen==0.3.1

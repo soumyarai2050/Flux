@@ -258,12 +258,12 @@ class PhoneBookBaseTailExecutor(AppTailExecutor):
         self.send_contact_alerts(severity=self.get_severity("error"), alert_brief=err_str_brief,
                                    alert_meta=alert_meta)
 
-    def _get_update_obj_list_for_journal_type_update(
+    def _get_update_obj_list_for_ledger_type_update(
             self, basemodel_class_type: Type[MsgspecBaseModel], update_type: str, method_name: str,
             patch_queue: Queue, max_fetch_from_queue: int, update_json_list: List[MsgspecModel | Dict],
             parse_to_model: bool | None = None):
         # blocking function
-        update_json_list = get_update_obj_list_for_journal_type_update(
+        update_json_list = get_update_obj_list_for_ledger_type_update(
             basemodel_class_type, update_type, method_name, patch_queue,
             max_fetch_from_queue, update_json_list, parse_to_model=parse_to_model)
 
@@ -317,7 +317,7 @@ class PhoneBookBaseTailExecutor(AppTailExecutor):
 
             handle_patch_db_queue_updater(update_type, self.model_type_name_to_patch_queue_cache_dict,
                                           basemodel_type_name, method_name, kwargs,
-                                          self._get_update_obj_list_for_journal_type_update,
+                                          self._get_update_obj_list_for_ledger_type_update,
                                           self.get_update_obj_for_snapshot_type_update,
                                           photo_book_service_http_client.process_plan_view_updates_query_client,
                                           self.dynamic_queue_handler_err_handler, self.max_fetch_from_queue,

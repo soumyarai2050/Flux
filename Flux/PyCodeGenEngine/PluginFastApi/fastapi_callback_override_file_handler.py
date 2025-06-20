@@ -295,7 +295,7 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
                 if query_route_path is None:
                     query_route_path = "GET"
 
-                routes_import_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.http_routes_file_name)
+                routes_import_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.http_routes_import_file_name)
                 aggregate_file_path = self.import_path_from_os_path("PROJECT_DIR", "app.aggregate")
 
                 query_params_name_list = []
@@ -407,7 +407,7 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
                         f"    async def {query_name}_query_pre(self, {msg_name_snake_cased}_class_type: "
                         f"Type[{msg_name}], {query_param_with_type_str}):\n")
                     routes_import_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR",
-                                                                       self.http_routes_file_name)
+                                                                       self.http_routes_import_file_name)
                     output_str += f"        from {routes_import_path} import " \
                                   f"underlying_read_{msg_name_snake_cased}_http\n"
                     output_str += (f"        # once aggregate function used below is shifted to aggregate.py "

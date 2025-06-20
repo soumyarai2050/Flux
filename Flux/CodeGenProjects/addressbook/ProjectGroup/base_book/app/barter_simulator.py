@@ -110,16 +110,16 @@ class BarterSimulator(BarteringLinkBase):
             else:
                 chore_event = ChoreEventType.OE_EXH_REJ
 
-            chore_journal = ChoreJournal(chore=chore_brief, chore_event_date_time=create_date_time,
+            chore_ledger = ChoreLedger(chore=chore_brief, chore_event_date_time=create_date_time,
                                          chore_event=chore_event)
-            msg = f"SIM:Chore REJ for {chore_journal.chore.security.sec_id}, chore_id {chore_journal.chore.chore_id} " \
-                  f"and side {chore_journal.chore.side}"
+            msg = f"SIM:Chore REJ for {chore_ledger.chore.security.sec_id}, chore_id {chore_ledger.chore.chore_id} " \
+                  f"and side {chore_ledger.chore.side}"
             add_to_texts(chore_brief, msg)
-            await BarterSimulator.chore_create_async_callable(chore_journal)
+            await BarterSimulator.chore_create_async_callable(chore_ledger)
 
     @classmethod
     async def place_new_chore(cls, px: float, qty: int, side: Side, bartering_sec_id: str, system_sec_id: str,
-                              symbol_type: str, account: str, exchange: str | None = None, text: List[str] | None = None,
+                              bartering_sec_type: str, account: str, exchange: str | None = None, text: List[str] | None = None,
                               client_ord_id: str | None = None, **kwargs) -> Tuple[bool, str]:
         """
         when invoked form log analyzer - all params are passed as strings
@@ -130,7 +130,7 @@ class BarterSimulator(BarteringLinkBase):
         if BarterSimulator.chore_create_async_callable:
             create_date_time = DateTime.utcnow()
             chore_id: str = f"{bartering_sec_id}-{create_date_time}"
-            # use system_sec_id to create system's internal chore brief / journal
+            # use system_sec_id to create system's internal chore brief / ledger
             security = Security(sec_id=system_sec_id, sec_id_source=SecurityIdSource.TICKER)
             bartering_security = Security(sec_id=system_sec_id, sec_id_source=SecurityIdSource.TICKER)
 
@@ -141,10 +141,10 @@ class BarterSimulator(BarteringLinkBase):
             msg = f"SIM: Choreing {bartering_sec_id}/{system_sec_id}, qty {qty} and px {px}"
             add_to_texts(chore_brief, msg)
 
-            chore_journal = ChoreJournal(chore=chore_brief,
+            chore_ledger = ChoreLedger(chore=chore_brief,
                                          chore_event_date_time=create_date_time,
                                          chore_event=ChoreEventType.OE_NEW)
-            await BarterSimulator.chore_create_async_callable(chore_journal)
+            await BarterSimulator.chore_create_async_callable(chore_ledger)
             logging.info(f"placed new chore with Simulator, qty: {qty} for symbol_side_key: "
                          f"{get_symbol_side_key([(system_sec_id, side)])}")
 
@@ -158,7 +158,7 @@ class BarterSimulator(BarteringLinkBase):
                 elif symbol_configs.get("simulate_new_to_cxl_rej_chores") and cls.is_special_chore(system_sec_id):
                     cls.cxl_rej_symbol_to_bool_dict[system_sec_id] = True
                     await cls.place_cxl_chore(chore_id, side, security.sec_id, security.sec_id, account)
-                elif symbol_configs.get("simulate_fills_pre_chore_ack") and cls.is_special_chore(system_sec_id):
+                elif symbol_configs.get("simulate_deals_pre_chore_ack") and cls.is_special_chore(system_sec_id):
                     await cls.process_fill(chore_id, px, qty, side, security.sec_id, security.sec_id)
                 else:
                     await cls.process_chore_ack(chore_id, chore_brief.px, chore_brief.qty, chore_brief.side, system_sec_id,
@@ -177,7 +177,7 @@ class BarterSimulator(BarteringLinkBase):
 
     @classmethod
     def _process_chore_ack(cls, chore_id, px: float, qty: int, side: Side, sec_id: str, underlying_account: str,
-                           text: List[str] | None = None) -> ChoreJournal:
+                           text: List[str] | None = None) -> ChoreLedger:
         security = Security(sec_id=sec_id, sec_id_source=SecurityIdSource.TICKER)
 
         qty = cls.get_partial_allowed_ack_qty(sec_id, qty)
@@ -186,46 +186,46 @@ class BarterSimulator(BarteringLinkBase):
         msg = f"SIM: ACK received for {sec_id}, qty {qty} and px {px}"
         add_to_texts(chore_brief_obj, msg)
 
-        chore_journal_obj = ChoreJournal(chore=chore_brief_obj,
+        chore_ledger_obj = ChoreLedger(chore=chore_brief_obj,
                                          chore_event_date_time=DateTime.utcnow(),
                                          chore_event=ChoreEventType.OE_ACK)
-        return chore_journal_obj
+        return chore_ledger_obj
 
     @classmethod
-    async def _process_chore_ack_symbol_specific_handling(cls, chore_journal_obj: ChoreJournal):
-        symbol_configs = cls.get_symbol_configs(chore_journal_obj.chore.security.sec_id)
+    async def _process_chore_ack_symbol_specific_handling(cls, chore_ledger_obj: ChoreLedger):
+        symbol_configs = cls.get_symbol_configs(chore_ledger_obj.chore.security.sec_id)
         if symbol_configs is not None and symbol_configs.get("simulate_reverse_path"):
             if (symbol_configs.get("simulate_ack_to_reject_chores") and
-                    cls.is_special_chore(chore_journal_obj.chore.security.sec_id)):
-                await cls.process_chore_reject(chore_journal_obj.chore)
+                    cls.is_special_chore(chore_ledger_obj.chore.security.sec_id)):
+                await cls.process_chore_reject(chore_ledger_obj.chore)
             elif (symbol_configs.get("simulate_ack_unsolicited_cxl_chores") and
-                  cls.is_special_chore(chore_journal_obj.chore.security.sec_id)):
-                await cls.process_cxl_ack(chore_journal_obj.chore, is_unsol_cxl=True)
+                  cls.is_special_chore(chore_ledger_obj.chore.security.sec_id)):
+                await cls.process_cxl_ack(chore_ledger_obj.chore, is_unsol_cxl=True)
             else:
                 if not symbol_configs.get("simulate_avoid_fill_after_ack"):
-                    await cls.process_fill(chore_journal_obj.chore.chore_id, chore_journal_obj.chore.px,
-                                           chore_journal_obj.chore.qty, chore_journal_obj.chore.side,
-                                           chore_journal_obj.chore.security.sec_id,
-                                           chore_journal_obj.chore.underlying_account)
+                    await cls.process_fill(chore_ledger_obj.chore.chore_id, chore_ledger_obj.chore.px,
+                                           chore_ledger_obj.chore.qty, chore_ledger_obj.chore.side,
+                                           chore_ledger_obj.chore.security.sec_id,
+                                           chore_ledger_obj.chore.underlying_account)
 
                 if (symbol_configs.get("simulate_ack_to_cxl_rej_chores") and
-                        cls.is_special_chore(chore_journal_obj.chore.security.sec_id)):
-                    cls.cxl_rej_symbol_to_bool_dict[chore_journal_obj.chore.security.sec_id] = True
-                    await cls.place_cxl_chore(chore_journal_obj.chore.chore_id, chore_journal_obj.chore.side,
-                                              chore_journal_obj.chore.security.sec_id,
-                                              chore_journal_obj.chore.security.sec_id,
-                                              chore_journal_obj.chore.underlying_account,
-                                              px=chore_journal_obj.chore.px,
-                                              qty=chore_journal_obj.chore.qty)
+                        cls.is_special_chore(chore_ledger_obj.chore.security.sec_id)):
+                    cls.cxl_rej_symbol_to_bool_dict[chore_ledger_obj.chore.security.sec_id] = True
+                    await cls.place_cxl_chore(chore_ledger_obj.chore.chore_id, chore_ledger_obj.chore.side,
+                                              chore_ledger_obj.chore.security.sec_id,
+                                              chore_ledger_obj.chore.security.sec_id,
+                                              chore_ledger_obj.chore.underlying_account,
+                                              px=chore_ledger_obj.chore.px,
+                                              qty=chore_ledger_obj.chore.qty)
 
     @classmethod
     async def process_chore_ack(cls, chore_id, px: float, qty: int, side: Side, sec_id: str,
                                 underlying_account: str, text: List[str] | None = None):
         """simulate chore's Ack """
         if BarterSimulator.chore_create_async_callable:
-            chore_journal_obj = cls._process_chore_ack(chore_id, px, qty, side, sec_id, underlying_account, text)
-            await BarterSimulator.chore_create_async_callable(chore_journal_obj)
-            await cls._process_chore_ack_symbol_specific_handling(chore_journal_obj)
+            chore_ledger_obj = cls._process_chore_ack(chore_id, px, qty, side, sec_id, underlying_account, text)
+            await BarterSimulator.chore_create_async_callable(chore_ledger_obj)
+            await cls._process_chore_ack_symbol_specific_handling(chore_ledger_obj)
 
     @classmethod
     def get_partial_qty_from_total_qty_and_percentage(cls, fill_percent: int, total_qty: int) -> int:
@@ -252,9 +252,9 @@ class BarterSimulator(BarteringLinkBase):
         return qty, total_fill_count
 
     @classmethod
-    def store_intraday_chore_fills(cls, intraday_chore_fills: List[FillsJournal]):
-        if not intraday_chore_fills:
-            logging.warning("No intraday chore fills to store")
+    def store_intraday_chore_deals(cls, intraday_chore_deals: List[DealsLedger]):
+        if not intraday_chore_deals:
+            logging.warning("No intraday chore deals to store")
             return
 
         include_header: bool = False
@@ -262,15 +262,15 @@ class BarterSimulator(BarteringLinkBase):
             if not os.path.exists(f"{str(cls.intraday_bartering_chores_csv_file)}.csv"):
                 include_header = True
             # file already exists, don't include headers
-            fieldnames = get_fieldnames_from_record_type(FillsJournal)
-            dict_or_list_records_csv_writer(cls.intraday_bartering_chores_csv_file_name, intraday_chore_fills,
-                                            fieldnames, FillsJournal, EXECUTOR_PROJECT_DATA_DIR, append_mode=True,
+            fieldnames = get_fieldnames_from_record_type(DealsLedger)
+            dict_or_list_records_csv_writer(cls.intraday_bartering_chores_csv_file_name, intraday_chore_deals,
+                                            fieldnames, DealsLedger, EXECUTOR_PROJECT_DATA_DIR, append_mode=True,
                                             include_header=include_header, by_alias=True)
 
     @classmethod
     async def process_fill(cls, chore_id, px: float, qty: int, side: Side, sec_id: str,
                            underlying_account: str, use_exact_passed_qty: bool | None = None) -> bool:
-        """Simulates Chore's fills - returns True if fully fills chore else returns False"""
+        """Simulates Chore's deals - returns True if fully deals chore else returns False"""
         if BarterSimulator.fill_create_async_callable:
 
             if use_exact_passed_qty:
@@ -279,17 +279,17 @@ class BarterSimulator(BarteringLinkBase):
                 fill_qty, total_fill_count = cls._process_fill(sec_id, qty)
 
             total_fill_qty = 0
-            intraday_chore_fills: List[FillsJournal] = []
+            intraday_chore_deals: List[DealsLedger] = []
             for fill_count in range(total_fill_count):
-                fill_journal = FillsJournal(chore_id=chore_id, fill_px=px, fill_qty=fill_qty, fill_symbol=sec_id,
+                fill_ledger = DealsLedger(chore_id=chore_id, fill_px=px, fill_qty=fill_qty, fill_symbol=sec_id,
                                             fill_side=side, underlying_account=underlying_account,
                                             fill_date_time=DateTime.utcnow(),
                                             fill_id=f"F{chore_id[1:]}")
                 total_fill_count += fill_count
-                fill_journal = await BarterSimulator.fill_create_async_callable(fill_journal)
-                intraday_chore_fills.append(fill_journal)
+                fill_ledger = await BarterSimulator.fill_create_async_callable(fill_ledger)
+                intraday_chore_deals.append(fill_ledger)
 
-            cls.store_intraday_chore_fills(intraday_chore_fills)
+            cls.store_intraday_chore_deals(intraday_chore_deals)
             if total_fill_qty == qty:
                 return True
             else:
@@ -310,11 +310,11 @@ class BarterSimulator(BarteringLinkBase):
                 remaining_qty_per = 100 - fill_percent
                 fill_qty = cls.get_partial_qty_from_total_qty_and_percentage(remaining_qty_per, qty)
 
-            fill_journal = FillsJournal(chore_id=chore_id, fill_px=px, fill_qty=fill_qty, fill_symbol=sec_id,
+            fill_ledger = DealsLedger(chore_id=chore_id, fill_px=px, fill_qty=fill_qty, fill_symbol=sec_id,
                                         fill_side=side, underlying_account=underlying_account,
                                         fill_date_time=DateTime.utcnow(),
                                         fill_id=f"F{chore_id[1:]}")
-            await BarterSimulator.fill_create_async_callable(fill_journal)
+            await BarterSimulator.fill_create_async_callable(fill_ledger)
 
     @classmethod
     async def process_cxl_rej(cls, chore_brief: ChoreBrief):
@@ -322,12 +322,12 @@ class BarterSimulator(BarteringLinkBase):
             chore_event = random.choice([ChoreEventType.OE_CXL_INT_REJ,
                                           ChoreEventType.OE_CXL_BRK_REJ,
                                           ChoreEventType.OE_CXL_EXH_REJ])
-            chore_journal = ChoreJournal(chore=chore_brief, chore_event_date_time=DateTime.utcnow(),
+            chore_ledger = ChoreLedger(chore=chore_brief, chore_event_date_time=DateTime.utcnow(),
                                          chore_event=chore_event)
-            msg = f"SIM:Cancel REJ for {chore_journal.chore.security.sec_id}, chore_id {chore_journal.chore.chore_id} " \
-                  f"and side {chore_journal.chore.side}"
+            msg = f"SIM:Cancel REJ for {chore_ledger.chore.security.sec_id}, chore_id {chore_ledger.chore.chore_id} " \
+                  f"and side {chore_ledger.chore.side}"
             add_to_texts(chore_brief, msg)
-            await BarterSimulator.chore_create_async_callable(chore_journal)
+            await BarterSimulator.chore_create_async_callable(chore_ledger)
 
     @classmethod
     async def process_cxl_ack(cls, chore_brief: ChoreBrief, is_unsol_cxl: bool | None = None):
@@ -338,12 +338,12 @@ class BarterSimulator(BarteringLinkBase):
             else:
                 chore_event = ChoreEventType.OE_CXL_ACK
 
-            chore_journal = ChoreJournal(chore=chore_brief, chore_event_date_time=DateTime.utcnow(),
+            chore_ledger = ChoreLedger(chore=chore_brief, chore_event_date_time=DateTime.utcnow(),
                                          chore_event=chore_event)
-            msg = f"SIM:Cancel ACK for {chore_journal.chore.security.sec_id}, chore_id {chore_journal.chore.chore_id} " \
-                  f"and side {chore_journal.chore.side}"
+            msg = f"SIM:Cancel ACK for {chore_ledger.chore.security.sec_id}, chore_id {chore_ledger.chore.chore_id} " \
+                  f"and side {chore_ledger.chore.side}"
             add_to_texts(chore_brief, msg)
-            await BarterSimulator.chore_create_async_callable(chore_journal)
+            await BarterSimulator.chore_create_async_callable(chore_ledger)
 
     @classmethod
     async def place_cxl_chore(cls, chore_id: str, side: Side | None = None, bartering_sec_id: str | None = None,
@@ -365,9 +365,9 @@ class BarterSimulator(BarteringLinkBase):
             msg = f"SIM:Cancel Request for {bartering_sec_id}/{system_sec_id}, chore_id {chore_id} and side {side}"
             add_to_texts(chore_brief, msg)
             # simulate cancel ack
-            chore_journal = ChoreJournal(chore=chore_brief, chore_event_date_time=DateTime.utcnow(),
+            chore_ledger = ChoreLedger(chore=chore_brief, chore_event_date_time=DateTime.utcnow(),
                                          chore_event=ChoreEventType.OE_CXL)
-            await BarterSimulator.chore_create_async_callable(chore_journal)
+            await BarterSimulator.chore_create_async_callable(chore_ledger)
 
             if system_sec_id in cls.cxl_rej_symbol_to_bool_dict and cls.cxl_rej_symbol_to_bool_dict.get(system_sec_id):
                 symbol_configs = cls.get_symbol_configs(system_sec_id)
@@ -399,9 +399,9 @@ class BarterSimulator(BarteringLinkBase):
                                      underlying_account=underlying_account, px=px, qty=qty)
             msg = f"SIM:Amend Request for {bartering_sec_id}/{system_sec_id}, chore_id {chore_id} and side {side}"
             add_to_texts(chore_brief, msg)
-            chore_journal = ChoreJournal(chore=chore_brief, chore_event_date_time=DateTime.utcnow(),
+            chore_ledger = ChoreLedger(chore=chore_brief, chore_event_date_time=DateTime.utcnow(),
                                          chore_event=amend_event)
-            await BarterSimulator.chore_create_async_callable(chore_journal)
+            await BarterSimulator.chore_create_async_callable(chore_ledger)
 
     @classmethod
     async def place_amend_ack_chore(cls, chore_id: str, side: Side, bartering_sec_id: str,
@@ -414,9 +414,9 @@ class BarterSimulator(BarteringLinkBase):
                                      underlying_account=underlying_account)
             msg = f"SIM:Amend ACK for {bartering_sec_id}/{system_sec_id}, chore_id {chore_id} and side {side}"
             add_to_texts(chore_brief, msg)
-            chore_journal = ChoreJournal(chore=chore_brief, chore_event_date_time=DateTime.utcnow(),
+            chore_ledger = ChoreLedger(chore=chore_brief, chore_event_date_time=DateTime.utcnow(),
                                          chore_event=ChoreEventType.OE_AMD_ACK)
-            await BarterSimulator.chore_create_async_callable(chore_journal)
+            await BarterSimulator.chore_create_async_callable(chore_ledger)
 
     @classmethod
     async def place_amend_rej_chore(cls, chore_id: str, side: Side, bartering_sec_id: str,
@@ -428,9 +428,9 @@ class BarterSimulator(BarteringLinkBase):
                                      underlying_account=underlying_account)
             msg = f"SIM:Amend REJ for {bartering_sec_id}/{system_sec_id}, chore_id {chore_id} and side {side}"
             add_to_texts(chore_brief, msg)
-            chore_journal = ChoreJournal(chore=chore_brief, chore_event_date_time=DateTime.utcnow(),
+            chore_ledger = ChoreLedger(chore=chore_brief, chore_event_date_time=DateTime.utcnow(),
                                          chore_event=ChoreEventType.OE_AMD_REJ)
-            await BarterSimulator.chore_create_async_callable(chore_journal)
+            await BarterSimulator.chore_create_async_callable(chore_ledger)
 
     @classmethod
     async def place_lapse_chore(cls, chore_id: str, side: Side, bartering_sec_id: str, system_sec_id: str,
@@ -442,9 +442,9 @@ class BarterSimulator(BarteringLinkBase):
                                      underlying_account=underlying_account)
             msg = f"SIM:LAPSE for {bartering_sec_id}/{system_sec_id}, chore_id {chore_id} and side {side}, {qty=}"
             add_to_texts(chore_brief, msg)
-            chore_journal = ChoreJournal(chore=chore_brief, chore_event_date_time=DateTime.utcnow(),
+            chore_ledger = ChoreLedger(chore=chore_brief, chore_event_date_time=DateTime.utcnow(),
                                          chore_event=ChoreEventType.OE_LAPSE)
-            await BarterSimulator.chore_create_async_callable(chore_journal)
+            await BarterSimulator.chore_create_async_callable(chore_ledger)
 
     @classmethod
     async def is_kill_switch_enabled(cls) -> bool:
@@ -454,6 +454,11 @@ class BarterSimulator(BarteringLinkBase):
     @classmethod
     async def trigger_kill_switch(cls) -> bool:
         logging.critical("Called BarteringLink.trigger_kill_switch from BarterSimulator")
+        return True
+
+    @classmethod
+    async def revoke_kill_switch_n_resume_bartering(cls) -> bool:
+        logging.critical("Called BarteringLink.revoke_kill_switch_n_resume_bartering from BarterSimulator")
         return True
 
     @classmethod
@@ -471,6 +476,5 @@ class BarterSimulator(BarteringLinkBase):
         """
         returns chore_status (ChoreStatusType), any_chore_text, filled-Qty, chore-px and chore-qty as seen by bartering
         link, caller may use these for reconciliation
-        returns None if chore not found by Bartering Link
         """
         raise NotImplementedError

@@ -115,6 +115,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += JsxFileGenPlugin.indentation_space*3 + "actions: ModelActions,\n"
         output_str += JsxFileGenPlugin.indentation_space*3 + "schema: modelSchema,\n"
         output_str += JsxFileGenPlugin.indentation_space*3 + "url: getServerUrl(modelSchema),\n"
+        output_str += JsxFileGenPlugin.indentation_space*3 + "viewUrl: getServerUrl(modelSchema, undefined, undefined, undefined, true),\n"
         # adding attribute telling some abbreviated msg is dependent on this message
         for abb_msg in self.abbreviated_merge_layout_msg_list:
             dependent_msg_list = self.msg_name_to_dependent_msg_name_list_dict.get(abb_msg.proto.name)
@@ -156,6 +157,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += JsxFileGenPlugin.indentation_space * 4 + f"actions: actions,\n"
                 output_str += JsxFileGenPlugin.indentation_space * 4 + "schema: dataSourceSchema,\n"
                 output_str += JsxFileGenPlugin.indentation_space * 4 + "url: getServerUrl(dataSourceSchema),\n"
+                output_str += JsxFileGenPlugin.indentation_space * 4 + "viewUrl: getServerUrl(dataSourceSchema, undefined, undefined, undefined, true),\n"
                 output_str += JsxFileGenPlugin.indentation_space * 4 + "fieldsMetadata: schemaCollections[dataSourceName],\n"
                 output_str += JsxFileGenPlugin.indentation_space * 4 + f"selector: selector\n"
                 output_str += JsxFileGenPlugin.indentation_space * 3 + "}\n"
@@ -173,6 +175,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += JsxFileGenPlugin.indentation_space*3 + f"actions: {dependent_msg_name}Actions,\n"
                 output_str += JsxFileGenPlugin.indentation_space*3 + "schema: dataSourceName,\n"
                 output_str += JsxFileGenPlugin.indentation_space*3 + "url: getServerUrl(dataSourceSchema),\n"
+                output_str += JsxFileGenPlugin.indentation_space*3 + "viewUrl: getServerUrl(dataSourceSchema, undefined, undefined, undefined, true),\n"
                 output_str += JsxFileGenPlugin.indentation_space*3 + "fieldsMetadata: schemaCollections[dataSourceName],\n"
                 output_str += JsxFileGenPlugin.indentation_space*3 + f"selector: Selectors.select{dependent_msg_name}\n"
                 output_str += JsxFileGenPlugin.indentation_space*2 + "}\n"
@@ -209,6 +212,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         output_str += JsxFileGenPlugin.indentation_space*2 + "actions: PropTypes.object.isRequired,\n"
         output_str += JsxFileGenPlugin.indentation_space*2 + "schema: PropTypes.object.isRequired,\n"
         output_str += JsxFileGenPlugin.indentation_space*2 + "url: PropTypes.string,\n"
+        output_str += JsxFileGenPlugin.indentation_space*2 + "viewUrl: PropTypes.string,\n"
         output_str += JsxFileGenPlugin.indentation_space + "}),\n"
         if model_type == JsxFileGenPlugin.abbreviated_merge_type:
             output_str += JsxFileGenPlugin.indentation_space + "dataSources: PropTypes.arrayOf(\n"
@@ -217,7 +221,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += JsxFileGenPlugin.indentation_space*3 + "selector: PropTypes.object.isRequired,\n"
             output_str += JsxFileGenPlugin.indentation_space*3 + "actions: PropTypes.object.isRequired,\n"
             output_str += JsxFileGenPlugin.indentation_space*3 + "schema: PropTypes.object.isRequired,\n"
-            output_str += JsxFileGenPlugin.indentation_space*3 + "url: PropTypes.string\n"
+            output_str += JsxFileGenPlugin.indentation_space*3 + "url: PropTypes.string,\n"
+            output_str += JsxFileGenPlugin.indentation_space*3 + "viewUrl: PropTypes.string,\n"
             output_str += JsxFileGenPlugin.indentation_space*2 + "})\n"
             output_str += JsxFileGenPlugin.indentation_space + ")\n"
         else:
@@ -226,7 +231,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
             output_str += JsxFileGenPlugin.indentation_space*2 + "selector: PropTypes.func.isRequired,\n"
             output_str += JsxFileGenPlugin.indentation_space*2 + "actions: PropTypes.object.isRequired,\n"
             output_str += JsxFileGenPlugin.indentation_space*2 + "schema: PropTypes.object.isRequired,\n"
-            output_str += JsxFileGenPlugin.indentation_space*2 + "url: PropTypes.string\n"
+            output_str += JsxFileGenPlugin.indentation_space*2 + "url: PropTypes.string,\n"
+            output_str += JsxFileGenPlugin.indentation_space*2 + "viewUrl: PropTypes.string,\n"
             output_str += JsxFileGenPlugin.indentation_space + "}),\n"
         output_str += "};\n\n"
         return output_str

@@ -77,8 +77,8 @@ class BaseBook(Service):
         self.internal_reject_count += 1
         internal_reject_chore_id: str = str(self.internal_reject_count * -1) + str(DateTime.utcnow())
         self.bartering_link_internal_chore_state_update(
-            ChoreEventType.OE_INT_REJ, internal_reject_chore_id, new_chore.side, None,
-            new_chore.security.sec_id, None, reject_msg)
+            ChoreEventType.OE_INT_REJ, internal_reject_chore_id, new_chore.side, new_chore.security.sec_id,
+            new_chore.ticker, None, reject_msg)
 
     def get_client_chore_id(self):
         self.internal_new_chore_count += 1
@@ -143,7 +143,7 @@ class BaseBook(Service):
 
         # block for start_executor_server task to finish
         try:
-            # ignore return chore_journal: don't generate cxl chores in system, just treat cancel acks as unsol cxls
+            # ignore return chore_ledger: don't generate cxl chores in system, just treat cancel acks as unsol cxls
             res: bool = future.result()
             if not res:
                 logging.error(f"bartering_link_place_cxl_chore failed, {res=} returned")

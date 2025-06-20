@@ -326,6 +326,7 @@ async def _underlying_patch_n_put(msgspec_class_type: Type[MsgspecModel], proto_
             filename=str(_id),
             source=orjson.dumps(updated_json_obj_dict),
         )
+
     else:
         collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.collection_obj
 
@@ -1233,3 +1234,50 @@ def generic_encoder(obj_to_encode: Any, enc_hook: Callable, exclude_none: bool =
     if exclude_none:
         updated_dict = remove_none_values(updated_dict)
     return updated_dict
+
+
+async def watch_specific_collection_with_stream(msgspec_class_type: Type[MsgspecModel],
+                                                filter_ws_updates_callable: Callable | None = None,
+                                                filter_agg_pipeline_callable: Callable | None = None):
+    """Watches a specific collection for changes."""
+
+    collection_cursor: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.collection_obj
+
+    logging.info(f"[STREAM - {msgspec_class_type.__name__}] Starting to watch for changes...")
+    try:
+        async with collection_cursor.watch(full_document='updateLookup') as stream:
+            async for change in stream:
+                document_id = change['documentKey']['_id']
+                if 'fullDocument' in change and change['fullDocument']:
+                    updated_or_created_obj = change['fullDocument']
+                    logging.debug(f"STREAM - Full document: {updated_or_created_obj}")
+                    if filter_ws_updates_callable is not None:
+                        if not filter_ws_updates_callable(updated_or_created_obj):
+                            # if filter check fails for obj then avoiding ws update
+                            continue
+                        # else not required: if passes check allowing it for ws update
+                    # else not required: if no filter_ws_updates_callable passed - no need for any handling
+                    if filter_agg_pipeline_callable is not None:
+                        filter_agg_pipeline = filter_agg_pipeline_callable(updated_or_created_obj)
+                        fetched_obj: Dict = await get_obj(msgspec_class_type, document_id, filter_agg_pipeline)
+                        # handling all datetime fields - converting to epoch int values - caller of this function will handle
+                        # these fields back if required
+                        msgspec_class_type.convert_ts_fields_from_datetime_to_epoch_int(fetched_obj)
+                        await publish_ws(msgspec_class_type, document_id, fetched_obj,
+                                         update_ws_with_id=True)
+                    else:
+                        # handling all datetime fields - converting to epoch int values - caller of this function will handle
+                        # these fields back if required
+                        msgspec_class_type.convert_ts_fields_from_datetime_to_epoch_int(updated_or_created_obj)
+                        await publish_ws(msgspec_class_type, document_id, updated_or_created_obj, update_ws_with_id=True)
+                elif change['operationType'] == 'delete':
+                    logging.debug(f"STREAM - Document with _id '{document_id}' was deleted.")
+                    empty_obj_dict = {'_id': document_id}
+                    await publish_ws(msgspec_class_type, document_id, empty_obj_dict, update_ws_with_id=True)
+                else:
+                    logging.error(f"Mongo Stream Unhandled change detected: {change}")
+    except Exception as e:
+        logging.exception(f"[STREAM - {msgspec_class_type.__name__}] Error: {e}")
+    finally:
+        logging.info(f"[STREAM - {msgspec_class_type.__name__}] Stopped watching changes.")
+

@@ -327,10 +327,11 @@ message PairPlan {
     optional int64 pair_plan_params_update_seq_num = 7 [(FluxFldHide) = "True"];
     optional string host = 8 [(FluxFldHide) = "True"];
     optional int64 port = 9 [(FluxFldHide) = "True"];
-    optional int64 cpp_port = 10 [(FluxFldHide) = "True"];
-    optional int64 server_ready_state = 11 [default=0, (FluxFldHide) = "True", (FluxFldServerPopulate) = true, (FluxFldServerReadyStatus) = true];
+    optional int64 view_port = 10 [(FluxFldHide) = "True"];
+    optional int64 cpp_port = 11 [(FluxFldHide) = "True"];
+    optional int64 server_ready_state = 12 [default=0, (FluxFldHide) = "True", (FluxFldServerPopulate) = true, (FluxFldServerReadyStatus) = true];
     // UI can only move from READY, PAUSED, ERROR states to ACTIVE or from ACTIVE to PAUSED - this triggers auto-save {UI sends model update to server}
-    required PlanState plan_state = 12 [default = PlanState_SNOOZED, (FluxFldButton) = {
+    required PlanState plan_state = 13 [default = PlanState_SNOOZED, (FluxFldButton) = {
       unpressed_caption: "Activate",
       pressed_caption: "Pause",
       disabled_captions: "PlanState_DONE=Done",
@@ -375,14 +376,16 @@ message PlanCollection {
     QueryParams: {
       QueryParamName: "plan_id",
       QueryParamDataType: "int"
-    }
+    },
+    QueryRouteType: PATCH
   };
   option (FluxMsgJsonQuery) = {
     QueryName: "reload_plan_from_plan_id",
     QueryParams: {
       QueryParamName: "plan_id",
       QueryParamDataType: "int"
-    }
+    },
+    QueryRouteType: PATCH
   };
   option (FluxMsgSmallSizedCollection) = true;
   option (FluxMsgStringLength) = 128;

@@ -6,14 +6,15 @@ ui_port: "3080"
 # server specific configs
 server_host: "127.0.0.1"
 main_server_beanie_port: "8080"
-main_server_cache_port: "8085"
+view_port: "8085"
+main_server_cache_port: "8086"
 min_refresh_interval: 20
 custom_logger_lvls:
   - TIMING: 15
   - JUNK: 5
 
 log_mongo_uri: True
-mongo_server: "mongodb://localhost:27017"
+mongo_server: "mongodb://localhost:27017/?replicaSet=rs0&authSource=admin"
 
 # to be used by plugins to take proto files from these projects to generate combined output
 multi_project_plugin:
@@ -32,4 +33,4 @@ cache_override_type: "bare"
 
 log_level: "debug"  # log lvl in int or basic log lvl name
 
-md_trigger_wait_sec: 60  # secs to wait before re-trigger md-so script
+md_trigger_wait_sec: 60  # secs to wait before re-trigger md so script

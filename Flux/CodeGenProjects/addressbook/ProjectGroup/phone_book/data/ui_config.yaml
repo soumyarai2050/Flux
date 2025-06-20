@@ -59,7 +59,7 @@ ui_coordinates:
     y: 111
     w: 18
     h: 14
-  FillsJournal:
+  DealsLedger:
     x: 0
     y: 125
     w: 18
@@ -69,7 +69,7 @@ ui_coordinates:
     y: 145
     w: 18
     h: 20
-  ChoreJournal:
+  ChoreLedger:
     x: 0
     y: 165
     w: 18
@@ -79,7 +79,7 @@ ui_coordinates:
     y: 185
     w: 18
     h: 20
-  ExecutorEventJournal:
+  ExecutorEventLedger:
     x: 0
     y: 205
     w: 18

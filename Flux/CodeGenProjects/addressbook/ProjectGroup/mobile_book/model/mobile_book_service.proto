@@ -29,8 +29,8 @@ option (FluxFileImportDependencyModel) = {
 
 option (FluxFileImportDependencyModel) = {
     ImportFileName: "street_book_n_post_book_n_basket_book_core.proto",
-    ImportModelName: "ChoreJournal",
-    ImportModelName: "ChoreJournalList",
+    ImportModelName: "ChoreLedger",
+    ImportModelName: "ChoreLedgerList",
     ImportModelName: "ChoreSnapshot",
     ImportModelName: "ChoreSnapshotList",
 
@@ -38,8 +38,8 @@ option (FluxFileImportDependencyModel) = {
 
 // option (FluxFileImportDependencyModel) = {
 //     ImportFileName: "street_book_service.proto",
-//     ImportModelName: "FillsJournal",
-//    ImportModelName: "FillsJournalList"
+//     ImportModelName: "DealsLedger",
+//    ImportModelName: "DealsLedgerList"
 // };
 
 option (FluxFileCRUDPortOffset) = 40;
@@ -88,7 +88,7 @@ message TickByTickBBO {
   required int64 exch_time = 3 [(FluxFldValTimeField) = true, (FluxFldValIsDateTime) = true];
   required TickType tick_type = 4;
   required int64 arrival_time = 5 [(FluxFldValIsDateTime) = true];
-  optional float px = 6;
+  optional float px = 6 [(FluxFldNumberFormat) = ".3"];
   optional int64 qty = 7;
 }
 
@@ -120,7 +120,7 @@ message RawMarketDepthHistory {
   required int32 position = 5;
   required int32 operation = 6;
   required TickType side = 7;
-  required float px = 8;
+  required float px = 8 [(FluxFldNumberFormat) = ".3"];
   required int64 qty = 9;
 }
 
@@ -144,7 +144,7 @@ message RawMarketDepthHistoryList {
 }
 
 // TODO: Add message
-// FillsJournal
+// DealsLedger
 // ChoreBrief
 // inside Security add InstrumentType
-// ChoreJournal
+// ChoreLedger

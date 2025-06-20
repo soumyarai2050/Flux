@@ -279,6 +279,7 @@ class FastapiBaseRoutesFileHandler(BaseFastapiPlugin, ABC):
         output_str += f"\n\n"
         output_str += 'config_path = PurePath(__file__).parent.parent.parent / "data" / "config.yaml"\n'
         output_str += 'config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(config_path))\n'
+        output_str += f"is_view_server = os.environ.get('IS_VIEW_SERVER', False)\n\n"
         temp_list = []  # used to prevent code repetition
         for message in self.root_message_list:
             filter_config_var_declaration = self._set_filter_config_vars(message)

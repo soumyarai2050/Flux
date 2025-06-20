@@ -266,7 +266,7 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
                 f"{message_name_snake_cased}'",
             BaseFastapiPlugin.flux_json_root_read_field:
                 f"self.get_{message_name_snake_cased}_client_url: str = "
-                "f'http://{self.host}:{self.port}/" +
+                "f'http://{self.host}:{self.view_port if self.view_port else self.port}/" +
                 f"{self.proto_file_package}/"
                 f"get-{message_name_snake_cased}'",
             BaseFastapiPlugin.flux_json_root_update_field:
@@ -306,7 +306,7 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
                 f"delete-all-{message_name_snake_cased}'"
         }
         output_str += " " * 8 + "self.get_all_" + f"{message_name_snake_cased}" + \
-                      "_client_url: str = f'http://{self.host}:{self.port}/" + \
+                      "_client_url: str = f'http://{self.host}:{self.view_port if self.view_port else self.port}/" + \
                       f"{self.proto_file_package}/get-all-{message_name_snake_cased}'\n"
 
         for crud_option_field_name, url in crud_field_name_to_url_dict.items():
@@ -318,7 +318,7 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
         for field in message.fields:
             if self.is_bool_option_enabled(field, BaseFastapiPlugin.flux_fld_index):
                 output_str += " " * 8 + f"self.get_{message_name_snake_cased}_from_index_fields_client_url: " \
-                                        f"str = f'http://" + "{self.host}:{self.port}/" + \
+                                        f"str = f'http://" + "{self.host}:{self.view_port if self.view_port else self.port}/" + \
                               f"{self.proto_file_package}/get-{message_name_snake_cased}-from-index-fields'\n"
                 break
             # else not required: Avoiding field if index option is not enabled
@@ -326,7 +326,7 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
         id_field_type: str = self._get_msg_id_field_type(message)
         if id_field_type == "int":
             output_str += " " * 8 + "self.get_" + f"{message_name_snake_cased}_" + \
-                          "max_id_client_url: str = f'http://{self.host}:{self.port}/" + \
+                          "max_id_client_url: str = f'http://{self.host}:{self.view_port if self.view_port else self.port}/" + \
                           f"{self.proto_file_package}/query-get_{message_name_snake_cased}_max_id'\n"
         return output_str
 
@@ -345,7 +345,7 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
             projection_val_to_query_name_dict = (
                 FastapiHttpClientFileHandler.get_projection_temp_query_name_to_generated_query_name_dict(message))
             for temp_query_name, query_name in projection_val_to_query_name_dict.items():
-                url = f"self.query_{query_name}_url: str = " + "f'http://{self.host}:{self.port}/" + \
+                url = f"self.query_{query_name}_url: str = " + "f'http://{self.host}:{self.view_port if self.view_port else self.port}/" + \
                       f"{self.proto_file_package}/" + f"query-{query_name}'"
                 output_str += " " * 8 + f"{url}\n"
 
@@ -360,17 +360,25 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
             query_name = aggregate_value[FastapiHttpClientFileHandler.query_name_key]
             query_type = str(aggregate_value[FastapiHttpClientFileHandler.query_type_key]).lower() \
                 if aggregate_value[FastapiHttpClientFileHandler.query_type_key] is not None else None
+            query_route_type_value = aggregate_value[FastapiHttpClientFileHandler.query_route_type_key]
+            query_route_type = str(query_route_type_value) if query_route_type_value is not None else \
+                FastapiHttpClientFileHandler.flux_json_query_route_get_type_field_val
 
             if query_type is None or query_type == "http" or query_type == "both" or query_type == "http_file":
-                output_str += self._get_url_set_str_for_output(query_name)
+                output_str += self._get_url_set_str_for_output(query_name, query_route_type)
             # else not required: ws handling is done by ws client plugin
 
         return output_str
 
-    def _get_url_set_str_for_output(self, query_name: str):
+    def _get_url_set_str_for_output(self, query_name: str, query_route_type: str):
         output_str = ""
-        url = f"self.query_{query_name}_url: str = " + "f'http://{self.host}:{self.port}/" + \
-              f"{self.proto_file_package}/" + f"query-{query_name}'"
+        if query_route_type == FastapiHttpClientFileHandler.flux_json_query_route_get_type_field_val:
+            url = (f"self.query_{query_name}_url: str = " +
+                   "f'http://{self.host}:{self.view_port if self.view_port else self.port}/"
+                   f"{self.proto_file_package}/" + f"query-{query_name}'")
+        else:
+            url = f"self.query_{query_name}_url: str = " + "f'http://{self.host}:{self.port}/" + \
+                  f"{self.proto_file_package}/" + f"query-{query_name}'"
         output_str += " " * 8 + f"{url}\n"
 
         return output_str
@@ -391,7 +399,10 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
             for query_data_dict in query_data_dict_list:
                 query_data = query_data_dict.get("query_data")
                 query_name = query_data.get(FastapiHttpClientFileHandler.flux_json_query_name_field)
-                output_str += self._get_url_set_str_for_output(query_name)
+                query_route_type_value = query_data.get(FastapiHttpClientFileHandler.flux_json_query_route_type_field)
+                query_route_type = str(query_route_type_value) if query_route_type_value is not None else \
+                    FastapiHttpClientFileHandler.flux_json_query_route_get_type_field_val
+                output_str += self._get_url_set_str_for_output(query_name, query_route_type)
 
         return output_str
 
@@ -744,20 +755,25 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
         output_str += f"    get_instance_mutex: threading.Lock = threading.Lock()\n"
         output_str += f"    host_port_key_to_instance_dict: Dict[str, '{class_name}'] = "+"{}\n\n"
         output_str += f"    @classmethod\n"
-        output_str += f"    def set_or_get_if_instance_exists(cls, host: str | None = None, port: int | None = None):\n"
+        output_str += (f"    def set_or_get_if_instance_exists(cls, host: str | None = None, port: int | None = None, "
+                       f"view_port: int | None = None):\n")
         output_str += f"        with cls.get_instance_mutex:\n"
         output_str += f'            host = {host} if host is None else host\n'
         output_str += f'            port = {port} if port is None else port\n'
-        output_str += '            key = f"{host}_{port}"\n'
+        output_str += '            if view_port:\n'
+        output_str += '                key = f"{host}_{port}_{view_port}"\n'
+        output_str += '            else:\n'
+        output_str += '                key = f"{host}_{port}"\n'
         output_str += '            if key in cls.host_port_key_to_instance_dict:\n'
         output_str += '                return cls.host_port_key_to_instance_dict.get(key)\n'
         output_str += '            else:\n'
-        output_str += f'                cls.host_port_key_to_instance_dict[key] = {class_name}(host, port)\n'
+        output_str += f'                cls.host_port_key_to_instance_dict[key] = {class_name}(host, port, view_port)\n'
         output_str += '                return cls.host_port_key_to_instance_dict[key]\n\n'
-        output_str += "    def __init__(self, host: str, port: int):\n"
+        output_str += "    def __init__(self, host: str, port: int, view_port: int | None = None):\n"
         output_str += " "*4 + "    # host and port\n"
         output_str += " "*4 + f'    self.host = host\n'
-        output_str += " "*4 + f'    self.port = port\n\n'
+        output_str += " "*4 + f'    self.port = port\n'
+        output_str += " "*4 + f'    self.view_port = view_port\n\n'
         output_str += " "*4 + f'    # urls\n'
         for message in set(self.root_message_list+list(self.message_to_query_option_list_dict)):
             output_str += self._handle_client_url_gen(message)

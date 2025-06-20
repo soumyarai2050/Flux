@@ -52,6 +52,7 @@ message PlanBrief {
     depending_proto_model_name: "PairPlan",
     depending_proto_model_field_name_for_host: "PairPlan.host",
     depending_proto_model_field_name_for_port: "PairPlan.port",
+    depending_proto_model_field_name_for_view_port: "PairPlan.view_port"
     is_read_only: true
   };
   option (FluxMsgJsonQuery) = {

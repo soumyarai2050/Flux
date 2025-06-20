@@ -57,6 +57,7 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
     const [showAll, setShowAll] = useState(false);
     const [moreAll, setMoreAll] = useState(false);
     const [url, setUrl] = useState(modelDataSource.url);
+    const [viewUrl, setViewUrl] = useState(modelDataSource.viewUrl);
     const [isProcessingUserActions, setIsProcessingUserActions] = useState(false);
     const [reconnectCounter, setReconnectCounter] = useState(0);
     const [params, setParams] = useState(null);
@@ -100,6 +101,8 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
     useEffect(() => {
         const url = getServerUrl(modelSchema, dataSourceStoredObj, dataSource?.fieldsMetadata);
         setUrl(url);
+        const viewUrl = getServerUrl(modelSchema, dataSourceStoredObj, dataSource?.fieldsMetadata, null, true);
+        setViewUrl(viewUrl);
         let updatedParams = null;
         if (dataSourceStoredObj && Object.keys(dataSourceStoredObj).length > 0 && crudOverrideDictRef.current?.GET_ALL) {
             const { paramDict } = crudOverrideDictRef.current.GET_ALL;
@@ -125,8 +128,8 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
     }, [dataSourceStoredObj])
 
     useEffect(() => {
-        if (url && !isAbbreviationSource) {
-            let args = { url };
+        if (viewUrl && !isAbbreviationSource) {
+            let args = { url: viewUrl };
             if (crudOverrideDictRef.current?.GET_ALL) {
                 const { endpoint, paramDict } = crudOverrideDictRef.current.GET_ALL;
                 if (!params && Object.keys(paramDict).length > 0) {
@@ -136,7 +139,7 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
             }
             dispatch(actions.getAll({ ...args }));
         }
-    }, [url, params])
+    }, [viewUrl, params])
 
     useEffect(() => {
         workerRef.current = new Worker(new URL("../../workers/root-model.worker.js", import.meta.url));
@@ -253,7 +256,7 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
     }
 
     socketRef.current = useWebSocketWorker({
-        url,
+        url: (modelSchema.is_large_db_object || modelSchema.is_time_series) ? url : viewUrl,
         modelName,
         isDisabled: isWsDisabled,
         reconnectCounter,
@@ -289,8 +292,8 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
     }
 
     const handleReload = () => {
-        if (url) {
-            let args = { url };
+        if (viewUrl) {
+            let args = { url: viewUrl };
             if (crudOverrideDictRef.current?.GET_ALL) {
                 const { endpoint, paramDict } = crudOverrideDictRef.current.GET_ALL;
                 if (!params && Object.keys(paramDict).length > 0) {
@@ -619,6 +622,7 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
                         // button query menu
                         modelSchema={modelSchema}
                         url={url}
+                        viewUrl={viewUrl}
                         // misc
                         enableOverride={modelLayoutData.enable_override || []}
                         disableOverride={modelLayoutData.disable_override || []}

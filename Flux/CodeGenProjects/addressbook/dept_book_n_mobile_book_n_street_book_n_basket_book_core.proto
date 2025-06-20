@@ -33,6 +33,7 @@ message SymbolOverview {
     depending_proto_model_name: "PairPlan",
     depending_proto_model_field_name_for_host: "PairPlan.host",
     depending_proto_model_field_name_for_port: "PairPlan.port",
+    depending_proto_model_field_name_for_view_port: "PairPlan.view_port"
     is_read_only: true
   };
   option (FluxMsgJsonQuery) = {
@@ -94,6 +95,7 @@ message TopOfBook {
     depending_proto_model_name: "PairPlan",
     depending_proto_model_field_name_for_host: "PairPlan.host",
     depending_proto_model_field_name_for_port: "PairPlan.cpp_port",
+    depending_proto_model_field_name_for_view_port: "PairPlan.view_port"
     depending_proto_model_for_cpp_port: true,
     is_read_only: true
   };
@@ -161,6 +163,7 @@ message MarketDepth {
     depending_proto_model_name: "PairPlan",
     depending_proto_model_field_name_for_host: "PairPlan.host",
     depending_proto_model_field_name_for_port: "PairPlan.cpp_port",
+    depending_proto_model_field_name_for_view_port: "PairPlan.view_port"
     depending_proto_model_for_cpp_port: true,
     is_read_only: true
   };
@@ -220,6 +223,7 @@ message LastBarter {
     depending_proto_model_name: "PairPlan",
     depending_proto_model_field_name_for_host: "PairPlan.host",
     depending_proto_model_field_name_for_port: "PairPlan.cpp_port",
+    depending_proto_model_field_name_for_view_port: "PairPlan.view_port"
     depending_proto_model_for_cpp_port: true,
     is_read_only: true
   };

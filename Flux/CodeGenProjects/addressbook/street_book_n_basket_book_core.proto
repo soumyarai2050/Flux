@@ -51,7 +51,7 @@ message NewChore{
   optional string text = 19 [(FluxFldTitle) = "Text", (FluxFldAbbreviated) = "JSON", (FluxFldServerPopulate) = true];
   optional int64 pending_amd_qty = 20 [(FluxFldServerPopulate) = true, (FluxFldHide) = "True", (FluxFldHelp) = "used internally for amend qty support - also helps prevent second amend trigger unless prior is completed - px and qty simultaneous amend is allowed"];
   optional float pending_amd_px = 21 [(FluxFldServerPopulate) = true, (FluxFldHide) = "True", (FluxFldNumberFormat) = ".3", (FluxFldHelp) = "used internally for amend px support - also helps prevent second amend trigger unless prior amend is completed - px and qty simultaneous amend is allowed"];
-  optional bool pending_cxl = 22 [default=false, (FluxFldTitle) = "X", (FluxFldColor) = "ERROR", (FluxFldNoCommonKey) = true, (FluxFldUIUpdateOnly) = true, (FluxFldButton) = {
+  optional bool pending_cxl = 22 [default=false, (FluxFldTitle) = "X", (FluxFldNameColor) = "ERROR", (FluxFldNoCommonKey) = true, (FluxFldUIUpdateOnly) = true, (FluxFldButton) = {
     unpressed_caption: "Cxl",
     pressed_caption: "Removed",
     disabled_captions: "true=Removed"
@@ -116,11 +116,11 @@ message BarterSimulatorProcessNewChore{
       QueryParamDataType: "str"
     },
     QueryParams: {
-      QueryParamName: "symbol_type",
+      QueryParamName: "bartering_sec_type",
       QueryParamDataType: "str"
     },
     QueryParams: {
-      QueryParamName: "underlying_account",
+      QueryParamName: "account",
       QueryParamDataType: "str"
     },
     QueryParams: {
@@ -128,14 +128,14 @@ message BarterSimulatorProcessNewChore{
       QueryParamDataType: "str | None = None"
     },
     QueryParams: {
-      QueryParamName: "internal_ord_id",
+      QueryParamName: "client_ord_id",
       QueryParamDataType: "str | None = None"
     }
   };
   required bool resp = 1;
 }
 
-message FillsJournal{
+message DealsLedger{
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
@@ -156,9 +156,10 @@ message FillsJournal{
     depending_proto_model_name: "PairPlan",
     depending_proto_model_field_name_for_host: "PairPlan.host",
     depending_proto_model_field_name_for_port: "PairPlan.port",
+    depending_proto_model_field_name_for_view_port: "PairPlan.view_port"
     is_read_only: true
   };
-  option (FluxMsgCRUDSharedLock) = "journal_shared_lock";
+  option (FluxMsgCRUDSharedLock) = "ledger_shared_lock";
   option (FluxMsgUIGetAllLimit) = "-100";
   option (FluxMsgJsonQuery) = {
       QueryName: "get_symbol_side_underlying_account_cumulative_fill_qty",
@@ -173,7 +174,7 @@ message FillsJournal{
       }
   };
   option (FluxMsgJsonQuery) = {
-      QueryName: "get_fills_journal_from_cache"
+      QueryName: "get_deals_ledger_from_cache"
   };
   option (FluxMsgExecutorOptions) = {
     IsWebSocketModel: true,

@@ -37,6 +37,7 @@ const MenuGroup = ({
     commonKeys,
     modelSchema,
     url,
+    viewUrl,
     onShowAllToggle,
     onMoreAllToggle,
     onColumnsChange,
@@ -421,6 +422,7 @@ const MenuGroup = ({
                 <ButtonQuery
                     key={idx}
                     url={url}
+                    viewUrl={viewUrl}
                     queryObj={obj}
                 />
             ))}

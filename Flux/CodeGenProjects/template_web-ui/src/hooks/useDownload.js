@@ -65,7 +65,7 @@ const useDownload = (modelName, fieldsMetadata, xpath, modelType = null) => {
             if (!storedData) {
                 const defaultEndpoint = `get-all-${modelName}`;
                 const { url, endpoint, uiLimit = null, params } = args;
-                const [apiUrl, apiParams] = getApiUrlMetadata(defaultEndpoint, url, endpoint, uiLimit, params);
+                const [apiUrl, apiParams] = getApiUrlMetadata(defaultEndpoint, url, endpoint, uiLimit, params, true);
                 try {
                     const res = await axios.get(apiUrl, { params: apiParams });
                     data = res.data;

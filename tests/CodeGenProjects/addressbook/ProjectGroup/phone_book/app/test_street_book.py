@@ -75,8 +75,8 @@ def test_min_chore_notional_breach_in_normal_plan_mode1(
         time.sleep(1)
         update_tob_through_market_depth_to_place_buy_chore(active_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        # Internally checks if chore_ledger is found with OE_NEW state
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
 
         if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
@@ -99,11 +99,11 @@ def test_min_chore_notional_breach_in_normal_plan_mode1(
         time.sleep(1)
         update_tob_through_market_depth_to_place_buy_chore(active_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        # Internally checks if chore_ledger is found with OE_NEW state
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client,
                                                                               expect_no_chore=True,
-                                                                              last_chore_id=placed_chore_journal.chore.chore_id)
+                                                                              last_chore_id=placed_chore_ledger.chore.chore_id)
         check_str = (f"blocked chore_opportunity {plan_limits.min_chore_notional_allowance} applied "
                      f"{min_chore_notional} < chore_usd_notional")
         assert_fail_msg = f"can't find alert_str: {check_str} in plan or contact_alerts"
@@ -182,8 +182,8 @@ def test_min_chore_notional_breach_in_normal_plan_mode2(
         time.sleep(1)
         update_tob_through_market_depth_to_place_buy_chore(active_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        # Internally checks if chore_ledger is found with OE_NEW state
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
 
         if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
@@ -206,11 +206,11 @@ def test_min_chore_notional_breach_in_normal_plan_mode2(
         time.sleep(1)
         update_tob_through_market_depth_to_place_buy_chore(active_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        # Internally checks if chore_ledger is found with OE_NEW state
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client,
                                                                               expect_no_chore=True,
-                                                                              last_chore_id=placed_chore_journal.chore.chore_id)
+                                                                              last_chore_id=placed_chore_ledger.chore.chore_id)
         check_str = f"blocked chore_opportunity {min_chore_notional} < chore_usd_notional"
         assert_fail_msg = f"can't find alert_str: {check_str} in plan or contact_alerts"
         time.sleep(5)
@@ -237,11 +237,11 @@ def test_min_chore_notional_breach_in_normal_plan_mode2(
         time.sleep(1)
         update_tob_through_market_depth_to_place_buy_chore(active_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        # Internally checks if chore_ledger is found with OE_NEW state
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client,
                                                                               expect_no_chore=True,
-                                                                              last_chore_id=placed_chore_journal.chore.chore_id)
+                                                                              last_chore_id=placed_chore_ledger.chore.chore_id)
         check_str = f"blocked chore_opportunity {min_chore_notional} < chore_usd_notional"
         assert_fail_msg = f"can't find alert_str: {check_str} in plan or contact_alerts"
         time.sleep(5)
@@ -339,7 +339,7 @@ def test_min_chore_notional_breach_in_relaxed_plan_mode(
         time.sleep(1)
         update_tob_through_market_depth_to_place_buy_chore(active_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
-        # Internally checks if chore_journal is found with OE_NEW state
+        # Internally checks if chore_ledger is found with OE_NEW state
         debug_max_wait_sec = None
         if debug_mode:
             debug_max_wait_sec = test_config_dict.get("debug_max_wait_sec")
@@ -347,8 +347,8 @@ def test_min_chore_notional_breach_in_relaxed_plan_mode(
         kwargs = {"expected_chore_event": ChoreEventType.OE_NEW,
                   "expected_symbol": buy_symbol,
                   "executor_web_client": executor_http_client}
-        placed_chore_journal = debug_callable_handler(debug_max_wait_sec,
-                                                      get_latest_chore_journal_with_event_and_symbol, kwargs)
+        placed_chore_ledger = debug_callable_handler(debug_max_wait_sec,
+                                                      get_latest_chore_ledger_with_event_and_symbol, kwargs)
 
         if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
             time.sleep(residual_wait_sec)
@@ -369,11 +369,11 @@ def test_min_chore_notional_breach_in_relaxed_plan_mode(
         time.sleep(1)
         update_tob_through_market_depth_to_place_buy_chore(active_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        # Internally checks if chore_ledger is found with OE_NEW state
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client,
                                                                               expect_no_chore=True,
-                                                                              last_chore_id=placed_chore_journal.chore.chore_id)
+                                                                              last_chore_id=placed_chore_ledger.chore.chore_id)
         check_str = f"blocked chore_opportunity < min_chore_notional_relaxed limit"
         assert_fail_msg = f"can't find alert_str: {check_str} in plan or contact_alerts"
         time.sleep(5)
@@ -474,8 +474,8 @@ def test_min_eqt_qty_in_buy_sell_plan(
         px = 97
         qty = 90
         place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        # Internally checks if chore_ledger is found with OE_NEW state
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
 
         if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
@@ -486,9 +486,9 @@ def test_min_eqt_qty_in_buy_sell_plan(
         qty = 90
         place_new_chore(sell_symbol, Side.SELL, px, qty, executor_http_client, sell_inst_type)
 
-        new_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        new_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                            sell_symbol, executor_http_client)
-        last_chore_id = new_chore_journal.chore.chore_id
+        last_chore_id = new_chore_ledger.chore.chore_id
 
         if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
             time.sleep(residual_wait_sec)
@@ -499,7 +499,7 @@ def test_min_eqt_qty_in_buy_sell_plan(
         qty = 10
         place_new_chore(sell_symbol, Side.SELL, px, qty, executor_http_client, sell_inst_type)
 
-        new_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        new_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                            sell_symbol, executor_http_client,
                                                                            expect_no_chore=True,
                                                                            last_chore_id=last_chore_id)
@@ -580,8 +580,8 @@ def test_min_eqt_qty_in_sell_buy_plan(
         px = 97
         qty = 90
         place_new_chore(leg1_symbol, Side.SELL, px, qty, executor_http_client, sell_inst_type)
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        # Internally checks if chore_ledger is found with OE_NEW state
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               leg1_symbol, executor_http_client)
 
         if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
@@ -592,9 +592,9 @@ def test_min_eqt_qty_in_sell_buy_plan(
         qty = 90
         place_new_chore(leg2_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
 
-        new_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        new_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                            leg2_symbol, executor_http_client)
-        last_chore_id = new_chore_journal.chore.chore_id
+        last_chore_id = new_chore_ledger.chore.chore_id
 
         if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
             time.sleep(residual_wait_sec)
@@ -605,7 +605,7 @@ def test_min_eqt_qty_in_sell_buy_plan(
         qty = 10
         place_new_chore(leg2_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
 
-        new_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        new_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                            leg2_symbol, executor_http_client,
                                                                            expect_no_chore=True,
                                                                            last_chore_id=last_chore_id)
@@ -681,8 +681,8 @@ def test_max_chore_notional_breach(static_data_, clean_and_set_limits, leg1_leg2
         time.sleep(1)
         update_tob_through_market_depth_to_place_buy_chore(active_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        # Internally checks if chore_ledger is found with OE_NEW state
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
 
         if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
@@ -700,11 +700,11 @@ def test_max_chore_notional_breach(static_data_, clean_and_set_limits, leg1_leg2
         time.sleep(1)
         update_tob_through_market_depth_to_place_buy_chore(active_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        # Internally checks if chore_ledger is found with OE_NEW state
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client,
                                                                               expect_no_chore=True,
-                                                                              last_chore_id=placed_chore_journal.chore.chore_id)
+                                                                              last_chore_id=placed_chore_ledger.chore.chore_id)
         check_str = f"blocked generated chore, breaches max_chore_notional limit, expected less than"
         assert_fail_msg = f"can't find alert_str: {check_str} in plan or contact_alerts"
         time.sleep(5)
@@ -777,8 +777,8 @@ def test_max_chore_qty_breach(static_data_, clean_and_set_limits, leg1_leg2_symb
         time.sleep(1)
         update_tob_through_market_depth_to_place_buy_chore(active_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        # Internally checks if chore_ledger is found with OE_NEW state
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
 
         if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
@@ -796,11 +796,11 @@ def test_max_chore_qty_breach(static_data_, clean_and_set_limits, leg1_leg2_symb
         time.sleep(1)
         update_tob_through_market_depth_to_place_buy_chore(active_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        # Internally checks if chore_ledger is found with OE_NEW state
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client,
                                                                               expect_no_chore=True,
-                                                                              last_chore_id=placed_chore_journal.chore.chore_id)
+                                                                              last_chore_id=placed_chore_ledger.chore.chore_id)
         check_str = "blocked generated chore, breaches max_chore_qty limit, expected less than"
         assert_fail_msg = f"can't find alert_str: {check_str} in plan or contact_alerts"
         time.sleep(5)
@@ -919,8 +919,8 @@ def test_breach_threshold_px_with_wrong_tob(static_data_, clean_and_set_limits, 
         time.sleep(1)
         update_tob_through_market_depth_to_place_buy_chore(active_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        # Internally checks if chore_ledger is found with OE_NEW state
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
 
         if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
@@ -932,8 +932,8 @@ def test_breach_threshold_px_with_wrong_tob(static_data_, clean_and_set_limits, 
 
         update_tob_through_market_depth_to_place_sell_chore(active_pair_plan.cpp_port, ask_sell_top_market_depth,
                                                             bid_buy_top_market_depth)
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        # Internally checks if chore_ledger is found with OE_NEW state
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               sell_symbol, executor_http_client)
 
     except AssertionError as e:
@@ -1000,8 +1000,8 @@ def test_breach_threshold_px_with_unsupported_side(static_data_, clean_and_set_l
         time.sleep(1)
         update_tob_through_market_depth_to_place_buy_chore(active_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        # Internally checks if chore_ledger is found with OE_NEW state
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
 
         if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
@@ -1016,7 +1016,7 @@ def test_breach_threshold_px_with_unsupported_side(static_data_, clean_and_set_l
         handle_place_chore_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.SIDE_UNSPECIFIED, px, qty,
                                                                       check_str, assert_fail_msg,
                                                                       active_pair_plan, executor_http_client,
-                                                                      last_chore_id=placed_chore_journal.chore.chore_id)
+                                                                      last_chore_id=placed_chore_ledger.chore.chore_id)
     except AssertionError as e:
         raise AssertionError(e)
     except Exception as e:
@@ -1114,8 +1114,8 @@ def test_breach_threshold_px_with_0_depth_px(static_data_, clean_and_set_limits,
         time.sleep(1)
         update_tob_through_market_depth_to_place_buy_chore(active_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        # Internally checks if chore_ledger is found with OE_NEW state
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
 
     except AssertionError as e:
@@ -1257,8 +1257,8 @@ def test_breach_threshold_px_with_none_aggressive_quote(static_data_, clean_and_
         time.sleep(1)
         update_tob_through_market_depth_to_place_buy_chore(active_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        # Internally checks if chore_ledger is found with OE_NEW state
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
 
         if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
@@ -1270,8 +1270,8 @@ def test_breach_threshold_px_with_none_aggressive_quote(static_data_, clean_and_
 
         update_tob_through_market_depth_to_place_sell_chore(active_pair_plan.cpp_port, ask_sell_top_market_depth,
                                                             bid_buy_top_market_depth)
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        # Internally checks if chore_ledger is found with OE_NEW state
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               sell_symbol, executor_http_client)
 
     except AssertionError as e:
@@ -1485,8 +1485,8 @@ def test_breach_threshold_px_for_max_buy_n_min_sell_px_by_basis_points(
         qty = 90
         place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
 
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        # Internally checks if chore_ledger is found with OE_NEW state
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
 
         if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
@@ -1579,8 +1579,8 @@ def test_breach_threshold_px_for_max_buy_n_min_sell_px_by_basis_points(
         qty = 90
         place_new_chore(sell_symbol, Side.SELL, px, qty, executor_http_client, sell_inst_type)
 
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        # Internally checks if chore_ledger is found with OE_NEW state
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               sell_symbol, executor_http_client)
 
     except AssertionError as e:
@@ -1749,8 +1749,8 @@ def test_breach_threshold_px_for_min_buy_n_max_sell_px_by_bbo_n_tick_size(
             px = 121
             qty = 90
             place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
-            # Internally checks if chore_journal is found with OE_NEW state
-            placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+            # Internally checks if chore_ledger is found with OE_NEW state
+            placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                                   buy_symbol, executor_http_client)
 
             if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
@@ -1821,8 +1821,8 @@ def test_breach_threshold_px_for_min_buy_n_max_sell_px_by_bbo_n_tick_size(
             qty = 90
             place_new_chore(sell_symbol, Side.SELL, px, qty, executor_http_client, sell_inst_type)
 
-            # Internally checks if chore_journal is found with OE_NEW state
-            placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+            # Internally checks if chore_ledger is found with OE_NEW state
+            placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                                   sell_symbol, executor_http_client)
 
         except AssertionError as e:
@@ -1991,8 +1991,8 @@ def test_breach_threshold_px_for_min_buy_n_max_sell_px_by_last_barter_n_tick_siz
             qty = 90
             place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
 
-            # Internally checks if chore_journal is found with OE_NEW state
-            placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+            # Internally checks if chore_ledger is found with OE_NEW state
+            placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                                   buy_symbol, executor_http_client)
 
             if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
@@ -2093,8 +2093,8 @@ def test_breach_threshold_px_for_min_buy_n_max_sell_px_by_last_barter_n_tick_siz
             qty = 90
             place_new_chore(sell_symbol, Side.SELL, px, qty, executor_http_client, sell_inst_type)
 
-            # Internally checks if chore_journal is found with OE_NEW state
-            placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+            # Internally checks if chore_ledger is found with OE_NEW state
+            placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                                   sell_symbol, executor_http_client)
 
         except AssertionError as e:
@@ -2254,8 +2254,8 @@ def test_breach_threshold_px_for_buy_max_n_sell_min_px_by_deviation(
         px = 96
         qty = 90
         place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        # Internally checks if chore_ledger is found with OE_NEW state
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
 
         if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
@@ -2318,8 +2318,8 @@ def test_breach_threshold_px_for_buy_max_n_sell_min_px_by_deviation(
         qty = 90
         place_new_chore(sell_symbol, Side.SELL, px, qty, executor_http_client, sell_inst_type)
 
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        # Internally checks if chore_ledger is found with OE_NEW state
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               sell_symbol, executor_http_client)
 
     except AssertionError as e:
@@ -2464,8 +2464,8 @@ def test_breach_threshold_px_for_px_by_max_depth(static_data_, clean_and_set_lim
         qty = 90
         place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
 
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        # Internally checks if chore_ledger is found with OE_NEW state
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
 
         if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
@@ -2550,8 +2550,8 @@ def test_breach_threshold_px_for_px_by_max_depth(static_data_, clean_and_set_lim
         qty = 90
         place_new_chore(sell_symbol, Side.SELL, px, qty, executor_http_client, sell_inst_type)
 
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        # Internally checks if chore_ledger is found with OE_NEW state
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               sell_symbol, executor_http_client)
 
     except AssertionError as e:
@@ -2566,8 +2566,8 @@ def test_breach_threshold_px_for_px_by_max_depth(static_data_, clean_and_set_lim
 
 # chore limits
 def test_max_contract_qty(static_data_, clean_and_set_limits, pair_securities_with_sides_,
-                          buy_chore_, sell_chore_, buy_fill_journal_,
-                          sell_fill_journal_, expected_buy_chore_snapshot_,
+                          buy_chore_, sell_chore_, buy_fill_ledger_,
+                          sell_fill_ledger_, expected_buy_chore_snapshot_,
                           expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
                           pair_plan_, expected_plan_limits_, expected_plan_status_,
                           expected_plan_brief_, expected_contact_status_,
@@ -2628,8 +2628,8 @@ def test_max_contract_qty(static_data_, clean_and_set_limits, pair_securities_wi
         time.sleep(1)
         update_tob_through_market_depth_to_place_buy_chore(active_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        # Internally checks if chore_ledger is found with OE_NEW state
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
 
         if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
@@ -2652,9 +2652,9 @@ def test_max_contract_qty(static_data_, clean_and_set_limits, pair_securities_wi
         place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
         print(f"symbol: {buy_symbol}, Created new_chore obj")
 
-        new_chore_journal = get_latest_chore_journal_with_event_and_symbol(
+        new_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(
             ChoreEventType.OE_NEW, buy_symbol, executor_http_client, expect_no_chore=True,
-            last_chore_id=placed_chore_journal.chore.chore_id)
+            last_chore_id=placed_chore_ledger.chore.chore_id)
 
         time.sleep(5)
         check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_message)
@@ -2802,8 +2802,8 @@ def test_plan_limits_with_none_or_o_limit_up_down_px(
         time.sleep(1)
         update_tob_through_market_depth_to_place_buy_chore(active_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        # Internally checks if chore_ledger is found with OE_NEW state
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
     except AssertionError as e:
         raise AssertionError(e)
@@ -2922,8 +2922,8 @@ def test_plan_limits_with_0_consumable_open_chores(static_data_, clean_and_set_l
         time.sleep(1)
         update_tob_through_market_depth_to_place_buy_chore(active_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        # Internally checks if chore_ledger is found with OE_NEW state
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
 
         if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
@@ -2951,7 +2951,7 @@ def test_plan_limits_with_0_consumable_open_chores(static_data_, clean_and_set_l
         handle_place_chore_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
                                                                       check_str, assert_fail_msg,
                                                                       active_pair_plan, executor_http_client,
-                                                                      last_chore_id=placed_chore_journal.chore.chore_id)
+                                                                      last_chore_id=placed_chore_ledger.chore.chore_id)
         plan_brief_list = executor_http_client.get_all_plan_brief_client()
         # since only one plan in current test
         assert len(plan_brief_list) == 1, "Unexpected length of plan_briefs, expected exactly one plan_brief " \
@@ -2993,8 +2993,8 @@ def _check_max_single_leg_notional_updates_before_placing_chore(
     qty = 90
     inst_type: InstrumentType = get_inst_type(side, activated_plan)
     place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
-    # Internally checks if chore_journal is found with OE_NEW state
-    placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
+    # Internally checks if chore_ledger is found with OE_NEW state
+    placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK,
                                                                           chore_symbol, executor_http_client)
 
     if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
@@ -3038,7 +3038,7 @@ def _check_max_single_leg_notional_updates_before_placing_chore(
     handle_place_chore_and_check_str_in_alert_for_executor_limits(chore_symbol, side, px, qty,
                                                                   check_str, assert_fail_msg,
                                                                   activated_plan, executor_http_client,
-                                                                  last_chore_id=placed_chore_journal.chore.chore_id)
+                                                                  last_chore_id=placed_chore_ledger.chore.chore_id)
 
     # reverting back max_single_leg_notional by updating it back to last value that will make consumable notional
     # worthy to place chore - this checks if max_single_leg_notional is exhausted and we increase it then
@@ -3053,10 +3053,10 @@ def _check_max_single_leg_notional_updates_before_placing_chore(
     time.sleep(1)
     inst_type: InstrumentType = get_inst_type(side, activated_plan)
     place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
-    # Internally checks if chore_journal is found with OE_NEW state
-    placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
+    # Internally checks if chore_ledger is found with OE_NEW state
+    placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK,
                                                                           chore_symbol, executor_http_client,
-                                                                          last_chore_id=placed_chore_journal.chore.chore_id)
+                                                                          last_chore_id=placed_chore_ledger.chore.chore_id)
 
 
 def _check_max_open_single_leg_notional_updates_before_placing_chore(
@@ -3070,8 +3070,8 @@ def _check_max_open_single_leg_notional_updates_before_placing_chore(
     qty = 90
     inst_type: InstrumentType = get_inst_type(side, activated_plan)
     place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
-    # Internally checks if chore_journal is found with OE_NEW state
-    placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
+    # Internally checks if chore_ledger is found with OE_NEW state
+    placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK,
                                                                           chore_symbol, executor_http_client)
 
     if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
@@ -3116,7 +3116,7 @@ def _check_max_open_single_leg_notional_updates_before_placing_chore(
     handle_place_chore_and_check_str_in_alert_for_executor_limits(chore_symbol, side, px, qty,
                                                                   check_str, assert_fail_msg,
                                                                   activated_plan, executor_http_client,
-                                                                  last_chore_id=placed_chore_journal.chore.chore_id)
+                                                                  last_chore_id=placed_chore_ledger.chore.chore_id)
 
     # reverting back max_single_leg_notional by updating it back to last value that will make consumable notional
     # worthy to place chore - this checks if max_single_leg_notional is exhausted and we increase it then
@@ -3131,10 +3131,10 @@ def _check_max_open_single_leg_notional_updates_before_placing_chore(
     time.sleep(1)
     inst_type: InstrumentType = get_inst_type(side, activated_plan)
     place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
-    # Internally checks if chore_journal is found with OE_NEW state
-    placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
+    # Internally checks if chore_ledger is found with OE_NEW state
+    placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK,
                                                                           chore_symbol, executor_http_client,
-                                                                          last_chore_id=placed_chore_journal.chore.chore_id)
+                                                                          last_chore_id=placed_chore_ledger.chore.chore_id)
 
 
 @pytest.mark.nightly
@@ -3328,8 +3328,8 @@ def test_plan_limits_with_high_consumable_notional(static_data_, clean_and_set_l
         time.sleep(1)
         update_tob_through_market_depth_to_place_buy_chore(activated_plan.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        # Internally checks if chore_ledger is found with OE_NEW state
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
 
         if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
@@ -3359,7 +3359,7 @@ def test_plan_limits_with_high_consumable_notional(static_data_, clean_and_set_l
         handle_place_chore_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
                                                                       check_str, assert_fail_msg,
                                                                       activated_plan, executor_http_client,
-                                                                      last_chore_id=placed_chore_journal.chore.chore_id)
+                                                                      last_chore_id=placed_chore_ledger.chore.chore_id)
         # placing new non-systematic new_chore
         px = 96
         qty = 90
@@ -3471,8 +3471,8 @@ def test_updating_max_concentration_updates_consumable_concentration(
         time.sleep(1)
         update_tob_through_market_depth_to_place_buy_chore(active_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        # Internally checks if chore_ledger is found with OE_NEW state
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
 
         if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
@@ -3484,8 +3484,8 @@ def test_updating_max_concentration_updates_consumable_concentration(
         time.sleep(1)
         update_tob_through_market_depth_to_place_sell_chore(active_pair_plan.cpp_port, ask_sell_top_market_depth,
                                                             bid_buy_top_market_depth)
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        # Internally checks if chore_ledger is found with OE_NEW state
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               sell_symbol, executor_http_client)
 
     except AssertionError as e:
@@ -3499,14 +3499,14 @@ def test_updating_max_concentration_updates_consumable_concentration(
 
 
 def _place_chore_n_check_consumable_concentration_is_0(
-        buy_symbol, sell_symbol, active_pair_plan, executor_http_client, placed_chore_journal=None):
+        buy_symbol, sell_symbol, active_pair_plan, executor_http_client, placed_chore_ledger=None):
     # placing new non-systematic new_chore
     px = 98
     qty = 90
     check_str = "blocked generated BUY chore, unexpected: consumable_concentration found 0!"
     assert_fail_message = "Could not find any alert containing message to block chores due to less " \
                           "consumable concentration"
-    last_chore_id = placed_chore_journal.chore.chore_id if placed_chore_journal is not None else None
+    last_chore_id = placed_chore_ledger.chore.chore_id if placed_chore_ledger is not None else None
     handle_place_chore_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
                                                                   check_str, assert_fail_message,
                                                                   active_pair_plan, executor_http_client,
@@ -3580,8 +3580,8 @@ def test_plan_limits_with_less_consumable_concentration(static_data_, clean_and_
         time.sleep(1)
         update_tob_through_market_depth_to_place_buy_chore(active_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        # Internally checks if chore_ledger is found with OE_NEW state
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
 
         if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
@@ -3617,7 +3617,7 @@ def test_plan_limits_with_less_consumable_concentration(static_data_, clean_and_
         handle_place_chore_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
                                                                       check_str, assert_fail_message,
                                                                       active_pair_plan, executor_http_client,
-                                                                      last_chore_id=placed_chore_journal.chore.chore_id)
+                                                                      last_chore_id=placed_chore_ledger.chore.chore_id)
         # placing new non-systematic new_chore
         px = 92
         qty = 90
@@ -3646,7 +3646,7 @@ def test_plan_limits_with_less_consumable_concentration(static_data_, clean_and_
             f"{updated_plan_brief.pair_sell_side_bartering_brief.consumable_concentration}"
 
         _place_chore_n_check_consumable_concentration_is_0(
-            buy_symbol, sell_symbol, active_pair_plan, executor_http_client, placed_chore_journal)
+            buy_symbol, sell_symbol, active_pair_plan, executor_http_client, placed_chore_ledger)
     except AssertionError as e:
         raise AssertionError(e)
     except Exception as e:
@@ -3714,8 +3714,8 @@ def test_plan_limits_with_symbol_overview_limit_dn_up_px(static_data_, clean_and
         time.sleep(1)
         update_tob_through_market_depth_to_place_buy_chore(active_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        # Internally checks if chore_ledger is found with OE_NEW state
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
 
         if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
@@ -3731,7 +3731,7 @@ def test_plan_limits_with_symbol_overview_limit_dn_up_px(static_data_, clean_and
         handle_place_chore_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
                                                                       check_str, assert_fail_message,
                                                                       active_pair_plan, executor_http_client,
-                                                                      last_chore_id=placed_chore_journal.chore.chore_id)
+                                                                      last_chore_id=placed_chore_ledger.chore.chore_id)
 
         # placing new non-systematic new_chore
         px = 40
@@ -3816,7 +3816,7 @@ def test_plan_limits_with_negative_consumable_participation_qty(static_data_, cl
         # placing new non-systematic new_chore
         place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
 
-        placed_new_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW, buy_symbol,
+        placed_new_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW, buy_symbol,
                                                                                   executor_http_client)
 
         if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
@@ -3839,7 +3839,7 @@ def test_plan_limits_with_negative_consumable_participation_qty(static_data_, cl
                                                                       activate_pair_plan,
                                                                       executor_http_client,
                                                                       last_chore_id=
-                                                                      placed_new_chore_journal.chore.chore_id)
+                                                                      placed_new_chore_ledger.chore.chore_id)
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -3927,8 +3927,8 @@ def test_plan_limits_with_0_consumable_participation_qty(static_data_, clean_and
         update_tob_through_market_depth_to_place_buy_chore(activate_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
 
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        # Internally checks if chore_ledger is found with OE_NEW state
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
 
     except AssertionError as e:
@@ -4030,8 +4030,8 @@ def test_plan_limits_with_positive_low_consumable_participation_qty(
         qty = 90
         place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
 
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        # Internally checks if chore_ledger is found with OE_NEW state
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
 
     except AssertionError as e:
@@ -4245,8 +4245,8 @@ def test_plan_limits_consumable_open_notional(static_data_, clean_and_set_limits
         time.sleep(1)
         update_tob_through_market_depth_to_place_buy_chore(active_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        # Internally checks if chore_ledger is found with OE_NEW state
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
 
         if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
@@ -4277,7 +4277,7 @@ def test_plan_limits_consumable_open_notional(static_data_, clean_and_set_limits
         handle_place_chore_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
                                                                       check_str, assert_fail_message,
                                                                       active_pair_plan, executor_http_client,
-                                                                      last_chore_id=placed_chore_journal.chore.chore_id)
+                                                                      last_chore_id=placed_chore_ledger.chore.chore_id)
 
         plan_brief_list = executor_http_client.get_all_plan_brief_client()
         # since only one plan in current test
@@ -4372,8 +4372,8 @@ def test_plan_limits_consumable_nett_filled_notional(static_data_, clean_and_set
         qty = 90
         buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_plan)
         place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        # Internally checks if chore_ledger is found with OE_NEW state
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client)
 
         if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
@@ -4386,7 +4386,7 @@ def test_plan_limits_consumable_nett_filled_notional(static_data_, clean_and_set
         last_consumable_nett_filled_notional = plan_brief.consumable_nett_filled_notional
         # making max_nett_filled_notional such it makes consumable_nett_filled_notional 16000 which is less than
         # next chore's notional - will be blocked and raise alert for exhaustion of consumable_nett_filled_notional
-        current_net_filled_notional = placed_chore_journal.chore.qty / 2    # since fill_percent in config is 50
+        current_net_filled_notional = placed_chore_ledger.chore.qty / 2    # since fill_percent in config is 50
         expected_consumable_nett_filled_notional = 1600
         # updated_max_net_filled_notional_delta = updated_max_net_filled_notional - stored_max_net_filled_notional
         # updated_consumable_nett_filled_notional = stored_consumable_nett_filled_notional - updated_max_net_filled_notional_delta
@@ -4416,7 +4416,7 @@ def test_plan_limits_consumable_nett_filled_notional(static_data_, clean_and_set
         handle_place_chore_and_check_str_in_alert_for_executor_limits(buy_symbol, Side.BUY, px, qty,
                                                                       check_str, assert_fail_message,
                                                                       active_pair_plan, executor_http_client,
-                                                                      last_chore_id=placed_chore_journal.chore.chore_id)
+                                                                      last_chore_id=placed_chore_ledger.chore.chore_id)
 
         # placing new non-systematic new_chore
         px = 96
@@ -4445,10 +4445,10 @@ def test_plan_limits_consumable_nett_filled_notional(static_data_, clean_and_set
         qty = 90
         buy_inst_type: InstrumentType = get_inst_type(Side.BUY, active_pair_plan)
         place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
-        # Internally checks if chore_journal is found with OE_NEW state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        # Internally checks if chore_ledger is found with OE_NEW state
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol, executor_http_client,
-                                                                              last_chore_id=placed_chore_journal.chore.chore_id)
+                                                                              last_chore_id=placed_chore_ledger.chore.chore_id)
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -4504,11 +4504,11 @@ def handle_place_both_side_chores_for_contact_limits_test(buy_symbol: str, sell_
             qty = 90
             place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
 
-            new_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+            new_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                                buy_symbol, executor_http_client,
                                                                                expect_no_chore=expect_no_chore,
                                                                                last_chore_id=last_buy_chore_id)
-            last_buy_chore_id = new_chore_journal.chore.chore_id
+            last_buy_chore_id = new_chore_ledger.chore.chore_id
 
         # Placing sell chores
         last_sell_chore_id = None
@@ -4519,11 +4519,11 @@ def handle_place_both_side_chores_for_contact_limits_test(buy_symbol: str, sell_
                 qty = 90
                 place_new_chore(sell_symbol, Side.SELL, px, qty, executor_http_client, sell_inst_type)
 
-                new_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+                new_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                                    sell_symbol, executor_http_client,
                                                                                    expect_no_chore=expect_no_chore,
                                                                                    last_chore_id=last_sell_chore_id)
-                last_sell_chore_id = new_chore_journal.chore.chore_id
+                last_sell_chore_id = new_chore_ledger.chore.chore_id
 
         return executor_http_client, buy_symbol, last_buy_chore_id, sell_symbol, last_sell_chore_id
     except AssertionError as e:
@@ -4587,14 +4587,14 @@ def handle_place_single_side_chores_for_contact_limits_test(leg_1_symbol: str, l
                 qty = 90
                 place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
 
-                new_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+                new_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                                    buy_symbol, executor_http_client,
                                                                                    last_chore_id=last_chore_id)
-                last_chore_id = new_chore_journal.chore.chore_id
+                last_chore_id = new_chore_ledger.chore.chore_id
 
-                # Checking if fills found
+                # Checking if deals found
                 time.sleep(10)
-                get_latest_fill_journal_from_chore_id(last_chore_id, executor_http_client)
+                get_latest_fill_ledger_from_chore_id(last_chore_id, executor_http_client)
 
         else:
             # Placing sell chores
@@ -4605,12 +4605,12 @@ def handle_place_single_side_chores_for_contact_limits_test(leg_1_symbol: str, l
                 qty = 90
                 place_new_chore(sell_symbol, Side.SELL, px, qty, executor_http_client, sell_inst_type)
 
-                new_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+                new_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                                    sell_symbol, executor_http_client,
                                                                                    last_chore_id=last_chore_id)
-                last_chore_id = new_chore_journal.chore.chore_id
+                last_chore_id = new_chore_ledger.chore.chore_id
                 time.sleep(10)
-                get_latest_fill_journal_from_chore_id(last_chore_id, executor_http_client)
+                get_latest_fill_ledger_from_chore_id(last_chore_id, executor_http_client)
 
         if chore_side == Side.BUY:
             return executor_http_client, buy_symbol, sell_symbol, last_chore_id
@@ -4665,19 +4665,19 @@ def _plan_pause_on_chore_fulfill_post_dod(buy_symbol, sell_symbol, pair_plan_,
                                                            ask_sell_top_market_depth)
         time.sleep(2)  # delay for chore to get placed
 
-        ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, buy_symbol,
+        ack_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, buy_symbol,
                                                                            executor_http_client)
-        get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_UNSOL_CXL,
+        get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_UNSOL_CXL,
                                                        symbol, executor_http_client)
 
         executor_http_client.barter_simulator_process_fill_query_client(
-            ack_chore_journal.chore.chore_id, ack_chore_journal.chore.px,
-            ack_chore_journal.chore.qty, ack_chore_journal.chore.side,
-            ack_chore_journal.chore.security.sec_id, ack_chore_journal.chore.underlying_account)
-        latest_fill_journal = get_latest_fill_journal_from_chore_id(ack_chore_journal.chore.chore_id,
+            ack_chore_ledger.chore.chore_id, ack_chore_ledger.chore.px,
+            ack_chore_ledger.chore.qty, ack_chore_ledger.chore.side,
+            ack_chore_ledger.chore.security.sec_id, ack_chore_ledger.chore.underlying_account)
+        latest_fill_ledger = get_latest_fill_ledger_from_chore_id(ack_chore_ledger.chore.chore_id,
                                                                     executor_http_client)
 
-        chore_snapshot = get_chore_snapshot_from_chore_id(ack_chore_journal.chore.chore_id, executor_http_client)
+        chore_snapshot = get_chore_snapshot_from_chore_id(ack_chore_ledger.chore.chore_id, executor_http_client)
         if not pause_fulfill_post_chore_dod:
             assert chore_snapshot.chore_status == ChoreStatusType.OE_FILLED, "ChoreStatus mismatched: expected status " \
                                                                              f"ChoreStatusType.OE_FILLED received " \
@@ -4725,13 +4725,13 @@ def test_no_plan_pause_on_chore_fulfill_post_dod_if_config_is_false(
            - Sets pause_fulfill_post_chore_dod to false
         2. Creates test conditions:
            - Places chores that become DOD
-           - Processes fills for DOD chores
+           - Processes deals for DOD chores
         3. Verifies planegy continues operation
         4. Validates chore processing
         5. Checks system state
 
         Key Validations:
-        - Confirms planegy remains active after DOD fills
+        - Confirms planegy remains active after DOD deals
         - Verifies proper chore status transitions
         - Checks fill processing behavior
         - Validates configuration handling
@@ -4788,13 +4788,13 @@ def test_plan_pause_on_chore_fulfill_post_dod_if_config_is_true(
            - Sets pause_fulfill_post_chore_dod to true
         2. Creates test conditions:
            - Places chores that become DOD
-           - Processes fills for DOD chores
+           - Processes deals for DOD chores
         3. Verifies planegy pauses
         4. Validates system state
         5. Checks alert generation
 
         Key Validations:
-        - Confirms planegy pauses after DOD fills
+        - Confirms planegy pauses after DOD deals
         - Verifies proper chore status transitions
         - Checks appropriate alert generation
         - Validates configuration handling
@@ -5173,7 +5173,7 @@ def test_all_plan_pause_for_max_gross_n_open_notional_breach(
     # triggers 8 street_books out of which 4 places BUY chores each and rest 4 places SELL chores each
 
     # these 8 chores must pass for positive check, then one more BUY chore is placed in
-    # any executor and this new chore journal must trigger all plan-pause + alert must be created in plan_alert
+    # any executor and this new chore ledger must trigger all plan-pause + alert must be created in plan_alert
 
     # Updating contact limits
     expected_contact_limits_.max_gross_n_open_notional = 136_000
@@ -5389,32 +5389,32 @@ def test_last_n_sec_chore_counts(static_data_, clean_and_set_limits, leg1_leg2_s
             executor_http_clients_n_last_chore_id_tuple_list.append(
                 (executor_http_client, buy_symbol, last_buy_chore_id, sell_symbol, last_sell_chore_id))
 
-    chore_count_updated_chore_journals = (
+    chore_count_updated_chore_ledgers = (
         post_book_service_http_client.get_last_n_sec_chores_by_events_query_client(
             expected_contact_limits_.rolling_max_chore_count.rolling_tx_count_period_seconds,
             [ChoreEventType.OE_NEW]))
 
-    assert len(chore_count_updated_chore_journals) == 1, \
+    assert len(chore_count_updated_chore_ledgers) == 1, \
         ("Unexpected: Length of returned list by get_last_n_sec_chores_by_events_query_client must be 1, "
-         f"received: {len(chore_count_updated_chore_journals)}, received list: {chore_count_updated_chore_journals}")
+         f"received: {len(chore_count_updated_chore_ledgers)}, received list: {chore_count_updated_chore_ledgers}")
 
-    assert 8 == chore_count_updated_chore_journals[0].current_period_chore_count, \
+    assert 8 == chore_count_updated_chore_ledgers[0].current_period_chore_count, \
         (f"Mismatch: Expected last_n_sec new chore_counts: 8, received: "
-         f"{chore_count_updated_chore_journals[0].current_period_chore_count}")
+         f"{chore_count_updated_chore_ledgers[0].current_period_chore_count}")
 
     # Updating contact limits
     expected_contact_limits_.rolling_max_chore_count.rolling_tx_count_period_seconds = 2
     email_book_service_native_web_client.put_contact_limits_client(expected_contact_limits_)
     time.sleep(3)   # wait to check after 2 sec to check no chore is found after it
 
-    chore_count_updated_chore_journals = (
+    chore_count_updated_chore_ledgers = (
         post_book_service_http_client.get_last_n_sec_chores_by_events_query_client(
             expected_contact_limits_.rolling_max_chore_count.rolling_tx_count_period_seconds,
             [ChoreEventType.OE_NEW]))
 
-    assert len(chore_count_updated_chore_journals) == 0, \
+    assert len(chore_count_updated_chore_ledgers) == 0, \
         ("Unexpected: Length of returned list by get_last_n_sec_chores_by_events_query_client must be 1, "
-         f"received: {len(chore_count_updated_chore_journals)}, received list: {chore_count_updated_chore_journals}")
+         f"received: {len(chore_count_updated_chore_ledgers)}, received list: {chore_count_updated_chore_ledgers}")
 
 
 @pytest.mark.nightly
@@ -5602,7 +5602,7 @@ def test_all_plan_pause_for_max_reject_limit_breach(
     update_tob_through_market_depth_to_place_buy_chore(created_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                        ask_sell_top_market_depth)
 
-    latest_chore_journal = get_latest_chore_journal_with_events_and_symbol(
+    latest_chore_ledger = get_latest_chore_ledger_with_events_and_symbol(
         [ChoreEventType.OE_BRK_REJ, ChoreEventType.OE_EXH_REJ], buy_symbol,
         executor_http_client, last_chore_id=last_buy_rej_id)
 
@@ -5653,8 +5653,8 @@ def _place_chore_at_limit_up(
 
         place_new_chore(buy_symbol, Side.BUY, 150, 90, executor_http_client, buy_inst_type)
 
-        # Internally checks if chore_journal is found with OE_ACK state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
+        # Internally checks if chore_ledger is found with OE_ACK state
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK,
                                                                               buy_symbol, executor_http_client)
 
     except AssertionError as e:
@@ -5794,8 +5794,8 @@ def place_chore_at_limit_dn(
 
         place_new_chore(sell_symbol, Side.SELL, 50, 90, executor_http_client, sell_inst_type)
 
-        # Internally checks if chore_journal is found with OE_ACK state
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
+        # Internally checks if chore_ledger is found with OE_ACK state
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK,
                                                                               sell_symbol, executor_http_client)
 
     except AssertionError as e:

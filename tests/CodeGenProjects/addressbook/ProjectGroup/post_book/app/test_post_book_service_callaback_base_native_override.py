@@ -7,12 +7,12 @@ from threading import Thread, Semaphore
 os.environ["DBType"] = "beanie"
 # project imports
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.app.post_book_service_routes_callback_base_native_override import (
-    PostBookServiceRoutesCallbackBaseNativeOverride, ContainerObject, ChoreJournalBaseModel,
+    PostBookServiceRoutesCallbackBaseNativeOverride, ContainerObject, ChoreLedgerBaseModel,
     ChoreSnapshotBaseModel, PlanBriefBaseModel)
 
 
 class MockContainerObject(ContainerObject):
-    chore_journals: List[ChoreJournalBaseModel]
+    chore_ledgers: List[ChoreLedgerBaseModel]
     chore_snapshots: List[ChoreSnapshotBaseModel]
     plan_brief: PlanBriefBaseModel | None = None
 
@@ -38,12 +38,12 @@ class MockPostBookServiceRoutesCallbackBaseNativeOverride(
         self.wait_semaphore.release()
         super().update_plan_id_list_n_dict_from_payload(plan_id_list, plan_id_to_container_obj_dict, payload_dict)
 
-    def _get_chore_journal_from_payload(self, payload_dict: Dict[str, Any]):
-        chore_journal: ChoreJournalBaseModel | None = None
-        if (chore_journal_dict := payload_dict.get("chore_journal")) is not None:
-            chore_journal = ChoreJournalBaseModel(**chore_journal_dict)
-        # else not required: Fills update doesn't contain chore_journal
-        return chore_journal
+    def _get_chore_ledger_from_payload(self, payload_dict: Dict[str, Any]):
+        chore_ledger: ChoreLedgerBaseModel | None = None
+        if (chore_ledger_dict := payload_dict.get("chore_ledger")) is not None:
+            chore_ledger = ChoreLedgerBaseModel(**chore_ledger_dict)
+        # else not required: Deals update doesn't contain chore_ledger
+        return chore_ledger
 
     def _get_chore_snapshot_from_payload(self, payload_dict: Dict[str, Any]):
         chore_snapshot: ChoreSnapshotBaseModel | None = None
@@ -73,10 +73,10 @@ def test_queue_handling(single_plan_single_data, single_plan_multi_data,
 
     # Checking single plan single data
     mock_post_book_override.expected_plan_id_list = [1]
-    chore_journal = ChoreJournalBaseModel(**single_plan_single_data[0].get("chore_journal"))
+    chore_ledger = ChoreLedgerBaseModel(**single_plan_single_data[0].get("chore_ledger"))
     chore_snapshot = ChoreSnapshotBaseModel(**single_plan_single_data[0].get("chore_snapshot"))
     plan_brief = PlanBriefBaseModel(**single_plan_single_data[0].get("plan_brief"))
-    container_obj = MockContainerObject(chore_journals=[chore_journal],
+    container_obj = MockContainerObject(chore_ledgers=[chore_ledger],
                                         chore_snapshots=[chore_snapshot],
                                         plan_brief=plan_brief)
     mock_post_book_override.expected_plan_id_to_container_obj_dict = {1: container_obj}
@@ -99,15 +99,15 @@ def test_queue_handling(single_plan_single_data, single_plan_multi_data,
     mock_post_book_override.is_plan_id_list = False
     mock_post_book_override.is_expected_plan_id_to_container_obj_dict = False
     mock_post_book_override.expected_plan_id_list = [1]
-    chore_journal_list = []
+    chore_ledger_list = []
     chore_snapshot_list = []
     plan_brief: PlanBriefBaseModel | None = None
 
     for payload in single_plan_multi_data:
-        chore_journal_list.append(ChoreJournalBaseModel(**payload.get("chore_journal")))
+        chore_ledger_list.append(ChoreLedgerBaseModel(**payload.get("chore_ledger")))
         chore_snapshot_list.append(ChoreSnapshotBaseModel(**payload.get("chore_snapshot")))
         plan_brief = PlanBriefBaseModel(**payload.get("plan_brief"))
-    container_obj = MockContainerObject(chore_journals=chore_journal_list,
+    container_obj = MockContainerObject(chore_ledgers=chore_ledger_list,
                                         chore_snapshots=chore_snapshot_list,
                                         plan_brief=plan_brief)
     mock_post_book_override.expected_plan_id_to_container_obj_dict = {1: container_obj}
@@ -133,10 +133,10 @@ def test_queue_handling(single_plan_single_data, single_plan_multi_data,
     mock_post_book_override.expected_plan_id_list = [1, 2, 3, 4, 5]
     for payload in multi_plan_single_data:
         plan_id = payload.get("plan_id")
-        chore_journal = ChoreJournalBaseModel(**payload.get("chore_journal"))
+        chore_ledger = ChoreLedgerBaseModel(**payload.get("chore_ledger"))
         chore_snapshot = ChoreSnapshotBaseModel(**payload.get("chore_snapshot"))
         plan_brief = PlanBriefBaseModel(**payload.get("plan_brief"))
-        container_obj = MockContainerObject(chore_journals=[chore_journal],
+        container_obj = MockContainerObject(chore_ledgers=[chore_ledger],
                                             chore_snapshots=[chore_snapshot],
                                             plan_brief=plan_brief)
         mock_post_book_override.expected_plan_id_to_container_obj_dict[plan_id] = container_obj
@@ -163,17 +163,17 @@ def test_queue_handling(single_plan_single_data, single_plan_multi_data,
 
     for payload in multi_plan_multi_data:
         plan_id = payload.get("plan_id")
-        chore_journal = ChoreJournalBaseModel(**payload.get("chore_journal"))
+        chore_ledger = ChoreLedgerBaseModel(**payload.get("chore_ledger"))
         chore_snapshot = ChoreSnapshotBaseModel(**payload.get("chore_snapshot"))
         plan_brief = PlanBriefBaseModel(**payload.get("plan_brief"))
 
         container_obj = mock_post_book_override.expected_plan_id_to_container_obj_dict.get(plan_id)
         if container_obj is None:
-            container_obj = MockContainerObject(chore_journals=[chore_journal],
+            container_obj = MockContainerObject(chore_ledgers=[chore_ledger],
                                                 chore_snapshots=[chore_snapshot],
                                                 plan_brief=plan_brief)
         else:
-            container_obj.chore_journals.append(chore_journal)
+            container_obj.chore_ledgers.append(chore_ledger)
             container_obj.chore_snapshots.append(chore_snapshot)
             container_obj.plan_brief = plan_brief
         mock_post_book_override.expected_plan_id_to_container_obj_dict[plan_id] = container_obj

@@ -26,18 +26,18 @@ MsgspecType = TypeVar('MsgspecType', bound=msgspec.Struct)
 
 
 class ContainerObject(msgspec.Struct, kw_only=True):
-    chore_journals: List[ChoreJournal]
+    chore_ledgers: List[ChoreLedger]
     chore_snapshots: List[ChoreSnapshot]
     plan_brief: PlanBrief | None = None
     contact_status_updates: List[ContactStatusUpdatesContainer]
 
 
 class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallback):
-    underlying_read_chore_journal_http: Callable[..., Any] | None = None
+    underlying_read_chore_ledger_http: Callable[..., Any] | None = None
     underlying_read_chore_snapshot_http: Callable[..., Any] | None = None
     underlying_create_all_chore_snapshot_http: Callable[..., Any] | None = None
     underlying_update_all_chore_snapshot_http: Callable[..., Any] | None = None
-    underlying_create_all_chore_journal_http: Callable[..., Any] | None = None
+    underlying_create_all_chore_ledger_http: Callable[..., Any] | None = None
     underlying_read_plan_brief_http: Callable[..., Any] | None = None
     underlying_create_plan_brief_http: Callable[..., Any] | None = None
     underlying_update_plan_brief_http: Callable[..., Any] | None = None
@@ -46,16 +46,16 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
     @classmethod
     def initialize_underlying_http_routes(cls):
         from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.generated.FastApi.post_book_service_http_routes_imports import (
-            underlying_read_chore_journal_http, underlying_read_chore_snapshot_http,
+            underlying_read_chore_ledger_http, underlying_read_chore_snapshot_http,
             underlying_create_all_chore_snapshot_http, underlying_update_all_chore_snapshot_http,
-            underlying_create_all_chore_journal_http, underlying_read_plan_brief_http,
+            underlying_create_all_chore_ledger_http, underlying_read_plan_brief_http,
             underlying_create_plan_brief_http, underlying_update_plan_brief_http,
             underlying_get_last_n_sec_chores_by_events_query_http)
-        cls.underlying_read_chore_journal_http = underlying_read_chore_journal_http
+        cls.underlying_read_chore_ledger_http = underlying_read_chore_ledger_http
         cls.underlying_read_chore_snapshot_http = underlying_read_chore_snapshot_http
         cls.underlying_create_all_chore_snapshot_http = underlying_create_all_chore_snapshot_http
         cls.underlying_update_all_chore_snapshot_http = underlying_update_all_chore_snapshot_http
-        cls.underlying_create_all_chore_journal_http = underlying_create_all_chore_journal_http
+        cls.underlying_create_all_chore_ledger_http = underlying_create_all_chore_ledger_http
         cls.underlying_read_plan_brief_http = underlying_read_plan_brief_http
         cls.underlying_create_plan_brief_http = underlying_create_plan_brief_http
         cls.underlying_update_plan_brief_http = underlying_update_plan_brief_http
@@ -95,7 +95,7 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
         while True:
             if should_sleep:
                 time.sleep(self.min_refresh_interval)
-            service_up_flag_env_var = os.environ.get(f"post_book_{pt_port}")
+            service_up_flag_env_var = os.environ.get(f"post_book_{self.port}")
 
             if service_up_flag_env_var == "1":
                 # validate essential services are up, if so, set service ready state to true
@@ -135,6 +135,66 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
             else:
                 should_sleep = True
 
+    def start_mongo_streamer(self):
+        run_coro = self._start_mongo_streamer()
+        future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
+        # block for task to finish
+        try:
+            future.result()
+        except Exception as e:
+            logging.exception(f"start_mongo_streamer failed with exception: {e}")
+
+    @except_n_log_alert()
+    def _view_app_launch_pre_thread_func(self):
+        """
+        sleep wait till engine is up, then create contact limits if required
+        TODO LAZY: we should invoke _apply_checks_n_alert on all active pair plans at startup/re-start
+        """
+
+        error_prefix = "_app_launch_pre_thread_func: "
+        service_up_no_error_retry_count = 3  # minimum retries that shouldn't raise error on UI dashboard
+        should_sleep: bool = False
+        mongo_stream_started: bool = False
+        while True:
+            if should_sleep:
+                time.sleep(self.min_refresh_interval)
+            service_up_flag_env_var = os.environ.get(f"post_book_{self.port}")
+
+            if service_up_flag_env_var == "1":
+                # validate essential services are up, if so, set service ready state to true
+                if self.service_up:
+                    if not self.service_ready:
+                        self.service_ready = True
+                        # print is just to manually check if this server is ready - useful when we run
+                        # multiple servers and before running any test we want to make sure servers are up
+                        print(f"INFO: post barter engine service is ready: {datetime.datetime.now().time()}")
+
+                if not self.service_up:
+                    try:
+                        if is_post_book_view_service_up(ignore_error=(service_up_no_error_retry_count > 0)):
+                            self.service_up = True
+                            should_sleep = False
+                    except Exception as e:
+                        logging.exception("unexpected: service startup threw exception, "
+                                          f"we'll retry periodically in: {self.min_refresh_interval} seconds"
+                                          f";;;exception: {e}", exc_info=True)
+                else:
+                    should_sleep = True
+                    # any periodic refresh code goes here
+
+                    if not mongo_stream_started:
+                        Thread(target=self.start_mongo_streamer, daemon=True).start()
+                        mongo_stream_started = True
+
+                    last_modified_timestamp = os.path.getmtime(config_yaml_path)
+                    if self.config_yaml_last_modified_timestamp != last_modified_timestamp:
+                        self.config_yaml_last_modified_timestamp = last_modified_timestamp
+
+                        handle_refresh_configurable_data_members(self, self.config_key_to_data_member_name_dict,
+                                                                 str(config_yaml_path))
+            else:
+                should_sleep = True
+
     def app_launch_pre(self):
         PostBookServiceRoutesCallbackBaseNativeOverride.initialize_underlying_http_routes()
 
@@ -143,8 +203,19 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
         app_launch_pre_thread = Thread(target=self._app_launch_pre_thread_func, daemon=True)
         app_launch_pre_thread.start()
 
+    def view_app_launch_pre(self):
+        PostBookServiceRoutesCallbackBaseNativeOverride.initialize_underlying_http_routes()
+
+        logging.debug("Triggered server launch view pre override")
+        self.port = pt_view_port
+        app_launch_pre_thread = Thread(target=self._view_app_launch_pre_thread_func, daemon=True)
+        app_launch_pre_thread.start()
+
     def app_launch_post(self):
         logging.debug("Triggered server launch post override")
+
+    def view_app_launch_post(self):
+        logging.debug("Triggered server launch view post override")
 
     async def read_all_ui_layout_pre(self):
         # Setting asyncio_loop in ui_layout_pre since it called to check current service up
@@ -161,9 +232,9 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
             logging.critical(err_str_)
             raise HTTPException(detail=err_str_, status_code=500)
 
-    async def get_last_n_sec_chores_by_events_query_pre(self, chore_journal_class_type: Type[ChoreJournal],
+    async def get_last_n_sec_chores_by_events_query_pre(self, chore_ledger_class_type: Type[ChoreLedger],
                                                         last_n_sec: int, chore_event_list: List[str]):
-        return await PostBookServiceRoutesCallbackBaseNativeOverride.underlying_read_chore_journal_http(
+        return await PostBookServiceRoutesCallbackBaseNativeOverride.underlying_read_chore_ledger_http(
             get_last_n_sec_chores_by_events(last_n_sec, chore_event_list))
 
     async def get_open_chore_count_query_pre(self, open_chore_count_class_type: Type[OpenChoreCount], symbol: str):
@@ -173,10 +244,10 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
         open_chore_count = OpenChoreCount(open_chore_count=len(open_chores))
         return [open_chore_count]
 
-    async def create_chore_journal_pre(self, chore_journal_obj: ChoreJournal):
+    async def create_chore_ledger_pre(self, chore_ledger_obj: ChoreLedger):
         if not self.service_ready:
             # raise service unavailable 503 exception, let the caller retry
-            err_str_ = "create_chore_journal_pre not ready - service is not initialized yet"
+            err_str_ = "create_chore_ledger_pre not ready - service is not initialized yet"
             logging.error(err_str_)
             raise HTTPException(detail=err_str_, status_code=503)
 
@@ -308,13 +379,13 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
                 await PostBookServiceRoutesCallbackBaseNativeOverride.underlying_update_all_chore_snapshot_http(
                     update_chore_snapshots)
 
-    def _get_chore_journal_from_payload(self, payload_dict: Dict[str, Any]) -> ChoreJournal | None:
-        chore_journal: ChoreJournal | None = None
-        if (chore_journal_dict := payload_dict.get("chore_journal")) is not None:
-            chore_journal_dict["_id"] = ChoreJournal.next_id()  # overriding id for this server db if exists
-            chore_journal = ChoreJournal.from_dict(chore_journal_dict)
-        # else not required: Fills update doesn't contain chore_journal
-        return chore_journal
+    def _get_chore_ledger_from_payload(self, payload_dict: Dict[str, Any]) -> ChoreLedger | None:
+        chore_ledger: ChoreLedger | None = None
+        if (chore_ledger_dict := payload_dict.get("chore_ledger")) is not None:
+            chore_ledger_dict["_id"] = ChoreLedger.next_id()  # overriding id for this server db if exists
+            chore_ledger = ChoreLedger.from_dict(chore_ledger_dict)
+        # else not required: Deals update doesn't contain chore_ledger
+        return chore_ledger
 
     def _get_chore_snapshot_from_payload(self, payload_dict: Dict[str, Any]) -> ChoreSnapshot | None:
         chore_snapshot: ChoreSnapshot | None = None
@@ -370,7 +441,7 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
             added_id = True
             plan_id_list.append(plan_id)
 
-        chore_journal: ChoreJournal | None = self._get_chore_journal_from_payload(payload_dict)
+        chore_ledger: ChoreLedger | None = self._get_chore_ledger_from_payload(payload_dict)
 
         chore_snapshot: ChoreSnapshot | None = self._get_chore_snapshot_from_payload(payload_dict)
         if chore_snapshot is None:
@@ -388,21 +459,21 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
 
         container_obj: ContainerObject = plan_id_to_container_obj_dict.get(plan_id)
         if container_obj is not None:
-            if chore_journal is not None:
-                container_obj.chore_journals.append(chore_journal)
+            if chore_ledger is not None:
+                container_obj.chore_ledgers.append(chore_ledger)
             container_obj.chore_snapshots.append(chore_snapshot)
             if plan_brief is not None:
                 container_obj.plan_brief = plan_brief
             if contact_status_updates is not None:
                 container_obj.contact_status_updates.append(contact_status_updates)
         else:
-            chore_journal_list = []
+            chore_ledger_list = []
             contact_status_updates_list = []
-            if chore_journal is not None:
-                chore_journal_list.append(chore_journal)
+            if chore_ledger is not None:
+                chore_ledger_list.append(chore_ledger)
             if contact_status_updates is not None:
                 contact_status_updates_list.append(contact_status_updates)
-            container_obj = self.container_model(chore_journals=chore_journal_list,
+            container_obj = self.container_model(chore_ledgers=chore_ledger_list,
                                                  chore_snapshots=[chore_snapshot],
                                                  plan_brief=plan_brief,
                                                  contact_status_updates=contact_status_updates_list)
@@ -410,16 +481,16 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
             plan_id_to_container_obj_dict[plan_id] = container_obj
         return None
 
-    def add_chore_journals(self, chore_journal_list: List[ChoreJournal]):
-        run_coro = PostBookServiceRoutesCallbackBaseNativeOverride.underlying_create_all_chore_journal_http(
-            chore_journal_list)
+    def add_chore_ledgers(self, chore_ledger_list: List[ChoreLedger]):
+        run_coro = PostBookServiceRoutesCallbackBaseNativeOverride.underlying_create_all_chore_ledger_http(
+            chore_ledger_list)
         future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
 
         # block for task to finish
         try:
             future.result()
         except Exception as e:
-            logging.exception(f"underlying_create_all_chore_journal_http failed "
+            logging.exception(f"underlying_create_all_chore_ledger_http failed "
                               f"with exception: {e}")
 
     async def create_or_update_plan_brief(self, plan_brief: PlanBrief):
@@ -432,12 +503,12 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
                     plan_brief)
             self.plan_id_to_plan_brief_cache_dict[plan_brief.id] = plan_brief
 
-    def update_db(self, chore_journal_list: List[ChoreJournal],
+    def update_db(self, chore_ledger_list: List[ChoreLedger],
                   chore_snapshot_list: List[ChoreSnapshot],
                   plan_brief: PlanBrief):
-        # creating chore_journals
-        if chore_journal_list:
-            self.add_chore_journals(chore_journal_list)
+        # creating chore_ledgers
+        if chore_ledger_list:
+            self.add_chore_ledgers(chore_ledger_list)
 
         # creating or updating chore_snapshot
         if chore_snapshot_list:
@@ -484,17 +555,17 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
     async def check_rolling_max_chore_count(self, rolling_chore_count_period_seconds: int, max_rolling_tx_count: int):
         pause_all_plans = False
 
-        chore_count_updated_chore_journals: List[ChoreJournal] = (
+        chore_count_updated_chore_ledgers: List[ChoreLedger] = (
             await PostBookServiceRoutesCallbackBaseNativeOverride.
             underlying_get_last_n_sec_chores_by_events_query_http(rolling_chore_count_period_seconds,
                                                                   [ChoreEventType.OE_NEW]))
 
-        if len(chore_count_updated_chore_journals) == 1:
-            rolling_new_chore_count = chore_count_updated_chore_journals[-1].current_period_chore_count
-        elif len(chore_count_updated_chore_journals) > 1:
+        if len(chore_count_updated_chore_ledgers) == 1:
+            rolling_new_chore_count = chore_count_updated_chore_ledgers[-1].current_period_chore_count
+        elif len(chore_count_updated_chore_ledgers) > 1:
             err_str_ = ("Must receive only one object in list by get_last_n_sec_chores_by_events_query, "
-                        f"received {len(chore_count_updated_chore_journals)}, skipping rolling_max_chore_count check, "
-                        f"received list: {chore_count_updated_chore_journals}")
+                        f"received {len(chore_count_updated_chore_ledgers)}, skipping rolling_max_chore_count check, "
+                        f"received list: {chore_count_updated_chore_ledgers}")
             logging.error(err_str_)
             return False
         else:
@@ -503,7 +574,7 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
             # @@@ below error log is used in specific test case for string matching - if changed here
             # needs to be changed in test also
             logging.critical(f"rolling_max_chore_count breached: "
-                             f"{chore_count_updated_chore_journals[0].current_period_chore_count} "
+                             f"{chore_count_updated_chore_ledgers[0].current_period_chore_count} "
                              f"chores in past {rolling_chore_count_period_seconds} secs, allowed chores within this "
                              f"period is {max_rolling_tx_count}, initiating all plan pause")
             pause_all_plans = True
@@ -512,16 +583,16 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
     async def check_rolling_max_rej_count(self, rolling_rej_count_period_seconds: int, max_rolling_tx_count: int):
         pause_all_plans = False
 
-        chore_count_updated_chore_journals: List[ChoreJournal] = (
+        chore_count_updated_chore_ledgers: List[ChoreLedger] = (
             await PostBookServiceRoutesCallbackBaseNativeOverride.
             underlying_get_last_n_sec_chores_by_events_query_http(
                 rolling_rej_count_period_seconds, [ChoreEventType.OE_BRK_REJ, ChoreEventType.OE_EXH_REJ]))
-        if len(chore_count_updated_chore_journals) == 1:
-            rolling_rej_chore_count = chore_count_updated_chore_journals[0].current_period_chore_count
-        elif len(chore_count_updated_chore_journals) > 0:
+        if len(chore_count_updated_chore_ledgers) == 1:
+            rolling_rej_chore_count = chore_count_updated_chore_ledgers[0].current_period_chore_count
+        elif len(chore_count_updated_chore_ledgers) > 0:
             err_str_ = ("Must receive only one object in list from get_last_n_sec_chores_by_events_query, "
-                        f"received: {len(chore_count_updated_chore_journals)}, avoiding this check, "
-                        f"received list: {chore_count_updated_chore_journals}")
+                        f"received: {len(chore_count_updated_chore_ledgers)}, avoiding this check, "
+                        f"received list: {chore_count_updated_chore_ledgers}")
             logging.error(err_str_)
             return False
         else:
@@ -531,7 +602,7 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
             # @@@ below error log is used in specific test case for string matching - if changed here
             # needs to be changed in test also
             logging.critical(f"max_allowed_rejection_within_period breached: "
-                             f"{chore_count_updated_chore_journals[0].current_period_chore_count} "
+                             f"{chore_count_updated_chore_ledgers[0].current_period_chore_count} "
                              f"rejections in past {rolling_rej_count_period_seconds} secs, "
                              f"allowed rejections within this period is {max_rolling_tx_count}"
                              f"- initiating all plan pause")
@@ -613,13 +684,13 @@ class PostBookServiceRoutesCallbackBaseNativeOverride(PostBookServiceRoutesCallb
         """post pickup form queue - data [list] is now in dict/list"""
         for plan_id in plan_id_list:
             container_object = plan_id_to_container_obj_dict.get(plan_id)
-            chore_journal_list = container_object.chore_journals
+            chore_ledger_list = container_object.chore_ledgers
             chore_snapshot_list = container_object.chore_snapshots
             plan_brief = container_object.plan_brief
             contact_status_updates_list = container_object.contact_status_updates
 
             # Updating db
-            self.update_db(chore_journal_list, chore_snapshot_list, plan_brief)
+            self.update_db(chore_ledger_list, chore_snapshot_list, plan_brief)
 
             # updating update_contact_status_queue - handler gets data and constantly tries
             #                                          to update until gets success

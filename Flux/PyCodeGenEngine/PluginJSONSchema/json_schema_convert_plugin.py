@@ -929,12 +929,16 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                 JsonSchemaConvertPlugin.widget_ui_option_depending_proto_model_field_name_for_host)
             dynamic_port = widget_ui_data_option_value_dict.get(
                 JsonSchemaConvertPlugin.widget_ui_option_depending_proto_model_field_name_for_port)
+            dynamic_view_port = widget_ui_data_option_value_dict.get(
+                JsonSchemaConvertPlugin.widget_ui_option_depending_proto_model_field_name_for_view_port
+            )
             indent_count += 2
             json_msg_str += (" " * indent_count) + '"connection_details": {\n'
             indent_count += 2
             if dynamic_host:
                 json_msg_str += (" " * indent_count) + f'"host": "{dynamic_host}",\n'
                 json_msg_str += (" " * indent_count) + f'"port": "{dynamic_port}",\n'
+                json_msg_str += (" " * indent_count) + f'"view_port": "{dynamic_view_port}",\n'
                 json_msg_str += (" " * indent_count) + f'"project_name": "{other_project_name}",\n'
                 json_msg_str += (" " * indent_count) + f'"dynamic_url": true\n'
             else:
@@ -953,9 +957,11 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                     YAMLConfigurationManager.load_yaml_configurations(str(other_project_config_file_path)))
                 host = other_project_config_yaml_dict.get("server_host")
                 port = other_project_config_yaml_dict.get("main_server_beanie_port")
+                view_port = other_project_config_yaml_dict.get("view_port")
 
                 json_msg_str += (" " * indent_count) + f'"host": "{host}",\n'
                 json_msg_str += (" " * indent_count) + f'"port": {port},\n'
+                json_msg_str += (" " * indent_count) + f'"view_port": {view_port},\n'
                 json_msg_str += (" " * indent_count) + f'"project_name": "{other_project_name}",\n'
                 json_msg_str += (" " * indent_count) + f'"dynamic_url": false\n'
             indent_count -= 2
@@ -994,12 +1000,24 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         json_msg_str += '    "$schema": "http://json-schema.org/draft-04/schema#",\n'
         json_msg_str += self.__handle_widget_ui_data_option_output(message)
         if message in self.__root_msg_list:
+            json_msg_str += self.__handle_time_series_or_large_db_object_tag(message, indent_count=2)
             json_msg_str += self.__handle_connection_details_output(message, indent_count=2)
         json_msg_str += self.__handle_underlying_message_part(message, 4)
         if message != self.__json_layout_message_list[-1] or self.__enum_list:
             json_msg_str += '  },\n'
         else:
             json_msg_str += '  }\n'
+        return json_msg_str
+
+    def __handle_time_series_or_large_db_object_tag(self, message: protogen.Message, indent_count: int) -> str:
+        json_msg_str = ""
+        if JsonSchemaConvertPlugin.is_option_enabled(message, JsonSchemaConvertPlugin.flux_msg_json_root_time_series):
+            json_msg_str += (" " * (indent_count+2)) + '"is_time_series": true,\n'
+        else:
+            option_val = JsonSchemaConvertPlugin.get_complex_option_value_from_proto(message, JsonSchemaConvertPlugin.flux_msg_json_root)
+            if option_val.get(JsonSchemaConvertPlugin.flux_json_root_enable_large_db_object_field):
+                json_msg_str += (" " * (indent_count+2)) + '"is_large_db_object": true,\n'
+            # else not reqiored: if not large db object options enabled - all good
         return json_msg_str
 
     def __handle_json_complex_type_schema(self, message: protogen.Message) -> str:
@@ -1014,6 +1032,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
             raise Exception(err_str)
         json_msg_str += f'    "{message_name}": ' + '{\n'
         if message in self.__root_msg_list:
+            json_msg_str += self.__handle_time_series_or_large_db_object_tag(message, indent_count=4)
             json_msg_str += self.__handle_connection_details_output(message, indent_count=4)
         json_msg_str += self.__handle_underlying_message_part(message, 6)
         if message != self.__json_non_layout_message_list[-1]:

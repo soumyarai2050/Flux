@@ -79,6 +79,7 @@ PAIR_STRAT_CACHE_HOST: Final[str] = ps_config_yaml_dict.get("server_host")
 PAIR_STRAT_BEANIE_HOST: Final[str] = ps_config_yaml_dict.get("server_host")
 PAIR_STRAT_CACHE_PORT: Final[str] = ps_config_yaml_dict.get("main_server_cache_port")
 PAIR_STRAT_BEANIE_PORT: Final[str] = ps_config_yaml_dict.get("main_server_beanie_port")
+PAIR_STRAT_VIEW_PORT: Final[str] = ps_config_yaml_dict.get("view_port")
 
 LOG_ANALYZER_CACHE_HOST: Final[str] = la_config_yaml_dict.get("server_host")
 LOG_ANALYZER_BEANIE_HOST: Final[str] = la_config_yaml_dict.get("server_host")
@@ -101,6 +102,10 @@ perf_benchmark_web_client: PerformanceBenchmarkServiceHttpClient = (
     PerformanceBenchmarkServiceHttpClient(host=PERF_BENCH_BEANIE_HOST, port=parse_to_int(PERF_BENCH_BEANIE_PORT)))
 email_book_service_native_web_client: EmailBookServiceHttpClient = \
     EmailBookServiceHttpClient(host=PAIR_STRAT_BEANIE_HOST, port=parse_to_int(PAIR_STRAT_BEANIE_PORT))
+email_book_service_native_view_web_client: EmailBookServiceHttpClient = \
+    EmailBookServiceHttpClient.set_or_get_if_instance_exists(host=PAIR_STRAT_BEANIE_HOST,
+                                                                port=parse_to_int(PAIR_STRAT_BEANIE_PORT),
+                                                                view_port=parse_to_int(PAIR_STRAT_VIEW_PORT))
 log_book_web_client: LogBookServiceHttpClient = (
     LogBookServiceHttpClient.set_or_get_if_instance_exists(host=LOG_ANALYZER_BEANIE_HOST,
                                                                port=parse_to_int(LOG_ANALYZER_BEANIE_PORT)))
@@ -542,7 +547,7 @@ def get_plan_limits(executor_web_client):
 
 def check_placed_buy_chore_computes_before_all_sells(loop_count: int,
                                                      expected_chore_id: str, symbol: str,
-                                                     buy_placed_chore_journal: ChoreJournalBaseModel,
+                                                     buy_placed_chore_ledger: ChoreLedgerBaseModel,
                                                      expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
                                                      expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                                      other_leg_expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
@@ -552,26 +557,26 @@ def check_placed_buy_chore_computes_before_all_sells(loop_count: int,
                                                      expected_plan_brief_obj: PlanBriefBaseModel,
                                                      executor_web_client: StreetBookServiceHttpClient):
     """
-    Checking resulted changes in ChoreJournal, ChoreSnapshot, SymbolSideSnapshot, PairPlan,
+    Checking resulted changes in ChoreLedger, ChoreSnapshot, SymbolSideSnapshot, PairPlan,
     PlanBrief and ContactStatus after chore is triggered
     """
-    chore_journal_obj_list = executor_web_client.get_all_chore_journal_client(-100)
-    assert buy_placed_chore_journal in chore_journal_obj_list, \
-        f"Couldn't find {buy_placed_chore_journal} in {chore_journal_obj_list}"
+    chore_ledger_obj_list = executor_web_client.get_all_chore_ledger_client(-100)
+    assert buy_placed_chore_ledger in chore_ledger_obj_list, \
+        f"Couldn't find {buy_placed_chore_ledger} in {chore_ledger_obj_list}"
 
     buy_last_barter_px, sell_last_barter_px = get_both_side_last_barter_px()
     buy_inst_type: InstrumentType = get_inst_type(Side.BUY, pair_plan_)
 
     # Checking chore_snapshot
     expected_chore_snapshot_obj.chore_brief.chore_id = expected_chore_id
-    expected_chore_snapshot_obj.chore_brief.px = buy_placed_chore_journal.chore.px
-    expected_chore_snapshot_obj.chore_brief.qty = buy_placed_chore_journal.chore.qty
-    expected_chore_snapshot_obj.chore_brief.chore_notional = (buy_placed_chore_journal.chore.qty *
-                                                              get_px_in_usd(buy_placed_chore_journal.chore.px))
+    expected_chore_snapshot_obj.chore_brief.px = buy_placed_chore_ledger.chore.px
+    expected_chore_snapshot_obj.chore_brief.qty = buy_placed_chore_ledger.chore.qty
+    expected_chore_snapshot_obj.chore_brief.chore_notional = (buy_placed_chore_ledger.chore.qty *
+                                                              get_px_in_usd(buy_placed_chore_ledger.chore.px))
     expected_chore_snapshot_obj.chore_status = ChoreStatusType.OE_UNACK
-    expected_chore_snapshot_obj.last_update_date_time = buy_placed_chore_journal.chore_event_date_time
-    expected_chore_snapshot_obj.create_date_time = buy_placed_chore_journal.chore_event_date_time
-    expected_chore_snapshot_obj.chore_brief.text.extend(buy_placed_chore_journal.chore.text)
+    expected_chore_snapshot_obj.last_update_date_time = buy_placed_chore_ledger.chore_event_date_time
+    expected_chore_snapshot_obj.create_date_time = buy_placed_chore_ledger.chore_event_date_time
+    expected_chore_snapshot_obj.chore_brief.text.extend(buy_placed_chore_ledger.chore.text)
 
     chore_snapshot_list = executor_web_client.get_all_chore_snapshot_client(-100)
     # updating below field from received_chore_snapshot_list for comparison
@@ -588,10 +593,10 @@ def check_placed_buy_chore_computes_before_all_sells(loop_count: int,
     expected_symbol_side_snapshot.chore_count = loop_count
     expected_symbol_side_snapshot.avg_px = (
         avg_of_new_val_sum_to_avg(expected_symbol_side_snapshot.avg_px,
-                                  buy_placed_chore_journal.chore.px,
+                                  buy_placed_chore_ledger.chore.px,
                                   expected_symbol_side_snapshot.chore_count))
-    expected_symbol_side_snapshot.total_qty += buy_placed_chore_journal.chore.qty
-    expected_symbol_side_snapshot.last_update_date_time = buy_placed_chore_journal.chore_event_date_time
+    expected_symbol_side_snapshot.total_qty += buy_placed_chore_ledger.chore.qty
+    expected_symbol_side_snapshot.last_update_date_time = buy_placed_chore_ledger.chore_event_date_time
     expected_symbol_side_snapshot.security.inst_type = buy_inst_type
 
     symbol_side_snapshot_list = executor_web_client.get_all_symbol_side_snapshot_client()
@@ -608,7 +613,7 @@ def check_placed_buy_chore_computes_before_all_sells(loop_count: int,
                                         expected_symbol_side_snapshot,
                                         other_leg_expected_symbol_side_snapshot,
                                         expected_plan_limits, expected_plan_brief_obj,
-                                        buy_placed_chore_journal.chore_event_date_time,
+                                        buy_placed_chore_ledger.chore_event_date_time,
                                         buy_last_barter_px, sell_last_barter_px, executor_web_client)
 
     print(f"@@@ fetching plan_brief for symbol: {symbol} at {DateTime.utcnow()}")
@@ -673,7 +678,7 @@ def check_placed_buy_chore_computes_before_all_sells(loop_count: int,
 
 
 def check_placed_buy_chore_computes_after_sells(loop_count: int, expected_chore_id: str, symbol: str,
-                                                buy_placed_chore_journal: ChoreJournalBaseModel,
+                                                buy_placed_chore_ledger: ChoreLedgerBaseModel,
                                                 expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
                                                 expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                                 other_leg_expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
@@ -683,26 +688,26 @@ def check_placed_buy_chore_computes_after_sells(loop_count: int, expected_chore_
                                                 expected_plan_brief_obj: PlanBriefBaseModel,
                                                 executor_web_client: StreetBookServiceHttpClient):
     """
-    Checking resulted changes in ChoreJournal, ChoreSnapshot, SymbolSideSnapshot, PairPlan,
+    Checking resulted changes in ChoreLedger, ChoreSnapshot, SymbolSideSnapshot, PairPlan,
     PlanBrief and ContactStatus after chore is triggered
     """
-    chore_journal_obj_list = executor_web_client.get_all_chore_journal_client(-100)
-    assert buy_placed_chore_journal in chore_journal_obj_list, \
-        f"Couldn't find {buy_placed_chore_journal} in {chore_journal_obj_list}"
+    chore_ledger_obj_list = executor_web_client.get_all_chore_ledger_client(-100)
+    assert buy_placed_chore_ledger in chore_ledger_obj_list, \
+        f"Couldn't find {buy_placed_chore_ledger} in {chore_ledger_obj_list}"
 
     buy_last_barter_px, sell_last_barter_px = get_both_side_last_barter_px()
     buy_inst_type: InstrumentType = get_inst_type(Side.BUY, expected_pair_plan)
 
     # Checking chore_snapshot
     expected_chore_snapshot_obj.chore_brief.chore_id = expected_chore_id
-    expected_chore_snapshot_obj.chore_brief.px = buy_placed_chore_journal.chore.px
-    expected_chore_snapshot_obj.chore_brief.qty = buy_placed_chore_journal.chore.qty
-    expected_chore_snapshot_obj.chore_brief.chore_notional = (buy_placed_chore_journal.chore.qty *
-                                                              get_px_in_usd(buy_placed_chore_journal.chore.px))
+    expected_chore_snapshot_obj.chore_brief.px = buy_placed_chore_ledger.chore.px
+    expected_chore_snapshot_obj.chore_brief.qty = buy_placed_chore_ledger.chore.qty
+    expected_chore_snapshot_obj.chore_brief.chore_notional = (buy_placed_chore_ledger.chore.qty *
+                                                              get_px_in_usd(buy_placed_chore_ledger.chore.px))
     expected_chore_snapshot_obj.chore_status = ChoreStatusType.OE_UNACK
-    expected_chore_snapshot_obj.last_update_date_time = buy_placed_chore_journal.chore_event_date_time
-    expected_chore_snapshot_obj.create_date_time = buy_placed_chore_journal.chore_event_date_time
-    expected_chore_snapshot_obj.chore_brief.text.extend(buy_placed_chore_journal.chore.text)
+    expected_chore_snapshot_obj.last_update_date_time = buy_placed_chore_ledger.chore_event_date_time
+    expected_chore_snapshot_obj.create_date_time = buy_placed_chore_ledger.chore_event_date_time
+    expected_chore_snapshot_obj.chore_brief.text.extend(buy_placed_chore_ledger.chore.text)
 
     chore_snapshot_list = executor_web_client.get_all_chore_snapshot_client(-100)
     # updating below field from received_chore_snapshot_list for comparison
@@ -721,10 +726,10 @@ def check_placed_buy_chore_computes_after_sells(loop_count: int, expected_chore_
     expected_symbol_side_snapshot.chore_count = loop_count
     expected_symbol_side_snapshot.avg_px = (
         avg_of_new_val_sum_to_avg(expected_symbol_side_snapshot.avg_px,
-                                  buy_placed_chore_journal.chore.px,
+                                  buy_placed_chore_ledger.chore.px,
                                   expected_symbol_side_snapshot.chore_count))
-    expected_symbol_side_snapshot.total_qty += buy_placed_chore_journal.chore.qty
-    expected_symbol_side_snapshot.last_update_date_time = buy_placed_chore_journal.chore_event_date_time
+    expected_symbol_side_snapshot.total_qty += buy_placed_chore_ledger.chore.qty
+    expected_symbol_side_snapshot.last_update_date_time = buy_placed_chore_ledger.chore_event_date_time
     expected_symbol_side_snapshot.security.inst_type = buy_inst_type
 
     symbol_side_snapshot_list = executor_web_client.get_all_symbol_side_snapshot_client()
@@ -738,7 +743,7 @@ def check_placed_buy_chore_computes_after_sells(loop_count: int, expected_chore_
     update_expected_plan_brief_for_buy(expected_chore_snapshot_obj, expected_symbol_side_snapshot,
                                         other_leg_expected_symbol_side_snapshot,
                                         expected_plan_limits, expected_plan_brief_obj,
-                                        buy_placed_chore_journal.chore_event_date_time,
+                                        buy_placed_chore_ledger.chore_event_date_time,
                                         buy_last_barter_px, sell_last_barter_px, executor_web_client,
                                         hedge_ratio=expected_pair_plan.pair_plan_params.hedge_ratio)
 
@@ -771,11 +776,11 @@ def check_placed_buy_chore_computes_after_sells(loop_count: int, expected_chore_
                        f"plan_limits_list: {plan_limits_obj_list}")
 
     # Checking plan_status
-    expected_plan_status.total_buy_qty += buy_placed_chore_journal.chore.qty
+    expected_plan_status.total_buy_qty += buy_placed_chore_ledger.chore.qty
     expected_plan_status.total_chore_qty = expected_plan_status.total_buy_qty + expected_plan_status.total_sell_qty
-    expected_plan_status.total_open_buy_qty += buy_placed_chore_journal.chore.qty
-    expected_plan_status.total_open_buy_notional += (get_px_in_usd(buy_placed_chore_journal.chore.px) *
-                                                       buy_placed_chore_journal.chore.qty)
+    expected_plan_status.total_open_buy_qty += buy_placed_chore_ledger.chore.qty
+    expected_plan_status.total_open_buy_notional += (get_px_in_usd(buy_placed_chore_ledger.chore.px) *
+                                                       buy_placed_chore_ledger.chore.qty)
     expected_plan_status.avg_open_buy_px = (
             get_usd_to_local_px_or_notional(expected_plan_status.total_open_buy_notional) /
             expected_plan_status.total_open_buy_qty)
@@ -814,18 +819,18 @@ def check_placed_buy_chore_computes_after_sells(loop_count: int, expected_chore_
     check_plan_view_computes(expected_pair_plan.id, executor_web_client)
 
 
-def placed_buy_chore_ack_receive(expected_chore_journal: ChoreJournalBaseModel,
+def placed_buy_chore_ack_receive(expected_chore_ledger: ChoreLedgerBaseModel,
                                  expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
                                  executor_web_client: StreetBookServiceHttpClient):
     """Checking after chore's ACK status is received"""
-    chore_journal_obj_list = executor_web_client.get_all_chore_journal_client(-100)
+    chore_ledger_obj_list = executor_web_client.get_all_chore_ledger_client(-100)
 
-    assert expected_chore_journal in chore_journal_obj_list, f"Couldn't find {expected_chore_journal} in list " \
-                                                             f"{chore_journal_obj_list}"
+    assert expected_chore_ledger in chore_ledger_obj_list, f"Couldn't find {expected_chore_ledger} in list " \
+                                                             f"{chore_ledger_obj_list}"
 
     # Checking chore_snapshot
     expected_chore_snapshot_obj.chore_status = ChoreStatusType.OE_ACKED
-    expected_chore_snapshot_obj.last_update_date_time = expected_chore_journal.chore_event_date_time
+    expected_chore_snapshot_obj.last_update_date_time = expected_chore_ledger.chore_event_date_time
 
     chore_snapshot_list = executor_web_client.get_all_chore_snapshot_client(-100)
     # updating below field from received_chore_snapshot_list for comparison
@@ -838,7 +843,7 @@ def placed_buy_chore_ack_receive(expected_chore_journal: ChoreJournalBaseModel,
 
 
 def check_fill_receive_for_placed_buy_chore_before_sells(symbol: str,
-                                                         buy_fill_journal: FillsJournalBaseModel,
+                                                         buy_fill_ledger: DealsLedgerBaseModel,
                                                          expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
                                                          expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                                          other_leg_expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
@@ -848,21 +853,21 @@ def check_fill_receive_for_placed_buy_chore_before_sells(symbol: str,
                                                          expected_plan_brief_obj: PlanBriefBaseModel,
                                                          executor_web_client: StreetBookServiceHttpClient):
     """
-    Checking resulted changes in ChoreJournal, ChoreSnapshot, SymbolSideSnapshot, PairPlan,
+    Checking resulted changes in ChoreLedger, ChoreSnapshot, SymbolSideSnapshot, PairPlan,
     PlanBrief and ContactStatus after fill is received
     """
-    fill_journal_obj_list = executor_web_client.get_all_fills_journal_client(-100)
-    assert buy_fill_journal in fill_journal_obj_list, f"Couldn't find {buy_fill_journal} in {fill_journal_obj_list}"
+    fill_ledger_obj_list = executor_web_client.get_all_deals_ledger_client(-100)
+    assert buy_fill_ledger in fill_ledger_obj_list, f"Couldn't find {buy_fill_ledger} in {fill_ledger_obj_list}"
 
     buy_last_barter_px, sell_last_barter_px = get_both_side_last_barter_px()
 
     # Checking chore_snapshot
-    expected_chore_snapshot_obj.filled_qty = buy_fill_journal.fill_qty
-    expected_chore_snapshot_obj.avg_fill_px = buy_fill_journal.fill_px
-    expected_chore_snapshot_obj.fill_notional = buy_fill_journal.fill_qty * get_px_in_usd(buy_fill_journal.fill_px)
-    expected_chore_snapshot_obj.last_update_fill_qty = buy_fill_journal.fill_qty
-    expected_chore_snapshot_obj.last_update_fill_px = buy_fill_journal.fill_px
-    expected_chore_snapshot_obj.last_update_date_time = buy_fill_journal.fill_date_time
+    expected_chore_snapshot_obj.filled_qty = buy_fill_ledger.fill_qty
+    expected_chore_snapshot_obj.avg_fill_px = buy_fill_ledger.fill_px
+    expected_chore_snapshot_obj.fill_notional = buy_fill_ledger.fill_qty * get_px_in_usd(buy_fill_ledger.fill_px)
+    expected_chore_snapshot_obj.last_update_fill_qty = buy_fill_ledger.fill_qty
+    expected_chore_snapshot_obj.last_update_fill_px = buy_fill_ledger.fill_px
+    expected_chore_snapshot_obj.last_update_date_time = buy_fill_ledger.fill_date_time
 
     chore_snapshot_list = executor_web_client.get_all_chore_snapshot_client(-100)
     # removing below field from received_chore_snapshot_list for comparison
@@ -873,15 +878,15 @@ def check_fill_receive_for_placed_buy_chore_before_sells(symbol: str,
                                                                f"{chore_snapshot_list}"
 
     # Checking symbol_side_snapshot
-    expected_symbol_side_snapshot.last_update_date_time = buy_fill_journal.fill_date_time
-    expected_symbol_side_snapshot.total_filled_qty += buy_fill_journal.fill_qty
-    expected_symbol_side_snapshot.total_fill_notional += (buy_fill_journal.fill_qty *
-                                                          get_px_in_usd(buy_fill_journal.fill_px))
+    expected_symbol_side_snapshot.last_update_date_time = buy_fill_ledger.fill_date_time
+    expected_symbol_side_snapshot.total_filled_qty += buy_fill_ledger.fill_qty
+    expected_symbol_side_snapshot.total_fill_notional += (buy_fill_ledger.fill_qty *
+                                                          get_px_in_usd(buy_fill_ledger.fill_px))
     expected_symbol_side_snapshot.avg_fill_px = \
         (get_usd_to_local_px_or_notional(expected_symbol_side_snapshot.total_fill_notional) /
          expected_symbol_side_snapshot.total_filled_qty)
-    expected_symbol_side_snapshot.last_update_fill_qty = buy_fill_journal.fill_qty
-    expected_symbol_side_snapshot.last_update_fill_px = buy_fill_journal.fill_px
+    expected_symbol_side_snapshot.last_update_fill_qty = buy_fill_ledger.fill_qty
+    expected_symbol_side_snapshot.last_update_fill_px = buy_fill_ledger.fill_px
 
     symbol_side_snapshot_list = executor_web_client.get_all_symbol_side_snapshot_client()
     # removing id field from received obj list for comparison
@@ -895,7 +900,7 @@ def check_fill_receive_for_placed_buy_chore_before_sells(symbol: str,
                                         expected_symbol_side_snapshot,
                                         other_leg_expected_symbol_side_snapshot,
                                         expected_plan_limits, expected_plan_brief_obj,
-                                        buy_fill_journal.fill_date_time,
+                                        buy_fill_ledger.fill_date_time,
                                         buy_last_barter_px, sell_last_barter_px, executor_web_client)
 
     plan_brief_list = executor_web_client.get_plan_brief_from_symbol_query_client(symbol)
@@ -921,16 +926,16 @@ def check_fill_receive_for_placed_buy_chore_before_sells(symbol: str,
         assert False, (f"PlanLimits' length must be exactly 1, found {len(plan_limits_obj_list)}, "
                        f"plan_limits_list: {plan_limits_obj_list}")
 
-    expected_plan_status.total_open_buy_qty -= buy_fill_journal.fill_qty
-    expected_plan_status.total_open_buy_notional -= (buy_fill_journal.fill_qty *
+    expected_plan_status.total_open_buy_qty -= buy_fill_ledger.fill_qty
+    expected_plan_status.total_open_buy_notional -= (buy_fill_ledger.fill_qty *
                                                       get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
     expected_plan_status.avg_open_buy_px = (
         get_usd_to_local_px_or_notional(expected_plan_status.total_open_buy_notional) /
         expected_plan_status.total_open_buy_qty)
     expected_plan_status.total_open_exposure = expected_plan_status.total_open_buy_notional
-    expected_plan_status.total_fill_buy_qty += buy_fill_journal.fill_qty
+    expected_plan_status.total_fill_buy_qty += buy_fill_ledger.fill_qty
     expected_plan_status.total_fill_buy_notional += (
-        get_px_in_usd(buy_fill_journal.fill_px) * buy_fill_journal.fill_qty)
+        get_px_in_usd(buy_fill_ledger.fill_px) * buy_fill_ledger.fill_qty)
     expected_plan_status.avg_fill_buy_px = (
         (get_usd_to_local_px_or_notional(expected_plan_status.total_fill_buy_notional) /
          expected_plan_status.total_fill_buy_qty))
@@ -961,7 +966,7 @@ def check_fill_receive_for_placed_buy_chore_before_sells(symbol: str,
 
 
 def check_cxl_receive_for_placed_buy_chore_before_sells(symbol: str,
-                                                        buy_cxl_chore_journal: ChoreJournalBaseModel,
+                                                        buy_cxl_chore_ledger: ChoreLedgerBaseModel,
                                                         expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
                                                         expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                                         other_leg_expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
@@ -971,19 +976,19 @@ def check_cxl_receive_for_placed_buy_chore_before_sells(symbol: str,
                                                         expected_plan_brief_obj: PlanBriefBaseModel,
                                                         executor_web_client: StreetBookServiceHttpClient,):
     """
-    Checking resulted changes in ChoreJournal, ChoreSnapshot, SymbolSideSnapshot, PairPlan,
+    Checking resulted changes in ChoreLedger, ChoreSnapshot, SymbolSideSnapshot, PairPlan,
     PlanBrief and ContactStatus after fill is received
     """
-    chore_journal_obj_list = executor_web_client.get_all_chore_journal_client(-100)
-    assert buy_cxl_chore_journal in chore_journal_obj_list, f"Couldn't find {buy_cxl_chore_journal} in list " \
-                                                            f"{chore_journal_obj_list}"
+    chore_ledger_obj_list = executor_web_client.get_all_chore_ledger_client(-100)
+    assert buy_cxl_chore_ledger in chore_ledger_obj_list, f"Couldn't find {buy_cxl_chore_ledger} in list " \
+                                                            f"{chore_ledger_obj_list}"
 
     buy_last_barter_px, sell_last_barter_px = get_both_side_last_barter_px()
 
     # Checking chore_snapshot
     unfilled_qty = expected_chore_snapshot_obj.chore_brief.qty - expected_chore_snapshot_obj.filled_qty
     expected_chore_snapshot_obj.chore_status = ChoreStatusType.OE_DOD
-    expected_chore_snapshot_obj.last_update_date_time = buy_cxl_chore_journal.chore_event_date_time
+    expected_chore_snapshot_obj.last_update_date_time = buy_cxl_chore_ledger.chore_event_date_time
     expected_chore_snapshot_obj.cxled_qty = unfilled_qty
     expected_chore_snapshot_obj.cxled_notional = (unfilled_qty *
                                                   get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
@@ -1002,7 +1007,7 @@ def check_cxl_receive_for_placed_buy_chore_before_sells(symbol: str,
                                                                f"{chore_snapshot_list}"
 
     # Checking symbol_side_snapshot
-    expected_symbol_side_snapshot.last_update_date_time = buy_cxl_chore_journal.chore_event_date_time
+    expected_symbol_side_snapshot.last_update_date_time = buy_cxl_chore_ledger.chore_event_date_time
     expected_symbol_side_snapshot.total_cxled_qty += unfilled_qty
     expected_symbol_side_snapshot.total_cxled_notional += (
             unfilled_qty * get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
@@ -1022,7 +1027,7 @@ def check_cxl_receive_for_placed_buy_chore_before_sells(symbol: str,
                                         expected_symbol_side_snapshot,
                                         other_leg_expected_symbol_side_snapshot,
                                         expected_plan_limits, expected_plan_brief_obj,
-                                        buy_cxl_chore_journal.chore_event_date_time,
+                                        buy_cxl_chore_ledger.chore_event_date_time,
                                         buy_last_barter_px, sell_last_barter_px, executor_web_client)
 
     plan_brief_list = executor_web_client.get_plan_brief_from_symbol_query_client(symbol)
@@ -1102,7 +1107,7 @@ def check_cxl_receive_for_placed_buy_chore_before_sells(symbol: str,
 
 
 def check_cxl_receive_for_placed_sell_chore_before_buy(symbol: str,
-                                                       sell_cxl_chore_journal: ChoreJournalBaseModel,
+                                                       sell_cxl_chore_ledger: ChoreLedgerBaseModel,
                                                        expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
                                                        expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                                        other_leg_expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
@@ -1112,19 +1117,19 @@ def check_cxl_receive_for_placed_sell_chore_before_buy(symbol: str,
                                                        expected_plan_brief_obj: PlanBriefBaseModel,
                                                        executor_web_client: StreetBookServiceHttpClient):
     """
-    Checking resulted changes in ChoreJournal, ChoreSnapshot, SymbolSideSnapshot, PairPlan,
+    Checking resulted changes in ChoreLedger, ChoreSnapshot, SymbolSideSnapshot, PairPlan,
     PlanBrief and ContactStatus after fill is received
     """
-    chore_journal_obj_list = executor_web_client.get_all_chore_journal_client(-100)
-    assert sell_cxl_chore_journal in chore_journal_obj_list, f"Couldn't find {sell_cxl_chore_journal} in list " \
-                                                            f"{chore_journal_obj_list}"
+    chore_ledger_obj_list = executor_web_client.get_all_chore_ledger_client(-100)
+    assert sell_cxl_chore_ledger in chore_ledger_obj_list, f"Couldn't find {sell_cxl_chore_ledger} in list " \
+                                                            f"{chore_ledger_obj_list}"
 
     buy_last_barter_px, sell_last_barter_px = get_both_side_last_barter_px()
 
     # Checking chore_snapshot
     unfilled_qty = expected_chore_snapshot_obj.chore_brief.qty - expected_chore_snapshot_obj.filled_qty
     expected_chore_snapshot_obj.chore_status = ChoreStatusType.OE_DOD
-    expected_chore_snapshot_obj.last_update_date_time = sell_cxl_chore_journal.chore_event_date_time
+    expected_chore_snapshot_obj.last_update_date_time = sell_cxl_chore_ledger.chore_event_date_time
     expected_chore_snapshot_obj.cxled_qty = unfilled_qty
     expected_chore_snapshot_obj.cxled_notional = (unfilled_qty *
                                                   get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
@@ -1143,7 +1148,7 @@ def check_cxl_receive_for_placed_sell_chore_before_buy(symbol: str,
                                                                f"{chore_snapshot_list}"
 
     # Checking symbol_side_snapshot
-    expected_symbol_side_snapshot.last_update_date_time = sell_cxl_chore_journal.chore_event_date_time
+    expected_symbol_side_snapshot.last_update_date_time = sell_cxl_chore_ledger.chore_event_date_time
     expected_symbol_side_snapshot.total_cxled_qty += unfilled_qty
     expected_symbol_side_snapshot.total_cxled_notional += (
             unfilled_qty * get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
@@ -1163,7 +1168,7 @@ def check_cxl_receive_for_placed_sell_chore_before_buy(symbol: str,
                                          expected_symbol_side_snapshot,
                                          other_leg_expected_symbol_side_snapshot,
                                          expected_plan_limits, expected_plan_brief_obj,
-                                         sell_cxl_chore_journal.chore_event_date_time,
+                                         sell_cxl_chore_ledger.chore_event_date_time,
                                          buy_last_barter_px, sell_last_barter_px, executor_web_client)
 
     plan_brief_list = executor_web_client.get_plan_brief_from_symbol_query_client(symbol)
@@ -1243,7 +1248,7 @@ def check_cxl_receive_for_placed_sell_chore_before_buy(symbol: str,
 
 
 def check_fill_receive_for_placed_buy_chore_after_all_sells(loop_count: int, expected_chore_id: str, symbol: str,
-                                                            buy_fill_journal: FillsJournalBaseModel,
+                                                            buy_fill_ledger: DealsLedgerBaseModel,
                                                             expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
                                                             expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                                             other_leg_expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
@@ -1253,24 +1258,24 @@ def check_fill_receive_for_placed_buy_chore_after_all_sells(loop_count: int, exp
                                                             expected_plan_brief_obj: PlanBriefBaseModel,
                                                             executor_web_client: StreetBookServiceHttpClient):
     """
-    Checking resulted changes in ChoreJournal, ChoreSnapshot, SymbolSideSnapshot, PairPlan,
+    Checking resulted changes in ChoreLedger, ChoreSnapshot, SymbolSideSnapshot, PairPlan,
     PlanBrief and ContactStatus after fill is received
     """
-    fill_journal_obj_list = executor_web_client.get_all_fills_journal_client(-100)
-    assert buy_fill_journal in fill_journal_obj_list, f"Couldn't find {buy_fill_journal} in {fill_journal_obj_list}"
+    fill_ledger_obj_list = executor_web_client.get_all_deals_ledger_client(-100)
+    assert buy_fill_ledger in fill_ledger_obj_list, f"Couldn't find {buy_fill_ledger} in {fill_ledger_obj_list}"
 
     buy_last_barter_px, sell_last_barter_px = get_both_side_last_barter_px()
 
     # Checking chore_snapshot
     expected_chore_snapshot_obj.chore_brief.chore_id = expected_chore_id
-    expected_chore_snapshot_obj.filled_qty += buy_fill_journal.fill_qty
-    expected_chore_snapshot_obj.fill_notional = buy_fill_journal.fill_qty * get_px_in_usd(buy_fill_journal.fill_px)
+    expected_chore_snapshot_obj.filled_qty += buy_fill_ledger.fill_qty
+    expected_chore_snapshot_obj.fill_notional = buy_fill_ledger.fill_qty * get_px_in_usd(buy_fill_ledger.fill_px)
     expected_chore_snapshot_obj.avg_fill_px = (
             get_usd_to_local_px_or_notional(expected_chore_snapshot_obj.fill_notional) /
             expected_chore_snapshot_obj.filled_qty)
-    expected_chore_snapshot_obj.last_update_fill_qty = buy_fill_journal.fill_qty
-    expected_chore_snapshot_obj.last_update_fill_px = buy_fill_journal.fill_px
-    expected_chore_snapshot_obj.last_update_date_time = buy_fill_journal.fill_date_time
+    expected_chore_snapshot_obj.last_update_fill_qty = buy_fill_ledger.fill_qty
+    expected_chore_snapshot_obj.last_update_fill_px = buy_fill_ledger.fill_px
+    expected_chore_snapshot_obj.last_update_date_time = buy_fill_ledger.fill_date_time
 
     chore_snapshot_list = executor_web_client.get_all_chore_snapshot_client(-100)
     # removing below field from received_chore_snapshot_list for comparison
@@ -1283,14 +1288,14 @@ def check_fill_receive_for_placed_buy_chore_after_all_sells(loop_count: int, exp
     # Checking symbol_side_snapshot
     expected_symbol_side_snapshot.last_update_date_time = expected_chore_snapshot_obj.last_update_date_time
     expected_symbol_side_snapshot.chore_count = loop_count
-    expected_symbol_side_snapshot.total_filled_qty += buy_fill_journal.fill_qty
-    expected_symbol_side_snapshot.total_fill_notional += (buy_fill_journal.fill_qty *
-                                                          get_px_in_usd(buy_fill_journal.fill_px))
+    expected_symbol_side_snapshot.total_filled_qty += buy_fill_ledger.fill_qty
+    expected_symbol_side_snapshot.total_fill_notional += (buy_fill_ledger.fill_qty *
+                                                          get_px_in_usd(buy_fill_ledger.fill_px))
     expected_symbol_side_snapshot.avg_fill_px = (
             get_usd_to_local_px_or_notional(expected_symbol_side_snapshot.total_fill_notional) /
             expected_symbol_side_snapshot.total_filled_qty)
-    expected_symbol_side_snapshot.last_update_fill_qty = buy_fill_journal.fill_qty
-    expected_symbol_side_snapshot.last_update_fill_px = buy_fill_journal.fill_px
+    expected_symbol_side_snapshot.last_update_fill_qty = buy_fill_ledger.fill_qty
+    expected_symbol_side_snapshot.last_update_fill_px = buy_fill_ledger.fill_px
 
     symbol_side_snapshot_list = executor_web_client.get_all_symbol_side_snapshot_client()
     # removing id field from received obj list for comparison
@@ -1303,7 +1308,7 @@ def check_fill_receive_for_placed_buy_chore_after_all_sells(loop_count: int, exp
     update_expected_plan_brief_for_buy(expected_chore_snapshot_obj, expected_symbol_side_snapshot,
                                         other_leg_expected_symbol_side_snapshot,
                                         expected_plan_limits, expected_plan_brief_obj,
-                                        buy_fill_journal.fill_date_time,
+                                        buy_fill_ledger.fill_date_time,
                                         buy_last_barter_px, sell_last_barter_px, executor_web_client,
                                         hedge_ratio=expected_pair_plan.pair_plan_params.hedge_ratio)
     plan_brief_list = executor_web_client.get_plan_brief_from_symbol_query_client(symbol)
@@ -1332,16 +1337,16 @@ def check_fill_receive_for_placed_buy_chore_after_all_sells(loop_count: int, exp
                        f"plan_limits_list: {plan_limits_obj_list}")
 
     # Checking start_status
-    expected_plan_status.total_open_buy_qty -= buy_fill_journal.fill_qty
-    expected_plan_status.total_open_buy_notional -= (buy_fill_journal.fill_qty *
+    expected_plan_status.total_open_buy_qty -= buy_fill_ledger.fill_qty
+    expected_plan_status.total_open_buy_notional -= (buy_fill_ledger.fill_qty *
                                                        get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
     expected_plan_status.avg_open_buy_px = (
             get_usd_to_local_px_or_notional(expected_plan_status.total_open_buy_notional) /
             expected_plan_status.total_open_buy_qty)
     expected_plan_status.total_open_exposure = expected_plan_status.total_open_buy_notional
-    expected_plan_status.total_fill_buy_qty += buy_fill_journal.fill_qty
-    expected_plan_status.total_fill_buy_notional += (buy_fill_journal.fill_qty *
-                                                       get_px_in_usd(buy_fill_journal.fill_px))
+    expected_plan_status.total_fill_buy_qty += buy_fill_ledger.fill_qty
+    expected_plan_status.total_fill_buy_notional += (buy_fill_ledger.fill_qty *
+                                                       get_px_in_usd(buy_fill_ledger.fill_px))
     expected_plan_status.avg_fill_buy_px = (
             get_usd_to_local_px_or_notional(expected_plan_status.total_fill_buy_notional) /
             expected_plan_status.total_fill_buy_qty)
@@ -1371,7 +1376,7 @@ def check_fill_receive_for_placed_buy_chore_after_all_sells(loop_count: int, exp
 
 
 def check_placed_sell_chore_computes_before_buys(loop_count: int, expected_chore_id: str,
-                                                 symbol: str, sell_placed_chore_journal: ChoreJournalBaseModel,
+                                                 symbol: str, sell_placed_chore_ledger: ChoreLedgerBaseModel,
                                                  expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
                                                  expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                                  other_leg_expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
@@ -1380,10 +1385,10 @@ def check_placed_sell_chore_computes_before_buys(loop_count: int, expected_chore
                                                  expected_plan_status: PlanStatus,
                                                  expected_plan_brief_obj: PlanBriefBaseModel,
                                                  executor_web_client: StreetBookServiceHttpClient):
-    chore_journal_obj_list = executor_web_client.get_all_chore_journal_client(-100)
+    chore_ledger_obj_list = executor_web_client.get_all_chore_ledger_client(-100)
 
-    assert sell_placed_chore_journal in chore_journal_obj_list, f"Couldn't find {sell_placed_chore_journal} in " \
-                                                                f"{chore_journal_obj_list}"
+    assert sell_placed_chore_ledger in chore_ledger_obj_list, f"Couldn't find {sell_placed_chore_ledger} in " \
+                                                                f"{chore_ledger_obj_list}"
 
     buy_last_barter_px, sell_last_barter_px = get_both_side_last_barter_px()
     sell_inst_type: InstrumentType = InstrumentType.EQT if (
@@ -1391,14 +1396,14 @@ def check_placed_sell_chore_computes_before_buys(loop_count: int, expected_chore
 
     # Checking chore_snapshot
     expected_chore_snapshot_obj.chore_brief.chore_id = expected_chore_id
-    expected_chore_snapshot_obj.chore_brief.px = sell_placed_chore_journal.chore.px
-    expected_chore_snapshot_obj.chore_brief.qty = sell_placed_chore_journal.chore.qty
-    expected_chore_snapshot_obj.chore_brief.chore_notional = (sell_placed_chore_journal.chore.qty *
-                                                              get_px_in_usd(sell_placed_chore_journal.chore.px))
+    expected_chore_snapshot_obj.chore_brief.px = sell_placed_chore_ledger.chore.px
+    expected_chore_snapshot_obj.chore_brief.qty = sell_placed_chore_ledger.chore.qty
+    expected_chore_snapshot_obj.chore_brief.chore_notional = (sell_placed_chore_ledger.chore.qty *
+                                                              get_px_in_usd(sell_placed_chore_ledger.chore.px))
     expected_chore_snapshot_obj.chore_status = ChoreStatusType.OE_UNACK
-    expected_chore_snapshot_obj.last_update_date_time = sell_placed_chore_journal.chore_event_date_time
-    expected_chore_snapshot_obj.create_date_time = sell_placed_chore_journal.chore_event_date_time
-    expected_chore_snapshot_obj.chore_brief.text.extend(sell_placed_chore_journal.chore.text)
+    expected_chore_snapshot_obj.last_update_date_time = sell_placed_chore_ledger.chore_event_date_time
+    expected_chore_snapshot_obj.create_date_time = sell_placed_chore_ledger.chore_event_date_time
+    expected_chore_snapshot_obj.chore_brief.text.extend(sell_placed_chore_ledger.chore.text)
 
     chore_snapshot_list = executor_web_client.get_all_chore_snapshot_client(-100)
     # updating below field from received_chore_snapshot_list for comparison
@@ -1412,10 +1417,10 @@ def check_placed_sell_chore_computes_before_buys(loop_count: int, expected_chore
     expected_symbol_side_snapshot.chore_count = loop_count
     expected_symbol_side_snapshot.avg_px = (
         avg_of_new_val_sum_to_avg(expected_symbol_side_snapshot.avg_px,
-                                  sell_placed_chore_journal.chore.px,
+                                  sell_placed_chore_ledger.chore.px,
                                   expected_symbol_side_snapshot.chore_count))
-    expected_symbol_side_snapshot.total_qty += sell_placed_chore_journal.chore.qty
-    expected_symbol_side_snapshot.last_update_date_time = sell_placed_chore_journal.chore_event_date_time
+    expected_symbol_side_snapshot.total_qty += sell_placed_chore_ledger.chore.qty
+    expected_symbol_side_snapshot.last_update_date_time = sell_placed_chore_ledger.chore_event_date_time
     expected_symbol_side_snapshot.security.inst_type = sell_inst_type
 
     symbol_side_snapshot_list = executor_web_client.get_all_symbol_side_snapshot_client()
@@ -1430,7 +1435,7 @@ def check_placed_sell_chore_computes_before_buys(loop_count: int, expected_chore
                                          expected_symbol_side_snapshot,
                                          other_leg_expected_symbol_side_snapshot,
                                          expected_plan_limits, expected_plan_brief_obj,
-                                         sell_placed_chore_journal.chore_event_date_time,
+                                         sell_placed_chore_ledger.chore_event_date_time,
                                          buy_last_barter_px, sell_last_barter_px, executor_web_client)
 
     print(f"@@@ fetching plan_brief for symbol: {symbol} at {DateTime.utcnow()}")
@@ -1502,7 +1507,7 @@ def check_placed_sell_chore_computes_before_buys(loop_count: int, expected_chore
 
 
 def check_placed_sell_chore_computes_after_all_buys(loop_count: int, expected_chore_id: str,
-                                                    symbol: str, sell_placed_chore_journal: ChoreJournalBaseModel,
+                                                    symbol: str, sell_placed_chore_ledger: ChoreLedgerBaseModel,
                                                     expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
                                                     expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
                                                     other_leg_expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
@@ -1511,10 +1516,10 @@ def check_placed_sell_chore_computes_after_all_buys(loop_count: int, expected_ch
                                                     expected_plan_status: PlanStatus,
                                                     expected_plan_brief_obj: PlanBriefBaseModel,
                                                     executor_web_client: StreetBookServiceHttpClient):
-    chore_journal_obj_list = executor_web_client.get_all_chore_journal_client(-100)
+    chore_ledger_obj_list = executor_web_client.get_all_chore_ledger_client(-100)
 
-    assert sell_placed_chore_journal in chore_journal_obj_list, f"Couldn't find {sell_placed_chore_journal} in " \
-                                                                f"{chore_journal_obj_list}"
+    assert sell_placed_chore_ledger in chore_ledger_obj_list, f"Couldn't find {sell_placed_chore_ledger} in " \
+                                                                f"{chore_ledger_obj_list}"
 
     buy_last_barter_px, sell_last_barter_px = get_both_side_last_barter_px()
     sell_inst_type: InstrumentType = InstrumentType.EQT if (
@@ -1522,14 +1527,14 @@ def check_placed_sell_chore_computes_after_all_buys(loop_count: int, expected_ch
 
     # Checking chore_snapshot
     expected_chore_snapshot_obj.chore_brief.chore_id = expected_chore_id
-    expected_chore_snapshot_obj.chore_brief.px = sell_placed_chore_journal.chore.px
-    expected_chore_snapshot_obj.chore_brief.qty = sell_placed_chore_journal.chore.qty
-    expected_chore_snapshot_obj.chore_brief.chore_notional = (sell_placed_chore_journal.chore.qty *
-                                                              get_px_in_usd(sell_placed_chore_journal.chore.px))
+    expected_chore_snapshot_obj.chore_brief.px = sell_placed_chore_ledger.chore.px
+    expected_chore_snapshot_obj.chore_brief.qty = sell_placed_chore_ledger.chore.qty
+    expected_chore_snapshot_obj.chore_brief.chore_notional = (sell_placed_chore_ledger.chore.qty *
+                                                              get_px_in_usd(sell_placed_chore_ledger.chore.px))
     expected_chore_snapshot_obj.chore_status = ChoreStatusType.OE_UNACK
-    expected_chore_snapshot_obj.last_update_date_time = sell_placed_chore_journal.chore_event_date_time
-    expected_chore_snapshot_obj.create_date_time = sell_placed_chore_journal.chore_event_date_time
-    expected_chore_snapshot_obj.chore_brief.text.extend(sell_placed_chore_journal.chore.text)
+    expected_chore_snapshot_obj.last_update_date_time = sell_placed_chore_ledger.chore_event_date_time
+    expected_chore_snapshot_obj.create_date_time = sell_placed_chore_ledger.chore_event_date_time
+    expected_chore_snapshot_obj.chore_brief.text.extend(sell_placed_chore_ledger.chore.text)
 
     chore_snapshot_list = executor_web_client.get_all_chore_snapshot_client(-100)
     # updating below field from received_chore_snapshot_list for comparison
@@ -1543,10 +1548,10 @@ def check_placed_sell_chore_computes_after_all_buys(loop_count: int, expected_ch
     expected_symbol_side_snapshot.chore_count = loop_count
     expected_symbol_side_snapshot.avg_px = (
         avg_of_new_val_sum_to_avg(expected_symbol_side_snapshot.avg_px,
-                                  sell_placed_chore_journal.chore.px,
+                                  sell_placed_chore_ledger.chore.px,
                                   expected_symbol_side_snapshot.chore_count))
-    expected_symbol_side_snapshot.total_qty += sell_placed_chore_journal.chore.qty
-    expected_symbol_side_snapshot.last_update_date_time = sell_placed_chore_journal.chore_event_date_time
+    expected_symbol_side_snapshot.total_qty += sell_placed_chore_ledger.chore.qty
+    expected_symbol_side_snapshot.last_update_date_time = sell_placed_chore_ledger.chore_event_date_time
     expected_symbol_side_snapshot.security.inst_type = sell_inst_type
 
     symbol_side_snapshot_list = executor_web_client.get_all_symbol_side_snapshot_client()
@@ -1560,7 +1565,7 @@ def check_placed_sell_chore_computes_after_all_buys(loop_count: int, expected_ch
                                          expected_symbol_side_snapshot,
                                          other_leg_expected_symbol_side_snapshot,
                                          expected_plan_limits, expected_plan_brief_obj,
-                                         sell_placed_chore_journal.chore_event_date_time,
+                                         sell_placed_chore_ledger.chore_event_date_time,
                                          buy_last_barter_px, sell_last_barter_px, executor_web_client,
                                          hedge_ratio=expected_pair_plan.pair_plan_params.hedge_ratio)
 
@@ -1592,11 +1597,11 @@ def check_placed_sell_chore_computes_after_all_buys(loop_count: int, expected_ch
                        f"plan_limits_list: {plan_limits_obj_list}")
 
     # Checking plan_status
-    expected_plan_status.total_sell_qty += sell_placed_chore_journal.chore.qty
+    expected_plan_status.total_sell_qty += sell_placed_chore_ledger.chore.qty
     expected_plan_status.total_chore_qty = expected_plan_status.total_buy_qty + expected_plan_status.total_sell_qty
-    expected_plan_status.total_open_sell_qty += sell_placed_chore_journal.chore.qty
-    expected_plan_status.total_open_sell_notional += (get_px_in_usd(sell_placed_chore_journal.chore.px) *
-                                                       sell_placed_chore_journal.chore.qty)
+    expected_plan_status.total_open_sell_qty += sell_placed_chore_ledger.chore.qty
+    expected_plan_status.total_open_sell_notional += (get_px_in_usd(sell_placed_chore_ledger.chore.px) *
+                                                       sell_placed_chore_ledger.chore.qty)
     expected_plan_status.avg_open_sell_px = (
         get_usd_to_local_px_or_notional(expected_plan_status.total_open_sell_notional) /
         expected_plan_status.total_open_sell_qty)
@@ -1635,18 +1640,18 @@ def check_placed_sell_chore_computes_after_all_buys(loop_count: int, expected_ch
     check_plan_view_computes(expected_pair_plan.id, executor_web_client)
 
 
-def placed_sell_chore_ack_receive(expected_chore_journal: ChoreJournalBaseModel,
+def placed_sell_chore_ack_receive(expected_chore_ledger: ChoreLedgerBaseModel,
                                   expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
                                   executor_web_client: StreetBookServiceHttpClient):
     """Checking after chore's ACK status is received"""
-    chore_journal_obj_list = executor_web_client.get_all_chore_journal_client(-100)
+    chore_ledger_obj_list = executor_web_client.get_all_chore_ledger_client(-100)
 
-    assert expected_chore_journal in chore_journal_obj_list, f"Couldn't find {expected_chore_journal} in " \
-                                                             f"{chore_journal_obj_list}"
+    assert expected_chore_ledger in chore_ledger_obj_list, f"Couldn't find {expected_chore_ledger} in " \
+                                                             f"{chore_ledger_obj_list}"
 
     # Checking chore_snapshot
     expected_chore_snapshot_obj.chore_status = ChoreStatusType.OE_ACKED
-    expected_chore_snapshot_obj.last_update_date_time = expected_chore_journal.chore_event_date_time
+    expected_chore_snapshot_obj.last_update_date_time = expected_chore_ledger.chore_event_date_time
 
     chore_snapshot_list = executor_web_client.get_all_chore_snapshot_client(-100)
     # updating below field from received_chore_snapshot_list for comparison
@@ -1659,25 +1664,25 @@ def placed_sell_chore_ack_receive(expected_chore_journal: ChoreJournalBaseModel,
 
 
 def check_fill_receive_for_placed_sell_chore_before_buys(
-        symbol: str, sell_fill_journal: FillsJournalBaseModel, expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
+        symbol: str, sell_fill_ledger: DealsLedgerBaseModel, expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
         expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
         other_leg_expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
         expected_pair_plan: PairPlanBaseModel,
         expected_plan_limits: PlanLimits, expected_plan_status: PlanStatus,
         expected_plan_brief_obj: PlanBriefBaseModel,
         executor_web_client: StreetBookServiceHttpClient):
-    fill_journal_obj_list = executor_web_client.get_all_fills_journal_client(-100)
-    assert sell_fill_journal in fill_journal_obj_list, f"Couldn't find {sell_fill_journal} in {fill_journal_obj_list}"
+    fill_ledger_obj_list = executor_web_client.get_all_deals_ledger_client(-100)
+    assert sell_fill_ledger in fill_ledger_obj_list, f"Couldn't find {sell_fill_ledger} in {fill_ledger_obj_list}"
 
     buy_last_barter_px, sell_last_barter_px = get_both_side_last_barter_px()
 
     # Checking chore_snapshot
-    expected_chore_snapshot_obj.filled_qty = sell_fill_journal.fill_qty
-    expected_chore_snapshot_obj.avg_fill_px = sell_fill_journal.fill_px
-    expected_chore_snapshot_obj.fill_notional = sell_fill_journal.fill_qty * get_px_in_usd(sell_fill_journal.fill_px)
-    expected_chore_snapshot_obj.last_update_fill_qty = sell_fill_journal.fill_qty
-    expected_chore_snapshot_obj.last_update_fill_px = sell_fill_journal.fill_px
-    expected_chore_snapshot_obj.last_update_date_time = sell_fill_journal.fill_date_time
+    expected_chore_snapshot_obj.filled_qty = sell_fill_ledger.fill_qty
+    expected_chore_snapshot_obj.avg_fill_px = sell_fill_ledger.fill_px
+    expected_chore_snapshot_obj.fill_notional = sell_fill_ledger.fill_qty * get_px_in_usd(sell_fill_ledger.fill_px)
+    expected_chore_snapshot_obj.last_update_fill_qty = sell_fill_ledger.fill_qty
+    expected_chore_snapshot_obj.last_update_fill_px = sell_fill_ledger.fill_px
+    expected_chore_snapshot_obj.last_update_date_time = sell_fill_ledger.fill_date_time
 
     chore_snapshot_list = executor_web_client.get_all_chore_snapshot_client(-100)
     # removing below field from received_chore_snapshot_list for comparison
@@ -1688,15 +1693,15 @@ def check_fill_receive_for_placed_sell_chore_before_buys(
                                                                f"{chore_snapshot_list}"
 
     # Checking symbol_side_snapshot
-    expected_symbol_side_snapshot.last_update_date_time = sell_fill_journal.fill_date_time
-    expected_symbol_side_snapshot.total_filled_qty += sell_fill_journal.fill_qty
-    expected_symbol_side_snapshot.total_fill_notional += (sell_fill_journal.fill_qty *
-                                                          get_px_in_usd(sell_fill_journal.fill_px))
+    expected_symbol_side_snapshot.last_update_date_time = sell_fill_ledger.fill_date_time
+    expected_symbol_side_snapshot.total_filled_qty += sell_fill_ledger.fill_qty
+    expected_symbol_side_snapshot.total_fill_notional += (sell_fill_ledger.fill_qty *
+                                                          get_px_in_usd(sell_fill_ledger.fill_px))
     expected_symbol_side_snapshot.avg_fill_px = \
         (get_usd_to_local_px_or_notional(expected_symbol_side_snapshot.total_fill_notional) /
          expected_symbol_side_snapshot.total_filled_qty)
-    expected_symbol_side_snapshot.last_update_fill_qty = sell_fill_journal.fill_qty
-    expected_symbol_side_snapshot.last_update_fill_px = sell_fill_journal.fill_px
+    expected_symbol_side_snapshot.last_update_fill_qty = sell_fill_ledger.fill_qty
+    expected_symbol_side_snapshot.last_update_fill_px = sell_fill_ledger.fill_px
 
     symbol_side_snapshot_list = executor_web_client.get_all_symbol_side_snapshot_client()
     # removing id field from received obj list for comparison
@@ -1710,7 +1715,7 @@ def check_fill_receive_for_placed_sell_chore_before_buys(
                                          expected_symbol_side_snapshot,
                                          other_leg_expected_symbol_side_snapshot,
                                          expected_plan_limits, expected_plan_brief_obj,
-                                         sell_fill_journal.fill_date_time,
+                                         sell_fill_ledger.fill_date_time,
                                          buy_last_barter_px, sell_last_barter_px, executor_web_client)
 
     plan_brief_list = executor_web_client.get_plan_brief_from_symbol_query_client(symbol)
@@ -1736,16 +1741,16 @@ def check_fill_receive_for_placed_sell_chore_before_buys(
                        f"plan_limits_list: {plan_limits_obj_list}")
 
     # Checking plan_status
-    expected_plan_status.total_open_sell_qty -= sell_fill_journal.fill_qty
-    expected_plan_status.total_open_sell_notional -= (sell_fill_journal.fill_qty *
+    expected_plan_status.total_open_sell_qty -= sell_fill_ledger.fill_qty
+    expected_plan_status.total_open_sell_notional -= (sell_fill_ledger.fill_qty *
                                                        get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
     expected_plan_status.avg_open_sell_px = (
             get_usd_to_local_px_or_notional(expected_plan_status.total_open_sell_notional) /
             expected_plan_status.total_open_sell_qty)
     expected_plan_status.total_open_exposure = - expected_plan_status.total_open_sell_notional
-    expected_plan_status.total_fill_sell_qty += sell_fill_journal.fill_qty
+    expected_plan_status.total_fill_sell_qty += sell_fill_ledger.fill_qty
     expected_plan_status.total_fill_sell_notional += (
-            get_px_in_usd(sell_fill_journal.fill_px) * sell_fill_journal.fill_qty)
+            get_px_in_usd(sell_fill_ledger.fill_px) * sell_fill_ledger.fill_qty)
     expected_plan_status.avg_fill_sell_px = (
         (get_usd_to_local_px_or_notional(expected_plan_status.total_fill_sell_notional) /
          expected_plan_status.total_fill_sell_qty))
@@ -1777,27 +1782,27 @@ def check_fill_receive_for_placed_sell_chore_before_buys(
 
 def check_fill_receive_for_placed_sell_chore_after_all_buys(
         loop_count: int, expected_chore_id: str,
-        symbol: str, sell_fill_journal: FillsJournalBaseModel, expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
+        symbol: str, sell_fill_ledger: DealsLedgerBaseModel, expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
         expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
         other_leg_expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
         expected_pair_plan: PairPlanBaseModel,
         expected_plan_limits: PlanLimits, expected_plan_status: PlanStatus,
         expected_plan_brief_obj: PlanBriefBaseModel, executor_web_client: StreetBookServiceHttpClient):
-    fill_journal_obj_list = executor_web_client.get_all_fills_journal_client(-100)
-    assert sell_fill_journal in fill_journal_obj_list, f"Couldn't find {sell_fill_journal} in {fill_journal_obj_list}"
+    fill_ledger_obj_list = executor_web_client.get_all_deals_ledger_client(-100)
+    assert sell_fill_ledger in fill_ledger_obj_list, f"Couldn't find {sell_fill_ledger} in {fill_ledger_obj_list}"
 
     buy_last_barter_px, sell_last_barter_px = get_both_side_last_barter_px()
 
     # Checking chore_snapshot
     expected_chore_snapshot_obj.chore_brief.chore_id = expected_chore_id
-    expected_chore_snapshot_obj.filled_qty += sell_fill_journal.fill_qty
-    expected_chore_snapshot_obj.fill_notional = sell_fill_journal.fill_qty * get_px_in_usd(sell_fill_journal.fill_px)
+    expected_chore_snapshot_obj.filled_qty += sell_fill_ledger.fill_qty
+    expected_chore_snapshot_obj.fill_notional = sell_fill_ledger.fill_qty * get_px_in_usd(sell_fill_ledger.fill_px)
     expected_chore_snapshot_obj.avg_fill_px = (
             get_usd_to_local_px_or_notional(expected_chore_snapshot_obj.fill_notional) /
             expected_chore_snapshot_obj.filled_qty)
-    expected_chore_snapshot_obj.last_update_fill_qty = sell_fill_journal.fill_qty
-    expected_chore_snapshot_obj.last_update_fill_px = sell_fill_journal.fill_px
-    expected_chore_snapshot_obj.last_update_date_time = sell_fill_journal.fill_date_time
+    expected_chore_snapshot_obj.last_update_fill_qty = sell_fill_ledger.fill_qty
+    expected_chore_snapshot_obj.last_update_fill_px = sell_fill_ledger.fill_px
+    expected_chore_snapshot_obj.last_update_date_time = sell_fill_ledger.fill_date_time
 
     chore_snapshot_list = executor_web_client.get_all_chore_snapshot_client(-100)
     # removing below field from received_chore_snapshot_list for comparison
@@ -1810,14 +1815,14 @@ def check_fill_receive_for_placed_sell_chore_after_all_buys(
     # Checking symbol_side_snapshot
     expected_symbol_side_snapshot.last_update_date_time = expected_chore_snapshot_obj.last_update_date_time
     expected_symbol_side_snapshot.chore_count = loop_count
-    expected_symbol_side_snapshot.total_filled_qty += sell_fill_journal.fill_qty
-    expected_symbol_side_snapshot.total_fill_notional += (sell_fill_journal.fill_qty *
-                                                          get_px_in_usd(sell_fill_journal.fill_px))
+    expected_symbol_side_snapshot.total_filled_qty += sell_fill_ledger.fill_qty
+    expected_symbol_side_snapshot.total_fill_notional += (sell_fill_ledger.fill_qty *
+                                                          get_px_in_usd(sell_fill_ledger.fill_px))
     expected_symbol_side_snapshot.avg_fill_px = (
         get_usd_to_local_px_or_notional(expected_symbol_side_snapshot.total_fill_notional) /
         expected_symbol_side_snapshot.total_filled_qty)
-    expected_symbol_side_snapshot.last_update_fill_qty = sell_fill_journal.fill_qty
-    expected_symbol_side_snapshot.last_update_fill_px = sell_fill_journal.fill_px
+    expected_symbol_side_snapshot.last_update_fill_qty = sell_fill_ledger.fill_qty
+    expected_symbol_side_snapshot.last_update_fill_px = sell_fill_ledger.fill_px
 
     symbol_side_snapshot_list = executor_web_client.get_all_symbol_side_snapshot_client()
     # removing id field from received obj list for comparison
@@ -1844,7 +1849,7 @@ def check_fill_receive_for_placed_sell_chore_after_all_buys(
                                          expected_symbol_side_snapshot,
                                          other_leg_expected_symbol_side_snapshot,
                                          expected_plan_limits, expected_plan_brief_obj,
-                                         sell_fill_journal.fill_date_time,
+                                         sell_fill_ledger.fill_date_time,
                                          buy_last_barter_px, sell_last_barter_px, executor_web_client,
                                          hedge_ratio=expected_pair_plan.pair_plan_params.hedge_ratio)
 
@@ -1865,16 +1870,16 @@ def check_fill_receive_for_placed_sell_chore_after_all_buys(
         f"Mismatched: Couldn't find {expected_plan_brief_obj} in any plan_brief in {plan_brief_list}"
 
     # Checking start_status
-    expected_plan_status.total_open_sell_qty -= sell_fill_journal.fill_qty
-    expected_plan_status.total_open_sell_notional -= (sell_fill_journal.fill_qty *
+    expected_plan_status.total_open_sell_qty -= sell_fill_ledger.fill_qty
+    expected_plan_status.total_open_sell_notional -= (sell_fill_ledger.fill_qty *
                                                        get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
     expected_plan_status.avg_open_sell_px = (
         get_usd_to_local_px_or_notional(expected_plan_status.total_open_sell_notional) /
         expected_plan_status.total_open_sell_qty)
     expected_plan_status.total_open_exposure = - expected_plan_status.total_open_sell_notional
-    expected_plan_status.total_fill_sell_qty += sell_fill_journal.fill_qty
-    expected_plan_status.total_fill_sell_notional += (sell_fill_journal.fill_qty *
-                                                       get_px_in_usd(sell_fill_journal.fill_px))
+    expected_plan_status.total_fill_sell_qty += sell_fill_ledger.fill_qty
+    expected_plan_status.total_fill_sell_notional += (sell_fill_ledger.fill_qty *
+                                                       get_px_in_usd(sell_fill_ledger.fill_px))
     expected_plan_status.avg_fill_sell_px = (
         get_usd_to_local_px_or_notional(expected_plan_status.total_fill_sell_notional) /
         expected_plan_status.total_fill_sell_qty)
@@ -1904,22 +1909,22 @@ def check_fill_receive_for_placed_sell_chore_after_all_buys(
 
 
 def check_cxl_receive_for_placed_sell_chore_after_all_buys(
-        symbol: str, sell_cxl_chore_journal: ChoreJournalBaseModel, expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
+        symbol: str, sell_cxl_chore_ledger: ChoreLedgerBaseModel, expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
         expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
         other_leg_expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
         expected_pair_plan: PairPlanBaseModel,
         expected_plan_limits: PlanLimits, expected_plan_status: PlanStatus,
         expected_plan_brief_obj: PlanBriefBaseModel, executor_web_client: StreetBookServiceHttpClient):
-    chore_journal_obj_list = executor_web_client.get_all_chore_journal_client(-100)
-    assert sell_cxl_chore_journal in chore_journal_obj_list, f"Couldn't find {sell_cxl_chore_journal} in list " \
-                                                             f"{chore_journal_obj_list}"
+    chore_ledger_obj_list = executor_web_client.get_all_chore_ledger_client(-100)
+    assert sell_cxl_chore_ledger in chore_ledger_obj_list, f"Couldn't find {sell_cxl_chore_ledger} in list " \
+                                                             f"{chore_ledger_obj_list}"
 
     buy_last_barter_px, sell_last_barter_px = get_both_side_last_barter_px()
 
     # Checking chore_snapshot
     unfilled_qty = expected_chore_snapshot_obj.chore_brief.qty - expected_chore_snapshot_obj.filled_qty
     expected_chore_snapshot_obj.chore_status = ChoreStatusType.OE_DOD
-    expected_chore_snapshot_obj.last_update_date_time = sell_cxl_chore_journal.chore_event_date_time
+    expected_chore_snapshot_obj.last_update_date_time = sell_cxl_chore_ledger.chore_event_date_time
     expected_chore_snapshot_obj.cxled_qty = unfilled_qty
     expected_chore_snapshot_obj.cxled_notional = (unfilled_qty *
                                                   get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
@@ -1938,7 +1943,7 @@ def check_cxl_receive_for_placed_sell_chore_after_all_buys(
                                                                f"{chore_snapshot_list}"
     # Checking symbol_side_snapshot
     expected_symbol_side_snapshot.last_update_date_time = expected_chore_snapshot_obj.last_update_date_time
-    expected_symbol_side_snapshot.last_update_date_time = sell_cxl_chore_journal.chore_event_date_time
+    expected_symbol_side_snapshot.last_update_date_time = sell_cxl_chore_ledger.chore_event_date_time
     expected_symbol_side_snapshot.total_cxled_qty += unfilled_qty
     expected_symbol_side_snapshot.total_cxled_notional += (
             unfilled_qty * get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
@@ -1971,7 +1976,7 @@ def check_cxl_receive_for_placed_sell_chore_after_all_buys(
                                          expected_symbol_side_snapshot,
                                          other_leg_expected_symbol_side_snapshot,
                                          expected_plan_limits, expected_plan_brief_obj,
-                                         sell_cxl_chore_journal.chore_event_date_time,
+                                         sell_cxl_chore_ledger.chore_event_date_time,
                                          buy_last_barter_px, sell_last_barter_px, executor_web_client,
                                          hedge_ratio=expected_pair_plan.pair_plan_params.hedge_ratio)
 
@@ -2047,22 +2052,22 @@ def check_cxl_receive_for_placed_sell_chore_after_all_buys(
 
 
 def check_cxl_receive_for_placed_buy_chore_after_all_sells(
-        symbol: str, buy_cxl_chore_journal: ChoreJournalBaseModel, expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
+        symbol: str, buy_cxl_chore_ledger: ChoreLedgerBaseModel, expected_chore_snapshot_obj: ChoreSnapshotBaseModel,
         expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
         other_leg_expected_symbol_side_snapshot: SymbolSideSnapshotBaseModel,
         expected_pair_plan: PairPlanBaseModel,
         expected_plan_limits: PlanLimits, expected_plan_status: PlanStatus,
         expected_plan_brief_obj: PlanBriefBaseModel, executor_web_client: StreetBookServiceHttpClient):
-    chore_journal_obj_list = executor_web_client.get_all_chore_journal_client(-100)
-    assert buy_cxl_chore_journal in chore_journal_obj_list, f"Couldn't find {buy_cxl_chore_journal} in list " \
-                                                            f"{chore_journal_obj_list}"
+    chore_ledger_obj_list = executor_web_client.get_all_chore_ledger_client(-100)
+    assert buy_cxl_chore_ledger in chore_ledger_obj_list, f"Couldn't find {buy_cxl_chore_ledger} in list " \
+                                                            f"{chore_ledger_obj_list}"
 
     buy_last_barter_px, sell_last_barter_px = get_both_side_last_barter_px()
 
     # Checking chore_snapshot
     unfilled_qty = expected_chore_snapshot_obj.chore_brief.qty - expected_chore_snapshot_obj.filled_qty
     expected_chore_snapshot_obj.chore_status = ChoreStatusType.OE_DOD
-    expected_chore_snapshot_obj.last_update_date_time = buy_cxl_chore_journal.chore_event_date_time
+    expected_chore_snapshot_obj.last_update_date_time = buy_cxl_chore_ledger.chore_event_date_time
     expected_chore_snapshot_obj.cxled_qty = unfilled_qty
     expected_chore_snapshot_obj.cxled_notional = (unfilled_qty *
                                                   get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
@@ -2081,7 +2086,7 @@ def check_cxl_receive_for_placed_buy_chore_after_all_sells(
                                                                f"{chore_snapshot_list}"
     # Checking symbol_side_snapshot
     expected_symbol_side_snapshot.last_update_date_time = expected_chore_snapshot_obj.last_update_date_time
-    expected_symbol_side_snapshot.last_update_date_time = buy_cxl_chore_journal.chore_event_date_time
+    expected_symbol_side_snapshot.last_update_date_time = buy_cxl_chore_ledger.chore_event_date_time
     expected_symbol_side_snapshot.total_cxled_qty += unfilled_qty
     expected_symbol_side_snapshot.total_cxled_notional += (
             unfilled_qty * get_px_in_usd(expected_chore_snapshot_obj.chore_brief.px))
@@ -2114,7 +2119,7 @@ def check_cxl_receive_for_placed_buy_chore_after_all_sells(
                                         expected_symbol_side_snapshot,
                                         other_leg_expected_symbol_side_snapshot,
                                         expected_plan_limits, expected_plan_brief_obj,
-                                        buy_cxl_chore_journal.chore_event_date_time,
+                                        buy_cxl_chore_ledger.chore_event_date_time,
                                         buy_last_barter_px, sell_last_barter_px, executor_web_client,
                                         hedge_ratio=expected_pair_plan.pair_plan_params.hedge_ratio)
 
@@ -2455,7 +2460,7 @@ def move_snoozed_pair_plan_to_ready_n_then_active(
         buy_symbol = stored_pair_plan_basemodel.pair_plan_params.plan_leg2.sec.sec_id
         sell_symbol = stored_pair_plan_basemodel.pair_plan_params.plan_leg1.sec.sec_id
 
-    for _ in range(60):
+    for _ in range(120):
         # checking server_ready_state of executor
         try:
             updated_pair_plan = (
@@ -2466,9 +2471,11 @@ def move_snoozed_pair_plan_to_ready_n_then_active(
         except Exception as e:
             pass
     else:
+        updated_pair_plan = (
+            email_book_service_native_web_client.get_pair_plan_client(stored_pair_plan_basemodel.id))
         assert False, (f"server_ready_state must be 1, "
                        f"buy_symbol: {buy_symbol}, sell_symbol: {sell_symbol}, "
-                       f"{stored_pair_plan_basemodel=}")
+                       f"{updated_pair_plan=}")
 
     assert updated_pair_plan.port is not None, (
         "Once pair_plan is partially running it also must contain executor port, updated object has "
@@ -2962,7 +2969,7 @@ def clean_executors_and_today_activated_symbol_side_lock_file():
         # removing today_activated_symbol_side_lock_file
         admin_control_obj: AdminControlBaseModel = (
             AdminControlBaseModel.from_kwargs(command_type=CommandType.CLEAR_STRAT,
-                                              datetime=DateTime.utcnow()))
+                                              date_time=DateTime.utcnow()))
         email_book_service_native_web_client.create_admin_control_client(admin_control_obj)
         time.sleep(1)
         email_book_service_native_web_client.delete_pair_plan_client(pair_plan.id)
@@ -3001,7 +3008,7 @@ def create_n_verify_system_control(system_control: SystemControlBaseModel):
     created_system_control = (
         email_book_service_native_web_client.create_system_control_client(system_control))
     assert created_system_control == system_control, \
-        f"Mismatch contact_status: expected {system_control}, received {created_system_control}"
+        f"Mismatch system_control: expected {system_control}, received {created_system_control}"
 
 
 def verify_contact_status(expected_contact_status: ContactStatusBaseModel):
@@ -3010,7 +3017,7 @@ def verify_contact_status(expected_contact_status: ContactStatusBaseModel):
                                                                f"{contact_status_list}"
 
 
-def get_latest_chore_journal_with_event_and_symbol(expected_chore_event, expected_symbol,
+def get_latest_chore_ledger_with_event_and_symbol(expected_chore_event, expected_symbol,
                                                    executor_web_client: StreetBookServiceHttpClient,
                                                    expect_no_chore: bool | None = None,
                                                    last_chore_id: str | None = None,
@@ -3018,48 +3025,48 @@ def get_latest_chore_journal_with_event_and_symbol(expected_chore_event, expecte
                                                    loop_wait_secs: int | float | None = None,
                                                    assert_code: int = 0):
     start_time = DateTime.utcnow()
-    placed_chore_journal = None
+    placed_chore_ledger = None
     if max_loop_count is None:
         max_loop_count = 20
     if loop_wait_secs is None:
         loop_wait_secs = 2
 
     for loop_count in range(max_loop_count):
-        stored_chore_journal_list = executor_web_client.get_all_chore_journal_client(-100)
-        for stored_chore_journal in stored_chore_journal_list:
-            if stored_chore_journal.chore_event == expected_chore_event and \
-                    stored_chore_journal.chore.security.sec_id == expected_symbol:
+        stored_chore_ledger_list = executor_web_client.get_all_chore_ledger_client(-100)
+        for stored_chore_ledger in stored_chore_ledger_list:
+            if stored_chore_ledger.chore_event == expected_chore_event and \
+                    stored_chore_ledger.chore.security.sec_id == expected_symbol:
                 if last_chore_id is None:
-                    placed_chore_journal = stored_chore_journal
+                    placed_chore_ledger = stored_chore_ledger
                 else:
-                    if last_chore_id != stored_chore_journal.chore.chore_id:
-                        placed_chore_journal = stored_chore_journal
+                    if last_chore_id != stored_chore_ledger.chore.chore_id:
+                        placed_chore_ledger = stored_chore_ledger
                         # since get_all return chores in descendant chore of date_time, first match is latest
                 break
-        if placed_chore_journal is not None:
+        if placed_chore_ledger is not None:
             break
         time.sleep(loop_wait_secs)
 
     time_delta = DateTime.utcnow() - start_time
-    print(f"Found placed_chore_journal - {placed_chore_journal} in {time_delta.total_seconds()}, "
+    print(f"Found placed_chore_ledger - {placed_chore_ledger} in {time_delta.total_seconds()}, "
           f"for symbol {expected_symbol}, chore_event {expected_chore_event}, "
           f"expect_no_chore {expect_no_chore} and last_chore_id {last_chore_id}")
 
     if expect_no_chore:
-        assert placed_chore_journal is None, f"Expected no new chore for symbol {expected_symbol}, " \
-                                             f"received {placed_chore_journal} - assert_code: {assert_code}"
-        placed_chore_journal = ChoreJournalBaseModel.from_kwargs(
+        assert placed_chore_ledger is None, f"Expected no new chore for symbol {expected_symbol}, " \
+                                             f"received {placed_chore_ledger} - assert_code: {assert_code}"
+        placed_chore_ledger = ChoreLedgerBaseModel.from_kwargs(
             chore=ChoreBriefBaseModel.from_kwargs(chore_id=last_chore_id))
     else:
-        assert placed_chore_journal is not None, \
-            f"Can't find any chore_journal with symbol {expected_symbol} chore_event {expected_chore_event}, " \
+        assert placed_chore_ledger is not None, \
+            f"Can't find any chore_ledger with symbol {expected_symbol} chore_event {expected_chore_event}, " \
             f"expect_no_chore {expect_no_chore} and last_chore_id {last_chore_id} - assert_code: {assert_code}"
 
-    return placed_chore_journal
+    return placed_chore_ledger
 
 
-# @@@ copy of get_latest_chore_journal_with_event_and_symbol - contains code repetition
-def get_latest_chore_journal_with_events_and_symbol(expected_chore_event_list, expected_symbol,
+# @@@ copy of get_latest_chore_ledger_with_event_and_symbol - contains code repetition
+def get_latest_chore_ledger_with_events_and_symbol(expected_chore_event_list, expected_symbol,
                                                     executor_web_client: StreetBookServiceHttpClient,
                                                     expect_no_chore: bool | None = None,
                                                     last_chore_id: str | None = None,
@@ -3067,77 +3074,77 @@ def get_latest_chore_journal_with_events_and_symbol(expected_chore_event_list, e
                                                     loop_wait_secs: int | None = None,
                                                     assert_code: int = 0):
     start_time = DateTime.utcnow()
-    placed_chore_journal = None
+    placed_chore_ledger = None
     if max_loop_count is None:
         max_loop_count = 20
     if loop_wait_secs is None:
         loop_wait_secs = 2
 
     for loop_count in range(max_loop_count):
-        stored_chore_journal_list = executor_web_client.get_all_chore_journal_client(-100)
-        for stored_chore_journal in stored_chore_journal_list:
-            if stored_chore_journal.chore_event in expected_chore_event_list and \
-                    stored_chore_journal.chore.security.sec_id == expected_symbol:
+        stored_chore_ledger_list = executor_web_client.get_all_chore_ledger_client(-100)
+        for stored_chore_ledger in stored_chore_ledger_list:
+            if stored_chore_ledger.chore_event in expected_chore_event_list and \
+                    stored_chore_ledger.chore.security.sec_id == expected_symbol:
                 if last_chore_id is None:
-                    placed_chore_journal = stored_chore_journal
+                    placed_chore_ledger = stored_chore_ledger
                 else:
-                    if last_chore_id != stored_chore_journal.chore.chore_id:
-                        placed_chore_journal = stored_chore_journal
+                    if last_chore_id != stored_chore_ledger.chore.chore_id:
+                        placed_chore_ledger = stored_chore_ledger
                         # since get_all return chores in descendant chore of date_time, first match is latest
                 break
-        if placed_chore_journal is not None:
+        if placed_chore_ledger is not None:
             break
         time.sleep(loop_wait_secs)
 
     time_delta = DateTime.utcnow() - start_time
-    print(f"Found placed_chore_journal - {placed_chore_journal} in {time_delta.total_seconds()}, "
+    print(f"Found placed_chore_ledger - {placed_chore_ledger} in {time_delta.total_seconds()}, "
           f"for symbol {expected_symbol}, chore_events {expected_chore_event_list}, "
           f"expect_no_chore {expect_no_chore} and last_chore_id {last_chore_id}")
 
     if expect_no_chore:
-        assert placed_chore_journal is None, f"Expected no new chore for symbol {expected_symbol}, " \
-                                             f"received {placed_chore_journal} - assert_code: {assert_code}"
-        placed_chore_journal = ChoreJournalBaseModel.from_kwargs(
+        assert placed_chore_ledger is None, f"Expected no new chore for symbol {expected_symbol}, " \
+                                             f"received {placed_chore_ledger} - assert_code: {assert_code}"
+        placed_chore_ledger = ChoreLedgerBaseModel.from_kwargs(
             chore=ChoreBriefBaseModel.from_kwargs(chore_id=last_chore_id))
     else:
-        assert placed_chore_journal is not None, \
-            f"Can't find any chore_journal with symbol {expected_symbol} chore_events {expected_chore_event_list}, " \
+        assert placed_chore_ledger is not None, \
+            f"Can't find any chore_ledger with symbol {expected_symbol} chore_events {expected_chore_event_list}, " \
             f"expect_no_chore {expect_no_chore} and last_chore_id {last_chore_id} - assert_code: {assert_code}"
 
-    return placed_chore_journal
+    return placed_chore_ledger
 
 
-def get_latest_fill_journal_from_chore_id(expected_chore_id: str,
+def get_latest_fill_ledger_from_chore_id(expected_chore_id: str,
                                           executor_web_client: StreetBookServiceHttpClient):
-    found_fill_journal = None
+    found_fill_ledger = None
 
-    stored_fill_journals = executor_web_client.get_all_fills_journal_client(-100)
-    for stored_fill_journal in stored_fill_journals:
-        if stored_fill_journal.chore_id == expected_chore_id:
-            # since fills_journal is having option to sort in descending, first occurrence will be latest
-            found_fill_journal = stored_fill_journal
+    stored_fill_ledgers = executor_web_client.get_all_deals_ledger_client(-100)
+    for stored_fill_ledger in stored_fill_ledgers:
+        if stored_fill_ledger.chore_id == expected_chore_id:
+            # since deals_ledger is having option to sort in descending, first occurrence will be latest
+            found_fill_ledger = stored_fill_ledger
             break
-    assert found_fill_journal is not None, f"Can't find any fill_journal with chore_id {expected_chore_id}"
-    return found_fill_journal
+    assert found_fill_ledger is not None, f"Can't find any fill_ledger with chore_id {expected_chore_id}"
+    return found_fill_ledger
 
 
-def get_fill_journals_for_chore_id(expected_chore_id: str,
+def get_fill_ledgers_for_chore_id(expected_chore_id: str,
                                    executor_web_client: StreetBookServiceHttpClient):
-    found_fill_journals = []
+    found_fill_ledgers = []
 
-    stored_fill_journals = executor_web_client.get_all_fills_journal_client(-100)
-    for stored_fill_journal in stored_fill_journals:
-        if stored_fill_journal.chore_id == expected_chore_id:
-            found_fill_journals.append(stored_fill_journal)
-    assert len(found_fill_journals) != 0, f"Can't find any fill_journal with chore_id {expected_chore_id}"
-    return found_fill_journals
+    stored_fill_ledgers = executor_web_client.get_all_deals_ledger_client(-100)
+    for stored_fill_ledger in stored_fill_ledgers:
+        if stored_fill_ledger.chore_id == expected_chore_id:
+            found_fill_ledgers.append(stored_fill_ledger)
+    assert len(found_fill_ledgers) != 0, f"Can't find any fill_ledger with chore_id {expected_chore_id}"
+    return found_fill_ledgers
 
 
 def place_new_chore(sec_id: str, side: Side, px: float, qty: int,
                     executor_web_client: StreetBookServiceHttpClient, inst_type: InstrumentType):
     security = SecurityBaseModel.from_kwargs(sec_id=sec_id, sec_id_source=SecurityIdSource.TICKER, inst_type=inst_type)
     usd_px = get_px_in_usd(px)
-    new_chore_obj = NewChoreBaseModel.from_kwargs(security=security, side=side, px=px, qty=qty, usd_px=usd_px,
+    new_chore_obj = NewChoreBaseModel.from_kwargs(security=security, ticker=sec_id, side=side, px=px, qty=qty, usd_px=usd_px,
                                                   pending_cxl=True)
     created_new_chore_obj = executor_web_client.create_new_chore_client(new_chore_obj)
 
@@ -3435,9 +3442,9 @@ def get_buy_bid_n_ask_sell_market_depth(
 
 
 def handle_test_buy_sell_chore(buy_symbol: str, sell_symbol: str, total_loop_count: int,
-                               refresh_sec: int, buy_chore_: ChoreJournalBaseModel,
-                               sell_chore_: ChoreJournalBaseModel,
-                               buy_fill_journal_: FillsJournalBaseModel, sell_fill_journal_: FillsJournalBaseModel,
+                               refresh_sec: int, buy_chore_: ChoreLedgerBaseModel,
+                               sell_chore_: ChoreLedgerBaseModel,
+                               buy_fill_ledger_: DealsLedgerBaseModel, sell_fill_ledger_: DealsLedgerBaseModel,
                                expected_buy_chore_snapshot_: ChoreSnapshotBaseModel,
                                expected_sell_chore_snapshot_: ChoreSnapshotBaseModel,
                                expected_symbol_side_snapshot_: List[SymbolSideSnapshotBaseModel],
@@ -3513,17 +3520,17 @@ def handle_test_buy_sell_chore(buy_symbol: str, sell_symbol: str, total_loop_cou
             print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Created new_chore obj")
             time.sleep(2)
 
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol, executor_web_client,
                                                                               last_chore_id=chore_id)
-        chore_id = placed_chore_journal.chore.chore_id
-        create_buy_chore_date_time: DateTime = placed_chore_journal.chore_event_date_time
-        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Received chore_journal with {chore_id}")
+        chore_id = placed_chore_ledger.chore.chore_id
+        create_buy_chore_date_time: DateTime = placed_chore_ledger.chore_event_date_time
+        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Received chore_ledger with {chore_id}")
         time.sleep(2)
 
         # Checking placed chore computations
         check_placed_buy_chore_computes_before_all_sells(loop_count, chore_id, buy_symbol,
-                                                         placed_chore_journal, expected_buy_chore_snapshot,
+                                                         placed_chore_ledger, expected_buy_chore_snapshot,
                                                          expected_buy_symbol_side_snapshot,
                                                          expected_sell_symbol_side_snapshot,
                                                          active_pair_plan,
@@ -3532,33 +3539,33 @@ def handle_test_buy_sell_chore(buy_symbol: str, sell_symbol: str, total_loop_cou
         print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed chore of chore_id {chore_id}")
 
         executor_web_client.barter_simulator_process_chore_ack_query_client(
-            chore_id, placed_chore_journal.chore.px,
-            placed_chore_journal.chore.qty,
-            placed_chore_journal.chore.side,
-            placed_chore_journal.chore.security.sec_id,
-            placed_chore_journal.chore.underlying_account
+            chore_id, placed_chore_ledger.chore.px,
+            placed_chore_ledger.chore.qty,
+            placed_chore_ledger.chore.side,
+            placed_chore_ledger.chore.security.sec_id,
+            placed_chore_ledger.chore.underlying_account
         )
 
-        placed_chore_journal_obj_ack_response = \
-            get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, buy_symbol, executor_web_client)
+        placed_chore_ledger_obj_ack_response = \
+            get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, buy_symbol, executor_web_client)
 
         # Checking Ack response on placed chore
-        placed_buy_chore_ack_receive(placed_chore_journal_obj_ack_response, expected_buy_chore_snapshot,
+        placed_buy_chore_ack_receive(placed_chore_ledger_obj_ack_response, expected_buy_chore_snapshot,
                                      executor_web_client)
         print(
             f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed chore ACK of chore_id {chore_id}")
 
-        buy_fill_journal_obj = copy.deepcopy(buy_fill_journal_)
-        buy_fill_journal_obj.fill_qty = random.randint(50, 55)
-        buy_fill_journal_obj.fill_px = random.randint(105, 110)
+        buy_fill_ledger_obj = copy.deepcopy(buy_fill_ledger_)
+        buy_fill_ledger_obj.fill_qty = random.randint(50, 55)
+        buy_fill_ledger_obj.fill_px = random.randint(105, 110)
         executor_web_client.barter_simulator_process_fill_query_client(
-            chore_id, buy_fill_journal_obj.fill_px, buy_fill_journal_obj.fill_qty,
-            Side.BUY, buy_symbol, buy_fill_journal_obj.underlying_account)
+            chore_id, buy_fill_ledger_obj.fill_px, buy_fill_ledger_obj.fill_qty,
+            Side.BUY, buy_symbol, buy_fill_ledger_obj.underlying_account)
 
-        placed_fill_journal_obj = get_latest_fill_journal_from_chore_id(chore_id, executor_web_client)
+        placed_fill_ledger_obj = get_latest_fill_ledger_from_chore_id(chore_id, executor_web_client)
 
         # Checking Fill receive on placed chore
-        check_fill_receive_for_placed_buy_chore_before_sells(buy_symbol, placed_fill_journal_obj,
+        check_fill_receive_for_placed_buy_chore_before_sells(buy_symbol, placed_fill_ledger_obj,
                                                              expected_buy_chore_snapshot,
                                                              expected_buy_symbol_side_snapshot,
                                                              expected_sell_symbol_side_snapshot,
@@ -3571,13 +3578,13 @@ def handle_test_buy_sell_chore(buy_symbol: str, sell_symbol: str, total_loop_cou
         # Sleeping to let the chore get cxlled
         time.sleep(residual_test_wait)
 
-        cxl_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+        cxl_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                            buy_symbol, executor_web_client,
                                                                            last_chore_id=cxl_chore_id)
-        cxl_chore_id = cxl_chore_journal.chore.chore_id
+        cxl_chore_id = cxl_chore_ledger.chore.chore_id
 
         # Checking CXL_ACK receive on placed chore by cxl_req from residual removal
-        check_cxl_receive_for_placed_buy_chore_before_sells(buy_symbol, cxl_chore_journal,
+        check_cxl_receive_for_placed_buy_chore_before_sells(buy_symbol, cxl_chore_ledger,
                                                             expected_buy_chore_snapshot,
                                                             expected_buy_symbol_side_snapshot,
                                                             expected_sell_symbol_side_snapshot,
@@ -3623,17 +3630,17 @@ def handle_test_buy_sell_chore(buy_symbol: str, sell_symbol: str, total_loop_cou
             print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Created new_chore obj")
             time.sleep(2)
 
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               sell_symbol, executor_web_client,
                                                                               last_chore_id=chore_id)
-        create_sell_chore_date_time: DateTime = placed_chore_journal.chore_event_date_time
-        chore_id = placed_chore_journal.chore.chore_id
-        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Received chore_journal with {chore_id}")
+        create_sell_chore_date_time: DateTime = placed_chore_ledger.chore_event_date_time
+        chore_id = placed_chore_ledger.chore.chore_id
+        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Received chore_ledger with {chore_id}")
         time.sleep(2)
 
         # Checking placed chore computations
         check_placed_sell_chore_computes_after_all_buys(loop_count, chore_id,
-                                                        sell_symbol, placed_chore_journal, expected_sell_chore_snapshot,
+                                                        sell_symbol, placed_chore_ledger, expected_sell_chore_snapshot,
                                                         expected_sell_symbol_side_snapshot,
                                                         expected_buy_symbol_side_snapshot,
                                                         active_pair_plan,
@@ -3642,35 +3649,35 @@ def handle_test_buy_sell_chore(buy_symbol: str, sell_symbol: str, total_loop_cou
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Checked sell placed chore of chore_id {chore_id}")
 
         executor_web_client.barter_simulator_process_chore_ack_query_client(
-            chore_id, placed_chore_journal.chore.px,
-            placed_chore_journal.chore.qty,
-            placed_chore_journal.chore.side,
-            placed_chore_journal.chore.security.sec_id,
-            placed_chore_journal.chore.underlying_account
+            chore_id, placed_chore_ledger.chore.px,
+            placed_chore_ledger.chore.qty,
+            placed_chore_ledger.chore.side,
+            placed_chore_ledger.chore.security.sec_id,
+            placed_chore_ledger.chore.underlying_account
         )
 
-        placed_chore_journal_obj_ack_response = \
-            get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, sell_symbol, executor_web_client)
+        placed_chore_ledger_obj_ack_response = \
+            get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, sell_symbol, executor_web_client)
 
         # Checking Ack response on placed chore
-        placed_sell_chore_ack_receive(placed_chore_journal_obj_ack_response,
+        placed_sell_chore_ack_receive(placed_chore_ledger_obj_ack_response,
                                       expected_sell_chore_snapshot, executor_web_client)
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, "
               f"Checked sell placed chore ACK of chore_id {chore_id}")
 
-        sell_fill_journal_obj = copy.deepcopy(sell_fill_journal_)
-        sell_fill_journal_obj.fill_qty = random.randint(48, 53)
-        sell_fill_journal_obj.fill_px = random.randint(105, 110)
+        sell_fill_ledger_obj = copy.deepcopy(sell_fill_ledger_)
+        sell_fill_ledger_obj.fill_qty = random.randint(48, 53)
+        sell_fill_ledger_obj.fill_px = random.randint(105, 110)
         executor_web_client.barter_simulator_process_fill_query_client(
-            chore_id, sell_fill_journal_obj.fill_px, sell_fill_journal_obj.fill_qty,
-            Side.SELL, sell_symbol, sell_fill_journal_obj.underlying_account)
+            chore_id, sell_fill_ledger_obj.fill_px, sell_fill_ledger_obj.fill_qty,
+            Side.SELL, sell_symbol, sell_fill_ledger_obj.underlying_account)
 
-        placed_fill_journal_obj = get_latest_fill_journal_from_chore_id(chore_id, executor_web_client)
+        placed_fill_ledger_obj = get_latest_fill_ledger_from_chore_id(chore_id, executor_web_client)
 
         # Checking Fill receive on placed chore
         check_fill_receive_for_placed_sell_chore_after_all_buys(loop_count, chore_id,
                                                                 sell_symbol,
-                                                                placed_fill_journal_obj, expected_sell_chore_snapshot,
+                                                                placed_fill_ledger_obj, expected_sell_chore_snapshot,
                                                                 expected_sell_symbol_side_snapshot,
                                                                 expected_buy_symbol_side_snapshot,
                                                                 active_pair_plan, expected_plan_limits_,
@@ -3681,14 +3688,14 @@ def handle_test_buy_sell_chore(buy_symbol: str, sell_symbol: str, total_loop_cou
         # Sleeping to let the chore get cxlled
         time.sleep(residual_test_wait)
 
-        cxl_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+        cxl_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                            sell_symbol, executor_web_client,
                                                                            last_chore_id=cxl_chore_id)
-        cxl_chore_id = cxl_chore_journal.chore.chore_id
+        cxl_chore_id = cxl_chore_ledger.chore.chore_id
 
         # Checking CXL_ACK receive on cxl req by residual handler
         check_cxl_receive_for_placed_sell_chore_after_all_buys(sell_symbol,
-                                                               cxl_chore_journal, expected_sell_chore_snapshot,
+                                                               cxl_chore_ledger, expected_sell_chore_snapshot,
                                                                expected_sell_symbol_side_snapshot,
                                                                expected_buy_symbol_side_snapshot,
                                                                active_pair_plan, expected_plan_limits_,
@@ -3701,9 +3708,9 @@ def handle_test_buy_sell_chore(buy_symbol: str, sell_symbol: str, total_loop_cou
 
 
 def handle_test_sell_buy_chore(leg1_symbol: str, leg2_symbol: str, total_loop_count: int,
-                               refresh_sec: int, buy_chore_: ChoreJournalBaseModel,
-                               sell_chore_: ChoreJournalBaseModel,
-                               buy_fill_journal_: FillsJournalBaseModel, sell_fill_journal_: FillsJournalBaseModel,
+                               refresh_sec: int, buy_chore_: ChoreLedgerBaseModel,
+                               sell_chore_: ChoreLedgerBaseModel,
+                               buy_fill_ledger_: DealsLedgerBaseModel, sell_fill_ledger_: DealsLedgerBaseModel,
                                expected_buy_chore_snapshot_: ChoreSnapshotBaseModel,
                                expected_sell_chore_snapshot_: ChoreSnapshotBaseModel,
                                expected_symbol_side_snapshot_: List[SymbolSideSnapshotBaseModel],
@@ -3776,17 +3783,17 @@ def handle_test_sell_buy_chore(leg1_symbol: str, leg2_symbol: str, total_loop_co
             print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Created new_chore obj")
             time.sleep(2)
 
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               sell_symbol, executor_web_client,
                                                                               last_chore_id=chore_id)
-        create_sell_chore_date_time: DateTime = placed_chore_journal.chore_event_date_time
-        chore_id = placed_chore_journal.chore.chore_id
-        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Received chore_journal with {chore_id}")
+        create_sell_chore_date_time: DateTime = placed_chore_ledger.chore_event_date_time
+        chore_id = placed_chore_ledger.chore.chore_id
+        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Received chore_ledger with {chore_id}")
         time.sleep(2)
 
         # Checking placed chore computations
         check_placed_sell_chore_computes_before_buys(loop_count, chore_id,
-                                                     sell_symbol, placed_chore_journal, expected_sell_chore_snapshot,
+                                                     sell_symbol, placed_chore_ledger, expected_sell_chore_snapshot,
                                                      expected_sell_symbol_side_snapshot,
                                                      expected_buy_symbol_side_snapshot,
                                                      active_pair_plan,
@@ -3795,30 +3802,30 @@ def handle_test_sell_buy_chore(leg1_symbol: str, leg2_symbol: str, total_loop_co
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Checked sell placed chore of chore_id {chore_id}")
 
         executor_web_client.barter_simulator_process_chore_ack_query_client(
-            chore_id, placed_chore_journal.chore.px, placed_chore_journal.chore.qty, placed_chore_journal.chore.side,
-            placed_chore_journal.chore.security.sec_id, placed_chore_journal.chore.underlying_account)
+            chore_id, placed_chore_ledger.chore.px, placed_chore_ledger.chore.qty, placed_chore_ledger.chore.side,
+            placed_chore_ledger.chore.security.sec_id, placed_chore_ledger.chore.underlying_account)
 
-        placed_chore_journal_obj_ack_response = \
-            get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, sell_symbol, executor_web_client)
+        placed_chore_ledger_obj_ack_response = \
+            get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, sell_symbol, executor_web_client)
 
         # Checking Ack response on placed chore
-        placed_sell_chore_ack_receive(placed_chore_journal_obj_ack_response,
+        placed_sell_chore_ack_receive(placed_chore_ledger_obj_ack_response,
                                       expected_sell_chore_snapshot, executor_web_client)
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, "
               f"Checked sell placed chore ACK of chore_id {chore_id}")
 
-        sell_fill_journal_obj = copy.deepcopy(sell_fill_journal_)
-        sell_fill_journal_obj.fill_qty = random.randint(48, 53)
-        sell_fill_journal_obj.fill_px = random.randint(100, 110)
+        sell_fill_ledger_obj = copy.deepcopy(sell_fill_ledger_)
+        sell_fill_ledger_obj.fill_qty = random.randint(48, 53)
+        sell_fill_ledger_obj.fill_px = random.randint(100, 110)
         executor_web_client.barter_simulator_process_fill_query_client(
-            chore_id, sell_fill_journal_obj.fill_px, sell_fill_journal_obj.fill_qty,
-            Side.SELL, sell_symbol, sell_fill_journal_obj.underlying_account)
+            chore_id, sell_fill_ledger_obj.fill_px, sell_fill_ledger_obj.fill_qty,
+            Side.SELL, sell_symbol, sell_fill_ledger_obj.underlying_account)
 
-        placed_fill_journal_obj = get_latest_fill_journal_from_chore_id(chore_id, executor_web_client)
+        placed_fill_ledger_obj = get_latest_fill_ledger_from_chore_id(chore_id, executor_web_client)
 
         # Checking Fill receive on placed chore
         check_fill_receive_for_placed_sell_chore_before_buys(
-            sell_symbol, placed_fill_journal_obj,
+            sell_symbol, placed_fill_ledger_obj,
             expected_sell_chore_snapshot, expected_sell_symbol_side_snapshot,
             expected_buy_symbol_side_snapshot, active_pair_plan,
             expected_plan_limits_, expected_plan_status, expected_plan_brief_obj, executor_web_client)
@@ -3827,13 +3834,13 @@ def handle_test_sell_buy_chore(leg1_symbol: str, leg2_symbol: str, total_loop_co
         # Sleeping to let the chore get cxlled
         time.sleep(residual_test_wait)
 
-        cxl_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+        cxl_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                            sell_symbol, executor_web_client,
                                                                            last_chore_id=cxl_chore_id)
-        cxl_chore_id = cxl_chore_journal.chore.chore_id
+        cxl_chore_id = cxl_chore_ledger.chore.chore_id
 
         # Checking CXL_ACK receive on placed chore by cxl_req from residual removal
-        check_cxl_receive_for_placed_sell_chore_before_buy(sell_symbol, cxl_chore_journal,
+        check_cxl_receive_for_placed_sell_chore_before_buy(sell_symbol, cxl_chore_ledger,
                                                            expected_sell_chore_snapshot,
                                                            expected_sell_symbol_side_snapshot,
                                                            expected_buy_symbol_side_snapshot,
@@ -3881,17 +3888,17 @@ def handle_test_sell_buy_chore(leg1_symbol: str, leg2_symbol: str, total_loop_co
             print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Created new_chore obj")
             time.sleep(2)
 
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol, executor_web_client,
                                                                               last_chore_id=chore_id)
-        chore_id = placed_chore_journal.chore.chore_id
-        create_buy_chore_date_time: DateTime = placed_chore_journal.chore_event_date_time
-        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Received chore_journal with {chore_id}")
+        chore_id = placed_chore_ledger.chore.chore_id
+        create_buy_chore_date_time: DateTime = placed_chore_ledger.chore_event_date_time
+        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Received chore_ledger with {chore_id}")
         time.sleep(2)
 
         # Checking placed chore computations
         check_placed_buy_chore_computes_after_sells(loop_count, chore_id, buy_symbol,
-                                                    placed_chore_journal, expected_buy_chore_snapshot,
+                                                    placed_chore_ledger, expected_buy_chore_snapshot,
                                                     expected_buy_symbol_side_snapshot,
                                                     expected_sell_symbol_side_snapshot, active_pair_plan,
                                                     expected_plan_limits_, expected_plan_status,
@@ -3899,30 +3906,30 @@ def handle_test_sell_buy_chore(leg1_symbol: str, leg2_symbol: str, total_loop_co
         print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed chore of chore_id {chore_id}")
 
         executor_web_client.barter_simulator_process_chore_ack_query_client(
-            chore_id, placed_chore_journal.chore.px, placed_chore_journal.chore.qty, placed_chore_journal.chore.side,
-            placed_chore_journal.chore.security.sec_id, placed_chore_journal.chore.underlying_account)
+            chore_id, placed_chore_ledger.chore.px, placed_chore_ledger.chore.qty, placed_chore_ledger.chore.side,
+            placed_chore_ledger.chore.security.sec_id, placed_chore_ledger.chore.underlying_account)
 
-        placed_chore_journal_obj_ack_response = \
-            get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, buy_symbol, executor_web_client)
+        placed_chore_ledger_obj_ack_response = \
+            get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, buy_symbol, executor_web_client)
 
         # Checking Ack response on placed chore
-        placed_buy_chore_ack_receive(placed_chore_journal_obj_ack_response, expected_buy_chore_snapshot,
+        placed_buy_chore_ack_receive(placed_chore_ledger_obj_ack_response, expected_buy_chore_snapshot,
                                      executor_web_client)
         print(
             f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed chore ACK of chore_id {chore_id}")
 
-        buy_fill_journal_obj = copy.deepcopy(buy_fill_journal_)
-        buy_fill_journal_obj.fill_qty = random.randint(50, 55)
-        buy_fill_journal_obj.fill_px = random.randint(95, 100)
+        buy_fill_ledger_obj = copy.deepcopy(buy_fill_ledger_)
+        buy_fill_ledger_obj.fill_qty = random.randint(50, 55)
+        buy_fill_ledger_obj.fill_px = random.randint(95, 100)
         executor_web_client.barter_simulator_process_fill_query_client(
-            chore_id, buy_fill_journal_obj.fill_px, buy_fill_journal_obj.fill_qty,
-            Side.BUY, buy_symbol, buy_fill_journal_obj.underlying_account)
+            chore_id, buy_fill_ledger_obj.fill_px, buy_fill_ledger_obj.fill_qty,
+            Side.BUY, buy_symbol, buy_fill_ledger_obj.underlying_account)
 
-        placed_fill_journal_obj = get_latest_fill_journal_from_chore_id(chore_id, executor_web_client)
+        placed_fill_ledger_obj = get_latest_fill_ledger_from_chore_id(chore_id, executor_web_client)
 
         # Checking Fill receive on placed chore
         check_fill_receive_for_placed_buy_chore_after_all_sells(loop_count, chore_id, buy_symbol,
-                                                                placed_fill_journal_obj,
+                                                                placed_fill_ledger_obj,
                                                                 expected_buy_chore_snapshot,
                                                                 expected_buy_symbol_side_snapshot,
                                                                 expected_sell_symbol_side_snapshot,
@@ -3935,14 +3942,14 @@ def handle_test_sell_buy_chore(leg1_symbol: str, leg2_symbol: str, total_loop_co
         # Sleeping to let the chore get cxlled
         time.sleep(residual_test_wait)
 
-        cxl_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+        cxl_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                            buy_symbol, executor_web_client,
                                                                            last_chore_id=cxl_chore_id)
-        cxl_chore_id = cxl_chore_journal.chore.chore_id
+        cxl_chore_id = cxl_chore_ledger.chore.chore_id
 
         # Checking CXL_ACK receive on cxl req by residual handler
         check_cxl_receive_for_placed_buy_chore_after_all_sells(buy_symbol,
-                                                               cxl_chore_journal, expected_buy_chore_snapshot,
+                                                               cxl_chore_ledger, expected_buy_chore_snapshot,
                                                                expected_buy_symbol_side_snapshot,
                                                                expected_sell_symbol_side_snapshot,
                                                                active_pair_plan, expected_plan_limits_,
@@ -3987,16 +3994,16 @@ def create_fx_symbol_overview():
 def verify_rej_chores(check_ack_to_reject_chores: bool, last_chore_id: int | None,
                       check_chore_event: ChoreEventType, symbol: str,
                       executor_web_client: StreetBookServiceHttpClient) -> str:
-    # internally checks chore_journal is not None else raises assert exception internally
-    latest_chore_journal = get_latest_chore_journal_with_event_and_symbol(check_chore_event, symbol,
+    # internally checks chore_ledger is not None else raises assert exception internally
+    latest_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(check_chore_event, symbol,
                                                                           executor_web_client,
                                                                           last_chore_id=last_chore_id)
-    last_chore_id = latest_chore_journal.chore.chore_id
+    last_chore_id = latest_chore_ledger.chore.chore_id
 
     if check_ack_to_reject_chores:
         if check_chore_event not in [ChoreEventType.OE_INT_REJ, ChoreEventType.OE_BRK_REJ, ChoreEventType.OE_EXH_REJ]:
-            # internally checks fills_journal is not None else raises assert exception
-            latest_fill_journal = get_latest_fill_journal_from_chore_id(latest_chore_journal.chore.chore_id,
+            # internally checks deals_ledger is not None else raises assert exception
+            latest_fill_ledger = get_latest_fill_ledger_from_chore_id(latest_chore_ledger.chore.chore_id,
                                                                         executor_web_client)
 
     chore_snapshot = get_chore_snapshot_from_chore_id(last_chore_id,
@@ -4018,7 +4025,7 @@ def handle_rej_chore_test(buy_symbol, sell_symbol, created_pair_plan, expected_p
     bid_buy_top_market_depth, ask_sell_top_market_depth = (
         get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, created_pair_plan))
 
-    # buy fills check
+    # buy deals check
     continues_chore_count, continues_special_chore_count = get_continuous_chore_configs(buy_symbol, config_dict)
     buy_chore_count = 0
     buy_special_chore_count = 0
@@ -4058,7 +4065,7 @@ def handle_rej_chore_test(buy_symbol, sell_symbol, created_pair_plan, expected_p
     if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
         time.sleep(residual_wait_secs)  # to start sell after buy is completely done
 
-    # sell fills check
+    # sell deals check
     continues_chore_count, continues_special_chore_count = get_continuous_chore_configs(sell_symbol, config_dict)
     last_id = None
     sell_rej_last_id = None
@@ -4102,31 +4109,31 @@ def verify_cxl_rej(last_cxl_chore_id: str | None, last_cxl_rej_chore_id: str | N
                    executor_web_client: StreetBookServiceHttpClient,
                    expected_reverted_chore_status: ChoreStatusType) -> Tuple[str, str]:
     if check_chore_event == "REJ":
-        # internally checks chore_journal is not None else raises assert exception internally
-        latest_cxl_rej_chore_journal = \
-            get_latest_chore_journal_with_events_and_symbol([ChoreEventType.OE_CXL_INT_REJ,
+        # internally checks chore_ledger is not None else raises assert exception internally
+        latest_cxl_rej_chore_ledger = \
+            get_latest_chore_ledger_with_events_and_symbol([ChoreEventType.OE_CXL_INT_REJ,
                                                              ChoreEventType.OE_CXL_BRK_REJ,
                                                              ChoreEventType.OE_CXL_EXH_REJ], symbol,
                                                             executor_web_client,
                                                             last_chore_id=last_cxl_rej_chore_id)
-        last_cxl_rej_chore_id = latest_cxl_rej_chore_journal.chore.chore_id
+        last_cxl_rej_chore_id = latest_cxl_rej_chore_ledger.chore.chore_id
 
-        chore_snapshot = get_chore_snapshot_from_chore_id(latest_cxl_rej_chore_journal.chore.chore_id,
+        chore_snapshot = get_chore_snapshot_from_chore_id(latest_cxl_rej_chore_ledger.chore.chore_id,
                                                           executor_web_client)
         assert chore_snapshot.chore_status == expected_reverted_chore_status, \
             f"Unexpected chore_snapshot.chore_status: expected {expected_reverted_chore_status}, " \
             f"received {chore_snapshot.chore_status}"
 
-    # checks chore_journal is not None else raises assert exception internally
-    latest_cxl_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK, symbol,
+    # checks chore_ledger is not None else raises assert exception internally
+    latest_cxl_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK, symbol,
                                                                               executor_web_client,
                                                                               last_chore_id=last_cxl_chore_id)
-    last_cxl_chore_id = latest_cxl_chore_journal.chore.chore_id
+    last_cxl_chore_id = latest_cxl_chore_ledger.chore.chore_id
 
     return last_cxl_chore_id, last_cxl_rej_chore_id
 
 
-def create_fills_for_underlying_account_test(buy_symbol: str, sell_symbol: str, active_pair_plan: PairPlanBaseModel,
+def create_deals_for_underlying_account_test(buy_symbol: str, sell_symbol: str, active_pair_plan: PairPlanBaseModel,
                                              tob_last_update_date_time_tracker: DateTime | None,
                                              chore_id: str | None, underlying_account_prefix: str, side: Side,
                                              executor_web_client: StreetBookServiceHttpClient,
@@ -4155,49 +4162,49 @@ def create_fills_for_underlying_account_test(buy_symbol: str, sell_symbol: str, 
         wait_for_get_new_chore_placed_from_tob(wait_stop_px, symbol, tob_last_update_date_time_tracker,
                                                side, executor_web_client)
 
-    placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+    placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                           symbol, executor_web_client,
                                                                           last_chore_id=chore_id)
-    chore_id = placed_chore_journal.chore.chore_id
+    chore_id = placed_chore_ledger.chore.chore_id
 
     executor_web_client.barter_simulator_process_chore_ack_query_client(
-        chore_id, placed_chore_journal.chore.px,
-        placed_chore_journal.chore.qty,
-        placed_chore_journal.chore.side,
-        placed_chore_journal.chore.security.sec_id,
-        placed_chore_journal.chore.underlying_account)
+        chore_id, placed_chore_ledger.chore.px,
+        placed_chore_ledger.chore.qty,
+        placed_chore_ledger.chore.side,
+        placed_chore_ledger.chore.security.sec_id,
+        placed_chore_ledger.chore.underlying_account)
 
-    fills_count = 6
+    deals_count = 6
     fill_px = 100
     fill_qty = 5
-    for loop_count in range(fills_count):
-        if loop_count + 1 <= (fills_count / 2):
+    for loop_count in range(deals_count):
+        if loop_count + 1 <= (deals_count / 2):
             underlying_account = f"{underlying_account_prefix}_1"
         else:
             underlying_account = f"{underlying_account_prefix}_2"
         executor_web_client.barter_simulator_process_fill_query_client(
             chore_id, fill_px, fill_qty,
-            placed_chore_journal.chore.side,
-            placed_chore_journal.chore.security.sec_id, underlying_account)
+            placed_chore_ledger.chore.side,
+            placed_chore_ledger.chore.security.sec_id, underlying_account)
     return tob_last_update_date_time_tracker, chore_id
 
 
 def verify_unsolicited_cxl_chores(last_id: str | None,
                                   check_chore_event: ChoreEventType, symbol: str,
                                   executor_web_client: StreetBookServiceHttpClient) -> str:
-    # internally checks chore_journal is not None else raises assert exception internally
+    # internally checks chore_ledger is not None else raises assert exception internally
     if check_chore_event == ChoreEventType.OE_CXL:
-        latest_chore_journal = get_latest_chore_journal_with_event_and_symbol(check_chore_event, symbol,
+        latest_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(check_chore_event, symbol,
                                                                               executor_web_client,
                                                                               last_chore_id=last_id)
     else:
         # checking no latest chore with OE_CXL
-        latest_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL, symbol,
+        latest_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL, symbol,
                                                                               executor_web_client,
                                                                               expect_no_chore=True,
                                                                               last_chore_id=last_id)
 
-    return latest_chore_journal.chore.chore_id
+    return latest_chore_ledger.chore.chore_id
 
 
 def handle_unsolicited_cxl_for_sides(symbol: str, last_id: str, last_cxl_ack_id: str, chore_count: int,
@@ -4220,7 +4227,7 @@ def handle_unsolicited_cxl_for_sides(symbol: str, last_id: str, last_cxl_ack_id:
     # internally contains assert checks
     last_id = verify_unsolicited_cxl_chores(last_id, check_chore_event, symbol, executor_web_client)
     if check_chore_event != ChoreEventType.OE_UNSOL_CXL:
-        latest_cxl_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+        latest_cxl_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                             symbol, executor_web_client,
                                                                             last_chore_id=last_cxl_ack_id)
         last_cxl_ack_id = latest_cxl_ack_obj.chore.chore_id
@@ -4233,7 +4240,7 @@ def handle_unsolicited_cxl(buy_symbol, sell_symbol, active_pair_plan, last_barte
     bid_buy_top_market_depth, ask_sell_top_market_depth = (
         get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, active_pair_plan))
 
-    # buy fills check
+    # buy deals check
     continues_chore_count, continues_special_chore_count = get_continuous_chore_configs(buy_symbol, config_dict)
     buy_chore_count = 0
     buy_cxl_chore_count = 0
@@ -4255,7 +4262,7 @@ def handle_unsolicited_cxl(buy_symbol, sell_symbol, active_pair_plan, last_barte
     if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
         time.sleep(residual_wait_sec)   # to start sell after buy is completely done
 
-    # sell fills check
+    # sell deals check
     continues_chore_count, continues_special_chore_count = get_continuous_chore_configs(sell_symbol, config_dict)
     sell_chore_count = 0
     sell_cxl_chore_count = 0
@@ -4288,18 +4295,18 @@ def get_partial_allowed_ack_qty(symbol: str, qty: int, config_dict: Dict):
 
 def handle_partial_ack_checks(symbol: str, new_chore_id: str, acked_chore_id: str,
                               executor_web_client: StreetBookServiceHttpClient, config_dict):
-    new_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+    new_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                        symbol, executor_web_client,
                                                                        last_chore_id=new_chore_id)
-    new_chore_id = new_chore_journal.chore.chore_id
-    partial_ack_qty = get_partial_allowed_ack_qty(symbol, new_chore_journal.chore.qty, config_dict)
+    new_chore_id = new_chore_ledger.chore.chore_id
+    partial_ack_qty = get_partial_allowed_ack_qty(symbol, new_chore_ledger.chore.qty, config_dict)
 
-    ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
+    ack_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK,
                                                                        symbol, executor_web_client,
                                                                        last_chore_id=acked_chore_id)
-    acked_chore_id = ack_chore_journal.chore.chore_id
-    assert ack_chore_journal.chore.qty == partial_ack_qty, f"Mismatch partial_ack_qty: expected {partial_ack_qty}, " \
-                                                           f"received {ack_chore_journal.chore.qty}"
+    acked_chore_id = ack_chore_ledger.chore.chore_id
+    assert ack_chore_ledger.chore.qty == partial_ack_qty, f"Mismatch partial_ack_qty: expected {partial_ack_qty}, " \
+                                                           f"received {ack_chore_ledger.chore.qty}"
 
     return new_chore_id, acked_chore_id, partial_ack_qty
 
@@ -4371,7 +4378,7 @@ def handle_place_chore_and_check_str_in_alert_for_executor_limits(symbol: str, s
     place_new_chore(symbol, side, px, qty, executor_web_client, inst_type)
     print(f"symbol: {symbol}, Created new_chore obj")
 
-    new_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW, symbol,
+    new_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW, symbol,
                                                                        executor_web_client,
                                                                        expect_no_chore=True,
                                                                        last_chore_id=last_chore_id)
@@ -4401,7 +4408,7 @@ def handle_test_for_plan_pause_on_less_consumable_cxl_qty_without_fill(buy_symbo
     place_new_chore(check_symbol, side, px, qty, executor_web_client, inst_type)
     print(f"symbol: {check_symbol}, Created new_chore obj")
 
-    new_chore_journal = get_latest_chore_journal_with_events_and_symbol([ChoreEventType.OE_CXL_ACK,
+    new_chore_ledger = get_latest_chore_ledger_with_events_and_symbol([ChoreEventType.OE_CXL_ACK,
                                                                          ChoreEventType.OE_UNSOL_CXL], check_symbol,
                                                                         executor_web_client,
                                                                         last_chore_id=last_cxl_chore_id)
@@ -4435,9 +4442,9 @@ def handle_test_for_plan_pause_on_less_consumable_cxl_qty_with_fill(
     place_new_chore(check_symbol, side, px, qty, executor_web_client, inst_type)
     print(f"symbol: {check_symbol}, Created new_chore obj")
 
-    ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, check_symbol,
+    ack_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, check_symbol,
                                                                        executor_web_client)
-    cxl_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK, check_symbol,
+    cxl_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK, check_symbol,
                                                                        executor_web_client,
                                                                        last_chore_id=last_cxl_chore_id)
 
@@ -4482,7 +4489,7 @@ def get_partial_allowed_fill_qty(check_symbol: str, config_dict: Dict, qty: int)
     return partial_filled_qty
 
 
-def underlying_handle_simulated_partial_fills_test(loop_count, check_symbol, buy_symbol,
+def underlying_handle_simulated_partial_deals_test(loop_count, check_symbol, buy_symbol,
                                                    sell_symbol, last_barter_fixture_list,
                                                    last_chore_id, config_dict, active_pair_plan,
                                                    executor_web_client: StreetBookServiceHttpClient):
@@ -4501,22 +4508,22 @@ def underlying_handle_simulated_partial_fills_test(loop_count, check_symbol, buy
         update_tob_through_market_depth_to_place_sell_chore(active_pair_plan.cpp_port, ask_sell_top_market_depth,
                                                             bid_buy_top_market_depth)
 
-    chore_ack_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
+    chore_ack_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK,
                                                                        check_symbol, executor_web_client,
                                                                        last_chore_id=last_chore_id)
-    last_chore_id = chore_ack_journal.chore.chore_id
+    last_chore_id = chore_ack_ledger.chore.chore_id
     time.sleep(5)
 
     # ATTENTION: Below code is dummy of original impl present in barter_executor, keep it sync with original
-    partial_filled_qty = get_partial_allowed_fill_qty(check_symbol, config_dict, chore_ack_journal.chore.qty)
+    partial_filled_qty = get_partial_allowed_fill_qty(check_symbol, config_dict, chore_ack_ledger.chore.qty)
 
-    latest_fill_journal = get_latest_fill_journal_from_chore_id(last_chore_id, executor_web_client)
-    assert latest_fill_journal.fill_qty == partial_filled_qty, f"fill_qty mismatch: expected {partial_filled_qty}, " \
-                                                               f"received {latest_fill_journal.fill_qty}"
+    latest_fill_ledger = get_latest_fill_ledger_from_chore_id(last_chore_id, executor_web_client)
+    assert latest_fill_ledger.fill_qty == partial_filled_qty, f"fill_qty mismatch: expected {partial_filled_qty}, " \
+                                                               f"received {latest_fill_ledger.fill_qty}"
     return last_chore_id, partial_filled_qty
 
 
-def underlying_handle_simulated_multi_partial_fills_test(loop_count, check_symbol, buy_symbol,
+def underlying_handle_simulated_multi_partial_deals_test(loop_count, check_symbol, buy_symbol,
                                                          sell_symbol, active_pair_plan, last_barter_fixture_list,
                                                          last_chore_id,
                                                          executor_web_client: StreetBookServiceHttpClient,
@@ -4534,31 +4541,31 @@ def underlying_handle_simulated_multi_partial_fills_test(loop_count, check_symbo
         qty = 95
         place_new_chore(sell_symbol, Side.SELL, px, qty, executor_web_client, sell_inst_type)
 
-    new_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
+    new_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK,
                                                                        check_symbol, executor_web_client,
                                                                        last_chore_id=last_chore_id)
-    last_chore_id = new_chore_journal.chore.chore_id
+    last_chore_id = new_chore_ledger.chore.chore_id
 
     # ATTENTION: Below code is dummy of original impl present in barter_executor, keep it sync with original
-    partial_filled_qty = get_partial_allowed_fill_qty(check_symbol, config_dict, new_chore_journal.chore.qty)
+    partial_filled_qty = get_partial_allowed_fill_qty(check_symbol, config_dict, new_chore_ledger.chore.qty)
 
-    fills_count = get_symbol_configs(check_symbol, config_dict).get("total_fill_count")
+    deals_count = get_symbol_configs(check_symbol, config_dict).get("total_fill_count")
     time.sleep(5)
     time_out_loop_count = 5
-    latest_fill_journals = []
+    latest_fill_ledgers = []
     for _ in range(time_out_loop_count):
-        latest_fill_journals = get_fill_journals_for_chore_id(last_chore_id, executor_web_client)
-        if loop_count == fills_count:
+        latest_fill_ledgers = get_fill_ledgers_for_chore_id(last_chore_id, executor_web_client)
+        if loop_count == deals_count:
             break
         time.sleep(2)
 
-    assert fills_count == len(latest_fill_journals), f"Mismatch numbers of fill for chore_id {last_chore_id}, " \
-                                                     f"expected {fills_count} received {len(latest_fill_journals)}"
+    assert deals_count == len(latest_fill_ledgers), f"Mismatch numbers of fill for chore_id {last_chore_id}, " \
+                                                     f"expected {deals_count} received {len(latest_fill_ledgers)}"
 
-    for latest_fill_journal in latest_fill_journals:
-        assert latest_fill_journal.fill_qty == partial_filled_qty, f"Mismatch partial_filled_qty: " \
+    for latest_fill_ledger in latest_fill_ledgers:
+        assert latest_fill_ledger.fill_qty == partial_filled_qty, f"Mismatch partial_filled_qty: " \
                                                                    f"expected {partial_filled_qty}, received " \
-                                                                   f"{latest_fill_journal.fill_px}"
+                                                                   f"{latest_fill_ledger.fill_px}"
     return last_chore_id, partial_filled_qty
 
 
@@ -4616,9 +4623,9 @@ def plan_done_after_exhausted_consumable_notional(
             check_symbol = sell_symbol
         time.sleep(2)  # delay for chore to get placed
 
-        ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, check_symbol,
+        ack_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, check_symbol,
                                                                            executor_http_client, assert_code=1)
-        chore_snapshot = get_chore_snapshot_from_chore_id(ack_chore_journal.chore.chore_id, executor_http_client)
+        chore_snapshot = get_chore_snapshot_from_chore_id(ack_chore_ledger.chore.chore_id, executor_http_client)
         assert chore_snapshot.chore_status == ChoreStatusType.OE_ACKED, "ChoreStatus mismatched: expected status " \
                                                                         f"ChoreStatusType.OE_ACKED received " \
                                                                         f"{chore_snapshot.chore_status}"
@@ -4628,7 +4635,7 @@ def plan_done_after_exhausted_consumable_notional(
         # Next placed chore must not get placed, instead it should find consumable_notional as exhausted for further
         # chores and should come out of executor run and must set plan_state to PlanState_DONE
 
-        # buy fills check
+        # buy deals check
         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_plan.cpp_port)
         if side_to_check == Side.BUY:
             px = 98
@@ -4639,9 +4646,9 @@ def plan_done_after_exhausted_consumable_notional(
             qty = 95
             place_new_chore(sell_symbol, Side.SELL, px, qty, executor_http_client, sell_inst_type)
         time.sleep(2)  # delay for chore to get placed
-        ack_chore_journal = (
-            get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW, check_symbol, executor_http_client,
-                                                           last_chore_id=ack_chore_journal.chore.chore_id,
+        ack_chore_ledger = (
+            get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW, check_symbol, executor_http_client,
+                                                           last_chore_id=ack_chore_ledger.chore.chore_id,
                                                            expect_no_chore=True, assert_code=3))
         pair_plan = email_book_service_native_web_client.get_pair_plan_client(created_pair_plan.id)
         assert pair_plan.plan_state == PlanState.PlanState_PAUSED, (
@@ -4688,9 +4695,9 @@ def append_csv_file(file_name: str, records: List[List[any]]):
 
 
 def handle_test_buy_sell_pair_chore(buy_symbol: str, sell_symbol: str, total_loop_count: int,
-                                    refresh_sec: int, buy_chore_: ChoreJournalBaseModel,
-                                    sell_chore_: ChoreJournalBaseModel,
-                                    buy_fill_journal_: FillsJournalBaseModel, sell_fill_journal_: FillsJournalBaseModel,
+                                    refresh_sec: int, buy_chore_: ChoreLedgerBaseModel,
+                                    sell_chore_: ChoreLedgerBaseModel,
+                                    buy_fill_ledger_: DealsLedgerBaseModel, sell_fill_ledger_: DealsLedgerBaseModel,
                                     expected_buy_chore_snapshot_: ChoreSnapshotBaseModel,
                                     expected_sell_chore_snapshot_: ChoreSnapshotBaseModel,
                                     expected_symbol_side_snapshot_: List[SymbolSideSnapshotBaseModel],
@@ -4763,18 +4770,18 @@ def handle_test_buy_sell_pair_chore(buy_symbol: str, sell_symbol: str, total_loo
             print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Created new_chore obj")
             time.sleep(2)
 
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol, executor_web_client,
                                                                               last_chore_id=chore_id)
-        chore_id = placed_chore_journal.chore.chore_id
-        create_buy_chore_date_time: DateTime = placed_chore_journal.chore_event_date_time
-        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Received chore_journal with {chore_id}")
+        chore_id = placed_chore_ledger.chore.chore_id
+        create_buy_chore_date_time: DateTime = placed_chore_ledger.chore_event_date_time
+        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Received chore_ledger with {chore_id}")
         time.sleep(2)
 
         # Checking placed chore computations
         check_placed_buy_chore_computes_before_all_sells(
             loop_count, chore_id, buy_symbol,
-            placed_chore_journal, expected_buy_chore_snapshot,
+            placed_chore_ledger, expected_buy_chore_snapshot,
             expected_buy_symbol_side_snapshot,
             expected_sell_symbol_side_snapshot,
             active_pair_plan,
@@ -4783,34 +4790,34 @@ def handle_test_buy_sell_pair_chore(buy_symbol: str, sell_symbol: str, total_loo
         print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed chore of chore_id {chore_id}")
 
         executor_web_client.barter_simulator_process_chore_ack_query_client(
-            chore_id, placed_chore_journal.chore.px,
-            placed_chore_journal.chore.qty,
-            placed_chore_journal.chore.side,
-            placed_chore_journal.chore.security.sec_id,
-            placed_chore_journal.chore.underlying_account
+            chore_id, placed_chore_ledger.chore.px,
+            placed_chore_ledger.chore.qty,
+            placed_chore_ledger.chore.side,
+            placed_chore_ledger.chore.security.sec_id,
+            placed_chore_ledger.chore.underlying_account
         )
 
-        placed_chore_journal_obj_ack_response = \
-            get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, buy_symbol, executor_web_client)
+        placed_chore_ledger_obj_ack_response = \
+            get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, buy_symbol, executor_web_client)
 
         # Checking Ack response on placed chore
-        placed_buy_chore_ack_receive(placed_chore_journal_obj_ack_response, expected_buy_chore_snapshot,
+        placed_buy_chore_ack_receive(placed_chore_ledger_obj_ack_response, expected_buy_chore_snapshot,
                                      executor_web_client)
         print(
             f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed chore ACK of chore_id {chore_id}")
 
-        buy_fill_journal_obj = copy.deepcopy(buy_fill_journal_)
-        buy_fill_journal_obj.fill_qty = random.randint(50, 55)
-        buy_fill_journal_obj.fill_px = random.randint(95, 100)
+        buy_fill_ledger_obj = copy.deepcopy(buy_fill_ledger_)
+        buy_fill_ledger_obj.fill_qty = random.randint(50, 55)
+        buy_fill_ledger_obj.fill_px = random.randint(95, 100)
         executor_web_client.barter_simulator_process_fill_query_client(
-            chore_id, buy_fill_journal_obj.fill_px, buy_fill_journal_obj.fill_qty,
-            Side.BUY, buy_symbol, buy_fill_journal_obj.underlying_account)
+            chore_id, buy_fill_ledger_obj.fill_px, buy_fill_ledger_obj.fill_qty,
+            Side.BUY, buy_symbol, buy_fill_ledger_obj.underlying_account)
 
-        placed_fill_journal_obj = get_latest_fill_journal_from_chore_id(chore_id, executor_web_client)
+        placed_fill_ledger_obj = get_latest_fill_ledger_from_chore_id(chore_id, executor_web_client)
 
         # Checking Fill receive on placed chore
         check_fill_receive_for_placed_buy_chore_before_sells(
-            buy_symbol, placed_fill_journal_obj,
+            buy_symbol, placed_fill_ledger_obj,
             expected_buy_chore_snapshot, expected_buy_symbol_side_snapshot,
             expected_sell_symbol_side_snapshot,
             active_pair_plan,
@@ -4823,13 +4830,13 @@ def handle_test_buy_sell_pair_chore(buy_symbol: str, sell_symbol: str, total_loo
         # Sleeping to let the chore get cxlled
         time.sleep(residual_test_wait)
 
-        cxl_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+        cxl_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                            buy_symbol, executor_web_client,
                                                                            last_chore_id=cxl_chore_id)
-        cxl_chore_id = cxl_chore_journal.chore.chore_id
+        cxl_chore_id = cxl_chore_ledger.chore.chore_id
 
         # Checking CXL_ACK receive on placed chore by cxl_req from residual removal
-        check_cxl_receive_for_placed_buy_chore_before_sells(buy_symbol, cxl_chore_journal,
+        check_cxl_receive_for_placed_buy_chore_before_sells(buy_symbol, cxl_chore_ledger,
                                                             expected_buy_chore_snapshot,
                                                             expected_buy_symbol_side_snapshot,
                                                             expected_sell_symbol_side_snapshot,
@@ -4876,50 +4883,50 @@ def handle_test_buy_sell_pair_chore(buy_symbol: str, sell_symbol: str, total_loo
             print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Created new_chore obj")
             time.sleep(2)
 
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               sell_symbol, executor_web_client,
                                                                               last_chore_id=chore_id)
-        create_sell_chore_date_time: DateTime = placed_chore_journal.chore_event_date_time
-        chore_id = placed_chore_journal.chore.chore_id
-        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Received chore_journal with {chore_id}")
+        create_sell_chore_date_time: DateTime = placed_chore_ledger.chore_event_date_time
+        chore_id = placed_chore_ledger.chore.chore_id
+        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Received chore_ledger with {chore_id}")
         time.sleep(2)
 
         # Checking placed chore computations
         check_placed_sell_chore_computes_after_all_buys(
-            loop_count, chore_id, sell_symbol, placed_chore_journal, expected_sell_chore_snapshot,
+            loop_count, chore_id, sell_symbol, placed_chore_ledger, expected_sell_chore_snapshot,
             expected_sell_symbol_side_snapshot, expected_buy_symbol_side_snapshot, active_pair_plan,
             expected_plan_limits_, expected_plan_status,
             expected_plan_brief_obj, executor_web_client)
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Checked sell placed chore of chore_id {chore_id}")
 
         executor_web_client.barter_simulator_process_chore_ack_query_client(
-            chore_id, placed_chore_journal.chore.px,
-            placed_chore_journal.chore.qty,
-            placed_chore_journal.chore.side,
-            placed_chore_journal.chore.security.sec_id,
-            placed_chore_journal.chore.underlying_account)
+            chore_id, placed_chore_ledger.chore.px,
+            placed_chore_ledger.chore.qty,
+            placed_chore_ledger.chore.side,
+            placed_chore_ledger.chore.security.sec_id,
+            placed_chore_ledger.chore.underlying_account)
 
-        placed_chore_journal_obj_ack_response = \
-            get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, sell_symbol, executor_web_client)
+        placed_chore_ledger_obj_ack_response = \
+            get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, sell_symbol, executor_web_client)
 
         # Checking Ack response on placed chore
-        placed_sell_chore_ack_receive(placed_chore_journal_obj_ack_response,
+        placed_sell_chore_ack_receive(placed_chore_ledger_obj_ack_response,
                                       expected_sell_chore_snapshot, executor_web_client)
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, "
               f"Checked sell placed chore ACK of chore_id {chore_id}")
 
-        sell_fill_journal_obj = copy.deepcopy(sell_fill_journal_)
-        sell_fill_journal_obj.fill_qty = random.randint(48, 53)
-        sell_fill_journal_obj.fill_px = random.randint(100, 110)
+        sell_fill_ledger_obj = copy.deepcopy(sell_fill_ledger_)
+        sell_fill_ledger_obj.fill_qty = random.randint(48, 53)
+        sell_fill_ledger_obj.fill_px = random.randint(100, 110)
         executor_web_client.barter_simulator_process_fill_query_client(
-            chore_id, sell_fill_journal_obj.fill_px, sell_fill_journal_obj.fill_qty,
-            Side.SELL, sell_symbol, sell_fill_journal_obj.underlying_account)
+            chore_id, sell_fill_ledger_obj.fill_px, sell_fill_ledger_obj.fill_qty,
+            Side.SELL, sell_symbol, sell_fill_ledger_obj.underlying_account)
 
-        placed_fill_journal_obj = get_latest_fill_journal_from_chore_id(chore_id, executor_web_client)
+        placed_fill_ledger_obj = get_latest_fill_ledger_from_chore_id(chore_id, executor_web_client)
 
         # Checking Fill receive on placed chore
         check_fill_receive_for_placed_sell_chore_after_all_buys(
-            loop_count, chore_id, sell_symbol, placed_fill_journal_obj,
+            loop_count, chore_id, sell_symbol, placed_fill_ledger_obj,
             expected_sell_chore_snapshot, expected_sell_symbol_side_snapshot,
             expected_buy_symbol_side_snapshot, active_pair_plan, expected_plan_limits_,
             expected_plan_status, expected_plan_brief_obj, executor_web_client)
@@ -4928,14 +4935,14 @@ def handle_test_buy_sell_pair_chore(buy_symbol: str, sell_symbol: str, total_loo
         # Sleeping to let the chore get cxlled
         time.sleep(residual_test_wait)
 
-        cxl_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+        cxl_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                            sell_symbol, executor_web_client,
                                                                            last_chore_id=cxl_chore_id)
-        cxl_chore_id = cxl_chore_journal.chore.chore_id
+        cxl_chore_id = cxl_chore_ledger.chore.chore_id
 
         # Checking CXL_ACK receive on cxl req by residual handler
         check_cxl_receive_for_placed_sell_chore_after_all_buys(sell_symbol,
-                                                               cxl_chore_journal, expected_sell_chore_snapshot,
+                                                               cxl_chore_ledger, expected_sell_chore_snapshot,
                                                                expected_sell_symbol_side_snapshot,
                                                                expected_buy_symbol_side_snapshot,
                                                                active_pair_plan, expected_plan_limits_,
@@ -4948,9 +4955,9 @@ def handle_test_buy_sell_pair_chore(buy_symbol: str, sell_symbol: str, total_loo
 
 
 def handle_test_sell_buy_pair_chore(leg1_symbol: str, leg2_symbol: str, total_loop_count: int,
-                                    refresh_sec: int, buy_chore_: ChoreJournalBaseModel,
-                                    sell_chore_: ChoreJournalBaseModel,
-                                    buy_fill_journal_: FillsJournalBaseModel, sell_fill_journal_: FillsJournalBaseModel,
+                                    refresh_sec: int, buy_chore_: ChoreLedgerBaseModel,
+                                    sell_chore_: ChoreLedgerBaseModel,
+                                    buy_fill_ledger_: DealsLedgerBaseModel, sell_fill_ledger_: DealsLedgerBaseModel,
                                     expected_buy_chore_snapshot_: ChoreSnapshotBaseModel,
                                     expected_sell_chore_snapshot_: ChoreSnapshotBaseModel,
                                     expected_symbol_side_snapshot_: List[SymbolSideSnapshotBaseModel],
@@ -5023,17 +5030,17 @@ def handle_test_sell_buy_pair_chore(leg1_symbol: str, leg2_symbol: str, total_lo
             print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Created new_chore obj")
             time.sleep(2)
 
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               sell_symbol, executor_web_client,
                                                                               last_chore_id=chore_id)
-        create_sell_chore_date_time: DateTime = placed_chore_journal.chore_event_date_time
-        chore_id = placed_chore_journal.chore.chore_id
-        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Received chore_journal with {chore_id}")
+        create_sell_chore_date_time: DateTime = placed_chore_ledger.chore_event_date_time
+        chore_id = placed_chore_ledger.chore.chore_id
+        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Received chore_ledger with {chore_id}")
         time.sleep(2)
 
         # Checking placed chore computations
         check_placed_sell_chore_computes_before_buys(loop_count, chore_id, sell_symbol,
-                                                     placed_chore_journal, expected_sell_chore_snapshot,
+                                                     placed_chore_ledger, expected_sell_chore_snapshot,
                                                      expected_sell_symbol_side_snapshot,
                                                      expected_buy_symbol_side_snapshot, active_pair_plan,
                                                      expected_plan_limits_, expected_plan_status,
@@ -5041,30 +5048,30 @@ def handle_test_sell_buy_pair_chore(leg1_symbol: str, leg2_symbol: str, total_lo
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, Checked sell placed chore of chore_id {chore_id}")
 
         executor_web_client.barter_simulator_process_chore_ack_query_client(
-            chore_id, placed_chore_journal.chore.px, placed_chore_journal.chore.qty, placed_chore_journal.chore.side,
-            placed_chore_journal.chore.security.sec_id, placed_chore_journal.chore.underlying_account)
+            chore_id, placed_chore_ledger.chore.px, placed_chore_ledger.chore.qty, placed_chore_ledger.chore.side,
+            placed_chore_ledger.chore.security.sec_id, placed_chore_ledger.chore.underlying_account)
 
-        placed_chore_journal_obj_ack_response = \
-            get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, sell_symbol, executor_web_client)
+        placed_chore_ledger_obj_ack_response = \
+            get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, sell_symbol, executor_web_client)
 
         # Checking Ack response on placed chore
-        placed_sell_chore_ack_receive(placed_chore_journal_obj_ack_response,
+        placed_sell_chore_ack_receive(placed_chore_ledger_obj_ack_response,
                                       expected_sell_chore_snapshot, executor_web_client)
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol}, "
               f"Checked sell placed chore ACK of chore_id {chore_id}")
 
-        sell_fill_journal_obj = copy.deepcopy(sell_fill_journal_)
-        sell_fill_journal_obj.fill_qty = random.randint(48, 53)
-        sell_fill_journal_obj.fill_px = random.randint(100, 110)
+        sell_fill_ledger_obj = copy.deepcopy(sell_fill_ledger_)
+        sell_fill_ledger_obj.fill_qty = random.randint(48, 53)
+        sell_fill_ledger_obj.fill_px = random.randint(100, 110)
         executor_web_client.barter_simulator_process_fill_query_client(
-            chore_id, sell_fill_journal_obj.fill_px, sell_fill_journal_obj.fill_qty,
-            Side.SELL, sell_symbol, sell_fill_journal_obj.underlying_account)
+            chore_id, sell_fill_ledger_obj.fill_px, sell_fill_ledger_obj.fill_qty,
+            Side.SELL, sell_symbol, sell_fill_ledger_obj.underlying_account)
 
-        placed_fill_journal_obj = get_latest_fill_journal_from_chore_id(chore_id, executor_web_client)
+        placed_fill_ledger_obj = get_latest_fill_ledger_from_chore_id(chore_id, executor_web_client)
 
         # Checking Fill receive on placed chore
         check_fill_receive_for_placed_sell_chore_before_buys(
-            sell_symbol, placed_fill_journal_obj,
+            sell_symbol, placed_fill_ledger_obj,
             expected_sell_chore_snapshot, expected_sell_symbol_side_snapshot,
             expected_buy_symbol_side_snapshot, active_pair_plan,
             expected_plan_limits_, expected_plan_status, expected_plan_brief_obj,
@@ -5074,14 +5081,14 @@ def handle_test_sell_buy_pair_chore(leg1_symbol: str, leg2_symbol: str, total_lo
         # Sleeping to let the chore get cxlled
         time.sleep(residual_test_wait)
 
-        cxl_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+        cxl_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                            sell_symbol, executor_web_client,
                                                                            last_chore_id=sell_cxl_chore_id)
-        sell_cxl_chore_id = cxl_chore_journal.chore.chore_id
+        sell_cxl_chore_id = cxl_chore_ledger.chore.chore_id
 
         # Checking CXL_ACK receive on cxl req by residual handler
         check_cxl_receive_for_placed_sell_chore_before_buy(sell_symbol,
-                                                           cxl_chore_journal, expected_sell_chore_snapshot,
+                                                           cxl_chore_ledger, expected_sell_chore_snapshot,
                                                            expected_sell_symbol_side_snapshot,
                                                            expected_buy_symbol_side_snapshot,
                                                            active_pair_plan, expected_plan_limits_,
@@ -5102,8 +5109,8 @@ def handle_test_sell_buy_pair_chore(leg1_symbol: str, leg2_symbol: str, total_lo
         expected_buy_chore_snapshot.chore_brief.bartering_security.inst_type = None
 
         # placing chore
-        current_itr_expected_buy_chore_journal_ = copy.deepcopy(buy_chore_)
-        current_itr_expected_buy_chore_journal_.chore.security.sec_id = buy_symbol
+        current_itr_expected_buy_chore_ledger_ = copy.deepcopy(buy_chore_)
+        current_itr_expected_buy_chore_ledger_.chore.security.sec_id = buy_symbol
 
         # running last barter once more before sell side
         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
@@ -5131,17 +5138,17 @@ def handle_test_sell_buy_pair_chore(leg1_symbol: str, leg2_symbol: str, total_lo
             print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Created new_chore obj")
             time.sleep(2)
 
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol, executor_web_client,
                                                                               last_chore_id=chore_id)
-        chore_id = placed_chore_journal.chore.chore_id
-        create_buy_chore_date_time: DateTime = placed_chore_journal.chore_event_date_time
-        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Received chore_journal with {chore_id}")
+        chore_id = placed_chore_ledger.chore.chore_id
+        create_buy_chore_date_time: DateTime = placed_chore_ledger.chore_event_date_time
+        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Received chore_ledger with {chore_id}")
         time.sleep(2)
 
         # Checking placed chore computations
         check_placed_buy_chore_computes_after_sells(loop_count, chore_id, buy_symbol,
-                                                    placed_chore_journal, expected_buy_chore_snapshot,
+                                                    placed_chore_ledger, expected_buy_chore_snapshot,
                                                     expected_buy_symbol_side_snapshot,
                                                     expected_sell_symbol_side_snapshot, active_pair_plan,
                                                     expected_plan_limits_, expected_plan_status,
@@ -5149,34 +5156,34 @@ def handle_test_sell_buy_pair_chore(leg1_symbol: str, leg2_symbol: str, total_lo
         print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed chore of chore_id {chore_id}")
 
         executor_web_client.barter_simulator_process_chore_ack_query_client(
-            chore_id, current_itr_expected_buy_chore_journal_.chore.px,
-            current_itr_expected_buy_chore_journal_.chore.qty,
-            current_itr_expected_buy_chore_journal_.chore.side,
-            current_itr_expected_buy_chore_journal_.chore.security.sec_id,
-            current_itr_expected_buy_chore_journal_.chore.underlying_account
+            chore_id, current_itr_expected_buy_chore_ledger_.chore.px,
+            current_itr_expected_buy_chore_ledger_.chore.qty,
+            current_itr_expected_buy_chore_ledger_.chore.side,
+            current_itr_expected_buy_chore_ledger_.chore.security.sec_id,
+            current_itr_expected_buy_chore_ledger_.chore.underlying_account
         )
 
-        placed_chore_journal_obj_ack_response = \
-            get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, buy_symbol, executor_web_client)
+        placed_chore_ledger_obj_ack_response = \
+            get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, buy_symbol, executor_web_client)
 
         # Checking Ack response on placed chore
-        placed_buy_chore_ack_receive(placed_chore_journal_obj_ack_response, expected_buy_chore_snapshot,
+        placed_buy_chore_ack_receive(placed_chore_ledger_obj_ack_response, expected_buy_chore_snapshot,
                                      executor_web_client)
         print(
             f"Loop count: {loop_count}, buy_symbol: {buy_symbol}, Checked buy placed chore ACK of chore_id {chore_id}")
 
-        buy_fill_journal_obj = copy.deepcopy(buy_fill_journal_)
-        buy_fill_journal_obj.fill_qty = random.randint(50, 55)
-        buy_fill_journal_obj.fill_px = random.randint(95, 100)
+        buy_fill_ledger_obj = copy.deepcopy(buy_fill_ledger_)
+        buy_fill_ledger_obj.fill_qty = random.randint(50, 55)
+        buy_fill_ledger_obj.fill_px = random.randint(95, 100)
         executor_web_client.barter_simulator_process_fill_query_client(
-            chore_id, buy_fill_journal_obj.fill_px, buy_fill_journal_obj.fill_qty,
-            Side.BUY, buy_symbol, buy_fill_journal_obj.underlying_account)
+            chore_id, buy_fill_ledger_obj.fill_px, buy_fill_ledger_obj.fill_qty,
+            Side.BUY, buy_symbol, buy_fill_ledger_obj.underlying_account)
 
-        placed_fill_journal_obj = get_latest_fill_journal_from_chore_id(chore_id, executor_web_client)
+        placed_fill_ledger_obj = get_latest_fill_ledger_from_chore_id(chore_id, executor_web_client)
 
         # Checking Fill receive on placed chore
         check_fill_receive_for_placed_buy_chore_after_all_sells(loop_count, chore_id,
-                                                                buy_symbol, placed_fill_journal_obj,
+                                                                buy_symbol, placed_fill_ledger_obj,
                                                                 expected_buy_chore_snapshot,
                                                                 expected_buy_symbol_side_snapshot,
                                                                 expected_sell_symbol_side_snapshot, active_pair_plan,
@@ -5188,14 +5195,14 @@ def handle_test_sell_buy_pair_chore(leg1_symbol: str, leg2_symbol: str, total_lo
         # Sleeping to let the chore get cxlled
         time.sleep(residual_test_wait)
 
-        cxl_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+        cxl_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                            buy_symbol, executor_web_client,
                                                                            last_chore_id=buy_cxl_chore_id)
-        buy_cxl_chore_id = cxl_chore_journal.chore.chore_id
+        buy_cxl_chore_id = cxl_chore_ledger.chore.chore_id
 
         # Checking CXL_ACK receive on cxl req by residual handler
         check_cxl_receive_for_placed_buy_chore_after_all_sells(buy_symbol,
-                                                               cxl_chore_journal, expected_buy_chore_snapshot,
+                                                               cxl_chore_ledger, expected_buy_chore_snapshot,
                                                                expected_buy_symbol_side_snapshot,
                                                                expected_sell_symbol_side_snapshot,
                                                                active_pair_plan, expected_plan_limits_,
@@ -5209,9 +5216,9 @@ def handle_test_sell_buy_pair_chore(leg1_symbol: str, leg2_symbol: str, total_lo
 
 def handle_test_buy_sell_n_sell_buy_pair_chore(
         total_loop_count: int,
-        refresh_sec: int, buy_chore_: ChoreJournalBaseModel,
-        sell_chore_: ChoreJournalBaseModel,
-        buy_fill_journal_: FillsJournalBaseModel, sell_fill_journal_: FillsJournalBaseModel,
+        refresh_sec: int, buy_chore_: ChoreLedgerBaseModel,
+        sell_chore_: ChoreLedgerBaseModel,
+        buy_fill_ledger_: DealsLedgerBaseModel, sell_fill_ledger_: DealsLedgerBaseModel,
         expected_buy_chore_snapshot_: ChoreSnapshotBaseModel,
         expected_sell_chore_snapshot_: ChoreSnapshotBaseModel,
         expected_symbol_side_snapshot_: List[SymbolSideSnapshotBaseModel],
@@ -5325,18 +5332,18 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
             print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol1}, Created new_chore obj")
             time.sleep(2)
 
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol1, executor_web_client1,
                                                                               last_chore_id=buy_chore_id1)
-        buy_chore_id1 = placed_chore_journal.chore.chore_id
-        create_buy_chore_date_time1: DateTime = placed_chore_journal.chore_event_date_time
-        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol1}, Received chore_journal with {buy_chore_id1}")
+        buy_chore_id1 = placed_chore_ledger.chore.chore_id
+        create_buy_chore_date_time1: DateTime = placed_chore_ledger.chore_event_date_time
+        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol1}, Received chore_ledger with {buy_chore_id1}")
         time.sleep(2)
 
         # Checking placed chore computations
         check_placed_buy_chore_computes_before_all_sells(
             loop_count, buy_chore_id1, buy_symbol1,
-            placed_chore_journal, expected_buy_chore_snapshot1,
+            placed_chore_ledger, expected_buy_chore_snapshot1,
             expected_buy_symbol_side_snapshot1,
             expected_sell_symbol_side_snapshot1,
             active_pair_plan1,
@@ -5345,34 +5352,34 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
         print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol1}, Checked buy placed chore of chore_id {buy_chore_id1}")
 
         executor_web_client1.barter_simulator_process_chore_ack_query_client(
-            buy_chore_id1, placed_chore_journal.chore.px,
-            placed_chore_journal.chore.qty,
-            placed_chore_journal.chore.side,
-            placed_chore_journal.chore.security.sec_id,
-            placed_chore_journal.chore.underlying_account
+            buy_chore_id1, placed_chore_ledger.chore.px,
+            placed_chore_ledger.chore.qty,
+            placed_chore_ledger.chore.side,
+            placed_chore_ledger.chore.security.sec_id,
+            placed_chore_ledger.chore.underlying_account
         )
 
-        placed_chore_journal_obj_ack_response = \
-            get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, buy_symbol1, executor_web_client1)
+        placed_chore_ledger_obj_ack_response = \
+            get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, buy_symbol1, executor_web_client1)
 
         # Checking Ack response on placed chore
-        placed_buy_chore_ack_receive(placed_chore_journal_obj_ack_response, expected_buy_chore_snapshot1,
+        placed_buy_chore_ack_receive(placed_chore_ledger_obj_ack_response, expected_buy_chore_snapshot1,
                                      executor_web_client1)
         print(
             f"Loop count: {loop_count}, buy_symbol: {buy_symbol1}, Checked buy placed chore ACK of chore_id {buy_chore_id1}")
 
-        buy_fill_journal_obj = copy.deepcopy(buy_fill_journal_)
-        buy_fill_journal_obj.fill_qty = random.randint(50, 55)
-        buy_fill_journal_obj.fill_px = random.randint(95, 100)
+        buy_fill_ledger_obj = copy.deepcopy(buy_fill_ledger_)
+        buy_fill_ledger_obj.fill_qty = random.randint(50, 55)
+        buy_fill_ledger_obj.fill_px = random.randint(95, 100)
         executor_web_client1.barter_simulator_process_fill_query_client(
-            buy_chore_id1, buy_fill_journal_obj.fill_px, buy_fill_journal_obj.fill_qty,
-            Side.BUY, buy_symbol1, buy_fill_journal_obj.underlying_account)
+            buy_chore_id1, buy_fill_ledger_obj.fill_px, buy_fill_ledger_obj.fill_qty,
+            Side.BUY, buy_symbol1, buy_fill_ledger_obj.underlying_account)
 
-        placed_fill_journal_obj = get_latest_fill_journal_from_chore_id(buy_chore_id1, executor_web_client1)
+        placed_fill_ledger_obj = get_latest_fill_ledger_from_chore_id(buy_chore_id1, executor_web_client1)
 
         # Checking Fill receive on placed chore
         check_fill_receive_for_placed_buy_chore_before_sells(
-            buy_symbol1, placed_fill_journal_obj,
+            buy_symbol1, placed_fill_ledger_obj,
             expected_buy_chore_snapshot1, expected_buy_symbol_side_snapshot1,
             expected_sell_symbol_side_snapshot1,
             active_pair_plan1,
@@ -5385,13 +5392,13 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
         # Sleeping to let the chore get cxlled
         time.sleep(residual_test_wait)
 
-        cxl_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+        cxl_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                            buy_symbol1, executor_web_client1,
                                                                            last_chore_id=buy_cxl_chore_id1)
-        buy_cxl_chore_id1 = cxl_chore_journal.chore.chore_id
+        buy_cxl_chore_id1 = cxl_chore_ledger.chore.chore_id
 
         # Checking CXL_ACK receive on placed chore by cxl_req from residual removal
-        check_cxl_receive_for_placed_buy_chore_before_sells(buy_symbol1, cxl_chore_journal,
+        check_cxl_receive_for_placed_buy_chore_before_sells(buy_symbol1, cxl_chore_ledger,
                                                             expected_buy_chore_snapshot1,
                                                             expected_buy_symbol_side_snapshot1,
                                                             expected_sell_symbol_side_snapshot1,
@@ -5439,50 +5446,50 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
             print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol1}, Created new_chore obj")
             time.sleep(2)
 
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               sell_symbol1, executor_web_client1,
                                                                               last_chore_id=sell_chore_id1)
-        create_sell_chore_date_time: DateTime = placed_chore_journal.chore_event_date_time
-        sell_chore_id1 = placed_chore_journal.chore.chore_id
-        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol1}, Received chore_journal with {sell_chore_id1}")
+        create_sell_chore_date_time: DateTime = placed_chore_ledger.chore_event_date_time
+        sell_chore_id1 = placed_chore_ledger.chore.chore_id
+        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol1}, Received chore_ledger with {sell_chore_id1}")
         time.sleep(2)
 
         # Checking placed chore computations
         check_placed_sell_chore_computes_after_all_buys(
-            loop_count, sell_chore_id1, sell_symbol1, placed_chore_journal, expected_sell_chore_snapshot1,
+            loop_count, sell_chore_id1, sell_symbol1, placed_chore_ledger, expected_sell_chore_snapshot1,
             expected_sell_symbol_side_snapshot1, expected_buy_symbol_side_snapshot1, active_pair_plan1,
             expected_plan_limits1, expected_plan_status1,
             expected_plan_brief_obj1, executor_web_client1)
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol1}, Checked sell placed chore of chore_id {sell_chore_id1}")
 
         executor_web_client1.barter_simulator_process_chore_ack_query_client(
-            sell_chore_id1, placed_chore_journal.chore.px,
-            placed_chore_journal.chore.qty,
-            placed_chore_journal.chore.side,
-            placed_chore_journal.chore.security.sec_id,
-            placed_chore_journal.chore.underlying_account)
+            sell_chore_id1, placed_chore_ledger.chore.px,
+            placed_chore_ledger.chore.qty,
+            placed_chore_ledger.chore.side,
+            placed_chore_ledger.chore.security.sec_id,
+            placed_chore_ledger.chore.underlying_account)
 
-        placed_chore_journal_obj_ack_response = \
-            get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, sell_symbol1, executor_web_client1)
+        placed_chore_ledger_obj_ack_response = \
+            get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, sell_symbol1, executor_web_client1)
 
         # Checking Ack response on placed chore
-        placed_sell_chore_ack_receive(placed_chore_journal_obj_ack_response,
+        placed_sell_chore_ack_receive(placed_chore_ledger_obj_ack_response,
                                       expected_sell_chore_snapshot1, executor_web_client1)
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol1}, "
               f"Checked sell placed chore ACK of chore_id {sell_chore_id1}")
 
-        sell_fill_journal_obj = copy.deepcopy(sell_fill_journal_)
-        sell_fill_journal_obj.fill_qty = random.randint(48, 53)
-        sell_fill_journal_obj.fill_px = random.randint(100, 110)
+        sell_fill_ledger_obj = copy.deepcopy(sell_fill_ledger_)
+        sell_fill_ledger_obj.fill_qty = random.randint(48, 53)
+        sell_fill_ledger_obj.fill_px = random.randint(100, 110)
         executor_web_client1.barter_simulator_process_fill_query_client(
-            sell_chore_id1, sell_fill_journal_obj.fill_px, sell_fill_journal_obj.fill_qty,
-            Side.SELL, sell_symbol1, sell_fill_journal_obj.underlying_account)
+            sell_chore_id1, sell_fill_ledger_obj.fill_px, sell_fill_ledger_obj.fill_qty,
+            Side.SELL, sell_symbol1, sell_fill_ledger_obj.underlying_account)
 
-        placed_fill_journal_obj = get_latest_fill_journal_from_chore_id(sell_chore_id1, executor_web_client1)
+        placed_fill_ledger_obj = get_latest_fill_ledger_from_chore_id(sell_chore_id1, executor_web_client1)
 
         # Checking Fill receive on placed chore
         check_fill_receive_for_placed_sell_chore_after_all_buys(
-            loop_count, sell_chore_id1, sell_symbol1, placed_fill_journal_obj,
+            loop_count, sell_chore_id1, sell_symbol1, placed_fill_ledger_obj,
             expected_sell_chore_snapshot1, expected_sell_symbol_side_snapshot1,
             expected_buy_symbol_side_snapshot1, active_pair_plan1, expected_plan_limits1,
             expected_plan_status1, expected_plan_brief_obj1, executor_web_client1)
@@ -5491,14 +5498,14 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
         # Sleeping to let the chore get cxlled
         time.sleep(residual_test_wait)
 
-        cxl_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+        cxl_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                            sell_symbol1, executor_web_client1,
                                                                            last_chore_id=sell_cxl_chore_id1)
-        sell_cxl_chore_id1 = cxl_chore_journal.chore.chore_id
+        sell_cxl_chore_id1 = cxl_chore_ledger.chore.chore_id
 
         # Checking CXL_ACK receive on cxl req by residual handler
         check_cxl_receive_for_placed_sell_chore_after_all_buys(sell_symbol1,
-                                                               cxl_chore_journal, expected_sell_chore_snapshot1,
+                                                               cxl_chore_ledger, expected_sell_chore_snapshot1,
                                                                expected_sell_symbol_side_snapshot1,
                                                                expected_buy_symbol_side_snapshot1,
                                                                active_pair_plan1, expected_plan_limits1,
@@ -5544,17 +5551,17 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
             print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol2}, Created new_chore obj")
             time.sleep(2)
 
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               sell_symbol2, executor_web_client2,
                                                                               last_chore_id=sell_chore_id2)
-        create_sell_chore_date_time: DateTime = placed_chore_journal.chore_event_date_time
-        sell_chore_id2 = placed_chore_journal.chore.chore_id
-        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol2}, Received chore_journal with {sell_chore_id2}")
+        create_sell_chore_date_time: DateTime = placed_chore_ledger.chore_event_date_time
+        sell_chore_id2 = placed_chore_ledger.chore.chore_id
+        print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol2}, Received chore_ledger with {sell_chore_id2}")
         time.sleep(2)
 
         # Checking placed chore computations
         check_placed_sell_chore_computes_before_buys(loop_count, sell_chore_id2, sell_symbol2,
-                                                     placed_chore_journal, expected_sell_chore_snapshot2,
+                                                     placed_chore_ledger, expected_sell_chore_snapshot2,
                                                      expected_sell_symbol_side_snapshot2,
                                                      expected_buy_symbol_side_snapshot2, active_pair_plan2,
                                                      expected_plan_limits2, expected_plan_status2,
@@ -5562,30 +5569,30 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol2}, Checked sell placed chore of chore_id {sell_chore_id2}")
 
         executor_web_client2.barter_simulator_process_chore_ack_query_client(
-            sell_chore_id2, placed_chore_journal.chore.px, placed_chore_journal.chore.qty, placed_chore_journal.chore.side,
-            placed_chore_journal.chore.security.sec_id, placed_chore_journal.chore.underlying_account)
+            sell_chore_id2, placed_chore_ledger.chore.px, placed_chore_ledger.chore.qty, placed_chore_ledger.chore.side,
+            placed_chore_ledger.chore.security.sec_id, placed_chore_ledger.chore.underlying_account)
 
-        placed_chore_journal_obj_ack_response = \
-            get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, sell_symbol2, executor_web_client2)
+        placed_chore_ledger_obj_ack_response = \
+            get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, sell_symbol2, executor_web_client2)
 
         # Checking Ack response on placed chore
-        placed_sell_chore_ack_receive(placed_chore_journal_obj_ack_response,
+        placed_sell_chore_ack_receive(placed_chore_ledger_obj_ack_response,
                                       expected_sell_chore_snapshot2, executor_web_client2)
         print(f"Loop count: {loop_count}, sell_symbol: {sell_symbol2}, "
               f"Checked sell placed chore ACK of chore_id {sell_chore_id2}")
 
-        sell_fill_journal_obj = copy.deepcopy(sell_fill_journal_)
-        sell_fill_journal_obj.fill_qty = random.randint(48, 53)
-        sell_fill_journal_obj.fill_px = random.randint(100, 110)
+        sell_fill_ledger_obj = copy.deepcopy(sell_fill_ledger_)
+        sell_fill_ledger_obj.fill_qty = random.randint(48, 53)
+        sell_fill_ledger_obj.fill_px = random.randint(100, 110)
         executor_web_client2.barter_simulator_process_fill_query_client(
-            sell_chore_id2, sell_fill_journal_obj.fill_px, sell_fill_journal_obj.fill_qty,
-            Side.SELL, sell_symbol2, sell_fill_journal_obj.underlying_account)
+            sell_chore_id2, sell_fill_ledger_obj.fill_px, sell_fill_ledger_obj.fill_qty,
+            Side.SELL, sell_symbol2, sell_fill_ledger_obj.underlying_account)
 
-        placed_fill_journal_obj = get_latest_fill_journal_from_chore_id(sell_chore_id2, executor_web_client2)
+        placed_fill_ledger_obj = get_latest_fill_ledger_from_chore_id(sell_chore_id2, executor_web_client2)
 
         # Checking Fill receive on placed chore
         check_fill_receive_for_placed_sell_chore_before_buys(
-            sell_symbol2, placed_fill_journal_obj,
+            sell_symbol2, placed_fill_ledger_obj,
             expected_sell_chore_snapshot2, expected_sell_symbol_side_snapshot2,
             expected_buy_symbol_side_snapshot2, active_pair_plan2,
             expected_plan_limits2, expected_plan_status2, expected_plan_brief_obj2,
@@ -5595,14 +5602,14 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
         # Sleeping to let the chore get cxlled
         time.sleep(residual_test_wait)
 
-        cxl_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+        cxl_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                            sell_symbol2, executor_web_client2,
                                                                            last_chore_id=sell_cxl_chore_id2)
-        sell_cxl_chore_id2 = cxl_chore_journal.chore.chore_id
+        sell_cxl_chore_id2 = cxl_chore_ledger.chore.chore_id
 
         # Checking CXL_ACK receive on cxl req by residual handler
         check_cxl_receive_for_placed_sell_chore_before_buy(sell_symbol2,
-                                                           cxl_chore_journal, expected_sell_chore_snapshot2,
+                                                           cxl_chore_ledger, expected_sell_chore_snapshot2,
                                                            expected_sell_symbol_side_snapshot2,
                                                            expected_buy_symbol_side_snapshot2,
                                                            active_pair_plan2, expected_plan_limits2,
@@ -5622,8 +5629,8 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
         expected_buy_chore_snapshot2.chore_brief.bartering_security.inst_type = None
 
         # placing chore
-        current_itr_expected_buy_chore_journal_ = copy.deepcopy(buy_chore_)
-        current_itr_expected_buy_chore_journal_.chore.security.sec_id = buy_symbol2
+        current_itr_expected_buy_chore_ledger_ = copy.deepcopy(buy_chore_)
+        current_itr_expected_buy_chore_ledger_.chore.security.sec_id = buy_symbol2
 
         # running last barter once more before sell side
         run_last_barter(buy_symbol2, sell_symbol2, last_barter_fixture_list, active_pair_plan2.cpp_port)
@@ -5652,17 +5659,17 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
             print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol2}, Created new_chore obj")
             time.sleep(2)
 
-        placed_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+        placed_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                               buy_symbol2, executor_web_client2,
                                                                               last_chore_id=buy_chore_id2)
-        buy_chore_id2 = placed_chore_journal.chore.chore_id
-        create_buy_chore_date_time: DateTime = placed_chore_journal.chore_event_date_time
-        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol2}, Received chore_journal with {buy_chore_id2}")
+        buy_chore_id2 = placed_chore_ledger.chore.chore_id
+        create_buy_chore_date_time: DateTime = placed_chore_ledger.chore_event_date_time
+        print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol2}, Received chore_ledger with {buy_chore_id2}")
         time.sleep(2)
 
         # Checking placed chore computations
         check_placed_buy_chore_computes_after_sells(loop_count, buy_chore_id2, buy_symbol2,
-                                                    placed_chore_journal, expected_buy_chore_snapshot2,
+                                                    placed_chore_ledger, expected_buy_chore_snapshot2,
                                                     expected_buy_symbol_side_snapshot2,
                                                     expected_sell_symbol_side_snapshot2, active_pair_plan2,
                                                     expected_plan_limits2, expected_plan_status2,
@@ -5670,34 +5677,34 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
         print(f"Loop count: {loop_count}, buy_symbol: {buy_symbol2}, Checked buy placed chore of chore_id {buy_chore_id2}")
 
         executor_web_client2.barter_simulator_process_chore_ack_query_client(
-            buy_chore_id2, current_itr_expected_buy_chore_journal_.chore.px,
-            current_itr_expected_buy_chore_journal_.chore.qty,
-            current_itr_expected_buy_chore_journal_.chore.side,
-            current_itr_expected_buy_chore_journal_.chore.security.sec_id,
-            current_itr_expected_buy_chore_journal_.chore.underlying_account
+            buy_chore_id2, current_itr_expected_buy_chore_ledger_.chore.px,
+            current_itr_expected_buy_chore_ledger_.chore.qty,
+            current_itr_expected_buy_chore_ledger_.chore.side,
+            current_itr_expected_buy_chore_ledger_.chore.security.sec_id,
+            current_itr_expected_buy_chore_ledger_.chore.underlying_account
         )
 
-        placed_chore_journal_obj_ack_response = \
-            get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, buy_symbol2, executor_web_client2)
+        placed_chore_ledger_obj_ack_response = \
+            get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, buy_symbol2, executor_web_client2)
 
         # Checking Ack response on placed chore
-        placed_buy_chore_ack_receive(placed_chore_journal_obj_ack_response, expected_buy_chore_snapshot2,
+        placed_buy_chore_ack_receive(placed_chore_ledger_obj_ack_response, expected_buy_chore_snapshot2,
                                      executor_web_client2)
         print(
             f"Loop count: {loop_count}, buy_symbol: {buy_symbol2}, Checked buy placed chore ACK of chore_id {buy_chore_id2}")
 
-        buy_fill_journal_obj = copy.deepcopy(buy_fill_journal_)
-        buy_fill_journal_obj.fill_qty = random.randint(50, 55)
-        buy_fill_journal_obj.fill_px = random.randint(95, 100)
+        buy_fill_ledger_obj = copy.deepcopy(buy_fill_ledger_)
+        buy_fill_ledger_obj.fill_qty = random.randint(50, 55)
+        buy_fill_ledger_obj.fill_px = random.randint(95, 100)
         executor_web_client2.barter_simulator_process_fill_query_client(
-            buy_chore_id2, buy_fill_journal_obj.fill_px, buy_fill_journal_obj.fill_qty,
-            Side.BUY, buy_symbol2, buy_fill_journal_obj.underlying_account)
+            buy_chore_id2, buy_fill_ledger_obj.fill_px, buy_fill_ledger_obj.fill_qty,
+            Side.BUY, buy_symbol2, buy_fill_ledger_obj.underlying_account)
 
-        placed_fill_journal_obj = get_latest_fill_journal_from_chore_id(buy_chore_id2, executor_web_client2)
+        placed_fill_ledger_obj = get_latest_fill_ledger_from_chore_id(buy_chore_id2, executor_web_client2)
 
         # Checking Fill receive on placed chore
         check_fill_receive_for_placed_buy_chore_after_all_sells(loop_count, buy_chore_id2,
-                                                                buy_symbol2, placed_fill_journal_obj,
+                                                                buy_symbol2, placed_fill_ledger_obj,
                                                                 expected_buy_chore_snapshot2,
                                                                 expected_buy_symbol_side_snapshot2,
                                                                 expected_sell_symbol_side_snapshot2, active_pair_plan2,
@@ -5709,14 +5716,14 @@ def handle_test_buy_sell_n_sell_buy_pair_chore(
         # Sleeping to let the chore get cxlled
         time.sleep(residual_test_wait)
 
-        cxl_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+        cxl_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                            buy_symbol2, executor_web_client2,
                                                                            last_chore_id=buy_cxl_chore_id2)
-        buy_cxl_chore_id2 = cxl_chore_journal.chore.chore_id
+        buy_cxl_chore_id2 = cxl_chore_ledger.chore.chore_id
 
         # Checking CXL_ACK receive on cxl req by residual handler
         check_cxl_receive_for_placed_buy_chore_after_all_sells(buy_symbol2,
-                                                               cxl_chore_journal, expected_buy_chore_snapshot2,
+                                                               cxl_chore_ledger, expected_buy_chore_snapshot2,
                                                                expected_buy_symbol_side_snapshot2,
                                                                expected_sell_symbol_side_snapshot2,
                                                                active_pair_plan2, expected_plan_limits2,
@@ -5741,12 +5748,12 @@ def place_sanity_chores_for_executor(
     buy_ack_chore_id = None
 
     if place_after_recovery:
-        chore_journals = executor_web_client.get_all_chore_journal_client(-100)
+        chore_ledgers = executor_web_client.get_all_chore_ledger_client(-100)
         max_id = 0
-        for chore_journal in chore_journals:
-            if chore_journal.chore.security.sec_id == buy_symbol and chore_journal.chore_event == ChoreEventType.OE_ACK:
-                if max_id < chore_journal.id:
-                    buy_ack_chore_id = chore_journal.chore.chore_id
+        for chore_ledger in chore_ledgers:
+            if chore_ledger.chore.security.sec_id == buy_symbol and chore_ledger.chore_event == ChoreEventType.OE_ACK:
+                if max_id < chore_ledger.id:
+                    buy_ack_chore_id = chore_ledger.chore.chore_id
 
     bid_buy_top_market_depth, ask_sell_top_market_depth = (
         get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, created_pair_plan))
@@ -5757,11 +5764,11 @@ def place_sanity_chores_for_executor(
         update_tob_through_market_depth_to_place_buy_chore(created_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
 
-        ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
+        ack_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK,
                                                                            buy_symbol, executor_web_client,
                                                                            last_chore_id=buy_ack_chore_id,
                                                                            expect_no_chore=expect_no_chore)
-        buy_ack_chore_id = ack_chore_journal.chore.chore_id
+        buy_ack_chore_id = ack_chore_ledger.chore.chore_id
 
         if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
             time.sleep(residual_wait_sec)  # wait to make this open chore residual
@@ -5776,11 +5783,11 @@ def place_sanity_chores_for_executor(
         update_tob_through_market_depth_to_place_sell_chore(created_pair_plan.cpp_port, ask_sell_top_market_depth,
                                                             bid_buy_top_market_depth)
 
-        ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
+        ack_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK,
                                                                            sell_symbol, executor_web_client,
                                                                            last_chore_id=sell_ack_chore_id,
                                                                            expect_no_chore=expect_no_chore)
-        sell_ack_chore_id = ack_chore_journal.chore.chore_id
+        sell_ack_chore_id = ack_chore_ledger.chore.chore_id
 
         if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
             time.sleep(residual_wait_sec)  # wait to make this open chore residual
@@ -5840,10 +5847,10 @@ def place_sanity_chores(buy_symbol, sell_symbol, pair_plan_,
             time.sleep(1)
             update_tob_through_market_depth_to_place_buy_chore(created_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                                ask_sell_top_market_depth)
-            ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
+            ack_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK,
                                                                                buy_symbol, executor_web_client,
                                                                                last_chore_id=buy_ack_chore_id)
-            buy_ack_chore_id = ack_chore_journal.chore.chore_id
+            buy_ack_chore_id = ack_chore_ledger.chore.chore_id
 
             if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
                 # Sleeping to let the chore get cxled
@@ -5859,10 +5866,10 @@ def place_sanity_chores(buy_symbol, sell_symbol, pair_plan_,
             update_tob_through_market_depth_to_place_sell_chore(created_pair_plan.cpp_port, ask_sell_top_market_depth,
                                                                 bid_buy_top_market_depth)
 
-            ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
+            ack_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK,
                                                                                sell_symbol, executor_web_client,
                                                                                last_chore_id=sell_ack_chore_id)
-            sell_ack_chore_id = ack_chore_journal.chore.chore_id
+            sell_ack_chore_id = ack_chore_ledger.chore.chore_id
 
             if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
                 # Sleeping to let the chore get cxled

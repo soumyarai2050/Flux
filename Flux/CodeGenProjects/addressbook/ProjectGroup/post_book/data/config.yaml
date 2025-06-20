@@ -6,14 +6,16 @@ ui_port: "3040"
 # server specific configs
 server_host: "127.0.0.1"
 main_server_beanie_port: "8040"
-main_server_cache_port: "8045"
+view_port: "8045"
+main_server_cache_port: "8046"
 min_refresh_interval: 20
 custom_logger_lvls:
   - TIMING: 15
   - JUNK: 5
+use_view_clients: True
 
 log_mongo_uri: True
-mongo_server: "mongodb://localhost:27017"
+mongo_server: "mongodb://localhost:27017/?replicaSet=rs0&authSource=admin"
 
 # below 2 configs are used to check types of override files to be initialized by fastapi launch script
 # supported values: "native" or "bare"

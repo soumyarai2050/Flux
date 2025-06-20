@@ -1,0 +1,103 @@
+.rightScrollIndicator {
+  position: absolute;
+  top: 12px;
+  right: 10px;
+  transform: translateY(0);
+  width: 20px;
+  height: 20px;
+  background: rgba(25, 118, 210, 0.9);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 100;
+  color: white;
+  box-shadow: 0 0 20px rgba(25, 118, 210, 0.6);
+  animation: glow 2s ease-in-out infinite alternate;
+  transition: all 0.3s ease;
+  pointer-events: auto;
+  background-color: rgba(255, 255, 255, 0.4);
+}
+
+.rightScrollIndicator:hover {
+  background: rgba(25, 118, 210, 1);
+  box-shadow: 0 0 30px rgba(25, 118, 210, 0.8);
+  transform: translateY(0) scale(1.1);
+}
+
+.rightScrollIndicator:active {
+  transform: translateY(0) scale(0.95);
+}
+
+.leftScrollIndicator {
+  position: absolute;
+  top: 12px;
+  left: 10px;
+  transform: translateY(0);
+  width: 20px;
+  height: 20px;
+  background: rgba(25, 118, 210, 0.9);
+  background-color: rgba(255, 255, 255, 0.4);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 100;
+  box-shadow: 0 0 20px rgba(25, 118, 210, 0.6);
+  animation: glow 2s ease-in-out infinite alternate;
+  transition: all 0.3s ease;
+  pointer-events: auto;
+}
+
+.leftScrollIndicator:hover {
+  background: rgba(25, 118, 210, 1);
+  box-shadow: 0 0 30px rgba(25, 118, 210, 0.8);
+  transform: translateY(0) scale(1.1);
+}
+
+.leftScrollIndicator:active {
+  transform: translateY(0) scale(0.95);
+}
+
+@keyframes glow {
+  from {
+    box-shadow: 0 0 20px rgba(25, 118, 210, 0.6);
+  }
+  to {
+    box-shadow: 0 0 30px rgba(25, 118, 210, 0.9), 0 0 40px rgba(25, 118, 210, 0.4);
+  }
+}
+
+/* Dark theme - properly override background color */
+@media (prefers-color-scheme: dark) {
+  .rightScrollIndicator {
+    background: rgba(144, 202, 249, 0.9);
+    box-shadow: 0 0 20px rgba(144, 202, 249, 0.6);
+  }
+  
+  .rightScrollIndicator:hover {
+    background: rgba(144, 202, 249, 1);
+    box-shadow: 0 0 30px rgba(144, 202, 249, 0.8);
+  }
+
+  .leftScrollIndicator {
+    background: rgba(144, 202, 249, 0.9);
+    box-shadow: 0 0 20px rgba(144, 202, 249, 0.6);
+  }
+  
+  .leftScrollIndicator:hover {
+    background: rgba(144, 202, 249, 1);
+    box-shadow: 0 0 30px rgba(144, 202, 249, 0.8);
+  }
+
+  @keyframes glow {
+    from {
+      box-shadow: 0 0 20px rgba(144, 202, 249, 0.6);
+    }
+    to {
+      box-shadow: 0 0 30px rgba(144, 202, 249, 0.9), 0 0 40px rgba(144, 202, 249, 0.4);
+    }
+  }
+} 

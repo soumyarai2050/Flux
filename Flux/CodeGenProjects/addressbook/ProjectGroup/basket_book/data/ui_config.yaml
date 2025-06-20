@@ -29,7 +29,7 @@ ui_coordinates:
     y: 50
     w: 18
     h: 10
-  FillsJournal:
+  DealsLedger:
     x: 0
     y: 60
     w: 18
@@ -39,7 +39,7 @@ ui_coordinates:
     y: 80
     w: 18
     h: 20
-  ChoreJournal:
+  ChoreLedger:
     x: 0
     y: 100
     w: 18

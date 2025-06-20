@@ -9,7 +9,7 @@ ui_coordinates:
     y: 12
     w: 18
     h: 20
-  ChoreJournal:
+  ChoreLedger:
     x: 0
     y: 32
     w: 18

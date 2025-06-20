@@ -7,7 +7,7 @@ import * as XLSX from 'xlsx';
 // project imports
 import {
     COLOR_PRIORITY, COLOR_TYPES, DATA_TYPES, HOVER_TEXT_TYPES, MODES, SHAPE_TYPES, SIZE_TYPES,
-    DB_ID, NEW_ITEM_ID, SCHEMA_DEFINITIONS_XPATH, API_ROOT_URL, SEVERITY_TYPES
+    DB_ID, NEW_ITEM_ID, SCHEMA_DEFINITIONS_XPATH, API_ROOT_URL, SEVERITY_TYPES, API_ROOT_VIEW_URL
 } from './constants';
 import * as workerUtils from './workerUtils';
 import { AlertCache } from './utility/alertCache';
@@ -3102,10 +3102,10 @@ function jsonify(obj) {
     return JSON.stringify({ obj });
 }
 
-export function getServerUrl(widgetSchema, linkedObj, linkedFieldsMetadata, requestType = 'http') {
+export function getServerUrl(widgetSchema, linkedObj, linkedFieldsMetadata, requestType = 'http', isViewUrl = false) {
     if (widgetSchema.connection_details) {
         const connectionDetails = widgetSchema.connection_details;
-        const { host, port, project_name } = connectionDetails;
+        const { host, port, view_port, project_name } = connectionDetails;
         // set url only if linkedObj running field is set to true for dynamic as well as static
         if (widgetSchema.widget_ui_data_element?.depending_proto_model_name) {
             const serverReadyStatusFld = linkedFieldsMetadata?.find(col => col.hasOwnProperty('server_ready_status')).key;
@@ -3113,7 +3113,7 @@ export function getServerUrl(widgetSchema, linkedObj, linkedFieldsMetadata, requ
             if (linkedObj && Object.keys(linkedObj).length && get(linkedObj, serverReadyStatusFld) >= requiredStateLvl) {
                 if (connectionDetails.dynamic_url) {
                     const hostxpath = host.substring(host.indexOf('.') + 1);
-                    const portFld = port;
+                    const portFld = isViewUrl ? view_port : port;
                     const portxpath = portFld.substring(port.indexOf('.') + 1);
                     const hostVal = get(linkedObj, hostxpath);
                     const portVal = get(linkedObj, portxpath);
@@ -3132,29 +3132,17 @@ export function getServerUrl(widgetSchema, linkedObj, linkedFieldsMetadata, requ
                         const err_ = `getServerUrl failed, unsupported ${jsonify(requestType)}. allowed [http, ws]`;
                         console.error(err_);
                     }
-                    // if (widgetSchema.widget_ui_data_element.depends_on_model_name_for_port && schemaName) {
-                    //     if (requestType === 'http') {
-                    //         const port = get(linkedObj, portxpath);
-                    //         if (!port) return null;
-                    //         return `http://${get(linkedObj, hostxpath)}:${port}/${project_name}`;
-                    //     } else if (requestType === 'ws') {
-                    //         portxpath = schemaName + '_port';
-                    //         const port = get(linkedObj, portxpath);
-                    //         if (!port) return null;
-                    //         return `http:${get(linkedObj, hostxpath)}:${port}`;
-                    //     }
-                    // } else {
-                    //     return `http://${get(linkedObj, hostxpath)}:${get(linkedObj, portxpath)}/${project_name}`;
-                    // }
                 } else {
-                    return `http://${host}:${port}/${project_name}`;
+                    const portVal = isViewUrl ? view_port : port;
+                    return `http://${host}:${portVal}/${project_name}`;
                 }
             }
         } else {
-            return `http://${host}:${port}/${project_name}`;
+            const portVal = isViewUrl ? view_port : port;
+            return `http://${host}:${portVal}/${project_name}`;
         }
     } else {
-        return API_ROOT_URL;
+        return isViewUrl ? API_ROOT_VIEW_URL : API_ROOT_URL;
     }
     return null;
 }
@@ -3621,8 +3609,8 @@ export function snakeToTitle(snakeStr) {
  * @param {Object} params - Additional parameters.
  * @returns {[string, Object]} The API URL and parameters.
  */
-export function getApiUrlMetadata(defaultEndpoint, overrideUrl, overrideEndpoint, uiLimit, params) {
-    const baseUrl = overrideUrl || API_ROOT_URL;
+export function getApiUrlMetadata(defaultEndpoint, overrideUrl, overrideEndpoint, uiLimit, params, isViewUrl = false) {
+    const baseUrl = overrideUrl || (isViewUrl ? API_ROOT_VIEW_URL : API_ROOT_URL);
     const baseEndpoint = overrideEndpoint || defaultEndpoint;
     const apiUrl = `${baseUrl}/${baseEndpoint}`;
     const apiParams = params ? { ...params } : {};

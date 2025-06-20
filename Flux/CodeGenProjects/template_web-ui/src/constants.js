@@ -6,7 +6,7 @@
 import * as CONFIG from './config';
 
 // Export API configuration values from config.
-export const { API_PUBLIC_URL, API_ROOT_URL, COOKIE_NAME, PROJECT_NAME } = CONFIG;
+export const { API_PUBLIC_URL, API_ROOT_URL, API_ROOT_VIEW_URL, COOKIE_NAME, PROJECT_NAME } = CONFIG;
 
 /**
  * Unique identifier field for database objects.

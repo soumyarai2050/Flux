@@ -8,15 +8,17 @@ DEBUG_MODEL: True
 # server specific configs
 server_host: "127.0.0.1"
 main_server_beanie_port: "8040"
-main_server_cache_port: "8035"
+view_port: "8045"
+main_server_cache_port: "8046"
 min_refresh_interval: 20
 custom_logger_lvls:
   - DB: 25
   - TIMING: 15
   - JUNK: 5
+use_view_clients: True
 
 log_mongo_uri: True
-mongo_server: "mongodb://localhost:27017"
+mongo_server: "mongodb://localhost:27017/?replicaSet=rs0&authSource=admin"
 avoid_top_of_book_db_update: True  # to be used in routes to bypass db updates if True
 avoid_market_depth_db_update: True  # to be used in routes to bypass db updates if True
 avoid_last_barter_db_update: True  # to be used in routes to bypass db updates if True

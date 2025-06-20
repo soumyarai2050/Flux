@@ -203,7 +203,7 @@ def expected_symbol_side_snapshot_():
 
 @pytest.fixture()
 def buy_chore_(pair_securities_with_sides_):
-    yield ChoreJournalBaseModel.from_dict({
+    yield ChoreLedgerBaseModel.from_dict({
         "chore": {
             "chore_id": "O1",
             "security": pair_securities_with_sides_["security1"],
@@ -260,8 +260,8 @@ def expected_buy_chore_snapshot_(pair_securities_with_sides_):
 
 
 @pytest.fixture()
-def buy_fill_journal_(pair_securities_with_sides_):
-    yield FillsJournalBaseModel.from_dict({
+def buy_fill_ledger_(pair_securities_with_sides_):
+    yield DealsLedgerBaseModel.from_dict({
         "chore_id": "O1",
         "fill_px": 90,
         "fill_qty": 50,
@@ -279,15 +279,15 @@ def chore_cxl_request(email_book_service_web_client_, buy_chore_):
     placed_chore_ack_obj = copy.deepcopy(buy_chore_)
     placed_chore_ack_obj.chore_event = "OE_CXL"
 
-    created_chore_journal_obj = \
-        email_book_service_web_client_.create_chore_journal_client(placed_chore_ack_obj)
+    created_chore_ledger_obj = \
+        email_book_service_web_client_.create_chore_ledger_client(placed_chore_ack_obj)
 
-    yield created_chore_journal_obj
+    yield created_chore_ledger_obj
 
 
 @pytest.fixture()
 def sell_chore_(pair_securities_with_sides_):
-    yield ChoreJournalBaseModel.from_dict({
+    yield ChoreLedgerBaseModel.from_dict({
         "chore": {
             "chore_id": "O2",
             "security": pair_securities_with_sides_["security2"],
@@ -343,8 +343,8 @@ def expected_sell_chore_snapshot_(pair_securities_with_sides_):
 
 
 @pytest.fixture()
-def sell_fill_journal_(pair_securities_with_sides_):
-    yield FillsJournalBaseModel(**{
+def sell_fill_ledger_(pair_securities_with_sides_):
+    yield DealsLedgerBaseModel(**{
         "chore_id": "O2",
         "fill_px": 120,
         "fill_qty": 30,
@@ -494,6 +494,7 @@ def get_missing_id_json():
     sample_json = sample.to_dict()
     yield sample_json, SampleBaseModel
 
+
 @pytest.fixture
 def sample_quote_df():
     return polars.DataFrame({
@@ -502,6 +503,7 @@ def sample_quote_df():
         'premium': [0.5],
         'last_update_date_time': [pendulum.now('UTC')]
     })
+
 
 @pytest.fixture
 def sample_top_of_book_df():

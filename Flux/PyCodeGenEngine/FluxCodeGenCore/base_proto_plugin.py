@@ -160,6 +160,8 @@ class BaseProtoPlugin(ABC):
         "depending_proto_model_field_name_for_host"
     widget_ui_option_depending_proto_model_field_name_for_port: ClassVar[str] = \
         "depending_proto_model_field_name_for_port"
+    widget_ui_option_depending_proto_model_field_name_for_view_port: ClassVar[str] = \
+        "depending_proto_model_field_name_for_view_port"
     widget_ui_option_depending_proto_model_field_name_for_ws_port: ClassVar[str] = \
         "depending_proto_model_field_name_for_ws_port"
     flux_msg_widget_ui_data_element_widget_ui_data_field: ClassVar[str] = "widget_ui_data"
@@ -261,6 +263,7 @@ class BaseProtoPlugin(ABC):
         widget_ui_option_depending_proto_model_name_field,
         widget_ui_option_depending_proto_model_field_name_for_host,
         widget_ui_option_depending_proto_model_field_name_for_port,
+        widget_ui_option_depending_proto_model_field_name_for_view_port,
         widget_ui_option_alert_bubble_source_field,
         widget_ui_option_alert_bubble_color_field,
         widget_ui_option_bind_id_fld_field,

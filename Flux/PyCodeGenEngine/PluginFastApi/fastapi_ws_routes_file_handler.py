@@ -103,6 +103,7 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str += f"async def get_{message_name_snake_cased}_from_index_fields_ws(websocket: WebSocket, " \
                       f"{field_params}):\n"
         field_params = ", ".join([f"{field.proto.name}" for field in index_fields])
+        output_str += self._get_view_check_code_for_ws(message)
         output_str += \
             f"    await underlying_get_{message_name_snake_cased}_from_index_fields_ws(websocket, {field_params})\n\n\n"
         return output_str
@@ -172,6 +173,7 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += (f"async def read_{message_name_snake_cased}_by_id_ws(websocket: WebSocket, "
                            f"{message_name_snake_cased}_id: {FastapiWsRoutesFileHandler.default_id_type_var_name},"
                            f"need_initial_snapshot: bool | None = True) -> None:\n")
+        output_str += self._get_view_check_code_for_ws(message)
         output_str += f"    await underlying_read_{message_name_snake_cased}_by_id_ws(websocket, " \
                       f"{message_name_snake_cased}_id, need_initial_snapshot=need_initial_snapshot)\n"
         return output_str
@@ -215,6 +217,38 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str += f"    await callback_class.read_all_ws_{message_name_snake_cased}_post()\n\n"
         return output_str
 
+    def _get_view_check_code_for_ws(self, message: protogen.Message):
+        # if model is usual type (non-time-series and non-gridfs) then read ws is supported as mongo
+        # change stream works with usual collections - only adding checks for time-series or large
+        # db objects with gridfs
+
+        output_str = f""
+        if FastapiWsRoutesFileHandler.is_option_enabled(message,
+                                                        FastapiWsRoutesFileHandler.flux_msg_json_root_time_series):
+            output_str += f"    if is_view_server:\n"
+            output_str += (f'        err_str_ = "MongoDb has limitation as '
+                           f'it doesn\'t support change stream with time-series collections - kept unsupported as '
+                           f'we dont have use-case for change stream based ws connection for time-series, if '
+                           f'with latest mongo version it is supported amd we have use-case '
+                           f'then make changes accordingly"\n')
+            output_str += f'        logging.error(err_str_)\n'
+            output_str += f'        raise HTTPException(detail=err_str_, status_code=400)\n'
+
+        else:
+            option_val = self.get_complex_option_value_from_proto(message, FastapiWsRoutesFileHandler.flux_msg_json_root)
+            if option_val.get(FastapiWsRoutesFileHandler.flux_json_root_enable_large_db_object_field):
+                output_str = f"    if is_view_server:\n"
+                output_str += (f'        err_str_ = "Mongo db doesn\'t support '
+                               f'change stream support for gridfs collections and since we dont have any '
+                               f'obvious use-case for gridfs based collection to monitor using change stream '
+                               f'we have disabled handling for it - if any use-case requires it now then '
+                               f'implement accordingly"\n')
+                output_str += f'        logging.error(err_str_)\n'
+                output_str += f'        raise HTTPException(detail=err_str_, status_code=400)\n'
+            # else not required: if model is usual type (not a large db object implemented with gridfs) then read ws
+            # is supported as mongo change stream works with usual collections
+        return output_str
+
     def handle_GET_ALL_ws_gen(self, message: protogen.Message, aggregation_type: str,
                               shared_lock_list: List[str] | None = None):
         message_name = message.proto.name
@@ -232,9 +266,11 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += "    limit_filter_agg: Dict[str, Any] | None = None\n"
             output_str += "    if limit_obj_count is not None:\n"
             output_str += "        limit_filter_agg = {'agg': get_limited_objs(limit_obj_count)}\n"
+            output_str += self._get_view_check_code_for_ws(message)
             output_str += (f"    await underlying_read_{message_name_snake_cased}_ws(websocket, "
                            f"limit_filter_agg, need_initial_snapshot)\n\n\n")
         else:
+            output_str += self._get_view_check_code_for_ws(message)
             output_str += (f"    await underlying_read_{message_name_snake_cased}_ws(websocket, "
                            f"need_initial_snapshot=need_initial_snapshot, "
                            f"limit_obj_count=limit_obj_count)\n\n\n")
@@ -248,6 +284,7 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str += f"async def ws_read_{message_name_snake_cased}_for_{field_name}(websocket: WebSocket, " \
                       f"{field_name}: {field_type}) -> None:\n"
         output_str += f'    """ websocket for {field_name} field of {message.proto.name} """\n'
+        output_str += self._get_view_check_code_for_ws(message)
         output_str += f"    await websocket.accept()\n"
         output_str += f"    while True:\n"
         output_str += f"        data = await websocket.receive()\n"
@@ -363,6 +400,7 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str += f'    """\n'
         output_str += f'    WS Query of {message.proto.name} with aggregate - {query_name}\n'
         output_str += f'    """\n'
+        output_str += self._get_view_check_code_for_ws(message)
         output_str += (f"    await underlying_{query_name}_query_ws(websocket, {query_params_str}, "
                        f"need_initial_snapshot)")
         output_str += "\n\n\n"
@@ -409,6 +447,7 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str += f'    """\n'
         output_str += f'    WS Query of {message.proto.name} with aggregate - {query_name}\n'
         output_str += f'    """\n'
+        output_str += self._get_view_check_code_for_ws(message)
         output_str += (f"    await underlying_{query_name}_query_ws(websocket, {query_params_str}, "
                        f"need_initial_snapshot)")
         output_str += "\n\n\n"

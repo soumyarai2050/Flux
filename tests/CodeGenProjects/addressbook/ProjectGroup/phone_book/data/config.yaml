@@ -1,6 +1,6 @@
 driver:
   chrome: "/home/sourav/Downloads/chromedriver-linux64 (2)/chromedriver"
-mongo_server_uri: "mongodb://localhost:27017"
+mongo_server_uri: "mongodb://localhost:27017/?replicaSet=rs0"
 ps_db_name: "phone_book_8020"
 md_db_name: "mobile_book"
 web_project_url: "http://localhost:3020"

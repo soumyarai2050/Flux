@@ -40,6 +40,60 @@
 * Export specific collection from remote db:
     ``mongodump --uri <connection_string> --db DBName --collection CollectionName``
 
+## Setting Up a Single-Node MongoDB Replica Set with Docker
+
+**Step 1: Stop and Remove Any Existing MongoDB Container (If Necessary)**
+If you have a plain MongoDB container (not configured as a replica set) or an old replica set container, stop and remove it to avoid conflicts.
+
+*   Find your container ID or name: `docker ps -a`
+*   Stop it: `docker stop <your_mongo_container_name_or_id>`
+*   Remove it: `docker rm <your_mongo_container_name_or_id>`
+*   If you have old volumes you want to clean up (this deletes data): `docker volume rm <volume_name>`
+
+**Step 2: Run a New MongoDB Container as a Single-Node Replica Set**
+
+```bash
+docker run -d \
+  --name my-mongo-repl \
+  -p 27017:27017 \
+  -v my-mongo-repl-data:/data/db \
+  mongo:latest \
+  mongod --replSet rs0 --bind_ip_all
+```
+
+**Explanation:**
+*   `docker run -d`: Run in detached mode.
+*   `--name my-mongo-repl`: A name for your container (e.g., `my-mongo-repl`).
+*   `-p 27017:27017`: Maps host port 27017 to the container's MongoDB port 27017.
+*   `-v my-mongo-repl-data:/data/db`: Creates and mounts a Docker volume named `my-mongo-repl-data` for persistent data. **Important!**
+*   `mongo:latest`: Uses the latest official MongoDB image.
+*   `mongod --replSet rs0 --bind_ip_all`:
+    *   `--replSet rs0`: Tells `mongod` to be part of a replica set named `rs0`. You can choose a different name if you like, but `rs0` is common for local setups.
+    *   `--bind_ip_all`: Makes MongoDB listen on all network interfaces within the container.
+
+**Step 3: Initiate the Single-Node Replica Set**
+Connect to the container and initiate the replica set.
+
+*   **Connect to the container's shell:**
+    ```bash
+    docker exec -it my-mongo-repl mongosh
+    ```
+
+*   **Inside `mongosh`, run:**
+    ```javascript
+    rs.initiate({
+      _id: "rs0", // Must match the --replSet name used in docker run
+      members: [
+        { _id: 0, host: "localhost:27017" } // 'localhost' here refers to the container itself
+      ]
+    })
+    ```
+    You should see `{"ok": 1}`. The prompt will change to `rs0:PRIMARY>`.
+
+Your single-node MongoDB replica set is now running and ready!
+
+---
+
 ## Investigate:
 https://studio3t.com/knowledge-base/articles/mongodb-aggregation-framework/
 MongoDB $out

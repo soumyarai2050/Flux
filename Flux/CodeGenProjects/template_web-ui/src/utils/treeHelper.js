@@ -98,6 +98,53 @@ function checkMatch(nodeValue, filterValuesString) {
     return filterTokens.some(token => valueStr.includes(token));
 }
 
+// New helper function to check if a node and its descendants match ALL active filters.
+function objectMatchesAllFilters(node, projectSchema, modelName, activeFilters) {
+    if (!activeFilters || activeFilters.length === 0) {
+        return true; // No active filters means the object "matches".
+    }
+
+    for (const filter of activeFilters) {
+        let matchFoundForThisFilter = false;
+
+        // Recursively search within the node for a match for the current filter.
+        function searchForMatch(currentNode) {
+            if (matchFoundForThisFilter) return; // Optimization: stop if we found a match for this filter.
+
+            // Check if the current node is a primitive field that matches the filter.
+            if (!(currentNode.isObjectContainer || currentNode.isArrayContainer) && currentNode.xpath && currentNode.value !== undefined) {
+                const genericPath = stripIndices(currentNode.xpath);
+                const fieldSchema = getSchemaForPath(projectSchema, modelName, genericPath);
+                if (fieldSchema && fieldSchema.filter_enable && filter.fld_name === genericPath) {
+                    if (checkMatch(currentNode.value, filter.fld_value)) {
+                        matchFoundForThisFilter = true;
+                        return;
+                    }
+                }
+            }
+
+            // If no match yet, recurse into children.
+            if (currentNode.children) {
+                for (const child of currentNode.children) {
+                    searchForMatch(child);
+                    if (matchFoundForThisFilter) return; // Exit early if a child found a match.
+                }
+            }
+        }
+
+        searchForMatch(node);
+
+        // If after searching the entire subtree of the object, no match was found for this filter,
+        // then the object does not satisfy the AND condition.
+        if (!matchFoundForThisFilter) {
+            return false;
+        }
+    }
+
+    // If we get here, it means the object had at least one matching descendant for EVERY active filter.
+    return true;
+}
+
 // Recursive function to filter a single node based on the new requirements.
 function filterNodeRecursive(node, projectSchema, modelName, filters) {
     if (!node) return null;
@@ -161,20 +208,11 @@ function filterNodeRecursive(node, projectSchema, modelName, filters) {
                         finalChildren.push(correspondingFilteredChild);
                     } else {
                         // This child container (originalChild) and its descendants did NOT match ANY active filters.
-                        // If the parent object (node) was kept due to a direct primitive match,
+                        // If the parent object (node) was kept due to a direct primitive match OR a descendant match,
                         // then we should include this originalChild container as it was (unfiltered by this pass).
-                        if (hasDirectPrimitiveChildMatch) { 
+                        if (hasDirectPrimitiveChildMatch || hasMatchingDescendant) { 
                             finalChildren.push(cloneDeep(originalChild));
-                        } else if (originalChild.isArrayContainer) {
-                            // Parent was kept due to *other* descendants, not its own primitives.
-                            // This array child didn't match anything, so it becomes an empty array.
-                            const emptyArray = cloneDeep(originalChild);
-                            emptyArray.children = [];
-                            finalChildren.push(emptyArray);
                         }
-                        // If originalChild is an object and we are in this 'else' block (no correspondingFilteredChild)
-                        // and the parent was NOT kept due to hasDirectPrimitiveChildMatch (i.e., parent was kept due to other descendants),
-                        // then this object child (which didn't match anything) is pruned.
                     }
                 }
             });
@@ -184,12 +222,18 @@ function filterNodeRecursive(node, projectSchema, modelName, filters) {
         return null; // Object not kept
 
     } else if (node.isArrayContainer) {
+        const activeFilters = filters.filter(f => f.fld_value && f.fld_value.trim() !== '');
+        if (activeFilters.length === 0) {
+            return newNode; // No filters, so don't filter this array at all.
+        }
+        
         const itemMatches = [];
         if (node.children) {
             for (const item of node.children) {
-                const filteredItem = filterNodeRecursive(item, projectSchema, modelName, filters);
-                if (filteredItem) {
-                    itemMatches.push(filteredItem);
+                // For array items, we apply AND logic. An item is kept only if it matches ALL active filters.
+                if (objectMatchesAllFilters(item, projectSchema, modelName, activeFilters)) {
+                    // If it matches, we keep the entire item, un-pruned.
+                    itemMatches.push(cloneDeep(item));
                 }
             }
         }

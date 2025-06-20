@@ -74,15 +74,15 @@ def last_barter_basemodel_fixture() -> List[LastBarterBaseModel]:
 
 
 @pytest.fixture()
-def fills_journal_basemodel_fixture() -> List[FillsJournalBaseModel]:
-    input_data: List[FillsJournalBaseModel] = []
+def deals_ledger_basemodel_fixture() -> List[DealsLedgerBaseModel]:
+    input_data: List[DealsLedgerBaseModel] = []
     id_counter: int = 0
 
     for symbol in ["Type1_Sec_1", "Type2_Sec_1"]:
         for _ in range(5):
             id_counter += 1
             input_data.append(
-                FillsJournalBaseModel(
+                DealsLedgerBaseModel(
                     id=id_counter,
                     chore_id=f"Chore_{str(id_counter)}",
                     fill_px=120.5 + id_counter,
@@ -131,7 +131,7 @@ def plan_limits_fixture(expected_brokers_) -> List[PlanLimitsBaseModel]:
 
 
 @pytest.fixture()
-def chore_journal_basemodel_fixture() -> List[ChoreJournalBaseModel]:
+def chore_ledger_basemodel_fixture() -> List[ChoreLedgerBaseModel]:
     input_data = []
     id_counter: int = 0
 
@@ -139,7 +139,7 @@ def chore_journal_basemodel_fixture() -> List[ChoreJournalBaseModel]:
         for _ in range(5):  # Adjust the range as needed
             id_counter += 1
             input_data.append(
-                ChoreJournalBaseModel(
+                ChoreLedgerBaseModel(
                     id=id_counter,
                     chore=ChoreBriefBaseModel(
                         chore_id=f"Chore_{id_counter}",
@@ -426,9 +426,9 @@ def web_project(driver: WebDriver, pair_plan: Dict, expected_chore_limits_: Chor
                 expected_contact_limits_: ContactLimitsBaseModel, top_of_book_fixture: List,
                 market_depth_basemodel_fixture: List[MarketDepthBaseModel],
                 last_barter_basemodel_fixture: List[LastBarterBaseModel],
-                fills_journal_basemodel_fixture: List[FillsJournalBaseModel],
+                deals_ledger_basemodel_fixture: List[DealsLedgerBaseModel],
                 chore_snapshot_basemodel_fixture: List[ChoreSnapshotBaseModel],
-                chore_journal_basemodel_fixture: List[ChoreJournalBaseModel],
+                chore_ledger_basemodel_fixture: List[ChoreLedgerBaseModel],
                 symbol_side_snapshot_fixture: SymbolSideSnapshotBaseModel,
                 plan_limits_fixture: PlanLimitsBaseModel, expected_pair_plan: Dict[str, any], basket_chore):
 
@@ -462,9 +462,9 @@ def web_project(driver: WebDriver, pair_plan: Dict, expected_chore_limits_: Chor
     create_tob_md_ld_fj_os_oj(driver=driver, top_of_book_fixture=top_of_book_fixture,
                               market_depth_basemodel_fixture=market_depth_basemodel_fixture,
                               last_barter_basemodel_fixture=last_barter_basemodel_fixture,
-                              fills_journal_basemodel_fixture=fills_journal_basemodel_fixture,
+                              deals_ledger_basemodel_fixture=deals_ledger_basemodel_fixture,
                               chore_snapshot_basemodel_fixture=chore_snapshot_basemodel_fixture,
-                              chore_journal_basemodel_fixture=chore_journal_basemodel_fixture,
+                              chore_ledger_basemodel_fixture=chore_ledger_basemodel_fixture,
                               plan_limits_fixture=plan_limits_fixture)
 
 @pytest.fixture()

@@ -171,7 +171,7 @@ class MDStreamingManager:
         symbol_streaming_data: SymbolStreamingData = SymbolStreamingData(run_symbol_overview_file_path,
                                                                          stop_symbol_overview_file_path)
 
-        subscription_data = self.get_subscription_data(sec_id, sec_id_source)
+        subscription_data = self._get_subscription_data(sec_id, sec_id_source)
         exch_code = "SS" if exch_id == "SSE" else "SZ"
         md_shell_env_data: MDShellEnvData = (
             MDShellEnvData(subscription_data=subscription_data, host=self.host, port=self.port, db_name=self.db_name,

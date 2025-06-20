@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import ValueBasedToggleButton from './ValueBasedToggleButton';
-import { API_ROOT_URL } from '../constants';
+import { API_ROOT_URL, API_ROOT_VIEW_URL } from '../constants';
 import { PlayArrow, Delete } from '@mui/icons-material';
 import Alert from './Alert';
 import { getColorTypeFromValue, getSizeFromValue, getShapeFromValue, getErrorDetails, getAxiosMethod } from '../utils';
@@ -14,7 +14,7 @@ import { computeFileChecksum } from '../utils/fileHelper';
 dayjs.extend(utc);
 
 
-const ButtonQuery = ({ queryObj, url }) => {
+const ButtonQuery = ({ queryObj, url, viewUrl }) => {
     const [value, setButtonValue] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
     const [alert, setAlert] = useState(null);
@@ -81,6 +81,7 @@ const ButtonQuery = ({ queryObj, url }) => {
     }, [queryObj])
 
     const baseUrl = useMemo(() => url || API_ROOT_URL, [url]);
+    const baseViewUrl = useMemo(() => viewUrl || API_ROOT_VIEW_URL, [viewUrl]);
 
     const { caption, color, isDisabledValue, shape, size } = buttonOptions;
     const { allow_force_update, button_icon_name, hide_caption } = queryObj.ui_button;
@@ -177,7 +178,7 @@ const ButtonQuery = ({ queryObj, url }) => {
     const handleHttpQuery = async (queryName, queryRouteType) => {
         try {
             const axiosFunc = getAxiosMethod(queryRouteType);
-            await axiosFunc(`${baseUrl}/${queryName}`);
+            await axiosFunc(`${queryRouteType === 'get' ? baseViewUrl : baseUrl}/${queryName}`);
             const text = `${queryName} successfully completed`;
             setAlert({ type: 'success', detail: text });
         } catch (err) {

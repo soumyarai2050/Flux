@@ -162,7 +162,7 @@ class BeanieFastApiPlugin(FastapiCallbackFileHandler,
         database_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.database_file_name)
         output_str += f"from {database_file_path} import init_db\n\n"
         output_str += "# Below imports are to initialize routes before launching server\n"
-        routes_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.http_routes_file_name)
+        routes_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.http_routes_import_file_name)
         output_str += f"from {routes_file_path} import *\n"
         routes_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.ws_routes_file_name)
         output_str += f"from {routes_file_path} import *\n\n"

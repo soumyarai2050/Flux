@@ -338,7 +338,16 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
         output_str += '        NotImplementedError("derived app_launch_pre not implemented to set self.port")\n\n'
 
         output_str += "    def app_launch_post(self):\n"
+        output_str += '        logging.debug("Post launch Fastapi app")\n\n'
+
+        output_str += "    @abstractmethod\n"
+        output_str += "    def view_app_launch_pre(self):\n"
+        output_str += '        logging.debug("Pre launch Fastapi app")\n\n'
+        output_str += '        NotImplementedError("derived app_launch_pre not implemented to set self.port")\n\n'
+
+        output_str += "    def view_app_launch_post(self):\n"
         output_str += '        logging.debug("Post launch Fastapi app")\n'
+
         return output_str
 
     def handle_get_set_instance(self) -> str:
@@ -711,12 +720,74 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
         # Adding app pre- and post-launch methods
         output_str += self.handle_launch_pre_and_post_callback()
         output_str += "\n"
-
+        output_str += self.handle_view_change_stream_code()
+        output_str += "\n"
         output_str += self.handle_callback_methods_output(model_type=ModelType.Msgspec)
 
         msg_name_n_ws_query_name_tuple_list: List = []      # to be populated in below calls
         output_str += self.handle_callback_query_methods_output(msg_name_n_ws_query_name_tuple_list)
         output_str += self.handle_callback_projection_query_methods_output(msg_name_n_ws_query_name_tuple_list)
         output_str += self.handle_query_filter_func_output(msg_name_n_ws_query_name_tuple_list)
+
+        return output_str
+
+    def handle_view_change_stream_code(self):
+        output_str = "    async def _start_mongo_streamer(self):\n"
+        output_str += "        try:\n"
+        output_str += "            task_list = []\n"
+        update_agg_set_message_list: List[protogen.Message] = []
+        filer_agg_set_message_list: List[protogen.Message] = []
+        for message in self.root_message_list:
+            if FastapiCallbackFileHandler.is_option_enabled(message, FastapiCallbackFileHandler.flux_msg_json_root_time_series):
+                # if time-series model
+                continue
+            option_val = FastapiCallbackFileHandler.get_complex_option_value_from_proto(message, FastapiCallbackFileHandler.flux_msg_json_root)
+            if option_val.get(FastapiCallbackFileHandler.flux_json_root_enable_large_db_object_field):
+                # if gridfs based message
+                continue
+            # else not required for both above if cases - allowing only usual mongo collections as change stream is supported for them only
+            output_str += f"            task_list.append(asyncio.create_task(watch_specific_collection_with_stream({message.proto.name}"
+            has_update_agg_set = False
+            has_filter_agg_set = False
+            for option_field_name, option_field_type in option_val.items():
+                if option_field_type == FastapiCallbackFileHandler.aggregation_type_update:
+                    has_update_agg_set = True
+                elif option_field_type == FastapiCallbackFileHandler.aggregation_type_filter:
+                    has_filter_agg_set = True
+                elif option_field_type == FastapiCallbackFileHandler.aggregation_type_both:
+                    has_filter_agg_set = True
+                    has_update_agg_set = True
+                # else not required: if none of these using default values
+
+            if has_update_agg_set:
+                update_agg_set_message_list.append(message)
+                message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
+                output_str += f", filter_ws_updates_callable=self.{message_name_snake_cased}_update_ws_filter_callable"
+            elif has_filter_agg_set:
+                filer_agg_set_message_list.append(message)
+                message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
+                output_str += f", filter_agg_pipeline_callable=self.{message_name_snake_cased}_filter_agg_callable"
+            # else not required: if none of these is set then avoiding any param
+            output_str += f")))\n"
+
+        output_str += "            await asyncio.gather(*task_list)\n"
+        output_str += "        except Exception as e:\n"
+        output_str += "            logging.error(f\"Something went wrong while watching changes using mongo streamer - stream \"\n"
+        output_str += "                          f\"tasks are stoped;;; exception: {e}\")\n\n"
+
+        # creating abstract methods for set update and filter callables
+        for message in update_agg_set_message_list:
+            message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
+            output_str += f"    @abstractmethod\n"
+            output_str += f"    def {message_name_snake_cased}_update_ws_filter_callable(self, stream_object: Dict):\n"
+            output_str += (f"        # must return bool suggesting this stream object should "
+                           f"be broadcasted to ws or not\n")
+            output_str += f"        raise NotImplementedError\n\n"
+        for message in filer_agg_set_message_list:
+            message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
+            output_str += f"    @abstractmethod\n"
+            output_str += f"    def {message_name_snake_cased}_filter_agg_callable(self, stream_object: Dict):\n"
+            output_str += f"        # must return filter aggregate pipeline\n"
+            output_str += f"        raise NotImplementedError\n\n"
 
         return output_str

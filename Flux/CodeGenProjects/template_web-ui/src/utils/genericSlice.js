@@ -10,7 +10,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 import { camelCase } from 'lodash';
-import { API_ROOT_URL, MODES } from '../constants';
+import { API_ROOT_URL, API_ROOT_VIEW_URL, MODES } from '../constants';
 import { getApiUrlMetadata, snakeToPascal, getErrorDetails } from '../utils';
 import {
   setStoredArrayHandler,
@@ -102,9 +102,9 @@ export function createGenericSlice({
     let apiUrl, apiParams;
     if (payload) {
       const { url, endpoint, uiLimit, params } = payload;
-      [apiUrl, apiParams] = getApiUrlMetadata(defaultEndpoint, url, endpoint, uiLimit, params);
+      [apiUrl, apiParams] = getApiUrlMetadata(defaultEndpoint, url, endpoint, uiLimit, params, true);
     } else {
-      apiUrl = `${API_ROOT_URL}/${defaultEndpoint}`;
+      apiUrl = `${API_ROOT_VIEW_URL}/${defaultEndpoint}`;
       apiParams = {};
     }
     try {
@@ -118,7 +118,7 @@ export function createGenericSlice({
   const getThunk = createAsyncThunk(`${capModelName}/get`, async (payload, { rejectWithValue }) => {
     const defaultEndpoint = `get-${endpointBase}`;
     const { url, endpoint, uiLimit, params, id } = payload;
-    const [apiUrl, apiParams] = getApiUrlMetadata(defaultEndpoint, url, endpoint, uiLimit, params);
+    const [apiUrl, apiParams] = getApiUrlMetadata(defaultEndpoint, url, endpoint, uiLimit, params, true);
     try {
       const res = await axios.get(`${apiUrl}/${id}`, { params: apiParams });
       return res.data;

@@ -27,6 +27,7 @@ class SecurityRecord(MsgspecBaseModel):
     ticker: str | None = None
     exchange_code: str | None = None
     sedol: str | None = None
+    secondary_sedol: str | None = None
     equityFloat: int | None = None
     amount_outstanding: float | None = None
     conv_px: float | None = None
@@ -38,6 +39,7 @@ class SecurityRecord(MsgspecBaseModel):
     limit_dn_px: float | None = None
     tick_size: float | None = None
     figi: str | None = None
+    secondary_figi: str | None = None
 
 
 class SecurityRecordManager:
@@ -192,3 +194,30 @@ class SecurityRecordManager:
         else:
             logging.error(f"unsupported {ric=} not found in barter_ready_records_by_ticker")
             return None
+
+    @staticmethod
+    def refresh_autocomplete_list(directory: PurePath, file_name: str):
+        pass
+
+    @staticmethod
+    def get_exchange_from_sec_rec_exch_code(exch_code: str):
+        return exch_code
+
+    def get_exchange_n_ticker_from_sec_id_n_source(self, sec_id: str,
+                                                   sec_id_type: str) -> Tuple[str | None, str | None]:
+        sec_rec: SecurityRecord | None
+        match sec_id_type.lower():
+            case "ticker":
+                sec_rec = self.get_security_record_from_ticker(sec_id)
+            case "sedol":
+                sec_rec = self.barter_ready_cb_records_by_sedol.get(sec_id)
+            case "ric":
+                ticker = self.get_ticker_from_ric(sec_id)
+                sec_rec = self.barter_ready_records_by_ticker.get(ticker)
+            case _:
+                raise Exception(f"Unsupported {sec_id_type} for {sec_id} found in "
+                                f"get_exchange_n_ticker_from_sec_id_n_source")
+        if sec_rec is not None:
+            return self.get_exchange_from_sec_rec_exch_code(sec_rec.exchange_code), sec_rec.ticker
+        else:
+            return None, None

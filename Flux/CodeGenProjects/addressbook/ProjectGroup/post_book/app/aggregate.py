@@ -78,7 +78,7 @@ def get_last_n_sec_chores_by_events(last_n_sec: int, chore_event_list: List[str]
 
 
 def get_last_n_sec_chores_by_event_n_symbol(symbol: str | None, last_n_sec: int, chore_event: str):
-    # Model - chore journal
+    # Model - chore ledger
     # Below match aggregation stages are based on max filtering first (stage that filters most gets precedence)
     # since this aggregate is used to count
     # Note: if you change sequence of match stages, don't forget to change hardcoded index number below to add

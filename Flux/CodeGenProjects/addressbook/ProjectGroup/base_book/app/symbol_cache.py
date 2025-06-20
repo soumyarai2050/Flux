@@ -125,7 +125,7 @@ class SymbolCacheContainer:
             SymbolCacheContainer.shared_memory = shm
         except FileNotFoundError as exp:
             # shared memory doesn't exist yet, will retry in next loop
-            logging.warning(f"Something went wrong with setting up md shared memory: {exp}")
+            logging.warning(f"Something went wrong with setting up md shared memory: {exp}", exc_info=True)
 
         try:
             semaphore = posix_ipc.Semaphore(shared_memory_semaphore_name)

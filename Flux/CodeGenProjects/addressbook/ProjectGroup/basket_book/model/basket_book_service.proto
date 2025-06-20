@@ -81,7 +81,7 @@ message UpdatePosCache {
       QueryParamDataType: "str"
     },
   };
-  required bool resp = 2;
+  required bool resp = 1;
 }
 
 // used to avoid unused import warning by using any random msg or enum from imported file causing warning

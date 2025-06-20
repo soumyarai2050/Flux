@@ -12,7 +12,6 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.StreetBo
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_plan_cache import BasePlanCache
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.generated.ORMModel.basket_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.generated.StreetBook.basket_book_service_key_handler import BasketBookServiceKeyHandler
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.data import security
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.pos_cache import PosCache
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import (
     ShadowBrokersBaseModel)
@@ -106,14 +105,14 @@ class BasketCache(BasePlanCache, BasketBookServiceBasePlanCache, EmailBookServic
                     logging.info(f"ignoring non-amend update: {new_chore_obj} orig: {stored_chore_obj}")
             else:
                 # this is new / recovered chore entry - add to non_cached_new_chore_list
-                self.update_chore_sec_details(new_chore_obj)  # we may have gone down with sec update in DB
+                self.update_chore_sec_details(new_chore_obj)  # we may have gone down without sec update in DB
                 non_cached_new_chore_list.append(new_chore_obj)
                 self.id_to_new_chore_dict[new_chore_obj.id] = new_chore_obj
                 logging.info(f"Added to non_cached_new_chore_list chore: {new_chore_obj.ticker} "
                              f"{new_chore_obj.side} {new_chore_obj.chore_id};;;{new_chore_obj}")
 
         if non_cached_new_chore_list:
-            non_cached_basket_chore_: BasketChore = BasketChore(id=self.basket_id,
+            non_cached_basket_chore_: BasketChore = BasketChore(id=self._basket_chore.id,
                                                                 new_chores=non_cached_new_chore_list)
             self.non_cached_basket_chore_queue.put(non_cached_basket_chore_)
         return self._basket_chore_update_date_time
@@ -148,7 +147,7 @@ class BasketCache(BasePlanCache, BasketBookServiceBasePlanCache, EmailBookServic
             else:
                 self.set_primary_ric_n_sedol_from_ticker_in_new_chore(new_chore_obj)
         elif (new_chore_obj.security.sec_id_source == SecurityIdSource.SEDOL or
-              new_chore_obj.security.sec_id_source.RIC) and new_chore_obj.ticker is not None:
+              new_chore_obj.security.sec_id_source == SecurityIdSource.RIC) and new_chore_obj.ticker is not None:
             pass  # pre-set
 
         elif new_chore_obj.security.sec_id_source == SecurityIdSource.SEC_ID_SOURCE_UNSPECIFIED:
@@ -254,7 +253,7 @@ class BasketCache(BasePlanCache, BasketBookServiceBasePlanCache, EmailBookServic
                 else:
                     found = False
                 if not found:
-                    err_ = (f"Error: new chore's {ric=} matches record in figi_to_sec_rec_dict, but either "
+                    err_ = (f"Error: new chore's {ric=} matches record in static_data, but either "
                             f"{sec_rec.sec_type=} not EQT/CB or the matched sec_rec's ric(s): {sec_rec.ric=}, "
                             f"{sec_rec.secondary_ric=}; dont match found {ric=} on new chore;;;{new_chore_obj=}")
                     raise HTTPException(status_code=500, detail=err_)
@@ -264,13 +263,12 @@ class BasketCache(BasePlanCache, BasketBookServiceBasePlanCache, EmailBookServic
                 raise HTTPException(status_code=500, detail=err_)
 
         else:
-            err_ = f"Unsupported ric: {new_chore_obj.security.sec_id}; found on {new_chore_obj=}"
+            err_ = f"Unsupported {new_chore_obj.security.sec_id_source=}; found on {new_chore_obj=}"
             raise HTTPException(status_code=500, detail=err_)
-        # else not required = chore sec_id is RIC
+        # else not required - chore sec_id is RIC
 
     @staticmethod
-    def has_qty_amend(stored_chore_obj: NewChore | Dict | None,
-                      updated_chore_obj: NewChore | Dict) -> Tuple[bool, int | None]:
+    def has_qty_amend(stored_chore_obj: NewChore | Dict, updated_chore_obj: NewChore | Dict) -> Tuple[bool, int | None]:
         updated_qty: int | None = None
         is_amend: bool = False
         if isinstance(stored_chore_obj, Dict):
@@ -297,7 +295,7 @@ class BasketCache(BasePlanCache, BasketBookServiceBasePlanCache, EmailBookServic
             elif stored_px != updated_px and updated_px is not None:
                 is_amend = True
         else:
-            if updated_chore_obj.qty is not None and (not math.isclose(stored_chore_obj.px, updated_chore_obj.px)):
+            if updated_chore_obj.px is not None and (not math.isclose(stored_chore_obj.px, updated_chore_obj.px)):
                 updated_px = updated_chore_obj.px
                 is_amend = True
         return is_amend, updated_px
@@ -359,8 +357,8 @@ class BasketCache(BasePlanCache, BasketBookServiceBasePlanCache, EmailBookServic
             email_book_service_http_client.get_dismiss_filter_contact_limit_brokers_query_client(
                 system_symbol, system_symbol))
         if not shadow_brokers:
-            err_str_ = (f"Http Query get_dismiss_filter_contact_limit_brokers_query_client returned empty list, "
-                        f"expected shadow_brokers list")
+            err_str_ = ("Http Query get_dismiss_filter_contact_limit_brokers_query returned empty list, "
+                        "expected shadow_brokers list")
             logging.warning(err_str_)
         logging.debug(f"shadow brokers for {system_symbol=} - {shadow_brokers=}")
         eligible_brokers: List[BrokerBaseModel] = []

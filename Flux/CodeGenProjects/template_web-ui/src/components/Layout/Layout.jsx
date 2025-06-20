@@ -2,8 +2,8 @@ import React, { useEffect, useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { useSelector, useDispatch } from 'react-redux';
 import { Responsive, WidthProvider } from 'react-grid-layout';
-import { Grid, Popover, Select, MenuItem, FormControl, InputLabel } from '@mui/material';
-import { Brightness4, Brightness7, DashboardCustomize, DoNotTouch, PanTool, SaveAs, ViewComfy, Palette } from '@mui/icons-material';
+import { Grid, Popover, MenuItem } from '@mui/material';
+import { Brightness4, Brightness7, DashboardCustomize, DoNotTouch, PanTool, SaveAs, ViewComfy, Palette, SpaceDashboard } from '@mui/icons-material';
 import { defaultLayouts } from '../../projectSpecificUtils';
 import { actions as LayoutActions } from '../../features/uiLayoutSlice';
 import * as Selectors from '../../selectors';
@@ -14,7 +14,7 @@ import 'react-resizable/css/styles.css';
 import styles from './Layout.module.css';
 import Icon, { ToggleIcon } from '../Icon';
 import { SaveLayoutPopup } from '../Popup';
-import { API_ROOT_URL, COOKIE_NAME } from '../../config';
+import { API_ROOT_URL, API_ROOT_VIEW_URL, COOKIE_NAME } from '../../config';
 import { DB_ID } from '../../constants';
 import { useURLParams, useWebSocketWorker } from '../../hooks';
 import { BaseColor, cssVar, baseColorPalettes, Theme, DEFAULT_BASE_COLOR } from '../../theme';
@@ -89,6 +89,11 @@ const Layout = ({ projectName, theme, onThemeToggle, baseColor, onBaseColorChang
   // Check if admin_control parameter exists in URL
   const showAdminControl = urlParams && urlParams.admin_control === 'true';
 
+  // Calculate dropdown selected index
+  const profileOptions = ['reset', ...(storedArray || []).map(profile => profile.profile_id)];
+  const currentProfileValue = profileId || 'reset';
+  const dropdownSelectedIndex = profileOptions.indexOf(currentProfileValue);
+
   const handleWorkerUpdate = (updatedArray) => {
     dispatch(LayoutActions.setStoredArray(updatedArray));
   }
@@ -98,7 +103,7 @@ const Layout = ({ projectName, theme, onThemeToggle, baseColor, onBaseColorChang
   }
 
   useWebSocketWorker({
-    url: API_ROOT_URL,
+    url: API_ROOT_VIEW_URL,
     modelName: 'ui_layout',
     isDisabled: false,
     reconnectCounter,
@@ -124,7 +129,25 @@ const Layout = ({ projectName, theme, onThemeToggle, baseColor, onBaseColorChang
     // Retrieve the active layout ID from sessionStorage.
     const activeLayoutId = urlParams?.layout ?? sessionStorage.getItem(COOKIE_NAME);
     if (!activeLayoutId) {
-      handleReset(); // Reset to default if no layout parameter
+      // Reset to default if no layout parameter (inline logic instead of calling handleReset)
+      sessionStorage.removeItem(COOKIE_NAME);
+      setLayout(defaultLayouts);
+      const newVisibleComponents = defaultLayouts.map(item => item.i);
+      setVisibleComponents(newVisibleComponents);
+      dispatch(LayoutActions.setStoredObj({ profile_id: 'default', widget_ui_data_elements: defaultLayouts, base_color: DEFAULT_BASE_COLOR }));
+      setProfileId('');
+      
+      // Reset base color to default
+      setSelectedBaseColor(DEFAULT_BASE_COLOR);
+      if (onBaseColorChange) {
+        onBaseColorChange(DEFAULT_BASE_COLOR);
+      }
+      
+      // Clear the layout parameter from URL
+      const currentUrl = new URL(window.location);
+      currentUrl.searchParams.delete('layout');
+      window.history.pushState({}, '', currentUrl.toString());
+      
       return;
     }
     let newLayout;
@@ -272,7 +295,7 @@ const Layout = ({ projectName, theme, onThemeToggle, baseColor, onBaseColorChang
     root.style.setProperty('--dynamic-cell-selected', `var(${cellSelectedColorVarName})`);
   }, [selectedBaseColor, theme]);
 
-  if (isLoading) return <div>Loading layout...</div>;
+  if (isLoading || !layout) return <div>Loading layout...</div>;
   if (!layout && !storedObj.widget_ui_data_elements) return null;
 
   const popoverId = Boolean(anchorEl) ? 'toggle-popover' : undefined;
@@ -300,8 +323,7 @@ const Layout = ({ projectName, theme, onThemeToggle, baseColor, onBaseColorChang
     setIsSaveLayoutPopupOpen((prev) => !prev);
   }
 
-  const handleProfileDropdownChange = (event) => {
-    const selectedValue = event.target.value;
+  const handleProfileDropdownChange = (selectedValue) => {
     if (selectedValue === 'reset') {
       handleReset();
     } else {
@@ -423,27 +445,8 @@ const Layout = ({ projectName, theme, onThemeToggle, baseColor, onBaseColorChang
       {/* Enhanced Navbar with hide-on-scroll functionality */}
       <nav className={`${styles.navbar} ${!isNavbarVisible ? styles.hidden : ''}`}>
         <div className={styles.navbarLogo}>{snakeToTitle(projectName)}</div>
-        <Icon name='drag' title='drag' onClick={handleDraggableToggle}>
-          <DraggableIcon fontSize='medium' />
-        </Icon>
-        <Icon name='theme' title='theme' onClick={handleThemeToggle}>
-          <MuiThemeIcon fontSize='medium' />
-        </Icon>
         {/* Base Color Selector - only show if admin_control URL param exists */}
         {showAdminControl && (
-          // <FormControl variant="outlined" size="small" sx={{ m: 1, width: 65, '& .MuiOutlinedInput-root': {color: navbarTextColorValue }, '& .MuiSelect-icon': {color: navbarTextColorValue }, '& .MuiOutlinedInput-notchedOutline': {borderColor: cssVar('--light-border-default')} }}>
-          //   <Select
-          //     labelId="base-color-select-label"
-          //     id="base-color-select"
-          //     value={selectedBaseColor}
-          //     onChange={handleBaseColorSelectorChange}
-          //     sx={{fontSize: '0.875rem', '.MuiSelect-select': {paddingTop: '6px', paddingBottom: '6px'}}}
-          //   >
-          //     <MenuItem value={BaseColor.GREEN}>🟩</MenuItem>
-          //     <MenuItem value={BaseColor.BLUE}> 🟦</MenuItem>
-          //     <MenuItem value={BaseColor.BROWN}>🟫</MenuItem>
-          //   </Select>
-          // </FormControl>
           <DropdownButton
             options={Object.values(BaseColor)}
             renderButtonContent={(color) => (
@@ -452,43 +455,39 @@ const Layout = ({ projectName, theme, onThemeToggle, baseColor, onBaseColorChang
               </span>
             )}
             renderOption={(color) => (
-              <MenuItem value={color}>
+              <>
                 {color === BaseColor.GREEN ? '🟩' : color === BaseColor.BLUE ? '🟦' : '🟫'}
-              </MenuItem>
+              </>
             )}
             initialSelectedIndex={Object.values(BaseColor).indexOf(selectedBaseColor)}
+            selectedIndex={Object.values(BaseColor).indexOf(selectedBaseColor)}
             onOptionSelect={handleBaseColorSelectorChange}
           />
         )}
         {/* Profile Dropdown - replacing load popup */}
-        <FormControl variant="outlined" size="small" sx={{
-          m: 1,
-          width: 150,
-          '& .MuiOutlinedInput-root': {
-            color: navbarTextColorValue,
-            fontSize: '0.875rem',
-            '& .MuiOutlinedInput-notchedOutline': {
-              borderColor: cssVar('--light-border-default')
-            }
-          },
-          '& .MuiSelect-icon': {
-            color: navbarTextColorValue
-          }
-        }}>
-          <Select
-            value={profileId || 'reset'}
-            onChange={handleProfileDropdownChange}
-            displayEmpty
-            sx={{ fontSize: '0.75rem' }}
-          >
-            <MenuItem value="reset">Default</MenuItem>
-            {(storedArray || []).map((profile) => (
-              <MenuItem key={profile[DB_ID]} value={profile.profile_id}>
-                {profile.profile_id}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+        <DropdownButton
+          options={['reset', ...(storedArray || []).map(profile => profile.profile_id)]}
+          renderButtonContent={(option) => (
+            <span style={{ fontSize: '0.75rem', color: navbarTextColorValue }}>
+              <SpaceDashboard fontSize='medium' sx={{marginRight: '4px'}} />
+              {option === 'reset' ? 'Default' : option}
+            </span>
+          )}
+          renderOption={(option) => (
+            <>
+              {option === 'reset' ? 'Default' : option}
+            </>
+          )}
+          initialSelectedIndex={dropdownSelectedIndex}
+          selectedIndex={dropdownSelectedIndex}
+          onOptionSelect={handleProfileDropdownChange}
+        />
+        <Icon name='drag' title='drag' onClick={handleDraggableToggle}>
+          <DraggableIcon fontSize='medium' />
+        </Icon>
+        <Icon name='theme' title='theme' onClick={handleThemeToggle}>
+          <MuiThemeIcon fontSize='medium' />
+        </Icon>
         <Icon name='save' title='save' onClick={handleSaveLayoutPopupToggle}>
           <SaveAs fontSize='medium' />
         </Icon>

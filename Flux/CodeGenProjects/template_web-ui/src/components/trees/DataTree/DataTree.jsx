@@ -5,7 +5,7 @@ import { generateObjectFromSchema, addxpath, getDataxpath, /* setTreeState, */ c
 import { DATA_TYPES, ITEMS_PER_PAGE } from '../../../constants';
 import Node from '../../Node';
 import HeaderField from '../../HeaderField';
-import NodeBaseClasses from '../../Node.module.css'; 
+import NodeBaseClasses from '../../Node.module.css';
 import PropTypes from 'prop-types';
 
 
@@ -38,8 +38,9 @@ const DataTree = ({
     const workerRef = useRef(null);
     const levelRef = useRef(treeLevel ? treeLevel : xpath ? 3 : 2);
 
-    // Add ref to track when full regeneration is needed
-    const needsFullRegenerationRef = useRef(true);
+    // ref to track when full regeneration is needed
+    const needsFullRegenerationRef = useRef(false);
+    const isInitialMount = useRef(true);
 
     useEffect(() => {
         levelRef.current = treeLevel ? treeLevel : xpath ? 3 : 2;
@@ -85,6 +86,11 @@ const DataTree = ({
     const prevUpdatedDataRef = useRef(updatedData);
     const prevStoredDataRef = useRef(storedData);
 
+    // Refs to store previous prop values for major change detection
+    const prevProjectSchemaRef = useRef(projectSchema);
+    const prevModeRef = useRef(mode);
+    const prevFiltersRef = useRef(filters);
+
     // Update latestPropsRef whenever relevant props change.
     // This ref always holds the most current data to be sent to the worker.
     useEffect(() => {
@@ -104,48 +110,29 @@ const DataTree = ({
     useEffect(() => {
         if (!workerRef.current) return;
 
-        let isReloadScenario = false;
-        // Detect reload: updatedData changed and now matches storedData, after being different from storedData
-        if (updatedData !== prevUpdatedDataRef.current &&
-            prevUpdatedDataRef.current !== prevStoredDataRef.current &&
-            updatedData === storedData) {
-            isReloadScenario = true;
-            console.log("DataTree: Reload Scenario 1 detected (updatedData aligned with storedData).");
-        }
-        // Detect reload: storedData changed, and updatedData matches the new storedData
-        else if (storedData !== prevStoredDataRef.current &&
-            updatedData === storedData) {
-            isReloadScenario = true;
-            console.log("DataTree: Reload Scenario 2 detected (storedData changed, updatedData aligned).");
-        }
-
-        if (isReloadScenario) {
-            console.log("DataTree: Resetting expanded nodes and initial expansion flag due to reload.");
-            setExpandedNodeXPaths({ "root": true }); // Reset to only root expanded
-            initialExpansionSetForCurrentTreeRef.current = false; // Allow re-application of initial expansion rules
-            // Note: setPaginatedNodes({}); // Not resetting paginatedNodes for now, to keep it minimal
-            // Note: setItemVisualStates({}); // Not resetting itemVisualStates for now
-            
-            // Mark that full regeneration is needed for reload scenarios
-            needsFullRegenerationRef.current = true;
-        }
-
         const processWithWorker = () => {
             console.log("Posting to worker with props:", latestPropsRef.current);
             setIsWorkerProcessing(true);
             pendingRequestRef.current = false; // Reset pending flag as we are processing now
+
+            // Set flag for initial mount
+            if (isInitialMount.current) {
+                needsFullRegenerationRef.current = true;
+                isInitialMount.current = false;
+            }
+
             workerRef.current.postMessage({ type: 'PROCESS_TREE', payload: latestPropsRef.current });
         };
 
-        // Check if this is a major change requiring full regeneration
+        // Check if this is a change requiring full regeneration
+        // Only set for major structural changes, not for data updates
         const majorChanges = [
-            projectSchema !== prevUpdatedDataRef.current?.projectSchema,
-            modelName !== prevUpdatedDataRef.current?.modelName,
-            mode !== prevUpdatedDataRef.current?.mode,
-            JSON.stringify(filters) !== JSON.stringify(prevUpdatedDataRef.current?.filters)
+            projectSchema !== prevProjectSchemaRef.current,
+            mode !== prevModeRef.current,
+            JSON.stringify(filters) !== JSON.stringify(prevFiltersRef.current)
         ];
-        
-        if (majorChanges.some(Boolean) || isReloadScenario) {
+
+        if (majorChanges.some(Boolean)) {
             needsFullRegenerationRef.current = true;
         }
 
@@ -168,7 +155,15 @@ const DataTree = ({
     useEffect(() => {
         prevUpdatedDataRef.current = updatedData;
         prevStoredDataRef.current = storedData;
+        prevProjectSchemaRef.current = projectSchema;
+        prevModeRef.current = mode;
+        prevFiltersRef.current = filters;
     }); // Runs after every render
+
+
+    useEffect(() => {
+        needsFullRegenerationRef.current = false;
+    }, [counter]);
 
     // Setup worker message handler once on component mount
     useEffect(() => {
@@ -178,18 +173,26 @@ const DataTree = ({
             const { type, payload } = event.data;
             if (type === 'TREE_GENERATED') {
                 console.log("Worker response received:", payload);
-                setOriginalTree(payload.originalTree || []);
+
+
                 const newTreeData = payload.treeData || [];
+                // Capture the length of the tree currently in state, BEFORE updating it.
+                const previousTreeLength = treeData.length;
+                // A structural change is detected if the number of top-level nodes changes.
+                // This is a reliable heuristic for additions/removals that should force a remount.
+
+                const structuralChangeDetected = newTreeData.length !== previousTreeLength;
+
+                setOriginalTree(payload.originalTree || []);
                 setTreeData(newTreeData);
-                setCounter((prev) => prev + 1);
 
-                // Mark that full regeneration is complete
-                needsFullRegenerationRef.current = false;
+                // Updated condition for remounting the TreeView.
+                // A remount is forced if it was pre-flagged (e.g., by filter/mode change/reload)
+                // OR if the worker response indicates a significant structural change (the length check).
+                if (needsFullRegenerationRef.current || structuralChangeDetected) {
+                    setCounter((prev) => prev + 1);
+                }
 
-                // Prune expandedNodeXPaths: Addressed Issue 1 here.
-                // The old pruning was too aggressive, removing states for paginated-away items.
-                // Actual pruning for deleted items is handled by specific 'remove' action handlers.
-                // We primarily ensure 'root' consistency here, and preserve other user-set expansions.
                 setExpandedNodeXPaths(prevExpandedPaths => {
                     const newExpandedState = { ...prevExpandedPaths }; // Start with a copy
                     let changed = false;
@@ -250,11 +253,9 @@ const DataTree = ({
         workerRef.current.onmessage = messageHandler;
 
         return () => {
-            // Optional: Clean up worker message handler if component unmounts
-            // dataTreeWorker.onmessage = null;
-            // Consider terminating if worker is not shared: dataTreeWorker.terminate();
+            // workerRef.current.onmessage = null; // Optional cleanup
         };
-    }, []); // Empty dependency array: setup message handler only once
+    }, [treeData.length]);
 
     // Effect to scroll to newly added/duplicated item and manage glow timing
     useEffect(() => {
@@ -300,7 +301,7 @@ const DataTree = ({
                             console.warn(`Scroll Warning: Target element not found for primary XPath: ${newlyAddedOrDuplicatedXPath} nor deeper XPath: ${finalTargetXPath}.`);
                         }
                     } else {
-                         console.warn(`Scroll Warning: Target element not found for XPath: ${finalTargetXPath}.`);
+                        console.warn(`Scroll Warning: Target element not found for XPath: ${finalTargetXPath}.`);
                     }
                 }
                 // DO NOT reset newlyAddedOrDuplicatedXPath here; it's for the glow timer
@@ -318,46 +319,6 @@ const DataTree = ({
         }
     }, [newlyAddedOrDuplicatedXPath, treeData, setNewlyAddedOrDuplicatedXPath]); // Dependencies
 
-    // Add local tree update function for optimized operations
-    const updateTreeLocally = useCallback((parentXPath, action, newItem = null, index = null) => {
-        setTreeData(prevTree => {
-            const newTree = cloneDeep(prevTree);
-            const findAndUpdateNode = (nodes) => {
-                for (let i = 0; i < nodes.length; i++) {
-                    if (nodes[i].id === parentXPath) {
-                        switch (action) {
-                            case 'add':
-                                if (newItem) {
-                                    nodes[i].children = nodes[i].children || [];
-                                    nodes[i].children.push({
-                                        ...newItem,
-                                        id: newItem.id || `${parentXPath}_${Date.now()}`
-                                    });
-                                }
-                                break;
-                            case 'remove':
-                                if (index !== null && nodes[i].children) {
-                                    nodes[i].children.splice(index, 1);
-                                }
-                                break;
-                            case 'update':
-                                if (index !== null && nodes[i].children && newItem) {
-                                    nodes[i].children[index] = newItem;
-                                }
-                                break;
-                        }
-                        return true;
-                    }
-                    if (nodes[i].children && findAndUpdateNode(nodes[i].children)) {
-                        return true;
-                    }
-                }
-                return false;
-            };
-            findAndUpdateNode(newTree);
-            return newTree;
-        });
-    }, []);
 
     // Handle page change for a paginated node
     const handlePageChange = useCallback((nodeId, direction, totalPagesForNode) => {
@@ -371,14 +332,29 @@ const DataTree = ({
                 newPage = Math.max(currentPage - 1, 0);
             }
 
+            // Only trigger remount if we're actually changing pages
+            if (newPage !== currentPage) {
+                // Check if there are any expanded nodes under this paginated container
+                const hasExpandedChildren = Object.keys(expandedNodeXPaths).some(xpath =>
+                    xpath.startsWith(nodeId + '.') || xpath.startsWith(nodeId + '[')
+                );
+
+                if (hasExpandedChildren) {
+                    // Pagination requires remount because TreeView's internal state can get out of sync
+                    // with our expansion states when the data structure changes significantly
+
+                    needsFullRegenerationRef.current = true;
+                } else {
+                    console.log("[DataTree] Pagination change without expanded children - no remount needed");
+                }
+            }
+
             return {
                 ...prev,
                 [nodeId]: { page: newPage }
             };
         });
-        // paginatedNodes change will be caught by the main useEffect which updates latestPropsRef
-        // and then triggers the worker communication useEffect.
-    }, []);
+    }, [expandedNodeXPaths]);
 
     const handleTextChange = useCallback((e, type, xpath, value, dataxpath, validationRes) => {
         if (value === '') value = null;
@@ -444,8 +420,8 @@ const DataTree = ({
                 if (propSchema.type === DATA_TYPES.OBJECT) {
                     let subSchemaDefToRecurse = propSchema;
                     if (propSchema.items && propSchema.items.$ref) { // Object defined by $ref under items
-                         const refParts = propSchema.items.$ref.split('/');
-                         subSchemaDefToRecurse = refParts.length === 2 ? currentProjectSchema[refParts[1]] : currentProjectSchema[refParts[1]][refParts[2]];
+                        const refParts = propSchema.items.$ref.split('/');
+                        subSchemaDefToRecurse = refParts.length === 2 ? currentProjectSchema[refParts[1]] : currentProjectSchema[refParts[1]][refParts[2]];
                     }
                     // Only recurse if there's a schema definition for children
                     if ((subSchemaDefToRecurse && subSchemaDefToRecurse.properties) || (subSchemaDefToRecurse && subSchemaDefToRecurse.items && subSchemaDefToRecurse.items.$ref)) {
@@ -454,7 +430,7 @@ const DataTree = ({
                 } else if (propSchema.type === DATA_TYPES.ARRAY && propSchema.items && propSchema.items.$ref) {
                     const itemRefParts = propSchema.items.$ref.split('/');
                     const itemSchemaDef = itemRefParts.length === 2 ? currentProjectSchema[itemRefParts[1]] : currentProjectSchema[itemRefParts[1]][itemRefParts[2]];
-                    
+
                     if (Array.isArray(childData)) {
                         childData.forEach((itemData, index) => {
                             const itemSchemaPath = `${childNodeSchemaPath}[${index}]`;
@@ -469,7 +445,7 @@ const DataTree = ({
 
         // Start discovery from the children of the new node.
         discoverPaths(newDataInstance, baseSchemaPathOfNewNode, schemaOfNewNodeInstance);
-        
+
         setExpandedNodeXPaths(prevExpanded => ({
             ...prevExpanded,
             [baseSchemaPathOfNewNode]: true, // Ensure the base node itself is expanded
@@ -524,7 +500,6 @@ const DataTree = ({
                 const isArrayItemAddition = originalNode.isArrayContainer && schemaRefString; // For array, schemaRefString is for the *type* of item in array
 
                 if (isObjectInitialization) {
-                    console.log('[DataTree] Attempting OBJECT INITIALIZATION for:', xpathAttr, 'Node:', originalNode);
                     try {
                         let updatedObj = cloneDeep(updatedData);
                         const objectSchemaDefinitionPath = originalNode.schemaRef.split('/');
@@ -561,7 +536,7 @@ const DataTree = ({
                         expandNodeAndAllChildren(xpathAttr, newObjectInstance, itemSchemaForObject, projectSchema);
                         onUpdate(updatedObj, 'add');
                         setNewlyAddedOrDuplicatedXPath(xpathAttr); // Scroll to the initialized object
-                        
+
                         // Mark that full regeneration is needed for structural changes
                         needsFullRegenerationRef.current = true;
                         setCounter(prev => prev + 1);
@@ -639,10 +614,10 @@ const DataTree = ({
                     setPaginatedNodes(prev => ({ ...prev, [xpathAttr]: { page: newItemPageIndex } }));
                     onUpdate(updatedObj, 'add');
                     setNewlyAddedOrDuplicatedXPath(schemaXpathForNewItem); // Scroll to the new array item
-                    
+
                     // Mark that full regeneration is needed for structural changes
                     needsFullRegenerationRef.current = true;
-                    setCounter(prev => prev + 1);
+                    // setCounter(prev => prev + 1);
                     return;
                 } else {
                     // Fallback or error: Unhandled add click scenario
@@ -724,10 +699,10 @@ const DataTree = ({
                 setPaginatedNodes(prev => ({ ...prev, [parentDataXpath]: { page: newItemPageIndex } }));
                 onUpdate(updatedObj, 'add');
                 setNewlyAddedOrDuplicatedXPath(schemaXpathForDuplicatedItem); // Scroll to the duplicated item
-                
+
                 // Mark that full regeneration is needed for structural changes
                 needsFullRegenerationRef.current = true;
-                setCounter(prev => prev + 1);
+                // setCounter(prev => prev + 1);
                 return; // Action handled
             }
 
@@ -764,10 +739,10 @@ const DataTree = ({
                     });
 
                     onUpdate(updatedObj, 'remove'); // 'remove' might signify data changed to null
-                    
+
                     // Mark that full regeneration is needed for structural changes
                     needsFullRegenerationRef.current = true;
-                    setCounter(prev => prev + 1);
+                    // setCounter(prev => prev + 1);
                     return; // Action handled
                 }
                 // Handle removal of an array item (existing logic)
@@ -804,7 +779,7 @@ const DataTree = ({
                             return changed ? newExpandedPaths : prevExpandedPaths;
                         });
                         onUpdate(updatedObj, 'remove');
-                        
+
                         // Mark that full regeneration is needed for structural changes
                         needsFullRegenerationRef.current = true;
                         setCounter(prev => prev + 1);
@@ -852,21 +827,13 @@ const DataTree = ({
             } else { // No explicit state (undefined)
                 // Use levelRef.current for the comparison
                 // Only expand if it's a container and within the default expansion level
-                if (level <= levelRef.current && (originalNode?.isObjectContainer || originalNode?.isArrayContainer)) { 
+                if (level <= levelRef.current && (originalNode?.isObjectContainer || originalNode?.isArrayContainer)) {
                     nodeIsOpen = true;
                     isChanged = true; // Mark to persist this default decision
                 }
                 // else, if level > levelRef.current or not a container, and no explicit state, nodeIsOpen remains false (default collapsed)
             }
         } else {
-            // Node does NOT have an XPath: apply no-XPath-based default level
-            // Cannot have an explicit state in expandedNodeXPaths as it's keyed by XPath.
-            // This default decision cannot be persisted in expandedNodeXPaths.
-            //   if (level <= 2) { // Default expansion for nodes WITHOUT XPath up to level 2
-            //       nodeIsOpen = true;
-            //   }
-            // isChanged remains false, as we can't persist state without an XPath key.
-            // else, if level > 2, nodeIsOpen remains false (default collapsed)
             console.error('something went wrong. nodexpath found null' + xpath);
         }
 
@@ -890,7 +857,6 @@ const DataTree = ({
             updatedDataForColor: updatedData,
             storedDataForColor: storedData,
             visualState: visualState,
-            // triggerGlowForXPath: newlyAddedOrDuplicatedXPath // This prop is now removed as HeaderField won't use it
         };
 
         if (originalNode.pagination) {
@@ -906,9 +872,7 @@ const DataTree = ({
             updatedDataForColor: updatedData,
             storedDataForColor: storedData,
             visualState: visualState,
-            // triggerGlowForXPath: newlyAddedOrDuplicatedXPath // This prop can be conditionally removed or 
         };
-        
         // If HeaderField no longer needs triggerGlowForXPath, this prop can be conditionally removed or 
         // HeaderField can be updated to not expect it. For now, let's assume it might still be there
         // or will be cleaned up in the next step when editing HeaderField.jsx.
@@ -977,9 +941,9 @@ const DataTree = ({
             // Tree is empty or not yet loaded, reset the flag
             initialExpansionSetForCurrentTreeRef.current = false;
             // Ensure "root" is still in the base state for when tree loads
-            setExpandedNodeXPaths(prevPaths => { // Changed to functional update
-                if (Object.keys(prevPaths).length === 1 && prevPaths.root === true) return prevPaths; // Already minimal state
-                return { "root": true }; // Reset to just root expanded if tree is empty
+            setExpandedNodeXPaths(prevPaths => {
+                if (Object.keys(prevPaths).length === 1 && prevPaths.root === true) return prevPaths;
+                return { "root": true };
             });
         }
     }, [originalTree]);
@@ -1002,61 +966,55 @@ const DataTree = ({
                 if (!shouldExpand && node.xpath && (node.isObjectContainer || node.isArrayContainer)) {
                     const nodeDataInUpdated = get(updatedData, node.xpath);
                     const nodeDataInStored = get(storedData, node.xpath);
-                    
+
                     // If object exists in updated but not in stored, it's newly created
                     if (nodeDataInUpdated && !nodeDataInStored && 
                         typeof nodeDataInUpdated === 'object' && nodeDataInUpdated !== null) {
                         shouldExpand = true;
                         expansionReason = 'exists in updated but not in stored data';
                     }
-                    
+
                     // Additional check for nested objects: if stored data is null/undefined but updated has object
-                    if (!shouldExpand && nodeDataInUpdated && 
+                    if (!shouldExpand && nodeDataInUpdated &&
                         (nodeDataInStored === null || nodeDataInStored === undefined) &&
                         typeof nodeDataInUpdated === 'object' && nodeDataInUpdated !== null) {
                         shouldExpand = true;
                         expansionReason = 'stored data is null but updated has object';
                     }
                 }
-                
+
                 if (shouldExpand) {
                     console.log('[DataTree] Auto-expanding newly created object:', node.xpath, 'Reason:', expansionReason, 'Node:', node);
-                    
+
                     // Get the data for this newly created object
                     const nodeData = get(updatedData, node.xpath);
-                    
                     if (nodeData) {
                         let objectSchema = null;
-                        
+
                         // Try to get schema from ref first
                         if (node.ref) {
                             const schemaRefParts = node.ref.split('/');
-                            objectSchema = schemaRefParts.length === 2 ? 
-                                projectSchema[schemaRefParts[1]] : 
+                            objectSchema = schemaRefParts.length === 2 ?
+                                projectSchema[schemaRefParts[1]] :
                                 projectSchema[schemaRefParts[1]][schemaRefParts[2]];
                         }
-                        
                         // If no ref or no schema found via ref, try to infer from the data structure
                         if (!objectSchema && typeof nodeData === 'object' && nodeData !== null) {
                             // For nested objects, we can try to expand based on the data structure itself
                             console.log('[DataTree] No schema ref found, using data structure for expansion:', node.xpath);
-                            
+
                             // Create a minimal schema-like object from the data
-                            objectSchema = {
-                                properties: {}
-                            };
-                            
+                            objectSchema = { properties: {} };
                             Object.keys(nodeData).forEach(key => {
                                 if (!key.startsWith('xpath_') && key !== 'data-id') {
                                     objectSchema.properties[key] = {
-                                        type: Array.isArray(nodeData[key]) ? 'array' : 
-                                              typeof nodeData[key] === 'object' && nodeData[key] !== null ? 'object' : 
-                                              typeof nodeData[key]
+                                        type: Array.isArray(nodeData[key]) ? 'array' :
+                                            typeof nodeData[key] === 'object' && nodeData[key] !== null ? 'object' :
+                                                typeof nodeData[key]
                                     };
                                 }
                             });
                         }
-                        
                         if (objectSchema) {
                             console.log('[DataTree] Expanding newly created object with schema:', objectSchema);
                             // Use the same expansion logic as the + button
@@ -1071,7 +1029,7 @@ const DataTree = ({
                         }
                     }
                 }
-                
+
                 // Recursively check children
                 if (node.children && Array.isArray(node.children)) {
                     node.children.forEach(child => {
@@ -1093,18 +1051,20 @@ const DataTree = ({
     const updatedExpandedIds = Object.keys(expandedNodeXPaths)
         .filter(xpath => expandedNodeXPaths[xpath] && activeNodeIdsSet.has(xpath));
 
+    const treeViewKey = counter;
+
     return (
         <TreeView
-            key={needsFullRegenerationRef.current ? counter : 'stable'}
+            key={treeViewKey}
             data={treeData}
             aria-label={modelName}
             nodeRenderer={nodeRenderer}
             expandedIds={updatedExpandedIds} // Control TreeView expansion
             multiSelect={false}
             onKeyDown={(e) => {
-            e.stopPropagation();
-            e.preventDefault(); // Fully disables default keyboard behavior
-  }}
+                e.stopPropagation();
+                e.preventDefault(); // Fully disables default keyboard behavior
+            }}
         />
     );
 };

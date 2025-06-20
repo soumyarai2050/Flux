@@ -25,8 +25,8 @@ message CheckContactLimits{
       QueryParamDataType: "int"
     }
     QueryParams: {
-      QueryParamName: "chore_journal",
-      QueryParamDataType: "ChoreJournalBaseModel"
+      QueryParamName: "chore_ledger",
+      QueryParamDataType: "ChoreLedgerBaseModel"
     }
     QueryParams: {
       QueryParamName: "chore_snapshot",

@@ -29,6 +29,12 @@
 # @@protoc_insertion_point(api_root)
 
 /**
+ * The API view root URL constructed using the project name.
+ * @type {string}
+ */
+# @@protoc_insertion_point(api_view_root)
+
+/**
  * The public API URL.
  * @type {string}
  */
@@ -40,6 +46,13 @@
  * @type {string}
  */
 export const API_ROOT_URL = ENABLE_PROXY ? PROXY_SERVER_ROOT : API_ROOT;
+
+/**
+ * The primary API VIEW URL used in the application.
+ * This will use the proxy server URL if the ENABLE_PROXY flag is set to true.
+ * @type {string}
+ */
+export const API_ROOT_VIEW_URL = ENABLE_PROXY ? PROXY_SERVER_ROOT : API_VIEW_ROOT;
 
 /**
  * The name of the cookie used by the application.

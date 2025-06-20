@@ -26,9 +26,17 @@ config_yaml_path: PurePath = CURRENT_PROJECT_DATA_DIR / f"config.yaml"
 config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(config_yaml_path))
 
 la_host, la_port = config_yaml_dict.get("server_host"), parse_to_int(config_yaml_dict.get("main_server_beanie_port"))
+la_view_port = parse_to_int(config_yaml_dict.get("view_port"))
 
-log_book_service_http_client = \
+log_book_service_http_view_client = \
+    LogBookServiceHttpClient.set_or_get_if_instance_exists(la_host, la_port, view_port=la_view_port)
+log_book_service_http_main_client = \
     LogBookServiceHttpClient.set_or_get_if_instance_exists(la_host, la_port)
+
+if config_yaml_dict.get("use_view_clients"):
+    log_book_service_http_client = log_book_service_http_view_client
+else:
+    log_book_service_http_client = log_book_service_http_main_client
 
 datetime_str = datetime.datetime.now().strftime("%Y%m%d")
 contact_alert_fail_log = f"contact_alert_fail_logs_{datetime_str}.log"
@@ -84,7 +92,22 @@ def create_alert(
 def is_log_book_service_up(ignore_error: bool = False) -> bool:
     try:
         ui_layout_list: List[UILayoutBaseModel] = (
-            log_book_service_http_client.get_all_ui_layout_client())
+            log_book_service_http_main_client.get_all_ui_layout_client())
+
+        return True
+    except Exception as _e:
+        if not ignore_error:
+            logging.exception("is_executor_service_up test failed - tried "
+                              "get_all_ui_layout_client ;;;"
+                              f"exception: {_e}", exc_info=True)
+        # else not required - silently ignore error is true
+        return False
+
+
+def is_view_log_book_service_up(ignore_error: bool = False) -> bool:
+    try:
+        ui_layout_list: List[UILayoutBaseModel] = (
+            log_book_service_http_view_client.get_all_ui_layout_client())
 
         return True
     except Exception as _e:
@@ -197,7 +220,7 @@ def should_retry_due_to_server_down(exception: Exception) -> bool:
     return True
 
 
-def get_update_obj_list_for_journal_type_update(
+def get_update_obj_list_for_ledger_type_update(
         basemodel_class_type: Type[MsgspecBaseModel], update_type: str, method_name: str, patch_queue: queue.Queue,
         max_fetch_from_queue: int, update_dict_list: List[MsgspecModel | Dict],
         parse_to_model: bool | None = None) -> List[Dict] | str:  # blocking function
@@ -208,7 +231,7 @@ def get_update_obj_list_for_journal_type_update(
 
     # handling thread exit
     if kwargs == "EXIT":
-        logging.info(f"Exiting get_update_obj_list_for_journal_type_update")
+        logging.info(f"Exiting get_update_obj_list_for_ledger_type_update")
         return "EXIT"
 
     if parse_to_model:
@@ -223,7 +246,7 @@ def get_update_obj_list_for_journal_type_update(
 
         # handling thread exit
         if kwargs == "EXIT":
-            logging.info(f"Exiting get_update_obj_list_for_journal_type_update")
+            logging.info(f"Exiting get_update_obj_list_for_ledger_type_update")
             return "EXIT"
 
         if parse_to_model:
@@ -353,7 +376,7 @@ def get_update_obj_for_snapshot_type_update(
 def handle_patch_db_queue_updater(
         update_type: str, model_type_name_to_patch_queue_cache_dict: Dict[str, queue.Queue],
         basemodel_type_name: str, method_name: str, update_data,
-        journal_type_handler_callable: Callable, snapshot_type_handler_callable: Callable,
+        ledger_type_handler_callable: Callable, snapshot_type_handler_callable: Callable,
         update_handler_callable: Callable, error_handler_callable: Callable,
         max_fetch_from_queue: int, snapshot_type_callable_err_handler: Callable,
         parse_to_model: bool | None = None):
@@ -369,7 +392,7 @@ def handle_patch_db_queue_updater(
 
             Thread(target=handle_dynamic_queue_for_patch_n_patch_all,
                    args=(basemodel_type_name, method_name, update_type,
-                         patch_queue, journal_type_handler_callable, snapshot_type_handler_callable,
+                         patch_queue, ledger_type_handler_callable, snapshot_type_handler_callable,
                          update_handler_callable, error_handler_callable, max_fetch_from_queue,
                          snapshot_type_callable_err_handler, parse_to_model,),
                    name=f"{basemodel_type_name}_handler").start()
@@ -384,7 +407,7 @@ def handle_patch_db_queue_updater(
 
 def handle_dynamic_queue_for_patch_n_patch_all(basemodel_type: str, method_name: str,
                                                update_type: UpdateType, patch_queue: queue.Queue,
-                                               journal_type_handler_callable: Callable,
+                                               ledger_type_handler_callable: Callable,
                                                snapshot_type_handler_callable: Callable,
                                                update_handler_callable: Callable, error_handler_callable: Callable,
                                                max_fetch_from_queue: int,
@@ -401,7 +424,7 @@ def handle_dynamic_queue_for_patch_n_patch_all(basemodel_type: str, method_name:
                 if update_type == UpdateType.JOURNAL_TYPE:
                     # blocking call
                     pending_updates: List[Any] | Any = (
-                        journal_type_handler_callable(basemodel_class_type, update_type, method_name, patch_queue,
+                        ledger_type_handler_callable(basemodel_class_type, update_type, method_name, patch_queue,
                                                       max_fetch_from_queue, pending_updates, parse_to_model))
 
                 else:  # if update_type is UpdateType.SNAPSHOT_TYPE

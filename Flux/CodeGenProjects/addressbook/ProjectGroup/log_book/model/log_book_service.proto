@@ -200,7 +200,7 @@ message ExecutorEventMeta {
   required string execution_date = 2 [(FluxFldFilterEnable) = true, (FluxFldHelp) = "dd-mm-yyyy"];
 }
 
-message ExecutorEventJournal {
+message ExecutorEventLedger {
   option (FluxMsgJsonRootTimeSeries) = {
     MongoVersion: 7.0,
     CreateOp: AggregateType_UNSPECIFIED,

@@ -277,8 +277,8 @@ class BaseFastapiPlugin(BaseProtoPlugin):
 
     def _import_current_http_routes(self) -> List[str]:
         import_statements: List[str] = []
-        model_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.http_routes_file_name)
-        import_statements.append(f"            from {model_file_path} import *\n")
+        routes_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.http_routes_file_name)
+        import_statements.append(f"            from {routes_file_path} import *\n")
         return import_statements
 
     def handle_http_routes_import_file_gen(self) -> str:

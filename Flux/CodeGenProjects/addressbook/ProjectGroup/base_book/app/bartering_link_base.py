@@ -8,7 +8,7 @@ import os
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import (
     Security, Side)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.ORMModel.street_book_service_model_imports import (
-    ChoreBrief, ChoreJournal, ChoreEventType, ChoreStatusType)
+    ChoreBrief, ChoreLedger, ChoreEventType, ChoreStatusType)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.executor_config_loader import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     EmailBookServiceHttpClient, email_book_service_http_client)
@@ -88,7 +88,7 @@ class BarteringLinkBase(ABC):
     @classmethod
     @abstractmethod
     async def place_new_chore(cls, px: float, qty: int, side: Side, bartering_sec_id: str, system_sec_id: str,
-                              symbol_type: str, account: str, exchange: str | None = None, text: List[str] | None = None,
+                              bartering_sec_type: str, account: str, exchange: str | None = None, text: List[str] | None = None,
                               client_ord_id: str | None = None, **kwargs) -> Tuple[bool, str]:
         """
         derived to implement connector to underlying link provider, and
@@ -100,6 +100,14 @@ class BarteringLinkBase(ABC):
     async def place_amend_chore(cls, chore_id: str, px: float | None = None, qty: int | None = None,
                                 bartering_sec_id: str | None = None, system_sec_id: str | None = None,
                                 bartering_sec_type: str | None = None) -> bool:
+        """
+        derived to implement connector to underlying link provider
+        """
+
+    @classmethod
+    @abstractmethod
+    async def place_cxl_chore(cls, chore_id: str, side: Side | None = None, bartering_sec_id: str | None = None,
+                              system_sec_id: str | None = None, underlying_account: str | None = None) -> bool:
         """
         derived to implement connector to underlying link provider
         """
@@ -119,7 +127,7 @@ class BarteringLinkBase(ABC):
         derived to implement connector to underlying link provider
         returns chore_status (ChoreStatusType), any_chore_text, filled-Qty, chore-px and chore-qty as seen by bartering
         link, caller may use these for reconciliation
-        returns None [indicating no chore found for this chore_id]
+        return None [indicating no chore found for this chore_id]
         throws exception if found chore state is unsupported
         """
 
@@ -129,15 +137,15 @@ class BarteringLinkBase(ABC):
                                           underlying_account: str | None = None, msg: str | None = None) -> bool:
         """use for rejects New / Cxl for now - maybe other use cases in future"""
         from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes_imports import (
-            underlying_create_chore_journal_http)
+            underlying_create_chore_ledger_http)
 
         security = Security(sec_id=system_sec_id)
         chore_brief = ChoreBrief(chore_id=chore_id, security=security, side=side,
                                  underlying_account=underlying_account)
         add_to_texts(chore_brief, msg)
-        chore_journal = ChoreJournal(chore=chore_brief, chore_event_date_time=DateTime.utcnow(),
+        chore_ledger = ChoreLedger(chore=chore_brief, chore_event_date_time=DateTime.utcnow(),
                                      chore_event=chore_event)
-        await underlying_create_chore_journal_http(chore_journal)
+        await underlying_create_chore_ledger_http(chore_ledger)
         return True
 
     @classmethod

@@ -14,14 +14,29 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi
     StreetBookServiceHttpClient)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.ORMModel.street_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
-    email_book_service_http_client, get_symbol_side_key)
+    email_book_service_http_view_client, email_book_service_http_main_client, get_symbol_side_key)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import (
-    log_book_service_http_client)
+    log_book_service_http_view_client, log_book_service_http_main_client)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.app.post_book_service_helper import (
-    post_book_service_http_client)
+    post_book_service_http_view_client, post_book_service_http_main_client)
 from FluxPythonUtils.scripts.general_utility_functions import parse_to_int, get_symbol_side_pattern
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.executor_config_loader import executor_config_yaml_dict
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_helper import (
+    photo_book_service_http_view_client, photo_book_service_http_main_client)
 
 update_plan_status_lock: threading.Lock = threading.Lock()
+
+
+if executor_config_yaml_dict.get("use_view_clients"):
+    email_book_service_http_client = email_book_service_http_view_client
+    post_book_service_http_client = post_book_service_http_view_client
+    log_book_service_http_client = log_book_service_http_view_client
+    photo_book_service_http_client = photo_book_service_http_view_client
+else:
+    email_book_service_http_client = email_book_service_http_main_client
+    post_book_service_http_client = post_book_service_http_main_client
+    log_book_service_http_client = log_book_service_http_main_client
+    photo_book_service_http_client = photo_book_service_http_main_client
 
 
 def all_service_up_check(executor_client: StreetBookServiceHttpClient, ignore_error: bool = False):
@@ -46,6 +61,48 @@ def all_service_up_check(executor_client: StreetBookServiceHttpClient, ignore_er
         # else not required - silently ignore error is true
         return False
 
+
+def all_view_service_up_check(executor_client: StreetBookServiceHttpClient, ignore_error: bool = False):
+    try:
+        ui_layout_list: List[UILayoutBaseModel] = (
+            email_book_service_http_client.get_all_ui_layout_client())
+
+        ui_layout_list: List[UILayoutBaseModel] = (
+            post_book_service_http_client.get_all_ui_layout_client())
+
+        ui_layout_list: List[UILayoutBaseModel] = (
+            log_book_service_http_client.get_all_ui_layout_client())
+
+        ui_layout_list: List[UILayoutBaseModel] = (
+            executor_client.get_all_ui_layout_client())
+        return True
+    except Exception as _e:
+        if not ignore_error:
+            logging.exception("all_service_up_check test failed - tried "
+                              "get_all_ui_layout_client of phone_book, street_book and log_book ;;;"
+                              f"exception: {_e}", exc_info=True)
+        # else not required - silently ignore error is true
+        return False
+
+
+def get_host_n_port_from_pair_plan(pair_plan_id: int, ignore_error: bool = False) -> Tuple[str, int] | None:
+    try:
+        pair_plan = email_book_service_http_client.get_pair_plan_client(pair_plan_id)
+
+        if pair_plan.host is not None and pair_plan.port is not None:
+            return pair_plan.host, pair_plan.port
+        else:
+            if not ignore_error:
+                logging.exception("get_host_n_port_from_pair_plan failed - Can't find host and port "
+                                  "in pair_plan ;;;")
+            return None
+    except Exception as _e:
+        if not ignore_error:
+            logging.exception("get_host_n_port_from_pair_plan failed - "
+                              "phone_book service failed when get_pair_plan_client called;;;"
+                              f"exception: {_e}")
+        # else not required - silently ignore error is true
+    return None
 
 # def update_plan_alert_by_sec_and_side_async(sec_id: str, side: Side, alert_brief: str,
 #                                              alert_details: str | None = None,

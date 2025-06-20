@@ -21,10 +21,10 @@ symbol_configs:
     simulate_ack_unsolicited_cxl_chores: False
     simulate_new_unsolicited_cxl_chores: False
 
-    # to simulate fills before chore ack
-    simulate_fills_pre_chore_ack: False
+    # to simulate deals before chore ack
+    simulate_deals_pre_chore_ack: False
 
-    # to avoid fills after ack chore
+    # to avoid deals after ack chore
     simulate_avoid_fill_after_ack: False
 
     # used in continuous checks, like, rej and unsol cxl, continuous normal chores following continuous special chores
@@ -50,10 +50,10 @@ symbol_configs:
     simulate_ack_unsolicited_cxl_chores: False
     simulate_new_unsolicited_cxl_chores: False
 
-    # to simulate fills before chore ack
-    simulate_fills_pre_chore_ack: False
+    # to simulate deals before chore ack
+    simulate_deals_pre_chore_ack: False
 
-    # to avoid fills after ack chore
+    # to avoid deals after ack chore
     simulate_avoid_fill_after_ack: False
 
     # used in continuous checks, like, rej and unsol cxl, continuous normal chores following continuous special chores
@@ -79,10 +79,10 @@ symbol_configs:
     simulate_ack_unsolicited_cxl_chores: False
     simulate_new_unsolicited_cxl_chores: False
 
-    # to simulate fills before chore ack
-    simulate_fills_pre_chore_ack: False
+    # to simulate deals before chore ack
+    simulate_deals_pre_chore_ack: False
 
-    # to avoid fills after ack chore
+    # to avoid deals after ack chore
     simulate_avoid_fill_after_ack: False
 
     # used in continuous checks, like, rej and unsol cxl, continuous normal chores following continuous special chores
@@ -108,10 +108,10 @@ symbol_configs:
     simulate_ack_unsolicited_cxl_chores: False
     simulate_new_unsolicited_cxl_chores: False
 
-    # to simulate fills before chore ack
-    simulate_fills_pre_chore_ack: False
+    # to simulate deals before chore ack
+    simulate_deals_pre_chore_ack: False
 
-    # to avoid fills after ack chore
+    # to avoid deals after ack chore
     simulate_avoid_fill_after_ack: False
 
     # used in continuous checks, like, rej and unsol cxl, continuous normal chores following continuous special chores

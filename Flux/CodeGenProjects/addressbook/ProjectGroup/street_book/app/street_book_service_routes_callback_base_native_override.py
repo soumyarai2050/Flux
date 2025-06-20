@@ -20,6 +20,15 @@ from sqlalchemy.testing.plugin.plugin_base import logging
 from filelock import FileLock
 from pathlib import Path
 
+
+# Executor is started as separate process from create pair_plan pre call - if by the time we reach here and
+# plan manager process is still within pre call of create pair_plan then any get_pair_plan by id from view
+# server (view server being independent process will not find pair_plan by id) will fail - to avoid fail with
+# get pair_plan call in any imported file below putting a wait for 2 sec to let start manager create this
+# pair_plan in DB
+time.sleep(2)
+
+
 # project imports
 # below import is required to symbol_cache to work - SymbolCacheContainer must import from base_plan_cache
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_plan_cache import SymbolCacheContainer, SymbolCache
@@ -31,7 +40,8 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book_s
     get_plan_brief_log_key, get_new_plan_limits, get_new_plan_status,
     post_book_service_http_client, get_default_max_notional,
     get_default_max_open_single_leg_notional, get_default_max_net_filled_notional,
-    get_simulator_config_file_path)
+    get_simulator_config_file_path, photo_book_service_http_client, all_view_service_up_check,
+    get_host_n_port_from_pair_plan)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.executor_config_loader import ( EXECUTOR_PROJECT_DIR,
     host, EXECUTOR_PROJECT_DATA_DIR, executor_config_yaml_dict, main_config_yaml_path, EXECUTOR_PROJECT_SCRIPTS_DIR)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book_helper import OTHER_TERMINAL_STATES, \
@@ -66,8 +76,6 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.generated.ORMModel.
 from FluxPythonUtils.scripts.ws_reader import WSReader
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.ORMModel.photo_book_service_model_imports import (
     PlanViewBaseModel)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_helper import (
-    photo_book_service_http_client)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book import (
     StreetBook, BarteringDataManager, get_bartering_link, MarketDepth)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book_service_routes_callback_base_native_override import BaseBookServiceRoutesCallbackBaseNativeOverride
@@ -166,14 +174,14 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
     underlying_read_plan_limits_http: Callable[..., Any] | None = None
     underlying_delete_plan_status_http: Callable[..., Any] | None = None
     underlying_barter_simulator_place_cxl_chore_query_http: Callable[..., Any] | None = None
-    underlying_create_chore_journal_http: Callable[..., Any] | None = None
-    underlying_create_fills_journal_http: Callable[..., Any] | None = None
+    underlying_create_chore_ledger_http: Callable[..., Any] | None = None
+    underlying_create_deals_ledger_http: Callable[..., Any] | None = None
 
     @classmethod
     def initialize_underlying_http_routes(cls):
         from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes_imports import (
             underlying_read_plan_brief_http, underlying_get_symbol_overview_from_symbol_query_http,
-            residual_compute_shared_lock, journal_shared_lock,
+            residual_compute_shared_lock, ledger_shared_lock,
             underlying_create_plan_limits_http, underlying_delete_plan_limits_http,
             underlying_create_plan_status_http, underlying_update_plan_status_http,
             underlying_get_executor_check_snapshot_query_http, underlying_create_plan_brief_http,
@@ -181,23 +189,23 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             underlying_partial_update_symbol_overview_http, underlying_read_plan_limits_by_id_http,
             underlying_read_symbol_overview_http, underlying_create_cancel_chore_http,
             underlying_read_top_of_book_http, underlying_get_top_of_book_from_symbol_query_http,
-            underlying_read_chore_snapshot_http, underlying_read_chore_journal_http,
+            underlying_read_chore_snapshot_http, underlying_read_chore_ledger_http,
             underlying_get_last_n_sec_total_barter_qty_query_http, underlying_partial_update_cancel_chore_http,
             get_underlying_account_cumulative_fill_qty_query_http, underlying_create_chore_snapshot_http,
             underlying_update_chore_snapshot_http, underlying_partial_update_symbol_side_snapshot_http,
             underlying_partial_update_plan_status_http, underlying_get_open_chore_count_query_http,
             underlying_partial_update_plan_brief_http, underlying_delete_symbol_side_snapshot_http,
-            underlying_read_fills_journal_http,
-            underlying_read_last_barter_http, underlying_create_chore_journal_http,
+            underlying_read_deals_ledger_http,
+            underlying_read_last_barter_http, underlying_create_chore_ledger_http,
             underlying_delete_plan_brief_http, underlying_read_market_depth_http, underlying_read_plan_status_http,
             underlying_read_plan_status_by_id_http, underlying_read_cancel_chore_http,
             underlying_read_plan_limits_http, underlying_delete_plan_status_http,
-            underlying_barter_simulator_place_cxl_chore_query_http, underlying_create_fills_journal_http,
+            underlying_barter_simulator_place_cxl_chore_query_http, underlying_create_deals_ledger_http,
             underlying_read_symbol_overview_by_id_http,
             underlying_get_symbol_side_underlying_account_cumulative_fill_qty_query_http)
 
         cls.residual_compute_shared_lock = residual_compute_shared_lock
-        cls.journal_shared_lock = journal_shared_lock
+        cls.ledger_shared_lock = ledger_shared_lock
         cls.underlying_read_plan_brief_http = underlying_read_plan_brief_http
         cls.underlying_get_symbol_overview_from_symbol_query_http = (
             underlying_get_symbol_overview_from_symbol_query_http)
@@ -216,7 +224,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         cls.underlying_read_top_of_book_http = underlying_read_top_of_book_http
         cls.underlying_get_top_of_book_from_symbol_query_http = underlying_get_top_of_book_from_symbol_query_http
         cls.underlying_read_chore_snapshot_http = underlying_read_chore_snapshot_http
-        cls.underlying_read_chore_journal_http = underlying_read_chore_journal_http
+        cls.underlying_read_chore_ledger_http = underlying_read_chore_ledger_http
         cls.underlying_get_last_n_sec_total_barter_qty_query_http = underlying_get_last_n_sec_total_barter_qty_query_http
         cls.get_underlying_account_cumulative_fill_qty_query_http = (
             get_underlying_account_cumulative_fill_qty_query_http)
@@ -230,7 +238,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         cls.underlying_delete_symbol_side_snapshot_http = underlying_delete_symbol_side_snapshot_http
         cls.underlying_get_symbol_side_underlying_account_cumulative_fill_qty_query_http = (
             underlying_get_symbol_side_underlying_account_cumulative_fill_qty_query_http)
-        cls.underlying_read_fills_journal_http = underlying_read_fills_journal_http
+        cls.underlying_read_deals_ledger_http = underlying_read_deals_ledger_http
         cls.underlying_read_last_barter_http = underlying_read_last_barter_http
         cls.underlying_delete_plan_brief_http = underlying_delete_plan_brief_http
         cls.underlying_create_cancel_chore_http = underlying_create_cancel_chore_http
@@ -242,8 +250,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         cls.underlying_delete_plan_status_http = underlying_delete_plan_status_http
         cls.underlying_barter_simulator_place_cxl_chore_query_http = (
             underlying_barter_simulator_place_cxl_chore_query_http)
-        cls.underlying_create_chore_journal_http = underlying_create_chore_journal_http
-        cls.underlying_create_fills_journal_http = underlying_create_fills_journal_http
+        cls.underlying_create_chore_ledger_http = underlying_create_chore_ledger_http
+        cls.underlying_create_deals_ledger_http = underlying_create_deals_ledger_http
 
     def __init__(self):
         pair_plan_id, is_crash_recovery = get_pair_plan_id_n_recovery_info_from_cmd_argv()
@@ -386,8 +394,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                     # validate essential services are up, if so, set service ready state to true
                     # static data and md service are considered essential
                     if (self.all_services_up and static_data_service_state.ready and
-                            self.usd_fx is not None and symbol_overview_for_symbol_exists and
-                            self.bartering_data_manager is not None):
+                            self.usd_fx is not None and symbol_overview_for_symbol_exists):
                         if not self.service_ready:
                             self.service_ready = True
                             # creating required models for this plan
@@ -435,14 +442,14 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                 LogBarterSimulator.executor_port = self.port
                                 BarteringLinkBase.reload_executor_configs()
 
-                                # setting partial_run to True and assigning port to pair_plan
-                                pair_plan.port = self.port
-                                pair_plan.server_ready_state = 1   # indicates to ui - executor server has started
+                                # assigning port to pair_plan
+                                update_pair_plan = {"_id": self.pair_plan_id, "port": self.port,
+                                                     "server_ready_state": 1}   # indicates to ui - executor server has started
 
                                 try:
-                                    updated_pair_plan = email_book_service_http_client.put_pair_plan_client(pair_plan)
+                                    updated_pair_plan = email_book_service_http_client.patch_pair_plan_client(update_pair_plan)
                                 except Exception as exp:
-                                    logging.exception(f"put_pair_plan_client failed for {plan_key};;;"
+                                    logging.exception(f"patch_pair_plan_client failed for {plan_key};;;"
                                                       f"{exp=}, {pair_plan=}")
                                     continue
                                 else:
@@ -451,15 +458,10 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                     self.leg2_symbol_cache = (
                                         SymbolCacheContainer.add_symbol_cache_for_symbol(self.plan_leg_2.sec.sec_id))
 
-                                    logging.info(f"Creating bartering_data_manager for {plan_key=}")
+                                    logging.info(f"Creating plan_cache for {plan_key=}")
                                     self.plan_cache: PlanCache = self.get_pair_plan_loaded_plan_cache(
                                         updated_pair_plan)
-                                    # Setting asyncio_loop for StreetBook
-                                    StreetBook.asyncio_loop = self.asyncio_loop
-                                    BarteringDataManager.asyncio_loop = self.asyncio_loop
-                                    self.bartering_data_manager = BarteringDataManager(StreetBook.executor_trigger,
-                                                                                   self.plan_cache)
-                                    logging.debug(f"Created bartering_data_manager for {plan_key=};;;{pair_plan=}")
+
                                 logging.debug(f"Marked pair_plan.server_ready_state to 1 for {plan_key=}")
 
                                 self.all_services_up = True
@@ -514,7 +516,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                             # updating symbol_overviews
                             leg1_symbol_overview = self.leg1_symbol_cache.so
                             leg2_symbol_overview = self.leg2_symbol_cache.so
-                            if leg1_symbol_overview is not None and leg2_symbol_overview is not None:
+                            if (leg1_symbol_overview is not None and leg1_symbol_overview.last_update_date_time is not None and
+                                    leg2_symbol_overview is not None and leg2_symbol_overview.last_update_date_time is not None):
                                 symbol_overview_for_symbol_exists = True
                             else:
                                 run_coro = (
@@ -590,6 +593,109 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             logging.warning(f"_app_launch_pre_thread_func, thread going down, for {plan_key=} executor "
                             f"{self.port=}")
 
+    @except_n_log_alert()
+    def _view_app_launch_pre_thread_func(self):
+        """
+        sleep wait till engine is up, then create contact limits if required
+        TODO LAZY: we should invoke _apply_checks_n_alert on all active pair plans at startup/re-start
+        """
+        try:
+            error_prefix = "_app_launch_pre_thread_func: "
+            should_sleep: bool = False
+            mongo_stream_started: bool = False
+            main_host_n_port_check_counts = 0
+            while True:
+                if should_sleep:
+                    time.sleep(self.min_refresh_interval)
+                service_up_flag_env_var = os.environ.get(f"street_book_{self.port}")
+
+                # first checking if main server is up and we are able to get pair_plan's host and port
+                if main_host_n_port_check_counts > 2:
+                    should_sleep = False
+                    ignore_error = False
+                else:
+                    should_sleep = False
+                    ignore_error = False
+                    main_host_n_port_check_counts += 1
+                host_n_port = get_host_n_port_from_pair_plan(self.pair_plan_id, ignore_error=ignore_error)
+                if host_n_port is not None:
+                    host, main_server_port = host_n_port
+                    if executor_config_yaml_dict.get("use_view_clients"):
+                        self.web_client = StreetBookServiceHttpClient.set_or_get_if_instance_exists(host, main_server_port,
+                                                                                                       view_port=self.port)
+                    else:
+                        self.web_client = StreetBookServiceHttpClient.set_or_get_if_instance_exists(host, main_server_port)
+                else:
+                    continue
+
+                # if we reach here - host and port of main executor's server is found
+                if service_up_flag_env_var == "1":
+                    # validate essential services are up, if so, set service ready state to true
+                    # static data and md service are considered essential
+                    if self.all_services_up:
+                        if not self.service_ready:
+                            self.service_ready = True
+                    else:
+                        warn: str = f"plan executor service is not up yet;;;{self.all_services_up=}"
+                    if not self.all_services_up:
+                        try:
+                            # explicitly passing view client so that when this service's
+                            # get_ui_layout is called in all_view_service_up_check, is initializes self.asyncio_loop
+                            # since with main server's client get_ui_layout call it calls and inits
+                            # self.asyncio_loop in main server
+                            web_client = StreetBookServiceHttpClient.set_or_get_if_instance_exists(host,
+                                                                                                      main_server_port,
+                                                                                                      view_port=self.port)
+                            if all_view_service_up_check(web_client):
+
+                                pair_plan_json = {"_id": self.pair_plan_id,
+                                                   "view_port": self.port}
+                                _updated_pair_plan = email_book_service_http_client.patch_pair_plan_client(pair_plan_json)
+                                logging.debug(f"Updated view_port to {self.port}, {_updated_pair_plan=}")
+
+                                self.all_services_up = True
+                                logging.debug(f"Marked all_services_up True")
+                                should_sleep = False
+                            else:
+                                should_sleep = True
+                        except Exception as exp:
+                            logging.error(f"unexpected: all_service_up_check threw exception"
+                                          f"we'll retry periodically in: {self.min_refresh_interval} seconds"
+                                          f";;;{exp=}", exc_info=True)
+                    else:
+                        should_sleep = True
+                        # any periodic refresh code goes here
+
+                        if not mongo_stream_started:
+                            threading.Thread(target=self.start_mongo_streamer, daemon=True).start()
+                            mongo_stream_started = True
+
+                        # Updating data-members synced with config file update
+                        last_modified_timestamp = os.path.getmtime(main_config_yaml_path)
+                        if self.config_yaml_last_modified_timestamp != last_modified_timestamp:
+                            self.config_yaml_last_modified_timestamp = last_modified_timestamp
+
+                            handle_refresh_configurable_data_members(self, self.config_key_to_data_member_name_dict,
+                                                                     str(main_config_yaml_path))
+                else:
+                    should_sleep = True
+        except Exception as e:
+            error_str = (f"unexpected! _app_launch_pre_thread_func caught outer exception: {e}; "
+                         f"executor {self.port=}, thread going down;;;")
+            logging.exception(error_str)
+        finally:
+            logging.warning(f"_app_launch_pre_thread_func, thread going down, executor "
+                            f"{self.port=}")
+
+    def start_mongo_streamer(self):
+        run_coro = self._start_mongo_streamer()
+        future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
+        # block for task to finish
+        try:
+            future.result()
+        except Exception as e:
+            logging.exception(f"start_mongo_streamer failed with exception: {e}")
+
     def get_free_port_for_md(self) -> int:
         # must be called after taking file lock
         while True:
@@ -610,7 +716,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                     f.write(str(port_) + "\n")
                     return port_
 
-    def update_simulate_config_yaml(self, pair_plan: PairPlan):
+    def update_simulate_config_yaml(self):
         if not self.updated_simulator_config_file:
             mongo_server = executor_config_yaml_dict.get("mongo_server")
 
@@ -618,6 +724,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                 self.simulate_config_yaml_file_path, load_as_str=True)
             with FileLock(self.ports_cache_lock_file_path):
                 self.cpp_port = self.get_free_port_for_md()
+                logging.debug(f"Set cpp_port: {self.cpp_port} - not started cpp process yet")
             simulate_config_yaml_file_data += "\n\n"
             simulate_config_yaml_file_data += f"leg_1_symbol: {self.plan_leg_1.sec.sec_id}\n"
             simulate_config_yaml_file_data += f"leg_1_feed_code: {self.plan_leg_1.exch_id}\n"
@@ -663,9 +770,6 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
 
             BarteringLinkBase.reload_executor_configs()
 
-            # Setting MobileBookCache instances for this symbol pair
-            pair_plan.cpp_port = self.cpp_port
-
             self.updated_simulator_config_file = True   # setting it true avoid updating config file again
 
     def app_launch_pre(self):
@@ -674,13 +778,13 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         set_package_logger_level("filelock", logging.WARNING)
         if self.market.is_test_run:
             LogBarterSimulator.chore_create_async_callable = (
-                StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_create_chore_journal_http)
+                StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_create_chore_ledger_http)
             LogBarterSimulator.fill_create_async_callable = (
-                StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_create_fills_journal_http)
+                StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_create_deals_ledger_http)
             BarterSimulator.chore_create_async_callable = (
-                StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_create_chore_journal_http)
+                StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_create_chore_ledger_http)
             BarterSimulator.fill_create_async_callable = (
-                StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_create_fills_journal_http)
+                StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_create_deals_ledger_http)
 
         self.port = find_free_port()
         self.web_client = StreetBookServiceHttpClient.set_or_get_if_instance_exists(host, self.port)
@@ -692,6 +796,14 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                                  name="_app_launch_pre_thread_func", daemon=True)
         app_launch_pre_thread.start()
         logging.debug(f"Triggered server launch pre override for executor {self.port=}")
+
+    def view_app_launch_pre(self):
+        StreetBookServiceRoutesCallbackBaseNativeOverride.initialize_underlying_http_routes()
+        self.port = find_free_port()
+        app_launch_pre_thread = threading.Thread(target=self._view_app_launch_pre_thread_func,
+                                                 name="_app_launch_pre_thread_func", daemon=True)
+        app_launch_pre_thread.start()
+        logging.debug(f"Triggered view server launch pre override for executor {self.port=}")
 
     def app_launch_post(self):
         logging.debug(f"Triggered server launch post override for executor {self.port=}")
@@ -727,6 +839,9 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         if not terminate_status:
             logging.error(f"Couldn't terminate fluent-bit process pid:{self.fluent_bit_process_id} "
                           f"for this executor before terminating")
+
+    def view_app_launch_post(self):
+        logging.debug("Triggered view server launch post override")
 
     @staticmethod
     def create_n_run_so_shell_script(pair_plan):
@@ -907,7 +1022,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         existing_symbol_overviews: List[SymbolOverview] = []
         # load symbol overview
         run_coro = StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_read_symbol_overview_http()
-        future = asyncio.run_coroutine_threadsafe(run_coro, StreetBook.asyncio_loop)
+        future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
         # block for task to finish
         try:
             existing_symbol_overviews = future.result()
@@ -1254,41 +1369,47 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                     # else not required: happens in some crash recovery
 
     def _check_n_create_related_models_for_plan(self) -> bool:
+        self.update_simulate_config_yaml()  # sets self.cpp_port internally to be used in below update
+        # Setting asyncio_loop for StreetBook
+        StreetBook.asyncio_loop = self.asyncio_loop
+        BarteringDataManager.asyncio_loop = self.asyncio_loop
+        self.bartering_data_manager = BarteringDataManager(StreetBook.executor_trigger,
+                                                       self.plan_cache)
+        logging.debug(f"Created bartering_data_manager")
+
         plan_limits = self._check_n_create_default_plan_limits()
         if plan_limits is not None:
             plan_status = self._check_n_create_or_update_plan_status(plan_limits)
 
             if plan_status is not None:
-                pair_plan_tuple = self.plan_cache.get_pair_plan()
-                if pair_plan_tuple is not None:
-                    pair_plan, _ = pair_plan_tuple
-                    if pair_plan.server_ready_state < 2:
-                        pair_plan.server_ready_state = 2   # indicates to ui that executor server is ready
+                pair_plan = email_book_service_http_client.get_pair_plan_client(self.pair_plan_id)
+                if pair_plan.server_ready_state < 2:
+                    update_pair_start: Dict[str, Any] = {"_id": self.pair_plan_id}
+                    update_pair_start["server_ready_state"] = 2   # indicates to ui that executor server is ready
 
-                        self.update_simulate_config_yaml(pair_plan)
+                    update_pair_start["cpp_port"] = self.cpp_port
 
-                        plan_state = None
-                        if pair_plan.plan_state == PlanState.PlanState_SNOOZED:
-                            pair_plan.plan_state = PlanState.PlanState_READY
-                            # plan_state = PlanState.PlanState_READY
-                        # else not required: If it's not startup for reload or new plan creation then avoid
+                    plan_state = None
+                    if pair_plan.plan_state == PlanState.PlanState_SNOOZED:
+                        update_pair_start["plan_state"] = PlanState.PlanState_READY
+                        # plan_state = PlanState.PlanState_READY
+                    # else not required: If it's not startup for reload or new plan creation then avoid
 
-                        # setting pair_plan's legs' company name
-                        pair_plan.pair_plan_params.plan_leg1.company = self.leg1_symbol_cache.so.company
-                        pair_plan.pair_plan_params.plan_leg2.company = self.leg2_symbol_cache.so.company
+                    # setting pair_plan's legs' company name
+                    update_pair_start["pair_plan_params"] = {}
+                    update_pair_start["pair_plan_params"]["plan_leg1"] = {}
+                    update_pair_start["pair_plan_params"]["plan_leg1"]["company"] = self.leg1_symbol_cache.so.company
+                    update_pair_start["pair_plan_params"]["plan_leg2"] = {}
+                    update_pair_start["pair_plan_params"]["plan_leg2"]["company"] = self.leg2_symbol_cache.so.company
 
-                        try:
-                            email_book_service_http_client.put_pair_plan_client(pair_plan)
-                            logging.debug(f"pair_plan's server_ready_state set to 2, {pair_plan=}")
-                            return True
-                        except Exception as e:
-                            logging.exception("patch_pair_plan_client failed while setting server_ready_state "
-                                              f"to 2, retrying in next startup refresh: exception: {e}")
-                    # else not required: not updating if already server_ready_state == 2
-                else:
-                    err_str_ = ("Unexpected: Can't find pair_plan object in plan_cache - "
-                                "retrying in next startup refresh")
-                    logging.error(err_str_)
+                    try:
+                        updated_pair_plan = email_book_service_http_client.patch_pair_plan_client(update_pair_start)
+                        logging.debug(f"pair_plan's server_ready_state set to 2, {updated_pair_plan=}")
+                        return True
+                    except Exception as e:
+                        logging.exception("patch_pair_plan_client failed while setting server_ready_state "
+                                          f"to 2, retrying in next startup refresh: exception: {e}")
+                # else not required: not updating if already server_ready_state == 2
         return False
 
     async def load_plan_cache(self):
@@ -1300,11 +1421,11 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
 
         if self.is_crash_recovery:
 
-            # updating chore_journals
-            chore_journals: List[ChoreJournal] = \
-                await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_read_chore_journal_http()
-            for chore_journal in chore_journals:
-                self.bartering_data_manager.handle_recovery_chore_journal(chore_journal)
+            # updating chore_ledgers
+            chore_ledgers: List[ChoreLedger] = \
+                await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_read_chore_ledger_http()
+            for chore_ledger in chore_ledgers:
+                self.bartering_data_manager.handle_recovery_chore_ledger(chore_ledger)
 
             # updating chore_snapshots
             chore_snapshots: List[ChoreSnapshot] = \
@@ -1420,7 +1541,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                     plan_limits.cancel_rate.waived_min_rolling_notional > 0):
                 last_n_sec_chore_qty = await self.get_last_n_sec_chore_qty(
                     symbol, side, plan_limits.cancel_rate.waived_min_rolling_period_seconds)
-                logging.debug(f"_update_plan_status_from_fill_journal: {last_n_sec_chore_qty=}, {symbol=}, {side=}")
+                logging.debug(f"_update_plan_status_from_fill_ledger: {last_n_sec_chore_qty=}, {symbol=}, {side=}")
                 if (last_n_sec_chore_qty * self.get_usd_px(symbol_side_snapshot_.avg_px, symbol) >
                         plan_limits.cancel_rate.waived_min_rolling_notional):
                     min_notional_condition_met = True
@@ -1677,36 +1798,36 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         return updated_plan_status_obj_json
 
     ##############################
-    # Chore Journal Update Methods
+    # Chore Ledger Update Methods
     ##############################
 
-    async def create_chore_journal_pre(self, chore_journal_obj: ChoreJournal) -> None:
-        await self.handle_create_chore_journal_pre(chore_journal_obj)
+    async def create_chore_ledger_pre(self, chore_ledger_obj: ChoreLedger) -> None:
+        await self.handle_create_chore_ledger_pre(chore_ledger_obj)
 
-    async def create_chore_journal_post(self, chore_journal_obj: ChoreJournal):
+    async def create_chore_ledger_post(self, chore_ledger_obj: ChoreLedger):
         # updating bartering_data_manager's plan_cache
-        self.bartering_data_manager.handle_chore_journal_get_all_ws(chore_journal_obj)
+        self.bartering_data_manager.handle_chore_ledger_get_all_ws(chore_ledger_obj)
 
-        async with StreetBookServiceRoutesCallbackBaseNativeOverride.journal_shared_lock:
-            res = await self._update_chore_snapshot_from_chore_journal(chore_journal_obj)
+        async with StreetBookServiceRoutesCallbackBaseNativeOverride.ledger_shared_lock:
+            res = await self._update_chore_snapshot_from_chore_ledger(chore_ledger_obj)
             is_cxl_after_cxl: bool = False
             if res is not None:
                 if len(res) == 3:
                     chore_snapshot, plan_brief, contact_status_updates = res
                     # Updating and checking contact_limits in contact_manager
                     post_book_service_http_client.check_contact_limits_query_client(
-                        self.pair_plan_id, chore_journal_obj, chore_snapshot, plan_brief, contact_status_updates)
+                        self.pair_plan_id, chore_ledger_obj, chore_snapshot, plan_brief, contact_status_updates)
                 elif len(res) == 1:
                     is_cxl_after_cxl = res[0]
                     if not is_cxl_after_cxl:
-                        logging.error(f"_update_chore_snapshot_from_chore_journal failed for key: "
-                                      f"{StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_journal_log_key(chore_journal_obj)};;;{chore_journal_obj=}")
+                        logging.error(f"_update_chore_snapshot_from_chore_ledger failed for key: "
+                                      f"{StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_ledger_log_key(chore_ledger_obj)};;;{chore_ledger_obj=}")
                     else:
-                        logging.debug(f"_update_chore_snapshot_from_chore_journal detected cxl_after_cxl for key: "
-                                      f"{StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_journal_log_key(chore_journal_obj)};;;{chore_journal_obj=}")
+                        logging.debug(f"_update_chore_snapshot_from_chore_ledger detected cxl_after_cxl for key: "
+                                      f"{StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_ledger_log_key(chore_ledger_obj)};;;{chore_ledger_obj=}")
             else:
-                logging.error(f"_update_chore_snapshot_from_chore_journal failed for key: "
-                              f"{StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_journal_log_key(chore_journal_obj)};;;{chore_journal_obj=}")
+                logging.error(f"_update_chore_snapshot_from_chore_ledger failed for key: "
+                              f"{StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_ledger_log_key(chore_ledger_obj)};;;{chore_ledger_obj=}")
             # signifies some unexpected exception occurred so complete update was not done,
             # therefore avoiding contact_limit checks too
 
@@ -1718,52 +1839,52 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         if symbol_side_snapshot_obj.security.sec_id_source is None:
             symbol_side_snapshot_obj.security.sec_id_source = SecurityIdSource.TICKER
 
-    async def _handle_post_chore_snapshot_update_tasks_in_chore_dod(self, chore_journal_obj: ChoreJournal,
+    async def _handle_post_chore_snapshot_update_tasks_in_chore_dod(self, chore_ledger_obj: ChoreLedger,
                                                                     chore_snapshot: ChoreSnapshot):
         if chore_snapshot.chore_status != ChoreStatusType.OE_FILLED:
-            symbol_side_snapshot = await self._create_update_symbol_side_snapshot_from_chore_journal(
-                chore_journal_obj, chore_snapshot)
+            symbol_side_snapshot = await self._create_update_symbol_side_snapshot_from_chore_ledger(
+                chore_ledger_obj, chore_snapshot)
             if symbol_side_snapshot is not None:
                 updated_plan_brief = (
-                    await self._update_plan_brief_from_chore_or_fill(chore_journal_obj, chore_snapshot,
+                    await self._update_plan_brief_from_chore_or_fill(chore_ledger_obj, chore_snapshot,
                                                                       symbol_side_snapshot))
                 if updated_plan_brief is not None:
-                    await self._update_plan_status_from_chore_journal(
-                        chore_journal_obj, chore_snapshot, symbol_side_snapshot, updated_plan_brief)
+                    await self._update_plan_status_from_chore_ledger(
+                        chore_ledger_obj, chore_snapshot, symbol_side_snapshot, updated_plan_brief)
                 # else not required: if updated_plan_brief is None then it means some error occurred in
                 # _update_plan_brief_from_chore which would have got added to alert already
                 contact_status_updates: ContactStatusUpdatesContainer | None = (
-                    await self._update_contact_status_from_chore_journal(
-                        chore_journal_obj, chore_snapshot))
+                    await self._update_contact_status_from_chore_ledger(
+                        chore_ledger_obj, chore_snapshot))
 
                 return chore_snapshot, updated_plan_brief, contact_status_updates
 
             # else not required: if symbol_side_snapshot is None then it means some error occurred in
-            # _create_update_symbol_side_snapshot_from_chore_journal which would have got added to
+            # _create_update_symbol_side_snapshot_from_chore_ledger which would have got added to
             # alert already
 
         # else not required: If CXL_ACK arrived after chore is fully filled then since we ignore
-        # any update for this chore journal object, returns None to not update post barter engine too
+        # any update for this chore ledger object, returns None to not update post barter engine too
 
-    async def _handle_post_chore_snapshot_update_tasks_after_chore_journal_amend_applied(
-            self, chore_journal_obj: ChoreJournal, chore_snapshot: ChoreSnapshot):
+    async def _handle_post_chore_snapshot_update_tasks_after_chore_ledger_amend_applied(
+            self, chore_ledger_obj: ChoreLedger, chore_snapshot: ChoreSnapshot):
         symbol_side_snapshot = \
-            await self._create_update_symbol_side_snapshot_from_chore_journal(chore_journal_obj,
+            await self._create_update_symbol_side_snapshot_from_chore_ledger(chore_ledger_obj,
                                                                               chore_snapshot)
         if symbol_side_snapshot is not None:
             updated_plan_brief = (
-                await self._update_plan_brief_from_chore_or_fill(chore_journal_obj,
+                await self._update_plan_brief_from_chore_or_fill(chore_ledger_obj,
                                                                   chore_snapshot,
                                                                   symbol_side_snapshot))
             if updated_plan_brief is not None:
-                await self._update_plan_status_from_chore_journal(
-                    chore_journal_obj, chore_snapshot, symbol_side_snapshot,
+                await self._update_plan_status_from_chore_ledger(
+                    chore_ledger_obj, chore_snapshot, symbol_side_snapshot,
                     updated_plan_brief)
             # else not required: if updated_plan_brief is None then it means some error occurred in
             # _update_plan_brief_from_chore which would have got added to alert already
             contact_status_updates: ContactStatusUpdatesContainer = (
-                await self._update_contact_status_from_chore_journal(
-                    chore_journal_obj, chore_snapshot))
+                await self._update_contact_status_from_chore_ledger(
+                    chore_ledger_obj, chore_snapshot))
             return chore_snapshot, updated_plan_brief, contact_status_updates
         return None, None, None
 
@@ -1775,113 +1896,113 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             return False
         return True
 
-    async def handle_post_chore_snapshot_update_tasks_for_new_chore_journal(
-            self, chore_journal_obj: ChoreJournal, chore_snapshot: ChoreSnapshot):
+    async def handle_post_chore_snapshot_update_tasks_for_new_chore_ledger(
+            self, chore_ledger_obj: ChoreLedger, chore_snapshot: ChoreSnapshot):
         symbol_side_snapshot = \
-            await self._create_update_symbol_side_snapshot_from_chore_journal(chore_journal_obj,
+            await self._create_update_symbol_side_snapshot_from_chore_ledger(chore_ledger_obj,
                                                                               chore_snapshot)
         if symbol_side_snapshot is not None:
-            updated_plan_brief = await self._update_plan_brief_from_chore_or_fill(chore_journal_obj,
+            updated_plan_brief = await self._update_plan_brief_from_chore_or_fill(chore_ledger_obj,
                                                                                     chore_snapshot,
                                                                                     symbol_side_snapshot)
             if updated_plan_brief is not None:
-                await self._update_plan_status_from_chore_journal(chore_journal_obj, chore_snapshot,
+                await self._update_plan_status_from_chore_ledger(chore_ledger_obj, chore_snapshot,
                                                                    symbol_side_snapshot, updated_plan_brief)
             # else not required: if updated_plan_brief is None then it means some error occurred in
             # _update_plan_brief_from_chore which would have got added to alert already
             contact_status_updates: ContactStatusUpdatesContainer | None = (
-                await self._update_contact_status_from_chore_journal(
-                    chore_journal_obj, chore_snapshot))
+                await self._update_contact_status_from_chore_ledger(
+                    chore_ledger_obj, chore_snapshot))
 
             return chore_snapshot, updated_plan_brief, contact_status_updates
-        # else not require_create_update_symbol_side_snapshot_from_chore_journald: if symbol_side_snapshot
-        # is None then it means some error occurred in _create_update_symbol_side_snapshot_from_chore_journal
+        # else not require_create_update_symbol_side_snapshot_from_chore_ledgerd: if symbol_side_snapshot
+        # is None then it means some error occurred in _create_update_symbol_side_snapshot_from_chore_ledger
         # which would have got added to alert already
 
-    async def handle_post_chore_snapshot_update_tasks_for_ack_chore_journal(
-            self, chore_journal_obj: ChoreJournal, chore_snapshot: ChoreSnapshot):
+    async def handle_post_chore_snapshot_update_tasks_for_ack_chore_ledger(
+            self, chore_ledger_obj: ChoreLedger, chore_snapshot: ChoreSnapshot):
         return chore_snapshot, None, None
 
-    async def handle_post_chore_snapshot_update_tasks_for_cxl_unack_chore_journal(
-            self, chore_journal_obj: ChoreJournal, chore_snapshot: ChoreSnapshot):
+    async def handle_post_chore_snapshot_update_tasks_for_cxl_unack_chore_ledger(
+            self, chore_ledger_obj: ChoreLedger, chore_snapshot: ChoreSnapshot):
         return chore_snapshot, None, None
 
-    async def handle_post_chore_snapshot_update_tasks_for_cxl_rej_chore_journal(
-            self, chore_journal_obj: ChoreJournal, chore_snapshot: ChoreSnapshot):
+    async def handle_post_chore_snapshot_update_tasks_for_cxl_rej_chore_ledger(
+            self, chore_ledger_obj: ChoreLedger, chore_snapshot: ChoreSnapshot):
         return chore_snapshot, None, None
 
-    async def handle_post_chore_snapshot_update_tasks_for_int_rej_chore_journal(
-            self, chore_journal_obj: ChoreJournal, chore_snapshot: ChoreSnapshot):
+    async def handle_post_chore_snapshot_update_tasks_for_int_rej_chore_ledger(
+            self, chore_ledger_obj: ChoreLedger, chore_snapshot: ChoreSnapshot):
         symbol_side_snapshot = \
-            await self._create_update_symbol_side_snapshot_from_chore_journal(chore_journal_obj,
+            await self._create_update_symbol_side_snapshot_from_chore_ledger(chore_ledger_obj,
                                                                               chore_snapshot)
         if symbol_side_snapshot is not None:
             updated_plan_brief = (
-                await self._update_plan_brief_from_chore_or_fill(chore_journal_obj, chore_snapshot,
+                await self._update_plan_brief_from_chore_or_fill(chore_ledger_obj, chore_snapshot,
                                                                   symbol_side_snapshot))
             if updated_plan_brief is not None:
-                await self._update_plan_status_from_chore_journal(
-                    chore_journal_obj, chore_snapshot, symbol_side_snapshot, updated_plan_brief)
+                await self._update_plan_status_from_chore_ledger(
+                    chore_ledger_obj, chore_snapshot, symbol_side_snapshot, updated_plan_brief)
             # else not required: if updated_plan_brief is None then it means some error occurred in
             # _update_plan_brief_from_chore which would have got added to alert already
             contact_status_updates: ContactStatusUpdatesContainer = (
-                await self._update_contact_status_from_chore_journal(
-                    chore_journal_obj, chore_snapshot))
+                await self._update_contact_status_from_chore_ledger(
+                    chore_ledger_obj, chore_snapshot))
 
             return chore_snapshot, updated_plan_brief, contact_status_updates
-        # else not require_create_update_symbol_side_snapshot_from_chore_journald:
+        # else not require_create_update_symbol_side_snapshot_from_chore_ledgerd:
         # if symbol_side_snapshot is None then it means some error occurred in
-        # _create_update_symbol_side_snapshot_from_chore_journal which would have
+        # _create_update_symbol_side_snapshot_from_chore_ledger which would have
         # got added to alert already
 
-    async def handle_post_chore_snapshot_update_tasks_for_lapse_chore_journal(
-            self, chore_journal_obj: ChoreJournal, chore_snapshot: ChoreSnapshot):
+    async def handle_post_chore_snapshot_update_tasks_for_lapse_chore_ledger(
+            self, chore_ledger_obj: ChoreLedger, chore_snapshot: ChoreSnapshot):
         symbol_side_snapshot = \
-            await self._create_update_symbol_side_snapshot_from_chore_journal(chore_journal_obj,
+            await self._create_update_symbol_side_snapshot_from_chore_ledger(chore_ledger_obj,
                                                                               chore_snapshot)
         if symbol_side_snapshot is not None:
             updated_plan_brief = (
-                await self._update_plan_brief_from_chore_or_fill(chore_journal_obj, chore_snapshot,
+                await self._update_plan_brief_from_chore_or_fill(chore_ledger_obj, chore_snapshot,
                                                                   symbol_side_snapshot))
             if updated_plan_brief is not None:
-                await self._update_plan_status_from_chore_journal(
-                    chore_journal_obj, chore_snapshot, symbol_side_snapshot, updated_plan_brief)
+                await self._update_plan_status_from_chore_ledger(
+                    chore_ledger_obj, chore_snapshot, symbol_side_snapshot, updated_plan_brief)
             # else not required: if updated_plan_brief is None then it means some error occurred in
             # _update_plan_brief_from_chore which would have got added to alert already
             contact_status_updates: ContactStatusUpdatesContainer = (
-                await self._update_contact_status_from_chore_journal(
-                    chore_journal_obj, chore_snapshot))
+                await self._update_contact_status_from_chore_ledger(
+                    chore_ledger_obj, chore_snapshot))
             return chore_snapshot, updated_plan_brief, contact_status_updates
-        # else not require_create_update_symbol_side_snapshot_from_chore_journald:
+        # else not require_create_update_symbol_side_snapshot_from_chore_ledgerd:
         # if symbol_side_snapshot is None then it means some error occurred in
-        # _create_update_symbol_side_snapshot_from_chore_journal which would have
+        # _create_update_symbol_side_snapshot_from_chore_ledger which would have
         # got added to alert already
 
-    async def handle_post_chore_snapshot_update_tasks_for_non_risky_amend_unack_chore_journal(
-            self, chore_journal_obj: ChoreJournal, chore_snapshot: ChoreSnapshot):
+    async def handle_post_chore_snapshot_update_tasks_for_non_risky_amend_unack_chore_ledger(
+            self, chore_ledger_obj: ChoreLedger, chore_snapshot: ChoreSnapshot):
         return chore_snapshot, None, None
 
-    async def handle_post_chore_snapshot_update_tasks_for_risky_amend_ack_chore_journal(
-            self, chore_journal_obj: ChoreJournal, chore_snapshot: ChoreSnapshot):
+    async def handle_post_chore_snapshot_update_tasks_for_risky_amend_ack_chore_ledger(
+            self, chore_ledger_obj: ChoreLedger, chore_snapshot: ChoreSnapshot):
         return chore_snapshot, None, None
 
-    async def handle_post_chore_snapshot_update_tasks_for_non_risky_amend_rej_chore_journal(
-            self, chore_journal_obj: ChoreJournal, chore_snapshot: ChoreSnapshot):
+    async def handle_post_chore_snapshot_update_tasks_for_non_risky_amend_rej_chore_ledger(
+            self, chore_ledger_obj: ChoreLedger, chore_snapshot: ChoreSnapshot):
         return chore_snapshot, None, None
 
     async def _create_symbol_side_snapshot_for_new_chore(self,
-                                                         new_chore_journal_obj: ChoreJournal) -> SymbolSideSnapshot:
-        security = new_chore_journal_obj.chore.security
-        side = new_chore_journal_obj.chore.side
+                                                         new_chore_ledger_obj: ChoreLedger) -> SymbolSideSnapshot:
+        security = new_chore_ledger_obj.chore.security
+        side = new_chore_ledger_obj.chore.side
         symbol_side_snapshot_obj = SymbolSideSnapshot(id=SymbolSideSnapshot.next_id(), security=security,
                                                       side=side,
-                                                      avg_px=new_chore_journal_obj.chore.px,
-                                                      total_qty=int(new_chore_journal_obj.chore.qty),
+                                                      avg_px=new_chore_ledger_obj.chore.px,
+                                                      total_qty=int(new_chore_ledger_obj.chore.qty),
                                                       total_filled_qty=0, avg_fill_px=0,
                                                       total_fill_notional=0, last_update_fill_qty=0,
                                                       last_update_fill_px=0, total_cxled_qty=0,
                                                       avg_cxled_px=0, total_cxled_notional=0,
-                                                      last_update_date_time=new_chore_journal_obj.chore_event_date_time,
+                                                      last_update_date_time=new_chore_ledger_obj.chore_event_date_time,
                                                       chore_count=1)
         symbol_side_snapshot_obj = \
             await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_create_symbol_side_snapshot_http(
@@ -1964,43 +2085,43 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             updated_symbol_side_snapshot_obj.avg_px = (
                     new_cumulative_notional / symbol_side_snapshot_obj.total_qty)
 
-    async def _create_update_symbol_side_snapshot_from_chore_journal(
-            self, chore_journal: ChoreJournal, chore_snapshot_obj: ChoreSnapshot) -> SymbolSideSnapshot | None:
+    async def _create_update_symbol_side_snapshot_from_chore_ledger(
+            self, chore_ledger: ChoreLedger, chore_snapshot_obj: ChoreSnapshot) -> SymbolSideSnapshot | None:
         async with SymbolSideSnapshot.reentrant_lock:
             symbol_side_snapshot_objs = (
-                self.plan_cache.get_symbol_side_snapshot_from_symbol(chore_journal.chore.security.sec_id))
+                self.plan_cache.get_symbol_side_snapshot_from_symbol(chore_ledger.chore.security.sec_id))
 
-            # If no symbol_side_snapshot for symbol-side of received chore_journal
+            # If no symbol_side_snapshot for symbol-side of received chore_ledger
             if symbol_side_snapshot_objs is None:
-                if chore_journal.chore_event == ChoreEventType.OE_NEW:
-                    created_symbol_side_snapshot = await self._create_symbol_side_snapshot_for_new_chore(chore_journal)
+                if chore_ledger.chore_event == ChoreEventType.OE_NEW:
+                    created_symbol_side_snapshot = await self._create_symbol_side_snapshot_for_new_chore(chore_ledger)
                     return created_symbol_side_snapshot
                 else:
-                    err_str_: str = (f"No OE_NEW detected for chore_journal_key: "
-                                     f"{StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_journal_log_key(chore_journal)} "
-                                     f"failed to create symbol_side_snapshot ;;; {chore_journal=}")
+                    err_str_: str = (f"No OE_NEW detected for chore_ledger_key: "
+                                     f"{StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_ledger_log_key(chore_ledger)} "
+                                     f"failed to create symbol_side_snapshot ;;; {chore_ledger=}")
                     logging.error(err_str_)
                     return
-            # If symbol_side_snapshot exists for chore_id from chore_journal
+            # If symbol_side_snapshot exists for chore_id from chore_ledger
             else:
                 symbol_side_snapshot_obj, _ = symbol_side_snapshot_objs
                 updated_symbol_side_snapshot_obj = SymbolSideSnapshotBaseModel(id=symbol_side_snapshot_obj.id)
-                match chore_journal.chore_event:
+                match chore_ledger.chore_event:
                     case ChoreEventType.OE_NEW:
                         updated_symbol_side_snapshot_obj.chore_count = symbol_side_snapshot_obj.chore_count + 1
-                        if chore_journal.chore.px:
+                        if chore_ledger.chore.px:
                             updated_symbol_side_snapshot_obj.avg_px = \
                                 avg_of_new_val_sum_to_avg(symbol_side_snapshot_obj.avg_px,
-                                                          chore_journal.chore.px,
+                                                          chore_ledger.chore.px,
                                                           updated_symbol_side_snapshot_obj.chore_count)
                         updated_symbol_side_snapshot_obj.total_qty = int(
-                            symbol_side_snapshot_obj.total_qty + chore_journal.chore.qty)
-                        updated_symbol_side_snapshot_obj.last_update_date_time = chore_journal.chore_event_date_time
+                            symbol_side_snapshot_obj.total_qty + chore_ledger.chore.qty)
+                        updated_symbol_side_snapshot_obj.last_update_date_time = chore_ledger.chore_event_date_time
                     case (ChoreEventType.OE_CXL_ACK | ChoreEventType.OE_UNSOL_CXL | ChoreEventType.OE_INT_REJ |
                           ChoreEventType.OE_BRK_REJ | ChoreEventType.OE_EXH_REJ):
                         self._handle_unfilled_cxl_in_symbol_side_snapshot(
                             updated_symbol_side_snapshot_obj, symbol_side_snapshot_obj, chore_snapshot_obj)
-                        updated_symbol_side_snapshot_obj.last_update_date_time = chore_journal.chore_event_date_time
+                        updated_symbol_side_snapshot_obj.last_update_date_time = chore_ledger.chore_event_date_time
 
                     case ChoreEventType.OE_LAPSE:
                         lapsed_qty = chore_snapshot_obj.last_lapsed_qty
@@ -2008,10 +2129,10 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                                    chore_snapshot_obj.chore_brief.security.sec_id)
                         self._handle_partial_cxl_qty_in_symbol_side_snapshot(
                             updated_symbol_side_snapshot_obj, symbol_side_snapshot_obj, lapsed_qty, cxled_px)
-                        updated_symbol_side_snapshot_obj.last_update_date_time = chore_journal.chore_event_date_time
+                        updated_symbol_side_snapshot_obj.last_update_date_time = chore_ledger.chore_event_date_time
 
                     case ChoreEventType.OE_AMD_DN_UNACK | ChoreEventType.OE_AMD_UP_UNACK | ChoreEventType.OE_AMD_ACK:
-                        chore_event = self.pending_amend_type(chore_journal, chore_snapshot_obj)
+                        chore_event = self.pending_amend_type(chore_ledger, chore_snapshot_obj)
 
                         if chore_event is None:
                             # pending_amend_type must have logged error msg
@@ -2088,10 +2209,10 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                     updated_symbol_side_snapshot_obj, symbol_side_snapshot_obj, last_px,
                                     last_qty, chore_snapshot_obj.chore_brief.px, amended_qty)
 
-                        updated_symbol_side_snapshot_obj.last_update_date_time = chore_journal.chore_event_date_time
+                        updated_symbol_side_snapshot_obj.last_update_date_time = chore_ledger.chore_event_date_time
 
                     case ChoreEventType.OE_AMD_REJ:
-                        chore_event = self.pending_amend_type(chore_journal, chore_snapshot_obj)
+                        chore_event = self.pending_amend_type(chore_ledger, chore_snapshot_obj)
 
                         if chore_event is None:
                             # pending_amend_type must have logged error msg
@@ -2137,11 +2258,11 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                     updated_symbol_side_snapshot_obj, symbol_side_snapshot_obj, last_px,
                                     last_qty, chore_snapshot_obj.chore_brief.px, amended_qty)
 
-                        updated_symbol_side_snapshot_obj.last_update_date_time = chore_journal.chore_event_date_time
+                        updated_symbol_side_snapshot_obj.last_update_date_time = chore_ledger.chore_event_date_time
 
                     case other_:
                         err_str_ = f"Unsupported PlanEventType for symbol_side_snapshot update {other_} " \
-                                   f"{StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_journal_log_key(chore_journal)}"
+                                   f"{StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_ledger_log_key(chore_ledger)}"
                         logging.error(err_str_)
                         return
 
@@ -2153,7 +2274,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
 
     def _handle_cxl_qty_in_plan_status_buy_side(
             self, update_plan_status_obj: PlanStatus, chore_snapshot: ChoreSnapshot,
-            chore_journal_obj: ChoreJournal, cxled_qty: int):
+            chore_ledger_obj: ChoreLedger, cxled_qty: int):
         update_plan_status_obj.total_open_buy_qty -= cxled_qty
         update_plan_status_obj.total_open_buy_notional -= \
             (cxled_qty * self.get_usd_px(chore_snapshot.chore_brief.px,
@@ -2164,7 +2285,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                         chore_snapshot.chore_brief.security.sec_id)
         update_plan_status_obj.avg_cxl_buy_px = (
             (self.get_local_px_or_notional(update_plan_status_obj.total_cxl_buy_notional,
-                                           chore_journal_obj.chore.security.sec_id) / update_plan_status_obj.total_cxl_buy_qty)
+                                           chore_ledger_obj.chore.security.sec_id) / update_plan_status_obj.total_cxl_buy_qty)
             if update_plan_status_obj.total_cxl_buy_qty != 0 else 0)
         update_plan_status_obj.total_cxl_exposure = \
             update_plan_status_obj.total_cxl_buy_notional - \
@@ -2172,7 +2293,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
 
     def _handle_cxl_qty_in_plan_status_sell_side(
             self, update_plan_status_obj: PlanStatus, chore_snapshot: ChoreSnapshot,
-            chore_journal_obj: ChoreJournal, cxled_qty: int):
+            chore_ledger_obj: ChoreLedger, cxled_qty: int):
         update_plan_status_obj.total_open_sell_qty -= cxled_qty
         update_plan_status_obj.total_open_sell_notional -= \
             (cxled_qty * self.get_usd_px(chore_snapshot.chore_brief.px,
@@ -2183,13 +2304,13 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                         chore_snapshot.chore_brief.security.sec_id)
         update_plan_status_obj.avg_cxl_sell_px = (
             (self.get_local_px_or_notional(update_plan_status_obj.total_cxl_sell_notional,
-                                           chore_journal_obj.chore.security.sec_id) / update_plan_status_obj.total_cxl_sell_qty)
+                                           chore_ledger_obj.chore.security.sec_id) / update_plan_status_obj.total_cxl_sell_qty)
             if update_plan_status_obj.total_cxl_sell_qty != 0 else 0)
         update_plan_status_obj.total_cxl_exposure = \
             update_plan_status_obj.total_cxl_buy_notional - \
             update_plan_status_obj.total_cxl_sell_notional
 
-    async def _update_plan_status_from_chore_journal(self, chore_journal_obj: ChoreJournal,
+    async def _update_plan_status_from_chore_ledger(self, chore_ledger_obj: ChoreLedger,
                                                       chore_snapshot: ChoreSnapshot,
                                                       symbol_side_snapshot: SymbolSideSnapshot,
                                                       plan_brief: PlanBrief):
@@ -2201,28 +2322,28 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             if plan_limits_tuple is not None and plan_status_tuple is not None:
                 plan_limits, _ = plan_limits_tuple
                 update_plan_status_obj, _ = plan_status_tuple
-                match chore_journal_obj.chore.side:
+                match chore_ledger_obj.chore.side:
                     case Side.BUY:
-                        match chore_journal_obj.chore_event:
+                        match chore_ledger_obj.chore_event:
                             case ChoreEventType.OE_NEW:
-                                update_plan_status_obj.total_buy_qty += int(chore_journal_obj.chore.qty)
-                                update_plan_status_obj.total_open_buy_qty += int(chore_journal_obj.chore.qty)
+                                update_plan_status_obj.total_buy_qty += int(chore_ledger_obj.chore.qty)
+                                update_plan_status_obj.total_open_buy_qty += int(chore_ledger_obj.chore.qty)
                                 update_plan_status_obj.total_open_buy_notional += \
-                                    chore_journal_obj.chore.qty * self.get_usd_px(chore_snapshot.chore_brief.px,
+                                    chore_ledger_obj.chore.qty * self.get_usd_px(chore_snapshot.chore_brief.px,
                                                                                   chore_snapshot.chore_brief.security.sec_id)
                             case (ChoreEventType.OE_CXL_ACK | ChoreEventType.OE_UNSOL_CXL | ChoreEventType.OE_INT_REJ |
                                   ChoreEventType.OE_BRK_REJ | ChoreEventType.OE_EXH_REJ):
                                 total_buy_unfilled_qty = self.get_residual_qty_post_chore_dod(chore_snapshot)
                                 self._handle_cxl_qty_in_plan_status_buy_side(
                                     update_plan_status_obj, chore_snapshot,
-                                    chore_journal_obj, total_buy_unfilled_qty)
+                                    chore_ledger_obj, total_buy_unfilled_qty)
                             case ChoreEventType.OE_LAPSE:
                                 lapse_qty = chore_snapshot.last_lapsed_qty
                                 self._handle_cxl_qty_in_plan_status_buy_side(
-                                    update_plan_status_obj, chore_snapshot, chore_journal_obj, lapse_qty)
+                                    update_plan_status_obj, chore_snapshot, chore_ledger_obj, lapse_qty)
                             case (ChoreEventType.OE_AMD_DN_UNACK | ChoreEventType.OE_AMD_UP_UNACK |
                                   ChoreEventType.OE_AMD_ACK):
-                                pending_amend_type = self.pending_amend_type(chore_journal_obj, chore_snapshot)
+                                pending_amend_type = self.pending_amend_type(chore_ledger_obj, chore_snapshot)
 
                                 if pending_amend_type == ChoreEventType.OE_AMD_DN_UNACK:
                                     amend_dn_px = chore_snapshot.pending_amend_dn_px
@@ -2254,7 +2375,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                         update_plan_status_obj.avg_cxl_buy_px = (
                                             (self.get_local_px_or_notional(
                                                 update_plan_status_obj.total_cxl_buy_notional,
-                                                chore_journal_obj.chore.security.sec_id) /
+                                                chore_ledger_obj.chore.security.sec_id) /
                                              update_plan_status_obj.total_cxl_buy_qty)
                                             if update_plan_status_obj.total_cxl_buy_qty != 0 else 0)
 
@@ -2314,7 +2435,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                                 update_plan_status_obj.avg_cxl_buy_px = (
                                                     (self.get_local_px_or_notional(
                                                         update_plan_status_obj.total_cxl_buy_notional,
-                                                        chore_journal_obj.chore.security.sec_id) /
+                                                        chore_ledger_obj.chore.security.sec_id) /
                                                      update_plan_status_obj.total_cxl_buy_qty)
                                                     if update_plan_status_obj.total_cxl_buy_qty != 0 else 0)
 
@@ -2341,7 +2462,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                                 new_open_notional)
 
                             case ChoreEventType.OE_AMD_REJ:
-                                pending_amend_type = self.pending_amend_type(chore_journal_obj, chore_snapshot)
+                                pending_amend_type = self.pending_amend_type(chore_ledger_obj, chore_snapshot)
 
                                 if pending_amend_type == ChoreEventType.OE_AMD_DN_UNACK:
                                     amend_dn_px = chore_snapshot.pending_amend_dn_px
@@ -2374,7 +2495,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                         update_plan_status_obj.avg_cxl_buy_px = (
                                             (self.get_local_px_or_notional(
                                                 update_plan_status_obj.total_cxl_buy_notional,
-                                                chore_journal_obj.chore.security.sec_id) /
+                                                chore_ledger_obj.chore.security.sec_id) /
                                              update_plan_status_obj.total_cxl_buy_qty)
                                             if update_plan_status_obj.total_cxl_buy_qty != 0 else 0)
 
@@ -2432,7 +2553,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                                 new_open_notional)
                             case other_:
                                 err_str_ = f"Unsupported Chore Event type {other_}, " \
-                                           f"chore_journal_key: {StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_journal_log_key(chore_journal_obj)}"
+                                           f"chore_ledger_key: {StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_ledger_log_key(chore_ledger_obj)}"
                                 logging.error(err_str_)
                                 return
                         if update_plan_status_obj.total_open_buy_qty == 0:
@@ -2440,29 +2561,29 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                         else:
                             update_plan_status_obj.avg_open_buy_px = \
                                 (self.get_local_px_or_notional(update_plan_status_obj.total_open_buy_notional,
-                                                               chore_journal_obj.chore.security.sec_id) /
+                                                               chore_ledger_obj.chore.security.sec_id) /
                                  update_plan_status_obj.total_open_buy_qty)
                     case Side.SELL:
-                        match chore_journal_obj.chore_event:
+                        match chore_ledger_obj.chore_event:
                             case ChoreEventType.OE_NEW:
-                                update_plan_status_obj.total_sell_qty += int(chore_journal_obj.chore.qty)
-                                update_plan_status_obj.total_open_sell_qty += int(chore_journal_obj.chore.qty)
+                                update_plan_status_obj.total_sell_qty += int(chore_ledger_obj.chore.qty)
+                                update_plan_status_obj.total_open_sell_qty += int(chore_ledger_obj.chore.qty)
                                 update_plan_status_obj.total_open_sell_notional += \
-                                    chore_journal_obj.chore.qty * self.get_usd_px(chore_journal_obj.chore.px,
-                                                                                  chore_journal_obj.chore.security.sec_id)
+                                    chore_ledger_obj.chore.qty * self.get_usd_px(chore_ledger_obj.chore.px,
+                                                                                  chore_ledger_obj.chore.security.sec_id)
                             case (ChoreEventType.OE_CXL_ACK | ChoreEventType.OE_UNSOL_CXL | ChoreEventType.OE_INT_REJ |
                                   ChoreEventType.OE_BRK_REJ | ChoreEventType.OE_EXH_REJ):
                                 total_sell_unfilled_qty = self.get_residual_qty_post_chore_dod(chore_snapshot)
                                 self._handle_cxl_qty_in_plan_status_sell_side(
                                     update_plan_status_obj, chore_snapshot,
-                                    chore_journal_obj, total_sell_unfilled_qty)
+                                    chore_ledger_obj, total_sell_unfilled_qty)
                             case ChoreEventType.OE_LAPSE:
                                 lapse_qty = chore_snapshot.last_lapsed_qty
                                 self._handle_cxl_qty_in_plan_status_sell_side(
-                                    update_plan_status_obj, chore_snapshot, chore_journal_obj, lapse_qty)
+                                    update_plan_status_obj, chore_snapshot, chore_ledger_obj, lapse_qty)
                             case (ChoreEventType.OE_AMD_DN_UNACK | ChoreEventType.OE_AMD_UP_UNACK |
                                   ChoreEventType.OE_AMD_ACK):
-                                pending_amend_type = self.pending_amend_type(chore_journal_obj, chore_snapshot)
+                                pending_amend_type = self.pending_amend_type(chore_ledger_obj, chore_snapshot)
 
                                 if pending_amend_type == ChoreEventType.OE_AMD_DN_UNACK:
                                     amend_dn_px = chore_snapshot.pending_amend_dn_px
@@ -2496,7 +2617,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                         update_plan_status_obj.avg_cxl_sell_px = (
                                             (self.get_local_px_or_notional(
                                                 update_plan_status_obj.total_cxl_sell_notional,
-                                                chore_journal_obj.chore.security.sec_id) /
+                                                chore_ledger_obj.chore.security.sec_id) /
                                              update_plan_status_obj.total_cxl_sell_qty)
                                             if update_plan_status_obj.total_cxl_sell_qty != 0 else 0)
 
@@ -2557,7 +2678,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                                 update_plan_status_obj.avg_cxl_sell_px = (
                                                     (self.get_local_px_or_notional(
                                                         update_plan_status_obj.total_cxl_sell_notional,
-                                                        chore_journal_obj.chore.security.sec_id) /
+                                                        chore_ledger_obj.chore.security.sec_id) /
                                                      update_plan_status_obj.total_cxl_sell_qty)
                                                     if update_plan_status_obj.total_cxl_sell_qty != 0 else 0)
 
@@ -2583,7 +2704,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                                 update_plan_status_obj.total_open_sell_notional - old_open_notional +
                                                 new_open_notional)
                             case ChoreEventType.OE_AMD_REJ:
-                                pending_amend_type = self.pending_amend_type(chore_journal_obj, chore_snapshot)
+                                pending_amend_type = self.pending_amend_type(chore_ledger_obj, chore_snapshot)
 
                                 if pending_amend_type == ChoreEventType.OE_AMD_DN_UNACK:
                                     amend_dn_px = chore_snapshot.pending_amend_dn_px
@@ -2616,7 +2737,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                         update_plan_status_obj.avg_cxl_sell_px = (
                                             (self.get_local_px_or_notional(
                                                 update_plan_status_obj.total_cxl_sell_notional,
-                                                chore_journal_obj.chore.security.sec_id) /
+                                                chore_ledger_obj.chore.security.sec_id) /
                                              update_plan_status_obj.total_cxl_sell_qty)
                                             if update_plan_status_obj.total_cxl_sell_qty != 0 else 0)
 
@@ -2670,7 +2791,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                                 update_plan_status_obj.avg_cxl_sell_px = (
                                                     (self.get_local_px_or_notional(
                                                         update_plan_status_obj.total_cxl_sell_notional,
-                                                        chore_journal_obj.chore.security.sec_id) /
+                                                        chore_ledger_obj.chore.security.sec_id) /
                                                      update_plan_status_obj.total_cxl_sell_qty)
                                                     if update_plan_status_obj.total_cxl_sell_qty != 0 else 0)
 
@@ -2697,7 +2818,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                                 new_open_notional)
                             case other_:
                                 err_str_ = f"Unsupported Chore Event type {other_} " \
-                                           f"chore_journal_key: {StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_journal_log_key(chore_journal_obj)}"
+                                           f"chore_ledger_key: {StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_ledger_log_key(chore_ledger_obj)}"
                                 logging.error(err_str_)
                                 return
                         if update_plan_status_obj.total_open_sell_qty == 0:
@@ -2705,12 +2826,12 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                         else:
                             update_plan_status_obj.avg_open_sell_px = \
                                 self.get_local_px_or_notional(update_plan_status_obj.total_open_sell_notional,
-                                                              chore_journal_obj.chore.security.sec_id) / \
+                                                              chore_ledger_obj.chore.security.sec_id) / \
                                 update_plan_status_obj.total_open_sell_qty
                     case other_:
-                        err_str_ = f"Unsupported Side Type {other_} received in chore_journal_key: " \
-                                   f"{StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_journal_log_key(chore_journal_obj)} while updating plan_status;;; " \
-                                   f"{chore_journal_obj = }"
+                        err_str_ = f"Unsupported Side Type {other_} received in chore_ledger_key: " \
+                                   f"{StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_ledger_log_key(chore_ledger_obj)} while updating plan_status;;; " \
+                                   f"{chore_ledger_obj = }"
                         logging.error(err_str_)
                         return
                 update_plan_status_obj.total_chore_qty = \
@@ -2730,8 +2851,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
 
                 # Updating plan_state as paused if limits get breached
                 is_cxl: bool = False
-                if chore_journal_obj.chore_event == ChoreEventType.OE_CXL_ACK or (
-                        chore_journal_obj.chore_event == ChoreEventType.OE_UNSOL_CXL):
+                if chore_ledger_obj.chore_event == ChoreEventType.OE_CXL_ACK or (
+                        chore_ledger_obj.chore_event == ChoreEventType.OE_UNSOL_CXL):
                     is_cxl = True
                 await self._pause_plan_if_limits_breached(update_plan_status_obj, plan_limits, plan_brief,
                                                            symbol_side_snapshot, is_cxl=is_cxl)
@@ -2781,7 +2902,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         open_notional = fetched_open_notional - amended_open_notional + reverted_open_notional
         return open_qty, open_notional
 
-    async def _update_plan_brief_from_chore_or_fill(self, chore_journal_or_fills_journal: ChoreJournal | FillsJournal,
+    async def _update_plan_brief_from_chore_or_fill(self, chore_ledger_or_deals_ledger: ChoreLedger | DealsLedger,
                                                      chore_snapshot: ChoreSnapshot,
                                                      symbol_side_snapshot: SymbolSideSnapshot,
                                                      received_fill_after_dod: bool | None = None) -> PlanBrief | None:
@@ -2812,9 +2933,9 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                             fetched_open_notional = plan_brief_obj.pair_sell_side_bartering_brief.open_notional
                             fetched_all_bkr_cxlled_qty = plan_brief_obj.pair_sell_side_bartering_brief.all_bkr_cxlled_qty
 
-                        if isinstance(chore_journal_or_fills_journal, ChoreJournal):
-                            chore_journal: ChoreJournal = chore_journal_or_fills_journal
-                            if chore_journal.chore_event == ChoreEventType.OE_NEW:
+                        if isinstance(chore_ledger_or_deals_ledger, ChoreLedger):
+                            chore_ledger: ChoreLedger = chore_ledger_or_deals_ledger
+                            if chore_ledger.chore_event == ChoreEventType.OE_NEW:
                                 # When chore_event is OE_NEW then just adding current chore's total qty to existing
                                 # open_qty + total notional (total chore Qty * chore px) to exist open_notional
                                 if fetched_open_qty is None:
@@ -2827,7 +2948,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                             chore_snapshot.chore_brief.qty *
                                             self.get_usd_px(chore_snapshot.chore_brief.px,
                                                             chore_snapshot.chore_brief.security.sec_id)))
-                            elif chore_journal.chore_event in [ChoreEventType.OE_INT_REJ, ChoreEventType.OE_BRK_REJ,
+                            elif chore_ledger.chore_event in [ChoreEventType.OE_INT_REJ, ChoreEventType.OE_BRK_REJ,
                                                                ChoreEventType.OE_EXH_REJ]:
                                 # When chore_event is OE_INT_REJ or OE_BRK_REJ or OE_EXH_REJ then just removing
                                 # current chore's total qty from existing open_qty + total notional
@@ -2838,7 +2959,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                             chore_snapshot.chore_brief.qty *
                                             self.get_usd_px(chore_snapshot.chore_brief.px,
                                                             chore_snapshot.chore_brief.security.sec_id)))
-                            elif chore_journal.chore_event in [ChoreEventType.OE_CXL_ACK, ChoreEventType.OE_UNSOL_CXL]:
+                            elif chore_ledger.chore_event in [ChoreEventType.OE_CXL_ACK, ChoreEventType.OE_UNSOL_CXL]:
                                 # When chore_event is OE_CXL_ACK or OE_UNSOL_CXL then removing current chore's
                                 # unfilled qty from existing open_qty + unfilled notional
                                 # (unfilled chore Qty * chore px) from existing open_notional
@@ -2846,16 +2967,16 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                 open_qty, open_notional, all_bkr_cxlled_qty = self._handle_cxled_qty_in_plan_brief(
                                     fetched_open_qty, fetched_open_notional, fetched_all_bkr_cxlled_qty,
                                     chore_snapshot, unfilled_qty)
-                            elif chore_journal.chore_event == ChoreEventType.OE_LAPSE:
+                            elif chore_ledger.chore_event == ChoreEventType.OE_LAPSE:
                                 lapsed_qty = chore_snapshot.last_lapsed_qty
                                 open_qty, open_notional, all_bkr_cxlled_qty = self._handle_cxled_qty_in_plan_brief(
                                     fetched_open_qty, fetched_open_notional, fetched_all_bkr_cxlled_qty,
                                     chore_snapshot, lapsed_qty)
 
-                            elif chore_journal.chore_event in [ChoreEventType.OE_AMD_DN_UNACK,
+                            elif chore_ledger.chore_event in [ChoreEventType.OE_AMD_DN_UNACK,
                                                                ChoreEventType.OE_AMD_UP_UNACK,
                                                                ChoreEventType.OE_AMD_ACK]:
-                                chore_event = self.pending_amend_type(chore_journal, chore_snapshot)
+                                chore_event = self.pending_amend_type(chore_ledger, chore_snapshot)
 
                                 if chore_event == ChoreEventType.OE_AMD_DN_UNACK:
                                     amend_dn_qty = chore_snapshot.pending_amend_dn_qty
@@ -2917,8 +3038,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                                                                             ChoreStatusType.OE_OVER_CXLED]:
                                             all_bkr_cxlled_qty = fetched_all_bkr_cxlled_qty + amend_up_qty
 
-                            elif chore_journal.chore_event == ChoreEventType.OE_AMD_REJ:
-                                chore_event = self.pending_amend_type(chore_journal, chore_snapshot)
+                            elif chore_ledger.chore_event == ChoreEventType.OE_AMD_REJ:
+                                chore_event = self.pending_amend_type(chore_ledger, chore_snapshot)
 
                                 if chore_event == ChoreEventType.OE_AMD_DN_UNACK:
                                     amend_dn_qty = chore_snapshot.pending_amend_dn_qty
@@ -2979,20 +3100,20 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                                  f"[{ChoreEventType.OE_NEW}, {ChoreEventType.OE_INT_REJ}, "
                                                  f"{ChoreEventType.OE_BRK_REJ}, {ChoreEventType.OE_EXH_REJ}"
                                                  f"{ChoreEventType.OE_CXL_ACK}, {ChoreEventType.OE_UNSOL_CXL}], "
-                                                 f"Found: {chore_journal_or_fills_journal.chore_event} - ignoring "
+                                                 f"Found: {chore_ledger_or_deals_ledger.chore_event} - ignoring "
                                                  f"plan_brief update")
                                 logging.error(err_str_)
                                 return
-                        elif isinstance(chore_journal_or_fills_journal, FillsJournal):
-                            # For fills, removing current fill's qty from existing
+                        elif isinstance(chore_ledger_or_deals_ledger, DealsLedger):
+                            # For deals, removing current fill's qty from existing
                             # open_qty + current fill's notional (fill_qty * chore_px) from existing open_notional
-                            fills_journal: FillsJournal = chore_journal_or_fills_journal
+                            deals_ledger: DealsLedger = chore_ledger_or_deals_ledger
                             if not received_fill_after_dod:
                                 if not chore_snapshot.chore_status == ChoreStatusType.OE_OVER_FILLED:
-                                    open_qty = fetched_open_qty - fills_journal.fill_qty
+                                    open_qty = fetched_open_qty - deals_ledger.fill_qty
                                     open_notional = (
                                             fetched_open_notional - (
-                                                fills_journal.fill_qty *
+                                                deals_ledger.fill_qty *
                                                 self.get_usd_px(chore_snapshot.chore_brief.px,
                                                                 chore_snapshot.chore_brief.security.sec_id)))
                                 else:
@@ -3000,7 +3121,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                     # removing only what was open originally
                                     available_qty = self.get_valid_available_fill_qty(chore_snapshot)
                                     extra_fill_qty = chore_snapshot.filled_qty - available_qty
-                                    acceptable_remaining_fill_qty = fills_journal.fill_qty - extra_fill_qty
+                                    acceptable_remaining_fill_qty = deals_ledger.fill_qty - extra_fill_qty
 
                                     open_qty = fetched_open_qty - acceptable_remaining_fill_qty
                                     open_notional = fetched_open_notional - (
@@ -3008,7 +3129,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                                         self.get_usd_px(chore_snapshot.chore_brief.px,
                                                                         chore_snapshot.chore_brief.security.sec_id))
                             else:
-                                # if fills come after DOD, this chore's open calculation must
+                                # if deals come after DOD, this chore's open calculation must
                                 # have already removed from overall open qty and notional - no need to remove fill qty from
                                 # existing open
                                 open_qty = fetched_open_qty
@@ -3018,14 +3139,14 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                 if chore_snapshot.chore_status == ChoreStatusType.OE_OVER_FILLED:
                                     available_qty = self.get_valid_available_fill_qty(chore_snapshot)
                                     extra_fill_qty = chore_snapshot.filled_qty - available_qty
-                                    acceptable_remaining_fill_qty = fills_journal.fill_qty - extra_fill_qty
+                                    acceptable_remaining_fill_qty = deals_ledger.fill_qty - extra_fill_qty
                                     all_bkr_cxlled_qty = int(fetched_all_bkr_cxlled_qty - acceptable_remaining_fill_qty)
                                 else:
                                     all_bkr_cxlled_qty = int(
                                         fetched_all_bkr_cxlled_qty - chore_snapshot.last_update_fill_qty)
                         else:
-                            err_str_: str = ("Unsupported Journal type: Must be either ChoreJournal or FillsJournal, "
-                                             f"Found type: {type(chore_journal_or_fills_journal)} - ignoring "
+                            err_str_: str = ("Unsupported Ledger type: Must be either ChoreLedger or DealsLedger, "
+                                             f"Found type: {type(chore_ledger_or_deals_ledger)} - ignoring "
                                              f"plan_brief update")
                             logging.error(err_str_)
                             return
@@ -3100,20 +3221,20 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                             # same residual_qty will be used if no match found below else will be replaced with
                             # updated residual_qty value
                             residual_qty = stored_pair_plan_bartering_brief.residual_qty
-                            if isinstance(chore_journal_or_fills_journal, ChoreJournal):
-                                if chore_journal.chore_event not in [ChoreEventType.OE_AMD_UP_UNACK,
+                            if isinstance(chore_ledger_or_deals_ledger, ChoreLedger):
+                                if chore_ledger.chore_event not in [ChoreEventType.OE_AMD_UP_UNACK,
                                                                      ChoreEventType.OE_AMD_DN_UNACK,
                                                                      ChoreEventType.OE_AMD_ACK,
                                                                      ChoreEventType.OE_AMD_REJ]:
                                     if chore_snapshot.chore_status == ChoreStatusType.OE_DOD:
-                                        if chore_journal.chore_event == ChoreEventType.OE_LAPSE:
+                                        if chore_ledger.chore_event == ChoreEventType.OE_LAPSE:
                                             # if chore is DOD and chore qty was lapsed - lapsed qty is residual
                                             unfilled_qty = chore_snapshot.last_lapsed_qty
                                         else:
                                             # If DOD came due to cxl_ack or any other non-lapse case
                                             unfilled_qty = self.get_residual_qty_post_chore_dod(chore_snapshot)
                                         residual_qty = int(stored_pair_plan_bartering_brief.residual_qty + unfilled_qty)
-                                    elif chore_journal.chore_event == ChoreEventType.OE_LAPSE:
+                                    elif chore_ledger.chore_event == ChoreEventType.OE_LAPSE:
                                         lapsed_qty = chore_snapshot.last_lapsed_qty
                                         residual_qty = int(stored_pair_plan_bartering_brief.residual_qty + lapsed_qty)
                                     # else not required: No other case can affect residual qty
@@ -3127,13 +3248,13 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                         if chore_snapshot.chore_status == ChoreStatusType.OE_OVER_FILLED:
                                             available_qty = self.get_valid_available_fill_qty(chore_snapshot)
                                             extra_fill_qty = chore_snapshot.filled_qty - available_qty
-                                            acceptable_remaining_fill_qty = fills_journal.fill_qty - extra_fill_qty
+                                            acceptable_remaining_fill_qty = deals_ledger.fill_qty - extra_fill_qty
                                             residual_qty = int((stored_pair_plan_bartering_brief.residual_qty -
                                                                 acceptable_remaining_fill_qty))
                                         else:
                                             residual_qty = int(stored_pair_plan_bartering_brief.residual_qty -
                                                                chore_snapshot.filled_qty)
-                                # else not required: fills have no impact on residual qty unless they arrive post DOD
+                                # else not required: deals have no impact on residual qty unless they arrive post DOD
 
                             updated_pair_side_brief_obj.residual_qty = residual_qty
 
@@ -3291,17 +3412,17 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                                    chore_snapshot_obj.chore_brief.security.sec_id))
         return old_open_qty, new_open_qty, old_open_notional, new_open_notional
 
-    async def _update_contact_status_from_chore_journal(
-            self, chore_journal_obj: ChoreJournal,
+    async def _update_contact_status_from_chore_ledger(
+            self, chore_ledger_obj: ChoreLedger,
             chore_snapshot_obj: ChoreSnapshot) -> ContactStatusUpdatesContainer | None:
-        match chore_journal_obj.chore.side:
+        match chore_ledger_obj.chore.side:
             case Side.BUY:
                 update_overall_buy_notional = 0
-                match chore_journal_obj.chore_event:
+                match chore_ledger_obj.chore_event:
                     case ChoreEventType.OE_NEW:
                         update_overall_buy_notional = \
-                            self.get_usd_px(chore_journal_obj.chore.px, chore_journal_obj.chore.security.sec_id) * \
-                            chore_journal_obj.chore.qty
+                            self.get_usd_px(chore_ledger_obj.chore.px, chore_ledger_obj.chore.security.sec_id) * \
+                            chore_ledger_obj.chore.qty
                     case (ChoreEventType.OE_CXL_ACK | ChoreEventType.OE_UNSOL_CXL | ChoreEventType.OE_INT_REJ |
                           ChoreEventType.OE_BRK_REJ | ChoreEventType.OE_EXH_REJ):
                         total_buy_unfilled_qty = self.get_residual_qty_post_chore_dod(chore_snapshot_obj)
@@ -3313,7 +3434,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                             chore_snapshot_obj, lapsed_qty)
                     case ChoreEventType.OE_AMD_DN_UNACK | ChoreEventType.OE_AMD_UP_UNACK | ChoreEventType.OE_AMD_ACK:
                         if chore_snapshot_obj.chore_status not in OTHER_TERMINAL_STATES:
-                            pending_amend_type = self.pending_amend_type(chore_journal_obj, chore_snapshot_obj)
+                            pending_amend_type = self.pending_amend_type(chore_ledger_obj, chore_snapshot_obj)
 
                             if pending_amend_type == ChoreEventType.OE_AMD_DN_UNACK:
                                 amend_dn_px = chore_snapshot_obj.pending_amend_dn_px
@@ -3364,7 +3485,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                         # case of amend post DOD so open would already be removed while handling DOD
                     case ChoreEventType.OE_AMD_REJ:
                         if chore_snapshot_obj.chore_status not in NON_FILLED_TERMINAL_STATES:
-                            pending_amend_type = self.pending_amend_type(chore_journal_obj, chore_snapshot_obj)
+                            pending_amend_type = self.pending_amend_type(chore_ledger_obj, chore_snapshot_obj)
 
                             if pending_amend_type == ChoreEventType.OE_AMD_DN_UNACK:
                                 amend_dn_px = chore_snapshot_obj.pending_amend_dn_px
@@ -3416,11 +3537,11 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                 return ContactStatusUpdatesContainer(buy_notional_update=update_overall_buy_notional)
             case Side.SELL:
                 update_overall_sell_notional = 0
-                match chore_journal_obj.chore_event:
+                match chore_ledger_obj.chore_event:
                     case ChoreEventType.OE_NEW:
                         update_overall_sell_notional = \
-                            self.get_usd_px(chore_journal_obj.chore.px, chore_journal_obj.chore.security.sec_id) * \
-                            chore_journal_obj.chore.qty
+                            self.get_usd_px(chore_ledger_obj.chore.px, chore_ledger_obj.chore.security.sec_id) * \
+                            chore_ledger_obj.chore.qty
                     case (ChoreEventType.OE_CXL_ACK | ChoreEventType.OE_UNSOL_CXL | ChoreEventType.OE_INT_REJ |
                           ChoreEventType.OE_BRK_REJ | ChoreEventType.OE_EXH_REJ):
                         total_sell_unfilled_qty = self.get_residual_qty_post_chore_dod(chore_snapshot_obj)
@@ -3432,7 +3553,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                             chore_snapshot_obj, lapsed_qty)
                     case ChoreEventType.OE_AMD_DN_UNACK | ChoreEventType.OE_AMD_UP_UNACK | ChoreEventType.OE_AMD_ACK:
                         if chore_snapshot_obj.chore_status not in OTHER_TERMINAL_STATES:
-                            pending_amend_type = self.pending_amend_type(chore_journal_obj, chore_snapshot_obj)
+                            pending_amend_type = self.pending_amend_type(chore_ledger_obj, chore_snapshot_obj)
 
                             if pending_amend_type == ChoreEventType.OE_AMD_DN_UNACK:
                                 amend_dn_px = chore_snapshot_obj.pending_amend_dn_px
@@ -3483,7 +3604,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                         # case of amend post DOD so open would already be removed while handling DOD
                     case ChoreEventType.OE_AMD_REJ:
                         if chore_snapshot_obj.chore_status not in NON_FILLED_TERMINAL_STATES:
-                            pending_amend_type = self.pending_amend_type(chore_journal_obj, chore_snapshot_obj)
+                            pending_amend_type = self.pending_amend_type(chore_ledger_obj, chore_snapshot_obj)
 
                             if pending_amend_type == ChoreEventType.OE_AMD_DN_UNACK:
                                 amend_dn_px = chore_snapshot_obj.pending_amend_dn_px
@@ -3535,25 +3656,25 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                         # case of amend post DOD so open would already be removed while handling DOD
                 return ContactStatusUpdatesContainer(sell_notional_update=update_overall_sell_notional)
             case other_:
-                err_str_ = f"Unsupported Side Type {other_} received in chore_journal of key: " \
-                           f"{StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_journal_log_key(chore_journal_obj)} while updating plan_status;;; " \
-                           f"{chore_journal_obj = } "
+                err_str_ = f"Unsupported Side Type {other_} received in chore_ledger of key: " \
+                           f"{StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_ledger_log_key(chore_ledger_obj)} while updating plan_status;;; " \
+                           f"{chore_ledger_obj = } "
                 logging.error(err_str_)
                 return None
 
     ##############################
-    # Fills Journal Update Methods
+    # Deals Ledger Update Methods
     ##############################
 
-    async def create_fills_journal_pre(self, fills_journal_obj: FillsJournal):
-        await self.handle_create_fills_journal_pre(fills_journal_obj)
+    async def create_deals_ledger_pre(self, deals_ledger_obj: DealsLedger):
+        await self.handle_create_deals_ledger_pre(deals_ledger_obj)
 
-    async def create_fills_journal_post(self, fills_journal_obj: FillsJournal):
+    async def create_deals_ledger_post(self, deals_ledger_obj: DealsLedger):
         # updating bartering_data_manager's plan_cache
-        self.bartering_data_manager.handle_fills_journal_get_all_ws(fills_journal_obj)
+        self.bartering_data_manager.handle_deals_ledger_get_all_ws(deals_ledger_obj)
 
-        async with StreetBookServiceRoutesCallbackBaseNativeOverride.journal_shared_lock:
-            res = await self._apply_fill_update_in_chore_snapshot(fills_journal_obj)
+        async with StreetBookServiceRoutesCallbackBaseNativeOverride.ledger_shared_lock:
+            res = await self._apply_fill_update_in_chore_snapshot(deals_ledger_obj)
 
             if res is not None:
                 chore_snapshot, plan_brief, contact_status_updates = res
@@ -3566,7 +3687,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             # signifies some unexpected exception occurred so complete update was not done,
             # therefore avoiding contact_limit checks too
 
-    async def _update_contact_status_from_fill_journal(
+    async def _update_contact_status_from_fill_ledger(
             self, chore_snapshot_obj: ChoreSnapshot, received_fill_after_dod: bool
             ) -> ContactStatusUpdatesContainer | None:
 
@@ -3708,7 +3829,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                 err_str_ = ("Received symbol_side_snapshot_tuple as None from plan_cache for symbol: "
                             f"{chore_snapshot_obj.chore_brief.security.sec_id}, "
                             f"chore_snapshot_key: {StreetBookServiceRoutesCallbackBaseNativeOverride.get_chore_snapshot_log_key(chore_snapshot_obj)} - "
-                            f"ignoring this symbol_side_snapshot update from fills")
+                            f"ignoring this symbol_side_snapshot update from deals")
                 logging.error(err_str_)
 
     def pause_plan(self):
@@ -3725,32 +3846,32 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             PairPlanBaseModel, email_book_service_http_client.patch_pair_plan_client,
             _id=self.pair_plan_id, plan_state=PlanState.PlanState_ACTIVE.value)
 
-    async def handle_post_chore_snapshot_tasks_for_fills(
-            self, fills_journal_obj: FillsJournal, chore_snapshot_obj: ChoreSnapshot,
+    async def handle_post_chore_snapshot_tasks_for_deals(
+            self, deals_ledger_obj: DealsLedger, chore_snapshot_obj: ChoreSnapshot,
             received_fill_after_dod: bool):
         symbol_side_snapshot = \
             await self._update_symbol_side_snapshot_from_fill_applied_chore_snapshot(
                 chore_snapshot_obj, received_fill_after_dod=received_fill_after_dod)
         if symbol_side_snapshot is not None:
             updated_plan_brief = await self._update_plan_brief_from_chore_or_fill(
-                fills_journal_obj, chore_snapshot_obj, symbol_side_snapshot,
+                deals_ledger_obj, chore_snapshot_obj, symbol_side_snapshot,
                 received_fill_after_dod=received_fill_after_dod)
             if updated_plan_brief is not None:
-                await self._update_plan_status_from_fill_journal(
+                await self._update_plan_status_from_fill_ledger(
                     chore_snapshot_obj, symbol_side_snapshot, updated_plan_brief,
                     received_fill_after_dod=received_fill_after_dod)
             # else not required: if updated_plan_brief is None then it means some error occurred in
             # _update_plan_brief_from_chore which would have got added to alert already
             contact_status_updates: ContactStatusUpdatesContainer | None = (
-                await self._update_contact_status_from_fill_journal(
+                await self._update_contact_status_from_fill_ledger(
                     chore_snapshot_obj, received_fill_after_dod=received_fill_after_dod))
 
             return chore_snapshot_obj, updated_plan_brief, contact_status_updates
-        # else not require_create_update_symbol_side_snapshot_from_chore_journald: if symbol_side_snapshot
-        # is None then it means error occurred in _create_update_symbol_side_snapshot_from_chore_journal
+        # else not require_create_update_symbol_side_snapshot_from_chore_ledgerd: if symbol_side_snapshot
+        # is None then it means error occurred in _create_update_symbol_side_snapshot_from_chore_ledger
         # which would have got added to alert already
 
-    async def _update_plan_status_from_fill_journal(self, chore_snapshot_obj: ChoreSnapshot,
+    async def _update_plan_status_from_fill_ledger(self, chore_snapshot_obj: ChoreSnapshot,
                                                      symbol_side_snapshot: SymbolSideSnapshot,
                                                      plan_brief_obj: PlanBrief,
                                                      received_fill_after_dod: bool):
@@ -4011,8 +4132,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
     # BarteringDataManager updates
     ############################
 
-    async def partial_update_chore_journal_post(self, updated_chore_journal_obj_json: Dict[str, Any]):
-        await self.handle_partial_update_chore_journal_post(updated_chore_journal_obj_json)
+    async def partial_update_chore_ledger_post(self, updated_chore_ledger_obj_json: Dict[str, Any]):
+        await self.handle_partial_update_chore_ledger_post(updated_chore_ledger_obj_json)
 
     async def create_chore_snapshot_post(self, chore_snapshot_obj: ChoreSnapshot):
         await self.handle_create_chore_snapshot_post(chore_snapshot_obj)
@@ -4082,8 +4203,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
     def update_fill(self):
         self.plan_cache.get_plan_brief()
 
-    async def partial_update_fills_journal_post(self, updated_fills_journal_obj_json: Dict[str, Any]):
-        await self.handle_partial_update_fills_journal_post(updated_fills_journal_obj_json)
+    async def partial_update_deals_ledger_post(self, updated_deals_ledger_obj_json: Dict[str, Any]):
+        await self.handle_partial_update_deals_ledger_post(updated_deals_ledger_obj_json)
 
     async def create_plan_brief_post(self, plan_brief_obj: PlanBrief):
         # updating bartering_data_manager's plan_cache
@@ -4134,8 +4255,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                   "pair_sell_side_bartering_brief": {}}    # will keep updating based on updates found
         do_plan_brief_update = False
 
-        async with StreetBookServiceRoutesCallbackBaseNativeOverride.journal_shared_lock:
-            # taking journal_shared_lock since in some updates open and filled qty too is involved
+        async with StreetBookServiceRoutesCallbackBaseNativeOverride.ledger_shared_lock:
+            # taking ledger_shared_lock since in some updates open and filled qty too is involved
             async with PlanBrief.reentrant_lock:
                 stored_plan_brief_tuple = self.plan_cache.get_plan_brief()
                 if stored_plan_brief_tuple is not None:
@@ -4352,7 +4473,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
 
     async def update_residuals_query_pre(self, pair_plan_class_type: Type[PlanStatus], security_id: str, side: Side,
                                          residual_qty: int):
-        async with StreetBookServiceRoutesCallbackBaseNativeOverride.journal_shared_lock:
+        async with StreetBookServiceRoutesCallbackBaseNativeOverride.ledger_shared_lock:
             async with (StreetBookServiceRoutesCallbackBaseNativeOverride.residual_compute_shared_lock):
                 plan_brief_tuple = self.plan_cache.get_plan_brief()
 
@@ -4421,7 +4542,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         return await self.handle_get_underlying_account_cumulative_fill_qty_query_pre(symbol, side)
 
     async def get_symbol_side_underlying_account_cumulative_fill_qty_query_pre(
-            self, fills_journal_class_type: Type[FillsJournal], symbol: str, side: str):
+            self, deals_ledger_class_type: Type[DealsLedger], symbol: str, side: str):
         return await self.handle_get_symbol_side_underlying_account_cumulative_fill_qty_query_pre(symbol, side)
 
     def get_residual_mark_secs(self):
@@ -4553,7 +4674,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
     async def delete_symbol_overview_pre(self, obj_id: int):
         await self.handle_delete_symbol_overview_pre(obj_id)
 
-    async def put_plan_to_snooze_query_pre(self, plan_status_class_type: Type[PlanStatus]):
+    async def put_plan_to_snooze_query_pre(self, put_plan_to_snooze_class_type: Type[PutPlanToSnooze],
+                                            payload: Dict[str, Any]):
         try:
             # removing current plan_status
             await self._check_n_remove_plan_status()
@@ -4677,20 +4799,20 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                 return [cached_plan_limits]
         return []
 
-    async def get_chore_journals_from_cache_query_pre(self, chore_journal_class_type: Type[ChoreJournal]):
-        cached_chore_journal_tuple = self.plan_cache.get_chore_journal()
-        if cached_chore_journal_tuple is not None:
-            cached_chore_journal, _ = cached_chore_journal_tuple
-            if cached_chore_journal is not None:
-                return cached_chore_journal
+    async def get_chore_ledgers_from_cache_query_pre(self, chore_ledger_class_type: Type[ChoreLedger]):
+        cached_chore_ledger_tuple = self.plan_cache.get_chore_ledger()
+        if cached_chore_ledger_tuple is not None:
+            cached_chore_ledger, _ = cached_chore_ledger_tuple
+            if cached_chore_ledger is not None:
+                return cached_chore_ledger
         return []
 
-    async def get_fills_journal_from_cache_query_pre(self, fills_journal_class_type: Type[FillsJournal]):
-        cached_fills_journal_tuple = self.plan_cache.get_fills_journal()
-        if cached_fills_journal_tuple is not None:
-            cached_fills_journal, _ = cached_fills_journal_tuple
-            if cached_fills_journal is not None:
-                return cached_fills_journal
+    async def get_deals_ledger_from_cache_query_pre(self, deals_ledger_class_type: Type[DealsLedger]):
+        cached_deals_ledger_tuple = self.plan_cache.get_deals_ledger()
+        if cached_deals_ledger_tuple is not None:
+            cached_deals_ledger, _ = cached_deals_ledger_tuple
+            if cached_deals_ledger is not None:
+                return cached_deals_ledger
         return []
 
     async def get_chore_snapshots_from_cache_query_pre(self, chore_snapshot_class_type: Type[ChoreSnapshot]):

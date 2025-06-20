@@ -72,17 +72,17 @@ class BasePlanCache:
         return None
 
     @classmethod
-    def get_key_n_symbol_from_fills_journal(
-            cls, fills_journal: FillsJournalBaseModel | FillsJournal) -> Tuple[str | None, str | None]:
+    def get_key_n_symbol_from_deals_ledger(
+            cls, deals_ledger: DealsLedgerBaseModel | DealsLedger) -> Tuple[str | None, str | None]:
         symbol: str
-        symbol_side_tuple = cls.chore_id_to_symbol_side_tuple_dict.get(fills_journal.chore_id)
+        symbol_side_tuple = cls.chore_id_to_symbol_side_tuple_dict.get(deals_ledger.chore_id)
         if not symbol_side_tuple:
-            logging.error(f"Unknown {fills_journal.chore_id=} found for fill "
-                          f"{get_symbol_side_key([(fills_journal.fill_symbol, fills_journal.fill_side)])};;; "
-                          f"{fills_journal=}")
+            logging.error(f"Unknown {deals_ledger.chore_id=} found for fill "
+                          f"{get_symbol_side_key([(deals_ledger.fill_symbol, deals_ledger.fill_side)])};;; "
+                          f"{deals_ledger=}")
             return None, None
         symbol, side = symbol_side_tuple
-        key: str | None = cls.KeyHandler.get_key_from_fills_journal(fills_journal)
+        key: str | None = cls.KeyHandler.get_key_from_deals_ledger(deals_ledger)
         return key, symbol
 
     def handle_set_chore_snapshot(self, chore_snapshot: ChoreSnapshotBaseModel | ChoreSnapshot,
@@ -137,17 +137,17 @@ class BasePlanCache:
                     return True
         return False
 
-    def update_has_fill_on_open_chore_snapshot(self, fills_journal: FillsJournal):
-        if not fills_journal.user_data:
+    def update_has_fill_on_open_chore_snapshot(self, deals_ledger: DealsLedger):
+        if not deals_ledger.user_data:
             return  # external chore, no processing needed
         with self._chore_id_to_open_chore_snapshot_cont_dict_n_chore_id_has_fill_set_lock:
             open_chore_snapshot_cont: ChoreSnapshotContainer
-            if open_chore_snapshot_cont := self._chore_id_to_open_chore_snapshot_cont_dict.get(fills_journal.chore_id):
+            if open_chore_snapshot_cont := self._chore_id_to_open_chore_snapshot_cont_dict.get(deals_ledger.chore_id):
                 open_chore_snapshot_cont.has_fill = True
-            elif fills_journal.chore_id not in self.open_chore_id_has_fill_set:
-                # TODO: this also adds fills that may arrive post DOD (non Open chores) and reenter the set - add
+            elif deals_ledger.chore_id not in self.open_chore_id_has_fill_set:
+                # TODO: this also adds deals that may arrive post DOD (non Open chores) and reenter the set - add
                 #  periodic cleanup
-                self.open_chore_id_has_fill_set.add(fills_journal.chore_id)
+                self.open_chore_id_has_fill_set.add(deals_ledger.chore_id)
 
     def _check_log_over_fill(self, chore_snapshot: ChoreSnapshotBaseModel | ChoreSnapshot, overfill_log_str: str):
         if chore_snapshot.chore_status == ChoreStatusType.OE_OVER_FILLED:

@@ -6,14 +6,15 @@ ui_port: "3010"
 # server specific configs
 server_host: "127.0.0.1"
 main_server_beanie_port: "8010"
-main_server_cache_port: "8015"
+view_port: "8015"
+main_server_cache_port: "8016"
 min_refresh_interval: 20
 custom_logger_lvls:
   - TIMING: 15
   - JUNK: 5
 
 log_mongo_uri: True
-mongo_server: "mongodb://localhost:27017"
+mongo_server: "mongodb://localhost:27017/?replicaSet=rs0&authSource=admin"
 
 # to be used by plugins to take proto files from these projects to generate combined output
 multi_project_plugin:

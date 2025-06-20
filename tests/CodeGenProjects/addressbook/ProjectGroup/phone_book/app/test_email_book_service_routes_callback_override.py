@@ -877,7 +877,7 @@ def test_delete_by_id_list(clean_and_set_limits, web_client):
             if return_value_type is not None or return_value_type:
                 assert delete_web_response["id"] == existing_ids_list, \
                     (f"Mismatched id list in delete_web_response, expected {existing_ids_list}, "
-                     f"found {delete_web_response["id"]}")
+                     f"found {delete_web_response['id']}")
             else:
                 assert delete_web_response, \
                     f"Mismatch when return_value param to clinet was False, expected True received {delete_web_response}"
@@ -1259,10 +1259,10 @@ def test_place_chores_with_manual_executor_port(
             # update_tob_through_market_depth_to_place_buy_chore(active_pair_plan.cpp_port, bid_buy_top_market_depth,
             #                                                    ask_sell_top_market_depth)
             place_new_chore(buy_symbol, Side.BUY, 98, 95, executor_web_client, InstrumentType.CB)
-            ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
+            ack_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK,
                                                                                buy_symbol, executor_web_client,
                                                                                last_chore_id=buy_ack_chore_id)
-            buy_ack_chore_id = ack_chore_journal.chore.chore_id
+            buy_ack_chore_id = ack_chore_ledger.chore.chore_id
 
             if not executor_config_yaml_dict.get("allow_multiple_open_chores_per_plan"):
                 # Sleeping to let the chore get cxlled
@@ -1279,10 +1279,10 @@ def test_place_chores_with_manual_executor_port(
             #                                                     bid_buy_top_market_depth)
             place_new_chore(sell_symbol, Side.SELL, 98, 95, executor_web_client, InstrumentType.EQT)
 
-            ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
+            ack_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK,
                                                                                sell_symbol, executor_web_client,
                                                                                last_chore_id=sell_ack_chore_id)
-            sell_ack_chore_id = ack_chore_journal.chore.chore_id
+            sell_ack_chore_id = ack_chore_ledger.chore.chore_id
 
             if not executor_config_yaml_dict.get("allow_multiple_open_chores_per_plan"):
                 # Sleeping to let the chore get cxlled
@@ -1409,20 +1409,20 @@ def test_place_sanity_parallel_chores(static_data_, clean_and_set_limits, leg1_l
 #
 #             buy_chore: NewChoreBaseModel = place_new_chore(buy_symbol, Side.BUY, 10, 90, executor_web_client)
 #
-#             # ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
+#             # ack_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK,
 #             #                                                                    buy_symbol, executor_web_client,
 #             #                                                                    last_chore_id=buy_ack_chore_id)
-#             # buy_ack_chore_id = ack_chore_journal.chore.chore_id
-#             # fills_journal = get_latest_fill_journal_from_chore_id(buy_ack_chore_id, executor_web_client)
+#             # buy_ack_chore_id = ack_chore_ledger.chore.chore_id
+#             # deals_ledger = get_latest_fill_ledger_from_chore_id(buy_ack_chore_id, executor_web_client)
 #             time.sleep(1)
 #             sell_chore: NewChoreBaseModel = place_new_chore(sell_symbol, Side.SELL, 110, 7, executor_web_client)
-#             sell_ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
+#             sell_ack_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK,
 #                                                                                sell_symbol, executor_web_client,
 #                                                                                last_chore_id=sell_ack_chore_id)
 #             plan_status: PlanStatusBaseModel = executor_web_client.get_plan_status_client(active_pair_plan.id)
 #             plan_view: PlanViewBaseModel = email_book_service_native_web_client.get_plan_view_client(
 #                 active_pair_plan.id)
-#             sell_ack_chore_id = sell_ack_chore_journal.chore.chore_id
+#             sell_ack_chore_id = sell_ack_chore_ledger.chore.chore_id
 #             assert plan_status.balance_notional == plan_view.balance_notional, \
 #                 f"Mismatched {plan_status.balance_notional = }, {plan_view.balance_notional = }"
 #
@@ -1707,8 +1707,8 @@ def test_plan_gets_deleted_even_when_symbol_overview_is_not_found(
 
 @pytest.mark.nightly1
 def test_buy_sell_chore_multi_pair_serialized(static_data_, clean_and_set_limits, pair_securities_with_sides_,
-                                              buy_chore_, sell_chore_, buy_fill_journal_,
-                                              sell_fill_journal_, expected_buy_chore_snapshot_,
+                                              buy_chore_, sell_chore_, buy_fill_ledger_,
+                                              sell_fill_ledger_, expected_buy_chore_snapshot_,
                                               expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
                                               pair_plan_, expected_plan_limits_, expected_plan_status_,
                                               expected_plan_brief_, expected_contact_status_,
@@ -1726,8 +1726,8 @@ def test_buy_sell_chore_multi_pair_serialized(static_data_, clean_and_set_limits
 
         plan_buy_notional, plan_sell_notional, plan_buy_fill_notional, plan_sell_fill_notional = (
             handle_test_buy_sell_chore(leg1_symbol, leg2_symbol, max_loop_count_per_side,
-                                       refresh_sec_update_fixture, buy_chore_, sell_chore_, buy_fill_journal_,
-                                       sell_fill_journal_, expected_buy_chore_snapshot_, expected_sell_chore_snapshot_,
+                                       refresh_sec_update_fixture, buy_chore_, sell_chore_, buy_fill_ledger_,
+                                       sell_fill_ledger_, expected_buy_chore_snapshot_, expected_sell_chore_snapshot_,
                                        expected_symbol_side_snapshot_, stored_pair_plan_basemodel,
                                        expected_plan_limits_, expected_plan_status_, expected_plan_brief_,
                                        last_barter_fixture_list, symbol_overview_obj_list,
@@ -1746,8 +1746,8 @@ def test_buy_sell_chore_multi_pair_serialized(static_data_, clean_and_set_limits
 
 @pytest.mark.nightly
 def test_buy_sell_chore_multi_pair_parallel(static_data_, clean_and_set_limits, pair_securities_with_sides_,
-                                            buy_chore_, sell_chore_, buy_fill_journal_,
-                                            sell_fill_journal_, expected_buy_chore_snapshot_,
+                                            buy_chore_, sell_chore_, buy_fill_ledger_,
+                                            sell_fill_ledger_, expected_buy_chore_snapshot_,
                                             expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
                                             pair_plan_, expected_plan_limits_, expected_plan_status_,
                                             expected_plan_brief_, expected_contact_status_,
@@ -1775,8 +1775,8 @@ def test_buy_sell_chore_multi_pair_parallel(static_data_, clean_and_set_limits, 
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
         results = [executor.submit(handle_test_buy_sell_chore, leg1_leg2_symbol[0], leg1_leg2_symbol[1],
                                    max_loop_count_per_side, refresh_sec_update_fixture, copy.deepcopy(buy_chore_),
-                                   copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_journal_),
-                                   copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_chore_snapshot_),
+                                   copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_ledger_),
+                                   copy.deepcopy(sell_fill_ledger_), copy.deepcopy(expected_buy_chore_snapshot_),
                                    copy.deepcopy(expected_sell_chore_snapshot_),
                                    copy.deepcopy(expected_symbol_side_snapshot_), pair_plan_list[idx],
                                    copy.deepcopy(expected_plan_limits_),
@@ -1804,8 +1804,8 @@ def test_buy_sell_chore_multi_pair_parallel(static_data_, clean_and_set_limits, 
 
 @pytest.mark.nightly
 def test_same_pair_parallel_run(static_data_, clean_and_set_limits, pair_securities_with_sides_,
-                                buy_chore_, sell_chore_, buy_fill_journal_,
-                                sell_fill_journal_, expected_buy_chore_snapshot_,
+                                buy_chore_, sell_chore_, buy_fill_ledger_,
+                                sell_fill_ledger_, expected_buy_chore_snapshot_,
                                 expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
                                 pair_plan_, expected_plan_limits_, expected_plan_status_,
                                 expected_plan_brief_, expected_contact_status_,
@@ -1837,8 +1837,8 @@ def test_same_pair_parallel_run(static_data_, clean_and_set_limits, pair_securit
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(pair_plan_to_test_callable_list)) as executor:
         results = [executor.submit(test_callable, leg1_symbol, leg2_symbol,
                                    max_loop_count_per_side, refresh_sec_update_fixture, copy.deepcopy(buy_chore_),
-                                   copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_journal_),
-                                   copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_chore_snapshot_),
+                                   copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_ledger_),
+                                   copy.deepcopy(sell_fill_ledger_), copy.deepcopy(expected_buy_chore_snapshot_),
                                    copy.deepcopy(expected_sell_chore_snapshot_),
                                    copy.deepcopy(expected_symbol_side_snapshot_), create_pair_plan,
                                    copy.deepcopy(expected_plan_limits_),
@@ -1867,8 +1867,8 @@ def test_same_pair_parallel_run(static_data_, clean_and_set_limits, pair_securit
 @pytest.mark.nightly
 def test_same_pair_parallel_run_both_side_in_pair(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -1900,8 +1900,8 @@ def test_same_pair_parallel_run_both_side_in_pair(
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(pair_plan_to_test_callable_list)) as executor:
         results = [executor.submit(test_callable, leg1_symbol, leg2_symbol,
                                    max_loop_count_per_side, refresh_sec_update_fixture, copy.deepcopy(buy_chore_),
-                                   copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_journal_),
-                                   copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_chore_snapshot_),
+                                   copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_ledger_),
+                                   copy.deepcopy(sell_fill_ledger_), copy.deepcopy(expected_buy_chore_snapshot_),
                                    copy.deepcopy(expected_sell_chore_snapshot_),
                                    copy.deepcopy(expected_symbol_side_snapshot_), create_pair_plan,
                                    copy.deepcopy(expected_plan_limits_),
@@ -1930,8 +1930,8 @@ def test_same_pair_parallel_run_both_side_in_pair(
 @pytest.mark.nightly
 def test_same_pair_parallel_place_chore_in_sequence(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -1959,7 +1959,7 @@ def test_same_pair_parallel_place_chore_in_sequence(
             max_loop_count_per_side,
             refresh_sec_update_fixture, buy_chore_,
             sell_chore_,
-            buy_fill_journal_, sell_fill_journal_,
+            buy_fill_ledger_, sell_fill_ledger_,
             expected_buy_chore_snapshot_,
             expected_sell_chore_snapshot_,
             expected_symbol_side_snapshot_,
@@ -1980,8 +1980,8 @@ def test_same_pair_parallel_place_chore_in_sequence(
 @pytest.mark.nightly
 def test_same_n_opposite_plans_in_combination1(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -2037,8 +2037,8 @@ def test_same_n_opposite_plans_in_combination1(
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(pair_plan_to_test_callable_list)) as executor:
         results = [executor.submit(test_callable, leg1_symbol, leg2_symbol,
                                    max_loop_count_per_side, refresh_sec_update_fixture, copy.deepcopy(buy_chore_),
-                                   copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_journal_),
-                                   copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_chore_snapshot_),
+                                   copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_ledger_),
+                                   copy.deepcopy(sell_fill_ledger_), copy.deepcopy(expected_buy_chore_snapshot_),
                                    copy.deepcopy(expected_sell_chore_snapshot_),
                                    copy.deepcopy(expected_symbol_side_snapshot_), create_pair_plan,
                                    copy.deepcopy(expected_plan_limits_),
@@ -2068,8 +2068,8 @@ def test_same_n_opposite_plans_in_combination1(
 @pytest.mark.nightly
 def test_same_n_opposite_plans_in_combination2(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -2115,8 +2115,8 @@ def test_same_n_opposite_plans_in_combination2(
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(pair_plan_to_test_callable_list)) as executor:
         results = [executor.submit(test_callable, leg1_symbol, leg2_symbol,
                                    max_loop_count_per_side, refresh_sec_update_fixture, copy.deepcopy(buy_chore_),
-                                   copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_journal_),
-                                   copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_chore_snapshot_),
+                                   copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_ledger_),
+                                   copy.deepcopy(sell_fill_ledger_), copy.deepcopy(expected_buy_chore_snapshot_),
                                    copy.deepcopy(expected_sell_chore_snapshot_),
                                    copy.deepcopy(expected_symbol_side_snapshot_), create_pair_plan,
                                    copy.deepcopy(expected_plan_limits_),
@@ -2157,8 +2157,8 @@ def test_same_n_opposite_plans_in_combination2(
 
 @pytest.mark.nightly
 def test_sell_buy_chore_multi_pair_parallel(static_data_, clean_and_set_limits, pair_securities_with_sides_,
-                                            buy_chore_, sell_chore_, buy_fill_journal_,
-                                            sell_fill_journal_, expected_buy_chore_snapshot_,
+                                            buy_chore_, sell_chore_, buy_fill_ledger_,
+                                            sell_fill_ledger_, expected_buy_chore_snapshot_,
                                             expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
                                             pair_plan_, expected_plan_limits_, expected_plan_status_,
                                             expected_plan_brief_, expected_contact_status_,
@@ -2187,8 +2187,8 @@ def test_sell_buy_chore_multi_pair_parallel(static_data_, clean_and_set_limits, 
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
         results = [executor.submit(handle_test_sell_buy_chore, leg1_leg2_symbol[0], leg1_leg2_symbol[1],
                                    max_loop_count_per_side, refresh_sec_update_fixture, copy.deepcopy(buy_chore_),
-                                   copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_journal_),
-                                   copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_chore_snapshot_),
+                                   copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_ledger_),
+                                   copy.deepcopy(sell_fill_ledger_), copy.deepcopy(expected_buy_chore_snapshot_),
                                    copy.deepcopy(expected_sell_chore_snapshot_),
                                    copy.deepcopy(expected_symbol_side_snapshot_), pair_plan_list[idx],
                                    copy.deepcopy(expected_plan_limits_),
@@ -2217,8 +2217,8 @@ def test_sell_buy_chore_multi_pair_parallel(static_data_, clean_and_set_limits, 
 @pytest.mark.nightly1
 def test_buy_sell_non_systematic_chore_multi_pair_serialized(static_data_, clean_and_set_limits,
                                                              pair_securities_with_sides_,
-                                                             buy_chore_, sell_chore_, buy_fill_journal_,
-                                                             sell_fill_journal_, expected_buy_chore_snapshot_,
+                                                             buy_chore_, sell_chore_, buy_fill_ledger_,
+                                                             sell_fill_ledger_, expected_buy_chore_snapshot_,
                                                              expected_sell_chore_snapshot_,
                                                              expected_symbol_side_snapshot_,
                                                              pair_plan_, expected_plan_limits_,
@@ -2238,8 +2238,8 @@ def test_buy_sell_non_systematic_chore_multi_pair_serialized(static_data_, clean
 
         plan_buy_notional, plan_sell_notional, plan_buy_fill_notional, plan_sell_fill_notional = (
             handle_test_buy_sell_chore(leg1_symbol, leg2_symbol, max_loop_count_per_side,
-                                       refresh_sec_update_fixture, buy_chore_, sell_chore_, buy_fill_journal_,
-                                       sell_fill_journal_, expected_buy_chore_snapshot_, expected_sell_chore_snapshot_,
+                                       refresh_sec_update_fixture, buy_chore_, sell_chore_, buy_fill_ledger_,
+                                       sell_fill_ledger_, expected_buy_chore_snapshot_, expected_sell_chore_snapshot_,
                                        expected_symbol_side_snapshot_, stored_pair_plan_basemodel,
                                        expected_plan_limits_, expected_plan_status_, expected_plan_brief_,
                                        last_barter_fixture_list, symbol_overview_obj_list,
@@ -2259,8 +2259,8 @@ def test_buy_sell_non_systematic_chore_multi_pair_serialized(static_data_, clean
 @pytest.mark.nightly
 def test_buy_sell_non_systematic_chore_multi_pair_parallel(static_data_, clean_and_set_limits,
                                                            pair_securities_with_sides_,
-                                                           buy_chore_, sell_chore_, buy_fill_journal_,
-                                                           sell_fill_journal_, expected_buy_chore_snapshot_,
+                                                           buy_chore_, sell_chore_, buy_fill_ledger_,
+                                                           sell_fill_ledger_, expected_buy_chore_snapshot_,
                                                            expected_sell_chore_snapshot_,
                                                            expected_symbol_side_snapshot_,
                                                            pair_plan_, expected_plan_limits_, expected_plan_status_,
@@ -2289,8 +2289,8 @@ def test_buy_sell_non_systematic_chore_multi_pair_parallel(static_data_, clean_a
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
         results = [executor.submit(handle_test_buy_sell_chore, buy_sell_symbol[0], buy_sell_symbol[1],
                                    max_loop_count_per_side, refresh_sec_update_fixture, copy.deepcopy(buy_chore_),
-                                   copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_journal_),
-                                   copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_chore_snapshot_),
+                                   copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_ledger_),
+                                   copy.deepcopy(sell_fill_ledger_), copy.deepcopy(expected_buy_chore_snapshot_),
                                    copy.deepcopy(expected_sell_chore_snapshot_),
                                    copy.deepcopy(expected_symbol_side_snapshot_), pair_plan_list[idx],
                                    copy.deepcopy(expected_plan_limits_),
@@ -2319,8 +2319,8 @@ def test_buy_sell_non_systematic_chore_multi_pair_parallel(static_data_, clean_a
 @pytest.mark.nightly
 def test_buy_sell_pair_chore(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -2351,8 +2351,8 @@ def test_buy_sell_pair_chore(
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
         results = [executor.submit(handle_test_buy_sell_pair_chore, leg1_leg2_symbol[0], leg1_leg2_symbol[1],
                                    max_loop_count_per_side, refresh_sec_update_fixture, copy.deepcopy(buy_chore_),
-                                   copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_journal_),
-                                   copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_chore_snapshot_),
+                                   copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_ledger_),
+                                   copy.deepcopy(sell_fill_ledger_), copy.deepcopy(expected_buy_chore_snapshot_),
                                    copy.deepcopy(expected_sell_chore_snapshot_),
                                    copy.deepcopy(expected_symbol_side_snapshot_), pair_plan_list[idx],
                                    copy.deepcopy(expected_plan_limits_),
@@ -2381,8 +2381,8 @@ def test_buy_sell_pair_chore(
 @pytest.mark.nightly
 def test_sell_buy_pair_chore(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -2414,8 +2414,8 @@ def test_sell_buy_pair_chore(
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
         results = [executor.submit(handle_test_sell_buy_pair_chore, leg1_leg2_symbol[0], leg1_leg2_symbol[1],
                                    max_loop_count_per_side, refresh_sec_update_fixture, copy.deepcopy(buy_chore_),
-                                   copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_journal_),
-                                   copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_chore_snapshot_),
+                                   copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_ledger_),
+                                   copy.deepcopy(sell_fill_ledger_), copy.deepcopy(expected_buy_chore_snapshot_),
                                    copy.deepcopy(expected_sell_chore_snapshot_),
                                    copy.deepcopy(expected_symbol_side_snapshot_), pair_plan_list[idx],
                                    copy.deepcopy(expected_plan_limits_),
@@ -2445,8 +2445,8 @@ def test_sell_buy_pair_chore(
 @pytest.mark.parametrize("market_depth_basemodel_list", [5, 10, 20], indirect=True)
 def test_multiple_market_depths_in_plans(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -2490,8 +2490,8 @@ def test_multiple_market_depths_in_plans(
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
         results = [executor.submit(handle_test_buy_sell_pair_chore, leg1_leg2_symbol[0], leg1_leg2_symbol[1],
                                    max_loop_count_per_side, refresh_sec_update_fixture, copy.deepcopy(buy_chore_),
-                                   copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_journal_),
-                                   copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_chore_snapshot_),
+                                   copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_ledger_),
+                                   copy.deepcopy(sell_fill_ledger_), copy.deepcopy(expected_buy_chore_snapshot_),
                                    copy.deepcopy(expected_sell_chore_snapshot_),
                                    copy.deepcopy(expected_symbol_side_snapshot_), pair_plan_list[idx],
                                    copy.deepcopy(expected_plan_limits_),
@@ -2520,8 +2520,8 @@ def test_multiple_market_depths_in_plans(
 @pytest.mark.nightly
 def test_asymmetric_market_depths_in_plans(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -2565,8 +2565,8 @@ def test_asymmetric_market_depths_in_plans(
     with concurrent.futures.ThreadPoolExecutor(max_workers=len(leg1_leg2_symbol_list)) as executor:
         results = [executor.submit(handle_test_buy_sell_pair_chore, leg1_leg2_symbol[0], leg1_leg2_symbol[1],
                                    max_loop_count_per_side, refresh_sec_update_fixture, copy.deepcopy(buy_chore_),
-                                   copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_journal_),
-                                   copy.deepcopy(sell_fill_journal_), copy.deepcopy(expected_buy_chore_snapshot_),
+                                   copy.deepcopy(sell_chore_), copy.deepcopy(buy_fill_ledger_),
+                                   copy.deepcopy(sell_fill_ledger_), copy.deepcopy(expected_buy_chore_snapshot_),
                                    copy.deepcopy(expected_sell_chore_snapshot_),
                                    copy.deepcopy(expected_symbol_side_snapshot_), pair_plan_list[idx],
                                    copy.deepcopy(expected_plan_limits_),
@@ -2616,8 +2616,8 @@ def test_trigger_kill_switch_systematic(static_data_, clean_and_set_limits, leg1
     update_tob_through_market_depth_to_place_buy_chore(created_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                        ask_sell_top_market_depth)
 
-    # internally checks chore_journal existence
-    chore_journal: ChoreJournal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+    # internally checks chore_ledger existence
+    chore_ledger: ChoreLedger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                                  leg1_symbol, executor_web_client)
 
     # negative test
@@ -2637,10 +2637,10 @@ def test_trigger_kill_switch_systematic(static_data_, clean_and_set_limits, leg1
     update_tob_through_market_depth_to_place_buy_chore(created_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                        ask_sell_top_market_depth)
     # internally checking buy chore
-    chore_journal = \
-        get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+    chore_ledger = \
+        get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                        leg1_symbol, executor_web_client,
-                                                       last_chore_id=chore_journal.chore.chore_id,
+                                                       last_chore_id=chore_ledger.chore.chore_id,
                                                        expect_no_chore=True)
 
     run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, created_pair_plan.cpp_port)
@@ -2650,8 +2650,8 @@ def test_trigger_kill_switch_systematic(static_data_, clean_and_set_limits, leg1
     update_tob_through_market_depth_to_place_sell_chore(created_pair_plan.cpp_port, ask_sell_top_market_depth,
                                                         bid_buy_top_market_depth)
     # internally checking sell chore
-    chore_journal = \
-        get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+    chore_ledger = \
+        get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                        leg2_symbol, executor_web_client, expect_no_chore=True)
 
 
@@ -2680,8 +2680,8 @@ def test_trigger_kill_switch_non_systematic(static_data_, clean_and_set_limits, 
                     buy_inst_type)
     time.sleep(2)
     # internally checking buy chore
-    chore_journal: ChoreJournal = \
-        get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+    chore_ledger: ChoreLedger = \
+        get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                        leg1_symbol, executor_web_client)
 
     # negative test
@@ -2702,9 +2702,9 @@ def test_trigger_kill_switch_non_systematic(static_data_, clean_and_set_limits, 
                     buy_inst_type)
     time.sleep(2)
     # internally checking buy chore
-    chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+    chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                    leg1_symbol, executor_web_client,
-                                                                   last_chore_id=chore_journal.chore.chore_id,
+                                                                   last_chore_id=chore_ledger.chore.chore_id,
                                                                    expect_no_chore=True)
 
     # placing sell chore
@@ -2713,8 +2713,8 @@ def test_trigger_kill_switch_non_systematic(static_data_, clean_and_set_limits, 
                     sell_inst_type)
     time.sleep(2)
     # internally checking sell chore
-    chore_journal = \
-        get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+    chore_ledger = \
+        get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                        leg2_symbol, executor_web_client, expect_no_chore=True)
 
 
@@ -2748,8 +2748,8 @@ def test_revoke_kill_switch(static_data_, clean_and_set_limits, leg1_leg2_symbol
     update_tob_through_market_depth_to_place_buy_chore(created_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                        ask_sell_top_market_depth)
     # internally checking buy chore
-    chore_journal = \
-        get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+    chore_ledger = \
+        get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                        leg1_symbol, executor_web_client, expect_no_chore=True)
 
     run_last_barter(leg1_symbol, leg2_symbol, last_barter_fixture_list, created_pair_plan.cpp_port)
@@ -2759,8 +2759,8 @@ def test_revoke_kill_switch(static_data_, clean_and_set_limits, leg1_leg2_symbol
     update_tob_through_market_depth_to_place_sell_chore(created_pair_plan.cpp_port, ask_sell_top_market_depth,
                                                         bid_buy_top_market_depth)
     # internally checking sell chore
-    chore_journal = \
-        get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+    chore_ledger = \
+        get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                        leg2_symbol, executor_web_client, expect_no_chore=True)
 
     # negative test
@@ -2780,8 +2780,8 @@ def test_revoke_kill_switch(static_data_, clean_and_set_limits, leg1_leg2_symbol
     update_tob_through_market_depth_to_place_buy_chore(created_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                        ask_sell_top_market_depth)
 
-    # internally checks chore_journal existence
-    chore_journal: ChoreJournal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+    # internally checks chore_ledger existence
+    chore_ledger: ChoreLedger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                                  leg1_symbol, executor_web_client)
     time.sleep(residual_wait_sec)
 
@@ -2792,8 +2792,8 @@ def test_revoke_kill_switch(static_data_, clean_and_set_limits, leg1_leg2_symbol
     update_tob_through_market_depth_to_place_sell_chore(created_pair_plan.cpp_port, ask_sell_top_market_depth,
                                                         bid_buy_top_market_depth)
     # internally checking sell chore
-    chore_journal = \
-        get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+    chore_ledger = \
+        get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                        leg2_symbol, executor_web_client)
 
 
@@ -2885,7 +2885,7 @@ def test_revoke_switch_fail(
 
 
 @pytest.mark.nightly
-def test_simulated_partial_fills(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
+def test_simulated_partial_deals(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
                                  pair_plan_, expected_plan_limits_,
                                  expected_plan_status_, symbol_overview_obj_list,
                                  last_barter_fixture_list, market_depth_basemodel_list,
@@ -2919,13 +2919,13 @@ def test_simulated_partial_fills(static_data_, clean_and_set_limits, leg1_leg2_s
             # updating simulator's configs
             executor_http_client.barter_simulator_reload_config_query_client()
 
-            # buy fills check
+            # buy deals check
             for check_symbol in [leg1_symbol, leg2_symbol]:
                 chore_id = None
                 total_partial_filled_qty = 0
                 for loop_count in range(1, max_loop_count_per_side + 1):
                     chore_id, partial_filled_qty = \
-                        underlying_handle_simulated_partial_fills_test(loop_count, check_symbol, leg1_symbol,
+                        underlying_handle_simulated_partial_deals_test(loop_count, check_symbol, leg1_symbol,
                                                                        leg2_symbol,
                                                                        last_barter_fixture_list,
                                                                        chore_id, config_dict,
@@ -2955,7 +2955,7 @@ def test_simulated_partial_fills(static_data_, clean_and_set_limits, leg1_leg2_s
 
 
 @pytest.mark.nightly
-def test_simulated_multi_partial_fills(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
+def test_simulated_multi_partial_deals(static_data_, clean_and_set_limits, leg1_leg2_symbol_list,
                                        pair_plan_, expected_plan_limits_,
                                        expected_plan_status_, symbol_overview_obj_list,
                                        last_barter_fixture_list, market_depth_basemodel_list,
@@ -2989,12 +2989,12 @@ def test_simulated_multi_partial_fills(static_data_, clean_and_set_limits, leg1_
             # updating simulator's configs
             executor_http_client.barter_simulator_reload_config_query_client()
 
-            # buy fills check
+            # buy deals check
             for check_symbol in [leg1_symbol, leg2_symbol]:
                 chore_id = None
                 for loop_count in range(1, max_loop_count_per_side + 1):
                     chore_id, partial_filled_qty = \
-                        underlying_handle_simulated_multi_partial_fills_test(loop_count, check_symbol, leg1_symbol,
+                        underlying_handle_simulated_multi_partial_deals_test(loop_count, check_symbol, leg1_symbol,
                                                                              leg2_symbol, created_pair_plan,
                                                                              last_barter_fixture_list, chore_id,
                                                                              executor_http_client, config_dict)
@@ -3048,7 +3048,7 @@ def test_filled_status(static_data_, clean_and_set_limits, leg1_leg2_symbol_list
             # updating simulator's configs
             executor_http_client.barter_simulator_reload_config_query_client()
 
-            # buy fills check
+            # buy deals check
             run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_plan.cpp_port)
 
             px = 100
@@ -3056,34 +3056,34 @@ def test_filled_status(static_data_, clean_and_set_limits, leg1_leg2_symbol_list
             place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
             time.sleep(2)  # delay for chore to get placed
 
-            ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, buy_symbol,
+            ack_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, buy_symbol,
                                                                                executor_http_client)
-            latest_fill_journal = get_latest_fill_journal_from_chore_id(ack_chore_journal.chore.chore_id,
+            latest_fill_ledger = get_latest_fill_ledger_from_chore_id(ack_chore_ledger.chore.chore_id,
                                                                         executor_http_client)
-            last_fill_date_time = latest_fill_journal.fill_date_time
-            filled_qty = get_partial_allowed_fill_qty(buy_symbol, config_dict, ack_chore_journal.chore.qty)
-            assert latest_fill_journal.fill_qty == filled_qty, f"filled_qty mismatched: expected filled_qty {filled_qty} " \
-                                                               f"received {latest_fill_journal.fill_qty}"
-            chore_snapshot = get_chore_snapshot_from_chore_id(ack_chore_journal.chore.chore_id, executor_http_client)
+            last_fill_date_time = latest_fill_ledger.fill_date_time
+            filled_qty = get_partial_allowed_fill_qty(buy_symbol, config_dict, ack_chore_ledger.chore.qty)
+            assert latest_fill_ledger.fill_qty == filled_qty, f"filled_qty mismatched: expected filled_qty {filled_qty} " \
+                                                               f"received {latest_fill_ledger.fill_qty}"
+            chore_snapshot = get_chore_snapshot_from_chore_id(ack_chore_ledger.chore.chore_id, executor_http_client)
             assert chore_snapshot.chore_status == ChoreStatusType.OE_ACKED, "ChoreStatus mismatched: expected status " \
                                                                             f"ChoreStatusType.OE_ACKED received " \
                                                                             f"{chore_snapshot.chore_status}"
 
-            # processing remaining 50% fills
+            # processing remaining 50% deals
             executor_http_client.barter_simulator_process_fill_query_client(
-                ack_chore_journal.chore.chore_id, ack_chore_journal.chore.px,
-                ack_chore_journal.chore.qty, ack_chore_journal.chore.side,
-                ack_chore_journal.chore.security.sec_id, ack_chore_journal.chore.underlying_account)
-            latest_fill_journal = get_latest_fill_journal_from_chore_id(ack_chore_journal.chore.chore_id,
+                ack_chore_ledger.chore.chore_id, ack_chore_ledger.chore.px,
+                ack_chore_ledger.chore.qty, ack_chore_ledger.chore.side,
+                ack_chore_ledger.chore.security.sec_id, ack_chore_ledger.chore.underlying_account)
+            latest_fill_ledger = get_latest_fill_ledger_from_chore_id(ack_chore_ledger.chore.chore_id,
                                                                         executor_http_client)
-            assert latest_fill_journal.fill_date_time != last_fill_date_time, "last_fill_date_time mismatched: " \
-                                                                              f"expected {latest_fill_journal} " \
+            assert latest_fill_ledger.fill_date_time != last_fill_date_time, "last_fill_date_time mismatched: " \
+                                                                              f"expected {latest_fill_ledger} " \
                                                                               f"received " \
-                                                                              f"{latest_fill_journal.fill_date_time}"
-            assert latest_fill_journal.fill_qty == filled_qty, f"fill_qty mismatched: expected {filled_qty} " \
-                                                               f"received {latest_fill_journal.fill_qty}"
+                                                                              f"{latest_fill_ledger.fill_date_time}"
+            assert latest_fill_ledger.fill_qty == filled_qty, f"fill_qty mismatched: expected {filled_qty} " \
+                                                               f"received {latest_fill_ledger.fill_qty}"
 
-            chore_snapshot = get_chore_snapshot_from_chore_id(ack_chore_journal.chore.chore_id, executor_http_client)
+            chore_snapshot = get_chore_snapshot_from_chore_id(ack_chore_ledger.chore.chore_id, executor_http_client)
             assert chore_snapshot.chore_status == ChoreStatusType.OE_FILLED, "ChoreStatus mismatched: expected status " \
                                                                              f"ChoreStatusType.OE_FILLED received " \
                                                                              f"{chore_snapshot.chore_status}"
@@ -3097,24 +3097,24 @@ def test_filled_status(static_data_, clean_and_set_limits, leg1_leg2_symbol_list
             YAMLConfigurationManager.update_yaml_configurations(config_dict_str, str(config_file_path))
 
 
-def _check_over_fill_computes(sell_symbol, created_pair_plan, executor_http_client, chore_journal,
-                              latest_fill_journal, chore_snapshot_before_over_fill, expected_plan_limits_):
+def _check_over_fill_computes(sell_symbol, created_pair_plan, executor_http_client, chore_ledger,
+                              latest_fill_ledger, chore_snapshot_before_over_fill, expected_plan_limits_):
     # Checking if plan went to pause
     pair_plan = email_book_service_native_web_client.get_pair_plan_client(created_pair_plan.id)
     assert pair_plan.plan_state == PlanState.PlanState_PAUSED, \
         f"Expected Plan to be Paused, found state: {pair_plan.plan_state}, pair_plan: {pair_plan}"
 
-    chore_snapshot = get_chore_snapshot_from_chore_id(chore_journal.chore.chore_id, executor_http_client)
+    chore_snapshot = get_chore_snapshot_from_chore_id(chore_ledger.chore.chore_id, executor_http_client)
     assert chore_snapshot.chore_status == ChoreStatusType.OE_OVER_FILLED, \
         f"ChoreStatus mismatched: expected status {ChoreStatusType.OE_OVER_FILLED} received " \
         f"{chore_snapshot.chore_status}"
-    assert chore_snapshot.filled_qty == chore_snapshot_before_over_fill.filled_qty + latest_fill_journal.fill_qty, \
+    assert chore_snapshot.filled_qty == chore_snapshot_before_over_fill.filled_qty + latest_fill_ledger.fill_qty, \
         ("chore_snapshot filled_qty mismatch: expected chore_snapshot filled_qty: "
-         f"{chore_snapshot_before_over_fill.filled_qty + latest_fill_journal.fill_qty} "
+         f"{chore_snapshot_before_over_fill.filled_qty + latest_fill_ledger.fill_qty} "
          f"but found {chore_snapshot.filled_qty = }")
-    assert chore_snapshot.fill_notional == chore_snapshot.filled_qty * get_px_in_usd(latest_fill_journal.fill_px), \
+    assert chore_snapshot.fill_notional == chore_snapshot.filled_qty * get_px_in_usd(latest_fill_ledger.fill_px), \
         ("chore_snapshot filled_qty mismatch: expected chore_snapshot fill_notional: "
-         f"{chore_snapshot.filled_qty * get_px_in_usd(latest_fill_journal.fill_px)} "
+         f"{chore_snapshot.filled_qty * get_px_in_usd(latest_fill_ledger.fill_px)} "
          f"but found {chore_snapshot.fill_notional = }")
 
     symbol_side_snapshot_list = (
@@ -3222,43 +3222,43 @@ def test_over_fill(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pa
         bid_buy_top_market_depth, ask_sell_top_market_depth = (
             get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, created_pair_plan))
 
-        # buy fills check
+        # buy deals check
         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_plan.cpp_port)
         time.sleep(1)
         update_tob_through_market_depth_to_place_buy_chore(created_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
         time.sleep(2)  # delay for chore to get placed
 
-        ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, buy_symbol,
+        ack_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, buy_symbol,
                                                                            executor_http_client)
-        latest_fill_journal = get_latest_fill_journal_from_chore_id(ack_chore_journal.chore.chore_id,
+        latest_fill_ledger = get_latest_fill_ledger_from_chore_id(ack_chore_ledger.chore.chore_id,
                                                                     executor_http_client)
-        last_fill_date_time = latest_fill_journal.fill_date_time
-        filled_qty = get_partial_allowed_fill_qty(buy_symbol, config_dict, ack_chore_journal.chore.qty)
-        assert latest_fill_journal.fill_qty == filled_qty, f"fill_qty mismatched: expected {filled_qty} " \
-                                                           f"received {latest_fill_journal.fill_qty}"
+        last_fill_date_time = latest_fill_ledger.fill_date_time
+        filled_qty = get_partial_allowed_fill_qty(buy_symbol, config_dict, ack_chore_ledger.chore.qty)
+        assert latest_fill_ledger.fill_qty == filled_qty, f"fill_qty mismatched: expected {filled_qty} " \
+                                                           f"received {latest_fill_ledger.fill_qty}"
         chore_snapshot_before_over_fill = (
-            get_chore_snapshot_from_chore_id(ack_chore_journal.chore.chore_id, executor_http_client))
+            get_chore_snapshot_from_chore_id(ack_chore_ledger.chore.chore_id, executor_http_client))
         assert chore_snapshot_before_over_fill.chore_status == ChoreStatusType.OE_ACKED, \
             "ChoreStatus mismatched: expected status ChoreStatusType.OE_ACKED received " \
             f"{chore_snapshot_before_over_fill.chore_status}"
 
         # processing fill for over_fill
         executor_http_client.barter_simulator_process_fill_query_client(
-            ack_chore_journal.chore.chore_id, ack_chore_journal.chore.px,
-            ack_chore_journal.chore.qty, ack_chore_journal.chore.side,
-            ack_chore_journal.chore.security.sec_id, ack_chore_journal.chore.underlying_account)
-        latest_fill_journal = get_latest_fill_journal_from_chore_id(ack_chore_journal.chore.chore_id,
+            ack_chore_ledger.chore.chore_id, ack_chore_ledger.chore.px,
+            ack_chore_ledger.chore.qty, ack_chore_ledger.chore.side,
+            ack_chore_ledger.chore.security.sec_id, ack_chore_ledger.chore.underlying_account)
+        latest_fill_ledger = get_latest_fill_ledger_from_chore_id(ack_chore_ledger.chore.chore_id,
                                                                     executor_http_client)
-        assert latest_fill_journal.fill_date_time != last_fill_date_time, "last_fill_date_time mismatched: " \
-                                                                          f"expected {latest_fill_journal} " \
+        assert latest_fill_ledger.fill_date_time != last_fill_date_time, "last_fill_date_time mismatched: " \
+                                                                          f"expected {latest_fill_ledger} " \
                                                                           f"received " \
-                                                                          f"{latest_fill_journal.fill_date_time}"
-        assert latest_fill_journal.fill_qty == filled_qty, f"fill_qty mismatched: expected {filled_qty} " \
-                                                           f"received {latest_fill_journal.fill_qty}"
+                                                                          f"{latest_fill_ledger.fill_date_time}"
+        assert latest_fill_ledger.fill_qty == filled_qty, f"fill_qty mismatched: expected {filled_qty} " \
+                                                           f"received {latest_fill_ledger.fill_qty}"
 
-        _check_over_fill_computes(sell_symbol, created_pair_plan, executor_http_client, ack_chore_journal,
-                                  latest_fill_journal, chore_snapshot_before_over_fill, expected_plan_limits_)
+        _check_over_fill_computes(sell_symbol, created_pair_plan, executor_http_client, ack_chore_ledger,
+                                  latest_fill_ledger, chore_snapshot_before_over_fill, expected_plan_limits_)
 
         time.sleep(5)
         check_str = "Unexpected: Received fill that will make chore_snapshot OVER_FILLED"
@@ -3308,22 +3308,22 @@ def test_over_fill_after_fulfill(
         bid_buy_top_market_depth, ask_sell_top_market_depth = (
             get_buy_bid_n_ask_sell_market_depth(buy_symbol, sell_symbol, created_pair_plan))
 
-        # buy fills check
+        # buy deals check
         run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_plan.cpp_port)
         time.sleep(1)
         update_tob_through_market_depth_to_place_buy_chore(created_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
         time.sleep(5)  # delay for chore to get placed
 
-        ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, buy_symbol,
+        ack_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, buy_symbol,
                                                                            executor_http_client)
-        latest_fill_journal = get_latest_fill_journal_from_chore_id(ack_chore_journal.chore.chore_id,
+        latest_fill_ledger = get_latest_fill_ledger_from_chore_id(ack_chore_ledger.chore.chore_id,
                                                                     executor_http_client)
-        last_fill_date_time = latest_fill_journal.fill_date_time
-        filled_qty = get_partial_allowed_fill_qty(buy_symbol, config_dict, ack_chore_journal.chore.qty)
-        assert latest_fill_journal.fill_qty == filled_qty, f"fill_qty mismatched: expected {filled_qty} " \
-                                                           f"received {latest_fill_journal.fill_qty}"
-        chore_snapshot_before_over_fill = get_chore_snapshot_from_chore_id(ack_chore_journal.chore.chore_id,
+        last_fill_date_time = latest_fill_ledger.fill_date_time
+        filled_qty = get_partial_allowed_fill_qty(buy_symbol, config_dict, ack_chore_ledger.chore.qty)
+        assert latest_fill_ledger.fill_qty == filled_qty, f"fill_qty mismatched: expected {filled_qty} " \
+                                                           f"received {latest_fill_ledger.fill_qty}"
+        chore_snapshot_before_over_fill = get_chore_snapshot_from_chore_id(ack_chore_ledger.chore.chore_id,
                                                                            executor_http_client)
         assert chore_snapshot_before_over_fill.filled_qty == chore_snapshot_before_over_fill.chore_brief.qty, \
             ("chore_snapshot filled_qty mismatch: expected complete fill, i.e., "
@@ -3334,19 +3334,19 @@ def test_over_fill_after_fulfill(
 
         # processing fill for over_fill
         executor_http_client.barter_simulator_process_fill_query_client(
-            ack_chore_journal.chore.chore_id, ack_chore_journal.chore.px,
-            ack_chore_journal.chore.qty, ack_chore_journal.chore.side,
-            ack_chore_journal.chore.security.sec_id, ack_chore_journal.chore.underlying_account)
+            ack_chore_ledger.chore.chore_id, ack_chore_ledger.chore.px,
+            ack_chore_ledger.chore.qty, ack_chore_ledger.chore.side,
+            ack_chore_ledger.chore.security.sec_id, ack_chore_ledger.chore.underlying_account)
         time.sleep(2)
-        latest_fill_journal = get_latest_fill_journal_from_chore_id(ack_chore_journal.chore.chore_id,
+        latest_fill_ledger = get_latest_fill_ledger_from_chore_id(ack_chore_ledger.chore.chore_id,
                                                                     executor_http_client)
-        assert latest_fill_journal.fill_date_time != last_fill_date_time, \
-            "last_fill_date_time mismatched: expected {latest_fill_journal} received " \
-            f"{latest_fill_journal.fill_date_time}"
-        assert latest_fill_journal.fill_qty == filled_qty, f"fill_qty mismatched: expected {filled_qty} " \
-                                                           f"received {latest_fill_journal.fill_qty}"
+        assert latest_fill_ledger.fill_date_time != last_fill_date_time, \
+            "last_fill_date_time mismatched: expected {latest_fill_ledger} received " \
+            f"{latest_fill_ledger.fill_date_time}"
+        assert latest_fill_ledger.fill_qty == filled_qty, f"fill_qty mismatched: expected {filled_qty} " \
+                                                           f"received {latest_fill_ledger.fill_qty}"
 
-        chore_snapshot_after_over_fill = get_chore_snapshot_from_chore_id(ack_chore_journal.chore.chore_id,
+        chore_snapshot_after_over_fill = get_chore_snapshot_from_chore_id(ack_chore_ledger.chore.chore_id,
                                                                           executor_http_client)
         assert chore_snapshot_after_over_fill.chore_status == ChoreStatusType.OE_FILLED, \
             (f"ChoreStatus mismatched: expected status ChoreStatusType.OE_FILLED received "
@@ -3702,26 +3702,26 @@ def test_cxl_rej_n_revert_to_filled(static_data_, clean_and_set_limits, leg1_leg
 
                     # internally contains assert statements
                     if check_chore_event == "REJ":
-                        # internally checks chore_journal is not None else raises assert exception internally
-                        latest_cxl_rej_chore_journal = \
-                            get_latest_chore_journal_with_events_and_symbol([ChoreEventType.OE_CXL_INT_REJ,
+                        # internally checks chore_ledger is not None else raises assert exception internally
+                        latest_cxl_rej_chore_ledger = \
+                            get_latest_chore_ledger_with_events_and_symbol([ChoreEventType.OE_CXL_INT_REJ,
                                                                              ChoreEventType.OE_CXL_BRK_REJ,
                                                                              ChoreEventType.OE_CXL_EXH_REJ],
                                                                             check_symbol, executor_http_client,
                                                                             last_chore_id=last_cxl_rej_chore_id)
-                        last_cxl_rej_chore_id = latest_cxl_rej_chore_journal.chore.chore_id
+                        last_cxl_rej_chore_id = latest_cxl_rej_chore_ledger.chore.chore_id
 
-                        chore_snapshot = get_chore_snapshot_from_chore_id(latest_cxl_rej_chore_journal.chore.chore_id,
+                        chore_snapshot = get_chore_snapshot_from_chore_id(latest_cxl_rej_chore_ledger.chore.chore_id,
                                                                           executor_http_client)
                         assert chore_snapshot.chore_status == ChoreStatusType.OE_FILLED, \
                             f"Unexpected chore_snapshot.chore_status: expected {ChoreStatusType.OE_FILLED}, " \
                             f"received {chore_snapshot.chore_status}"
                     else:
-                        # checks chore_journal is not None else raises assert exception internally
-                        latest_cxl_chore_journal = get_latest_chore_journal_with_event_and_symbol(
+                        # checks chore_ledger is not None else raises assert exception internally
+                        latest_cxl_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(
                             ChoreEventType.OE_CXL_ACK, check_symbol, executor_http_client,
                             last_chore_id=last_cxl_chore_id)
-                        last_cxl_chore_id = latest_cxl_chore_journal.chore.chore_id
+                        last_cxl_chore_id = latest_cxl_chore_ledger.chore.chore_id
 
         except AssertionError as e:
             raise AssertionError(e)
@@ -3773,12 +3773,12 @@ def test_no_cxl_req_from_residual_refresh_is_state_already_cxl_req(
         update_tob_through_market_depth_to_place_buy_chore(created_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                            ask_sell_top_market_depth)
 
-        cxl_req_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL,
+        cxl_req_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL,
                                                                                buy_symbol, executor_http_client)
         time.sleep(residual_wait_sec)
-        get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL,
+        get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL,
                                                        buy_symbol, executor_http_client, expect_no_chore=True,
-                                                       last_chore_id=cxl_req_chore_journal.chore.chore_id)
+                                                       last_chore_id=cxl_req_chore_ledger.chore.chore_id)
     except AssertionError as e:
         raise AssertionError(e)
     except Exception as e:
@@ -3856,7 +3856,7 @@ def test_underlying_account_cumulative_fill_qty_query(static_data_, clean_and_se
 
         # buy handling
         buy_tob_last_update_date_time_tracker, buy_chore_id = \
-            create_fills_for_underlying_account_test(leg1_symbol, leg2_symbol, active_pair_plan,
+            create_deals_for_underlying_account_test(leg1_symbol, leg2_symbol, active_pair_plan,
                                                      buy_tob_last_update_date_time_tracker, buy_chore_id,
                                                      underlying_account_prefix, Side.BUY, executor_http_client,
                                                      bid_buy_top_market_depth, ask_sell_top_market_depth,
@@ -3866,7 +3866,7 @@ def test_underlying_account_cumulative_fill_qty_query(static_data_, clean_and_se
 
         # sell handling
         sell_tob_last_update_date_time_tracker, sell_chore_id = \
-            create_fills_for_underlying_account_test(leg1_symbol, leg2_symbol, active_pair_plan,
+            create_deals_for_underlying_account_test(leg1_symbol, leg2_symbol, active_pair_plan,
                                                      sell_tob_last_update_date_time_tracker, sell_chore_id,
                                                      underlying_account_prefix, Side.SELL, executor_http_client,
                                                      bid_buy_top_market_depth, ask_sell_top_market_depth,
@@ -3905,7 +3905,7 @@ def test_last_n_sec_chore_qty_sum(static_data_, clean_and_set_limits, leg1_leg2_
                                   pair_plan_, expected_plan_limits_,
                                   expected_plan_status_, symbol_overview_obj_list,
                                   last_barter_fixture_list, market_depth_basemodel_list,
-                                  buy_fill_journal_, refresh_sec_update_fixture):
+                                  buy_fill_ledger_, refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
     total_chore_count_for_each_side = 5
@@ -3945,12 +3945,12 @@ def test_last_n_sec_chore_qty_sum(static_data_, clean_and_set_limits, leg1_leg2_
             update_tob_through_market_depth_to_place_buy_chore(active_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                                ask_sell_top_market_depth)
 
-            ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW,
+            ack_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW,
                                                                                buy_symbol, executor_http_client,
                                                                                last_chore_id=buy_new_chore_id)
-            buy_new_chore_id = ack_chore_journal.chore.chore_id
-            chore_create_time_list.append(ack_chore_journal.chore_event_date_time)
-            chore_qty_list.append(ack_chore_journal.chore.qty)
+            buy_new_chore_id = ack_chore_ledger.chore.chore_id
+            chore_create_time_list.append(ack_chore_ledger.chore_event_date_time)
+            chore_qty_list.append(ack_chore_ledger.chore.qty)
             if not executor_config_yaml_dict.get("allow_multiple_unfilled_chore_pairs_per_plan"):
                 time.sleep(residual_wait_sec)   # wait for this chore to get cancelled by residual
             else:
@@ -4204,7 +4204,7 @@ def test_partial_ack(static_data_, clean_and_set_limits, pair_plan_,
             # updating simulator's configs
             executor_http_client.barter_simulator_reload_config_query_client()
 
-            # buy fills check
+            # buy deals check
             new_chore_id = None
             acked_chore_id = None
             for loop_count in range(1, max_loop_count_per_side + 1):
@@ -4227,7 +4227,7 @@ def test_partial_ack(static_data_, clean_and_set_limits, pair_plan_,
                 f"Mismatched total_fill_buy_qty: Expected {partial_ack_qty * max_loop_count_per_side}, " \
                 f"received {plan_status.total_fill_buy_qty}"
 
-            # sell fills check
+            # sell deals check
             new_chore_id = None
             acked_chore_id = None
             for loop_count in range(1, max_loop_count_per_side + 1):
@@ -4355,9 +4355,9 @@ def test_ack_post_unack_unsol_cxl(static_data_, clean_and_set_limits, leg1_leg2_
         qty = 90
         place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
 
-        latest_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW, buy_symbol,
+        latest_unack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW, buy_symbol,
                                                                           executor_http_client)
-        latest_cxl_ack_obj = get_latest_chore_journal_with_events_and_symbol([ChoreEventType.OE_CXL_ACK,
+        latest_cxl_ack_obj = get_latest_chore_ledger_with_events_and_symbol([ChoreEventType.OE_CXL_ACK,
                                                                               ChoreEventType.OE_UNSOL_CXL], buy_symbol,
                                                                              executor_http_client)
 
@@ -4375,7 +4375,7 @@ def test_ack_post_unack_unsol_cxl(static_data_, clean_and_set_limits, leg1_leg2_
         assert chore_snapshot.chore_status == ChoreStatusType.OE_DOD, \
             f"Mismatched: Chore status must be DOD but found: {chore_snapshot.chore_status = }"
 
-        check_str = ("Unexpected: Received chore_journal of event: ChoreEventType.OE_ACK on chore of "
+        check_str = ("Unexpected: Received chore_ledger of event: ChoreEventType.OE_ACK on chore of "
                      "chore_snapshot status: ChoreStatusType.OE_DOD")
         assert_fail_msg = f"Can't find alert of {check_str} in neither plan_alert nor contact_alert"
         time.sleep(5)
@@ -4436,9 +4436,9 @@ def test_fill_post_unack_unsol_cxl(
             run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
-            latest_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW, chore_symbol,
+            latest_unack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW, chore_symbol,
                                                                               executor_http_client)
-            latest_cxl_ack_obj = get_latest_chore_journal_with_events_and_symbol([ChoreEventType.OE_CXL_ACK,
+            latest_cxl_ack_obj = get_latest_chore_ledger_with_events_and_symbol([ChoreEventType.OE_CXL_ACK,
                                                                                   ChoreEventType.OE_UNSOL_CXL],
                                                                                  chore_symbol,
                                                                                  executor_http_client)
@@ -4966,9 +4966,9 @@ def test_fulfill_post_unack_unsol_cxl(
             run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
-            latest_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW, chore_symbol,
+            latest_unack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW, chore_symbol,
                                                                               executor_http_client)
-            latest_cxl_ack_obj = get_latest_chore_journal_with_events_and_symbol([ChoreEventType.OE_CXL_ACK,
+            latest_cxl_ack_obj = get_latest_chore_ledger_with_events_and_symbol([ChoreEventType.OE_CXL_ACK,
                                                                                   ChoreEventType.OE_UNSOL_CXL],
                                                                                  chore_symbol,
                                                                                  executor_http_client)
@@ -5505,9 +5505,9 @@ def test_overfill_post_unack_unsol_cxl(
             run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, active_pair_plan.cpp_port)
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
-            latest_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW, chore_symbol,
+            latest_unack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW, chore_symbol,
                                                                               executor_http_client)
-            latest_cxl_ack_obj = get_latest_chore_journal_with_events_and_symbol([ChoreEventType.OE_CXL_ACK,
+            latest_cxl_ack_obj = get_latest_chore_ledger_with_events_and_symbol([ChoreEventType.OE_CXL_ACK,
                                                                                   ChoreEventType.OE_UNSOL_CXL], chore_symbol,
                                                                                  executor_http_client)
 
@@ -6006,7 +6006,7 @@ def test_fill_pre_chore_ack(
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
             config_dict["symbol_configs"][symbol]["simulate_avoid_fill_after_ack"] = True
-            config_dict["symbol_configs"][symbol]["simulate_fills_pre_chore_ack"] = True
+            config_dict["symbol_configs"][symbol]["simulate_deals_pre_chore_ack"] = True
             config_dict["symbol_configs"][symbol]["fill_percent"] = 50
             config_dict["symbol_configs"][symbol]["continues_chore_count"] = 0
             config_dict["symbol_configs"][symbol]["continues_special_chore_count"] = 1
@@ -6021,7 +6021,7 @@ def test_fill_pre_chore_ack(
         qty = 90
         place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
 
-        latest_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW, buy_symbol,
+        latest_unack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW, buy_symbol,
                                                                           executor_http_client)
 
         check_str = ("Received fill for chore that has status: ChoreStatusType.OE_UNACK, "
@@ -6030,17 +6030,17 @@ def test_fill_pre_chore_ack(
         time.sleep(5)
         check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
-        fills_journal_list: List[FillsJournalBaseModel] = (
-            get_fill_journals_for_chore_id(latest_unack_obj.chore.chore_id, executor_http_client))
+        deals_ledger_list: List[DealsLedgerBaseModel] = (
+            get_fill_ledgers_for_chore_id(latest_unack_obj.chore.chore_id, executor_http_client))
         chore_snapshot = get_chore_snapshot_from_chore_id(latest_unack_obj.chore.chore_id,
                                                           executor_http_client)
         assert chore_snapshot.chore_status == ChoreStatusType.OE_ACKED, \
             f"Mismatched: Chore status must be OE_ACKED but found: {chore_snapshot.chore_status = }"
-        assert chore_snapshot.filled_qty == fills_journal_list[0].fill_qty, \
-            (f"Mismatch chore_snapshot.filled_qty, expected {fills_journal_list[0].fill_qty}, "
+        assert chore_snapshot.filled_qty == deals_ledger_list[0].fill_qty, \
+            (f"Mismatch chore_snapshot.filled_qty, expected {deals_ledger_list[0].fill_qty}, "
              f"received {chore_snapshot.filled_qty}")
 
-        # applying ack post fills received
+        # applying ack post deals received
         executor_http_client.barter_simulator_process_chore_ack_query_client(
             latest_unack_obj.chore.chore_id,
             latest_unack_obj.chore.px,
@@ -6049,7 +6049,7 @@ def test_fill_pre_chore_ack(
             latest_unack_obj.chore.security.sec_id,
             latest_unack_obj.chore.underlying_account)
 
-        check_str = ("Unexpected: Received chore_journal of event: ChoreEventType.OE_ACK on chore of "
+        check_str = ("Unexpected: Received chore_ledger of event: ChoreEventType.OE_ACK on chore of "
                      "chore_snapshot status: ChoreStatusType.OE_ACKED")
         assert_fail_msg = f"can't find alert saying {check_str!r}"
         time.sleep(5)
@@ -6088,7 +6088,7 @@ def test_fulfill_pre_chore_ack(
         for symbol in config_dict["symbol_configs"]:
             config_dict["symbol_configs"][symbol]["simulate_reverse_path"] = True
             config_dict["symbol_configs"][symbol]["simulate_avoid_fill_after_ack"] = True
-            config_dict["symbol_configs"][symbol]["simulate_fills_pre_chore_ack"] = True
+            config_dict["symbol_configs"][symbol]["simulate_deals_pre_chore_ack"] = True
             config_dict["symbol_configs"][symbol]["continues_chore_count"] = 0
             config_dict["symbol_configs"][symbol]["continues_special_chore_count"] = 1
         YAMLConfigurationManager.update_yaml_configurations(config_dict, str(config_file_path))
@@ -6102,7 +6102,7 @@ def test_fulfill_pre_chore_ack(
         qty = 90
         place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
 
-        latest_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW, buy_symbol,
+        latest_unack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW, buy_symbol,
                                                                           executor_http_client)
 
         check_str = ("Received fill for chore that has status: ChoreStatusType.OE_UNACK that makes chore fulfilled, "
@@ -6111,17 +6111,17 @@ def test_fulfill_pre_chore_ack(
         time.sleep(5)
         check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
-        fills_journal_list: List[FillsJournalBaseModel] = (
-            get_fill_journals_for_chore_id(latest_unack_obj.chore.chore_id, executor_http_client))
+        deals_ledger_list: List[DealsLedgerBaseModel] = (
+            get_fill_ledgers_for_chore_id(latest_unack_obj.chore.chore_id, executor_http_client))
         chore_snapshot = get_chore_snapshot_from_chore_id(latest_unack_obj.chore.chore_id,
                                                           executor_http_client)
         assert chore_snapshot.chore_status == ChoreStatusType.OE_FILLED, \
             f"Mismatched: Chore status must be OE_FILLED but found: {chore_snapshot.chore_status = }"
-        assert chore_snapshot.filled_qty == fills_journal_list[0].fill_qty, \
-            (f"Mismatch chore_snapshot.filled_qty, expected {fills_journal_list[0].fill_qty}, "
+        assert chore_snapshot.filled_qty == deals_ledger_list[0].fill_qty, \
+            (f"Mismatch chore_snapshot.filled_qty, expected {deals_ledger_list[0].fill_qty}, "
              f"received {chore_snapshot.filled_qty}")
 
-        # applying ack post fills received
+        # applying ack post deals received
         executor_http_client.barter_simulator_process_chore_ack_query_client(
             latest_unack_obj.chore.chore_id,
             latest_unack_obj.chore.px,
@@ -6130,7 +6130,7 @@ def test_fulfill_pre_chore_ack(
             latest_unack_obj.chore.security.sec_id,
             latest_unack_obj.chore.underlying_account)
 
-        check_str = ("Unexpected: Received chore_journal of event: ChoreEventType.OE_ACK on chore of "
+        check_str = ("Unexpected: Received chore_ledger of event: ChoreEventType.OE_ACK on chore of "
                      "chore_snapshot status: ChoreStatusType.OE_FILLED")
         assert_fail_msg = f"can't find alert saying {check_str!r}"
         time.sleep(5)
@@ -6180,21 +6180,21 @@ def test_overfill_pre_chore_ack(
         qty = 90
         place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
 
-        latest_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW, buy_symbol,
+        latest_unack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW, buy_symbol,
                                                                           executor_http_client)
         overfill_qty = qty + 10
         executor_http_client.barter_simulator_process_fill_query_client(
             latest_unack_obj.chore.chore_id, latest_unack_obj.chore.px, overfill_qty, Side.BUY, buy_symbol,
             latest_unack_obj.chore.underlying_account, use_exact_passed_qty=True)
 
-        fills_journal_list: List[FillsJournalBaseModel] = (
-            get_fill_journals_for_chore_id(latest_unack_obj.chore.chore_id, executor_http_client))
+        deals_ledger_list: List[DealsLedgerBaseModel] = (
+            get_fill_ledgers_for_chore_id(latest_unack_obj.chore.chore_id, executor_http_client))
         chore_snapshot = get_chore_snapshot_from_chore_id(latest_unack_obj.chore.chore_id,
                                                           executor_http_client)
         assert chore_snapshot.chore_status == ChoreStatusType.OE_OVER_FILLED, \
             f"Mismatched: Chore status must be OE_OVER_FILLED but found: {chore_snapshot.chore_status = }"
         assert chore_snapshot.filled_qty == overfill_qty, \
-            (f"Mismatch chore_snapshot.filled_qty, expected {fills_journal_list[0].fill_qty}, "
+            (f"Mismatch chore_snapshot.filled_qty, expected {deals_ledger_list[0].fill_qty}, "
              f"received {chore_snapshot.filled_qty}")
 
         pair_plan = email_book_service_native_web_client.get_pair_plan_client(active_pair_plan.id)
@@ -6207,7 +6207,7 @@ def test_overfill_pre_chore_ack(
         time.sleep(5)
         check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
-        # applying ack post fills received
+        # applying ack post deals received
         executor_http_client.barter_simulator_process_chore_ack_query_client(
             latest_unack_obj.chore.chore_id,
             latest_unack_obj.chore.px,
@@ -6216,7 +6216,7 @@ def test_overfill_pre_chore_ack(
             latest_unack_obj.chore.security.sec_id,
             latest_unack_obj.chore.underlying_account)
 
-        check_str = ("Unexpected: Received chore_journal of event: ChoreEventType.OE_ACK on chore of chore_snapshot "
+        check_str = ("Unexpected: Received chore_ledger of event: ChoreEventType.OE_ACK on chore of chore_snapshot "
                      "status: ChoreStatusType.OE_OVER_FILLED")
         assert_fail_msg = f"can't find alert saying {check_str!r}"
         time.sleep(5)
@@ -6279,7 +6279,7 @@ def test_plan_pause_on_residual_notional_breach(static_data_, clean_and_set_limi
         place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
         print(f"symbol: {buy_symbol}, Created new_chore obj")
 
-        new_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_NEW, buy_symbol,
+        new_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_NEW, buy_symbol,
                                                                            executor_http_client)
         time.sleep(5)
         check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_message)
@@ -6414,7 +6414,7 @@ def _plan_pause_on_negative_consumable_cxl_qty_due_to_waived_min_rolling_notiona
         # placing new non-systematic new_chore
         place_new_chore(check_symbol, check_side, px, qty, executor_http_client, inst_type)
 
-        cxl_chore_journal = get_latest_chore_journal_with_events_and_symbol([ChoreEventType.OE_CXL_ACK,
+        cxl_chore_ledger = get_latest_chore_ledger_with_events_and_symbol([ChoreEventType.OE_CXL_ACK,
                                                                              ChoreEventType.OE_UNSOL_CXL], check_symbol,
                                                                             executor_http_client)
 
@@ -6425,7 +6425,7 @@ def _plan_pause_on_negative_consumable_cxl_qty_due_to_waived_min_rolling_notiona
 
         handle_test_for_plan_pause_on_less_consumable_cxl_qty_without_fill(
             buy_symbol, sell_symbol, active_pair_plan, last_barter_fixture_list,
-            check_side, executor_http_client, last_cxl_chore_id=cxl_chore_journal.chore.chore_id)
+            check_side, executor_http_client, last_cxl_chore_id=cxl_chore_ledger.chore.chore_id)
     except AssertionError as e:
         raise AssertionError(e)
     except Exception as e:
@@ -6603,7 +6603,7 @@ def _plan_pause_on_negative_consumable_cxl_qty_due_to_waived_min_rolling_notiona
         # placing new non-systematic new_chore
         place_new_chore(check_symbol, check_side, px, qty, executor_http_client, inst_type)
 
-        cxl_chore_journal = get_latest_chore_journal_with_events_and_symbol([ChoreEventType.OE_CXL_ACK,
+        cxl_chore_ledger = get_latest_chore_ledger_with_events_and_symbol([ChoreEventType.OE_CXL_ACK,
                                                                              ChoreEventType.OE_UNSOL_CXL], check_symbol,
                                                                             executor_http_client)
 
@@ -6614,7 +6614,7 @@ def _plan_pause_on_negative_consumable_cxl_qty_due_to_waived_min_rolling_notiona
 
         handle_test_for_plan_pause_on_less_consumable_cxl_qty_with_fill(
             buy_symbol, sell_symbol, active_pair_plan, last_barter_fixture_list,
-            check_side, executor_http_client, last_cxl_chore_id=cxl_chore_journal.chore.chore_id)
+            check_side, executor_http_client, last_cxl_chore_id=cxl_chore_ledger.chore.chore_id)
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -7103,11 +7103,11 @@ def test_get_market_depths_query(
 
 
 @pytest.mark.nightly
-def test_fills_after_cxl_request(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+def test_deals_after_cxl_request(static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
                                  expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
                                  last_barter_fixture_list, market_depth_basemodel_list,
                                  buy_chore_, sell_chore_, max_loop_count_per_side,
-                                 buy_fill_journal_, sell_fill_journal_, expected_plan_brief_,
+                                 buy_fill_ledger_, sell_fill_ledger_, expected_plan_brief_,
                                  refresh_sec_update_fixture):
     buy_symbol = leg1_leg2_symbol_list[0][0]
     sell_symbol = leg1_leg2_symbol_list[0][1]
@@ -7142,17 +7142,17 @@ def test_fills_after_cxl_request(static_data_, clean_and_set_limits, leg1_leg2_s
                 qty = 94
                 place_new_chore(sell_symbol, Side.SELL, px, qty, executor_http_client, sell_inst_type)
 
-            ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
+            ack_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK,
                                                                                symbol, executor_http_client)
-            ack_chore_id = ack_chore_journal.chore.chore_id
+            ack_chore_id = ack_chore_ledger.chore.chore_id
 
             executor_http_client.barter_simulator_place_cxl_chore_query_client(
-                ack_chore_id, side, symbol, symbol, ack_chore_journal.chore.underlying_account)
+                ack_chore_id, side, symbol, symbol, ack_chore_ledger.chore.underlying_account)
             time.sleep(2)
 
             executor_http_client.barter_simulator_process_fill_query_client(
-                ack_chore_journal.chore.chore_id, ack_chore_journal.chore.px, ack_chore_journal.chore.qty,
-                side, symbol, ack_chore_journal.chore.underlying_account)
+                ack_chore_ledger.chore.chore_id, ack_chore_ledger.chore.px, ack_chore_ledger.chore.qty,
+                side, symbol, ack_chore_ledger.chore.underlying_account)
             time.sleep(2)
 
             chore_snapshot = get_chore_snapshot_from_chore_id(ack_chore_id, executor_http_client)
@@ -7162,14 +7162,14 @@ def test_fills_after_cxl_request(static_data_, clean_and_set_limits, leg1_leg2_s
 
             # Sending CXL_ACk after chore is fully filled
 
-            cxl_ack_chore_journal = ChoreJournalBaseModel.from_kwargs(chore=ack_chore_journal.chore,
+            cxl_ack_chore_ledger = ChoreLedgerBaseModel.from_kwargs(chore=ack_chore_ledger.chore,
                                                           chore_event_date_time=DateTime.utcnow(),
                                                           chore_event=ChoreEventType.OE_CXL_ACK)
-            executor_http_client.create_chore_journal_client(cxl_ack_chore_journal)
+            executor_http_client.create_chore_ledger_client(cxl_ack_chore_ledger)
             time.sleep(2)
 
             # This must not impact any change in chore states, checking that
-            chore_snapshot = get_chore_snapshot_from_chore_id(cxl_ack_chore_journal.chore.chore_id,
+            chore_snapshot = get_chore_snapshot_from_chore_id(cxl_ack_chore_ledger.chore.chore_id,
                                                               executor_http_client)
 
             assert chore_snapshot.chore_status == ChoreStatusType.OE_FILLED, \
@@ -8338,8 +8338,8 @@ def check_all_computes_for_amend(
 @pytest.mark.nightly
 def test_simple_non_risky_amend_based_on_qty(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -8381,7 +8381,7 @@ def test_simple_non_risky_amend_based_on_qty(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -8451,7 +8451,7 @@ def test_simple_non_risky_amend_based_on_qty(
                 latest_ack_obj.chore.underlying_account,
                 chore_event=chore_event, qty=amend_qty)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             new_qty = qty
             new_px = px
@@ -8497,7 +8497,7 @@ def test_simple_non_risky_amend_based_on_qty(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK, chore_symbol,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK, chore_symbol,
                                                                                   executor_http_client)
             if side == Side.BUY:
                 cxled_qty = amend_qty
@@ -8550,7 +8550,7 @@ def test_simple_non_risky_amend_based_on_qty(
             # waiting for chore to get cxled
             time.sleep(residual_wait_sec)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
             if side == Side.BUY:
                 cxled_qty = open_qty + amend_qty
@@ -8611,8 +8611,8 @@ def test_simple_non_risky_amend_based_on_qty(
 @pytest.mark.nightly
 def test_simple_risky_amend_based_on_qty(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -8653,7 +8653,7 @@ def test_simple_risky_amend_based_on_qty(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, buy_inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
             if side == Side.BUY:
@@ -8720,7 +8720,7 @@ def test_simple_risky_amend_based_on_qty(
                 chore_event=chore_event,
                 qty=amend_qty)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             if side == Side.BUY:
                 cxled_qty = 0
@@ -8773,7 +8773,7 @@ def test_simple_risky_amend_based_on_qty(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
 
@@ -8791,7 +8791,7 @@ def test_simple_risky_amend_based_on_qty(
             # waiting for chore to get cxled
             time.sleep(residual_wait_sec)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
 
             if side == Side.BUY:
@@ -8844,8 +8844,8 @@ def test_simple_risky_amend_based_on_qty(
 @pytest.mark.nightly
 def test_simple_non_risky_amend_based_on_px(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -8887,7 +8887,7 @@ def test_simple_non_risky_amend_based_on_px(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
             if side == Side.BUY:
@@ -8954,7 +8954,7 @@ def test_simple_non_risky_amend_based_on_px(
                 chore_event=chore_event,
                 px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             new_qty = qty
             new_px = px
@@ -8997,7 +8997,7 @@ def test_simple_non_risky_amend_based_on_px(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             if side == Side.BUY:
@@ -9034,7 +9034,7 @@ def test_simple_non_risky_amend_based_on_px(
             # waiting for chore to get cxled
             time.sleep(residual_wait_sec)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
             chore_status = ChoreStatusType.OE_DOD
             residual_qty = open_qty
@@ -9080,8 +9080,8 @@ def test_simple_non_risky_amend_based_on_px(
 @pytest.mark.nightly
 def test_simple_risky_amend_based_on_px(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -9123,7 +9123,7 @@ def test_simple_risky_amend_based_on_px(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -9190,7 +9190,7 @@ def test_simple_risky_amend_based_on_px(
                 chore_event=chore_event,
                 px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             total_amend_dn_qty = 0
             total_amend_up_qty = 0
@@ -9233,7 +9233,7 @@ def test_simple_risky_amend_based_on_px(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             chore_status = ChoreStatusType.OE_ACKED
@@ -9250,7 +9250,7 @@ def test_simple_risky_amend_based_on_px(
             # waiting for chore to get cxled
             time.sleep(residual_wait_sec)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
             chore_status = ChoreStatusType.OE_DOD
             residual_qty = open_qty
@@ -9297,8 +9297,8 @@ def test_simple_risky_amend_based_on_px(
 @pytest.mark.nightly
 def test_simple_non_risky_amend_based_on_qty_and_px(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -9339,7 +9339,7 @@ def test_simple_non_risky_amend_based_on_qty_and_px(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -9408,7 +9408,7 @@ def test_simple_non_risky_amend_based_on_qty_and_px(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             new_qty = qty
             new_px = px
@@ -9452,7 +9452,7 @@ def test_simple_non_risky_amend_based_on_qty_and_px(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             if side == Side.BUY:
@@ -9502,7 +9502,7 @@ def test_simple_non_risky_amend_based_on_qty_and_px(
             # waiting for chore to get cxled
             time.sleep(residual_wait_sec)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
             cxled_qty += open_qty
             cxled_notional += open_qty * get_px_in_usd(open_px)
@@ -9551,8 +9551,8 @@ def test_simple_non_risky_amend_based_on_qty_and_px(
 @pytest.mark.nightly
 def test_simple_risky_amend_based_on_px_and_qty(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -9592,7 +9592,7 @@ def test_simple_risky_amend_based_on_px_and_qty(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -9661,7 +9661,7 @@ def test_simple_risky_amend_based_on_px_and_qty(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
 
             if side == Side.BUY:
@@ -9715,7 +9715,7 @@ def test_simple_risky_amend_based_on_px_and_qty(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
 
@@ -9735,7 +9735,7 @@ def test_simple_risky_amend_based_on_px_and_qty(
             # waiting for chore to get cxled
             time.sleep(residual_wait_sec)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
             cxled_qty += open_qty
             cxled_notional += open_qty * get_px_in_usd(open_px)
@@ -9782,8 +9782,8 @@ def test_simple_risky_amend_based_on_px_and_qty(
 @pytest.mark.nightly
 def test_non_risky_amend_based_on_qty_and_px_with_fill_before_amd_ack(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -9823,7 +9823,7 @@ def test_non_risky_amend_based_on_qty_and_px_with_fill_before_amd_ack(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -9892,7 +9892,7 @@ def test_non_risky_amend_based_on_qty_and_px_with_fill_before_amd_ack(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             new_qty = qty
             new_px = px
@@ -9929,7 +9929,7 @@ def test_non_risky_amend_based_on_qty_and_px_with_fill_before_amd_ack(
                 other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
                 residual_qty=residual_qty)
 
-            # placing fills before receiving AMD_ACK
+            # placing deals before receiving AMD_ACK
             executor_http_client.barter_simulator_process_fill_query_client(
                 latest_ack_obj.chore.chore_id, latest_ack_obj.chore.px, qty, side, chore_symbol,
                 latest_ack_obj.chore.underlying_account)
@@ -9979,7 +9979,7 @@ def test_non_risky_amend_based_on_qty_and_px_with_fill_before_amd_ack(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             if side == Side.BUY:
@@ -10031,7 +10031,7 @@ def test_non_risky_amend_based_on_qty_and_px_with_fill_before_amd_ack(
             # waiting for chore to get cxled
             time.sleep(residual_wait_sec)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
             cxled_qty += open_qty
             cxled_notional += open_qty * get_px_in_usd(open_px)
@@ -10080,8 +10080,8 @@ def test_non_risky_amend_based_on_qty_and_px_with_fill_before_amd_ack(
 @pytest.mark.nightly
 def test_non_risky_amend_based_on_qty_and_px_with_fulfill_before_amd_ack(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -10120,7 +10120,7 @@ def test_non_risky_amend_based_on_qty_and_px_with_fulfill_before_amd_ack(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, buy_inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -10189,7 +10189,7 @@ def test_non_risky_amend_based_on_qty_and_px_with_fulfill_before_amd_ack(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             new_qty = qty
             new_px = px
@@ -10227,7 +10227,7 @@ def test_non_risky_amend_based_on_qty_and_px_with_fulfill_before_amd_ack(
                 other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
                 residual_qty=residual_qty)
 
-            # placing fills before receiving AMD_ACK - makes chore filled
+            # placing deals before receiving AMD_ACK - makes chore filled
             executor_http_client.barter_simulator_process_fill_query_client(
                 latest_ack_obj.chore.chore_id, latest_ack_obj.chore.px, qty, side, chore_symbol,
                 latest_ack_obj.chore.underlying_account)
@@ -10278,7 +10278,7 @@ def test_non_risky_amend_based_on_qty_and_px_with_fulfill_before_amd_ack(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             if side == Side.BUY:
@@ -10401,8 +10401,8 @@ def test_non_risky_amend_based_on_qty_and_px_with_fulfill_before_amd_ack(
 @pytest.mark.nightly
 def test_non_risky_amend_based_on_qty_and_px_with_overfill_before_amd_ack(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -10442,7 +10442,7 @@ def test_non_risky_amend_based_on_qty_and_px_with_overfill_before_amd_ack(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -10511,7 +10511,7 @@ def test_non_risky_amend_based_on_qty_and_px_with_overfill_before_amd_ack(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             new_qty = qty
             new_px = px
@@ -10549,7 +10549,7 @@ def test_non_risky_amend_based_on_qty_and_px_with_overfill_before_amd_ack(
                 other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
                 residual_qty=residual_qty)
 
-            # placing fills before receiving AMD_ACK - makes chore filled
+            # placing deals before receiving AMD_ACK - makes chore filled
             executor_http_client.barter_simulator_process_fill_query_client(
                 latest_ack_obj.chore.chore_id, latest_ack_obj.chore.px, qty, side, chore_symbol,
                 latest_ack_obj.chore.underlying_account)
@@ -10609,7 +10609,7 @@ def test_non_risky_amend_based_on_qty_and_px_with_overfill_before_amd_ack(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             if side == Side.BUY:
@@ -10689,8 +10689,8 @@ def test_non_risky_amend_based_on_qty_and_px_with_overfill_before_amd_ack(
 @pytest.mark.nightly
 def test_non_risky_amend_up_based_on_qty_and_px_with_overfill_before_n_filled_post_amd_ack(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -10729,7 +10729,7 @@ def test_non_risky_amend_up_based_on_qty_and_px_with_overfill_before_n_filled_po
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, sell_inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -10780,7 +10780,7 @@ def test_non_risky_amend_up_based_on_qty_and_px_with_overfill_before_n_filled_po
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             new_qty = qty
             new_px = px
@@ -10808,7 +10808,7 @@ def test_non_risky_amend_up_based_on_qty_and_px_with_overfill_before_n_filled_po
                 other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
                 residual_qty=residual_qty, is_sell_buy_plan=True)
 
-            # placing fills before receiving AMD_ACK - makes chore filled
+            # placing deals before receiving AMD_ACK - makes chore filled
             executor_http_client.barter_simulator_process_fill_query_client(
                 latest_ack_obj.chore.chore_id, latest_ack_obj.chore.px, qty, side, chore_symbol,
                 latest_ack_obj.chore.underlying_account)
@@ -10858,7 +10858,7 @@ def test_non_risky_amend_up_based_on_qty_and_px_with_overfill_before_n_filled_po
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             new_qty = qty + amend_qty
@@ -10910,8 +10910,8 @@ def test_non_risky_amend_up_based_on_qty_and_px_with_overfill_before_n_filled_po
 @pytest.mark.nightly
 def test_non_risky_amend_up_based_on_qty_and_px_with_overfill_before_n_acked_post_amd_ack(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -10950,7 +10950,7 @@ def test_non_risky_amend_up_based_on_qty_and_px_with_overfill_before_n_acked_pos
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, sell_inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -11001,7 +11001,7 @@ def test_non_risky_amend_up_based_on_qty_and_px_with_overfill_before_n_acked_pos
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             new_qty = qty
             new_px = px
@@ -11029,7 +11029,7 @@ def test_non_risky_amend_up_based_on_qty_and_px_with_overfill_before_n_acked_pos
                 other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
                 residual_qty=residual_qty, is_sell_buy_plan=True)
 
-            # placing fills before receiving AMD_ACK - makes chore filled
+            # placing deals before receiving AMD_ACK - makes chore filled
             executor_http_client.barter_simulator_process_fill_query_client(
                 latest_ack_obj.chore.chore_id, latest_ack_obj.chore.px, qty, side, chore_symbol,
                 latest_ack_obj.chore.underlying_account)
@@ -11079,7 +11079,7 @@ def test_non_risky_amend_up_based_on_qty_and_px_with_overfill_before_n_acked_pos
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             new_qty = qty + amend_qty
@@ -11124,7 +11124,7 @@ def test_non_risky_amend_up_based_on_qty_and_px_with_overfill_before_n_acked_pos
             # waiting for chore to get cxled
             time.sleep(residual_wait_sec)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
             cxled_qty += open_qty
             cxled_notional += open_qty * get_px_in_usd(open_px)
@@ -11160,8 +11160,8 @@ def test_non_risky_amend_up_based_on_qty_and_px_with_overfill_before_n_acked_pos
 @pytest.mark.nightly
 def test_risky_amend_based_on_px_and_qty_with_fill_before_amd_ack(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -11203,7 +11203,7 @@ def test_risky_amend_based_on_px_and_qty_with_fill_before_amd_ack(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -11272,7 +11272,7 @@ def test_risky_amend_based_on_px_and_qty_with_fill_before_amd_ack(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             if side == Side.BUY:
                 new_qty = qty + amend_qty
@@ -11317,7 +11317,7 @@ def test_risky_amend_based_on_px_and_qty_with_fill_before_amd_ack(
                 other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
                 residual_qty=residual_qty)
 
-            # placing fills before receiving AMD_ACK
+            # placing deals before receiving AMD_ACK
             executor_http_client.barter_simulator_process_fill_query_client(
                 latest_ack_obj.chore.chore_id, latest_ack_obj.chore.px, qty, side, chore_symbol,
                 latest_ack_obj.chore.underlying_account)
@@ -11360,7 +11360,7 @@ def test_risky_amend_based_on_px_and_qty_with_fill_before_amd_ack(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
 
@@ -11395,7 +11395,7 @@ def test_risky_amend_based_on_px_and_qty_with_fill_before_amd_ack(
             # waiting for chore to get cxled
             time.sleep(residual_wait_sec)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
             residual_qty = open_qty
             cxled_qty += open_qty
@@ -11443,8 +11443,8 @@ def test_risky_amend_based_on_px_and_qty_with_fill_before_amd_ack(
 @pytest.mark.nightly
 def test_risky_amend_based_on_px_and_qty_with_fulfill_before_amd_ack(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -11486,7 +11486,7 @@ def test_risky_amend_based_on_px_and_qty_with_fulfill_before_amd_ack(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -11555,7 +11555,7 @@ def test_risky_amend_based_on_px_and_qty_with_fulfill_before_amd_ack(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             if side == Side.BUY:
                 new_qty = qty + amend_qty
@@ -11602,7 +11602,7 @@ def test_risky_amend_based_on_px_and_qty_with_fulfill_before_amd_ack(
                 other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
                 residual_qty=residual_qty)
 
-            # placing fills before receiving AMD_ACK - makes chore filled
+            # placing deals before receiving AMD_ACK - makes chore filled
             last_filled_qty = open_qty
             executor_http_client.barter_simulator_process_fill_query_client(
                 latest_ack_obj.chore.chore_id, latest_ack_obj.chore.px, last_filled_qty, side, chore_symbol,
@@ -11646,7 +11646,7 @@ def test_risky_amend_based_on_px_and_qty_with_fulfill_before_amd_ack(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             chore_status = ChoreStatusType.OE_FILLED
@@ -11690,8 +11690,8 @@ def test_risky_amend_based_on_px_and_qty_with_fulfill_before_amd_ack(
 @pytest.mark.nightly
 def test_risky_amend_based_on_px_and_qty_with_overfill_before_amd_ack(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -11733,7 +11733,7 @@ def test_risky_amend_based_on_px_and_qty_with_overfill_before_amd_ack(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -11802,7 +11802,7 @@ def test_risky_amend_based_on_px_and_qty_with_overfill_before_amd_ack(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             if side == Side.BUY:
                 new_qty = qty + amend_qty
@@ -11847,7 +11847,7 @@ def test_risky_amend_based_on_px_and_qty_with_overfill_before_amd_ack(
                 other_side_residual_qty, other_side_fill_notional, open_exposure, filled_exposure, cxled_exposure,
                 residual_qty=residual_qty)
 
-            # placing fills before receiving AMD_ACK - makes chore filled
+            # placing deals before receiving AMD_ACK - makes chore filled
             last_filled_qty = open_qty + 20
             executor_http_client.barter_simulator_process_fill_query_client(
                 latest_ack_obj.chore.chore_id, latest_ack_obj.chore.px, last_filled_qty, side, chore_symbol,
@@ -11900,7 +11900,7 @@ def test_risky_amend_based_on_px_and_qty_with_overfill_before_amd_ack(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             chore_status = ChoreStatusType.OE_OVER_FILLED
@@ -11950,8 +11950,8 @@ def test_risky_amend_based_on_px_and_qty_with_overfill_before_amd_ack(
 @pytest.mark.nightly
 def test_non_risky_amend_based_on_px_and_qty_with_more_filled_qty_than_amend_qty(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -11993,7 +11993,7 @@ def test_non_risky_amend_based_on_px_and_qty_with_more_filled_qty_than_amend_qty
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, buy_inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
             last_filled_qty = filled_qty
@@ -12042,7 +12042,7 @@ def test_non_risky_amend_based_on_px_and_qty_with_more_filled_qty_than_amend_qty
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
 
             # not updating any value since this amend req should get rejected and values should stay unchanged
@@ -12080,8 +12080,8 @@ def test_non_risky_amend_based_on_px_and_qty_with_more_filled_qty_than_amend_qty
 @pytest.mark.nightly
 def test_risky_amend_based_on_px_and_qty_with_more_filled_qty_than_amend_qty(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -12121,7 +12121,7 @@ def test_risky_amend_based_on_px_and_qty_with_more_filled_qty_than_amend_qty(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, sell_inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
             last_filled_qty = filled_qty
@@ -12177,7 +12177,7 @@ def test_risky_amend_based_on_px_and_qty_with_more_filled_qty_than_amend_qty(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
 
             # not updating any value since this amend req should get rejected and values should stay unchanged
@@ -12215,8 +12215,8 @@ def test_risky_amend_based_on_px_and_qty_with_more_filled_qty_than_amend_qty(
 @pytest.mark.nightly
 def test_non_risky_amend_dn_based_on_px_and_qty_with_chore_making_dod(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -12256,7 +12256,7 @@ def test_non_risky_amend_dn_based_on_px_and_qty_with_chore_making_dod(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, buy_inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
             last_filled_qty = filled_qty
@@ -12315,7 +12315,7 @@ def test_non_risky_amend_dn_based_on_px_and_qty_with_chore_making_dod(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             new_qty = qty
             new_px = px
@@ -12357,7 +12357,7 @@ def test_non_risky_amend_dn_based_on_px_and_qty_with_chore_making_dod(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             cxled_qty = open_qty
@@ -12414,8 +12414,8 @@ def test_non_risky_amend_dn_based_on_px_and_qty_with_chore_making_dod(
 @pytest.mark.nightly
 def test_risky_amend_dn_based_on_px_and_qty_with_amend_making_filled(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -12455,7 +12455,7 @@ def test_risky_amend_dn_based_on_px_and_qty_with_amend_making_filled(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, sell_inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
             last_filled_qty = filled_qty
@@ -12513,7 +12513,7 @@ def test_risky_amend_dn_based_on_px_and_qty_with_amend_making_filled(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             cxled_qty = open_qty
             cxled_px = px
@@ -12563,7 +12563,7 @@ def test_risky_amend_dn_based_on_px_and_qty_with_amend_making_filled(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
 
@@ -12600,8 +12600,8 @@ def test_risky_amend_dn_based_on_px_and_qty_with_amend_making_filled(
 @pytest.mark.nightly
 def test_non_risky_amend_based_on_px_and_qty_with_cxl_req_n_cxl_ack_before_amend_ack(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -12640,7 +12640,7 @@ def test_non_risky_amend_based_on_px_and_qty_with_cxl_req_n_cxl_ack_before_amend
                                                        (95, 110, sell_symbol, Side.SELL, sell_inst_type)]:
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
 
             chore_snapshot = get_chore_snapshot_from_chore_id(latest_ack_obj.chore.chore_id,
@@ -12677,7 +12677,7 @@ def test_non_risky_amend_based_on_px_and_qty_with_cxl_req_n_cxl_ack_before_amend
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             new_qty = qty
             new_px = px
@@ -12735,7 +12735,7 @@ def test_non_risky_amend_based_on_px_and_qty_with_cxl_req_n_cxl_ack_before_amend
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             if side == Side.BUY:
@@ -12836,8 +12836,8 @@ def test_non_risky_amend_based_on_px_and_qty_with_cxl_req_n_cxl_ack_before_amend
 @pytest.mark.nightly
 def test_risky_amend_based_on_px_and_qty_with_cxl_req_n_cxl_ack_before_amend_ack(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -12876,7 +12876,7 @@ def test_risky_amend_based_on_px_and_qty_with_cxl_req_n_cxl_ack_before_amend_ack
                                                        (95, 110, sell_symbol, Side.SELL, sell_inst_type)]:
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
 
             chore_snapshot = get_chore_snapshot_from_chore_id(latest_ack_obj.chore.chore_id,
@@ -12913,7 +12913,7 @@ def test_risky_amend_based_on_px_and_qty_with_cxl_req_n_cxl_ack_before_amend_ack
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             if side == Side.BUY:
                 new_qty = qty + amend_qty
@@ -12980,7 +12980,7 @@ def test_risky_amend_based_on_px_and_qty_with_cxl_req_n_cxl_ack_before_amend_ack
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             chore_status = ChoreStatusType.OE_DOD
@@ -13049,8 +13049,8 @@ def test_risky_amend_based_on_px_and_qty_with_cxl_req_n_cxl_ack_before_amend_ack
 @pytest.mark.nightly
 def test_non_risky_amend_based_on_px_and_qty_with_cxl_req_after_amend_req_n_cxl_ack_post_amend(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -13090,7 +13090,7 @@ def test_non_risky_amend_based_on_px_and_qty_with_cxl_req_after_amend_req_n_cxl_
                                                        (95, 110, sell_symbol, Side.SELL, sell_inst_type)]:
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
 
             chore_snapshot = get_chore_snapshot_from_chore_id(latest_ack_obj.chore.chore_id,
@@ -13127,7 +13127,7 @@ def test_non_risky_amend_based_on_px_and_qty_with_cxl_req_after_amend_req_n_cxl_
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             new_qty = qty
             new_px = px
@@ -13185,7 +13185,7 @@ def test_non_risky_amend_based_on_px_and_qty_with_cxl_req_after_amend_req_n_cxl_
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             if side == Side.BUY:
@@ -13241,11 +13241,11 @@ def test_non_risky_amend_based_on_px_and_qty_with_cxl_req_after_amend_req_n_cxl_
                 raise Exception(e)
 
             # placing CXL ACK
-            cxl_ack_chore_journal = copy.deepcopy(latest_ack_obj)
-            cxl_ack_chore_journal.chore_event = ChoreEventType.OE_CXL_ACK
-            cxl_ack_chore_journal.chore_event_date_time = DateTime.utcnow()
-            cxl_ack_chore_journal.id = None
-            executor_http_client.create_chore_journal_client(cxl_ack_chore_journal)
+            cxl_ack_chore_ledger = copy.deepcopy(latest_ack_obj)
+            cxl_ack_chore_ledger.chore_event = ChoreEventType.OE_CXL_ACK
+            cxl_ack_chore_ledger.chore_event_date_time = DateTime.utcnow()
+            cxl_ack_chore_ledger.id = None
+            executor_http_client.create_chore_ledger_client(cxl_ack_chore_ledger)
 
             cxled_qty += open_qty
             cxled_notional += open_qty * get_px_in_usd(open_px)
@@ -13307,8 +13307,8 @@ def test_non_risky_amend_based_on_px_and_qty_with_cxl_req_after_amend_req_n_cxl_
 @pytest.mark.nightly
 def test_risky_amend_based_on_px_and_qty_with_cxl_req_after_amend_req_n_cxl_ack_post_amend(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -13348,7 +13348,7 @@ def test_risky_amend_based_on_px_and_qty_with_cxl_req_after_amend_req_n_cxl_ack_
                                                        (95, 110, sell_symbol, Side.SELL, sell_inst_type)]:
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
 
             chore_snapshot = get_chore_snapshot_from_chore_id(latest_ack_obj.chore.chore_id,
@@ -13385,7 +13385,7 @@ def test_risky_amend_based_on_px_and_qty_with_cxl_req_after_amend_req_n_cxl_ack_
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             if side == Side.BUY:
                 new_qty = qty + amend_qty
@@ -13452,7 +13452,7 @@ def test_risky_amend_based_on_px_and_qty_with_cxl_req_after_amend_req_n_cxl_ack_
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             pending_amend_dn_px = 0
@@ -13476,11 +13476,11 @@ def test_risky_amend_based_on_px_and_qty_with_cxl_req_after_amend_req_n_cxl_ack_
                 raise Exception(e)
 
             # placing CXL ACK
-            cxl_ack_chore_journal = copy.deepcopy(latest_ack_obj)
-            cxl_ack_chore_journal.chore_event = ChoreEventType.OE_CXL_ACK
-            cxl_ack_chore_journal.chore_event_date_time = DateTime.utcnow()
-            cxl_ack_chore_journal.id = None
-            executor_http_client.create_chore_journal_client(cxl_ack_chore_journal)
+            cxl_ack_chore_ledger = copy.deepcopy(latest_ack_obj)
+            cxl_ack_chore_ledger.chore_event = ChoreEventType.OE_CXL_ACK
+            cxl_ack_chore_ledger.chore_event_date_time = DateTime.utcnow()
+            cxl_ack_chore_ledger.id = None
+            executor_http_client.create_chore_ledger_client(cxl_ack_chore_ledger)
 
             cxled_qty += open_qty
             cxled_notional += open_qty * get_px_in_usd(open_px)
@@ -13542,8 +13542,8 @@ def test_risky_amend_based_on_px_and_qty_with_cxl_req_after_amend_req_n_cxl_ack_
 @pytest.mark.nightly
 def test_non_risky_amend_rej_based_on_px_and_qty(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -13582,7 +13582,7 @@ def test_non_risky_amend_rej_based_on_px_and_qty(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
             # Placing Amend req chore and checking computes should stay same since it is non-risky amend
@@ -13613,7 +13613,7 @@ def test_non_risky_amend_rej_based_on_px_and_qty(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol,
                                                                                     executor_http_client)
             new_qty = qty
@@ -13667,7 +13667,7 @@ def test_non_risky_amend_rej_based_on_px_and_qty(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             chore_status = ChoreStatusType.OE_ACKED
@@ -13709,7 +13709,7 @@ def test_non_risky_amend_rej_based_on_px_and_qty(
             # waiting for chore to get cxled
             time.sleep(residual_wait_sec)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
             chore_status = ChoreStatusType.OE_DOD
             cxled_qty = qty - filled_qty
@@ -13767,8 +13767,8 @@ def test_non_risky_amend_rej_based_on_px_and_qty(
 @pytest.mark.nightly
 def test_risky_amend_rej_based_on_px_and_qty(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -13807,7 +13807,7 @@ def test_risky_amend_rej_based_on_px_and_qty(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
             # Placing Amend req chore and checking computes
@@ -13838,7 +13838,7 @@ def test_risky_amend_rej_based_on_px_and_qty(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol,
                                                                                     executor_http_client)
             if side == Side.BUY:
@@ -13902,7 +13902,7 @@ def test_risky_amend_rej_based_on_px_and_qty(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             new_qty = qty
@@ -13952,7 +13952,7 @@ def test_risky_amend_rej_based_on_px_and_qty(
             # waiting for chore to get cxled
             time.sleep(residual_wait_sec)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
             chore_status = ChoreStatusType.OE_DOD
             cxled_qty = open_qty
@@ -14010,8 +14010,8 @@ def test_risky_amend_rej_based_on_px_and_qty(
 @pytest.mark.nightly
 def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_rej(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -14053,7 +14053,7 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_rej(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, buy_inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
 
             expected_chore_notional = qty * get_px_in_usd(px)
@@ -14080,11 +14080,11 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_rej(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol,
                                                                                     executor_http_client)
 
-            # placing fills before receiving AMD_ACK - makes chore filled
+            # placing deals before receiving AMD_ACK - makes chore filled
             executor_http_client.barter_simulator_process_fill_query_client(
                 latest_ack_obj.chore.chore_id, latest_ack_obj.chore.px, new_qty, side, chore_symbol,
                 latest_ack_obj.chore.underlying_account, use_exact_passed_qty=True)
@@ -14129,7 +14129,7 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_rej(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             new_qty = qty
@@ -14188,8 +14188,8 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_rej(
 @pytest.mark.nightly
 def test_risky_amend_rej_based_on_px_and_qty_making_chore_filled_post_rej(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -14199,7 +14199,7 @@ def test_risky_amend_rej_based_on_px_and_qty_making_chore_filled_post_rej(
         leg1_leg2_symbol_list, refresh_sec_update_fixture):
     """
     First buy chore is placed for 90 qty then amend req is placed for 100 qty since amend up is
-    risky in buy side amend will be applied, then 90 fills come and then rej comes, removing
+    risky in buy side amend will be applied, then 90 deals come and then rej comes, removing
     amended up qty and making chore filled
     """
 
@@ -14231,7 +14231,7 @@ def test_risky_amend_rej_based_on_px_and_qty_making_chore_filled_post_rej(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, buy_inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
 
             expected_chore_notional = qty * get_px_in_usd(px)
@@ -14258,11 +14258,11 @@ def test_risky_amend_rej_based_on_px_and_qty_making_chore_filled_post_rej(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol,
                                                                                     executor_http_client)
 
-            # placing fills before receiving AMD_ACK
+            # placing deals before receiving AMD_ACK
             filled_qty = qty
             executor_http_client.barter_simulator_process_fill_query_client(
                 latest_ack_obj.chore.chore_id, latest_ack_obj.chore.px, filled_qty, side, chore_symbol,
@@ -14306,7 +14306,7 @@ def test_risky_amend_rej_based_on_px_and_qty_making_chore_filled_post_rej(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             new_qty = qty
@@ -14362,8 +14362,8 @@ def test_risky_amend_rej_based_on_px_and_qty_making_chore_filled_post_rej(
 @pytest.mark.nightly
 def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_ack_post_amd_rej(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -14404,7 +14404,7 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_ack_po
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, sell_inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
 
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
@@ -14431,10 +14431,10 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_ack_po
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
 
-            # placing fills before receiving AMD_ACK - makes chore filled
+            # placing deals before receiving AMD_ACK - makes chore filled
             filled_qty = (qty - amend_qty) + 5
             executor_http_client.barter_simulator_process_fill_query_client(
                 latest_ack_obj.chore.chore_id, latest_ack_obj.chore.px, filled_qty, side, chore_symbol,
@@ -14489,7 +14489,7 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_ack_po
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             new_qty = qty
@@ -14539,7 +14539,7 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_ack_po
             # waiting for chore to get cxled
             time.sleep(residual_wait_sec)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
             chore_status = ChoreStatusType.OE_DOD
             residual_qty = open_qty
@@ -14583,8 +14583,8 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_ack_po
 @pytest.mark.nightly
 def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_filled_post_amd_rej(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -14627,7 +14627,7 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_filled
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, sell_inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
 
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
@@ -14654,10 +14654,10 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_filled
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
 
-            # placing fills before receiving AMD_ACK - makes chore filled
+            # placing deals before receiving AMD_ACK - makes chore filled
             filled_qty = qty
             executor_http_client.barter_simulator_process_fill_query_client(
                 latest_ack_obj.chore.chore_id, latest_ack_obj.chore.px, filled_qty, side, chore_symbol,
@@ -14712,7 +14712,7 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_filled
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             new_qty = qty
@@ -14773,8 +14773,8 @@ def test_risky_amend_rej_based_on_px_and_qty_with_overfill_post_amd_req_n_filled
 @pytest.mark.nightly
 def test_risky_amend_rej_based_on_px_and_qty_with_filled_post_amd_req_n_acked_post_amd_rej(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -14817,7 +14817,7 @@ def test_risky_amend_rej_based_on_px_and_qty_with_filled_post_amd_req_n_acked_po
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, sell_inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
 
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
@@ -14844,10 +14844,10 @@ def test_risky_amend_rej_based_on_px_and_qty_with_filled_post_amd_req_n_acked_po
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
 
-            # placing fills before receiving AMD_ACK - makes chore filled
+            # placing deals before receiving AMD_ACK - makes chore filled
             filled_qty = qty - amend_qty
             executor_http_client.barter_simulator_process_fill_query_client(
                 latest_ack_obj.chore.chore_id, latest_ack_obj.chore.px, filled_qty, side, chore_symbol,
@@ -14893,7 +14893,7 @@ def test_risky_amend_rej_based_on_px_and_qty_with_filled_post_amd_req_n_acked_po
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             new_qty = qty
@@ -14940,7 +14940,7 @@ def test_risky_amend_rej_based_on_px_and_qty_with_filled_post_amd_req_n_acked_po
             # waiting for chore to get cxled
             time.sleep(residual_wait_sec)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
             new_qty = qty
             new_px = px
@@ -14991,8 +14991,8 @@ def test_risky_amend_rej_based_on_px_and_qty_with_filled_post_amd_req_n_acked_po
 @pytest.mark.nightly
 def test_non_risky_amend_rej_based_on_px_and_qty_with_cxl_unack_pre_amd_rej(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -15033,7 +15033,7 @@ def test_non_risky_amend_rej_based_on_px_and_qty_with_cxl_unack_pre_amd_rej(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
             if side == Side.BUY:
@@ -15067,7 +15067,7 @@ def test_non_risky_amend_rej_based_on_px_and_qty_with_cxl_unack_pre_amd_rej(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol,
                                                                                     executor_http_client)
             new_qty = qty
@@ -15142,7 +15142,7 @@ def test_non_risky_amend_rej_based_on_px_and_qty_with_cxl_unack_pre_amd_rej(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             chore_status = ChoreStatusType.OE_CXL_UNACK
@@ -15166,11 +15166,11 @@ def test_non_risky_amend_rej_based_on_px_and_qty_with_cxl_unack_pre_amd_rej(
                 raise Exception(e)
 
             # placing CXL ACK
-            cxl_ack_chore_journal = copy.deepcopy(latest_ack_obj)
-            cxl_ack_chore_journal.chore_event = ChoreEventType.OE_CXL_ACK
-            cxl_ack_chore_journal.chore_event_date_time = DateTime.utcnow()
-            cxl_ack_chore_journal.id = None
-            executor_http_client.create_chore_journal_client(cxl_ack_chore_journal)
+            cxl_ack_chore_ledger = copy.deepcopy(latest_ack_obj)
+            cxl_ack_chore_ledger.chore_event = ChoreEventType.OE_CXL_ACK
+            cxl_ack_chore_ledger.chore_event_date_time = DateTime.utcnow()
+            cxl_ack_chore_ledger.id = None
+            executor_http_client.create_chore_ledger_client(cxl_ack_chore_ledger)
 
             cxled_qty = open_qty
             cxled_notional = open_notional
@@ -15230,8 +15230,8 @@ def test_non_risky_amend_rej_based_on_px_and_qty_with_cxl_unack_pre_amd_rej(
 @pytest.mark.nightly
 def test_risky_amend_rej_based_on_px_and_qty_with_cxl_unack_pre_amd_rej(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -15271,7 +15271,7 @@ def test_risky_amend_rej_based_on_px_and_qty_with_cxl_unack_pre_amd_rej(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
             # Placing Amend req chore and checking computes
@@ -15302,7 +15302,7 @@ def test_risky_amend_rej_based_on_px_and_qty_with_cxl_unack_pre_amd_rej(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol,
                                                                                     executor_http_client)
             if side == Side.BUY:
@@ -15387,7 +15387,7 @@ def test_risky_amend_rej_based_on_px_and_qty_with_cxl_unack_pre_amd_rej(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             new_qty = qty
@@ -15435,11 +15435,11 @@ def test_risky_amend_rej_based_on_px_and_qty_with_cxl_unack_pre_amd_rej(
                 raise Exception(e)
 
             # placing CXL ACK
-            cxl_ack_chore_journal = copy.deepcopy(latest_ack_obj)
-            cxl_ack_chore_journal.chore_event = ChoreEventType.OE_CXL_ACK
-            cxl_ack_chore_journal.chore_event_date_time = DateTime.utcnow()
-            cxl_ack_chore_journal.id = None
-            executor_http_client.create_chore_journal_client(cxl_ack_chore_journal)
+            cxl_ack_chore_ledger = copy.deepcopy(latest_ack_obj)
+            cxl_ack_chore_ledger.chore_event = ChoreEventType.OE_CXL_ACK
+            cxl_ack_chore_ledger.chore_event_date_time = DateTime.utcnow()
+            cxl_ack_chore_ledger.id = None
+            executor_http_client.create_chore_ledger_client(cxl_ack_chore_ledger)
             
             new_qty = qty
             new_px = px
@@ -15503,8 +15503,8 @@ def test_risky_amend_rej_based_on_px_and_qty_with_cxl_unack_pre_amd_rej(
 @pytest.mark.nightly
 def test_non_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -15544,7 +15544,7 @@ def test_non_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -15576,7 +15576,7 @@ def test_non_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol,
                                                                                     executor_http_client)
             new_qty = qty
@@ -15679,7 +15679,7 @@ def test_non_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             try:
@@ -15699,7 +15699,7 @@ def test_non_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
 
             time.sleep(5)
             check_str = (f"Received AMD_REJ post chore DOD on chore_id: "
-                         f".* - ignoring this amend chore_journal and chore will stay unchanged")
+                         f".* - ignoring this amend chore_ledger and chore will stay unchanged")
             assert_fail_msg = f"Can't find alert: {check_str!r}"
             check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
@@ -15717,8 +15717,8 @@ def test_non_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
 @pytest.mark.nightly
 def test_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -15757,7 +15757,7 @@ def test_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
             # Placing Amend req chore and checking computes
@@ -15788,7 +15788,7 @@ def test_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol,
                                                                                     executor_http_client)
             if side == Side.BUY:
@@ -15905,7 +15905,7 @@ def test_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             try:
@@ -15925,7 +15925,7 @@ def test_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
 
             time.sleep(5)
             check_str = (f"Received AMD_REJ post chore DOD on chore_id: "
-                         f".* - ignoring this amend chore_journal and chore will stay unchanged")
+                         f".* - ignoring this amend chore_ledger and chore will stay unchanged")
             assert_fail_msg = f"Can't find alert: {check_str!r}"
             check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
@@ -15943,8 +15943,8 @@ def test_risky_amend_rej_based_on_px_and_qty_cxl_ack_pre_amd_rej(
 @pytest.mark.nightly
 def test_non_risky_multi_amend_based_on_qty_and_px(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -15985,7 +15985,7 @@ def test_non_risky_multi_amend_based_on_qty_and_px(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -16064,7 +16064,7 @@ def test_non_risky_multi_amend_based_on_qty_and_px(
                     chore_event=chore_event,
                     qty=amend_qty, px=amend_px)
 
-                latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+                latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                         chore_symbol,
                                                                                         executor_http_client)
                 filled_notional = filled_qty * get_px_in_usd(px)
@@ -16110,7 +16110,7 @@ def test_non_risky_multi_amend_based_on_qty_and_px(
                     latest_ack_obj.chore.security.sec_id,
                     latest_ack_obj.chore.underlying_account)
 
-                latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+                latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                       chore_symbol,
                                                                                       executor_http_client)
                 if side == Side.BUY:
@@ -16170,7 +16170,7 @@ def test_non_risky_multi_amend_based_on_qty_and_px(
             # waiting for chore to get cxled
             time.sleep(residual_wait_sec)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
 
             cxled_qty += open_qty
@@ -16230,8 +16230,8 @@ def test_non_risky_multi_amend_based_on_qty_and_px(
 @pytest.mark.nightly
 def test_risky_multi_amend_based_on_px_and_qty(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -16273,7 +16273,7 @@ def test_risky_multi_amend_based_on_px_and_qty(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -16348,7 +16348,7 @@ def test_risky_multi_amend_based_on_px_and_qty(
                     chore_event=chore_event,
                     qty=amend_qty, px=amend_px)
 
-                latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+                latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                         chore_symbol,
                                                                                         executor_http_client)
 
@@ -16416,7 +16416,7 @@ def test_risky_multi_amend_based_on_px_and_qty(
                     latest_ack_obj.chore.security.sec_id,
                     latest_ack_obj.chore.underlying_account)
 
-                latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+                latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                       chore_symbol,
                                                                                       executor_http_client)
                 chore_status = ChoreStatusType.OE_ACKED
@@ -16443,7 +16443,7 @@ def test_risky_multi_amend_based_on_px_and_qty(
             # waiting for chore to get cxled
             time.sleep(residual_wait_sec)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
             cxled_qty += open_qty
             cxled_notional += open_qty * get_px_in_usd(open_px)
@@ -16502,8 +16502,8 @@ def test_risky_multi_amend_based_on_px_and_qty(
 @pytest.mark.nightly
 def test_multi_amends_based_on_qty_n_then_px(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -16548,7 +16548,7 @@ def test_multi_amends_based_on_qty_n_then_px(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -16577,7 +16577,7 @@ def test_multi_amends_based_on_qty_n_then_px(
                 chore_event=chore_event,
                 qty=amend_qty)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             new_qty = qty
             new_px = px
@@ -16630,7 +16630,7 @@ def test_multi_amends_based_on_qty_n_then_px(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol, executor_http_client)
             if side == Side.BUY:
                 cxled_qty = amend_qty
@@ -16706,7 +16706,7 @@ def test_multi_amends_based_on_qty_n_then_px(
                 chore_event=chore_event,
                 qty=amend_qty)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol,
                                                                                     executor_http_client)
             last_qty = new_qty
@@ -16764,7 +16764,7 @@ def test_multi_amends_based_on_qty_n_then_px(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             chore_status = ChoreStatusType.OE_ACKED
@@ -16829,7 +16829,7 @@ def test_multi_amends_based_on_qty_n_then_px(
                 chore_event=chore_event,
                 px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol,
                                                                                     executor_http_client)
             new_px = px
@@ -16873,7 +16873,7 @@ def test_multi_amends_based_on_qty_n_then_px(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             if side == Side.BUY:
@@ -16937,7 +16937,7 @@ def test_multi_amends_based_on_qty_n_then_px(
                 chore_event=chore_event,
                 px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol,
                                                                                     executor_http_client)
             if side == Side.BUY:
@@ -16985,7 +16985,7 @@ def test_multi_amends_based_on_qty_n_then_px(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             chore_status = ChoreStatusType.OE_ACKED
@@ -17026,7 +17026,7 @@ def test_multi_amends_based_on_qty_n_then_px(
             # waiting for chore to get cxled
             time.sleep(residual_wait_sec)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             cxled_notional += open_qty * get_px_in_usd(new_px)
@@ -17084,8 +17084,8 @@ def test_multi_amends_based_on_qty_n_then_px(
 @pytest.mark.nightly
 def test_multi_amends_based_on_qty_n_px1(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -17131,7 +17131,7 @@ def test_multi_amends_based_on_qty_n_px1(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -17164,7 +17164,7 @@ def test_multi_amends_based_on_qty_n_px1(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol,
                                                                                     executor_http_client)
             new_qty = qty
@@ -17220,7 +17220,7 @@ def test_multi_amends_based_on_qty_n_px1(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             if side == Side.BUY:
@@ -17307,7 +17307,7 @@ def test_multi_amends_based_on_qty_n_px1(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
 
             if side == Side.BUY:
@@ -17367,7 +17367,7 @@ def test_multi_amends_based_on_qty_n_px1(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
 
@@ -17411,7 +17411,7 @@ def test_multi_amends_based_on_qty_n_px1(
             # waiting for chore to get cxled
             time.sleep(residual_wait_sec)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             cxled_notional += open_qty * get_px_in_usd(new_px)
@@ -17470,8 +17470,8 @@ def test_multi_amends_based_on_qty_n_px1(
 @pytest.mark.nightly
 def test_multi_amends_based_on_qty_n_px2(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -17517,7 +17517,7 @@ def test_multi_amends_based_on_qty_n_px2(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -17550,7 +17550,7 @@ def test_multi_amends_based_on_qty_n_px2(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
 
             if side == Side.BUY:
@@ -17614,7 +17614,7 @@ def test_multi_amends_based_on_qty_n_px2(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
 
@@ -17683,7 +17683,7 @@ def test_multi_amends_based_on_qty_n_px2(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol,
                                                                                     executor_http_client)
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -17729,7 +17729,7 @@ def test_multi_amends_based_on_qty_n_px2(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             if side == Side.BUY:
@@ -17782,7 +17782,7 @@ def test_multi_amends_based_on_qty_n_px2(
             # waiting for chore to get cxled
             time.sleep(residual_wait_sec)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             cxled_notional += open_qty * get_px_in_usd(new_px)
@@ -17842,8 +17842,8 @@ def test_multi_amends_based_on_qty_n_px2(
 # @pytest.mark.nightly
 def test_partial_non_risky_amend(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -17884,7 +17884,7 @@ def test_partial_non_risky_amend(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -17953,7 +17953,7 @@ def test_partial_non_risky_amend(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             new_qty = qty
             new_px = px
@@ -17999,7 +17999,7 @@ def test_partial_non_risky_amend(
                 latest_ack_obj.chore.underlying_account,
                 amend_qty=partial_amd_qty)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             if side == Side.BUY:
@@ -18048,7 +18048,7 @@ def test_partial_non_risky_amend(
             # waiting for chore to get cxled
             time.sleep(residual_wait_sec)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
             cxled_qty += open_qty
             cxled_notional += open_qty * get_px_in_usd(open_px)
@@ -18098,8 +18098,8 @@ def test_partial_non_risky_amend(
 # @pytest.mark.nightly
 def test_partial_risky_amend(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -18139,7 +18139,7 @@ def test_partial_risky_amend(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -18208,7 +18208,7 @@ def test_partial_risky_amend(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
 
             if side == Side.BUY:
@@ -18264,7 +18264,7 @@ def test_partial_risky_amend(
                 latest_ack_obj.chore.underlying_account,
                 amend_qty=amend_ack_qty)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
 
@@ -18284,7 +18284,7 @@ def test_partial_risky_amend(
             # waiting for chore to get cxled
             time.sleep(residual_wait_sec)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
             cxled_qty += open_qty
             cxled_notional += open_qty * get_px_in_usd(open_px)
@@ -18378,8 +18378,8 @@ def check_all_computes_for_lapse(
 @pytest.mark.nightly
 def test_lapse_partial_qty_in_chore(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -18421,7 +18421,7 @@ def test_lapse_partial_qty_in_chore(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -18476,7 +18476,7 @@ def test_lapse_partial_qty_in_chore(
                 latest_ack_obj.chore.underlying_account,
                 qty=lapse_qty)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_LAPSE,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_LAPSE,
                                                                                     chore_symbol, executor_http_client)
             chore_status = ChoreStatusType.OE_ACKED
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -18522,7 +18522,7 @@ def test_lapse_partial_qty_in_chore(
             # waiting for chore to get cxled
             time.sleep(residual_wait_sec)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
             chore_status = ChoreStatusType.OE_DOD
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -18581,8 +18581,8 @@ def test_lapse_partial_qty_in_chore(
 @pytest.mark.nightly
 def test_lapse_complete_qty_in_chore_with_none_qty(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -18624,7 +18624,7 @@ def test_lapse_complete_qty_in_chore_with_none_qty(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -18678,7 +18678,7 @@ def test_lapse_complete_qty_in_chore_with_none_qty(
                 latest_ack_obj.chore.underlying_account,
                 qty=None)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_LAPSE,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_LAPSE,
                                                                                     chore_symbol, executor_http_client)
             chore_status = ChoreStatusType.OE_DOD
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -18739,8 +18739,8 @@ def test_lapse_complete_qty_in_chore_with_none_qty(
 @pytest.mark.nightly
 def test_lapse_complete_qty_in_chore_with_providing_qty(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -18782,7 +18782,7 @@ def test_lapse_complete_qty_in_chore_with_providing_qty(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -18837,7 +18837,7 @@ def test_lapse_complete_qty_in_chore_with_providing_qty(
                 latest_ack_obj.chore.underlying_account,
                 qty=lapsed_qty)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_LAPSE,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_LAPSE,
                                                                                     chore_symbol, executor_http_client)
             chore_status = ChoreStatusType.OE_DOD
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -18934,7 +18934,7 @@ def _handle_test_for_more_than_expected_lapse_qty(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -18992,7 +18992,7 @@ def _handle_test_for_more_than_expected_lapse_qty(
                 latest_ack_obj.chore.underlying_account,
                 qty=lapse_qty)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_LAPSE,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_LAPSE,
                                                                                     chore_symbol, executor_http_client)
             chore_status = ChoreStatusType.OE_DOD
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -19038,7 +19038,7 @@ def _handle_test_for_more_than_expected_lapse_qty(
                 raise Exception(e)
 
             time.sleep(5)
-            # Checking alert for rejected chore_journal
+            # Checking alert for rejected chore_ledger
             assert_fail_msg = f"Couldn't find any alert saying: {check_alert_str}"
             check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_alert_str, assert_fail_msg)
 
@@ -19056,8 +19056,8 @@ def _handle_test_for_more_than_expected_lapse_qty(
 @pytest.mark.nightly
 def test_lapse_qty_more_than_unfilled_qty(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -19077,8 +19077,8 @@ def test_lapse_qty_more_than_unfilled_qty(
 @pytest.mark.nightly
 def test_lapse_check_reject_when_lapse_qty_gt_chore_qty(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -19097,8 +19097,8 @@ def test_lapse_check_reject_when_lapse_qty_gt_chore_qty(
 @pytest.mark.nightly
 def test_lapse_post_cxl_req_pre_cxl_ack(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -19140,7 +19140,7 @@ def test_lapse_post_cxl_req_pre_cxl_ack(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -19200,7 +19200,7 @@ def test_lapse_post_cxl_req_pre_cxl_ack(
                 latest_ack_obj.chore.chore_id, latest_ack_obj.chore.side, latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.security.sec_id, latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL,
                                                                                   chore_symbol, executor_http_client)
             
             # putting lapse before cxl_ack
@@ -19246,13 +19246,13 @@ def test_lapse_post_cxl_req_pre_cxl_ack(
                 raise e
 
             # placing CXL ACK
-            cxl_ack_chore_journal = copy.deepcopy(latest_ack_obj)
-            cxl_ack_chore_journal.chore_event = ChoreEventType.OE_CXL_ACK
-            cxl_ack_chore_journal.chore_event_date_time = DateTime.utcnow()
-            cxl_ack_chore_journal.id = None
-            executor_http_client.create_chore_journal_client(cxl_ack_chore_journal)
+            cxl_ack_chore_ledger = copy.deepcopy(latest_ack_obj)
+            cxl_ack_chore_ledger.chore_event = ChoreEventType.OE_CXL_ACK
+            cxl_ack_chore_ledger.chore_event_date_time = DateTime.utcnow()
+            cxl_ack_chore_ledger.id = None
+            executor_http_client.create_chore_ledger_client(cxl_ack_chore_ledger)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
             chore_status = ChoreStatusType.OE_DOD
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -19309,10 +19309,10 @@ def test_lapse_post_cxl_req_pre_cxl_ack(
 
 
 @pytest.mark.nightly
-def test_lapse_in_btw_multi_fills(
+def test_lapse_in_btw_multi_deals(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -19353,7 +19353,7 @@ def test_lapse_in_btw_multi_fills(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -19406,7 +19406,7 @@ def test_lapse_in_btw_multi_fills(
                 latest_ack_obj.chore.underlying_account,
                 qty=lapse_qty)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_LAPSE,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_LAPSE,
                                                                                     chore_symbol, executor_http_client)
             chore_status = ChoreStatusType.OE_ACKED
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -19449,7 +19449,7 @@ def test_lapse_in_btw_multi_fills(
                 print("Exception", e)
                 raise e
 
-            # placing fills after LAPSE
+            # placing deals after LAPSE
             executor_http_client.barter_simulator_process_fill_query_client(
                 latest_ack_obj.chore.chore_id, latest_ack_obj.chore.px, latest_ack_obj.chore.qty, side, chore_symbol,
                 latest_ack_obj.chore.underlying_account)
@@ -19460,7 +19460,7 @@ def test_lapse_in_btw_multi_fills(
             # waiting for chore to get cxled
             time.sleep(residual_wait_sec)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
             chore_status = ChoreStatusType.OE_DOD
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -19521,8 +19521,8 @@ def test_lapse_in_btw_multi_fills(
 @pytest.mark.nightly
 def test_lapse_pre_fill_making_chore_filled(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -19563,7 +19563,7 @@ def test_lapse_pre_fill_making_chore_filled(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -19616,7 +19616,7 @@ def test_lapse_pre_fill_making_chore_filled(
                 latest_ack_obj.chore.underlying_account,
                 qty=lapse_qty)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_LAPSE,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_LAPSE,
                                                                                     chore_symbol, executor_http_client)
             chore_status = ChoreStatusType.OE_ACKED
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -19659,7 +19659,7 @@ def test_lapse_pre_fill_making_chore_filled(
                 print("Exception", e)
                 raise e
 
-            # placing fills after LAPSE
+            # placing deals after LAPSE
             executor_http_client.barter_simulator_process_fill_query_client(
                 latest_ack_obj.chore.chore_id, latest_ack_obj.chore.px, open_qty, side, chore_symbol,
                 latest_ack_obj.chore.underlying_account, use_exact_passed_qty=True)
@@ -19726,8 +19726,8 @@ def test_lapse_pre_fill_making_chore_filled(
 @pytest.mark.nightly
 def test_lapse_pre_fill_making_chore_over_filled(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -19768,7 +19768,7 @@ def test_lapse_pre_fill_making_chore_over_filled(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -19821,7 +19821,7 @@ def test_lapse_pre_fill_making_chore_over_filled(
                 latest_ack_obj.chore.underlying_account,
                 qty=lapse_qty)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_LAPSE,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_LAPSE,
                                                                                     chore_symbol, executor_http_client)
             chore_status = ChoreStatusType.OE_ACKED
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -19864,7 +19864,7 @@ def test_lapse_pre_fill_making_chore_over_filled(
                 print("Exception", e)
                 raise e
 
-            # placing fills after LAPSE
+            # placing deals after LAPSE
             fill_qty = open_qty + 10
             executor_http_client.barter_simulator_process_fill_query_client(
                 latest_ack_obj.chore.chore_id, latest_ack_obj.chore.px, fill_qty, side, chore_symbol,
@@ -19947,8 +19947,8 @@ def test_lapse_pre_fill_making_chore_over_filled(
 @pytest.mark.nightly
 def test_multi_partial_lapse_till_chore_dod(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -19988,7 +19988,7 @@ def test_multi_partial_lapse_till_chore_dod(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -20046,7 +20046,7 @@ def test_multi_partial_lapse_till_chore_dod(
                     qty=lapse_qty)
                 total_lapsed_qty += lapse_qty
 
-                latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_LAPSE,
+                latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_LAPSE,
                                                                                         chore_symbol, executor_http_client)
                 if i == 3:
                     chore_status = ChoreStatusType.OE_DOD
@@ -20112,8 +20112,8 @@ def test_multi_partial_lapse_till_chore_dod(
 @pytest.mark.nightly
 def test_lapse_pre_non_risky_amend_ack(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -20153,7 +20153,7 @@ def test_lapse_pre_non_risky_amend_ack(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -20229,7 +20229,7 @@ def test_lapse_pre_non_risky_amend_ack(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             new_qty = qty
             new_px = px
@@ -20328,7 +20328,7 @@ def test_lapse_pre_non_risky_amend_ack(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             print("Checking chore post OE_AMD_ACK")
@@ -20382,7 +20382,7 @@ def test_lapse_pre_non_risky_amend_ack(
             # waiting for chore to get cxled
             time.sleep(residual_wait_sec)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
             cxled_qty += open_qty
             cxled_notional += open_qty * get_px_in_usd(new_px)
@@ -20442,8 +20442,8 @@ def test_lapse_pre_non_risky_amend_ack(
 @pytest.mark.nightly
 def test_full_lapse_pre_non_risky_amend_ack(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -20483,7 +20483,7 @@ def test_full_lapse_pre_non_risky_amend_ack(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -20559,7 +20559,7 @@ def test_full_lapse_pre_non_risky_amend_ack(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             new_qty = qty
             new_px = px
@@ -20660,7 +20660,7 @@ def test_full_lapse_pre_non_risky_amend_ack(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             if side == Side.BUY:
@@ -20758,8 +20758,8 @@ def test_full_lapse_pre_non_risky_amend_ack(
 @pytest.mark.nightly
 def test_lapse_pre_non_risky_amend_req(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -20799,7 +20799,7 @@ def test_lapse_pre_non_risky_amend_req(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -20925,7 +20925,7 @@ def test_lapse_pre_non_risky_amend_req(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             print("Checking chore post OE_AMD_UNACK")
             new_qty = qty
@@ -20970,7 +20970,7 @@ def test_lapse_pre_non_risky_amend_req(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             print("Checking chore post OE_AMD_ACK")
@@ -21026,7 +21026,7 @@ def test_lapse_pre_non_risky_amend_req(
             time.sleep(residual_wait_sec)
 
             print("Checking chore cxled post residual time wait")
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
 
             cxled_qty += open_qty
@@ -21086,8 +21086,8 @@ def test_lapse_pre_non_risky_amend_req(
 @pytest.mark.nightly
 def test_lapse_qty_n_amend_up_same_qty_in_non_risky_amend(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -21126,7 +21126,7 @@ def test_lapse_qty_n_amend_up_same_qty_in_non_risky_amend(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, sell_inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -21223,7 +21223,7 @@ def test_lapse_qty_n_amend_up_same_qty_in_non_risky_amend(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             print("Checking chore post OE_AMD_UNACK")
             new_qty = qty
@@ -21258,7 +21258,7 @@ def test_lapse_qty_n_amend_up_same_qty_in_non_risky_amend(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             print("Checking chore post OE_AMD_ACK")
@@ -21295,7 +21295,7 @@ def test_lapse_qty_n_amend_up_same_qty_in_non_risky_amend(
             time.sleep(residual_wait_sec)
 
             print("Checking chore cxled post residual time wait")
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
             cxled_qty += open_qty
             cxled_notional += open_qty * get_px_in_usd(new_px)
@@ -21341,8 +21341,8 @@ def test_lapse_qty_n_amend_up_same_qty_in_non_risky_amend(
 @pytest.mark.nightly
 def test_lapse_qty_n_amend_up_same_qty_in_risky_amend(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -21381,7 +21381,7 @@ def test_lapse_qty_n_amend_up_same_qty_in_risky_amend(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, sell_inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -21479,7 +21479,7 @@ def test_lapse_qty_n_amend_up_same_qty_in_risky_amend(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             print("Checking chore post OE_AMD_UNACK")
             new_qty = qty + amend_qty
@@ -21516,7 +21516,7 @@ def test_lapse_qty_n_amend_up_same_qty_in_risky_amend(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             print("Checking chore post OE_AMD_ACK")
@@ -21544,7 +21544,7 @@ def test_lapse_qty_n_amend_up_same_qty_in_risky_amend(
             time.sleep(residual_wait_sec)
 
             print("Checking chore cxled post residual time wait")
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
             cxled_qty += open_qty
             cxled_notional += open_qty * get_px_in_usd(new_px)
@@ -21589,8 +21589,8 @@ def test_lapse_qty_n_amend_up_same_qty_in_risky_amend(
 @pytest.mark.nightly
 def test_lapse_pre_risky_amend_req(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -21630,7 +21630,7 @@ def test_lapse_pre_risky_amend_req(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -21757,7 +21757,7 @@ def test_lapse_pre_risky_amend_req(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             print("Checking chore post OE_AMD_UNACK")
             if side == Side.BUY:
@@ -21816,7 +21816,7 @@ def test_lapse_pre_risky_amend_req(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             print("Checking chore post OE_AMD_ACK")
@@ -21844,7 +21844,7 @@ def test_lapse_pre_risky_amend_req(
             time.sleep(residual_wait_sec)
 
             print("Checking chore cxled post residual time wait")
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
             cxled_qty += open_qty
             cxled_notional += open_qty * get_px_in_usd(open_px)
@@ -21903,8 +21903,8 @@ def test_lapse_pre_risky_amend_req(
 @pytest.mark.nightly
 def test_lapse_pre_risky_amend_ack(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -21944,7 +21944,7 @@ def test_lapse_pre_risky_amend_ack(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -22021,7 +22021,7 @@ def test_lapse_pre_risky_amend_ack(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             print("Checking chore post OE_AMD_UNACK")
             if side == Side.BUY:
@@ -22126,7 +22126,7 @@ def test_lapse_pre_risky_amend_ack(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             print("Checking chore post OE_AMD_ACK")
@@ -22154,7 +22154,7 @@ def test_lapse_pre_risky_amend_ack(
             time.sleep(residual_wait_sec)
 
             print("Checking chore cxled post residual time wait")
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
             cxled_qty += open_qty
             cxled_notional += open_qty * get_px_in_usd(open_px)
@@ -22213,8 +22213,8 @@ def test_lapse_pre_risky_amend_ack(
 @pytest.mark.nightly
 def test_lapse_pre_risky_amend_ack(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -22254,7 +22254,7 @@ def test_lapse_pre_risky_amend_ack(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -22331,7 +22331,7 @@ def test_lapse_pre_risky_amend_ack(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             print("Checking chore post OE_AMD_UNACK")
             if side == Side.BUY:
@@ -22436,7 +22436,7 @@ def test_lapse_pre_risky_amend_ack(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             print("Checking chore post OE_AMD_ACK")
@@ -22464,7 +22464,7 @@ def test_lapse_pre_risky_amend_ack(
             time.sleep(residual_wait_sec)
 
             print("Checking chore cxled post residual time wait")
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
             cxled_qty += open_qty
             cxled_notional += open_qty * get_px_in_usd(open_px)
@@ -22523,8 +22523,8 @@ def test_lapse_pre_risky_amend_ack(
 @pytest.mark.nightly
 def test_full_lapse_pre_risky_amend_ack(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -22564,7 +22564,7 @@ def test_full_lapse_pre_risky_amend_ack(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -22641,7 +22641,7 @@ def test_full_lapse_pre_risky_amend_ack(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             print("Checking chore post OE_AMD_UNACK")
             if side == Side.BUY:
@@ -22748,7 +22748,7 @@ def test_full_lapse_pre_risky_amend_ack(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             open_qty = 0
@@ -22806,8 +22806,8 @@ def test_full_lapse_pre_risky_amend_ack(
 @pytest.mark.nightly
 def test_lapse_post_non_risky_amend(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -22847,7 +22847,7 @@ def test_lapse_post_non_risky_amend(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
             new_qty = qty
@@ -22922,7 +22922,7 @@ def test_lapse_post_non_risky_amend(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             new_qty = qty
             new_px = px
@@ -22973,7 +22973,7 @@ def test_lapse_post_non_risky_amend(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_ACK,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             if side == Side.BUY:
@@ -23079,7 +23079,7 @@ def test_lapse_post_non_risky_amend(
             # waiting for chore to get cxled
             time.sleep(residual_wait_sec)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
             cxled_qty += open_qty
             cxled_notional += open_qty * get_px_in_usd(open_px)
@@ -23140,8 +23140,8 @@ def test_lapse_post_non_risky_amend(
 @pytest.mark.nightly
 def test_lapse_pre_non_risky_amend_rej_req(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -23180,7 +23180,7 @@ def test_lapse_pre_non_risky_amend_rej_req(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -23268,7 +23268,7 @@ def test_lapse_pre_non_risky_amend_rej_req(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             new_qty = qty
             new_px = px
@@ -23312,7 +23312,7 @@ def test_lapse_pre_non_risky_amend_rej_req(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             new_qty = qty
@@ -23359,7 +23359,7 @@ def test_lapse_pre_non_risky_amend_rej_req(
             time.sleep(residual_wait_sec)
 
             print("Checking chore post OE_CXL_ACK")
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
             chore_status = ChoreStatusType.OE_DOD
             filled_notional = filled_qty * get_px_in_usd(px)
@@ -23421,8 +23421,8 @@ def test_lapse_pre_non_risky_amend_rej_req(
 @pytest.mark.nightly
 def test_lapse_pre_non_risky_amend_rej_ack(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -23462,7 +23462,7 @@ def test_lapse_pre_non_risky_amend_rej_ack(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -23539,7 +23539,7 @@ def test_lapse_pre_non_risky_amend_rej_ack(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             new_qty = qty
             new_px = px
@@ -23640,7 +23640,7 @@ def test_lapse_pre_non_risky_amend_rej_ack(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             chore_status = ChoreStatusType.OE_ACKED
@@ -23684,7 +23684,7 @@ def test_lapse_pre_non_risky_amend_rej_ack(
             # waiting for chore to get cxled
             time.sleep(residual_wait_sec)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
             cxled_qty += open_qty
             cxled_notional += open_qty * get_px_in_usd(px)
@@ -23746,8 +23746,8 @@ def test_lapse_pre_non_risky_amend_rej_ack(
 @pytest.mark.nightly
 def test_full_lapse_pre_non_risky_amend_rej_ack(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -23787,7 +23787,7 @@ def test_full_lapse_pre_non_risky_amend_rej_ack(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -23864,7 +23864,7 @@ def test_full_lapse_pre_non_risky_amend_rej_ack(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             new_qty = qty
             new_px = px
@@ -23970,7 +23970,7 @@ def test_full_lapse_pre_non_risky_amend_rej_ack(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             try:
@@ -23990,7 +23990,7 @@ def test_full_lapse_pre_non_risky_amend_rej_ack(
 
             time.sleep(5)
             check_str = (f"Received AMD_REJ post chore DOD on chore_id: "
-                         f".* - ignoring this amend chore_journal and chore will stay unchanged")
+                         f".* - ignoring this amend chore_ledger and chore will stay unchanged")
             assert_fail_msg = f"Can't find alert: {check_str!r}"
             check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
@@ -24008,8 +24008,8 @@ def test_full_lapse_pre_non_risky_amend_rej_ack(
 @pytest.mark.nightly
 def test_lapse_post_non_risky_amend_rej_ack(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -24048,7 +24048,7 @@ def test_lapse_post_non_risky_amend_rej_ack(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
 
@@ -24124,7 +24124,7 @@ def test_lapse_post_non_risky_amend_rej_ack(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
             new_qty = qty
             new_px = px
@@ -24175,7 +24175,7 @@ def test_lapse_post_non_risky_amend_rej_ack(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             chore_status = ChoreStatusType.OE_ACKED
@@ -24266,7 +24266,7 @@ def test_lapse_post_non_risky_amend_rej_ack(
             time.sleep(residual_wait_sec)
 
             print("Checking chore post OE_CXL_ACK")
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
             new_qty = qty
             new_px = px
@@ -24332,8 +24332,8 @@ def test_lapse_post_non_risky_amend_rej_ack(
 @pytest.mark.nightly
 def test_lapse_pre_risky_amend_rej_req(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -24372,7 +24372,7 @@ def test_lapse_pre_risky_amend_rej_req(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
 
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
@@ -24469,7 +24469,7 @@ def test_lapse_pre_risky_amend_rej_req(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
         
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
 
             if side == Side.BUY:
@@ -24533,7 +24533,7 @@ def test_lapse_pre_risky_amend_rej_req(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             new_qty = qty
@@ -24584,7 +24584,7 @@ def test_lapse_pre_risky_amend_rej_req(
             time.sleep(residual_wait_sec)
 
             print("Checking chore post OE_CXL_ACK")
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
             chore_status = ChoreStatusType.OE_DOD
             cxled_qty += open_qty
@@ -24643,8 +24643,8 @@ def test_lapse_pre_risky_amend_rej_req(
 @pytest.mark.nightly
 def test_lapse_pre_risky_amend_rej_ack(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -24685,7 +24685,7 @@ def test_lapse_pre_risky_amend_rej_ack(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
 
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
@@ -24735,7 +24735,7 @@ def test_lapse_pre_risky_amend_rej_ack(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
 
             if side == Side.BUY:
@@ -24842,7 +24842,7 @@ def test_lapse_pre_risky_amend_rej_ack(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             new_qty = qty
@@ -24896,7 +24896,7 @@ def test_lapse_pre_risky_amend_rej_ack(
             time.sleep(residual_wait_sec)
 
             print("Checking chore post OE_CXL_ACK")
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
             new_qty = qty
             new_px = px
@@ -24961,8 +24961,8 @@ def test_lapse_pre_risky_amend_rej_ack(
 @pytest.mark.nightly
 def test_full_lapse_pre_risky_amend_rej_ack(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -25003,7 +25003,7 @@ def test_full_lapse_pre_risky_amend_rej_ack(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
 
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
@@ -25053,7 +25053,7 @@ def test_full_lapse_pre_risky_amend_rej_ack(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
 
             if side == Side.BUY:
@@ -25165,7 +25165,7 @@ def test_full_lapse_pre_risky_amend_rej_ack(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             try:
@@ -25185,7 +25185,7 @@ def test_full_lapse_pre_risky_amend_rej_ack(
 
             time.sleep(5)
             check_str = (f"Received AMD_REJ post chore DOD on chore_id: "
-                         f".* - ignoring this amend chore_journal and chore will stay unchanged")
+                         f".* - ignoring this amend chore_ledger and chore will stay unchanged")
             assert_fail_msg = f"Can't find alert: {check_str!r}"
             check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)
 
@@ -25203,8 +25203,8 @@ def test_full_lapse_pre_risky_amend_rej_ack(
 @pytest.mark.nightly
 def test_lapse_post_risky_amend_rej_ack(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -25243,7 +25243,7 @@ def test_lapse_post_risky_amend_rej_ack(
             place_new_chore(chore_symbol, side, px, qty, executor_http_client, inst_type)
 
             # checking ACK chore before amend
-            latest_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
+            latest_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, chore_symbol,
                                                                             executor_http_client)
 
             filled_qty = get_partial_allowed_fill_qty(chore_symbol, config_dict, qty)
@@ -25293,7 +25293,7 @@ def test_lapse_post_risky_amend_rej_ack(
                 chore_event=chore_event,
                 qty=amend_qty, px=amend_px)
 
-            latest_amend_unack_obj = get_latest_chore_journal_with_event_and_symbol(chore_event,
+            latest_amend_unack_obj = get_latest_chore_ledger_with_event_and_symbol(chore_event,
                                                                                     chore_symbol, executor_http_client)
 
             if side == Side.BUY:
@@ -25357,7 +25357,7 @@ def test_lapse_post_risky_amend_rej_ack(
                 latest_ack_obj.chore.security.sec_id,
                 latest_ack_obj.chore.underlying_account)
 
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_AMD_REJ,
                                                                                   chore_symbol,
                                                                                   executor_http_client)
             new_qty = qty
@@ -25456,7 +25456,7 @@ def test_lapse_post_risky_amend_rej_ack(
             time.sleep(residual_wait_sec)
 
             print("Checking chore post OE_CXL_ACK")
-            latest_amend_ack_obj = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
+            latest_amend_ack_obj = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_CXL_ACK,
                                                                                   chore_symbol, executor_http_client)
             new_qty = qty
             new_px = px
@@ -25530,8 +25530,8 @@ def looped_update_residuals_query_client_call(buy_symbol, sell_symbol, executor_
 @pytest.mark.nightly
 def test_verify_deadlock_in_update_residuals_query(
         static_data_, clean_and_set_limits, pair_securities_with_sides_,
-        buy_chore_, sell_chore_, buy_fill_journal_,
-        sell_fill_journal_, expected_buy_chore_snapshot_,
+        buy_chore_, sell_chore_, buy_fill_ledger_,
+        sell_fill_ledger_, expected_buy_chore_snapshot_,
         expected_sell_chore_snapshot_, expected_symbol_side_snapshot_,
         pair_plan_, expected_plan_limits_, expected_plan_status_,
         expected_plan_brief_, expected_contact_status_,
@@ -25584,22 +25584,22 @@ def test_verify_deadlock_in_update_residuals_query(
             px = 100
             qty = 90
             place_new_chore(buy_symbol, Side.BUY, px, qty, executor_http_client, buy_inst_type)
-            ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, buy_symbol,
+            ack_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, buy_symbol,
                                                                                executor_http_client,
                                                                                last_chore_id=last_buy_chore_id)
-            last_buy_chore_id = ack_chore_journal.chore.chore_id
-            latest_fill_journal = get_latest_fill_journal_from_chore_id(ack_chore_journal.chore.chore_id,
+            last_buy_chore_id = ack_chore_ledger.chore.chore_id
+            latest_fill_ledger = get_latest_fill_ledger_from_chore_id(ack_chore_ledger.chore.chore_id,
                                                                         executor_http_client)
             time.sleep(2)
 
             px = 95
             qty = 110
             place_new_chore(sell_symbol, Side.SELL, px, qty, executor_http_client, sell_inst_type)
-            ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK, sell_symbol,
+            ack_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK, sell_symbol,
                                                                                executor_http_client,
                                                                                last_chore_id=last_sell_chore_id)
-            last_sell_chore_id = ack_chore_journal.chore.chore_id
-            latest_fill_journal = get_latest_fill_journal_from_chore_id(ack_chore_journal.chore.chore_id,
+            last_sell_chore_id = ack_chore_ledger.chore.chore_id
+            latest_fill_ledger = get_latest_fill_ledger_from_chore_id(ack_chore_ledger.chore.chore_id,
                                                                         executor_http_client)
 
     except AssertionError as e:

@@ -59,23 +59,23 @@ def _place_sanity_complete_buy_sell_pair_chores_with_pair_plan(
             buy_chore: NewChoreBaseModel = place_new_chore(buy_symbol, Side.BUY, 98, 20, executor_web_client,
                                                            buy_inst_type)
 
-            buy_ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
+            buy_ack_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK,
                                                                                    buy_symbol, executor_web_client,
                                                                                    loop_wait_secs=1,
                                                                                    last_chore_id=buy_ack_chore_id)
-            buy_ack_chore_id = buy_ack_chore_journal.chore.chore_id
-            # fills_journal = get_latest_fill_journal_from_chore_id(buy_ack_chore_id, executor_web_client)
+            buy_ack_chore_id = buy_ack_chore_ledger.chore.chore_id
+            # deals_ledger = get_latest_fill_ledger_from_chore_id(buy_ack_chore_id, executor_web_client)
             time.sleep(1)
             sell_chore: NewChoreBaseModel = place_new_chore(sell_symbol, Side.SELL, 96, 20, executor_web_client,
                                                             sell_inst_type)
-            sell_ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
+            sell_ack_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK,
                                                                                     sell_symbol, executor_web_client,
                                                                                     loop_wait_secs=1,
                                                                                     last_chore_id=sell_ack_chore_id)
             # plan_status: PlanStatusBaseModel = executor_web_client.get_plan_status_client(active_pair_plan.id)
             # plan_view: PlanViewBaseModel = photo_book_web_client.get_plan_view_client(
             #     active_pair_plan.id)
-            sell_ack_chore_id = sell_ack_chore_journal.chore.chore_id
+            sell_ack_chore_id = sell_ack_chore_ledger.chore.chore_id
             # assert plan_status.balance_notional == plan_view.balance_notional, \
             #     f"Mismatched {plan_status.balance_notional = }, {plan_view.balance_notional = }"
             check_plan_view_computes(active_pair_plan.id, executor_web_client)
@@ -195,23 +195,23 @@ def _place_sanity_complete_buy_sell_pair_chores_with_pair_plan_and_parallel_mark
             buy_chore: NewChoreBaseModel = place_new_chore(buy_symbol, Side.BUY, 98, 20, executor_web_client,
                                                            buy_inst_type)
 
-            buy_ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
+            buy_ack_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK,
                                                                                    buy_symbol, executor_web_client,
                                                                                    loop_wait_secs=1,
                                                                                    last_chore_id=buy_ack_chore_id)
-            buy_ack_chore_id = buy_ack_chore_journal.chore.chore_id
-            # fills_journal = get_latest_fill_journal_from_chore_id(buy_ack_chore_id, executor_web_client)
+            buy_ack_chore_id = buy_ack_chore_ledger.chore.chore_id
+            # deals_ledger = get_latest_fill_ledger_from_chore_id(buy_ack_chore_id, executor_web_client)
             time.sleep(1)
             sell_chore: NewChoreBaseModel = place_new_chore(sell_symbol, Side.SELL, 96, 20, executor_web_client,
                                                             sell_inst_type)
-            sell_ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
+            sell_ack_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK,
                                                                                     sell_symbol, executor_web_client,
                                                                                     loop_wait_secs=1,
                                                                                     last_chore_id=sell_ack_chore_id)
             # plan_status: PlanStatusBaseModel = executor_web_client.get_plan_status_client(active_pair_plan.id)
             # plan_view: PlanViewBaseModel = photo_book_web_client.get_plan_view_client(
             #     active_pair_plan.id)
-            sell_ack_chore_id = sell_ack_chore_journal.chore.chore_id
+            sell_ack_chore_id = sell_ack_chore_ledger.chore.chore_id
             # assert plan_status.balance_notional == plan_view.balance_notional, \
             #     f"Mismatched {plan_status.balance_notional = }, {plan_view.balance_notional = }"
             check_plan_view_computes(active_pair_plan.id, executor_web_client)
@@ -333,11 +333,11 @@ def _place_sanity_complete_buy_chores_with_pair_plan(
             buy_chore: NewChoreBaseModel = place_new_chore(buy_symbol, Side.BUY, px, qty, executor_web_client,
                                                            buy_inst_type)
 
-            ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
+            ack_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK,
                                                                                buy_symbol, executor_web_client,
                                                                                last_chore_id=buy_ack_chore_id)
-            # buy_ack_chore_id = ack_chore_journal.chore.chore_id
-            # fills_journal = get_latest_fill_journal_from_chore_id(buy_ack_chore_id, executor_web_client)
+            # buy_ack_chore_id = ack_chore_ledger.chore.chore_id
+            # deals_ledger = get_latest_fill_ledger_from_chore_id(buy_ack_chore_id, executor_web_client)
         return buy_symbol, sell_symbol, active_pair_plan, executor_web_client
 
     except AssertionError as e:
@@ -393,11 +393,11 @@ def _place_sanity_complete_buy_chores(buy_symbol, sell_symbol, pair_plan_,
             buy_chore: NewChoreBaseModel = place_new_chore(buy_symbol, Side.BUY, px, qty, executor_web_client,
                                                            buy_inst_type)
 
-            ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
+            ack_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK,
                                                                                buy_symbol, executor_web_client,
                                                                                last_chore_id=buy_ack_chore_id)
-            buy_ack_chore_id = ack_chore_journal.chore.chore_id
-            # fills_journal = get_latest_fill_journal_from_chore_id(buy_ack_chore_id, executor_web_client)
+            buy_ack_chore_id = ack_chore_ledger.chore.chore_id
+            # deals_ledger = get_latest_fill_ledger_from_chore_id(buy_ack_chore_id, executor_web_client)
         return buy_symbol, sell_symbol, created_pair_plan, executor_web_client
 
     except AssertionError as e:
@@ -440,9 +440,9 @@ def _place_sanity_complete_sell_chores(buy_symbol, sell_symbol, created_pair_pla
         for loop_count in range(total_chore_count_for_each_side):
             run_last_barter(buy_symbol, sell_symbol, last_barter_fixture_list, created_pair_plan.cpp_port,
                            create_counts_per_side=10)
-            sell_chore: ChoreJournal = place_new_chore(sell_symbol, Side.SELL, px, qty, executor_web_client,
+            sell_chore: ChoreLedger = place_new_chore(sell_symbol, Side.SELL, px, qty, executor_web_client,
                                                        sell_inst_type)
-            ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
+            ack_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK,
                                                                                sell_symbol, executor_web_client,
                                                                                last_chore_id=sell_ack_chore_id)
             plan_status: PlanStatusBaseModel = executor_web_client.get_plan_status_client(created_pair_plan.id)
@@ -451,11 +451,11 @@ def _place_sanity_complete_sell_chores(buy_symbol, sell_symbol, created_pair_pla
             assert plan_status.balance_notional == plan_view.balance_notional, \
                 f"Mismatched {plan_status.balance_notional=}, {plan_view.balance_notional=}"
 
-            # ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(ChoreEventType.OE_ACK,
+            # ack_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(ChoreEventType.OE_ACK,
             #                                                                    sell_symbol, executor_web_client,
             #                                                                    last_chore_id=sell_ack_chore_id)
-            sell_ack_chore_id = ack_chore_journal.chore.chore_id
-            # fills_journal = get_latest_fill_journal_from_chore_id(sell_ack_chore_id, executor_web_client)
+            sell_ack_chore_id = ack_chore_ledger.chore.chore_id
+            # deals_ledger = get_latest_fill_ledger_from_chore_id(sell_ack_chore_id, executor_web_client)
 
     except AssertionError as e:
         raise AssertionError(e)

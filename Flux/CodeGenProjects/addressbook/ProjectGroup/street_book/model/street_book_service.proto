@@ -61,6 +61,7 @@ message SymbolSideSnapshot{
     depending_proto_model_name: "PairPlan",
     depending_proto_model_field_name_for_host: "PairPlan.host",
     depending_proto_model_field_name_for_port: "PairPlan.port",
+    depending_proto_model_field_name_for_view_port: "PairPlan.view_port"
     is_read_only: true
   };
   option (FluxMsgStringLength) = 128;
@@ -103,7 +104,8 @@ message PlanStatus{
     depending_proto_model_name: "PairPlan",
     depends_on_other_model_for_id: true,
     depending_proto_model_field_name_for_host: "PairPlan.host",
-    depending_proto_model_field_name_for_port: "PairPlan.port"
+    depending_proto_model_field_name_for_port: "PairPlan.port",
+    depending_proto_model_field_name_for_view_port: "PairPlan.view_port"
   };
   option (FluxMsgExecutorOptions) = {
     IsWebSocketModel: true,
@@ -129,9 +131,6 @@ message PlanStatus{
       QueryParamName: "residual_qty",
       QueryParamDataType: "int"
     }
-  };
-  option (FluxMsgJsonQuery) = {
-    QueryName: "put_plan_to_snooze",
   };
   option (FluxMsgStringLength) = 128;
 
@@ -173,6 +172,18 @@ message PlanStatus{
   optional int64 last_update_date_time = 31 [(FluxFldValIsDateTime) = true];
 }
 
+message PutPlanToSnooze{
+  option (FluxMsgJsonQuery) = {
+    QueryName: "put_plan_to_snooze",
+    QueryParams: {
+      QueryParamName: "temp",   // temp field setting just to make this query patch - internally has update logic
+      QueryParamDataType: "bool | None = None"
+    }
+    QueryRouteType: PATCH
+  };
+  optional bool temp = 1;
+}
+
 message PlanLimits{
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
@@ -197,6 +208,7 @@ message PlanLimits{
     depends_on_other_model_for_id: true,
     depending_proto_model_field_name_for_host: "PairPlan.host",
     depending_proto_model_field_name_for_port: "PairPlan.port",
+    depending_proto_model_field_name_for_view_port: "PairPlan.view_port"
   };
   option (FluxMsgExecutorOptions) = {
     IsWebSocketModel: true,

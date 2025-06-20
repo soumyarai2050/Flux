@@ -43,7 +43,7 @@ def get_symbol_side_underlying_account_cumulative_fill_qty(symbol: str, side: st
     ]}
 
 
-def get_last_n_chore_journals_from_chore_id(chore_id: str, journal_count: int):
+def get_last_n_chore_ledgers_from_chore_id(chore_id: str, ledger_count: int):
     return {"aggregate": [
         {
             "$match": {
@@ -54,7 +54,7 @@ def get_last_n_chore_journals_from_chore_id(chore_id: str, journal_count: int):
             "$sort": {"_id": -1},
         },
         {
-            "$limit": journal_count
+            "$limit": ledger_count
         }
     ]}
 

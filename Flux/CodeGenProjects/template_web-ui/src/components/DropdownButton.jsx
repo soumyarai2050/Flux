@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import Button from '@mui/material/Button';
 import Menu from '@mui/material/Menu';
@@ -11,11 +11,22 @@ export default function DropdownButton({
   renderOption,
   onOptionSelect,
   initialSelectedIndex = 0,
+  selectedIndex: controlledSelectedIndex,
   ...rest // Pass other ButtonProps like variant, color, sx, etc.
 }) {
   const [anchorEl, setAnchorEl] = useState(null);
-  const [selectedIndex, setSelectedIndex] = useState(initialSelectedIndex);
+  const [internalSelectedIndex, setInternalSelectedIndex] = useState(initialSelectedIndex);
   const open = Boolean(anchorEl);
+
+  // Use controlled selectedIndex if provided, otherwise use internal state
+  const selectedIndex = controlledSelectedIndex !== undefined ? controlledSelectedIndex : internalSelectedIndex;
+
+  // Update internal state when controlledSelectedIndex changes
+  useEffect(() => {
+    if (controlledSelectedIndex !== undefined) {
+      setInternalSelectedIndex(controlledSelectedIndex);
+    }
+  }, [controlledSelectedIndex]);
 
   // Memoize the selected option to avoid re-computation
   const selectedOption = useMemo(
@@ -28,7 +39,10 @@ export default function DropdownButton({
   };
 
   const handleMenuItemClick = (event, index) => {
-    setSelectedIndex(index);
+    // Only update internal state if not controlled
+    if (controlledSelectedIndex === undefined) {
+      setInternalSelectedIndex(index);
+    }
     setAnchorEl(null);
     if (onOptionSelect) {
       onOptionSelect(options[index], index);
@@ -39,8 +53,14 @@ export default function DropdownButton({
     setAnchorEl(null);
   };
 
+  const dropdownContainer = {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    margin: '0 4px',
+    borderRadius: '5px'
+  }
+
   return (
-    <div>
+    <div style={dropdownContainer}>
       <Button
         aria-haspopup="true"
         aria-expanded={open ? 'true' : undefined}
@@ -91,4 +111,6 @@ DropdownButton.propTypes = {
   onOptionSelect: PropTypes.func,
   /** Optional: The initially selected index. Defaults to 0. */
   initialSelectedIndex: PropTypes.number,
+  /** Optional: Controlled selected index that can be changed externally. */
+  selectedIndex: PropTypes.number,
 };

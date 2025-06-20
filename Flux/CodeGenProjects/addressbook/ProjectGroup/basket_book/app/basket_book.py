@@ -7,12 +7,11 @@ import subprocess
 import math
 import copy
 from typing import Set
+from enum import auto
 
-import pendulum
 # 3rd party imports
 from fastapi_restful.enums import StrEnum
 
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.data import security
 # project imports
 from FluxPythonUtils.scripts.general_utility_functions import parse_to_int
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.bartering_link import (
@@ -21,7 +20,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.app.basket_barter
     BasketBarteringDataManager)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.app.basket_cache import BasketCache
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
-    get_symbol_side_key, get_usd_px, email_book_service_http_client, config_yaml_path)
+    get_symbol_side_key, get_usd_px, email_book_service_http_client, config_yaml_dict)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.pos_cache import PosCache, SecPosExtended
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import (
     ChoreLimitsBaseModel, ChoreLimits)
@@ -229,8 +228,8 @@ class BasketBook(BaseBook):
 
         # block this new chore processing if any prior unack chore exist [user may resubmit another chore later]
         if self.plan_cache.check_unack(system_symbol, side):
-            err_str_ = (f"past submit chore on symbol_side: {get_symbol_side_key([(bartering_symbol, side)])} is in unack state"
-                        f", dropping chore request with {px=}, {qty=}, for {new_chore_obj.chore_id};;;{new_chore_obj=}")
+            err_str_ = (f"past submit on symbol_side: {get_symbol_side_key([(bartering_symbol, side)])} is in unack state"
+                        f", dropping chore request with {px=}, {qty=} for {new_chore_obj.chore_id};;;{new_chore_obj=}")
             err_str_ = capped_by_size_text(err_str_)
             new_chore_obj.text = err_str_
             logging.error(err_str_)
@@ -242,7 +241,7 @@ class BasketBook(BaseBook):
 
         self.md_streaming_mgr.trigger_md_for_symbols([(system_symbol, self.system_symbol_type),])
         self.sys_symbol_to_md_trigger_time_dict[system_symbol] = DateTime.utcnow()
-        # now add to manager_chores_by_symbol
+        # now add to managed_chores_by_symbol
         self.add_chore_to_managed_chores_by_symbol(system_symbol, new_chore_obj)
         # releasing semaphore to get added chores executed
         SymbolCacheContainer.release_semaphore()
@@ -331,7 +330,7 @@ class BasketBook(BaseBook):
                                                                               **kwargs)
         # reset unack for subsequent chores to go through - this chore did fail to go through
         self.plan_cache.set_unack(False, new_chore_obj.security.sec_id, new_chore_obj.side)
-        # failed or not - chore posting is done - we'll not support retry until chore snapshot integration
+        # failed or not - chore posting is done - we'll not support retry until after chore snapshot integration
         new_chore_obj.chore_submit_state = ChoreSubmitType.ORDER_SUBMIT_DONE
         if res:
             err_, new_chore_obj.chore_id = self.get_chore_id_from_ret_id_or_err_desc(ret_id_or_err_desc)
@@ -384,7 +383,7 @@ class BasketBook(BaseBook):
         is_available, sec_pos_extended = pos_cache.extract_availability(new_chore_obj)
         if not is_available:
             # error logged in extract_availability
-            err_str_ = f"failed to extract position, retry in next iteration"
+            err_str_ = "failed to extract position, retry in next iteration"
             new_chore_obj.text = err_str_
             new_chore_obj.chore_submit_state = ChoreSubmitType.ORDER_SUBMIT_RETRY
             logging.error(err_str_)
@@ -589,7 +588,7 @@ class BasketBook(BaseBook):
 
     async def recover_n_reconcile_(self) -> bool:
         # return True
-        recovered_baskets: list[BasketChore] = await (
+        recovered_baskets: List[BasketChore] = await (
             BasketBook.underlying_read_basket_chore_http())
         if len(recovered_baskets) > 1:
             logging.error(f"invalid {len(recovered_baskets)=}, unable to process "
@@ -620,7 +619,7 @@ class BasketBook(BaseBook):
                         elif not is_open:
                             self.mark_chore_closed(recovered_chore)
                             is_updated = True
-                        # else - chore is unack-  dealt later
+                        # else - chore is unack - dealt later
                     if posted_qty is not None and recovered_chore.qty != posted_qty:
                         recovered_chore.qty = posted_qty
                         is_updated = True
@@ -639,7 +638,7 @@ class BasketBook(BaseBook):
                         is_updated = True
 
                     if is_open or is_unack:
-                        logging.info(f"added to recovered_chores_symbol_n_type_list: {recovered_chore}, {is_open=}, "
+                        logging.info(f"added to recovered_chores_symbol_n_type_list: {recovered_chore}, {is_open}, "
                                      f"{is_unack}, {filled_qty}")
                         recovered_chores_symbol_n_type_list.add((recovered_chore.ticker, "ticker"))
                     else:
@@ -668,7 +667,7 @@ class BasketBook(BaseBook):
                         id=self.plan_cache.basket_id, processing_level=1, new_chores=updated_recovered_new_chores)
                     await BasketBook.underlying_partial_update_basket_chore_http(
                         partial_updated_basket_chore.to_json_dict(exclude_none=True))
-                    # now allow standard basket chore processing recovered / reconciled is persisted
+                    # now allow standard basket chore processing recovered / reconciled [then process]
                     self.plan_cache.is_recovered_n_reconciled = True
                     # just new update_id is fine
                     partial_updated_basket_chore: BasketChore = BasketChore(
@@ -681,7 +680,7 @@ class BasketBook(BaseBook):
             self.plan_cache.chores = []
         return True
 
-    def check_n_place_cancel_chore(self, chore_list: list[NewChore]):
+    def check_n_place_cancel_chore(self, chore_list: List[NewChore]):
         run_coro = self.check_n_place_cancel_chore_(chore_list)
         future = asyncio.run_coroutine_threadsafe(run_coro, BasketBook.asyncio_loop)
         try:
@@ -689,8 +688,8 @@ class BasketBook(BaseBook):
         except Exception as exp:
             logging.exception(f"check_n_place_cancel_chore_ failed with exception: {exp}")
 
-    async def check_n_place_cancel_chore_(self, chore_list: list[NewChore]):
-        cancel_chore_list = []
+    async def check_n_place_cancel_chore_(self, chore_list: List[NewChore]):
+        cancel_chore_list: List = []
         for chore in chore_list:
             if chore.pending_cxl and chore.chore_id is not None:
                 cancel_chore_list.append(chore)
@@ -699,7 +698,7 @@ class BasketBook(BaseBook):
 
     def check_if_amendable(self, chore, amend_chore, remove_chore_list, is_open, is_unack, text, filled_qty):
         run_coro = self.check_if_amendable_(chore, amend_chore, remove_chore_list, is_open, is_unack, text, filled_qty)
-        future = asyncio.run_coroutine_threadsafe(run_coro, BasketBook.asyncio_loop)  # fun_coro is undefined here
+        future = asyncio.run_coroutine_threadsafe(run_coro, BasketBook.asyncio_loop)
         try:
             return future.result()
         except Exception as exp:
@@ -711,15 +710,15 @@ class BasketBook(BaseBook):
             chore.text = f"{chore.text}; {text}"
             chore.text = capped_by_size_text(chore.text)
             remove_chore_list.append(chore)
-            err_ = (f"removing {chore.chore_id=} for {chore.ticker} {chore.security_sec_id} on {chore.algo=}; "
-                    f"{filled_qty=} chore is not in modifiable state")
+            err_ = (f"removing {chore.chore_id=} for {chore.ticker} {chore.security.sec_id} on {chore.algo=}; "
+                    f"{filled_qty=} chore is not open anymore")
             if amend_chore is not None:
                 logging.error(f"Error amend failed: {err_}, found amend chore: {amend_chore}")
             else:
                 logging.info(err_)
             return False
         if is_unack:
-            err_ = (f"ignoring {chore.chore_id=} for {chore.ticker} {chore.security_sec_id} on {chore.algo=}"
+            err_ = (f"ignoring {chore.chore_id=} for {chore.ticker} {chore.security.sec_id} on {chore.algo=}"
                     f"; {filled_qty=} chore is not in modifiable state")
             if amend_chore is not None:
                 logging.warning(f"amend to be retried in next iteration: {err_}, found amend chore: {amend_chore}")
@@ -746,7 +745,6 @@ class BasketBook(BaseBook):
 
     def trigger_amend_chore(self, chore, amend_chore, remove_chore_list, processable_algo_market_chore,
                             symbol_cache: SymbolCache, sys_symbol_n_new_submit_chore_list, sys_symbol) -> bool:
-
         is_open, is_unack, text, filled_qty, posted_px, posted_qty = (
             self.bartering_link_check_is_chore_open_n_modifiable(chore))
         if not (self.check_if_amendable(chore, amend_chore, remove_chore_list, is_open, is_unack, text, filled_qty)):
@@ -762,12 +760,12 @@ class BasketBook(BaseBook):
             generated_qty = amend_chore.qty
 
         if processable_algo_market_chore:
-            chore_limits_tuple = self.bartering_data_manager.get_chore_limits()
+            chore_limits_tuple = self.bartering_data_manager.bartering_cache.get_chore_limits()
             if chore_limits_tuple is not None:
                 chore_limits, _ = chore_limits_tuple
                 # we are to manage the price [market algo] - till chore remains open and modifiable
                 generated_px = self.generate_algo_market_chore_price(chore, chore_limits, symbol_cache)
-        # even if not an amend chore, if new price generated - we amend the chore
+        # even if not an amend chore - if new price generated - we amend the chore
         if amend_chore or generated_px is not None:
             if self.soft_amend:
                 res = self.bartering_link_place_cxl_chore(chore.chore_id, None, None, None, None)
@@ -775,7 +773,7 @@ class BasketBook(BaseBook):
                     # get chore state again to get filled qty after chore is cancelled
                     for retry_count in range(self.max_post_cxl_chore_check_retry_count):
                         is_open, is_unack, text, filled_qty, posted_px, posted_qty = (
-                            self.bartering_link_check_is_chore_open_n_modifiable(chore))
+                            self.bartering_link_check_is_chore_open_n_modifiable_(chore))
                         if is_open:
                             time.sleep(1)
                             logging.warning(f"post place_cxl_chore: chore found in non-cancelled state,"
@@ -811,15 +809,15 @@ class BasketBook(BaseBook):
                     if not res:
                         logging.error(f"failed to send {amend_as_new_ord=}")
                     else:
-                        pass # TODO AMEND Amend done
+                        pass  # TODO AMEND Amend done
                     # amended or not: needed in managed, to be removed later after cyclic state-check
                     sys_symbol_n_new_submit_chore_list.append((sys_symbol, amend_as_new_ord))
                 else:
                     text = capped_by_size_text(text)
 
-                    logging.error(f"cancel for amend attempt failed: Basket {chore.chore_id=} from px: "
+                    logging.error(f"cancel for amend attempt failed! Basket {chore.chore_id=} from px: "
                                   f"{chore.px:.3f} to generated px: {generated_px:.3f} for {chore.ticker} "
-                                  f"{chore.security_sec_id}, {chore.side}, {text=}, we'll retry in next"
+                                  f"{chore.security.sec_id}, {chore.side}, {text=}, we'll retry in next"
                                   f" iteration")
                     return False
             else:
@@ -828,21 +826,21 @@ class BasketBook(BaseBook):
                                                           system_sec_id=chore.ticker,
                                                           bartering_sec_type=chore.security.sec_id_source)
             if res:
-                soft_amend_spaced_str = " " if not self.soft_amend else f" {self.soft_amend=}"
+                soft_amend_spaced_str = " " if not self.soft_amend else f" {self.soft_amend=} "
                 px_amend_str = (f"from {chore.px:.3f} to new px: {generated_px:.3f}"
                                 f"") if generated_px and not math.isclose(chore.px, generated_px) else ''
                 qty_amend_str = (f"from {chore.qty} to new qty: {generated_qty}"
-                                 f"") if generated_qty is not None and chore.qty != generated_qty else ''
+                                 f"") if generated_qty and chore.qty != generated_qty else ''
                 logging.info(f"amended {soft_amend_spaced_str}{chore.chore_id=} {px_amend_str} {qty_amend_str} for "
-                             f"{chore.ticker} {chore.security_sec_id}, {chore.side}, {text=}")
+                             f"{chore.ticker} {chore.security.sec_id}, {chore.side}, {text=}")
                 if generated_px is not None:
                     chore.px = generated_px
                     if amend_chore and generated_px is not None:
                         amend_chore.px = generated_px
             else:
-                logging.error(f"amend attempt failed - we'll retry: Basket {chore.chore_id=} from px: "
+                logging.error(f"amend attempt failed - we'll retry! Basket {chore.chore_id=} from px: "
                               f"{chore.px:.3f} to generated px: {generated_px:.3f} for {chore.ticker} "
-                              f"{chore.security_sec_id}, {chore.side}, {text=}")
+                              f"{chore.security.sec_id}, {chore.side}, {text=}")
                 return False
         return True
 
@@ -853,10 +851,10 @@ class BasketBook(BaseBook):
                 chore.pending_amd_px is not None and not math.isclose(chore.pending_amd_px, 0)):
             amend_chore = copy.deepcopy(chore)
             if chore.pending_amd_qty is not None and chore.pending_amd_qty != 0:
-                amend_chore.qty = chore.pending_amd_qty
+                amend_chore.qty = amend_chore.pending_amd_qty
                 amend_chore.pending_amd_qty = 0
             if chore.pending_amd_px is not None and not math.isclose(chore.pending_amd_px, 0):
-                amend_chore.px = chore.pending_amd_px
+                amend_chore.px = amend_chore.pending_amd_px
                 amend_chore.pending_amd_px = 0
         return amend_chore
 
@@ -868,7 +866,7 @@ class BasketBook(BaseBook):
             if chore.id in chore_by_id:
                 del_chore = chore_by_id[chore.id]
                 logging.warning(f"Found multiple entries of {chore.id} for {del_chore.ticker=}/"
-                                f"{del_chore.security_sec_id=}, dropping older;;;"
+                                f"{del_chore.security.sec_id=}, dropping older;;;"
                                 f"retained {chore=}; removed {del_chore=}")
                 del_chore_list.append(del_chore)
             # if or else - store the last found chore
@@ -904,7 +902,7 @@ class BasketBook(BaseBook):
     async def update_bartering_link_submit_cxl_chore_task(chore, pending_cxl_tasks):
         status = False
         is_open, is_unack, text, filled_qty, posted_px, posted_qty = await (
-            BasketBook.bartering_link_check_is_chore_open_n_modifiable(chore))
+            BasketBook.bartering_link_check_is_chore_open_n_modifiable_(chore))
         text = capped_by_size_text(text)
 
         if is_open or (is_unack and chore.chore_id is not None):
@@ -914,25 +912,25 @@ class BasketBook(BaseBook):
             pending_cxl_tasks.append(cxl_chore_task)
             status = True
         elif not is_open:  # prior cancel, don't add in pending_cxl_tasks TODO: Add found_cancelled IN param & update ?
-            logging.error(f"unable to cxl chore not open on bartering link: {chore.ticker} {chore.security_sec_id} "
+            logging.error(f"unable to cxl chore not open on bartering link: {chore.ticker} {chore.security.sec_id} "
                           f"{chore.side} {chore.id} {chore.chore_id} found unack on bartering link: {text=};;;{chore=}")
             status = True
             chore.chore_submit_state = ChoreSubmitType.ORDER_SUBMIT_NA
             chore.text = f"chore closed! {filled_qty=}"
         elif is_unack:
-            logging.error(f"unable to cxl unack chore: {chore.ticker} {chore.security_sec_id} "
+            logging.error(f"unable to cxl unack chore: {chore.ticker} {chore.security.sec_id} {chore.side} "
                           f"{chore.id} {chore.chore_id} found unack on bartering link: {text=};;;{chore=}")
         else:
-            logging.warning(f"unable to cxl chore {chore.ticker} {chore.security_sec_id} {is_open=}, "
+            logging.warning(f"unable to cxl chore {chore.ticker} {chore.security.sec_id} {is_open=}, "
                             f"{is_unack=}, {chore.side}, {chore.chore_id} found not open on bartering "
                             f"link: {text=};;;{chore=}")
         return status
 
     @staticmethod
-    async def pending_link_submit_cxl_chore_tasks(pending_cxl_tasks, symbol_to_cxl_chores):  # : Set[str, NewChore]
+    async def bartering_link_submit_cxl_chore_tasks(pending_cxl_tasks, symbol_to_cxl_chores):  # : Set[str, NewChore]
         orig_pending_cxl_tasks_count = len(pending_cxl_tasks)
         timeout: float = 20.0
-        while len(pending_cxl_tasks) > 0:
+        while len(pending_cxl_tasks):
             try:
                 # wait doesn't raise TimeoutError!
                 # Futures that aren't done when timeout occurs are returned in 2nd set
@@ -940,7 +938,7 @@ class BasketBook(BaseBook):
                 completed_cxl_tasks, pending_cxl_tasks = \
                     await asyncio.wait(pending_cxl_tasks, return_when=asyncio.ALL_COMPLETED, timeout=timeout)
             except Exception as exp:
-                logging.exception(f"dropping pending_submit_cxl_chore_tasks: {len(pending_cxl_tasks)} of total: "
+                logging.exception(f"dropping pending submit_cxl_chore_tasks: {len(pending_cxl_tasks)} of total: "
                                   f"{orig_pending_cxl_tasks_count} tasks; await asyncio.wait raised {exp=};;;"
                                   f"{pending_cxl_tasks}, {symbol_to_cxl_chores=}")
                 break
@@ -954,27 +952,26 @@ class BasketBook(BaseBook):
                     task_name = cxl_done_task.get_name() if cxl_done_task else "cxl_done_task_is_None"
                     logging.exception('\n', f"cxl_task future returned exception within loop for: "
                                             f"{task_name=};;;{exp=}")
-                if len(pending_cxl_tasks):
-                    logging.error(f"unexpected, submitted {orig_pending_cxl_tasks_count} cxl task, found "
-                                  f"{len(pending_cxl_tasks)=} post {timeout=:.1f}, going for retry")
+            if len(pending_cxl_tasks):
+                logging.error(f"unexpected, submitted {orig_pending_cxl_tasks_count} cxl task, found "
+                              f"{len(pending_cxl_tasks)=} post {timeout=:.1f}, going for retry")
 
     @staticmethod
     def handle_pending_amd_qty(chore) -> bool:
         if chore.pending_amd_qty is not None and chore.pending_amd_qty != 0:
             if chore.pending_amd_qty != chore.qty:
-                logging.debug(f"internal qty amd accepted from: {chore.qty=} to {chore.pending_amd_qty=}")
+                logging.debug(f"internal qty amend accepted from: {chore.qty=} to {chore.pending_amd_qty=}")
                 chore.qty = chore.pending_amd_qty
             chore.pending_amd_qty = 0
             return True  # DB update needed for qty [caller may set fast cycle with this indicator]
         return False  # no DB update required
 
-    #############################################
     def manage_chore(self, chore, chore_limits, remove_chore_list, symbol_cache, sys_symbol_n_new_submit_chore_list,
                      sys_symbol, is_algo) -> CallerLoopReturns:
         if chore.chore_submit_state == ChoreSubmitType.ORDER_SUBMIT_RETRY:
             if self.retry_if_failed:
                 chore.chore_submit_state = ChoreSubmitType.ORDER_SUBMIT_PENDING
-            # above will allow for previous attempt failed chores to be retried
+        # above will allow for previous attempt failed chores to be retried
         if chore.chore_submit_state == ChoreSubmitType.ORDER_SUBMIT_DONE:
             is_open: bool
             is_unack: bool
@@ -988,45 +985,45 @@ class BasketBook(BaseBook):
                                                          sys_symbol_n_new_submit_chore_list, sys_symbol)
                 if not amended:
                     return CallerLoopReturns.CONTINUE  # no further processing for this chore, error logged in call
-                else:  # amend was successfully posted - reflect change in chore
+                else:  # amend successfully posted - reflect change in chore
                     if amend_chore:
                         chore.qty = amend_chore.qty
                         chore.px = amend_chore.px
-                        chore.pending_amend_qty = 0
-                        chore.pending_amend_px = 0
+                        chore.pending_amd_qty = 0
+                        chore.pending_amd_px = 0
             else:
                 # meaningful support logs
                 is_open, is_unack, text, filled_qty, posted_px, posted_qty = (
                     self.bartering_link_check_is_chore_open_n_modifiable(chore))
                 if is_unack:
                     logging.warning(f"found non-market unack {chore.chore_id} for {chore.ticker} "
-                                    f"{chore.security_sec_id} or {chore.algo}, not managing this, monitor till "
+                                    f"{chore.security.sec_id} on {chore.algo}; not managing this; monitor till "
                                     f"it remains unack, {text=}, {filled_qty=}")
                     return CallerLoopReturns.CONTINUE  # no further processing for this chore, error logged in call
                 if not math.isclose(filled_qty, 0):
                     filled_qty_str = f"{filled_qty=}; "
                 else:
                     filled_qty_str = ''
-                # update text if chore is getting removed
+                # update text - chore is getting removed
                 chore.text = f"{filled_qty_str}{text if text and text not in chore.text else ''} {chore.text};"
                 if not is_open:
-                    logging.info(f"removing market {chore.chore_id} for {chore.ticker} "
-                                 f"{chore.security_sec_id} or {chore.algo}; chore not in open state "
+                    logging.info(f"removing non-market {chore.chore_id} for {chore.ticker} "
+                                 f"{chore.security.sec_id} on {chore.algo}; chore not in open state "
                                  f"{chore.text=}")
                     if chore.chore_submit_state != ChoreSubmitType.ORDER_SUBMIT_NA:
                         self.mark_chore_closed(chore, posted_qty, filled_qty)
                         self.update_chore_in_db_n_cache(chore)
                     remove_chore_list.append(chore)
-                elif not chore.is_pending_cxl:
+                elif not chore.pending_cxl:
                     remove_chore_list.append(chore)
-                    logging.info(f"ignoring: {chore.chore_id} for {chore.ticker} {chore.security_sec_id}, "
-                                 f"we won't manage/monitor non-market, non-pending[SUBMIT-DONE] or pending_cxl,"
+                    logging.info(f"ignoring: {chore.chore_id} for {chore.ticker} {chore.security.sec_id}, "
+                                 f"we don't manage/monitor non-market, non-pending[SUBMIT-DONE] or pending_cxl,"
                                  f" non-unack algo chores; removed from managed chore list, {chore.text=}")
-        elif chore.chore_submit_state != ChoreSubmitType.ORDER_SUBMIT_PENDING:
+        elif chore.chore_submit_state == ChoreSubmitType.ORDER_SUBMIT_PENDING:
             # chore is yet to go to the market
-            if chore.is_pending_cxl:
+            if chore.pending_cxl:
                 logging.info(f"removing market-unsent {chore.id} for {chore.ticker} "
-                             f"{chore.security_sec_id} on {chore.algo}; chore has {chore.pending_cxl=} set;;;"
+                             f"{chore.security.sec_id} on {chore.algo}; chore has {chore.pending_cxl=} set;;;"
                              f"{chore.text=}")
                 self.mark_chore_closed(chore)
                 self.update_chore_in_db_n_cache(chore)
@@ -1062,12 +1059,12 @@ class BasketBook(BaseBook):
                     self.update_chore_in_db_n_cache(chore)
             else:
                 # chore has px, check if it is within the range and fire if so, otherwise re-evaluate in the
-                # next cycle and retry (refer ORDER_SUBMIT_DONE handling)
+                # next cycle and retry [refer ORDER_SUBMIT_DONE handling]
                 if self.handle_pending_amd_qty(chore):
                     self.update_chore_in_db_n_cache(chore)
-                    # handle mod in next cycle
-                    # Do not ALTER any parameter besides chore to avoid side effect due to dup additions for REDO_CONTINUE return
-                    return CallerLoopReturns.REDO_CONTINUE  # Other parts of chore management in next cycle
+                    # handle more in next cycle
+                    # DO NOT ALTER any parameter besides chore to avoid side effect due to dup additions for REDO_CONTINUE return
+                    return CallerLoopReturns.REDO_CONTINUE  # other parts of chore management in next cycle
 
                 if chore.pending_amd_px is not None and not math.isclose(chore.pending_amd_px, 0):
                     if not math.isclose(chore.pending_amd_px, chore.px):
@@ -1076,7 +1073,7 @@ class BasketBook(BaseBook):
                         chore.px = chore.pending_amd_px
                     chore.pending_amd_px = 0
                     self.update_chore_in_db_n_cache(chore)
-                    # handle mod in next cycle
+                    # handle more in next cycle
                     # DO NOT ALTER any parameter besides chore to avoid side effect due to dup additions for REDO_CONTINUE return
                     return CallerLoopReturns.REDO_CONTINUE  # other parts of chore management in next cycle
                 tob = symbol_cache.top_of_book
@@ -1111,13 +1108,11 @@ class BasketBook(BaseBook):
             remove_chore_list.append(chore)
         # else not required, chore.chore_submit_state == ChoreSubmitType.ORDER_SUBMIT_RETRY are to be retried
 
-    #################################################
-
     def trigger_or_manage_algo_chores(self) -> bool:
         """
-         Any chore that needs active management after posting stays in managed_chores_by_symbol, others are posted and
-         removed called periodically to start with, later this can be moved to update via semaphore notification
-         return True if we want next cycle to be normal - False if next cycle needs to be fast
+        Any chore that needs active management after posting stays in managed_chores_by_symbol, others are posted and
+        removed called periodically to start with, later this can be moved to update via semaphore notification
+        return True if we want next cycle to be normal - False if next cycle needs to be fast
         """
         next_cycle_not_fast: bool = True
         if self.plan_cache.chores is None:
@@ -1173,7 +1168,7 @@ class BasketBook(BaseBook):
                             self.sys_symbol_to_md_retry_count[sys_symbol] = 0
                         if md_retry_count > self.max_md_retry_count:
                             logging.error(f"None or missing so in {symbol_cache=} for chores triggered over 120 sec ago"
-                                          f" for {sys_symbol=} - re-trigger market data field; "
+                                          f" for {sys_symbol=} - re-trigger market data failed; "
                                           f"{self.max_md_retry_count=} exceeded")
                         else:
                             md_trigger_time: DateTime | None = self.sys_symbol_to_md_trigger_time_dict.get(sys_symbol)
@@ -1215,7 +1210,7 @@ class BasketBook(BaseBook):
             # dropping symbol altogether - stop corresponding market data and delete it from managed_chores_by_symbol
             if len(remove_sys_sym_n_type_list) > 0:
                 self.md_streaming_mgr.force_stop_md_for_symbols(remove_sys_sym_n_type_list)
-            if len(restart_sys_sym_n_type_list):
+            if len(restart_sys_sym_n_type_list) > 0:
                 self.md_streaming_mgr.restart_md_for_symbols(restart_sys_sym_n_type_list)
                 for sys_symbol, _ in restart_sys_sym_n_type_list:
                     self.sys_symbol_to_md_trigger_time_dict[sys_symbol] = DateTime.utcnow()
@@ -1235,4 +1230,5 @@ class BasketBook(BaseBook):
         while True:
             SymbolCacheContainer.semaphore.acquire()
             logging.debug("basket_book signaled")
+
             self.trigger_or_manage_algo_chores()

@@ -1393,14 +1393,14 @@ def expand_all_nested_fld_name_frm_review_changes_dialog(driver: WebDriver) -> N
 def create_tob_md_ld_fj_os_oj(driver: WebDriver, top_of_book_fixture: List,
                               market_depth_basemodel_fixture: List[MarketDepthBaseModel],
                               last_barter_basemodel_fixture: List[LastBarterBaseModel],
-                              fills_journal_basemodel_fixture: List[FillsJournalBaseModel],
+                              deals_ledger_basemodel_fixture: List[DealsLedgerBaseModel],
                               chore_snapshot_basemodel_fixture: List[ChoreSnapshotBaseModel],
-                              chore_journal_basemodel_fixture: List[ChoreJournalBaseModel],
+                              chore_ledger_basemodel_fixture: List[ChoreLedgerBaseModel],
                               plan_limits_fixture: PlanLimitsBaseModel) -> None:
     """
 
     Function for creating top_of_book, market_depth, last_barter,
-    fills_journal, chore_snapshot, chore_journal, using the web client.
+    deals_ledger, chore_snapshot, chore_ledger, using the web client.
 
     The function sets up and executes a series of tests to ensure the proper
     creation and functionality of various components related to data
@@ -1442,12 +1442,12 @@ def create_tob_md_ld_fj_os_oj(driver: WebDriver, top_of_book_fixture: List,
         last_barter_basemodel_fixture)
     assert created_last_barter_list == last_barter_basemodel_fixture, f"LastBarter mismatch: Expected {last_barter_basemodel_fixture}, but got {created_last_barter_list}"
 
-    # Fills Journal
-    for expected_fills_journal in fills_journal_basemodel_fixture:
-        created_fills_journal: FillsJournalBaseModel = executor_web_client.create_fills_journal_client(
-            expected_fills_journal)
-        expected_fills_journal.fill_notional = created_fills_journal.fill_notional
-        assert created_fills_journal == expected_fills_journal, f"FillsJournal mismatch: Expected {expected_fills_journal}, but got {created_fills_journal}"
+    # Deals Ledger
+    for expected_deals_ledger in deals_ledger_basemodel_fixture:
+        created_deals_ledger: DealsLedgerBaseModel = executor_web_client.create_deals_ledger_client(
+            expected_deals_ledger)
+        expected_deals_ledger.fill_notional = created_deals_ledger.fill_notional
+        assert created_deals_ledger == expected_deals_ledger, f"DealsLedger mismatch: Expected {expected_deals_ledger}, but got {created_deals_ledger}"
 
     # Chore Snapshot
     for expected_chore_snapshot in chore_snapshot_basemodel_fixture:
@@ -1455,19 +1455,19 @@ def create_tob_md_ld_fj_os_oj(driver: WebDriver, top_of_book_fixture: List,
             expected_chore_snapshot)
         assert created_chore_snapshot == expected_chore_snapshot, f"ChoreSnapshot mismatch: Expected {expected_chore_snapshot}, but got {created_chore_snapshot}"
 
-    # Chore Journal
-    for expected_chore_journal in chore_journal_basemodel_fixture:
-        created_chore_journal: ChoreJournalBaseModel = executor_web_client.create_chore_journal_client(
-            expected_chore_journal)
-        expected_chore_journal.chore.chore_notional = created_chore_journal.chore.chore_notional
-        assert expected_chore_journal == created_chore_journal, f"ChoreJournal mismatch: Expected {expected_chore_journal}, but got {created_chore_journal}"
+    # Chore Ledger
+    for expected_chore_ledger in chore_ledger_basemodel_fixture:
+        created_chore_ledger: ChoreLedgerBaseModel = executor_web_client.create_chore_ledger_client(
+            expected_chore_ledger)
+        expected_chore_ledger.chore.chore_notional = created_chore_ledger.chore.chore_notional
+        assert expected_chore_ledger == created_chore_ledger, f"ChoreLedger mismatch: Expected {expected_chore_ledger}, but got {created_chore_ledger}"
 
 
 def delete_tob_md_ld_fj_os_oj() -> None:
     """
 
         Function for deleting top_of_book, market_depth, last_barter,
-        fills_journal, chore_snapshot, chore_journal, using the web client.
+        deals_ledger, chore_snapshot, chore_ledger, using the web client.
 
         The function sets up and executes a series of tests to ensure the proper
         creation and functionality of various components related to data
@@ -1480,7 +1480,7 @@ def delete_tob_md_ld_fj_os_oj() -> None:
     for pair_plan in pair_plan_list:
         if not pair_plan.is_executor_running:
             err_str_ = ("plan exists but is not running, can't delete top_of_book, market_depth, last_barter, "
-                        "fills_journal, chore_snapshot, chore_journal when not running, delete it manually")
+                        "deals_ledger, chore_snapshot, chore_ledger when not running, delete it manually")
             logging.error(err_str_)
             raise Exception(err_str_)
         assert pair_plan.is_executor_running
@@ -1496,13 +1496,13 @@ def delete_tob_md_ld_fj_os_oj() -> None:
         assert executor_web_client.delete_all_last_barter_client(return_obj_copy=False)
 
         for _ in range(1, 11):
-            assert executor_web_client.delete_fills_journal_client(fills_journal_id=_, return_obj_copy=False)
+            assert executor_web_client.delete_deals_ledger_client(deals_ledger_id=_, return_obj_copy=False)
 
         for _ in range(1, 11):
             assert executor_web_client.delete_chore_snapshot_client(chore_snapshot_id=_, return_obj_copy=False)
 
         for _ in range(1, 11):
-            assert executor_web_client.delete_chore_journal_client(chore_journal_id=_, return_obj_copy=False)
+            assert executor_web_client.delete_chore_ledger_client(chore_ledger_id=_, return_obj_copy=False)
 
 
 def scroll_into_view(driver: WebDriver, element: WebElement):

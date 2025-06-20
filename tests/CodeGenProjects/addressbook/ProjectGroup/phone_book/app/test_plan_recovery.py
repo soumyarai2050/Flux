@@ -66,6 +66,18 @@ def _check_new_executor_has_new_port(old_port: int, pair_plan_id: int):
         pair_plan = email_book_service_native_web_client.get_pair_plan_client(pair_plan_id)
         if pair_plan.port is not None and pair_plan.port != old_port:
             return pair_plan
+        print(f"Couldn't find new port in {pair_plan=}")
+        time.sleep(1)
+    else:
+        assert False, (f"PairPlan not found with updated port of recovered executor: "
+                       f"pair_plan_id: {pair_plan_id}, old_port: {old_port}")
+
+
+def _check_new_view_executor_has_new_port(old_port: int, pair_plan_id: int):
+    for _ in range(10):
+        pair_plan = email_book_service_native_view_web_client.get_pair_plan_client(pair_plan_id)
+        if pair_plan.view_port is not None and pair_plan.view_port != old_port:
+            return pair_plan
         time.sleep(1)
     else:
         assert False, (f"PairPlan not found with updated port of recovered executor: "
@@ -76,7 +88,7 @@ def _test_executor_crash_recovery(
         buy_symbol, sell_symbol, pair_plan_,
         expected_plan_limits_, expected_start_status_, symbol_overview_obj_list,
         last_barter_fixture_list, market_depth_basemodel_list,
-        plan_state_to_handle, refresh_sec):
+        plan_state_to_handle, refresh_sec, check_view_server: bool = False):
     # making limits suitable for this test
     expected_plan_limits_.max_open_chores_per_side = 10
     expected_plan_limits_.residual_restriction.max_residual = 105000
@@ -117,22 +129,31 @@ def _test_executor_crash_recovery(
             place_sanity_chores_for_executor(
                 buy_symbol, sell_symbol, created_pair_plan, total_chore_count_for_each_side, last_barter_fixture_list,
                 residual_wait_sec, executor_web_client)
-        port: int = created_pair_plan.port
-        _handle_process_kill(port)      # asserts implicitly
+        if check_view_server:
+            port: int = created_pair_plan.view_port
+            _handle_process_kill(port)      # asserts implicitly
+        else:
+            port: int = created_pair_plan.port
+            _handle_process_kill(port)      # asserts implicitly
 
         time.sleep(residual_wait_sec)
 
-        _check_new_executor_has_new_port(old_port=port, pair_plan_id=created_pair_plan.id)
+        if check_view_server:
+            _check_new_view_executor_has_new_port(old_port=port, pair_plan_id=created_pair_plan.id)
+        else:
+            _check_new_executor_has_new_port(old_port=port, pair_plan_id=created_pair_plan.id)
         time.sleep(residual_wait_sec)
 
-        # checking server_ready_state in recovered_plan
-        updated_pair_plan = _verify_server_ready_state_in_recovered_plan(plan_state_to_handle, created_pair_plan.id)
+        if not check_view_server:
+            # checking server_ready_state in recovered_plan
+            updated_pair_plan = _verify_server_ready_state_in_recovered_plan(plan_state_to_handle, created_pair_plan.id)
 
-        # checking if state stays same as before recovery
-        pair_plan = email_book_service_native_web_client.get_pair_plan_client(created_pair_plan.id)
-        assert pair_plan.plan_state == created_pair_plan.plan_state, \
-            (f"Mismatched: plan_state before crash was {created_pair_plan.plan_state}, but after recovery "
-             f"plan_state is {pair_plan.plan_state}")
+            # checking if state stays same as before recovery
+            pair_plan = email_book_service_native_web_client.get_pair_plan_client(created_pair_plan.id)
+            assert pair_plan.plan_state == created_pair_plan.plan_state, \
+                (f"Mismatched: plan_state before crash was {created_pair_plan.plan_state}, but after recovery "
+                 f"plan_state is {pair_plan.plan_state}")
+        # else not required: if check_view_server - state can't change since view server has no ability to update
 
     except AssertionError as e:
         raise AssertionError(e)
@@ -146,7 +167,7 @@ def _test_executor_crash_recovery(
     new_pair_plan = email_book_service_native_web_client.get_pair_plan_client(created_pair_plan.id)
     if plan_state_to_handle == PlanState.PlanState_ACTIVE:
         new_executor_web_client = StreetBookServiceHttpClient.set_or_get_if_instance_exists(
-            updated_pair_plan.host, updated_pair_plan.port)
+            new_pair_plan.host, new_pair_plan.port)
         try:
             time.sleep(10)
             config_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(config_file_path)
@@ -195,6 +216,32 @@ def test_executor_crash_recovery(
                                    deepcopy(symbol_overview_obj_list),
                                    deepcopy(last_barter_fixture_list), deepcopy(market_depth_basemodel_list),
                                    handle_plan_state, refresh_sec_update_fixture)
+                   for buy_symbol, sell_symbol, handle_plan_state in symbols_n_plan_state_list]
+
+        for future in concurrent.futures.as_completed(results):
+            if future.exception() is not None:
+                raise Exception(future.exception())
+
+
+@pytest.mark.recovery
+def test_view_executor_crash_recovery(
+        static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
+        expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
+        last_barter_fixture_list, market_depth_basemodel_list, refresh_sec_update_fixture):
+    symbols_n_plan_state_list = []
+    plan_state_list = [PlanState.PlanState_ACTIVE, PlanState.PlanState_READY, PlanState.PlanState_PAUSED,
+                        PlanState.PlanState_SNOOZED, PlanState.PlanState_ERROR, PlanState.PlanState_DONE]
+    # plan_state_list = [PlanState.PlanState_ERROR]
+    for index, symbol_tuple in enumerate(leg1_leg2_symbol_list[:len(plan_state_list)]):
+        symbols_n_plan_state_list.append((symbol_tuple[0], symbol_tuple[1], plan_state_list[index]))
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(symbols_n_plan_state_list)) as executor:
+        results = [executor.submit(_test_executor_crash_recovery, buy_symbol, sell_symbol,
+                                   deepcopy(pair_plan_),
+                                   deepcopy(expected_plan_limits_), deepcopy(expected_plan_status_),
+                                   deepcopy(symbol_overview_obj_list),
+                                   deepcopy(last_barter_fixture_list), deepcopy(market_depth_basemodel_list),
+                                   handle_plan_state, refresh_sec_update_fixture, True)
                    for buy_symbol, sell_symbol, handle_plan_state in symbols_n_plan_state_list]
 
         for future in concurrent.futures.as_completed(results):
@@ -418,15 +465,15 @@ def check_all_cache(pair_plan_n_plan_state_tuple_list: List[Tuple[PairPlanBaseMo
                  f"cached symbol_side_snapshot: {cached_symbol_side_snapshot_list}, "
                  f"stored symbol_side_snapshot: {symbol_side_snapshot_list}")
 
-            # checking chore_journal
-            chore_journal_list: List[ChoreJournalBaseModel] = (
-                executor_http_client.get_all_chore_journal_client())
-            cached_chore_journal_list: List[ChoreJournalBaseModel] = (
-                executor_http_client.get_chore_journals_from_cache_query_client())
-            assert chore_journal_list == cached_chore_journal_list, \
-                ("Mismatched: cached chore_journal is not same as stored chore_journal, "
-                 f"cached chore_journal: {cached_chore_journal_list}, "
-                 f"stored chore_journal: {chore_journal_list}")
+            # checking chore_ledger
+            chore_ledger_list: List[ChoreLedgerBaseModel] = (
+                executor_http_client.get_all_chore_ledger_client())
+            cached_chore_ledger_list: List[ChoreLedgerBaseModel] = (
+                executor_http_client.get_chore_ledgers_from_cache_query_client())
+            assert chore_ledger_list == cached_chore_ledger_list, \
+                ("Mismatched: cached chore_ledger is not same as stored chore_ledger, "
+                 f"cached chore_ledger: {cached_chore_ledger_list}, "
+                 f"stored chore_ledger: {chore_ledger_list}")
 
             # checking chore_snapshot
             chore_snapshot_list: List[ChoreSnapshotBaseModel] = (
@@ -797,17 +844,17 @@ def _place_chore_n_kill_executor_n_verify_post_recovery(
     update_tob_through_market_depth_to_place_buy_chore(activated_pair_plan.cpp_port, bid_buy_top_market_depth,
                                                        ask_sell_top_market_depth)
 
-    ack_chore_journal = get_latest_chore_journal_with_event_and_symbol(expected_chore_event,
+    ack_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(expected_chore_event,
                                                                        leg1_symbol, executor_web_client)
 
     if check_fulfilled:
-        chore_snapshot = get_chore_snapshot_from_chore_id(ack_chore_journal.chore.chore_id, executor_web_client)
+        chore_snapshot = get_chore_snapshot_from_chore_id(ack_chore_ledger.chore.chore_id, executor_web_client)
         assert chore_snapshot.chore_status == ChoreStatusType.OE_FILLED, \
             f"Mismatched chore_status: expected {ChoreStatusType.OE_FILLED}, found: {chore_snapshot.chore_status}"
         assert chore_snapshot.cxled_qty == 0, \
             f"Mismatched cxled_qty: expected 0, received {chore_snapshot.cxled_qty}"
-        assert chore_snapshot.filled_qty == ack_chore_journal.chore.qty, \
-            f"Mismatched filled_qty: expected {ack_chore_journal.chore.qty}, received {chore_snapshot.cxled_qty}"
+        assert chore_snapshot.filled_qty == ack_chore_ledger.chore.qty, \
+            f"Mismatched filled_qty: expected {ack_chore_ledger.chore.qty}, received {chore_snapshot.cxled_qty}"
 
     port: int = activated_pair_plan.port
     _handle_process_kill(port)  # asserts implicitly
@@ -823,10 +870,10 @@ def _place_chore_n_kill_executor_n_verify_post_recovery(
     new_executor_web_client = StreetBookServiceHttpClient.set_or_get_if_instance_exists(
         updated_pair_plan.host, updated_pair_plan.port)
 
-    cxl_chore_journal = get_latest_chore_journal_with_event_and_symbol(
+    cxl_chore_ledger = get_latest_chore_ledger_with_event_and_symbol(
         ChoreEventType.OE_CXL_ACK, leg1_symbol, new_executor_web_client,
         expect_no_chore=True if check_fulfilled else False)
-    return ack_chore_journal, new_executor_web_client
+    return ack_chore_ledger, new_executor_web_client
 
 
 def test_verify_placed_chores_get_cxled_after_recovery1(
@@ -861,14 +908,14 @@ def test_verify_placed_chores_get_cxled_after_recovery1(
 
         executor_web_client.barter_simulator_reload_config_query_client()
 
-        ack_chore_journal, new_executor_web_client = _place_chore_n_kill_executor_n_verify_post_recovery(
+        ack_chore_ledger, new_executor_web_client = _place_chore_n_kill_executor_n_verify_post_recovery(
             leg1_symbol, leg2_symbol, activated_pair_plan, last_barter_fixture_list,
             executor_web_client, residual_wait_sec, ChoreEventType.OE_ACK)
-        chore_snapshot = get_chore_snapshot_from_chore_id(ack_chore_journal.chore.chore_id, new_executor_web_client)
+        chore_snapshot = get_chore_snapshot_from_chore_id(ack_chore_ledger.chore.chore_id, new_executor_web_client)
         assert chore_snapshot.chore_status == ChoreStatusType.OE_DOD, \
             f"Mismatched chore_status: expected {ChoreStatusType.OE_DOD}, found: {chore_snapshot.chore_status}"
         # below logic is required for handling odd chore qty: expected_cxled_qty = chore_qty - filled_qty
-        expected_cxled_qty = ack_chore_journal.chore.qty - int(ack_chore_journal.chore.qty / 2)
+        expected_cxled_qty = ack_chore_ledger.chore.qty - int(ack_chore_ledger.chore.qty / 2)
         assert chore_snapshot.cxled_qty == expected_cxled_qty, \
             f"Mismatched cxled_qty: expected {expected_cxled_qty}, received {chore_snapshot.cxled_qty}"
     except AssertionError as e:
@@ -913,14 +960,14 @@ def test_verify_placed_chores_get_cxled_after_recovery2(
 
         executor_web_client.barter_simulator_reload_config_query_client()
 
-        ack_chore_journal, new_executor_web_client = _place_chore_n_kill_executor_n_verify_post_recovery(
+        ack_chore_ledger, new_executor_web_client = _place_chore_n_kill_executor_n_verify_post_recovery(
             leg1_symbol, leg2_symbol, activated_pair_plan, last_barter_fixture_list,
             executor_web_client, residual_wait_sec, ChoreEventType.OE_ACK)
-        chore_snapshot = get_chore_snapshot_from_chore_id(ack_chore_journal.chore.chore_id, new_executor_web_client)
+        chore_snapshot = get_chore_snapshot_from_chore_id(ack_chore_ledger.chore.chore_id, new_executor_web_client)
         assert chore_snapshot.chore_status == ChoreStatusType.OE_DOD, \
             f"Mismatched chore_status: expected {ChoreStatusType.OE_DOD}, found: {chore_snapshot.chore_status}"
-        assert chore_snapshot.cxled_qty == ack_chore_journal.chore.qty, \
-            f"Mismatched cxled_qty: expected {ack_chore_journal.chore.qty}, received {chore_snapshot.cxled_qty}"
+        assert chore_snapshot.cxled_qty == ack_chore_ledger.chore.qty, \
+            f"Mismatched cxled_qty: expected {ack_chore_ledger.chore.qty}, received {chore_snapshot.cxled_qty}"
     except AssertionError as e:
         raise AssertionError(e)
     except Exception as e:
@@ -952,14 +999,14 @@ def test_verify_placed_chores_get_cxled_after_recovery3(
         symbol_overview_obj_list, market_depth_basemodel_list)
 
     try:
-        ack_chore_journal, new_executor_web_client = _place_chore_n_kill_executor_n_verify_post_recovery(
+        ack_chore_ledger, new_executor_web_client = _place_chore_n_kill_executor_n_verify_post_recovery(
             leg1_symbol, leg2_symbol, activated_pair_plan, last_barter_fixture_list,
             executor_web_client, residual_wait_sec, ChoreEventType.OE_NEW)
-        chore_snapshot = get_chore_snapshot_from_chore_id(ack_chore_journal.chore.chore_id, new_executor_web_client)
+        chore_snapshot = get_chore_snapshot_from_chore_id(ack_chore_ledger.chore.chore_id, new_executor_web_client)
         assert chore_snapshot.chore_status == ChoreStatusType.OE_DOD, \
             f"Mismatched chore_status: expected {ChoreStatusType.OE_DOD}, found: {chore_snapshot.chore_status}"
-        assert chore_snapshot.cxled_qty == ack_chore_journal.chore.qty, \
-            f"Mismatched cxled_qty: expected {ack_chore_journal.chore.qty}, received {chore_snapshot.cxled_qty}"
+        assert chore_snapshot.cxled_qty == ack_chore_ledger.chore.qty, \
+            f"Mismatched cxled_qty: expected {ack_chore_ledger.chore.qty}, received {chore_snapshot.cxled_qty}"
     except AssertionError as e:
         raise AssertionError(e)
     except Exception as e:
@@ -1000,10 +1047,10 @@ def test_verify_placed_chores_get_cxled_after_recovery4(
 
         executor_web_client.barter_simulator_reload_config_query_client()
 
-        ack_chore_journal, new_executor_web_client = _place_chore_n_kill_executor_n_verify_post_recovery(
+        ack_chore_ledger, new_executor_web_client = _place_chore_n_kill_executor_n_verify_post_recovery(
             leg1_symbol, leg2_symbol, activated_pair_plan, last_barter_fixture_list,
             executor_web_client, residual_wait_sec, ChoreEventType.OE_ACK, check_fulfilled=True)
-        chore_snapshot = get_chore_snapshot_from_chore_id(ack_chore_journal.chore.chore_id, new_executor_web_client)
+        chore_snapshot = get_chore_snapshot_from_chore_id(ack_chore_ledger.chore.chore_id, new_executor_web_client)
         assert chore_snapshot.chore_status == ChoreStatusType.OE_FILLED, \
             f"Mismatched chore_status: expected {ChoreStatusType.OE_FILLED}, found: {chore_snapshot.chore_status}"
     except AssertionError as e:

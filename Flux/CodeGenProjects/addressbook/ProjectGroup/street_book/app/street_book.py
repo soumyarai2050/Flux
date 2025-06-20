@@ -31,7 +31,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.model_extensio
 from Flux.PyCodeGenEngine.FluxCodeGenCore.perf_benchmark_decorators import perf_benchmark_sync_callable
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.generated.ORMModel.post_book_service_model_imports import (
     IsContactLimitsBreached)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.app.post_book_service_helper import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book_service_helper import (
     post_book_service_http_client)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.symbol_cache import (
     SymbolCache, MarketDepth, TopOfBook, LastBarter)
@@ -184,8 +184,8 @@ class StreetBook(BaseBook):
         self._system_control_update_date_time: DateTime | None = None
         self._plan_brief_update_date_time: DateTime | None = None
         self._chore_snapshots_update_date_time: DateTime | None = None
-        self._chore_journals_update_date_time: DateTime | None = None
-        self._fills_journals_update_date_time: DateTime | None = None
+        self._chore_ledgers_update_date_time: DateTime | None = None
+        self._deals_ledgers_update_date_time: DateTime | None = None
         self._chore_limits_update_date_time: DateTime | None = None
         self._new_chores_update_date_time: DateTime | None = None
         self._new_chores_processed_slice: int = 0
@@ -398,7 +398,7 @@ class StreetBook(BaseBook):
         ret_val: int
         if err_dict is None:
             err_dict = dict()
-        system_symbol = new_ord.security.sec_id
+        system_symbol = new_ord.ticker
         sec_pos_extended_list: List[SecPosExtended]
         is_availability: bool
         # is_availability, sec_pos_extended = self.plan_cache.pos_cache.extract_availability(new_ord)
@@ -420,7 +420,7 @@ class StreetBook(BaseBook):
                                   f"{new_ord.px=}, {new_ord.qty=}, key: {get_new_chore_log_key(new_ord)}")
                 # if self.plan_cache.has_unack_leg():
                 #     error_msg: str = (f"past chore on: {'leg1' if self.plan_cache.has_unack_leg1() else 'leg2'} is in "
-                #                       f"unack state, dropping chore with symbol: {new_ord.security.sec_id} "
+                #                       f"unack state, dropping chore with symbol: {new_ord.ticker} "
                 #                       f"{new_ord.px=}, {new_ord.qty=}, key: {get_new_chore_log_key(new_ord)}")
                 logging.warning(error_msg)
                 return ChoreControl.ORDER_CONTROL_CHECK_UNACK_FAIL
@@ -445,15 +445,15 @@ class StreetBook(BaseBook):
                 remaining_qty: int = new_ord.qty
                 for idx, sec_pos_extended in enumerate(sec_pos_extended_list):
                     bartering_symbol = sec_pos_extended.security.sec_id
-                    symbol_type = "SEDOL" if sec_pos_extended.security.inst_type == InstrumentType.CB else "RIC"
+                    bartering_symbol_type = "SEDOL" if sec_pos_extended.security.inst_type == InstrumentType.CB else "RIC"
                     account = sec_pos_extended.bartering_account
                     exchange = sec_pos_extended.bartering_route
                     # create_date_time_gmt_epoch_micro_sec = int(DateTime.utcnow().timestamp() * 1_000_000)
                     suffix = "" if 1 == sec_pos_extended_list_len else f".{idx}"
-                    client_ord_id += suffix
+                    internal_ord_id = f"{client_ord_id}{suffix}"
 
                     # set unack for subsequent chores - this symbol to be blocked until this chore goes through
-                    self.set_unack(system_symbol, True, client_ord_id)
+                    self.set_unack(system_symbol, True, internal_ord_id)
                     if len(sec_pos_extended.positions) < 2:  # 0 is valid in long buy cases
                         if sec_pos_extended_list_len > 1:
                             new_ord.qty = sec_pos_extended.get_extracted_size()
@@ -470,16 +470,13 @@ class StreetBook(BaseBook):
                                       f"{len(sec_pos_extended.positions)=}, expected 0 or 1;;;{sec_pos_extended}; "
                                       f"{sec_pos_extended_list}")
 
-                    kwargs = {}
-                    if new_ord.mplan is not None:
-                        kwargs["mplan"] = new_ord.mplan
                     res, ret_id_or_err_desc = (
                         StreetBook.bartering_link_place_new_chore(new_ord.px, new_ord.qty, new_ord.side, bartering_symbol,
-                                                                   system_symbol, symbol_type, account, exchange,
-                                                                   client_ord_id=client_ord_id, **kwargs))
+                                                                   system_symbol, bartering_symbol_type, account, exchange,
+                                                                   client_ord_id=internal_ord_id, mplan=new_ord.mplan))
                     if not res:
                         # reset unack for subsequent chores to go through - this chore did fail to go through
-                        self.set_unack(system_symbol, False, client_ord_id)
+                        self.set_unack(system_symbol, False, internal_ord_id)
                         if 0 != idx:
                             # handle partial fail
                             err_dict["FAILED_QTY"] = orig_new_chore_qty - sent_qty
@@ -496,9 +493,10 @@ class StreetBook(BaseBook):
                               f"{new_ord.px}-{new_ord.qty}-{new_ord.side}, with exception: {e}")
             return ChoreControl.ORDER_CONTROL_EXCEPTION_FAIL
         finally:
-            for sec_pos_extended in sec_pos_extended_list:
-                if not sec_pos_extended.consumed:
-                    self.plan_cache.pos_cache.return_availability(system_symbol, sec_pos_extended)
+            if sec_pos_extended_list is not None:
+                for sec_pos_extended in sec_pos_extended_list:
+                    if not sec_pos_extended.consumed:
+                        self.plan_cache.pos_cache.return_availability(system_symbol, sec_pos_extended)
 
     def check_consumable_concentration(self, plan_brief: PlanBrief | PlanBriefBaseModel,
                                        bartering_brief: PairSideBarteringBriefBaseModel, qty: int,
@@ -526,7 +524,7 @@ class StreetBook(BaseBook):
                            new_ord: NewChoreBaseModel, chore_usd_notional: float, err_dict: Dict[str, any]):
         checks_passed = ChoreControl.ORDER_CONTROL_SUCCESS
         symbol_overview: SymbolOverviewBaseModel | None = None
-        system_symbol = new_ord.security.sec_id
+        system_symbol = new_ord.ticker
 
         symbol_overview_tuple = \
             self.plan_cache.get_symbol_overview_from_symbol(system_symbol)
@@ -550,7 +548,7 @@ class StreetBook(BaseBook):
             bartering_brief = plan_brief.pair_sell_side_bartering_brief
             # Sell - not allowed less than limit dn px
             # limit down - TODO : Important : Upgrade this to support bartering at Limit Dn within the limit Dn limit
-            if new_ord.px < symbol_overview.limit_dn_px:
+            if new_ord.px <= symbol_overview.limit_dn_px:
                 # @@@ below error log is used in specific test case for string matching - if changed here
                 # needs to be changed in test also
                 logging.error(f"blocked generated SELL chore, px expected higher than limit-dn px: "
@@ -562,7 +560,7 @@ class StreetBook(BaseBook):
             bartering_brief = plan_brief.pair_buy_side_bartering_brief
             # Buy - not allowed more than limit up px
             # limit up - TODO : Important : Upgrade this to support bartering at Limit Up within the limit Up limit
-            if new_ord.px > symbol_overview.limit_up_px:
+            if new_ord.px >= symbol_overview.limit_up_px:
                 # @@@ below error log is used in specific test case for string matching - if changed here
                 # needs to be changed in test also
                 logging.error(f"blocked generated BUY chore, px expected lower than limit-up px: "
@@ -684,7 +682,7 @@ class StreetBook(BaseBook):
     def check_chore_limits(self, top_of_book: TopOfBook, chore_limits: ChoreLimitsBaseModel,
                            pair_plan: PairPlan, new_ord: NewChoreBaseModel, chore_usd_notional: float,
                            check_mask: int = ChoreControl.ORDER_CONTROL_SUCCESS):
-        sys_symbol = new_ord.security.sec_id
+        sys_symbol = new_ord.ticker
         checks_passed: int = ChoreControl.ORDER_CONTROL_SUCCESS
         # TODO: min chore notional is to be a chore opportunity condition instead of chore check
         checks_passed_ = ChoreControl.check_min_chore_notional(pair_plan.pair_plan_params.plan_mode,
@@ -772,6 +770,7 @@ class StreetBook(BaseBook):
                                          instance_id=str(pair_plan.id))
         os.chmod(generation_start_file_path, stat.S_IRWXU)
         subprocess.Popen([f"{generation_start_file_path}"])
+        logging.info(f"Started process {generation_start_file_path}")
         time.sleep(3)
 
     def _mark_plan_state_as_error(self, pair_plan: PairPlanBaseModel):
@@ -1025,12 +1024,12 @@ class StreetBook(BaseBook):
         leg1_tob, leg2_tob = self.extract_plan_specific_legs_from_tobs(pair_plan, top_of_books)
 
         if leg1_tob is not None:
-            if pair_plan.pair_plan_params.plan_leg1.sec.sec_id == new_chore.security.sec_id:
+            if pair_plan.pair_plan_params.plan_leg1.sec.sec_id == new_chore.ticker:
             # if self.plan_cache.leg1_bartering_symbol == new_chore.security.sec_id:
                 barter_tob = leg1_tob
 
         if barter_tob is None and leg2_tob is not None:
-            if pair_plan.pair_plan_params.plan_leg2.sec.sec_id == new_chore.security.sec_id:
+            if pair_plan.pair_plan_params.plan_leg2.sec.sec_id == new_chore.ticker:
             # if self.plan_cache.leg2_bartering_symbol == new_chore.security.sec_id:
                 barter_tob = leg2_tob
 
@@ -1041,8 +1040,8 @@ class StreetBook(BaseBook):
             logging.error(err_str_)
             return False
         else:
-            usd_px = self.get_usd_px(new_chore.px, new_chore.security.sec_id)
-            ord_sym_ovrw = self.plan_cache.get_symbol_overview_from_symbol_obj(new_chore.security.sec_id)
+            usd_px = self.get_usd_px(new_chore.px, new_chore.ticker)
+            ord_sym_ovrw = self.plan_cache.get_symbol_overview_from_symbol_obj(new_chore.ticker)
             chore_placed: int = self.place_new_chore(barter_tob, ord_sym_ovrw, plan_brief, chore_limits, pair_plan,
                                                      new_chore)
             return chore_placed
@@ -1257,7 +1256,8 @@ class StreetBook(BaseBook):
                         inst_type: InstrumentType = InstrumentType.CB if is_cb_buy else InstrumentType.EQT
                         security = Security(sec_id=buy_symbol, sec_id_source=SecurityIdSource.TICKER,
                                             inst_type=inst_type)
-                        new_ord = NewChoreBaseModel(security=security, side=Side.BUY, px=px, usd_px=usd_px, qty=qty)
+                        new_ord = NewChoreBaseModel(security=security, ticker=buy_symbol, side=Side.BUY, px=px,
+                                                    usd_px=usd_px, qty=qty)
                         chore_placed = self.place_new_chore(buy_top_of_book, buy_sym_ovrw, plan_brief, chore_limits,
                                                             pair_plan, new_ord)
             elif sell_top_of_book is not None:
@@ -1271,7 +1271,8 @@ class StreetBook(BaseBook):
                         inst_type: InstrumentType = InstrumentType.EQT if is_cb_buy else InstrumentType.CB
                         security = Security(sec_id=sell_symbol, sec_id_source=SecurityIdSource.TICKER,
                                             inst_type=inst_type)
-                        new_ord = NewChoreBaseModel(security=security, side=Side.SELL, px=px, usd_px=usd_px, qty=qty)
+                        new_ord = NewChoreBaseModel(security=security, ticker=sell_symbol, side=Side.SELL, px=px,
+                                                    usd_px=usd_px, qty=qty)
                         chore_placed = self.place_new_chore(sell_top_of_book, sell_sym_ovrw, plan_brief, chore_limits,
                                                             pair_plan, new_ord)
             else:
@@ -1328,7 +1329,7 @@ class StreetBook(BaseBook):
         if plan_done:
             logging.warning(f"Plan is_consumable_notional_tradable returned done, plan will be closed / marked done "
                             f"for {get_plan_brief_log_key(plan_brief)}")
-            time.sleep(5)  # allow for any pending post cancel ack race fills to arrive
+            time.sleep(5)  # allow for any pending post cancel ack race deals to arrive
             return 0
         else:
             return -1  # in progress

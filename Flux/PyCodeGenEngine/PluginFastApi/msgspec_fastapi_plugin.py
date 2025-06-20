@@ -151,8 +151,6 @@ class MsgspecFastApiPlugin(FastapiCallbackFileHandler,
                       'config_yaml_dict.get("mongo_server")) is None else mongo_env\n'
         output_str += '    if config_yaml_dict.get("log_mongo_uri", True):\n'
         output_str += '        logging.debug(f"mongo_server: {mongo_server}")\n'
-        output_str += '    if (db_name := os.getenv("DB_NAME")) is not None and len(db_name):\n'
-        output_str += '        mongo_server += f"/{db_name}?authSource=admin"\n'
         output_str += '    return mongo_server\n\n\n'
 
         output_str += 'class MongoDBInit:\n'
@@ -243,7 +241,7 @@ class MsgspecFastApiPlugin(FastapiCallbackFileHandler,
         output_str += '    mongo_server = get_mongo_server_uri()\n'
         output_str += '    client = motor.motor_asyncio.AsyncIOMotorClient(mongo_server, tz_aware=True)\n'
         output_str += f'    if (db_name := os.getenv("DB_NAME")) is not None and len(db_name):\n'
-        output_str += f'        db = client.get_default_database()\n'
+        output_str += f'        db = client.get_database(db_name)\n'
         output_str += f'    else:\n'
         output_str += f'        db = client.{self.proto_file_package}\n'
         output_str += '    logging.debug(f"db_name: {db.name}")\n'
@@ -291,7 +289,7 @@ class MsgspecFastApiPlugin(FastapiCallbackFileHandler,
         generic_utils_path = self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH", "generic_utils")
         output_str += f"from {generic_utils_path} import init_max_id_handler, init_nested_max_id_handler\n\n"
         output_str += "# Below imports are to initialize routes before launching server\n"
-        routes_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.http_routes_file_name)
+        routes_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.http_routes_import_file_name)
         output_str += f"from {routes_file_path} import *\n"
         routes_file_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR", self.ws_routes_file_name)
         output_str += f"from {routes_file_path} import *\n"

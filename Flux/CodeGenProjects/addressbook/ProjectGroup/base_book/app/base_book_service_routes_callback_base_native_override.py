@@ -23,7 +23,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.barter_simulato
     BarterSimulator, BarteringLinkBase)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.aggregate import (
     get_symbol_side_underlying_account_cumulative_fill_qty,
-    get_last_n_chore_journals_from_chore_id, get_objs_from_symbol)
+    get_last_n_chore_ledgers_from_chore_id, get_objs_from_symbol)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book import (
     BaseBook)
 from FluxPythonUtils.scripts.service import Service
@@ -36,18 +36,20 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_mod
 BasePlanCacheType = TypeVar('BasePlanCacheType', bound=BasePlanCache)
 BaseBarteringDataManagerType = TypeVar('BaseBarteringDataManagerType', bound=BaseBarteringDataManager)
 
+is_view_server = os.environ.get('IS_VIEW_SERVER', False)
+
 
 class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
     KeyHandler = None   # must be set by derived class
     residual_compute_shared_lock: AsyncRLock | None = None
-    journal_shared_lock: AsyncRLock | None = None
+    ledger_shared_lock: AsyncRLock | None = None
     get_underlying_account_cumulative_fill_qty_query_http: Callable[..., Any] | None = None
     underlying_update_chore_snapshot_http: Callable[..., Any] | None = None
     underlying_create_chore_snapshot_http: Callable[..., Any] | None = None
-    underlying_read_chore_journal_http: Callable[..., Any] | None = None
+    underlying_read_chore_ledger_http: Callable[..., Any] | None = None
     underlying_read_symbol_overview_by_id_http: Callable[..., Any] | None = None
     underlying_get_symbol_side_underlying_account_cumulative_fill_qty_query_http: Callable[..., Any] | None = None
-    underlying_read_fills_journal_http: Callable[..., Any] | None = None
+    underlying_read_deals_ledger_http: Callable[..., Any] | None = None
     underlying_read_top_of_book_http: Callable[..., Any] | None = None
 
     @classmethod
@@ -81,8 +83,9 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
         self.log_dir_path = None
         self.log_simulator_file_name = None
         self.log_simulator_file_path = None
-        self.initialize_log_simulator_logger()
-
+        if not is_view_server:
+            self.initialize_log_simulator_logger()
+        # else not required: only initializing log simulator if primary server
         self.is_test_run = self.market.is_test_run
 
     @property
@@ -113,20 +116,20 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                       self.log_simulator_file_name)
 
     @classmethod
-    def get_chore_journal_log_key(cls, chore_journal: ChoreJournal | ChoreJournalBaseModel | ChoreJournalOptional):
-        sec_id = chore_journal.chore.security.sec_id
-        side = chore_journal.chore.side
+    def get_chore_ledger_log_key(cls, chore_ledger: ChoreLedger | ChoreLedgerBaseModel | ChoreLedgerOptional):
+        sec_id = chore_ledger.chore.security.sec_id
+        side = chore_ledger.chore.side
         symbol_side_key = get_symbol_side_key([(sec_id, side)])
-        base_chore_journal_key = cls.KeyHandler.get_log_key_from_chore_journal(chore_journal)
-        return f"{symbol_side_key}-{base_chore_journal_key}"
+        base_chore_ledger_key = cls.KeyHandler.get_log_key_from_chore_ledger(chore_ledger)
+        return f"{symbol_side_key}-{base_chore_ledger_key}"
 
     @classmethod
-    def get_fills_journal_log_key(cls, fills_journal: FillsJournal | FillsJournalBaseModel | FillsJournalOptional):
-        sec_id = fills_journal.fill_symbol
-        side = fills_journal.fill_side
+    def get_deals_ledger_log_key(cls, deals_ledger: DealsLedger | DealsLedgerBaseModel | DealsLedgerOptional):
+        sec_id = deals_ledger.fill_symbol
+        side = deals_ledger.fill_side
         symbol_side_key = get_symbol_side_key([(sec_id, side)])
-        base_fill_journal_key = cls.KeyHandler.get_log_key_from_fills_journal(fills_journal)
-        return f"{symbol_side_key}-{base_fill_journal_key}"
+        base_fill_ledger_key = cls.KeyHandler.get_log_key_from_deals_ledger(deals_ledger)
+        return f"{symbol_side_key}-{base_fill_ledger_key}"
 
     @classmethod
     def get_chore_snapshot_log_key(cls, chore_snapshot: ChoreSnapshot | ChoreSnapshotBaseModel | ChoreSnapshotOptional):
@@ -196,7 +199,7 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
         return underlying_account_cum_fill_qty_obj_list[0].underlying_account_n_cumulative_fill_qty
 
     ##############################
-    # Chore Journal Update Methods
+    # Chore Ledger Update Methods
     ##############################
 
     @staticmethod
@@ -209,36 +212,36 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                           f"{SymbolCacheContainer.symbol_to_symbol_cache_dict}")
             return None
 
-    async def handle_create_chore_journal_pre(self, chore_journal_obj: ChoreJournal) -> None:
+    async def handle_create_chore_ledger_pre(self, chore_ledger_obj: ChoreLedger) -> None:
         if not self.service_ready:
             # raise service unavailable 503 exception, let the caller retry
-            err_str_ = (f"create_chore_journal_pre not ready - service is not initialized yet, chore_journal_key: "
-                        f"{self.derived_class_type.get_chore_journal_log_key(chore_journal_obj)}")
+            err_str_ = (f"create_chore_ledger_pre not ready - service is not initialized yet, chore_ledger_key: "
+                        f"{self.derived_class_type.get_chore_ledger_log_key(chore_ledger_obj)}")
             logging.error(err_str_)
             raise HTTPException(status_code=503, detail=err_str_)
-        # updating chore notional in chore journal obj
-        if chore_journal_obj.chore_event == ChoreEventType.OE_NEW:
-            if chore_journal_obj.chore.px == 0:
-                top_of_book_obj = self.get_cached_top_of_book_from_symbol(chore_journal_obj.chore.security.sec_id)
+        # updating chore notional in chore ledger obj
+        if chore_ledger_obj.chore_event == ChoreEventType.OE_NEW:
+            if chore_ledger_obj.chore.px == 0:
+                top_of_book_obj = self.get_cached_top_of_book_from_symbol(chore_ledger_obj.chore.security.sec_id)
                 if top_of_book_obj is not None:
-                    chore_journal_obj.chore.px = top_of_book_obj.last_barter.px
+                    chore_ledger_obj.chore.px = top_of_book_obj.last_barter.px
                 else:
-                    err_str_ = (f"received chore journal px 0 and to update px, received TOB also as {top_of_book_obj}"
-                                f", chore_journal_key: "
-                                f"{self.derived_class_type.get_chore_journal_log_key(chore_journal_obj)}")
+                    err_str_ = (f"received chore ledger px 0 and to update px, received TOB also as {top_of_book_obj}"
+                                f", chore_ledger_key: "
+                                f"{self.derived_class_type.get_chore_ledger_log_key(chore_ledger_obj)}")
                     logging.error(err_str_)
                     raise HTTPException(status_code=500, detail=err_str_)
             # extract availability if this chore is not from this executor
             if not self.executor_inst_id:
                 self.executor_inst_id = BaseBook.bartering_link.inst_id
-            if (not chore_journal_obj.chore.user_data) or (
-                    not chore_journal_obj.chore.user_data.startswith(self.executor_inst_id)):
+            if (not chore_ledger_obj.chore.user_data) or (
+                    not chore_ledger_obj.chore.user_data.startswith(self.executor_inst_id)):
                 # this chore is not from executor
-                chore = chore_journal_obj.chore
+                chore = chore_ledger_obj.chore
                 if not chore.security.inst_type:
-                    logging.error(f"unexpected chore_journal_obj with no chore.security.inst_type, assumed EQT chore "
-                                  f"for sec_id: {chore_journal_obj.chore.security.sec_id} ord_id: "
-                                  f"{chore_journal_obj.chore.chore_id};;;{chore_journal_obj=}")
+                    logging.error(f"unexpected chore_ledger_obj with no chore.security.inst_type, assumed EQT chore "
+                                  f"for sec_id: {chore_ledger_obj.chore.security.sec_id} ord_id: "
+                                  f"{chore_ledger_obj.chore.chore_id};;;{chore_ledger_obj=}")
 
                 # prepare new chore to extract availability
                 force_bkr: str = get_bkr_from_underlying_account(chore.underlying_account, chore.security.inst_type)
@@ -252,22 +255,22 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                 pos_cache = BasePlanCache.get_pos_cache_from_symbol_side(chore.security.sec_id, chore.side)
                 is_available, sec_pos_extended = pos_cache.extract_availability(new_ord)
                 if not is_available:
-                    pos_disable_payload = {"symbol": chore_journal_obj.chore.bartering_security.sec_id,
-                                           "symbol_type": chore_journal_obj.chore.bartering_security.sec_id_source,
-                                           "account": chore_journal_obj.chore.underlying_account}
-                    logging.error(f"EXT: failed to extract position for external chore: {chore_journal_obj};;;"
+                    pos_disable_payload = {"symbol": chore_ledger_obj.chore.bartering_security.sec_id,
+                                           "symbol_type": chore_ledger_obj.chore.bartering_security.sec_id_source,
+                                           "account": chore_ledger_obj.chore.underlying_account}
+                    logging.error(f"EXT: failed to extract position for external chore: {chore_ledger_obj};;;"
                                   f"sec_pos_extended: {sec_pos_extended}, pos_disable_payload: {pos_disable_payload}")
                 else:
-                    logging.info(f"extracted position for external chore: {chore_journal_obj}, extracted "
+                    logging.info(f"extracted position for external chore: {chore_ledger_obj}, extracted "
                                  f"sec_pos_extended: {sec_pos_extended}")
-        # else If chore_journal is not new then we don't care about px, we care about event_type and if chore is new
+        # else If chore_ledger is not new then we don't care about px, we care about event_type and if chore is new
         # and px is not 0 then using provided px
-        if chore_journal_obj.chore.px is not None and chore_journal_obj.chore.qty is not None:
-            chore_journal_obj.chore.chore_notional = \
-                self.get_usd_px(chore_journal_obj.chore.px,
-                                chore_journal_obj.chore.security.sec_id) * chore_journal_obj.chore.qty
+        if chore_ledger_obj.chore.px is not None and chore_ledger_obj.chore.qty is not None:
+            chore_ledger_obj.chore.chore_notional = \
+                self.get_usd_px(chore_ledger_obj.chore.px,
+                                chore_ledger_obj.chore.security.sec_id) * chore_ledger_obj.chore.qty
         else:
-            chore_journal_obj.chore.chore_notional = 0
+            chore_ledger_obj.chore.chore_notional = 0
 
     async def handle_create_chore_snapshot_pre(self, chore_snapshot_obj: ChoreSnapshot):
         # updating security's sec_id_source to default value if sec_id_source is None
@@ -280,27 +283,27 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
             return True
         return False
 
-    async def _handle_chore_snapshot_update_in_chore_dod(self, chore_journal_obj: ChoreJournal,
+    async def _handle_chore_snapshot_update_in_chore_dod(self, chore_ledger_obj: ChoreLedger,
                                                          chore_snapshot: ChoreSnapshot,
                                                          is_lapse_call: bool) -> Tuple[ChoreSnapshot, bool]:
         prior_chore_status = chore_snapshot.chore_status
         # When CXL_ACK arrived after chore got fully filled, since nothing is left to cxl - ignoring
-        # this chore_journal's chore_snapshot update
+        # this chore_ledger's chore_snapshot update
         if chore_snapshot.chore_status == ChoreStatusType.OE_FILLED:
-            logging.info("Received chore_journal with event CXL_ACK after ChoreSnapshot is fully "
-                         f"filled - ignoring this CXL_ACK, chore_journal_key: "
-                         f"{self.derived_class_type.get_chore_journal_log_key(chore_journal_obj)};;; "
-                         f"{chore_journal_obj=}, {chore_snapshot=}")
+            logging.info("Received chore_ledger with event CXL_ACK after ChoreSnapshot is fully "
+                         f"filled - ignoring this CXL_ACK, chore_ledger_key: "
+                         f"{self.derived_class_type.get_chore_ledger_log_key(chore_ledger_obj)};;; "
+                         f"{chore_ledger_obj=}, {chore_snapshot=}")
         else:
             # If chore_event is OE_UNSOL_CXL, that is treated as unsolicited cxl
             # If CXL_ACK comes after OE_CXL_UNACK, that means cxl_ack came after cxl request
             chore_brief = chore_snapshot.chore_brief
-            if chore_journal_obj.chore.text:  # put update
+            if chore_ledger_obj.chore.text:  # put update
                 if chore_brief.text is None:
                     chore_brief.text = []
                 # else not required: text is already set
-                chore_brief.text.extend(chore_journal_obj.chore.text)
-            # else not required: If no text is present in chore_journal then updating
+                chore_brief.text.extend(chore_ledger_obj.chore.text)
+            # else not required: If no text is present in chore_ledger then updating
             # chore snapshot with same obj
 
             if ChoreStatusType.OE_DOD == prior_chore_status:
@@ -325,23 +328,23 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                  chore_snapshot.cxled_qty) if chore_snapshot.cxled_qty != 0 else 0
 
             chore_snapshot.chore_brief = chore_brief
-            chore_snapshot.last_update_date_time = chore_journal_obj.chore_event_date_time
+            chore_snapshot.last_update_date_time = chore_ledger_obj.chore_event_date_time
             chore_snapshot.chore_status = ChoreStatusType.OE_DOD
             chore_snapshot = await (self.derived_class_type.
                                     underlying_update_chore_snapshot_http(chore_snapshot))
         return chore_snapshot, False
 
-    async def _handle_post_chore_snapshot_update_tasks_in_chore_dod(self, chore_journal: ChoreJournal,
+    async def _handle_post_chore_snapshot_update_tasks_in_chore_dod(self, chore_ledger: ChoreLedger,
                                                                     chore_snapshot: ChoreSnapshot):
         return chore_snapshot
 
-    async def _handle_chore_dod(self, chore_journal_obj: ChoreJournal, chore_snapshot: ChoreSnapshot,
+    async def _handle_chore_dod(self, chore_ledger_obj: ChoreLedger, chore_snapshot: ChoreSnapshot,
                                 is_lapse_call: bool = False):
 
         chore_snapshot, cxl_after_cxl = await self._handle_chore_snapshot_update_in_chore_dod(
-            chore_journal_obj, chore_snapshot, is_lapse_call)
+            chore_ledger_obj, chore_snapshot, is_lapse_call)
         if not cxl_after_cxl:
-            return await self._handle_post_chore_snapshot_update_tasks_in_chore_dod(chore_journal_obj, chore_snapshot)
+            return await self._handle_post_chore_snapshot_update_tasks_in_chore_dod(chore_ledger_obj, chore_snapshot)
         else:
             return (True,)
 
@@ -367,38 +370,38 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
         open_qty = chore_snapshot.chore_brief.qty - chore_snapshot.filled_qty - chore_snapshot.cxled_qty
         return open_qty
 
-    async def _handle_chore_snapshot_update_after_chore_journal_amend_applied(
-            self, chore_journal_obj: ChoreJournal, chore_snapshot: ChoreSnapshot, amend_direction: ChoreEventType,
+    async def _handle_chore_snapshot_update_after_chore_ledger_amend_applied(
+            self, chore_ledger_obj: ChoreLedger, chore_snapshot: ChoreSnapshot, amend_direction: ChoreEventType,
             is_amend_rej_call: bool):
         last_chore_status = chore_snapshot.chore_status
         if is_amend_rej_call:
-            chore_status = self.get_chore_status_post_amend_rej(chore_journal_obj,
+            chore_status = self.get_chore_status_post_amend_rej(chore_ledger_obj,
                                                                 chore_snapshot, amend_direction,
                                                                 last_chore_status)
         else:
-            chore_status = self.get_chore_status_post_amend_applied(chore_journal_obj,
+            chore_status = self.get_chore_status_post_amend_applied(chore_ledger_obj,
                                                                     chore_snapshot, amend_direction,
                                                                     last_chore_status)
         if chore_status is not None:
             chore_snapshot.chore_status = chore_status
         # else not required: if something went wrong then not updating status and issue must be logged already
 
-        chore_snapshot.last_update_date_time = chore_journal_obj.chore_event_date_time
+        chore_snapshot.last_update_date_time = chore_ledger_obj.chore_event_date_time
         chore_snapshot = await (self.derived_class_type.
                                 underlying_update_chore_snapshot_http(chore_snapshot))
         return chore_snapshot
 
-    async def _handle_post_chore_snapshot_update_tasks_after_chore_journal_amend_applied(
-            self, chore_journal_obj: ChoreJournal, chore_snapshot: ChoreSnapshot):
+    async def _handle_post_chore_snapshot_update_tasks_after_chore_ledger_amend_applied(
+            self, chore_ledger_obj: ChoreLedger, chore_snapshot: ChoreSnapshot):
         return chore_snapshot
 
-    async def handle_model_updates_post_chore_journal_amend_applied(
-            self, chore_journal_obj: ChoreJournal, chore_snapshot: ChoreSnapshot, amend_direction: ChoreEventType,
+    async def handle_model_updates_post_chore_ledger_amend_applied(
+            self, chore_ledger_obj: ChoreLedger, chore_snapshot: ChoreSnapshot, amend_direction: ChoreEventType,
             is_amend_rej_call: bool = False):
-        chore_snapshot = await self._handle_chore_snapshot_update_after_chore_journal_amend_applied(
-            chore_journal_obj, chore_snapshot, amend_direction, is_amend_rej_call)
+        chore_snapshot = await self._handle_chore_snapshot_update_after_chore_ledger_amend_applied(
+            chore_ledger_obj, chore_snapshot, amend_direction, is_amend_rej_call)
 
-        return await self._handle_post_chore_snapshot_update_tasks_after_chore_journal_amend_applied(chore_journal_obj,
+        return await self._handle_post_chore_snapshot_update_tasks_after_chore_ledger_amend_applied(chore_ledger_obj,
                                                                                                      chore_snapshot)
 
     def set_default_values_to_pend_amend_fields(self, chore_snapshot: ChoreSnapshot):
@@ -410,59 +413,59 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
     def update_chore_snapshot_pre_checks(self) -> bool:
         return True
 
-    async def handle_post_chore_snapshot_update_tasks_for_new_chore_journal(
-            self, chore_journal_obj: ChoreJournal, chore_snapshot: ChoreSnapshot):
+    async def handle_post_chore_snapshot_update_tasks_for_new_chore_ledger(
+            self, chore_ledger_obj: ChoreLedger, chore_snapshot: ChoreSnapshot):
         return chore_snapshot
 
-    async def handle_post_chore_snapshot_update_tasks_for_ack_chore_journal(
-            self, chore_journal_obj: ChoreJournal, chore_snapshot: ChoreSnapshot):
+    async def handle_post_chore_snapshot_update_tasks_for_ack_chore_ledger(
+            self, chore_ledger_obj: ChoreLedger, chore_snapshot: ChoreSnapshot):
         return chore_snapshot
 
-    async def handle_post_chore_snapshot_update_tasks_for_cxl_unack_chore_journal(
-            self, chore_journal_obj: ChoreJournal, chore_snapshot: ChoreSnapshot):
+    async def handle_post_chore_snapshot_update_tasks_for_cxl_unack_chore_ledger(
+            self, chore_ledger_obj: ChoreLedger, chore_snapshot: ChoreSnapshot):
         return chore_snapshot
 
-    async def handle_post_chore_snapshot_update_tasks_for_cxl_rej_chore_journal(
-            self, chore_journal_obj: ChoreJournal, chore_snapshot: ChoreSnapshot):
+    async def handle_post_chore_snapshot_update_tasks_for_cxl_rej_chore_ledger(
+            self, chore_ledger_obj: ChoreLedger, chore_snapshot: ChoreSnapshot):
         return chore_snapshot
 
-    async def handle_post_chore_snapshot_update_tasks_for_int_rej_chore_journal(
-            self, chore_journal_obj: ChoreJournal, chore_snapshot: ChoreSnapshot):
+    async def handle_post_chore_snapshot_update_tasks_for_int_rej_chore_ledger(
+            self, chore_ledger_obj: ChoreLedger, chore_snapshot: ChoreSnapshot):
         return chore_snapshot
 
-    async def handle_post_chore_snapshot_update_tasks_for_lapse_chore_journal(
-            self, chore_journal_obj: ChoreJournal, chore_snapshot: ChoreSnapshot):
+    async def handle_post_chore_snapshot_update_tasks_for_lapse_chore_ledger(
+            self, chore_ledger_obj: ChoreLedger, chore_snapshot: ChoreSnapshot):
         return chore_snapshot
 
-    async def handle_post_chore_snapshot_update_tasks_for_non_risky_amend_unack_chore_journal(
-            self, chore_journal_obj: ChoreJournal, chore_snapshot: ChoreSnapshot):
+    async def handle_post_chore_snapshot_update_tasks_for_non_risky_amend_unack_chore_ledger(
+            self, chore_ledger_obj: ChoreLedger, chore_snapshot: ChoreSnapshot):
         return chore_snapshot
 
-    async def handle_post_chore_snapshot_update_tasks_for_risky_amend_ack_chore_journal(
-            self, chore_journal_obj: ChoreJournal, chore_snapshot: ChoreSnapshot):
+    async def handle_post_chore_snapshot_update_tasks_for_risky_amend_ack_chore_ledger(
+            self, chore_ledger_obj: ChoreLedger, chore_snapshot: ChoreSnapshot):
         return chore_snapshot
 
-    async def handle_post_chore_snapshot_update_tasks_for_non_risky_amend_rej_chore_journal(
-            self, chore_journal_obj: ChoreJournal, chore_snapshot: ChoreSnapshot):
+    async def handle_post_chore_snapshot_update_tasks_for_non_risky_amend_rej_chore_ledger(
+            self, chore_ledger_obj: ChoreLedger, chore_snapshot: ChoreSnapshot):
         return chore_snapshot
 
-    async def _update_chore_snapshot_from_chore_journal(
-            self, chore_journal_obj: ChoreJournal):
+    async def _update_chore_snapshot_from_chore_ledger(
+            self, chore_ledger_obj: ChoreLedger):
         res = self.update_chore_snapshot_pre_checks()
         if not res:     # returning None if some check fails
             return None
 
-        match chore_journal_obj.chore_event:
+        match chore_ledger_obj.chore_event:
             case ChoreEventType.OE_NEW:
                 # importing routes here otherwise at the time of launch callback's set instance is called by
                 # routes call before set_instance file call and set_instance file throws error that
                 # 'set instance is called more than once in one session'
-                if not chore_journal_obj.chore.px:  # market chore
-                    chore_journal_obj.chore.px = BasePlanCache.get_close_px(chore_journal_obj.chore.security.sec_id)
-                    if not chore_journal_obj.chore.px:
+                if not chore_ledger_obj.chore.px:  # market chore
+                    chore_ledger_obj.chore.px = BasePlanCache.get_close_px(chore_ledger_obj.chore.security.sec_id)
+                    if not chore_ledger_obj.chore.px:
                         logging.error("ChoreEventType.OE_NEW came with no px, get_close_px failed unable to apply px")
                 chore_snapshot = ChoreSnapshot(id=ChoreSnapshot.next_id(),
-                                               chore_brief=chore_journal_obj.chore,
+                                               chore_brief=chore_ledger_obj.chore,
                                                filled_qty=0, avg_fill_px=0,
                                                fill_notional=0,
                                                cxled_qty=0,
@@ -478,48 +481,47 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                                                total_amend_up_qty=0,
                                                last_lapsed_qty=0,
                                                total_lapsed_qty=0,
-                                               create_date_time=chore_journal_obj.chore_event_date_time,
-                                               last_update_date_time=chore_journal_obj.chore_event_date_time,
+                                               create_date_time=chore_ledger_obj.chore_event_date_time,
+                                               last_update_date_time=chore_ledger_obj.chore_event_date_time,
                                                chore_status=ChoreStatusType.OE_UNACK)
                 chore_snapshot = await (self.derived_class_type.
                                         underlying_create_chore_snapshot_http(chore_snapshot))
-                return await self.handle_post_chore_snapshot_update_tasks_for_new_chore_journal(chore_journal_obj,
+                return await self.handle_post_chore_snapshot_update_tasks_for_new_chore_ledger(chore_ledger_obj,
                                                                                                 chore_snapshot)
 
             case ChoreEventType.OE_ACK:
                 async with ChoreSnapshot.reentrant_lock:
                     chore_snapshot = \
-                        await self._check_state_and_get_chore_snapshot_obj(chore_journal_obj,
+                        await self._check_state_and_get_chore_snapshot_obj(chore_ledger_obj,
                                                                            [ChoreStatusType.OE_UNACK])
                     if chore_snapshot is not None:
-                        chore_snapshot.last_update_date_time = chore_journal_obj.chore_event_date_time
+                        chore_snapshot.last_update_date_time = chore_ledger_obj.chore_event_date_time
                         chore_snapshot.chore_status = ChoreStatusType.OE_ACKED
                         updated_chore_snapshot = (
                             await self.derived_class_type.underlying_update_chore_snapshot_http(chore_snapshot))
 
-                        return await self.handle_post_chore_snapshot_update_tasks_for_ack_chore_journal(
-                            chore_journal_obj, updated_chore_snapshot)
+                        return await self.handle_post_chore_snapshot_update_tasks_for_ack_chore_ledger(
+                            chore_ledger_obj, updated_chore_snapshot)
 
                     # else not required: none returned object signifies there was something wrong in
                     # _check_state_and_get_chore_snapshot_obj and hence would have been added to alert already
             case ChoreEventType.OE_CXL:
                 async with ChoreSnapshot.reentrant_lock:
                     chore_snapshot = await self._check_state_and_get_chore_snapshot_obj(
-                        chore_journal_obj, [ChoreStatusType.OE_UNACK, ChoreStatusType.OE_ACKED,
-                                            ChoreStatusType.OE_AMD_DN_UNACKED,
-                                            ChoreStatusType.OE_AMD_UP_UNACKED, ChoreStatusType.OE_AMD_UP_UNACKED,
+                        chore_ledger_obj, [ChoreStatusType.OE_UNACK, ChoreStatusType.OE_ACKED,
+                                            ChoreStatusType.OE_AMD_DN_UNACKED, ChoreStatusType.OE_AMD_UP_UNACKED,
                                             ChoreStatusType.OE_CXL_UNACK, ChoreStatusType.OE_DOD])
                     if chore_snapshot is not None and chore_snapshot.chore_status in [ChoreStatusType.OE_CXL_UNACK,
                                                                                       ChoreStatusType.OE_DOD]:
                         return (True,)  # CXL detected after CXL/CXL-ACK, no further processing needed
                     if chore_snapshot is not None:
-                        chore_snapshot.last_update_date_time = chore_journal_obj.chore_event_date_time
+                        chore_snapshot.last_update_date_time = chore_ledger_obj.chore_event_date_time
                         chore_snapshot.chore_status = ChoreStatusType.OE_CXL_UNACK
                         updated_chore_snapshot = await (
                             self.derived_class_type.underlying_update_chore_snapshot_http(chore_snapshot))
 
-                        return await self.handle_post_chore_snapshot_update_tasks_for_cxl_unack_chore_journal(
-                            chore_journal_obj, chore_snapshot)
+                        return await self.handle_post_chore_snapshot_update_tasks_for_cxl_unack_chore_ledger(
+                            chore_ledger_obj, chore_snapshot)
 
                     # else not required: none returned object signifies there was something wrong in
                     # _check_state_and_get_chore_snapshot_obj and hence would have been added to alert already
@@ -527,14 +529,14 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                 async with ChoreSnapshot.reentrant_lock:
                     chore_snapshot = \
                         await self._check_state_and_get_chore_snapshot_obj(
-                            chore_journal_obj, [ChoreStatusType.OE_CXL_UNACK, ChoreStatusType.OE_ACKED,
+                            chore_ledger_obj, [ChoreStatusType.OE_CXL_UNACK, ChoreStatusType.OE_ACKED,
                                                 ChoreStatusType.OE_UNACK, ChoreStatusType.OE_FILLED,
                                                 ChoreStatusType.OE_AMD_DN_UNACKED,
-                                                ChoreStatusType.OE_AMD_UP_UNACKED, ChoreStatusType.DOD])
+                                                ChoreStatusType.OE_AMD_UP_UNACKED, ChoreStatusType.OE_DOD])
                     if chore_snapshot is not None and chore_snapshot.chore_status == ChoreStatusType.OE_DOD:
                         return (True,)  # CXL Ack detected after CXL-ACK - no further processing needed
                     if chore_snapshot is not None:
-                        return await self._handle_chore_dod(chore_journal_obj, chore_snapshot)
+                        return await self._handle_chore_dod(chore_ledger_obj, chore_snapshot)
 
                     # else not required: none returned object signifies there was something wrong in
                     # _check_state_and_get_chore_snapshot_obj and hence would have been added to alert already
@@ -544,43 +546,43 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
 
                 async with ChoreSnapshot.reentrant_lock:
                     chore_snapshot = await self._check_state_and_get_chore_snapshot_obj(
-                        chore_journal_obj, [ChoreStatusType.OE_CXL_UNACK, ChoreStatusType.OE_FILLED])
+                        chore_ledger_obj, [ChoreStatusType.OE_CXL_UNACK, ChoreStatusType.OE_FILLED])
                     if chore_snapshot is not None:
                         if chore_snapshot.chore_brief.qty > chore_snapshot.filled_qty:
-                            last_3_chore_journals_from_chore_id = \
-                                await (self.derived_class_type.underlying_read_chore_journal_http(
-                                    get_last_n_chore_journals_from_chore_id(
-                                        chore_journal_obj.chore.chore_id, 3),
+                            last_3_chore_ledgers_from_chore_id = \
+                                await (self.derived_class_type.underlying_read_chore_ledger_http(
+                                    get_last_n_chore_ledgers_from_chore_id(
+                                        chore_ledger_obj.chore.chore_id, 3),
                                     self.get_generic_read_route()))
-                            if last_3_chore_journals_from_chore_id:
-                                if (last_3_chore_journals_from_chore_id[0].chore_event in
+                            if last_3_chore_ledgers_from_chore_id:
+                                if (last_3_chore_ledgers_from_chore_id[0].chore_event in
                                         [ChoreEventType.OE_CXL_INT_REJ,
                                          ChoreEventType.OE_CXL_BRK_REJ,
                                          ChoreEventType.OE_CXL_EXH_REJ]):
-                                    if last_3_chore_journals_from_chore_id[-1].chore_event == ChoreEventType.OE_NEW:
+                                    if last_3_chore_ledgers_from_chore_id[-1].chore_event == ChoreEventType.OE_NEW:
                                         chore_status = ChoreStatusType.OE_UNACK
-                                    elif last_3_chore_journals_from_chore_id[-1].chore_event == ChoreEventType.OE_ACK:
+                                    elif last_3_chore_ledgers_from_chore_id[-1].chore_event == ChoreEventType.OE_ACK:
                                         chore_status = ChoreStatusType.OE_ACKED
                                     else:
-                                        err_str_ = ("3rd chore journal from chore_journal of status OE_CXL_INT_REJ "
+                                        err_str_ = ("3rd chore ledger from chore_ledger of status OE_CXL_INT_REJ "
                                                     "or OE_CXL_BRK_REJ or OE_CXL_EXH_REJ, must be"
-                                                    "of status OE_ACK or OE_UNACK, received last 3 chore_journals "
-                                                    f"{last_3_chore_journals_from_chore_id = }, "
-                                                    f"chore_journal_key: "
-                                                    f"{self.derived_class_type.get_chore_journal_log_key(chore_journal_obj)}")
+                                                    "of status OE_ACK or OE_UNACK, received last 3 chore_ledgers "
+                                                    f"{last_3_chore_ledgers_from_chore_id = }, "
+                                                    f"chore_ledger_key: "
+                                                    f"{self.derived_class_type.get_chore_ledger_log_key(chore_ledger_obj)}")
                                         logging.error(err_str_)
                                         return None
                                 else:
-                                    err_str_ = ("Recent chore journal must be of status OE_CXL_INT_REJ "
+                                    err_str_ = ("Recent chore ledger must be of status OE_CXL_INT_REJ "
                                                 "or OE_CXL_BRK_REJ or OE_CXL_EXH_REJ, received last 3 "
-                                                "chore_journals {last_3_chore_journals_from_chore_id}, "
-                                                f"chore_journal_key: {self.derived_class_type.get_chore_journal_log_key(chore_journal_obj)}")
+                                                "chore_ledgers {last_3_chore_ledgers_from_chore_id}, "
+                                                f"chore_ledger_key: {self.derived_class_type.get_chore_ledger_log_key(chore_ledger_obj)}")
                                     logging.error(err_str_)
                                     return None
                             else:
-                                err_str_ = f"Received empty list while fetching last 3 chore_journals for " \
-                                           f"{chore_journal_obj.chore.chore_id = }, " \
-                                           f"chore_journal_key: {self.derived_class_type.get_chore_journal_log_key(chore_journal_obj)}"
+                                err_str_ = f"Received empty list while fetching last 3 chore_ledgers for " \
+                                           f"{chore_ledger_obj.chore.chore_id = }, " \
+                                           f"chore_ledger_key: {self.derived_class_type.get_chore_ledger_log_key(chore_ledger_obj)}"
                                 logging.error(err_str_)
                                 return None
                         elif chore_snapshot.chore_brief.qty < chore_snapshot.filled_qty:
@@ -588,14 +590,14 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                         else:
                             chore_status = ChoreStatusType.OE_FILLED
 
-                        chore_snapshot.last_update_date_time = chore_journal_obj.chore_event_date_time
+                        chore_snapshot.last_update_date_time = chore_ledger_obj.chore_event_date_time
                         chore_snapshot.chore_status = chore_status
                         updated_chore_snapshot = \
                             await (self.derived_class_type.
                                    underlying_update_chore_snapshot_http(chore_snapshot))
 
-                        return await self.handle_post_chore_snapshot_update_tasks_for_cxl_rej_chore_journal(
-                            chore_journal_obj, updated_chore_snapshot)
+                        return await self.handle_post_chore_snapshot_update_tasks_for_cxl_rej_chore_ledger(
+                            chore_ledger_obj, updated_chore_snapshot)
                     # else not required: none returned object signifies there was something wrong in
                     # _check_state_and_get_chore_snapshot_obj and hence would have been added to alert already
 
@@ -603,13 +605,13 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                 async with ChoreSnapshot.reentrant_lock:
                     chore_snapshot = \
                         await self._check_state_and_get_chore_snapshot_obj(
-                            chore_journal_obj, [ChoreStatusType.OE_UNACK, ChoreStatusType.OE_ACKED])
+                            chore_ledger_obj, [ChoreStatusType.OE_UNACK, ChoreStatusType.OE_ACKED])
                     if chore_snapshot is not None:
                         chore_brief = chore_snapshot.chore_brief
                         if chore_brief.text:
-                            chore_brief.text.extend(chore_journal_obj.chore.text)
+                            chore_brief.text.extend(chore_ledger_obj.chore.text)
                         else:
-                            chore_brief.text = chore_journal_obj.chore.text
+                            chore_brief.text = chore_ledger_obj.chore.text
                         cxled_qty = int(chore_snapshot.chore_brief.qty - chore_snapshot.filled_qty)
                         cxled_notional = \
                             chore_snapshot.cxled_qty * self.get_usd_px(chore_snapshot.chore_brief.px,
@@ -622,16 +624,16 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                         chore_snapshot.cxled_qty = cxled_qty
                         chore_snapshot.cxled_notional = cxled_notional
                         chore_snapshot.avg_cxled_px = avg_cxled_px
-                        chore_snapshot.last_update_date_time = chore_journal_obj.chore_event_date_time
+                        chore_snapshot.last_update_date_time = chore_ledger_obj.chore_event_date_time
                         chore_snapshot.chore_status = ChoreStatusType.OE_DOD
                         chore_snapshot = \
                             await (self.derived_class_type.
                                    underlying_update_chore_snapshot_http(chore_snapshot))
-                        return await self.handle_post_chore_snapshot_update_tasks_for_int_rej_chore_journal(
-                            chore_journal_obj, chore_snapshot)
-                        # else not require_create_update_symbol_side_snapshot_from_chore_journald:
+                        return await self.handle_post_chore_snapshot_update_tasks_for_int_rej_chore_ledger(
+                            chore_ledger_obj, chore_snapshot)
+                        # else not require_create_update_symbol_side_snapshot_from_chore_ledgerd:
                         # if symbol_side_snapshot is None then it means some error occurred in
-                        # _create_update_symbol_side_snapshot_from_chore_journal which would have
+                        # _create_update_symbol_side_snapshot_from_chore_ledger which would have
                         # got added to alert already
                     # else not required: none returned object signifies there was something wrong in
                     # _check_state_and_get_chore_snapshot_obj and hence would have been added to alert already
@@ -639,37 +641,37 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
             case ChoreEventType.OE_LAPSE:
                 async with ChoreSnapshot.reentrant_lock:
                     chore_snapshot = await self._check_state_and_get_chore_snapshot_obj(
-                        chore_journal_obj, [ChoreStatusType.OE_UNACK, ChoreStatusType.OE_ACKED,
+                        chore_ledger_obj, [ChoreStatusType.OE_UNACK, ChoreStatusType.OE_ACKED,
                                             ChoreStatusType.OE_AMD_DN_UNACKED,
                                             ChoreStatusType.OE_AMD_UP_UNACKED, ChoreStatusType.OE_CXL_UNACK])
                     if chore_snapshot is not None:
-                        lapsed_qty = chore_journal_obj.chore.qty
+                        lapsed_qty = chore_ledger_obj.chore.qty
                         # if no qty is specified then canceling remaining complete qty for chore
                         if not lapsed_qty:
-                            return await self._handle_chore_dod(chore_journal_obj, chore_snapshot, is_lapse_call=True)
+                            return await self._handle_chore_dod(chore_ledger_obj, chore_snapshot, is_lapse_call=True)
                         else:
                             # avoiding any lapse qty greater than chore qty
                             if lapsed_qty > chore_snapshot.chore_brief.qty:
                                 logging.critical(f"Unexpected: Lapse qty can't be greater than chore_qty - putting "
-                                                 f"plan to DOD state, {chore_journal_obj.chore.chore_id=}, "
-                                                 f"lapse_qty: {chore_journal_obj.chore.qty}, "
+                                                 f"plan to DOD state, {chore_ledger_obj.chore.chore_id=}, "
+                                                 f"lapse_qty: {chore_ledger_obj.chore.qty}, "
                                                  f"chore_qty: {chore_snapshot.chore_brief.qty}")
-                                # Passing chore_journal with passing OE_CXL_ACK as event so that all models
+                                # Passing chore_ledger with passing OE_CXL_ACK as event so that all models
                                 # later are handled as DOD handling
-                                chore_journal_obj.chore_event = ChoreEventType.OE_CXL_ACK
-                                return await self._handle_chore_dod(chore_journal_obj, chore_snapshot)
+                                chore_ledger_obj.chore_event = ChoreEventType.OE_CXL_ACK
+                                return await self._handle_chore_dod(chore_ledger_obj, chore_snapshot)
 
                             # avoiding any lapse qty greater than unfilled qty
                             unfilled_qty = self.get_open_qty(chore_snapshot)
                             if lapsed_qty > unfilled_qty:
                                 logging.critical("Unexpected: Lapse qty can't be greater than unfilled qty - putting "
-                                                 f"plan to DOD state, {chore_journal_obj.chore.chore_id=}, "
-                                                 f"lapse_qty: {chore_journal_obj.chore.qty}, "
+                                                 f"plan to DOD state, {chore_ledger_obj.chore.chore_id=}, "
+                                                 f"lapse_qty: {chore_ledger_obj.chore.qty}, "
                                                  f"unfilled_qty: {unfilled_qty}")
-                                # Passing chore_journal with passing OE_CXL_ACK as event so that all models
+                                # Passing chore_ledger with passing OE_CXL_ACK as event so that all models
                                 # later are handled as DOD handling
-                                chore_journal_obj.chore_event = ChoreEventType.OE_CXL_ACK
-                                return await self._handle_chore_dod(chore_journal_obj, chore_snapshot)
+                                chore_ledger_obj.chore_event = ChoreEventType.OE_CXL_ACK
+                                return await self._handle_chore_dod(chore_ledger_obj, chore_snapshot)
 
                             # handling partial cxl that got lapsed
                             if chore_snapshot.total_lapsed_qty is None:
@@ -696,17 +698,17 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                             chore_snapshot.last_update_date_time = DateTime.utcnow()
                             chore_snapshot = await (self.derived_class_type.
                                                     underlying_update_chore_snapshot_http(chore_snapshot))
-                            return await self.handle_post_chore_snapshot_update_tasks_for_lapse_chore_journal(
-                                chore_journal_obj, chore_snapshot)
+                            return await self.handle_post_chore_snapshot_update_tasks_for_lapse_chore_ledger(
+                                chore_ledger_obj, chore_snapshot)
 
                     # else not required: none returned object signifies there was something wrong in
                     # _check_state_and_get_chore_snapshot_obj and hence would have been added to alert already
 
             case ChoreEventType.OE_AMD_DN_UNACK | ChoreEventType.OE_AMD_UP_UNACK:
-                if not chore_journal_obj.chore.qty and not chore_journal_obj.chore.px:
-                    logging.error("Unexpected: no amend qty or px found in requested amend chore_journal - "
-                                  f"ignoring this amend request, amend_qty: {chore_journal_obj.chore.qty}, "
-                                  f"amend_px: {chore_journal_obj.chore.px};;; {chore_journal_obj=}")
+                if not chore_ledger_obj.chore.qty and not chore_ledger_obj.chore.px:
+                    logging.error("Unexpected: no amend qty or px found in requested amend chore_ledger - "
+                                  f"ignoring this amend request, amend_qty: {chore_ledger_obj.chore.qty}, "
+                                  f"amend_px: {chore_ledger_obj.chore.px};;; {chore_ledger_obj=}")
                     return
 
                 # amend changes are applied to chore in unack state immediately if chore is risky and if chore
@@ -716,20 +718,20 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                 async with ChoreSnapshot.reentrant_lock:
                     chore_snapshot = \
                         await self._check_state_and_get_chore_snapshot_obj(
-                            chore_journal_obj, [ChoreStatusType.OE_ACKED])
+                            chore_ledger_obj, [ChoreStatusType.OE_ACKED])
 
                     if chore_snapshot is not None:
-                        if chore_journal_obj.chore_event == ChoreEventType.OE_AMD_DN_UNACK:
-                            amend_dn_qty = chore_journal_obj.chore.qty
-                            amend_dn_px = chore_journal_obj.chore.px
+                        if chore_ledger_obj.chore_event == ChoreEventType.OE_AMD_DN_UNACK:
+                            amend_dn_qty = chore_ledger_obj.chore.qty
+                            amend_dn_px = chore_ledger_obj.chore.px
 
                             open_qty = self.get_open_qty(chore_snapshot)
                             if amend_dn_qty is not None:
                                 if open_qty < amend_dn_qty:
                                     logging.error("Unexpected: Amend qty is higher than open qty - ignoring is "
-                                                  f"amend request, amend_qty: {chore_journal_obj.chore.qty}, "
+                                                  f"amend request, amend_qty: {chore_ledger_obj.chore.qty}, "
                                                   f"open_qty: {open_qty};;; "
-                                                  f"amend_dn_unack chore_journal: {chore_journal_obj}, "
+                                                  f"amend_dn_unack chore_ledger: {chore_ledger_obj}, "
                                                   f"chore_snapshot {chore_snapshot}")
                                     return None
 
@@ -768,11 +770,11 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                                 if amend_dn_qty:
                                     chore_snapshot.pending_amend_dn_qty = amend_dn_qty
 
-                                return await self.handle_model_updates_post_chore_journal_amend_applied(
-                                        chore_journal_obj, chore_snapshot, chore_journal_obj.chore_event)
+                                return await self.handle_model_updates_post_chore_ledger_amend_applied(
+                                        chore_ledger_obj, chore_snapshot, chore_ledger_obj.chore_event)
 
                             else:
-                                chore_snapshot.last_update_date_time = chore_journal_obj.chore_event_date_time
+                                chore_snapshot.last_update_date_time = chore_ledger_obj.chore_event_date_time
                                 # updating all pending amend fields to 0
                                 self.set_default_values_to_pend_amend_fields(chore_snapshot)
                                 # updating fields required to other models to be updated once chore_snapshot is updated
@@ -784,11 +786,11 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                                 updated_chore_snapshot = (
                                     await self.derived_class_type.
                                     underlying_update_chore_snapshot_http(chore_snapshot))
-                                return await self.handle_post_chore_snapshot_update_tasks_for_non_risky_amend_unack_chore_journal(chore_journal_obj, updated_chore_snapshot)
+                                return await self.handle_post_chore_snapshot_update_tasks_for_non_risky_amend_unack_chore_ledger(chore_ledger_obj, updated_chore_snapshot)
 
                         else:
-                            amend_up_qty = chore_journal_obj.chore.qty
-                            amend_up_px = chore_journal_obj.chore.px
+                            amend_up_qty = chore_ledger_obj.chore.qty
+                            amend_up_px = chore_ledger_obj.chore.px
 
                             # amend up is risky in BUY side and non-risky in SELL
                             # Risky side will be amended right away and non-risky side will be amended on AMD_ACK
@@ -813,11 +815,11 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                                 if amend_up_qty:
                                     chore_snapshot.pending_amend_up_qty = amend_up_qty
 
-                                return await self.handle_model_updates_post_chore_journal_amend_applied(
-                                    chore_journal_obj, chore_snapshot, chore_journal_obj.chore_event)
+                                return await self.handle_model_updates_post_chore_ledger_amend_applied(
+                                    chore_ledger_obj, chore_snapshot, chore_ledger_obj.chore_event)
 
                             else:
-                                chore_snapshot.last_update_date_time = chore_journal_obj.chore_event_date_time
+                                chore_snapshot.last_update_date_time = chore_ledger_obj.chore_event_date_time
                                 # updating all pending amend fields to 0
                                 self.set_default_values_to_pend_amend_fields(chore_snapshot)
                                 # updating fields required to other models to be updated once chore_snapshot is updated
@@ -829,7 +831,7 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                                 updated_chore_snapshot = (
                                     await self.derived_class_type.
                                     underlying_update_chore_snapshot_http(chore_snapshot))
-                                return await self.handle_post_chore_snapshot_update_tasks_for_non_risky_amend_unack_chore_journal(chore_journal_obj, updated_chore_snapshot)
+                                return await self.handle_post_chore_snapshot_update_tasks_for_non_risky_amend_unack_chore_ledger(chore_ledger_obj, updated_chore_snapshot)
                     # else not required: Ignoring this update since none returned object signifies
                     # there was something wrong in _check_state_and_get_chore_snapshot_obj and
                     # hence would have been added to alert already
@@ -838,7 +840,7 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                 async with ChoreSnapshot.reentrant_lock:
                     chore_snapshot: ChoreSnapshot = \
                         await self._check_state_and_get_chore_snapshot_obj(
-                            chore_journal_obj, [ChoreStatusType.OE_AMD_DN_UNACKED,
+                            chore_ledger_obj, [ChoreStatusType.OE_AMD_DN_UNACKED,
                                                 ChoreStatusType.OE_AMD_UP_UNACKED,
                                                 ChoreStatusType.OE_FILLED,
                                                 ChoreStatusType.OE_OVER_FILLED,
@@ -847,7 +849,7 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                     # Non-risky amend cases will be updated in AMD_ACK
                     # Risky cases already get updated at amend unack event only
                     if chore_snapshot is not None:
-                        pending_amend_event = self.pending_amend_type(chore_journal_obj, chore_snapshot)
+                        pending_amend_event = self.pending_amend_type(chore_ledger_obj, chore_snapshot)
                         if pending_amend_event == ChoreEventType.OE_AMD_DN_UNACK:
                             amend_dn_qty = chore_snapshot.pending_amend_dn_qty
                             amend_dn_px = chore_snapshot.pending_amend_dn_px
@@ -877,13 +879,13 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                                             chore_snapshot.chore_brief.qty *
                                             self.get_usd_px(chore_snapshot.chore_brief.px,
                                                             chore_snapshot.chore_brief.security.sec_id))
-                                return await self.handle_model_updates_post_chore_journal_amend_applied(
-                                        chore_journal_obj, chore_snapshot, pending_amend_event)
+                                return await self.handle_model_updates_post_chore_ledger_amend_applied(
+                                        chore_ledger_obj, chore_snapshot, pending_amend_event)
 
                             else:
                                 # since if amend was already applied in amend unack event only for risky case - no
                                 # further compute updates are required
-                                chore_snapshot.last_update_date_time = chore_journal_obj.chore_event_date_time
+                                chore_snapshot.last_update_date_time = chore_ledger_obj.chore_event_date_time
                                 # updating all pending amend fields to 0
                                 self.set_default_values_to_pend_amend_fields(chore_snapshot)
                                 if (not chore_has_terminal_state(chore_snapshot) and
@@ -894,7 +896,7 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                                 updated_chore_snapshot = (
                                     await self.derived_class_type.
                                     underlying_update_chore_snapshot_http(chore_snapshot))
-                                return await self.handle_post_chore_snapshot_update_tasks_for_risky_amend_ack_chore_journal(chore_journal_obj, updated_chore_snapshot)
+                                return await self.handle_post_chore_snapshot_update_tasks_for_risky_amend_ack_chore_ledger(chore_ledger_obj, updated_chore_snapshot)
 
                         else:
                             amend_up_qty = chore_snapshot.pending_amend_up_qty
@@ -931,13 +933,13 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                                         self.get_usd_px(chore_snapshot.chore_brief.px,
                                                         chore_snapshot.chore_brief.security.sec_id))
 
-                                return await self.handle_model_updates_post_chore_journal_amend_applied(
-                                        chore_journal_obj, chore_snapshot, pending_amend_event)
+                                return await self.handle_model_updates_post_chore_ledger_amend_applied(
+                                        chore_ledger_obj, chore_snapshot, pending_amend_event)
 
                             else:
                                 # since if amend was already applied in amend unack event only for risky case - no
                                 # further compute updates are required
-                                chore_snapshot.last_update_date_time = chore_journal_obj.chore_event_date_time
+                                chore_snapshot.last_update_date_time = chore_ledger_obj.chore_event_date_time
                                 # updating all pending amend fields to 0
                                 self.set_default_values_to_pend_amend_fields(chore_snapshot)
                                 if (not chore_has_terminal_state(chore_snapshot) and
@@ -948,7 +950,7 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                                 updated_chore_snapshot = (
                                     await self.derived_class_type.
                                     underlying_update_chore_snapshot_http(chore_snapshot))
-                                return await self.handle_post_chore_snapshot_update_tasks_for_risky_amend_ack_chore_journal(chore_journal_obj, updated_chore_snapshot)
+                                return await self.handle_post_chore_snapshot_update_tasks_for_risky_amend_ack_chore_ledger(chore_ledger_obj, updated_chore_snapshot)
                     # else not required: Ignoring this update since none returned object signifies
                     # there was something wrong in _check_state_and_get_chore_snapshot_obj and
                     # hence would have been added to alert already
@@ -957,19 +959,19 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                 async with ChoreSnapshot.reentrant_lock:
                     chore_snapshot: ChoreSnapshot = \
                         await self._check_state_and_get_chore_snapshot_obj(
-                            chore_journal_obj, [ChoreStatusType.OE_AMD_DN_UNACKED,
+                            chore_ledger_obj, [ChoreStatusType.OE_AMD_DN_UNACKED,
                                                 ChoreStatusType.OE_AMD_UP_UNACKED, ChoreStatusType.OE_FILLED,
                                                 ChoreStatusType.OE_OVER_FILLED,
                                                 ChoreStatusType.OE_CXL_UNACK, ChoreStatusType.OE_DOD])
                     if chore_snapshot is not None:
                         if chore_snapshot.chore_status == ChoreStatusType.OE_DOD:
                             logging.error(f"Received AMD_REJ post chore DOD on chore_id: "
-                                          f"{chore_snapshot.chore_brief.chore_id} - ignoring this amend chore_journal "
-                                          f"and chore will stay unchanged;;; amd_rej {chore_journal_obj=}, "
+                                          f"{chore_snapshot.chore_brief.chore_id} - ignoring this amend chore_ledger "
+                                          f"and chore will stay unchanged;;; amd_rej {chore_ledger_obj=}, "
                                           f"{chore_snapshot=}")
                             return None
 
-                        pending_amend_event = self.pending_amend_type(chore_journal_obj, chore_snapshot)
+                        pending_amend_event = self.pending_amend_type(chore_ledger_obj, chore_snapshot)
                         if pending_amend_event == ChoreEventType.OE_AMD_DN_UNACK:
                             amend_dn_qty = chore_snapshot.pending_amend_dn_qty
                             amend_dn_px = chore_snapshot.pending_amend_dn_px
@@ -1002,12 +1004,12 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                                             self.get_usd_px(chore_snapshot.chore_brief.px,
                                                             chore_snapshot.chore_brief.security.sec_id))
 
-                                return await self.handle_model_updates_post_chore_journal_amend_applied(
-                                        chore_journal_obj, chore_snapshot, pending_amend_event,
+                                return await self.handle_model_updates_post_chore_ledger_amend_applied(
+                                        chore_ledger_obj, chore_snapshot, pending_amend_event,
                                         is_amend_rej_call=True)
 
                             else:
-                                chore_snapshot.last_update_date_time = chore_journal_obj.chore_event_date_time
+                                chore_snapshot.last_update_date_time = chore_ledger_obj.chore_event_date_time
                                 # updating all pending amend fields to 0
                                 self.set_default_values_to_pend_amend_fields(chore_snapshot)
                                 if (not chore_has_terminal_state(chore_snapshot) and
@@ -1018,7 +1020,7 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                                 updated_chore_snapshot = (
                                     await self.derived_class_type.
                                     underlying_update_chore_snapshot_http(chore_snapshot))
-                                return await self.handle_post_chore_snapshot_update_tasks_for_non_risky_amend_rej_chore_journal(chore_journal_obj, updated_chore_snapshot)
+                                return await self.handle_post_chore_snapshot_update_tasks_for_non_risky_amend_rej_chore_ledger(chore_ledger_obj, updated_chore_snapshot)
 
                         else:
                             amend_up_qty = chore_snapshot.pending_amend_up_qty
@@ -1040,12 +1042,12 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                                         self.get_usd_px(chore_snapshot.chore_brief.px,
                                                         chore_snapshot.chore_brief.security.sec_id))
 
-                                return await self.handle_model_updates_post_chore_journal_amend_applied(
-                                        chore_journal_obj, chore_snapshot, pending_amend_event,
+                                return await self.handle_model_updates_post_chore_ledger_amend_applied(
+                                        chore_ledger_obj, chore_snapshot, pending_amend_event,
                                         is_amend_rej_call=True)
 
                             else:
-                                chore_snapshot.last_update_date_time = chore_journal_obj.chore_event_date_time
+                                chore_snapshot.last_update_date_time = chore_ledger_obj.chore_event_date_time
                                 # updating all pending amend fields to 0
                                 self.set_default_values_to_pend_amend_fields(chore_snapshot)
                                 if (not chore_has_terminal_state(chore_snapshot) and
@@ -1056,20 +1058,20 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                                 updated_chore_snapshot = (
                                     await self.derived_class_type.
                                     underlying_update_chore_snapshot_http(chore_snapshot))
-                                return await self.handle_post_chore_snapshot_update_tasks_for_non_risky_amend_rej_chore_journal(chore_journal_obj, updated_chore_snapshot)
+                                return await self.handle_post_chore_snapshot_update_tasks_for_non_risky_amend_rej_chore_ledger(chore_ledger_obj, updated_chore_snapshot)
 
                     # else not required: Ignoring this update since none returned object signifies
                     # there was something wrong in _check_state_and_get_chore_snapshot_obj and
                     # hence would have been added to alert already
             case other_:
-                chore_jpurnal_key = self.derived_class_type.get_chore_journal_log_key(chore_journal_obj)
-                err_str_ = f"Unsupported Chore event - {other_} in {chore_jpurnal_key=};;;{chore_journal_obj=}"
+                chore_ledger_key = self.derived_class_type.get_chore_ledger_log_key(chore_ledger_obj)
+                err_str_ = f"Unsupported Chore event: {other_} in {chore_ledger_key=};;;{chore_ledger_obj=}"
                 logging.error(err_str_)
         # avoiding any update for all cases that end up here
         return None
 
     def get_chore_status_post_amend_applied(
-            self, chore_journal: ChoreJournal, chore_snapshot: ChoreSnapshot, amend_direction: ChoreEventType,
+            self, chore_ledger: ChoreLedger, chore_snapshot: ChoreSnapshot, amend_direction: ChoreEventType,
             last_chore_status: ChoreStatusType) -> ChoreStatusType | None:
         # risky
         # * dn
@@ -1090,7 +1092,7 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
         # - open = 0 -> DOD
         # - open < 0 -> if over-filled then ovr-filled else over-cxl
 
-        chore_event = chore_journal.chore_event
+        chore_event = chore_ledger.chore_event
         open_qty = self.derived_class_type.get_open_qty(chore_snapshot)
         if chore_event != ChoreEventType.OE_AMD_ACK:
             # risky case
@@ -1103,8 +1105,8 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                     logging.warning(
                         f"Received {chore_event} for amend qty which makes chore DOD, before status was "
                         f"{last_chore_status} - applying amend and putting "
-                        f"chore as DOD, chore_journal_key: {self.derived_class_type.get_chore_journal_log_key(chore_journal)};;; "
-                        f"{chore_journal=}, {chore_snapshot=}")
+                        f"chore as DOD, chore_ledger_key: {self.derived_class_type.get_chore_ledger_log_key(chore_ledger)};;; "
+                        f"{chore_ledger=}, {chore_snapshot=}")
                     return ChoreStatusType.OE_DOD
                 else:
                     logging.error("Can't find chore_status, keeping last status - open_qty can't be negative post "
@@ -1139,17 +1141,17 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                     logging.warning(
                         f"Received {chore_event} for amend qty which makes chore DOD, before status was "
                         f"{last_chore_status} - applying amend and putting "
-                        f"chore as DOD, chore_journal_key: {self.derived_class_type.get_chore_journal_log_key(chore_journal)};;; "
-                        f"{chore_journal=}, {chore_snapshot=}")
+                        f"chore as DOD, chore_ledger_key: {self.derived_class_type.get_chore_ledger_log_key(chore_ledger)};;; "
+                        f"{chore_ledger=}, {chore_snapshot=}")
                     return ChoreStatusType.OE_DOD
                 else:
                     # If chore qty becomes negative post amend dn then chore must be in terminal state already before
                     # non-risky amend dn - any further amend dn will be added to extra cxled
                     logging.warning(f"Received {chore_event} for amend qty which makes chore OVER_CXLED to "
                                     f"chore which was {last_chore_status} before - amend applied and "
-                                    f"putting plan to PAUSE , chore_journal_key: "
-                                    f"{self.derived_class_type.get_chore_journal_log_key(chore_journal)};;; "
-                                    f"{chore_journal=}, {chore_snapshot=}")
+                                    f"putting plan to PAUSE , chore_ledger_key: "
+                                    f"{self.derived_class_type.get_chore_ledger_log_key(chore_ledger)};;; "
+                                    f"{chore_ledger=}, {chore_snapshot=}")
                     self.pause_plan()
                     return ChoreStatusType.OE_OVER_CXLED
             else:
@@ -1162,15 +1164,15 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                             logging.warning(f"Received {chore_event} for amend qty which makes chore back to ACKED "
                                             f"which was FILLED before amend, "
                                             f"chore_id: {chore_snapshot.chore_brief.chore_id}, "
-                                            f"chore_journal_key: {self.derived_class_type.get_chore_journal_log_key(chore_journal)};;; "
-                                            f"{chore_journal=}, {chore_snapshot=}")
+                                            f"chore_ledger_key: {self.derived_class_type.get_chore_ledger_log_key(chore_ledger)};;; "
+                                            f"{chore_ledger=}, {chore_snapshot=}")
                         elif last_chore_status == ChoreStatusType.OE_OVER_FILLED:
                             logging.warning(f"Received {chore_event} for amend qty which makes chore back to ACKED "
                                             f"which was OVER_FILLED before amend, chore_id: "
                                             f"{chore_snapshot.chore_brief.chore_id} - setting plan back to ACTIVE"
                                             f" and applying amend, also ignore OVERFILLED ALERT for this chore"
-                                            f"chore_journal_key: {self.derived_class_type.get_chore_journal_log_key(chore_journal)};;; "
-                                            f"{chore_journal=}, {chore_snapshot=}")
+                                            f"chore_ledger_key: {self.derived_class_type.get_chore_ledger_log_key(chore_ledger)};;; "
+                                            f"{chore_ledger=}, {chore_snapshot=}")
                             self.unpause_plan()
                         return ChoreStatusType.OE_ACKED
                 elif open_qty == 0:
@@ -1185,16 +1187,16 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                                         f"which was OVER_FILLED before amend, chore_id: "
                                         f"{chore_snapshot.chore_brief.chore_id} - setting plan back to ACTIVE"
                                         f" and applying amend, also ignore OVERFILLED ALERT for this chore"
-                                        f"chore_journal_key: {self.derived_class_type.get_chore_journal_log_key(chore_journal)};;; "
-                                        f"{chore_journal=}, {chore_snapshot=}")
+                                        f"chore_ledger_key: {self.derived_class_type.get_chore_ledger_log_key(chore_ledger)};;; "
+                                        f"{chore_ledger=}, {chore_snapshot=}")
                         self.unpause_plan()
                         return ChoreStatusType.OE_FILLED
                     else:
                         logging.warning(
                             f"Received {chore_event} for amend qty which makes chore DOD, before status was "
                             f"{last_chore_status} - applying amend and putting "
-                            f"chore as DOD, chore_journal_key: {self.derived_class_type.get_chore_journal_log_key(chore_journal)};;; "
-                            f"{chore_journal=}, {chore_snapshot=}")
+                            f"chore as DOD, chore_ledger_key: {self.derived_class_type.get_chore_ledger_log_key(chore_ledger)};;; "
+                            f"{chore_ledger=}, {chore_snapshot=}")
                         return ChoreStatusType.OE_DOD
                 else:
                     # amend up also couldn't make open_qty non-negative so keeping same status on chore
@@ -1208,7 +1210,7 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
         pass
 
     def get_chore_status_post_amend_rej(
-            self, chore_journal: ChoreJournal, chore_snapshot: ChoreSnapshot, amend_direction: ChoreEventType,
+            self, chore_ledger: ChoreLedger, chore_snapshot: ChoreSnapshot, amend_direction: ChoreEventType,
             last_chore_status: ChoreStatusType) -> ChoreStatusType:
         # * dn
         # - open > 0 -> ACK
@@ -1231,13 +1233,13 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                                f"{ChoreStatusType.OE_ACKED}")
                     if last_chore_status == ChoreStatusType.OE_OVER_FILLED:
                         log_str += (" - UNPAUSING plan and applying amend rollback, "
-                                    f"chore_journal_key: {self.derived_class_type.get_chore_journal_log_key(chore_journal)};;; "
-                                    f"{chore_journal=}, {chore_snapshot=}")
+                                    f"chore_ledger_key: {self.derived_class_type.get_chore_ledger_log_key(chore_ledger)};;; "
+                                    f"{chore_ledger=}, {chore_snapshot=}")
                         logging.warning(log_str)
                         self.unpause_plan()
                     elif last_chore_status == ChoreStatusType.OE_FILLED:
-                        log_str += (f"chore_journal_key: {self.derived_class_type.get_chore_journal_log_key(chore_journal)};;; "
-                                    f"{chore_journal=}, {chore_snapshot=}")
+                        log_str += (f"chore_ledger_key: {self.derived_class_type.get_chore_ledger_log_key(chore_ledger)};;; "
+                                    f"{chore_ledger=}, {chore_snapshot=}")
                         logging.warning(log_str)
                     # else not required: if chore was already acked then no need to notify as alert
 
@@ -1251,15 +1253,15 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                                    f"{last_chore_status} before amend applied - status post amd_rej applied: "
                                    f"{ChoreStatusType.OE_ACKED}")
                         log_str += (" - UNPAUSING plan and applying amend rollback, "
-                                    f"chore_journal_key: {self.derived_class_type.get_chore_journal_log_key(chore_journal)};;; "
-                                    f"{chore_journal=}, {chore_snapshot=}")
+                                    f"chore_ledger_key: {self.derived_class_type.get_chore_ledger_log_key(chore_ledger)};;; "
+                                    f"{chore_ledger=}, {chore_snapshot=}")
                         logging.warning(log_str)
                         self.unpause_plan()
                     else:
                         log_str = (f"Reverted amend changes post receiving OE_AMD_REJ on chore that had status "
                                    f"{last_chore_status} before amend applied - status post amd_rej applied: "
-                                   f"{ChoreStatusType.OE_FILLED}, chore_journal_key: "
-                                   f"{self.derived_class_type.get_chore_journal_log_key(chore_journal)};;; {chore_journal=}, {chore_snapshot=}")
+                                   f"{ChoreStatusType.OE_FILLED}, chore_ledger_key: "
+                                   f"{self.derived_class_type.get_chore_ledger_log_key(chore_ledger)};;; {chore_ledger=}, {chore_snapshot=}")
                         logging.warning(log_str)
                     return ChoreStatusType.OE_FILLED
             else:
@@ -1277,8 +1279,8 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                 else:
                     log_str = (f"Reverted amend changes post receiving OE_AMD_REJ on chore that had status "
                                f"{last_chore_status} before amend applied - status post amd_rej applied: "
-                               f"{ChoreStatusType.OE_FILLED}, chore_journal_key: "
-                               f"{self.derived_class_type.get_chore_journal_log_key(chore_journal)};;; {chore_journal=}, {chore_snapshot=}")
+                               f"{ChoreStatusType.OE_FILLED}, chore_ledger_key: "
+                               f"{self.derived_class_type.get_chore_ledger_log_key(chore_ledger)};;; {chore_ledger=}, {chore_snapshot=}")
                     logging.warning(log_str)
                     return ChoreStatusType.OE_FILLED
             else:
@@ -1287,22 +1289,22 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                            f"{ChoreStatusType.OE_OVER_FILLED}")
                 if last_chore_status == ChoreStatusType.OE_OVER_FILLED:
                     log_str += (" - plan must be at PAUSE already and "
-                                f"applying amend rollback, chore_journal_key: "
-                                f"{self.derived_class_type.get_chore_journal_log_key(chore_journal)};;; "
-                                f"{chore_journal=}, {chore_snapshot=}")
+                                f"applying amend rollback, chore_ledger_key: "
+                                f"{self.derived_class_type.get_chore_ledger_log_key(chore_ledger)};;; "
+                                f"{chore_ledger=}, {chore_snapshot=}")
                     logging.warning(log_str)
                 else:
-                    log_str += (" - putting plan to pause and applying amend rollback, chore_journal_key: "
-                                f"{self.derived_class_type.get_chore_journal_log_key(chore_journal)};;; "
-                                f"{chore_journal=}, {chore_snapshot=}")
+                    log_str += (" - putting plan to pause and applying amend rollback, chore_ledger_key: "
+                                f"{self.derived_class_type.get_chore_ledger_log_key(chore_ledger)};;; "
+                                f"{chore_ledger=}, {chore_snapshot=}")
                     logging.warning(log_str)
                     self.pause_plan()
                 return ChoreStatusType.OE_OVER_FILLED
 
-    def pending_amend_type(self, chore_journal: ChoreJournal, chore_snapshot: ChoreSnapshot) -> ChoreEventType | None:
-        if chore_journal.chore_event == ChoreEventType.OE_AMD_DN_UNACK:
+    def pending_amend_type(self, chore_ledger: ChoreLedger, chore_snapshot: ChoreSnapshot) -> ChoreEventType | None:
+        if chore_ledger.chore_event == ChoreEventType.OE_AMD_DN_UNACK:
             chore_event = ChoreEventType.OE_AMD_DN_UNACK
-        elif chore_journal.chore_event == ChoreEventType.OE_AMD_UP_UNACK:
+        elif chore_ledger.chore_event == ChoreEventType.OE_AMD_UP_UNACK:
             chore_event = ChoreEventType.OE_AMD_UP_UNACK
         else:
             # if event is AMD_ACK then checking what all fields are updated by amend unack event - for
@@ -1321,61 +1323,61 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                 return None
         return chore_event
 
-    async def _check_state_and_get_chore_snapshot_obj(self, chore_journal_obj: ChoreJournal,
+    async def _check_state_and_get_chore_snapshot_obj(self, chore_ledger_obj: ChoreLedger,
                                                       expected_status_list: List[str]) -> ChoreSnapshot | None:
         """
-        Checks if chore_snapshot holding chore_id of passed chore_journal has expected status
+        Checks if chore_snapshot holding chore_id of passed chore_ledger has expected status
         from provided statuses list and then returns that chore_snapshot
         """
-        chore_snapshot_obj = self.plan_cache.get_chore_snapshot_from_chore_id(chore_journal_obj.chore.chore_id)
+        chore_snapshot_obj = self.plan_cache.get_chore_snapshot_from_chore_id(chore_ledger_obj.chore.chore_id)
 
         if chore_snapshot_obj is not None:
             if chore_snapshot_obj.chore_status in expected_status_list:
                 return chore_snapshot_obj
             else:
-                ord_journal_key: str = self.derived_class_type.get_chore_journal_log_key(chore_journal_obj)
+                ord_ledger_key: str = self.derived_class_type.get_chore_ledger_log_key(chore_ledger_obj)
                 ord_snapshot_key: str = self.derived_class_type.get_chore_snapshot_log_key(chore_snapshot_obj)
-                err_str_: str = (f"Unexpected: Received chore_journal of event: {chore_journal_obj.chore_event} on "
+                err_str_: str = (f"Unexpected: Received chore_ledger of event: {chore_ledger_obj.chore_event} on "
                                  f"chore of chore_snapshot status: {chore_snapshot_obj.chore_status}, expected "
-                                 f"chore_statuses for chore_journal event {chore_journal_obj.chore_event} is "
-                                 f"{expected_status_list=}, {ord_journal_key=}, {ord_snapshot_key=};;; "
-                                 f"{chore_journal_obj=}, {chore_snapshot_obj=}")
+                                 f"chore_statuses for chore_ledger event {chore_ledger_obj.chore_event} is "
+                                 f"{expected_status_list=}, {ord_ledger_key=}, {ord_snapshot_key=};;; "
+                                 f"{chore_ledger_obj=}, {chore_snapshot_obj=}")
                 logging.error(err_str_)
                 return None
         else:
             logging.error(f"unexpected: _check_state_and_get_chore_snapshot_obj got chore_snapshot_obj as None;;;"
-                          f"{self.derived_class_type.get_chore_journal_log_key(chore_journal_obj)}; {chore_journal_obj=}")
+                          f"{self.derived_class_type.get_chore_ledger_log_key(chore_ledger_obj)}; {chore_ledger_obj=}")
             return None
 
     ##############################
-    # Fills Journal Update Methods
+    # Deals Ledger Update Methods
     ##############################
 
-    async def handle_create_fills_journal_pre(self, fills_journal_obj: FillsJournal):
+    async def handle_create_deals_ledger_pre(self, deals_ledger_obj: DealsLedger):
         if not self.service_ready:
             # raise service unavailable 503 exception, let the caller retry
-            err_str_ = "create_fills_journal_pre not ready - service is not initialized yet, " \
-                       f"fills_journal_key: " \
-                       f"{self.derived_class_type.get_fills_journal_log_key(fills_journal_obj)}"
+            err_str_ = "create_deals_ledger_pre not ready - service is not initialized yet, " \
+                       f"deals_ledger_key: " \
+                       f"{self.derived_class_type.get_deals_ledger_log_key(deals_ledger_obj)}"
             logging.error(err_str_)
             raise HTTPException(status_code=503, detail=err_str_)
-        # Updating notional field in fills journal
-        fills_journal_obj.fill_notional = \
-            self.get_usd_px(fills_journal_obj.fill_px, fills_journal_obj.fill_symbol) * fills_journal_obj.fill_qty
+        # Updating notional field in deals ledger
+        deals_ledger_obj.fill_notional = \
+            self.get_usd_px(deals_ledger_obj.fill_px, deals_ledger_obj.fill_symbol) * deals_ledger_obj.fill_qty
 
-    async def handle_post_chore_snapshot_tasks_for_fills(
-            self, fills_journal_obj: FillsJournal, chore_snapshot_obj: ChoreSnapshot,
+    async def handle_post_chore_snapshot_tasks_for_deals(
+            self, deals_ledger_obj: DealsLedger, chore_snapshot_obj: ChoreSnapshot,
             received_fill_after_dod: bool):
         return chore_snapshot_obj
 
     async def _apply_fill_update_in_chore_snapshot(
-            self, fills_journal_obj: FillsJournal):
+            self, deals_ledger_obj: DealsLedger):
         res = self.update_chore_snapshot_pre_checks()
         if not res:  # returning None if some check fails
             return None
 
         async with (ChoreSnapshot.reentrant_lock):  # for read-write atomicity
-            chore_snapshot_obj = self.plan_cache.get_chore_snapshot_from_chore_id(fills_journal_obj.chore_id)
+            chore_snapshot_obj = self.plan_cache.get_chore_snapshot_from_chore_id(deals_ledger_obj.chore_id)
 
             if chore_snapshot_obj is not None:
                 if chore_snapshot_obj.chore_status in [ChoreStatusType.OE_UNACK, ChoreStatusType.OE_ACKED,
@@ -1388,13 +1390,13 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
 
                     updated_total_filled_qty: int
                     if (total_filled_qty := chore_snapshot_obj.filled_qty) is not None:
-                        updated_total_filled_qty = int(total_filled_qty + fills_journal_obj.fill_qty)
+                        updated_total_filled_qty = int(total_filled_qty + deals_ledger_obj.fill_qty)
                     else:
-                        updated_total_filled_qty = int(fills_journal_obj.fill_qty)
-                    received_fill_notional = fills_journal_obj.fill_notional
-                    fills_before_ack = False
+                        updated_total_filled_qty = int(deals_ledger_obj.fill_qty)
+                    received_fill_notional = deals_ledger_obj.fill_notional
+                    deals_before_ack = False
                     if chore_snapshot_obj.chore_status == ChoreStatusType.OE_UNACK:
-                        fills_before_ack = True
+                        deals_before_ack = True
 
                     available_qty = self.get_valid_available_fill_qty(chore_snapshot_obj)
                     if available_qty == updated_total_filled_qty:
@@ -1407,7 +1409,7 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                                              "already of state OE_DOD, ignoring this fill and putting this plan to "
                                              f"PAUSE, symbol_side_key: "
                                              f"{self.derived_class_type.get_chore_snapshot_log_key(chore_snapshot_obj)}"
-                                             f";;; {fills_journal_obj=}, {chore_snapshot_obj=}")
+                                             f";;; {deals_ledger_obj=}, {chore_snapshot_obj=}")
                             self.pause_plan()
                             return None
                             # pause_plan = True
@@ -1419,8 +1421,8 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                                     "Received fill that makes chore_snapshot OE_FILLED which is "
                                     "already of state OE_DOD, symbol_side_key: "
                                     f"{self.derived_class_type.get_chore_snapshot_log_key(chore_snapshot_obj)}"
-                                    f";;; {fills_journal_obj=}, {chore_snapshot_obj=}")
-                                chore_snapshot_obj.cxled_qty -= int(fills_journal_obj.fill_qty)
+                                    f";;; {deals_ledger_obj=}, {chore_snapshot_obj=}")
+                                chore_snapshot_obj.cxled_qty -= int(deals_ledger_obj.fill_qty)
                                 chore_snapshot_obj.cxled_notional = (
                                         chore_snapshot_obj.cxled_qty * self.get_usd_px(chore_snapshot_obj.chore_brief.px,
                                                                                        chore_snapshot_obj.chore_brief.security.sec_id))
@@ -1429,17 +1431,17 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                                 else:
                                     logging.error("Unexpected: Received fill that makes chore FULFILL after DOD but "
                                                   "when fill_qty removed from cxl_qty, cxl_qty is not turning 0 ;;; "
-                                                  f"fill_journal: {fills_journal_obj}, "
-                                                  f"chore_journal: {chore_snapshot_obj}")
+                                                  f"fill_ledger: {deals_ledger_obj}, "
+                                                  f"chore_ledger: {chore_snapshot_obj}")
 
                             chore_snapshot_obj.chore_status = ChoreStatusType.OE_FILLED
-                            if fills_before_ack:
+                            if deals_before_ack:
                                 logging.warning(f"Received fill for chore that has status: {ChoreStatusType.OE_UNACK} "
                                                 f"that makes chore fulfilled, putting chore to "
                                                 f"{chore_snapshot_obj.chore_status} status and applying fill")
                     elif available_qty < updated_total_filled_qty:  # OVER_FILLED
                         vacant_fill_qty = int(available_qty - chore_snapshot_obj.filled_qty)
-                        non_required_received_fill_qty = fills_journal_obj.fill_qty - vacant_fill_qty
+                        non_required_received_fill_qty = deals_ledger_obj.fill_qty - vacant_fill_qty
 
                         if received_fill_after_dod:
                             # @@@ below error log is used in specific test case for string matching - if changed
@@ -1447,12 +1449,12 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                             logging.critical(
                                 f"Unexpected: Received fill that will make chore_snapshot OVER_FILLED which "
                                 f"is already OE_DOD, {vacant_fill_qty=}, received "
-                                f"{fills_journal_obj.fill_qty=}, {non_required_received_fill_qty=} "
-                                f"from fills_journal_key of {fills_journal_obj.chore_id=} and "
-                                f"{fills_journal_obj.id=} - putting plan to PAUSE and applying fill, "
+                                f"{deals_ledger_obj.fill_qty=}, {non_required_received_fill_qty=} "
+                                f"from deals_ledger_key of {deals_ledger_obj.chore_id=} and "
+                                f"{deals_ledger_obj.id=} - putting plan to PAUSE and applying fill, "
                                 f"symbol_side_key: {self.derived_class_type.get_chore_snapshot_log_key(chore_snapshot_obj)}"
-                                f";;; {fills_journal_obj=}, {chore_snapshot_obj=}")
-                            chore_snapshot_obj.cxled_qty -= int(fills_journal_obj.fill_qty -
+                                f";;; {deals_ledger_obj=}, {chore_snapshot_obj=}")
+                            chore_snapshot_obj.cxled_qty -= int(deals_ledger_obj.fill_qty -
                                                                 non_required_received_fill_qty)
                             chore_snapshot_obj.cxled_notional = (
                                     chore_snapshot_obj.cxled_qty *
@@ -1464,39 +1466,39 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                                 logging.error("Unexpected: Received fill that makes chore OVERFILL after DOD but "
                                               "when valid fill_qty (excluding extra fill) is removed from cxl_qty, "
                                               "cxl_qty is not turning 0 ;;; "
-                                              f"fill_journal: {fills_journal_obj}, "
-                                              f"chore_journal: {chore_snapshot_obj}")
+                                              f"fill_ledger: {deals_ledger_obj}, "
+                                              f"chore_ledger: {chore_snapshot_obj}")
 
-                        elif fills_before_ack:
+                        elif deals_before_ack:
                             # @@@ below error log is used in specific test case for string matching - if changed
                             # here needs to be changed in test also
                             logging.critical(
                                 f"Unexpected: Received fill that will make chore_snapshot OVER_FILLED to chore "
                                 f"which is still OE_UNACK, "
-                                f"{vacant_fill_qty=}, received {fills_journal_obj.fill_qty=}, "
+                                f"{vacant_fill_qty=}, received {deals_ledger_obj.fill_qty=}, "
                                 f"{non_required_received_fill_qty=} "
-                                f"from fills_journal_key of {fills_journal_obj.chore_id=} and "
-                                f"{fills_journal_obj.id=} - putting plan to PAUSE and applying fill, "
+                                f"from deals_ledger_key of {deals_ledger_obj.chore_id=} and "
+                                f"{deals_ledger_obj.id=} - putting plan to PAUSE and applying fill, "
                                 f"symbol_side_key: {self.derived_class_type.get_chore_snapshot_log_key(chore_snapshot_obj)}"
-                                f";;; {fills_journal_obj=}, {chore_snapshot_obj=}")
+                                f";;; {deals_ledger_obj=}, {chore_snapshot_obj=}")
                         else:
                             # @@@ below error log is used in specific test case for string matching - if changed
                             # here needs to be changed in test also
                             logging.critical(
                                 f"Unexpected: Received fill that will make chore_snapshot OVER_FILLED, "
-                                f"{vacant_fill_qty=}, received {fills_journal_obj.fill_qty=}, "
+                                f"{vacant_fill_qty=}, received {deals_ledger_obj.fill_qty=}, "
                                 f"{non_required_received_fill_qty=} "
-                                f"from fills_journal_key of {fills_journal_obj.chore_id=} and "
-                                f"{fills_journal_obj.id=} - putting plan to PAUSE and applying fill, "
+                                f"from deals_ledger_key of {deals_ledger_obj.chore_id=} and "
+                                f"{deals_ledger_obj.id=} - putting plan to PAUSE and applying fill, "
                                 f"symbol_side_key: {self.derived_class_type.get_chore_snapshot_log_key(chore_snapshot_obj)}"
-                                f";;; {fills_journal_obj=}, {chore_snapshot_obj=}")
+                                f";;; {deals_ledger_obj=}, {chore_snapshot_obj=}")
                         chore_snapshot_obj.chore_status = ChoreStatusType.OE_OVER_FILLED
                         self.pause_plan()
                         # pause_plan = True
                     else:
                         if received_fill_after_dod:
                             chore_snapshot_obj.cxled_qty = int(chore_snapshot_obj.cxled_qty -
-                                                               fills_journal_obj.fill_qty)
+                                                               deals_ledger_obj.fill_qty)
                             chore_snapshot_obj.cxled_notional = (
                                     chore_snapshot_obj.cxled_qty * self.get_usd_px(chore_snapshot_obj.chore_brief.px,
                                                                                    chore_snapshot_obj.chore_brief.security.sec_id))
@@ -1504,7 +1506,7 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                                 (self.get_local_px_or_notional(chore_snapshot_obj.cxled_notional,
                                                                chore_snapshot_obj.chore_brief.security.sec_id) /
                                  chore_snapshot_obj.cxled_qty) if chore_snapshot_obj.cxled_qty != 0 else 0
-                        elif fills_before_ack:
+                        elif deals_before_ack:
                             chore_snapshot_obj.chore_status = ChoreStatusType.OE_ACKED
                             logging.warning(f"Received fill for chore that has status: {ChoreStatusType.OE_UNACK}, "
                                             f"putting chore to {chore_snapshot_obj.chore_status} "
@@ -1516,41 +1518,41 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                         updated_fill_notional = received_fill_notional
                     updated_avg_fill_px = \
                         (self.get_local_px_or_notional(updated_fill_notional,
-                                                       fills_journal_obj.fill_symbol) / updated_total_filled_qty
+                                                       deals_ledger_obj.fill_symbol) / updated_total_filled_qty
                          if updated_total_filled_qty != 0 else 0)
 
                     chore_snapshot_obj.filled_qty = updated_total_filled_qty
                     chore_snapshot_obj.avg_fill_px = updated_avg_fill_px
                     chore_snapshot_obj.fill_notional = updated_fill_notional
-                    chore_snapshot_obj.last_update_fill_qty = int(fills_journal_obj.fill_qty)
-                    chore_snapshot_obj.last_update_fill_px = fills_journal_obj.fill_px
-                    chore_snapshot_obj.last_update_date_time = fills_journal_obj.fill_date_time
+                    chore_snapshot_obj.last_update_fill_qty = int(deals_ledger_obj.fill_qty)
+                    chore_snapshot_obj.last_update_fill_px = deals_ledger_obj.fill_px
+                    chore_snapshot_obj.last_update_date_time = deals_ledger_obj.fill_date_time
                     chore_snapshot_obj = \
                         await (self.derived_class_type.
                                underlying_update_chore_snapshot_http(chore_snapshot_obj))
-                    return await self.handle_post_chore_snapshot_tasks_for_fills(
-                        fills_journal_obj, chore_snapshot_obj, received_fill_after_dod)
+                    return await self.handle_post_chore_snapshot_tasks_for_deals(
+                        deals_ledger_obj, chore_snapshot_obj, received_fill_after_dod)
 
-                    # else not require_create_update_symbol_side_snapshot_from_chore_journald: if symbol_side_snapshot
-                    # is None then it means error occurred in _create_update_symbol_side_snapshot_from_chore_journal
+                    # else not require_create_update_symbol_side_snapshot_from_chore_ledgerd: if symbol_side_snapshot
+                    # is None then it means error occurred in _create_update_symbol_side_snapshot_from_chore_ledger
                     # which would have got added to alert already
                 elif chore_snapshot_obj.chore_status == ChoreStatusType.OE_FILLED:
                     err_str_ = (f"Unsupported - Fill received for completely filled chore_snapshot, "
                                 f"chore_snapshot_key: {self.derived_class_type.get_chore_snapshot_log_key(chore_snapshot_obj)}, "
-                                f"ignoring this fill journal - putting plan to PAUSE;;; "
-                                f"{fills_journal_obj=}, {chore_snapshot_obj=}")
+                                f"ignoring this fill ledger - putting plan to PAUSE;;; "
+                                f"{deals_ledger_obj=}, {chore_snapshot_obj=}")
                     logging.critical(err_str_)
                     self.pause_plan()
                 else:
                     err_str_ = f"Unsupported - Fill received for chore_snapshot having status " \
                                f"{chore_snapshot_obj.chore_status}, chore_snapshot_key: " \
                                f"{self.derived_class_type.get_chore_snapshot_log_key(chore_snapshot_obj)};;; " \
-                               f"{fills_journal_obj=}, {chore_snapshot_obj=}"
+                               f"{deals_ledger_obj=}, {chore_snapshot_obj=}"
                     logging.error(err_str_)
             else:
-                err_str_ = (f"Could not find any chore snapshot with {fills_journal_obj.chore_id=} in "
-                            f"plan_cache, fill_journal_key: "
-                            f"{self.derived_class_type.get_fills_journal_log_key(fills_journal_obj)}")
+                err_str_ = (f"Could not find any chore snapshot with {deals_ledger_obj.chore_id=} in "
+                            f"plan_cache, fill_ledger_key: "
+                            f"{self.derived_class_type.get_deals_ledger_log_key(deals_ledger_obj)}")
                 logging.error(err_str_)
 
     ############################
@@ -1560,10 +1562,10 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
     #       underlying or client
     ############################
 
-    async def handle_partial_update_chore_journal_post(self, updated_chore_journal_obj_json: Dict[str, Any]):
-        updated_chore_journal_obj = ChoreJournal.from_dict(updated_chore_journal_obj_json)
+    async def handle_partial_update_chore_ledger_post(self, updated_chore_ledger_obj_json: Dict[str, Any]):
+        updated_chore_ledger_obj = ChoreLedger.from_dict(updated_chore_ledger_obj_json)
         # updating bartering_data_manager's plan_cache
-        self.bartering_data_manager.handle_chore_journal_get_all_ws(updated_chore_journal_obj)
+        self.bartering_data_manager.handle_chore_ledger_get_all_ws(updated_chore_ledger_obj)
 
     async def handle_create_chore_snapshot_post(self, chore_snapshot_obj: ChoreSnapshot):
         # updating bartering_data_manager's plan_cache
@@ -1578,10 +1580,10 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
         # updating bartering_data_manager's plan_cache
         self.bartering_data_manager.handle_chore_snapshot_get_all_ws(updated_chore_snapshot_obj)
 
-    async def handle_partial_update_fills_journal_post(self, updated_fills_journal_obj_json: Dict[str, Any]):
-        updated_fills_journal_obj = FillsJournal.from_dict(updated_fills_journal_obj_json)
+    async def handle_partial_update_deals_ledger_post(self, updated_deals_ledger_obj_json: Dict[str, Any]):
+        updated_deals_ledger_obj = DealsLedger.from_dict(updated_deals_ledger_obj_json)
         # updating bartering_data_manager's plan_cache
-        self.bartering_data_manager.handle_fills_journal_get_all_ws(updated_fills_journal_obj)
+        self.bartering_data_manager.handle_deals_ledger_get_all_ws(updated_deals_ledger_obj)
 
     async def handle_create_new_chore_post(self, new_chore_obj: NewChore):
         # updating bartering_data_manager's plan_cache
@@ -1678,7 +1680,7 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
 
     async def handle_get_underlying_account_cumulative_fill_qty_query_pre(
             self, symbol: str, side: str):
-        fill_journal_obj_list = \
+        fill_ledger_obj_list = \
             await (self.derived_class_type.
                    underlying_get_symbol_side_underlying_account_cumulative_fill_qty_query_http(symbol, side))
 
@@ -1686,17 +1688,17 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
         underlying_accounts_cum_fill_qty_obj: UnderlyingAccountCumFillQty = UnderlyingAccountCumFillQty(
             underlying_account_n_cumulative_fill_qty=[]
         )
-        for fill_journal_obj in fill_journal_obj_list:
-            if (underlying_acc := fill_journal_obj.underlying_account) not in underlying_accounts:
+        for fill_ledger_obj in fill_ledger_obj_list:
+            if (underlying_acc := fill_ledger_obj.underlying_account) not in underlying_accounts:
                 underlying_accounts.add(underlying_acc)
                 underlying_accounts_cum_fill_qty_obj.underlying_account_n_cumulative_fill_qty.append(
                     UnderlyingAccountNCumFillQty(underlying_account=underlying_acc,
-                                                 cumulative_qty=fill_journal_obj.underlying_account_cumulative_fill_qty)
+                                                 cumulative_qty=fill_ledger_obj.underlying_account_cumulative_fill_qty)
                 )
         return [underlying_accounts_cum_fill_qty_obj]
 
     async def handle_get_symbol_side_underlying_account_cumulative_fill_qty_query_pre(self, symbol: str, side: str):
-        return await self.derived_class_type.underlying_read_fills_journal_http(
+        return await self.derived_class_type.underlying_read_deals_ledger_http(
             get_symbol_side_underlying_account_cumulative_fill_qty(symbol, side), self.get_generic_read_route())
 
     @abstractmethod
@@ -1754,12 +1756,12 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
     #########################
 
     async def handle_barter_simulator_place_new_chore_query_pre(
-            self, px: float, qty: int, side: Side, bartering_sec_id: str, system_sec_id: str, symbol_type: str,
-            underlying_account: str, exchange: str | None = None, internal_ord_id: str | None = None):
+            self, px: float, qty: int, side: Side, bartering_sec_id: str, system_sec_id: str, bartering_sec_type: str,
+            account: str, exchange: str | None = None, client_ord_id: str | None = None):
         if BarterSimulator.symbol_configs is None:
             BarterSimulator.reload_symbol_configs()
-        await BarterSimulator.place_new_chore(px, qty, side, bartering_sec_id, system_sec_id, symbol_type,
-                                             underlying_account, exchange, client_ord_id=internal_ord_id)
+        await BarterSimulator.place_new_chore(px, qty, side, bartering_sec_id, system_sec_id, bartering_sec_type,
+                                             account, exchange, client_ord_id=client_ord_id)
         return []
 
     async def handle_barter_simulator_place_cxl_chore_query_pre(

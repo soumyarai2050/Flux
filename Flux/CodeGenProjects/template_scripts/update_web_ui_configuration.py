@@ -37,6 +37,7 @@ class UpdateWebUIConfiguration:
             self.is_proxy_server = str(self.is_proxy_server).lower()
         self.main_server_beanie_port: str = self.project_config_yaml_dict.get("main_server_beanie_port")
         self.main_server_cache_port: str = self.project_config_yaml_dict.get("main_server_cache_port")
+        self.view_port: str = self.project_config_yaml_dict.get("view_port")
         self.ui_port: str = self.project_config_yaml_dict.get("ui_port")
 
         self._update_config_js()
@@ -57,6 +58,10 @@ class UpdateWebUIConfiguration:
         content = re.sub(
             r'const API_ROOT = [^;]+;',
             f"const API_ROOT = `http://{self.server_host}:{self.main_server_beanie_port}/"+"${PROJECT_NAME}`;", content)
+
+        content = re.sub(
+            r'const API_VIEW_ROOT = [^;]+;',
+            f"const API_ROOT = `http://{self.server_host}:{self.view_port}/"+"${PROJECT_NAME}`;", content)
 
         content = re.sub(
             r'export const API_PUBLIC_URL = [^;]+;',

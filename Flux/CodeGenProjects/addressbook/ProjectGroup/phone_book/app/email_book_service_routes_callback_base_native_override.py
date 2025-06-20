@@ -8,6 +8,7 @@ import subprocess
 import stat
 import time
 import queue
+from threading import Thread
 from typing import Set
 from datetime import datetime
 import threading
@@ -31,7 +32,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_ser
     get_new_contact_limits, get_new_chore_limits, CURRENT_PROJECT_DATA_DIR, is_ongoing_plan,
     get_plan_key_from_pair_plan, get_id_from_plan_key, get_new_plan_view_obj,
     get_matching_plan_from_symbol_n_side, get_dismiss_filter_brokers, handle_shadow_broker_updates,
-    handle_shadow_broker_creates)
+    handle_shadow_broker_creates, ps_view_port, is_view_service_up)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import plan_view_client_call_log_str
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import (
     get_pair_plan_log_key, get_pair_plan_dict_log_key, pair_plan_id_key, symbol_side_key)
@@ -49,11 +50,18 @@ from FluxPythonUtils.scripts.general_utility_functions import (
     handle_refresh_configurable_data_members, parse_to_int, set_package_logger_level)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.bartering_link import get_bartering_link
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_helper import (
-    photo_book_service_http_client)
+    photo_book_service_http_view_client, photo_book_service_http_main_client)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.service_state import ServiceState
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import (
     UpdateType, enable_disable_plan_alerts_log_str)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecordManager
+
+is_view_server: Final[bool] = os.environ.get('IS_VIEW_SERVER', False)
+use_view_clients: Final[bool] = config_yaml_dict.get("use_view_clients", False)
+if use_view_clients:
+    photo_book_service_http_client = photo_book_service_http_view_client
+else:
+    photo_book_service_http_client = photo_book_service_http_main_client
 
 
 class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookServiceRoutesCallback):
@@ -160,6 +168,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
 
 
     def __init__(self):
+        self.config_yaml_dict = config_yaml_dict
         self.asyncio_loop = None
         self.service_up: bool = False
         self.service_ready: bool = False
@@ -168,10 +177,9 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
         self.usd_fx_symbol: Final[str] = "USD|SGD"
         self.fx_symbol_overview_dict: Dict[str, FxSymbolOverviewBaseModel | None] = {"USD|SGD": None}
         self.usd_fx: float | None = None
-        self.pair_plan_id_to_executor_process_id_dict: Dict[int, int] = {}
+        self.pair_plan_id_to_executor_process_id_dict: Dict[int, Tuple[int | None, int | None]] = {}
         self.port_to_executor_http_client_dict: Dict[int, StreetBookServiceHttpClient] = {}
         self.plan_id_by_symbol_side_dict: Dict[str, int] = {}
-        self.config_yaml_dict = config_yaml_dict
         self.config_yaml_last_modified_timestamp = os.path.getmtime(config_yaml_path)
         # dict to hold realtime configurable data members and their respective keys in config_yaml_dict
         self.config_key_to_data_member_name_dict: Dict[str, str] = {
@@ -276,7 +284,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
         while True:
             if should_sleep:
                 time.sleep(self.min_refresh_interval)
-            service_up_flag_env_var = os.environ.get(f"phone_book_{ps_port}")
+            service_up_flag_env_var = os.environ.get(f"phone_book_{self.port}")
 
             if service_up_flag_env_var == "1":
                 # validate essential services are up, if so, set service ready state to true
@@ -289,6 +297,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
                         self.recover_existing_executors()
                         self._block_active_plan_with_restricted_security()
                         self.service_ready = True
+                        logging.info("Service marked Ready")
                         # print is just to manually check if this server is ready - useful when we run
                         # multiple servers and before running any test we want to make sure servers are up
                         print(f"INFO: phone_book service is ready: {datetime.datetime.now().time()}")
@@ -361,6 +370,101 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
             else:
                 should_sleep = True
 
+    @except_n_log_alert()
+    def _view_app_launch_pre_thread_func(self):
+        """
+        sleep wait till engine is up, then create contact limits if required
+        TODO LAZY: we should invoke _apply_checks_n_alert on all active pair plans at startup/re-start
+        """
+
+        error_prefix = "_view_app_launch_pre_thread_func: "
+        service_up_no_error_retry_count = 3  # minimum retries that shouldn't raise error on UI dashboard
+        should_sleep: bool = False
+        static_data_service_state: ServiceState = ServiceState(error_prefix=error_prefix + "static_data_service")
+        mongo_stream_started = False
+        while True:
+            if should_sleep:
+                time.sleep(self.min_refresh_interval)
+            service_up_flag_env_var = os.environ.get(f"phone_book_{self.port}")
+
+            if service_up_flag_env_var == "1":
+                # validate essential services are up, if so, set service ready state to true
+                # static data are considered essential
+                if self.service_up and static_data_service_state.ready:
+                    if not self.service_ready:
+                        # running all existing executor
+                        self.service_ready = True
+                        logging.info("Service marked Ready")
+                        # print is just to manually check if this server is ready - useful when we run
+                        # multiple servers and before running any test we want to make sure servers are up
+                        print(f"INFO: phone_book service is ready: {datetime.datetime.now().time()}")
+
+                if not self.service_up:
+                    try:
+                        if is_view_service_up(ignore_error=(service_up_no_error_retry_count > 0)):
+                            self.service_up = True
+                            should_sleep = False
+                        else:
+                            should_sleep = True
+                            service_up_no_error_retry_count -= 1
+                    except Exception as e:
+                        logging.exception("unexpected: service startup threw exception, "
+                                          f"we'll retry periodically in: {self.min_refresh_interval} seconds"
+                                          f";;;exception: {e}", exc_info=True)
+                else:
+                    should_sleep = True
+                    # any periodic refresh code goes here
+
+                    # service loop: manage all sub-services within their private try-catch to allow high level service
+                    # to remain partially operational even if some sub-service is not available for any reason
+                    if not static_data_service_state.ready:
+                        try:
+                            self.static_data = SecurityRecordManager.get_loaded_instance(from_cache=True)
+                            if self.static_data is not None:
+                                static_data_service_state.ready = True
+                                logging.debug("Marked static_data_service_state.ready True")
+                                # we just got static data - no need to sleep - force no sleep
+                                should_sleep = False
+                            else:
+                                raise Exception("self.static_data init to None, unexpected!!")
+                        except Exception as e:
+                            static_data_service_state.handle_exception(e)
+                    else:
+                        # refresh static data periodically (maybe more in future)
+                        try:
+                            self.static_data_periodic_refresh()
+                        except Exception as e:
+                            static_data_service_state.handle_exception(e)
+                            static_data_service_state.ready = False  # forces re-init in next iteration
+
+                    if not mongo_stream_started:
+                        Thread(target=self.start_mongo_streamer, daemon=True).start()
+                        mongo_stream_started = True
+
+                    last_modified_timestamp = os.path.getmtime(config_yaml_path)
+                    if self.config_yaml_last_modified_timestamp != last_modified_timestamp:
+                        self.config_yaml_last_modified_timestamp = last_modified_timestamp
+
+                        handle_refresh_configurable_data_members(self, self.config_key_to_data_member_name_dict,
+                                                                 str(config_yaml_path))
+            else:
+                should_sleep = True
+
+    def start_mongo_streamer(self):
+        run_coro = self._start_mongo_streamer()
+        future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
+        # block for task to finish
+        try:
+            future.result()
+        except Exception as e:
+            logging.exception(f"start_mongo_streamer failed with exception: {e}")
+
+    def sample_model_update_ws_filter_callable(self, stream_object: Dict):
+        if stream_object.get('cum_sum_of_num'):
+            return True
+        else:
+            return False
+
     def run_crashed_executors(self) -> None:
         # coro needs public method
         run_coro = self.async_run_crashed_executors()
@@ -387,11 +491,20 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
             if pending_plans:
                 await self._async_start_executor_server_by_task_submit(pending_plans, is_crash_recovery=True)
 
-    async def get_crashed_pair_plans(self, pair_plan_id, executor_process_id) -> PairPlan:
+    async def get_crashed_pair_plans(self, pair_plan_id,
+                                      executor_process_ids: Tuple[int | None, int | None]) -> PairPlan:
+        """
+        Also starts found crashed view server
+        """
         pair_plan: PairPlan | None = None
-        if not is_process_running(executor_process_id):
-            logging.info(f"process for {pair_plan_id=} and {executor_process_id=} found killed, "
+        main_executor_pid, view_executor_pid = executor_process_ids
+        if not is_process_running(main_executor_pid):
+            logging.info(f"process for {pair_plan_id=} and {main_executor_pid=} found killed, "
                          f"restarting again ...")
+
+            # closing view server if it is still running
+            if is_process_running(view_executor_pid):
+                os.kill(view_executor_pid, signal.SIGINT)
 
             pair_plan: PairPlan = (
                 await EmailBookServiceRoutesCallbackBaseNativeOverride.
@@ -405,17 +518,31 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
                        underlying_update_pair_plan_to_non_running_state_query_http(pair_plan.id))
             # else not required: if it is newly created pair plan then already values are False
 
+        # if main server is running but view server is crashed - rerunning view server
+        elif not is_process_running(view_executor_pid):
+            pair_plan_for_view_restart: PairPlan = (
+                await EmailBookServiceRoutesCallbackBaseNativeOverride.
+                underlying_read_pair_plan_by_id_http(pair_plan_id))
+            view_executor = self._start_view_server(pair_plan_for_view_restart)
+
+            # overriding new pid for view server
+            pid_tuple = self.pair_plan_id_to_executor_process_id_dict.get(pair_plan_id)
+            self.pair_plan_id_to_executor_process_id_dict[pair_plan_id] = (pid_tuple[0], view_executor.pid)
+
+        # returns pair_plan only when main start executor needs to be restarted - for view executor
+        # we restart it in above elif case only
         return pair_plan
 
-    async def _async_check_running_executors(self, pair_plan_id_to_executor_process_id_dict: Dict[int, int]) -> List[PairPlan]:
+    async def _async_check_running_executors(
+            self, pair_plan_id_to_executor_process_id_dict: Dict[int, Tuple[int | None, int | None]]) -> List[PairPlan]:
         tasks: List = []
         pair_plan_list: List[PairPlan] = []
-        for pair_plan_id, executor_process_id in pair_plan_id_to_executor_process_id_dict.items():
-            task = asyncio.create_task(self.get_crashed_pair_plans(pair_plan_id, executor_process_id), name=str(pair_plan_id))
+        for pair_plan_id, executor_process_ids in pair_plan_id_to_executor_process_id_dict.items():
+            task = asyncio.create_task(self.get_crashed_pair_plans(pair_plan_id, executor_process_ids), name=str(pair_plan_id))
             tasks.append(task)
 
         if tasks:
-            pair_plan_list = await submit_task_with_first_completed_wait(tasks)
+            pair_plan_list = await submit_task_with_first_completed_wait(tasks)   # internally filters out None returns
         return pair_plan_list
 
     async def _async_start_executor_server_by_task_submit(self, pending_plans: List[PairPlan],
@@ -477,6 +604,42 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
         os.chmod(run_fx_symbol_overview_file_path, stat.S_IRWXU)
         subprocess.Popen([f"{run_fx_symbol_overview_file_path}"])
 
+    async def async_handle_view_server_when_main_server_is_crashed_or_hung(
+            self, street_book_http_view_client: StreetBookServiceHttpClient, pair_plan: PairPlan):
+        try:
+            # Checking if get-request works
+            street_book_http_view_client.get_all_ui_layout_client()
+        except requests.exceptions.Timeout:
+            # If timeout error occurs most probably executor server got hung/stuck
+            # logging and killing this executor
+            logging.exception(f"Found view executor with port: {pair_plan.view_port} in hung state, killing "
+                              f"the executor process;;; pair_plan: {pair_plan}")
+            pid = get_pid_from_port(pair_plan.view_port)
+            os.kill(pid, signal.SIGKILL)
+
+        except Exception as e:
+            if "Failed to establish a new connection: [Errno 111] Connection refused" in str(e):
+                logging.error(f"PairPlan found to have port set to {pair_plan.port=} and {pair_plan.view_port=} "
+                              f"but executor server is down, recovering executor for "
+                              f"{pair_plan.id=};;; {pair_plan=}")
+            elif ("The Web Server may be down, too busy, or experiencing other problems preventing "
+                  "it from responding to requests" in str(e) and "status_code: 503" in str(e)):
+                pid = get_pid_from_port(pair_plan.view_port)
+                if pid is not None:
+                    os.kill(pid, signal.SIGKILL)
+            else:
+                logging.exception("Something went wrong while checking is_service_up of view executor "
+                                  f"with port: {pair_plan.port} and view_port: {pair_plan.view_port} in "
+                                  f"pair_plan plan_up recovery "
+                                  f"check - force kill this executor if is running, "
+                                  f"exception: {e};;; {pair_plan=}")
+        else:
+            # If executor server is still up and is in healthy state - Finding and returning process_id
+            pid: int = get_pid_from_port(pair_plan.view_port)
+            return pid
+        return None
+
+
     async def async_recover_existing_executors(self) -> None:
         existing_pair_plans: List[PairPlan] = \
             await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_pair_plan_http()
@@ -499,19 +662,32 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
                         if pair_plan.port is not None:
                             # setting cache for executor client
                             self._update_port_to_executor_http_client_dict_from_updated_pair_plan(pair_plan.host,
-                                                                                                   pair_plan.port)
+                                                                                                   pair_plan.port,
+                                                                                                   pair_plan.view_port)
 
-                            street_book_http_client = self.port_to_executor_http_client_dict.get(pair_plan.port)
+                            street_book_http_main_client = StreetBookServiceHttpClient.set_or_get_if_instance_exists(pair_plan.host,
+                                                                                                                           pair_plan.port)
+                            street_book_http_view_client = StreetBookServiceHttpClient.set_or_get_if_instance_exists(pair_plan.host,
+                                                                                                                           pair_plan.port,
+                                                                                                                           pair_plan.view_port)
+
                             try:
                                 # Checking if get-request works
-                                street_book_http_client.get_all_ui_layout_client()
+                                street_book_http_main_client.get_all_ui_layout_client()
                             except requests.exceptions.Timeout:
-                                # If timeout error occurs it is most probably that executor server got hung/stuck
+                                # If timeout error occurs most probably executor server got hung/stuck
                                 # logging and killing this executor
                                 logging.exception(f"Found executor with port: {pair_plan.port} in hung state, killing "
                                                   f"the executor process;;; pair_plan: {pair_plan}")
                                 pid = get_pid_from_port(pair_plan.port)
                                 os.kill(pid, signal.SIGKILL)
+
+                                # if view executor is running then terminating it to get it restarted else if is in
+                                # stuck case or crashed then anyways will be restarted in recovery
+                                pid = await self.async_handle_view_server_when_main_server_is_crashed_or_hung(street_book_http_view_client, pair_plan)
+                                if pid is not None:
+                                    os.kill(pid, signal.SIGTERM)
+                                # if pid is None - either server was crashed or was killed when found unresponsive
 
                                 # Updating pair_plan
                                 pair_plan_json = {
@@ -519,8 +695,8 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
                                     "plan_state": PlanState.PlanState_ERROR,
                                     "server_ready_state": 0,
                                     "port": None,
+                                    "view_port": None,
                                     "cpp_port": None,
-                                    "cpp_ws_port": None
                                 }
 
                                 await (EmailBookServiceRoutesCallbackBaseNativeOverride.
@@ -532,6 +708,15 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
                                                   f"server is down, recovering executor for "
                                                   f"{pair_plan.id=};;; {pair_plan=}")
                                     crashed_plans.append(pair_plan)
+
+                                    # if view executor is running then terminating it to get it restarted else if is in
+                                    # stuck case or crashed then anyways will be restarted in recovery
+                                    pid = await self.async_handle_view_server_when_main_server_is_crashed_or_hung(
+                                        street_book_http_view_client, pair_plan)
+                                    if pid is not None:
+                                        os.kill(pid, signal.SIGTERM)
+                                    # if pid is None - either server was crashed or was killed when found unresponsive
+
                                     await (EmailBookServiceRoutesCallbackBaseNativeOverride.
                                            underlying_update_pair_plan_to_non_running_state_query_http(pair_plan.id))
                                 elif ("The Web Server may be down, too busy, or experiencing other problems preventing "
@@ -540,6 +725,15 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
                                     if pid is not None:
                                         os.kill(pid, signal.SIGKILL)
                                     crashed_plans.append(pair_plan)
+
+                                    # if view executor is running then terminating it to get it restarted else if is in
+                                    # stuck case or crashed then anyways will be restarted in recovery
+                                    pid = await self.async_handle_view_server_when_main_server_is_crashed_or_hung(
+                                        street_book_http_view_client, pair_plan)
+                                    if pid is not None:
+                                        os.kill(pid, signal.SIGTERM)
+                                    # if pid is None - either server was crashed or was killed when found unresponsive
+
                                     await (EmailBookServiceRoutesCallbackBaseNativeOverride.
                                            underlying_update_pair_plan_to_non_running_state_query_http(pair_plan.id))
                                 else:
@@ -550,8 +744,19 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
                             else:
                                 # If executor server is still up and is in healthy state - Finding and adding
                                 # process_id to pair_plan_id_to_executor_process_dicts
-                                pid = get_pid_from_port(pair_plan.port)
-                                self.pair_plan_id_to_executor_process_id_dict[pair_plan.id] = pid
+                                main_pid: int = get_pid_from_port(pair_plan.port)
+
+                                # if view executor is running then adding it to cache else if is in
+                                # stuck case or crashed then anyways will be restarted in recovery
+                                view_pid = await self.async_handle_view_server_when_main_server_is_crashed_or_hung(
+                                    street_book_http_view_client, pair_plan)
+                                if view_pid is not None:
+                                    self.pair_plan_id_to_executor_process_id_dict[pair_plan.id] = (main_pid, view_pid)
+                                else:
+                                    # if server is crashed or killed - restarting view server and setting it up
+                                    view_executor = self._start_view_server(pair_plan)
+                                    self.pair_plan_id_to_executor_process_id_dict[pair_plan.id] = (main_pid, view_executor.pid)
+
                         else:
                             crashed_plans.append(pair_plan)
                     # else not required: avoiding if pair_plan is not in loaded_plans
@@ -607,6 +812,13 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
         app_launch_pre_thread.start()
         logging.debug("Triggered server launch pre override")
 
+    def view_app_launch_pre(self):
+        EmailBookServiceRoutesCallbackBaseNativeOverride.initialize_underlying_http_routes()
+        self.port = ps_view_port
+        app_launch_pre_thread = threading.Thread(target=self._view_app_launch_pre_thread_func, daemon=True)
+        app_launch_pre_thread.start()
+        logging.debug("Triggered view server launch pre override")
+
     def app_launch_post(self):
         logging.debug("Triggered server launch post override")
 
@@ -617,6 +829,9 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
         except Exception as e:
             err_str_ = f"Something went wrong while deleting fx_so shell script, exception: {e}"
             logging.error(err_str_)
+
+    def view_app_launch_post(self):
+        logging.debug("Triggered view server launch post override")
 
     def get_generic_read_route(self):
         return None
@@ -965,10 +1180,17 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
             self._apply_fallback_route_check(updated_pair_plan_obj, raise_exception=True)
         return check_passed
 
-    def _update_port_to_executor_http_client_dict_from_updated_pair_plan(self, host: str, port: int):
-        if port is not None and port not in self.port_to_executor_http_client_dict:
-            self.port_to_executor_http_client_dict[port] = (
-                StreetBookServiceHttpClient.set_or_get_if_instance_exists(host, port))
+    def _update_port_to_executor_http_client_dict_from_updated_pair_plan(self, host: str, port: int,
+                                                                          view_port: int):
+        # todo: view port
+        if not use_view_clients:
+            if port is not None and port not in self.port_to_executor_http_client_dict:
+                self.port_to_executor_http_client_dict[port] = (
+                    StreetBookServiceHttpClient.set_or_get_if_instance_exists(host, port))
+        else:
+            if port is not None and port not in self.port_to_executor_http_client_dict:
+                self.port_to_executor_http_client_dict[port] = (
+                    StreetBookServiceHttpClient.set_or_get_if_instance_exists(host, port, view_port))
 
     async def update_pair_plan_pre(self, stored_pair_plan_obj: PairPlan, updated_pair_plan_obj: PairPlan):
         if not self.service_ready:
@@ -998,7 +1220,8 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
 
         # updating port_to_executor_http_client_dict with this port if not present
         self._update_port_to_executor_http_client_dict_from_updated_pair_plan(updated_pair_plan_obj.host,
-                                                                               updated_pair_plan_obj.port)
+                                                                               updated_pair_plan_obj.port,
+                                                                               updated_pair_plan_obj.view_port)
 
         return updated_pair_plan_obj
 
@@ -1028,7 +1251,8 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
         # updating port_to_executor_http_client_dict with this port if not present
         host = updated_pair_plan_obj_dict.get("host")
         port = updated_pair_plan_obj_dict.get("port")
-        self._update_port_to_executor_http_client_dict_from_updated_pair_plan(host, port)
+        view_port = updated_pair_plan_obj_dict.get("view_port")
+        self._update_port_to_executor_http_client_dict_from_updated_pair_plan(host, port, view_port)
         return updated_pair_plan_obj_dict
 
     async def partial_update_pair_plan_pre(self, stored_pair_plan_obj_json: Dict[str, Any],
@@ -1125,8 +1349,8 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
             "_id": pair_plan_id,
             "server_ready_state": 0,
             "port": None,
-            "cpp_port": None,
-            "cpp_ws_port": None
+            "view_port": None,
+            "cpp_port": None
         }
 
         update_pair_plan = \
@@ -1134,23 +1358,39 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
                    underlying_partial_update_pair_plan_http(pair_plan_json))
         return [update_pair_plan]
 
+    def get_launch_script_path(self):
+        code_gen_projects_dir = PurePath(__file__).parent.parent.parent
+        executor_path = code_gen_projects_dir / "street_book" / "scripts" / 'launch_msgspec_fastapi.py'
+        return executor_path
+
+    def _start_view_server(self, pair_plan: PairPlan) -> subprocess.Popen:
+        executor_path = self.get_launch_script_path()
+        env_dict = os.environ.copy()
+        env_dict["IS_VIEW_SERVER"] = "1"
+        view_executor = subprocess.Popen(['python', str(executor_path), f'{pair_plan.id}', '&'],
+                                         env=env_dict)
+        return view_executor
+
     async def _start_executor_server(self, pair_plan: PairPlan, is_crash_recovery: bool | None = None) -> None:
         code_gen_projects_dir = PurePath(__file__).parent.parent.parent
-        # executor_path = code_gen_projects_dir / "street_book" / "scripts" / 'launch_beanie_fastapi.py'
-        executor_path = code_gen_projects_dir / "street_book" / "scripts" / 'launch_msgspec_fastapi.py'
+        executor_path = self.get_launch_script_path()
+
         if is_crash_recovery:
             # 1 is sent to indicate it is recovery restart
-            executor = subprocess.Popen(['python', str(executor_path), f'{pair_plan.id}', "1", '&'])
+            main_executor = subprocess.Popen(['python', str(executor_path), f'{pair_plan.id}', "1", '&'])
         else:
-            executor = subprocess.Popen(['python', str(executor_path), f'{pair_plan.id}', '&'])
+            main_executor = subprocess.Popen(['python', str(executor_path), f'{pair_plan.id}', '&'])
+        # view server doesn't need special recovery handling
+        view_executor = self._start_view_server(pair_plan)
 
         logging.info(f"Launched plan executor for {pair_plan.id=};;;{executor_path=}")
-        self.pair_plan_id_to_executor_process_id_dict[pair_plan.id] = executor.pid
+        self.pair_plan_id_to_executor_process_id_dict[pair_plan.id] = (main_executor.pid, view_executor.pid)
 
     def _close_executor_server(self, pair_plan_id: int) -> None:
-        process_id = self.pair_plan_id_to_executor_process_id_dict.get(pair_plan_id)
+        main_serive_pid, view_service_pid = self.pair_plan_id_to_executor_process_id_dict.get(pair_plan_id)
         # process.terminate()
-        os.kill(process_id, signal.SIGINT)
+        os.kill(main_serive_pid, signal.SIGINT)
+        os.kill(view_service_pid, signal.SIGINT)
 
         del self.pair_plan_id_to_executor_process_id_dict[pair_plan_id]
 
@@ -1296,6 +1536,12 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
                         await (EmailBookServiceRoutesCallbackBaseNativeOverride.
                                underlying_read_pair_plan_by_id_http(pair_plan_id))
                     if pair_plan.port is not None:
+                        if is_view_server:
+                            self._update_port_to_executor_http_client_dict_from_updated_pair_plan(pair_plan.host,
+                                                                                                   pair_plan.port,
+                                                                                                   pair_plan.view_port)
+                        # else not required: In primary server, street_book_web_client is expected to be present in cache since
+                        # we added it in cache in create_pair_plan_pre
                         street_book_web_client: StreetBookServiceHttpClient = (
                             self.port_to_executor_http_client_dict.get(pair_plan.port))
                     else:
@@ -1436,10 +1682,10 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
         plan_collection = plan_collections[0]
         return plan_collection
 
-    async def unload_plan_from_plan_id_query_pre(
-            self, plan_collection_class_type: Type[PlanCollection], plan_id: int):
+    async def unload_plan_from_plan_id_query_pre(self, plan_collection_class_type: Type[PlanCollection],
+                                                   payload: Dict[str, Any]):
         async with PlanCollection.reentrant_lock:
-
+            plan_id: int = payload.get("plan_id")
             pair_plan = await (
                 EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_pair_plan_by_id_http(plan_id))
             plan_key = get_plan_key_from_pair_plan(pair_plan)
@@ -1459,9 +1705,10 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
                 raise HTTPException(detail=err_str_, status_code=400)
         return []
 
-    async def reload_plan_from_plan_id_query_pre(
-            self, plan_collection_class_type: Type[PlanCollection], plan_id: int):
+    async def reload_plan_from_plan_id_query_pre(self, plan_collection_class_type: Type[PlanCollection],
+                                                   payload: Dict[str, Any]):
         async with PlanCollection.reentrant_lock:
+            plan_id: int = payload.get("plan_id")
             plan_collection = await self.get_plan_collection()
             pair_plan = await (
                 EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_pair_plan_by_id_http(plan_id))
@@ -1749,7 +1996,7 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
             # else - valid pair plan id and not monitored
 
             # register pair plan
-            self.pair_plan_id_to_executor_process_id_dict[pair_plan_id] = None
+            self.pair_plan_id_to_executor_process_id_dict[pair_plan_id] = (None, None)
             return [pair_plan_obj]
         except Exception as exp:
             err_str_ = f"register_pair_plan_for_recovery failed, exception: {exp}"

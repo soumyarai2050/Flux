@@ -193,4 +193,4 @@ class PlanCache(BasePlanCache, EmailBookServiceBasePlanCache, StreetBookServiceB
                f"unack_leg1 {self.unack_leg1_set}, unack_leg2 {self.unack_leg2_set}, " \
                f"plan_brief: {self._plan_brief}, cancel_chores: {self._chore_id_to_cancel_chore_dict}, " \
                f"new_chores: [{self._new_chores}], chore_snapshots: {self._chore_id_to_chore_snapshot_dict}, " \
-               f"chore_journals: {self._chore_journals}, fills_journals: {self._fills_journals}"
+               f"chore_ledgers: {self._chore_ledgers}, deals_ledgers: {self._deals_ledgers}"

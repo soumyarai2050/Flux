@@ -42,7 +42,7 @@ enum ChoreStatusType {
 }
 
 
-message ChoreJournal {
+message ChoreLedger {
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     CreateAllOp: AggregateType_UNSPECIFIED,
@@ -64,6 +64,7 @@ message ChoreJournal {
     depending_proto_model_name: "PairPlan",
     depending_proto_model_field_name_for_host: "PairPlan.host",
     depending_proto_model_field_name_for_port: "PairPlan.port",
+    depending_proto_model_field_name_for_view_port: "PairPlan.view_port"
     is_read_only: true
   };
   option (FluxMsgJsonQuery) = {
@@ -79,9 +80,9 @@ message ChoreJournal {
       }
   };
   option (FluxMsgJsonQuery) = {
-      QueryName: "get_chore_journals_from_cache"
+      QueryName: "get_chore_ledgers_from_cache"
   };
-  option (FluxMsgCRUDSharedLock) = "journal_shared_lock";
+  option (FluxMsgCRUDSharedLock) = "ledger_shared_lock";
   option (FluxMsgUIGetAllLimit) = "-100";
   option (FluxMsgExecutorOptions) = {
     IsWebSocketModel: true,
@@ -101,8 +102,8 @@ message ChoreJournal {
   optional int32 current_period_chore_count = 8 [ (FluxFldHelp) = "total new chore count within chore_rate(s) applicable_period_seconds"];
 }
 
-message ChoreJournalList {
-    repeated ChoreJournal chore_journal = 1 [(FluxFldPk) = "true"];
+message ChoreLedgerList {
+    repeated ChoreLedger chore_ledger = 1 [(FluxFldPk) = "true"];
 }
 
 message ChoreSnapshot {
@@ -129,6 +130,7 @@ message ChoreSnapshot {
     depending_proto_model_name: "PairPlan",
     depending_proto_model_field_name_for_host: "PairPlan.host",
     depending_proto_model_field_name_for_port: "PairPlan.port",
+    depending_proto_model_field_name_for_view_port: "PairPlan.view_port"
     is_read_only: true
   };
   option (FluxMsgJsonQuery) = {

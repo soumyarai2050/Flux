@@ -87,6 +87,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     const [showAll, setShowAll] = useState(false);
     const [moreAll, setMoreAll] = useState(false);
     const [url, setUrl] = useState(modelDataSource.url);
+    const [viewUrl, setViewUrl] = useState(modelDataSource.viewUrl);
     const [isProcessingUserActions, setIsProcessingUserActions] = useState(false);
     const [reconnectCounter, setReconnectCounter] = useState(0);
     const [rowIds, setRowIds] = useState(null);
@@ -182,8 +183,8 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
 
     useEffect(() => {
         if (dataSourcesCrudOverrideDictRef.current) return;
-        dataSources.forEach(({ actions, name, url }) => {
-            let args = { url };
+        dataSources.forEach(({ actions, name, url, viewUrl }) => {
+            let args = { url: viewUrl };
             const crudOverrideDict = dataSourcesCrudOverrideDictRef.current?.[name];
             const params = dataSourcesParams?.[name];
             if (crudOverrideDict?.GET_ALL) {
@@ -326,7 +327,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     }
 
     socketRef.current = useWebSocketWorker({
-        url,
+        url: (modelSchema.is_large_db_object || modelSchema.is_time_series) ? url : viewUrl,
         modelName,
         isDisabled: isWsDisabled,
         reconnectCounter,
@@ -406,8 +407,8 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
 
     const handleReload = () => {
         dispatch(modelActions.getAll());
-        dataSources.forEach(({ name, url, actions }) => {
-            let args = { url };
+        dataSources.forEach(({ name, url, viewUrl, actions }) => {
+            let args = { url: viewUrl };
             const crudOverrideDict = dataSourcesCrudOverrideDictRef.current?.[name];
             const params = dataSourcesParams?.[name];
             if (crudOverrideDict?.GET_ALL) {
@@ -913,6 +914,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                         // button query menu
                         modelSchema={modelSchema}
                         url={url}
+                        viewUrl={viewUrl}
                         // misc
                         enableOverride={modelLayoutData.enable_override || []}
                         disableOverride={modelLayoutData.disable_override || []}

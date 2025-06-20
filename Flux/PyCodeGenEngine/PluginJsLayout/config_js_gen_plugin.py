@@ -76,6 +76,7 @@ class JsConstantsGenPlugin(BaseJSLayoutPlugin):
             logging.error(err_str)
             raise Exception(err_str)
         beanie_port = os.environ.get("BEANIE_PORT")
+        view_port = os.environ.get("VIEW_PORT")
         if beanie_port is None or len(beanie_port) == 0:
             err_str = (f"Env var 'BEANIE_PORT' found as '{beanie_port}', "
                        f"likely bug in setting env var from launch of this plugin")
@@ -94,6 +95,7 @@ class JsConstantsGenPlugin(BaseJSLayoutPlugin):
                 "project_name": f"export const PROJECT_NAME = '{self.proto_package_name}';",
                 "proxy_server_root": f"const PROXY_SERVER_ROOT = 'http://{ui_proxy_host}:{ui_proxy_port}/ui_proxy';",
                 "api_root": f"const API_ROOT = `http://{self.host}:{beanie_port}/"+"${PROJECT_NAME}`;",
+                "api_view_root": f"const API_VIEW_ROOT = `http://{self.host}:{view_port}/" + "${PROJECT_NAME}`;",
                 "api_public_url": f"export const API_PUBLIC_URL = 'http://{self.host}:{ui_port}';"
             }
         }

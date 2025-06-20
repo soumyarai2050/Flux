@@ -15,7 +15,7 @@ from FluxPythonUtils.scripts.general_utility_functions import (
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.FastApi.photo_book_service_routes_msgspec_callback import PhotoBookServiceRoutesCallback
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_helper import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import (
-    handle_patch_db_queue_updater, get_update_obj_list_for_journal_type_update,
+    handle_patch_db_queue_updater, get_update_obj_list_for_ledger_type_update,
     get_update_obj_for_snapshot_type_update, UpdateType, non_existing_obj_read_fail_regex_pattern,
     get_field_seperator_pattern, get_pattern_to_remove_file_from_created_cache,
     get_key_val_seperator_pattern, get_pattern_for_plan_view_db_updates)
@@ -49,7 +49,7 @@ class PhotoBookServiceRoutesCallbackBaseNativeOverride(PhotoBookServiceRoutesCal
 
     @classmethod
     def initialize_underlying_http_callables(cls):
-        from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.FastApi.photo_book_service_http_msgspec_routes import (
+        from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.FastApi.photo_book_service_http_routes_imports import (
             underlying_partial_update_all_plan_view_http, underlying_read_plan_view_http,
             underlying_update_plan_view_http)
         cls.underlying_partial_update_all_plan_view_http = underlying_partial_update_all_plan_view_http
@@ -69,7 +69,7 @@ class PhotoBookServiceRoutesCallbackBaseNativeOverride(PhotoBookServiceRoutesCal
         while True:
             if should_sleep:
                 time.sleep(self.min_refresh_interval)
-            service_up_flag_env_var = os.environ.get(f"photo_book_{sv_port}")
+            service_up_flag_env_var = os.environ.get(f"photo_book_{self.port}")
 
             if service_up_flag_env_var == "1":
                 # validate essential services are up, if so, set service ready state to true
@@ -102,6 +102,66 @@ class PhotoBookServiceRoutesCallbackBaseNativeOverride(PhotoBookServiceRoutesCal
             else:
                 should_sleep = True
 
+    @except_n_log_alert()
+    def _view_app_launch_pre_thread_func(self):
+        """
+        sleep wait till engine is up, then create contact limits if required
+        TODO LAZY: we should invoke _apply_checks_n_alert on all active pair plans at startup/re-start
+        """
+
+        error_prefix = "_app_launch_pre_thread_func: "
+        service_up_no_error_retry_count = 3  # minimum retries that shouldn't raise error on UI dashboard
+        should_sleep: bool = False
+        mongo_stream_started: bool = False
+        while True:
+            if should_sleep:
+                time.sleep(self.min_refresh_interval)
+            service_up_flag_env_var = os.environ.get(f"photo_book_{self.port}")
+
+            if service_up_flag_env_var == "1":
+                # validate essential services are up, if so, set service ready state to true
+                if self.service_up:
+                    if not self.service_ready:
+                        self.service_ready = True
+                        # print is just to manually check if this server is ready - useful when we run
+                        # multiple servers and before running any test we want to make sure servers are up
+                        print(f"INFO: plan view engine service is ready: {datetime.datetime.now().time()}")
+
+                if not self.service_up:
+                    try:
+                        if is_photo_book_view_service_up(ignore_error=(service_up_no_error_retry_count > 0)):
+                            self.service_up = True
+                            should_sleep = False
+                    except Exception as e:
+                        logging.exception("unexpected: service startup threw exception, "
+                                          f"we'll retry periodically in: {self.min_refresh_interval} seconds"
+                                          f";;;exception: {e}", exc_info=True)
+                else:
+                    should_sleep = True
+                    # any periodic refresh code goes here
+
+                    if not mongo_stream_started:
+                        Thread(target=self.start_mongo_streamer, daemon=True).start()
+                        mongo_stream_started = True
+
+                    last_modified_timestamp = os.path.getmtime(config_yaml_path)
+                    if self.config_yaml_last_modified_timestamp != last_modified_timestamp:
+                        self.config_yaml_last_modified_timestamp = last_modified_timestamp
+
+                        handle_refresh_configurable_data_members(self, self.config_key_to_data_member_name_dict,
+                                                                 str(config_yaml_path))
+            else:
+                should_sleep = True
+
+    def start_mongo_streamer(self):
+        run_coro = self._start_mongo_streamer()
+        future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
+        # block for task to finish
+        try:
+            future.result()
+        except Exception as e:
+            logging.exception(f"start_mongo_streamer failed with exception: {e}")
+
     def app_launch_pre(self):
         PhotoBookServiceRoutesCallbackBaseNativeOverride.initialize_underlying_http_callables()
 
@@ -110,12 +170,23 @@ class PhotoBookServiceRoutesCallbackBaseNativeOverride(PhotoBookServiceRoutesCal
         app_launch_pre_thread = Thread(target=self._app_launch_pre_thread_func, daemon=True)
         app_launch_pre_thread.start()
 
+    def view_app_launch_pre(self):
+        PhotoBookServiceRoutesCallbackBaseNativeOverride.initialize_underlying_http_callables()
+
+        logging.debug("Triggered view server launch pre override")
+        self.port = sv_view_port
+        app_launch_pre_thread = Thread(target=self._view_app_launch_pre_thread_func, daemon=True)
+        app_launch_pre_thread.start()
+
     def app_launch_post(self):
         logging.debug("Triggered server launch post override, killing file_watcher and tail executor processes")
 
         # Exiting running threads
         for _, queue_ in self.model_type_name_to_patch_queue_cache_dict.items():
             queue_.put("EXIT")
+
+    def view_app_launch_post(self):
+        logging.debug("Triggered view server launch post override")
 
     async def read_all_ui_layout_pre(self):
         # Setting asyncio_loop in ui_layout_pre since it called to check current service up
@@ -275,7 +346,7 @@ class PhotoBookServiceRoutesCallbackBaseNativeOverride(PhotoBookServiceRoutesCal
 
                 handle_patch_db_queue_updater(update_type, self.model_type_name_to_patch_queue_cache_dict,
                                               basemodel_type_name, method_name, update_json,
-                                              get_update_obj_list_for_journal_type_update,
+                                              get_update_obj_list_for_ledger_type_update,
                                               get_update_obj_for_snapshot_type_update,
                                               method_callable, self.dynamic_queue_handler_err_handler,
                                               self.max_fetch_from_queue, self._snapshot_type_callable_err_handler,

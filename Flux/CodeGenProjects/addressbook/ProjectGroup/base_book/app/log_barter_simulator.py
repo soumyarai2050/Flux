@@ -27,7 +27,7 @@ from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_post_book_n_basket_
 log_simulate_logger = logging.getLogger("log_simulator")
 
 
-class FillsJournalCont(FillsJournalBaseModel):
+class DealsLedgerCont(DealsLedgerBaseModel):
 
     @staticmethod
     def transform(kwargs: Dict):
@@ -40,16 +40,16 @@ class FillsJournalCont(FillsJournalBaseModel):
     @classmethod
     def from_kwargs(cls, **kwargs):
         cls.transform(kwargs)
-        fills_journal_cont = super().from_kwargs(**kwargs)
-        return fills_journal_cont
+        deals_ledger_cont = super().from_kwargs(**kwargs)
+        return deals_ledger_cont
 
     @classmethod
     def from_dict_list(cls, args_dict_list: List[Dict], **kwargs):
         args_dict: Dict
         for args_dict in args_dict_list:
             cls.transform(args_dict)
-        fills_journal_cont_list = super().from_dict_list(args_dict_list, **kwargs)
-        return fills_journal_cont_list
+        deals_ledger_cont_list = super().from_dict_list(args_dict_list, **kwargs)
+        return deals_ledger_cont_list
 
 
 class LogBarterSimulator(BarteringLinkBase):
@@ -80,15 +80,15 @@ class LogBarterSimulator(BarteringLinkBase):
             return broker_sec_pos_dict
 
         with FileLock(str(cls.intraday_bartering_chores_lock_file)):
-            intraday_chore_fills: List[FillsJournalCont] = dict_or_list_records_csv_reader(  # noqa
-                cls.intraday_bartering_chores_csv_file_name, FillsJournalCont, EXECUTOR_PROJECT_DATA_DIR)
+            intraday_chore_deals: List[DealsLedgerCont] = dict_or_list_records_csv_reader(  # noqa
+                cls.intraday_bartering_chores_csv_file_name, DealsLedgerCont, EXECUTOR_PROJECT_DATA_DIR)
 
-            if not intraday_chore_fills:
+            if not intraday_chore_deals:
                 logging.warning("No positions found in barter simulator")
                 return broker_sec_pos_dict
 
-            chore_fill: FillsJournalCont
-            for chore_fill in intraday_chore_fills:
+            chore_fill: DealsLedgerCont
+            for chore_fill in intraday_chore_deals:
                 ticker: str = chore_fill.fill_symbol
                 inst_type: InstrumentType
                 sec_id: str
@@ -156,7 +156,7 @@ class LogBarterSimulator(BarteringLinkBase):
 
     @classmethod
     async def place_new_chore(cls, px: float, qty: int, side: Side, bartering_sec_id: str, system_sec_id: str,
-                              symbol_type: str, account: str, exchange: str | None = None, text: List[str] | None = None,
+                              bartering_sec_type: str, account: str, exchange: str | None = None, text: List[str] | None = None,
                               client_ord_id: str | None = None, **kwargs) -> Tuple[bool, str]:
         """
         return bool indicating success/fail and unique-id-str/err-description in second param
@@ -167,16 +167,17 @@ class LogBarterSimulator(BarteringLinkBase):
                 logging.error(f"logit_simulator does not support list arguments, found: {text} for chore: "
                               f"px{cls.val_sep}{px}{cls.fld_sep}qty{cls.val_sep}{qty}{cls.fld_sep}side{cls.val_sep}"
                               f"{side.value}{cls.fld_sep}bartering_sec_id{cls.val_sep}{bartering_sec_id}{cls.fld_sep}"
-                              f"system_sec_id: {system_sec_id}{cls.fld_sep}account{cls.val_sep}{account}{exchange_str}"
-                              f"{cls.fld_sep}internal_ord_id{cls.val_sep}{client_ord_id}")
+                              f"system_sec_id: {system_sec_id}{cls.fld_sep}bartering_sec_type: {bartering_sec_type}"
+                              f"{cls.fld_sep}account{cls.val_sep}{account}{exchange_str}"
+                              f"{cls.fld_sep}client_ord_id{cls.val_sep}{client_ord_id}")
             log_simulate_logger.info(
                 f"{LogBarterSimulator.log_simulator_pattern}barter_simulator_place_new_chore_query_client{cls.fld_sep}"
                 f"{cls.executor_host}{cls.fld_sep}"
                 f"{cls.executor_port}{cls.fld_sep}px{cls.val_sep}{px}{cls.fld_sep}qty{cls.val_sep}{qty}"
                 f"{cls.fld_sep}side{cls.val_sep}{side.value}{cls.fld_sep}bartering_sec_id{cls.val_sep}{bartering_sec_id}"
                 f"{cls.fld_sep}system_sec_id{cls.val_sep}{system_sec_id}{cls.fld_sep}"
-                f"symbol_type{cls.val_sep}{symbol_type}{cls.fld_sep}underlying_account"
-                f"{cls.val_sep}{account}{exchange_str}{cls.fld_sep}internal_ord_id{cls.val_sep}{client_ord_id}")
+                f"bartering_sec_type{cls.val_sep}{bartering_sec_type}{cls.fld_sep}account"
+                f"{cls.val_sep}{account}{exchange_str}{cls.fld_sep}client_ord_id{cls.val_sep}{client_ord_id}")
         cls.int_id += 1
         sync_check = kwargs.get("sync_check")
         if sync_check:
@@ -216,6 +217,6 @@ class LogBarterSimulator(BarteringLinkBase):
         """
         returns chore_status (ChoreStatusType), any_chore_text, filled-Qty, chore-px and chore-qty as seen by bartering
         link, caller may use these for reconciliation
-        returns None if chore not found by Bartering Link
+        return None if chore not found by Bartering Link
         """
         raise NotImplementedError
