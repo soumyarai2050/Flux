@@ -7,7 +7,7 @@
 
 .cell {
     /* color: white !important; */
-    padding: 4px 2px !important;
+    padding: 2px 4px !important;
 }
 
 .cell:hover {
@@ -60,4 +60,10 @@
 .icon {
     color: white !important;
     margin-left: -4px !important;
+}
+
+.sticky {
+    position: sticky;
+    top: 0;
+    z-index: 3;
 }

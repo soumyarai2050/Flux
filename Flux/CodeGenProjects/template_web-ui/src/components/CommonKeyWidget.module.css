@@ -2,10 +2,11 @@
     padding: 5px 10px;
     display: flex;
     justify-content: flex-start;
-    /* background-color: cadetblue; */
     flex-wrap: wrap;
-    max-height: 75%;
+    /* max-height: 75%; */
+    max-height: 200px;
     overflow: auto;
+    flex-shrink: 0;
 }
 
 .item {
@@ -17,28 +18,28 @@
 }
 
 .critical {
-    color: #9C0006 !important;
+    color: var(--red-critical) !important;
     animation: blink 0.5s step-start infinite;
 }
 
 .error {
-    color: #9C0006 !important;
+    color: var(--red-error) !important;
 }
 
 .warning {
-    color: #9c6500 !important;
+    color: var(--yellow-warning) !important;
 }
 
 .info {
-    color: blue !important;
+    color: var(--blue-info) !important;
 }
 
 .debug {
-    color: #444 !important;
+    color: var(--grey-debug) !important;
 }
 
 .success {
-    color: green !important;
+    color: var(--green-success) !important;
 }
 
 .default {
@@ -52,7 +53,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     text-decoration: underline;
-    color: blue;
+    color: var(--blue-info);
     font-weight: bold;
     cursor: pointer;
 }

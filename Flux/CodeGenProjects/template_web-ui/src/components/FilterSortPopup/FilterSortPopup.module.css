@@ -1,0 +1,300 @@
+/* Filter icon */
+.filterIconWrapper {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+  background-color: rgba(255, 255, 255, 0.2);
+  /* background-color: inherit; */
+  border-radius: 2px;
+  margin-left: 4px;
+}
+
+.filterButton {
+  color: rgba(0, 0, 0, 0.54) !important;
+  padding: 2px !important;
+}
+
+.hasFilter {
+  /* Office blue */
+  color: #0078d4 !important;
+}
+
+.activeFilter {
+  color: var(--red-error) !important;
+}
+
+.sortIndicator {
+  position: absolute;
+  left: 0px;
+  top: 2px;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ascArrow {
+  color: var(--red-error);
+  font-size: 10px;
+}
+
+.descArrow {
+  color: var(--red-error);
+  font-size: 10px;
+}
+
+/* Main popup container */
+.popoverPaper {
+  max-height: 80vh;
+  min-width: 280px;
+  max-width: 320px;
+  overflow: hidden;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+}
+
+.popupContainer {
+  display: flex;
+  flex-direction: column;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+}
+
+.copyOption {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  cursor: pointer;
+  color: #212121;
+}
+
+.copyOption:hover {
+  /* Excel's light blue hover */
+  background-color: #e5f3ff;
+}
+
+/* Sort options */
+.sortOption {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  cursor: pointer;
+  color: #212121;
+}
+
+.sortOption:hover {
+  /* Excel's light blue hover */
+  background-color: #e5f3ff;
+}
+
+.clearFilterOption {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  cursor: pointer;
+  color: #212121;
+}
+
+.clearFilterOption:hover {
+  /* Excel's light blue hover */
+  background-color: #e5f3ff;
+}
+
+.sortIcon {
+  width: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.checkMark {
+  /* Office blue */
+  color: #0078d4;
+  font-weight: bold;
+}
+
+.sortIconPlaceholder {
+  width: 24px;
+  margin-right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.menuIcon {
+  font-size: 18px !important;
+  color: #666;
+}
+
+/* Text filters */
+.textFiltersHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  cursor: pointer;
+  color: #212121;
+}
+
+.textFiltersHeader:hover {
+  /* Excel's light blue hover */
+  background-color: #e5f3ff;
+}
+
+.textFilterSection {
+  padding: 12px;
+  background-color: #f5f5f5;
+}
+
+.filterTypeSelect {
+  margin-bottom: 8px !important;
+}
+
+.textfield {
+  margin-top: 8px;
+}
+
+/* Search section */
+.searchContainer {
+  padding: 12px 12px 8px 12px;
+}
+
+.searchField {
+  font-size: 13px;
+}
+
+.searchIcon {
+  color: #666;
+}
+
+.addSelectionContainer {
+  padding: 0 12px 8px 12px;
+}
+
+.addSelectionCheckbox {
+  margin: 0 !important;
+}
+
+/* Filter list */
+.valuesList {
+  margin: 0 12px 12px;
+  border: 1px solid #e0e0e0;
+}
+
+.selectAllContainer {
+  border-bottom: 1px solid #e0e0e0;
+  background-color: #f5f5f5;
+}
+
+.selectAllCheckbox {
+  margin: 0 !important;
+  padding: 0;
+  width: 100%;
+}
+
+.checkboxListContainer {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.checkboxlist {
+  padding: 0 8px !important;
+  max-height: 200px;
+}
+
+.checkbox {
+  /* Office blue */
+  color: #0078d4 !important;
+}
+
+.checkbox.Mui-checked {
+  /* Office blue */
+  color: #0078d4 !important;
+}
+
+.checkboxItem {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.checkboxItem:hover {
+  /* Excel's light blue hover */
+  background-color: #e5f3ff;
+}
+
+.valueWithCount {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.checkboxLabel {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+  font-size: 13px;
+}
+
+.valueCount {
+  font-size: 11px;
+  color: rgba(0, 0, 0, 0.6);
+  margin-left: 8px;
+}
+
+.menuDivider {
+  margin: 4px 0 !important;
+}
+
+/* Action buttons */
+.actionButtons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 4px;
+  background-color: #f0f0f0;
+  border-top: 1px solid #d6d6d6;
+}
+
+.okButton {
+  font-size: 12px !important;
+  text-transform: none !important;
+  min-width: 80px !important;
+  /* Office blue */
+  background-color: #0078d4 !important;
+}
+
+.okButton:hover {
+  /* Darker Office blue */
+  background-color: #106ebe !important;
+}
+
+.cancelButton {
+  font-size: 12px !important;
+  text-transform: none !important;
+  min-width: 80px !important;
+  color: #333 !important;
+  border-color: #080505 !important;
+}
+
+.noResults {
+  padding: 16px;
+  text-align: center;
+  color: rgba(0, 0, 0, 0.54);
+  font-size: 13px !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 600px) {
+  .popoverPaper {
+    max-width: 90vw;
+    width: 90vw;
+  }
+
+  .checkboxLabel {
+    max-width: 150px;
+  }
+}

@@ -66,7 +66,7 @@ class ChoreControl:
         0x800000: "CONSUMABLE_NETT_FILLED_NOTIONAL_FAIL",
         0x1000000: "CONSUMABLE_OPEN_NOTIONAL_FAIL",
     }
-    market: Market = Market(market_id=MarketID.IN)
+    market: Market = Market([MarketID.IN])
 
     # Min Allowed EQT chore QTY Hardcoded to 200
     MIN_EQT_ORDER_QTY: Final[int] = 20 if market.is_sanity_test_run else 200

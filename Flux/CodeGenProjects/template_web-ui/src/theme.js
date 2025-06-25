@@ -22,7 +22,6 @@ export function cssVar(name) {
             return value.trim();
         }
     }
-   
 }
 
 const typography = {
@@ -84,8 +83,8 @@ const getComponents = (themeMode, selectedColorPalette) => {
     const isLight = themeMode === Theme.LIGHT;
 
     const headerBgColor = selectedColorPalette.medium;
-    const selectedItemBgColor = selectedColorPalette.darkest;
-    const selectedItemHoverBgColor = isLight ? selectedColorPalette.dark : selectedColorPalette.light;
+    const selectedItemBgColor = isLight ? selectedColorPalette.light : selectedColorPalette.dark;
+    const selectedItemHoverBgColor = isLight ? selectedColorPalette.medium : selectedColorPalette.medium;
     const pinClockColor = isLight ? selectedColorPalette.dark : selectedColorPalette.medium;
 
     return {
@@ -157,15 +156,15 @@ const getComponents = (themeMode, selectedColorPalette) => {
                     },
                 },
             },
-        },  
+        },
         MuiListItem: {
             styleOverrides: {
                 root: {
                     '&.Mui-selected': {
                         backgroundColor: cssVar(selectedItemBgColor),
-                        '&:hover': {
-                            backgroundColor: cssVar(selectedItemHoverBgColor),
-                        }
+                        // '&:hover': {
+                        //     backgroundColor: cssVar(selectedItemHoverBgColor),
+                        // }
                     },
                 },
             },
@@ -335,6 +334,9 @@ export const getTheme = (themeMode = Theme.LIGHT, baseColorName = DEFAULT_BASE_C
                 success: {
                     main: cssVar('--green-success'),
                 },
+                white: {
+                    main: 'white'
+                },
                 text: {
                     primary: cssVar('--dark-text-primary'),
                     secondary: cssVar('--dark-text-secondary'),
@@ -391,6 +393,9 @@ export const getTheme = (themeMode = Theme.LIGHT, baseColorName = DEFAULT_BASE_C
             },
             success: {
                 main: cssVar('--green-success'),
+            },
+            white: {
+                main: 'white'
             },
             text: {
                 primary: cssVar('--light-text-primary'),

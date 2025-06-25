@@ -6,6 +6,7 @@ import classes from './Popup.module.css';
 import { useTheme } from '@mui/material/styles';
 import { getDataSourceColor } from '../utils/themeHelper';
 import { cloneDeep } from 'lodash';
+import VerticalJsonTable from './tables/VerticalJsonTable/VerticalJsonTable';
 
 export const ConfirmSavePopup = (props) => {
     const theme = useTheme();
@@ -32,6 +33,11 @@ export const ConfirmSavePopup = (props) => {
                     src={props.src}
                     collapsed={1}
                 />
+                {/* <VerticalJsonTable 
+                    isOpen={props.open}
+                    data={props.src}
+                    usePopover={false}
+                /> */}
             </DialogContent>
             <DialogActions>
                 <Button variant='contained' color='error' onClick={handleClose} startIcon={<Delete />}>Discard Changes</Button>
@@ -160,12 +166,12 @@ export const DataSourceHexColorPopup = (props) => {
 
     const handleKeyDown = (e) => {
         if (e.key.length === 1 || e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === 'Escape') {
-          // Let Escape still close the popover/menu potentially? Maybe not stop propagation for Escape.
-          if (e.key !== 'Escape') {
-            e.stopPropagation();
-          }
+            // Let Escape still close the popover/menu potentially? Maybe not stop propagation for Escape.
+            if (e.key !== 'Escape') {
+                e.stopPropagation();
+            }
         }
-      }
+    }
 
     return (
         <Dialog aria-label='data-source-popup' className={classes.backdrop} open={props.open} onClose={handleClose}>
@@ -259,7 +265,7 @@ export const LoadLayoutPopup = ({
         if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;
         onClose();
     }
-    
+
     return (
         <Dialog
             aria-label='load-layout-popup'

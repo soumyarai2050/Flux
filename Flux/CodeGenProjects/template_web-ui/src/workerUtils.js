@@ -4,39 +4,132 @@ import { SortComparator, SortType } from './utility/sortComparator';
 
 const FLOAT_POINT_PRECISION = 2;
 
-export function applyFilter(arr, filters = []) {
-    if (arr && arr.length > 0) {
-        let updatedArr = cloneDeep(arr);
-        const filterDict = getFilterDict(filters);
-        Object.keys(filterDict).forEach(key => {
-            let values = filterDict[key].split(',').map(val => val.trim()).filter(val => val !== '');
-            updatedArr = updatedArr.filter(obj => {
-                let objValue = _.get(obj, key);
-                if (objValue === null || objValue === undefined || objValue === '') {
-                    // obj key is unset, filter the obj
-                    return false;
-                }
-                // filter is set
-                objValue = String(objValue).toLowerCase();
-                return values.some(value => objValue.includes(value.toLowerCase()));
-            });
-        })
-        return updatedArr;
+/**
+ * filter data based on all column filter settings
+ * @param {Array} data - The original data array
+ * @param {Object} columnSettings - Filter and sort settings for all columns
+ * @returns {Array} Filtered data
+ */
+export const applyFilter = (data, filters = []) => {
+    if (!data || !data.length || !filters || !filters.length) return data;
+    const filterDict = getFilterDict(filters);
+
+    return data.filter(row => {
+        // Check if row passes all column filters
+        return Object.keys(filterDict).every(columnId => {
+            const filterObj = filterDict[columnId];
+
+            // Skip columns with no filter settings
+            if (!filterObj) return true;
+
+            // Get column value
+            const value = row[columnId];
+            const strValue = String(value === null || value === undefined ? '' : value);
+
+            // Check if value is in selected filters
+            const passesValueFilter = filterObj.filtered_values?.includes(strValue) ?? true;
+
+            // Check text filter if present
+            const passesTextFilter = filterByText(value, filterObj.text_filter, filterObj.text_filter_type);
+
+            return passesValueFilter && passesTextFilter;
+        });
+    });
+};
+
+/**
+ * Filter a single value based on text filter and filter type
+ * @param {any} value - Cell value to check
+ * @param {string} textfilter - Text filter to apply
+ * @param {string} textFilterType - Type of text filter
+ * @returns {boolean} Whether value passes the text filter
+ */
+export const filterByText = (value, textfilter, textFilterType) => {
+    // If no text filter, always pass
+    if (!textfilter) return true;
+
+    // Convert value to string, handling null/undefined
+    const stringValue = String(value === null || value === undefined ? '' : value);
+
+    // Case-insensitive comparison
+    const filterLower = textfilter.toLowerCase();
+    const valueLower = stringValue.toLowerCase();
+
+    switch (textFilterType) {
+        case 'equals':
+            return valueLower === filterLower;
+
+        case 'notEqual':
+            return valueLower !== filterLower;
+
+        case 'contains':
+            return valueLower.includes(filterLower);
+
+        case 'notContains':
+            return !valueLower.includes(filterLower);
+
+        case 'beginsWith':
+            return valueLower.startsWith(filterLower);
+
+        case 'endsWith':
+            return valueLower.endsWith(filterLower);
+
+        default:
+            // Default to contains
+            return valueLower.includes(filterLower);
     }
-    return [];
-}
+};
 
 export function getFilterDict(filters) {
-    const filterDict = {};
-    if (filters) {
-        filters.forEach(filter => {
-            if (filter.fld_value) {
-                filterDict[filter.fld_name] = filter.fld_value;
-            }
-        })
-    }
-    return filterDict;
+    return filters.reduce((acc, item) => {
+        acc[item.column_name] = {
+            ...item,
+            filtered_values: item.filtered_values?.split(',') ?? null
+        };
+        return acc;
+    }, {});
 }
+
+export function getSortOrderDict(sortOrders) {
+    return sortOrders.reduce((acc, { order_by, sort_type }) => {
+        acc[order_by] = sort_type ?? null;
+        return acc;
+    }, {});
+}
+
+// export function applyFilter(arr, filters = []) {
+//     if (arr && arr.length > 0) {
+//         let updatedArr = cloneDeep(arr);
+//         const filterDict = getFilterDict(filters);
+//         Object.keys(filterDict).forEach(key => {
+//             let values = filterDict[key].split(',').map(val => val.trim()).filter(val => val !== '');
+//             updatedArr = updatedArr.filter(obj => {
+//                 let objValue = _.get(obj, key);
+//                 if (objValue === null || objValue === undefined || objValue === '') {
+//                     // obj key is unset, filter the obj
+//                     return false;
+//                 }
+//                 // filter is set
+//                 objValue = String(objValue).toLowerCase();
+//                 return values.some(value => objValue.includes(value.toLowerCase()));
+//             });
+//         })
+//         return updatedArr;
+//     }
+//     return [];
+// }
+
+// export function getFilterDict(filters) {
+//     const filterDict = {};
+//     if (filters) {
+//         filters.forEach(filter => {
+//             if (filter.fld_value) {
+//                 filterDict[filter.fld_name] = filter.fld_value;
+//             }
+//         })
+//     }
+//     return filterDict;
+// }
 
 export function stableSort(array, comparator) {
     const stabilizedThis = array.map((el, index) => [el, index]);
@@ -203,8 +296,9 @@ export function getRowsFromAbbreviation(items, itemsDataDict, itemProps, abbrevi
 }
 
 export function getActiveRows(rows, page, pageSize, sortOrders, nestedArray = false) {
-    return stableSort(rows, SortComparator.getInstance(sortOrders, nestedArray))
-        .slice(page * pageSize, page * pageSize + pageSize);
+    const sortedRows = stableSort(rows, SortComparator.getInstance(sortOrders, nestedArray));
+    const activeRows = sortedRows.slice(page * pageSize, page * pageSize + pageSize);
+    return { sortedRows, activeRows };
 }
 
 export function getIdFromAbbreviatedKey(abbreviated, abbreviatedKey) {
@@ -314,29 +408,22 @@ export function sortAlertArray(alertArray) {
 
     // reverted as not stable
     // const stabilized = alertArray.map((el, index) => [el, index]);
-
     // stabilized.sort((a, b) => {
     //     const alertA = a[0];
     //     const alertB = b[0];
-
     //     const severityA = SEVERITY_TYPES[alertA.severity];
     //     const severityB = SEVERITY_TYPES[alertB.severity];
-
     //     if (severityA > severityB) return -1;
     //     if (severityB > severityA) return 1;
-
     //     // same severity
     //     if (alertA.last_update_analyzer_time > alertB.last_update_analyzer_time) return -1;
     //     if (alertB.last_update_analyzer_time > alertA.last_update_analyzer_time) return 1;
-
     //     // same timestamp
     //     if (alertA.alert_count > alertB.alert_count) return -1;
     //     if (alertB.alert_count > alertA.alert_count) return 1;
-
     //     // fallback to original index for stability
     //     return a[1] - b[1];
     // });
-
     // return stabilized.map(pair => pair[0]);
 }
 
@@ -679,7 +766,18 @@ export function getGroupedTableColumns(columns, maxRowSize, rows, groupBy = [], 
     return tableColumns;
 }
 
-export function getTableColumns(fieldsMetadata, mode, enableOverride = [], disableOverride = [], showLess = [], absoluteSortOverride = [], collectionView = false, repeatedView = false) {
+export function getTableColumns(fieldsMetadata, mode, enableOverride = [], disableOverride = [], showLess = [],
+    absoluteSortOverride = [], frozenColumns = [], columnNameOverride = [], highlightUpdateOverride = [], collectionView = false, repeatedView = false) {
+    const columnNameOverrideDict = columnNameOverride.reduce((acc, item) => {
+        const [name, override] = item.split(':');
+        acc[name] = override;
+        return acc;
+    }, {});
+    const highlightUpdateOverrideDict = highlightUpdateOverride.reduce((acc, item) => {
+        const [name, override] = item.split(':');
+        acc[name] = override;
+        return acc;
+    }, {});
     let tableColumns = fieldsMetadata
         .map(collection => Object.assign({}, collection))
         .map(collection => {
@@ -698,6 +796,17 @@ export function getTableColumns(fieldsMetadata, mode, enableOverride = [], disab
             }
             if (absoluteSortOverride.includes(fieldName)) {
                 collection.absoluteSort = true;
+            }
+            if (frozenColumns.includes(fieldName)) {
+                collection.frozenColumn = true;
+            } else {
+                delete collection.frozenColumn;
+            }
+            if (columnNameOverrideDict[fieldName]) {
+                collection.displayName = columnNameOverrideDict[fieldName];
+            }
+            if (highlightUpdateOverrideDict[fieldName]) {
+                collection.highlightUpdate = highlightUpdateOverrideDict[fieldName];
             }
             if (repeatedView) {
                 collection.rootLevel = false;

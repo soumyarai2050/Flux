@@ -1,7 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import PropTypes from 'prop-types';
-import { Box, Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField } from '@mui/material';
+import { Box, Dialog, DialogTitle, DialogContent } from '@mui/material';
 import styles from './FilterDialog.module.css';
+import FilterSortPopup from '../../FilterSortPopup/FilterSortPopup';
+import LinkText from '../../LinkText';
+import { getFilterDict, getSortOrderDict } from '../../../workerUtils';
+import { FilterAlt } from '@mui/icons-material';
 
 /**
  * FilterMenu renders a dialog that allows users to apply filters on a data set.
@@ -33,69 +37,124 @@ const FilterDialog = ({
   filters,
   onFiltersChange,
   fieldsMetadata,
-  isCollectionModel
+  isCollectionModel,
+  uniqueValues,
+  sortOrders,
+  onSortOrdersChange,
+  groupedRows
 }) => {
   // Lazy initializer for filterDict to avoid recomputation on every render.
-  const [filterDict, setFilterDict] = useState(() =>
-    filters.reduce((acc, { fld_name, fld_value }) => {
-      acc[fld_name] = fld_value;
-      return acc;
-    }, {})
-  );
+  const [filterDict, setFilterDict] = useState(getFilterDict(filters));
+  const [sortOrderDict, setSortOrderDict] = useState(getSortOrderDict(sortOrders));
+  const [clipboardText, setClipboardText] = useState(null);
 
   // Update filterDict whenever the filters prop changes.
   useEffect(() => {
-    const updatedFilterDict = filters.reduce((acc, { fld_name, fld_value }) => {
-      acc[fld_name] = fld_value;
-      return acc;
-    }, {});
+    const updatedFilterDict = getFilterDict(filters);
     setFilterDict(updatedFilterDict);
   }, [filters]);
 
+  useEffect(() => {
+    const updatedSortOrderDict = getSortOrderDict(sortOrders);
+    setSortOrderDict(updatedSortOrderDict);
+  }, [sortOrders])
+
   const handlePopupClose = (e, reason) => {
-    if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;
+    // if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;
     onClose();
   };
 
-  const handleTextChange = (e, fieldKey) => {
-    setFilterDict((prev) => ({
-      ...prev,
-      [fieldKey]: e.target.value,
-    }));
-  };
+  const handleApply = useCallback((filterName, values, textFilter, textFilterType, sortDirection, multiSort = false) => {
+    let updatedFilterDict;
+    let updatedSortOrderDict;
 
-  const handleFilterApply = () => {
-    const updatedFilters = Object.keys(filterDict).map((filterField) => ({
-      fld_name: filterField,
-      fld_value: filterDict[filterField],
-    }));
-    onFiltersChange(updatedFilters);
-    onClose();
-  };
+    setFilterDict((prev) => {
+      updatedFilterDict = {
+        ...prev,
+        [filterName]: {
+          ...prev[filterName],
+          column_name: filterName,
+          filtered_values: values,
+          text_filter: textFilter,
+          text_filter_type: textFilterType
+        }
+      };
+      return updatedFilterDict;
+    });
 
-  const handleFilterClear = () => {
-    setFilterDict({});
-    onFiltersChange([]);
-    onClose();
-  };
-
-  const handleKeyDown = (e) => {
-    if (e.key.length === 1 || e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === 'Escape') {
-      // Let Escape still close the popover/menu potentially? Maybe not stop propagation for Escape.
-      if (e.key !== 'Escape') {
-        e.stopPropagation();
+    setSortOrderDict((prev) => {
+      updatedSortOrderDict = multiSort ? {
+        ...prev,
+        [filterName]: sortDirection
+      } : { [filterName]: sortDirection };
+      if (!sortDirection) {
+        delete updatedSortOrderDict[filterName];
       }
-    }
-  }
 
-  const filterFieldsMetadata = useMemo(() => fieldsMetadata.filter(meta => meta.filterEnable), []);
-  const fieldKey = isCollectionModel ? 'key' : 'path';
+      const updatedFilters = Object.keys(updatedFilterDict).map((filterName) => ({
+        ...updatedFilterDict[filterName],
+        filtered_values: updatedFilterDict[filterName].filtered_values?.join(',') ?? null,
+      }));
+      const updatedSortOrders = Object.keys(updatedSortOrderDict).map((sortBy) => ({
+        order_by: sortBy,
+        sort_type: updatedSortOrderDict[sortBy]
+      }));
+      onFiltersChange(updatedFilters);
+      onSortOrdersChange(updatedSortOrders);
+
+      return updatedSortOrderDict;
+    });
+    onClose();
+  }, [onFiltersChange, onSortOrdersChange, onClose]);
+
+  const handleCopy = (columnId, columnName) => {
+    const fieldKey = isCollectionModel ? 'key' : 'tableTitle';
+    const column = fieldsMetadata.find((meta) => meta[fieldKey] === columnId);
+    if (!column) {
+      console.error(`handleCopy failed, no column found with columnId: ${columnId}`);
+      return;
+    }
+
+    let sourceIndex = column.sourceIndex;
+    if (sourceIndex == null) {
+      sourceIndex = 0;
+    }
+    const values = [columnName];
+    groupedRows.forEach((groupedRow) => {
+      const row = groupedRow[sourceIndex];
+      values.push(row[columnId]);
+    });
+
+    const text = values.join('\n');
+    setClipboardText(text);
+    setTimeout(() => {
+      // to allow same column to be copied again even if there is no text change
+      setClipboardText(null);
+    }, 2000);
+  };
+
+  // const handleKeyDown = (e) => {
+  //   if (e.key.length === 1 || e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === 'Escape') {
+  //     // Let Escape still close the popover/menu potentially? Maybe not stop propagation for Escape.
+  //     if (e.key !== 'Escape') {
+  //       e.stopPropagation();
+  //     }
+  //   }
+  // }
+
+  const fieldKey = isCollectionModel ? 'key' : 'tableTitle';
 
   return (
     <Dialog open={isOpen} onClose={handlePopupClose}>
-      <DialogTitle>Filters</DialogTitle>
-      <DialogContent>
-        {filterFieldsMetadata
+      <DialogTitle>
+        <span style={{ display: 'flex', alignItems: 'center' }}>
+          <FilterAlt fontSize='large' color='info' />
+          Filter & Sort
+        </span>
+      </DialogTitle>
+      <DialogContent style={{ minWidth: '350px' }}>
+        {fieldsMetadata
+          .filter((meta) => meta.type !== 'object' && meta.type !== 'array')
           .map((meta) => {
             // Determine display name and a unique field key for the filter.
             const displayName = isCollectionModel
@@ -103,10 +162,11 @@ const FilterDialog = ({
               : meta.elaborateTitle
                 ? meta.tableTitle
                 : meta.title;
+            const fieldName = meta[fieldKey];
             return (
               <Box key={displayName} className={styles.filter} mb={2}>
                 <span className={styles.filter_name}>{displayName}</span>
-                <TextField
+                {/* <TextField
                   id={meta[fieldKey]}
                   className={styles.text_field}
                   name={meta[fieldKey]}
@@ -121,19 +181,39 @@ const FilterDialog = ({
                   fullWidth
                   margin='dense'
                   onKeyDown={handleKeyDown}
+                /> */}
+                <FilterSortPopup
+                  columnId={fieldName}
+                  columnName={meta.title}
+                  valueCounts={uniqueValues[fieldName] ?? new Map()}
+                  uniqueValues={Array.from(uniqueValues[fieldName]?.keys() ?? [])}
+                  selectedFilters={filterDict[fieldName]?.filtered_values ?? []}
+                  textFilter={filterDict[fieldName]?.text_filter ?? null}
+                  textFilterType={filterDict[fieldName]?.text_filter_type ?? null}
+                  sortDirection={sortOrderDict[fieldName] ?? null}
+                  onApply={handleApply}
+                  onCopy={handleCopy}
+                  filterEnable={meta.filterEnable ?? false}
+                  clipboardText={clipboardText}
                 />
+                {filterDict[fieldName]?.filtered_values && (
+                  <LinkText
+                    text={JSON.stringify(filterDict[fieldName]?.filtered_values)}
+                    linkText={JSON.stringify(filterDict[fieldName]?.filtered_values)}
+                  />
+                )}
               </Box>
             );
           })}
       </DialogContent>
-      <DialogActions>
+      {/* <DialogActions>
         <Button color='error' variant='contained' onClick={handleFilterClear}>
           Clear
         </Button>
         <Button color='success' variant='contained' onClick={handleFilterApply}>
           Apply
         </Button>
-      </DialogActions>
+      </DialogActions> */}
     </Dialog>
   );
 };
@@ -143,7 +223,7 @@ FilterDialog.propTypes = {
   fieldsMetadata: PropTypes.arrayOf(
     PropTypes.shape({
       key: PropTypes.string,
-      filter_enable: PropTypes.bool,
+      filterEnable: PropTypes.bool,
       elaborateTitle: PropTypes.bool,
       tableTitle: PropTypes.string,
       title: PropTypes.string,
@@ -152,8 +232,10 @@ FilterDialog.propTypes = {
   /** Array of filter objects with field name and value. */
   filters: PropTypes.arrayOf(
     PropTypes.shape({
-      fld_name: PropTypes.string.isRequired,
-      fld_value: PropTypes.string,
+      column_name: PropTypes.string.isRequired,
+      filtered_values: PropTypes.string,
+      text_filter: PropTypes.string,
+      text_filter_type: PropTypes.string
     })
   ).isRequired,
   /** Callback function invoked with updated filters when the user applies changes. */

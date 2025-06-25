@@ -13,7 +13,7 @@ import { DATA_TYPES as DATA_TYPES_CONSTANT, ITEMS_PER_PAGE as ITEMS_PER_PAGE_CON
 function workerProcessNode(node, parentId, paginatedNodes, ITEMS_PER_PAGE, allFlattenedNodes, enableObjectPagination) {
     // Use xpath as ID, ensure it's a string and handle null/undefined
     // Nodes from generateTreeStructure should have an xpath.
-    const currentId = node.xpath || String(Math.random()); 
+    const currentId = node.xpath || String(Math.random());
 
     const treeNode = {
         name: node.name || node.key || "", // Ensure name is a string
@@ -48,11 +48,11 @@ function workerProcessNode(node, parentId, paginatedNodes, ITEMS_PER_PAGE, allFl
                 // onPageChange is not set here; main thread handles interactions
             };
         }
-        
+
         const startIndex = currentPage * ITEMS_PER_PAGE;
         const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, metadataFromGenTree.children.length);
         const visibleChildren = metadataFromGenTree.children.slice(startIndex, endIndex);
-        
+
         visibleChildren.forEach(childNode => {
             // Pass enableObjectPagination down recursively
             const childId = workerProcessNode(childNode, currentId, paginatedNodes, ITEMS_PER_PAGE, allFlattenedNodes, enableObjectPagination);
@@ -66,13 +66,13 @@ function workerProcessNode(node, parentId, paginatedNodes, ITEMS_PER_PAGE, allFl
             // Pass enableObjectPagination down recursively
             const childId = workerProcessNode(childNode, currentId, paginatedNodes, ITEMS_PER_PAGE, allFlattenedNodes, enableObjectPagination);
             if (childId) { // Ensure childId is valid before pushing
-                 treeNode.children.push(childId);
+                treeNode.children.push(childId);
             }
         });
     }
     // It's crucial that 'node.xpath' exists and is unique for 'currentId' to be effective.
     // If node.xpath can be undefined or not unique for identifiable nodes, IDs might clash or be unstable.
-    return currentId; 
+    return currentId;
 }
 
 
@@ -80,6 +80,7 @@ onmessage = (e) => {
     const {
         projectSchema, modelName, updatedData, storedData, subtree, mode, xpath,
         selectedId, showHidden, paginatedNodes, filters,
+        quickFilter, isQuickFilterView,
         enableObjectPagination
     } = e.data.payload;
 
@@ -91,7 +92,7 @@ onmessage = (e) => {
     if (e.data.type === 'PROCESS_SUBTREE') {
         const subtreeData = e.data.payload.subtreeData;
         const flattenedNodes = [];
-        
+
         if (subtreeData && typeof subtreeData === 'object') {
             const nodeId = workerProcessNode(subtreeData, "root", paginatedNodes, ITEMS_PER_PAGE, flattenedNodes, enableObjectPagination);
             postMessage({
@@ -120,14 +121,16 @@ onmessage = (e) => {
         'xpath': xpath, // Root xpath for this tree generation context
         'index': selectedId,
         'forceUpdate': false,
-        'filters': filters
+        'filters': filters,
+        'quickFilter': quickFilter ?? null,
+        'isQuickFilterView': isQuickFilterView
     };
 
     const generatedTree = generateTreeStructure(cloneDeep(projectSchema), modelName, callerPropsForWorker);
 
     const flattenedNodes = [];
     const rootId = "root"; // Synthetic root for react-accessible-treeview
-    
+
     flattenedNodes.push({
         name: modelName,
         children: [],
@@ -143,7 +146,7 @@ onmessage = (e) => {
             const nodeId = workerProcessNode(node, rootId, paginatedNodes, ITEMS_PER_PAGE, flattenedNodes, enableObjectPagination);
             // Ensure the root's children array exists before pushing
             if (flattenedNodes[0] && flattenedNodes[0].children && nodeId) {
-                 flattenedNodes[0].children.push(nodeId);
+                flattenedNodes[0].children.push(nodeId);
             }
         }
     });

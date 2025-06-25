@@ -239,8 +239,8 @@ function PivotTable({
             >
                 <ModelCard>
                     <ModelCardHeader name={PIVOT_SCHEMA_NAME} >
-                        <Icon name='save' title='save' onClick={handleSave}><Save fontSize='small' /></Icon>
-                        <Icon name='close' title='close' onClick={handlePivotOptionClose}><Close fontSize='small' /></Icon>
+                        <Icon name='save' title='save' onClick={handleSave}><Save fontSize='small' color='white' /></Icon>
+                        <Icon name='close' title='close' onClick={handlePivotOptionClose}><Close fontSize='small' color='white' /></Icon>
                     </ModelCardHeader>
                     <ModelCardContent>
                         <DataTree

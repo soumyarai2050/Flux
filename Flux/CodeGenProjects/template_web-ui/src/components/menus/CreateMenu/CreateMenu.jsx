@@ -57,7 +57,7 @@ const CreateMenu = ({
       default:
         return (
           <Icon name={menuName} title={menuName} onClick={handleCreate}>
-            <Add fontSize='small' />
+            <Add fontSize='small' color='white' />
           </Icon>
         );
     }

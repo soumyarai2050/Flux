@@ -158,6 +158,7 @@ export const fieldProps = [
     // sets the allowed diff % on field which is saved without confirmation 
     { propertyName: "diff_threshold", usageName: "diffThreshold" },
     { propertyName: "zero_as_none", usageName: "zeroAsNone" },
+    { propertyName: "visible_if", usageName: "visible_if" }
 ]
 
 // additional properties supported only on array fields
@@ -700,6 +701,69 @@ export function getDataxpath(data, xpath) {
     updatedxpath = updatedxpath + xpath.split(']')[xpath.split(']').length - 1];
     return updatedxpath;
 }
+
+export function getDataxpathV2(data, xpath) {
+    // Early returns for edge cases
+    if (!xpath) return;
+    if (xpath.includes('-1')) return xpath;
+
+    // Cache the split operation to avoid repeated splits
+    const xpathParts = xpath.split('.');
+    const partsLength = xpathParts.length - 1;
+
+    // Handle special case for repeated root widget
+    const isRepeatedRoot = xpath.startsWith('[');
+
+    let updatedXpath = '';
+    let originalXpath = '';
+
+    for (let i = 0; i < partsLength; i++) {
+        const currentPart = xpathParts[i];
+        const bracketIndex = currentPart.indexOf('[');
+
+        // Extract current xpath and index more efficiently
+        const currentXpath = currentPart.substring(0, bracketIndex);
+        let index = currentPart.substring(bracketIndex + 1);
+
+        originalXpath += currentXpath + '[' + index + ']';
+
+        let found = isRepeatedRoot && i === 0; // Handle repeated root case
+
+        if (!found) {
+            const dataAtPath = get(data, updatedXpath + currentXpath);
+
+            if (dataAtPath?.length) {
+                // Use for loop instead of forEach for better performance and early exit
+                for (let idx = 0; idx < dataAtPath.length; idx++) {
+                    const obj = dataAtPath[idx];
+
+                    // Find xpath property more efficiently
+                    const xpathProp = Object.keys(obj).find(key => key.startsWith('xpath_'));
+
+                    if (xpathProp) {
+                        const propXpath = obj[xpathProp].substring(0, obj[xpathProp].lastIndexOf('.'));
+
+                        if (propXpath === originalXpath) {
+                            index = idx;
+                            found = true;
+                            break; // Early exit when found
+                        }
+                    }
+                }
+            }
+        }
+
+        if (found) {
+            updatedXpath += currentXpath + '[' + index + ']';
+        } else {
+            return; // Early return if not found
+        }
+    }
+
+    // Append the final part (after the last ']')
+    return updatedXpath + xpathParts[partsLength];
+}
+
 
 export function compareNodes(originalData, data, dataxpath, propname, xpath) {
     let object = {};
@@ -2845,25 +2909,30 @@ export function updateChartSchema(schema, collections, isCollectionType = false)
     const chartDataSchema = get(schema, [SCHEMA_DEFINITIONS_XPATH, 'chart_data']);
     updateChartAttributesInSchema(schema, chartDataSchema);
     chartDataSchema.auto_complete = 'partition_fld:StrFldList';
+    chartDataSchema.properties.partition_fld.visible_if = 'chart_data.time_series=false';
     const chartEncodeSchema = get(schema, [SCHEMA_DEFINITIONS_XPATH, 'chart_encode']);
     chartEncodeSchema.auto_complete = 'x:FldList,y:FldList';
+    chartEncodeSchema.properties.x.visible_if = 'chart_data.time_series=false';
     const filterSchema = get(schema, [SCHEMA_DEFINITIONS_XPATH, 'ui_filter']);
     filterSchema.auto_complete = 'fld_name:FldList';
     let fldList;
     let strFldList;
     let metaFldList;
+    let projectionFldList;
+    let fieldKey;
     if (isCollectionType) {
-        fldList = collections.map(collection => collection.key);
-        strFldList = collections.filter(collection => collection.type === DATA_TYPES.STRING).map(collection => collection.key);
-        metaFldList = collections.filter(collection => collection.hasOwnProperty('mapping_underlying_meta_field')).map(collection => collection.key);
+        fieldKey = 'key';
     } else {
-        fldList = collections.map(collection => collection.tableTitle);
-        strFldList = collections.filter(collection => collection.type === DATA_TYPES.STRING).map(collection => collection.tableTitle);
-        metaFldList = collections.filter(collection => collection.hasOwnProperty('mapping_underlying_meta_field')).map(collection => collection.tableTitle);
+        fieldKey = 'tableTitle';
     }
+    fldList = collections.map(collection => collection[fieldKey]);
+    strFldList = collections.filter(collection => collection.type === DATA_TYPES.STRING).map(collection => collection[fieldKey]);
+    metaFldList = collections.filter(collection => collection.hasOwnProperty('mapping_underlying_meta_field')).map(collection => collection[fieldKey]);
+    projectionFldList = collections.filter(col => col.hasOwnProperty('mapping_src')).map(col => col[fieldKey]);
     schema.autocomplete['FldList'] = fldList;
     schema.autocomplete['StrFldList'] = strFldList;
     schema.autocomplete['MetaFldList'] = metaFldList;
+    schema.autocomplete['ProjFldList'] = projectionFldList;
     return schema;
 }
 
@@ -3762,4 +3831,45 @@ export function getSortOrdersWithAbs(sortOrders, absoluteSorts) {
         return sortOrder;
     })
     return sortOrdersWithAbs;
+}
+
+export function getUniqueValues(rows, filterFieldsMetadata, isAbbreviationMerge = false) {
+    const uniqueValues = {};
+    filterFieldsMetadata
+        .filter((meta) => meta.type !== 'object' && meta.type !== 'array')
+        .forEach((meta) => {
+            const fieldKey = isAbbreviationMerge ? meta.key : meta.tableTitle;
+            uniqueValues[fieldKey] = new Map();
+            const counterMap = uniqueValues[fieldKey];
+            rows.forEach((row) => {
+                const value = row[fieldKey];
+                if (counterMap.has(value)) {
+                    const storedCount = counterMap.get(value);
+                    counterMap.set(value, storedCount + 1);
+                } else {
+                    counterMap.set(value, 1);
+                }
+            });
+            const sortedKeys = Array.from(counterMap.keys()).sort((a, b) => {
+                // both null/undefined - maintain order
+                if (a == null && b == null) return 0;
+
+                // Only 'a' is null/undefined - put it first
+                if (a == null) return -1;
+
+                // Only 'b' is null/undefined - put it second
+                if (b == null) return 1;
+                
+                // Both have values - sort ascending
+                if (a < b) return -1;
+                if (a > b) return 1;
+                return 0;
+            });
+            const sortedMap = new Map();
+            for (const key of sortedKeys) {
+                sortedMap.set(key, counterMap.get(key));
+            }
+            uniqueValues[fieldKey] = sortedMap;
+        });
+    return uniqueValues;
 }

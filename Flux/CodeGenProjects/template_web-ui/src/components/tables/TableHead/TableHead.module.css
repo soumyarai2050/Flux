@@ -11,36 +11,36 @@
 }
 
 .cell:hover {
-    color: white !important;
+    /* color: white !important; */
 }
 
 .critical {
-    color: #9C0006 !important;
+    /* color: #9C0006 !important; */
     animation: blink 0.5s step-start infinite;
 }
 
 .error {
-    color: #9C0006 !important;
+    /* color: #9C0006 !important; */
 }
 
 .warning {
-    color: #9c6500 !important;
+    /* color: #9c6500 !important; */
 }
 
 .info {
-    color: blue !important;
+    /* color: blue !important; */
 }
 
 .debug {
-    color: #444 !important;
+    /* color: #444 !important; */
 }
 
 .success {
-    color: green !important;
+    /* color: green !important; */
 }
 
 .default {
-    color: black !important;
+    /* color: black !important; */
 }
 
 @keyframes blink {
@@ -58,6 +58,6 @@
 }
 
 .icon {
-    color: white !important;
+    /* color: white !important; */
     margin-left: -4px !important;
 }

@@ -69,7 +69,7 @@ const DataSourceColorMenu = ({
             title={menuName}
             onClick={handlePopoverOpen}
           >
-            <ColorLens fontSize='small' />
+            <ColorLens fontSize='small' color='white' />
           </Icon>
         );
     }

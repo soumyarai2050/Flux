@@ -263,7 +263,7 @@ class BasketCache(BasePlanCache, BasketBookServiceBasePlanCache, EmailBookServic
                 raise HTTPException(status_code=500, detail=err_)
 
         else:
-            err_ = f"Unsupported {new_chore_obj.security.sec_id_source=}; found on {new_chore_obj=}"
+            err_ = f"Unsupported {new_chore_obj.security.sec_id_source=} found on {new_chore_obj=}"
             raise HTTPException(status_code=500, detail=err_)
         # else not required - chore sec_id is RIC
 

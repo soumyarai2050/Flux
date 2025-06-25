@@ -7,7 +7,7 @@ import {
 import { cloneDeep, get, isEqual } from 'lodash';
 import { Add, Close, Delete, Save } from '@mui/icons-material';
 // project constants and common utility function imports
-import { DATA_TYPES, MODES, API_ROOT_URL, MODEL_TYPES } from '../../../constants';
+import { DATA_TYPES, MODES, API_ROOT_URL, MODEL_TYPES, DB_ID } from '../../../constants';
 import {
     addxpath, applyFilter, clearxpath, genChartDatasets, genMetaFilters, generateObjectFromSchema,
     getChartOption, getCollectionByName, getFilterDict, getIdFromAbbreviatedKey, getModelSchema, mergeTsData, tooltipFormatter,
@@ -21,6 +21,7 @@ import styles from './ChartView.module.css';
 import { useTheme } from '@emotion/react';
 import DataTree from '../../trees/DataTree/DataTree';
 import { ModelCard, ModelCardContent, ModelCardHeader } from '../../cards';
+import { FilterAlt } from '@mui/icons-material';
 
 const CHART_SCHEMA_NAME = 'chart_data';
 
@@ -40,7 +41,9 @@ function ChartView({
     selectedChartName,
     chartEnableOverride,
     onChartPointSelect,
-    children
+    children,
+    quickFilters = [],
+    onQuickFiltersChange
 }) {
     // redux states
     const theme = useTheme();
@@ -65,6 +68,8 @@ function ChartView({
     const [reloadCounter, setReloadCounter] = useState(0);
     const [schema, setSchema] = useState(updateChartSchema(projectSchema, fieldsMetadata, modelType === MODEL_TYPES.ABBREVIATION_MERGE));
     const [selectedData, setSelectedData] = useState();
+    const [isCreate, setIsCreate] = useState(false);
+    const [isQuickFilterView, setIsQuickFilterView] = useState(false);
     const socketList = useRef([]);
     const getAllWsDict = useRef({});
 
@@ -324,6 +329,8 @@ function ChartView({
     // on closing of modal, open a pop up to confirm/discard changes
     const handleChartOptionClose = (e, reason) => {
         if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;
+        setIsCreate(false);
+        setIsQuickFilterView(false);
         if (!isEqual(updatedChartObj, data)) {
             setIsConfirmPopupOpen(true);
         } else {
@@ -345,6 +352,8 @@ function ChartView({
     const handleSave = () => {
         // setMode(MODES.READ);
         onModeToggle();
+        setIsCreate(false);
+        setIsQuickFilterView(false);
         setIsChartOptionOpen(false);
         setIsConfirmPopupOpen(false);
         const updatedObj = clearxpath(cloneDeep(data));
@@ -366,6 +375,8 @@ function ChartView({
             setData(updatedChartObj);
             setIsChartOptionOpen(false);
             setIsConfirmPopupOpen(false);
+            setIsCreate(false);
+            setIsQuickFilterView(false);
             // setMode(MODES.READ);
             onModeToggle();
         }
@@ -383,6 +394,7 @@ function ChartView({
         setUpdatedChartObj(updatedObj);
         setData(updatedObj);
         setStoredChartObj({});
+        setIsCreate(true);
         // setMode(MODES.EDIT);
         onModeToggle();
         setIsChartOptionOpen(true);
@@ -395,16 +407,19 @@ function ChartView({
     const handleUpdate = (updatedData) => {
         setData(updatedData);
         const updatedSchema = cloneDeep(schema);
+        const chartEncodeSchema = getModelSchema('chart_encode', updatedSchema);
         const filterSchema = getModelSchema('ui_filter', updatedSchema);
         // get(updatedSchema, [SCHEMA_DEFINITIONS_XPATH, 'ui_filter']);
-        const chartSchema = getModelSchema(CHART_SCHEMA_NAME, updatedSchema);
+        // const chartSchema = getModelSchema(CHART_SCHEMA_NAME, updatedSchema);
         // get(updatedSchema, [SCHEMA_DEFINITIONS_XPATH, CHART_SCHEMA_NAME]);
         if (updatedData.time_series) {
             filterSchema.auto_complete = 'fld_name:MetaFldList';
-            chartSchema.properties.partition_fld.hide = true;
+            // chartSchema.properties.partition_fld.hide = true;
+            chartEncodeSchema.auto_complete = 'x:FldList,y:ProjFldList';
         } else {
             filterSchema.auto_complete = 'fld_name:FldList';
-            chartSchema.properties.partition_fld.hide = false;
+            // chartSchema.properties.partition_fld.hide = false;
+            chartEncodeSchema.auto_complete = 'x:FldList,y:FldList';
         }
         setSchema(updatedSchema);
     }
@@ -416,7 +431,8 @@ function ChartView({
         }
     }
 
-    const handleChartDelete = (chartName, index) => {
+    const handleChartDelete = (e, chartName, index) => {
+        e.stopPropagation();
         const updatedChartData = chartData.filter((o) => o.chart_name !== chartName);
         onChartDataChange(updatedChartData);
         if (index === selectedIndex) {
@@ -431,10 +447,36 @@ function ChartView({
         if (mode === MODES.READ) {
             onModeToggle();
             setIsChartOptionOpen(true);
+            setIsQuickFilterView(true);
         }
     }
 
+    const handleQuickFilterChange = (key, value) => {
+        const updatedQuickFilters = cloneDeep(quickFilters);
+        const quickFilter = updatedQuickFilters.find((quickFilter) => quickFilter.chart_name === data.chart_name);
+        const newValue = value ? true : false;
+        if (quickFilter) {
+            quickFilter.filters = JSON.stringify({ ...quickFilter.filters, [key]: newValue });
+        } else {
+            updatedQuickFilters.push({
+                chart_name: data.chart_name,
+                filters: JSON.stringify({ [key]: newValue })
+            })
+        }
+        onQuickFiltersChange(updatedQuickFilters);
+    }
+
+    const handleQuickFilterViewToggle = () => {
+        setIsQuickFilterView((prev) => !prev);
+    }
+
     const options = useMemo(() => getChartOption(clearxpath(cloneDeep(chartOption))), [chartOption]);
+    const chartQuickFilter = quickFilters.find((quickFilter) => quickFilter.chart_name === data?.chart_name);
+
+    let filterDict = {};
+    if (chartQuickFilter) {
+        filterDict = chartQuickFilter.filters ? JSON.parse(chartQuickFilter.filters) : {};
+    }
 
     return (
         <>
@@ -448,17 +490,17 @@ function ChartView({
                         {chartData.map((item, index) => {
                             if (chartEnableOverride.includes(item.chart_name)) return;
                             return (
-                                <ListItem 
-                                    className={styles.list_item} 
-                                    key={index} 
-                                    selected={selectedIndex === index} 
-                                    disablePadding 
+                                <ListItem
+                                    className={styles.list_item}
+                                    key={index}
+                                    selected={selectedIndex === index}
+                                    disablePadding
                                     onClick={() => handleSelect(index)}
                                     onDoubleClick={() => handleDoubleClick(index)}>
                                     <ListItemButton>
                                         <ListItemText>{item.chart_name}</ListItemText>
                                     </ListItemButton>
-                                    <Icon title='Delete' onClick={() => handleChartDelete(item.chart_name, index)}>
+                                    <Icon title='Delete' onClick={(e) => handleChartDelete(e, item.chart_name, index)}>
                                         <Delete fontSize='small' />
                                     </Icon>
                                 </ListItem>
@@ -469,48 +511,48 @@ function ChartView({
                 <Divider orientation='vertical' flexItem />
                 <Box className={styles.chart_container}>
                     <Box className={styles.chart}>
-                    {storedChartObj.chart_name && (
-                        <EChart
-                            loading={false}
-                            theme={theme.palette.mode}
-                            option={{
-                                legend: {},
-                                tooltip: {
-                                    trigger: 'axis',
-                                    axisPointer: {
-                                        type: 'cross'
+                        {storedChartObj.chart_name && (
+                            <EChart
+                                loading={false}
+                                theme={theme.palette.mode}
+                                option={{
+                                    legend: {},
+                                    tooltip: {
+                                        trigger: 'axis',
+                                        axisPointer: {
+                                            type: 'cross'
+                                        },
+                                        valueFormatter: (value) => tooltipFormatter(value)
                                     },
-                                    valueFormatter: (value) => tooltipFormatter(value)
-                                },
-                                dataZoom: [
-                                    {
-                                        type: 'inside',
-                                        filterMode: 'filter',
-                                        xAxisIndex: [0, 1]
-                                    },
-                                    {
-                                        type: 'inside',
-                                        filterMode: 'empty',
-                                        yAxisIndex: [0, 1]
-                                    },
-                                    {
-                                        type: 'slider',
-                                        filterMode: 'filter',
-                                        xAxisIndex: [0, 1]
-                                    },
-                                    {
-                                        type: 'slider',
-                                        filterMode: 'empty',
-                                        yAxisIndex: [0, 1]
-                                    }
-                                ],
-                                dataset: datasets,
-                                ...options
-                            }}
-                            setSelectedData={setSelectedData}
-                            isCollectionType={modelType === MODEL_TYPES.ABBREVIATION_MERGE}
-                        />
-                    )}
+                                    dataZoom: [
+                                        {
+                                            type: 'inside',
+                                            filterMode: 'filter',
+                                            xAxisIndex: [0, 1]
+                                        },
+                                        {
+                                            type: 'inside',
+                                            filterMode: 'empty',
+                                            yAxisIndex: [0, 1]
+                                        },
+                                        {
+                                            type: 'slider',
+                                            filterMode: 'filter',
+                                            xAxisIndex: [0, 1]
+                                        },
+                                        {
+                                            type: 'slider',
+                                            filterMode: 'empty',
+                                            yAxisIndex: [0, 1]
+                                        }
+                                    ],
+                                    dataset: datasets,
+                                    ...options
+                                }}
+                                setSelectedData={setSelectedData}
+                                isCollectionType={modelType === MODEL_TYPES.ABBREVIATION_MERGE}
+                            />
+                        )}
                     </Box>
                     {children}
                 </Box>
@@ -522,8 +564,11 @@ function ChartView({
             >
                 <ModelCard>
                     <ModelCardHeader name={CHART_SCHEMA_NAME} >
-                        <Icon name='save' title='save' onClick={handleSave}><Save fontSize='small' /></Icon>
-                        <Icon name='close' title='close' onClick={handleChartOptionClose}><Close fontSize='small' /></Icon>
+                        <Icon name='QuickFilterView' title='quickFilterView' onClick={handleQuickFilterViewToggle}>
+                            <FilterAlt fontSize='small' color={isQuickFilterView ? 'info' : 'white'} />
+                        </Icon>
+                        <Icon name='save' title='save' onClick={handleSave}><Save fontSize='small' color='white' /></Icon>
+                        <Icon name='close' title='close' onClick={handleChartOptionClose}><Close fontSize='small' color='white' /></Icon>
                     </ModelCardHeader>
                     <ModelCardContent>
                         <DataTree
@@ -536,6 +581,9 @@ function ChartView({
                             xpath={null}
                             onUpdate={handleUpdate}
                             onUserChange={handleUserChange}
+                            quickFilter={!isCreate ? filterDict : null}
+                            onQuickFiltersChange={handleQuickFilterChange}
+                            isQuickFilterView={isQuickFilterView}
                             treeLevel={4}
                         />
                     </ModelCardContent>

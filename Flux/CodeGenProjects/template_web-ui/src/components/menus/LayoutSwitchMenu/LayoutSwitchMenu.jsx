@@ -96,7 +96,7 @@ const LayoutSwitchMenu = ({
       default:
         return (
           <Icon name={menuName} title={menuName} onClick={handlePopoverOpen}>
-            <IconComponent fontSize='small' />
+            <IconComponent fontSize='small' color='white' />
           </Icon>
         );
     }

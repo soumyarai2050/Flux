@@ -51,7 +51,7 @@ message NewChore{
   optional string text = 19 [(FluxFldTitle) = "Text", (FluxFldAbbreviated) = "JSON", (FluxFldServerPopulate) = true];
   optional int64 pending_amd_qty = 20 [(FluxFldServerPopulate) = true, (FluxFldHide) = "True", (FluxFldHelp) = "used internally for amend qty support - also helps prevent second amend trigger unless prior is completed - px and qty simultaneous amend is allowed"];
   optional float pending_amd_px = 21 [(FluxFldServerPopulate) = true, (FluxFldHide) = "True", (FluxFldNumberFormat) = ".3", (FluxFldHelp) = "used internally for amend px support - also helps prevent second amend trigger unless prior amend is completed - px and qty simultaneous amend is allowed"];
-  optional bool pending_cxl = 22 [default=false, (FluxFldTitle) = "X", (FluxFldNameColor) = "ERROR", (FluxFldNoCommonKey) = true, (FluxFldUIUpdateOnly) = true, (FluxFldButton) = {
+  optional bool pending_cxl = 22 [default = false, (FluxFldTitle) = "X", (FluxFldNameColor) = "ERROR", (FluxFldNoCommonKey) = true, (FluxFldUIUpdateOnly) = true, (FluxFldButton) = {
     unpressed_caption: "Cxl",
     pressed_caption: "Removed",
     disabled_captions: "true=Removed"

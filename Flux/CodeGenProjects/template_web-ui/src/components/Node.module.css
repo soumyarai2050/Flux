@@ -89,7 +89,7 @@
 }
 
 .default {
-    color: black;
+    /* color: black; */
 }
 
 @keyframes blink {

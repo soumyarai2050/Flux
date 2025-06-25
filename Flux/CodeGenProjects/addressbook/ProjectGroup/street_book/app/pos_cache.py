@@ -47,7 +47,7 @@ class PosCache:
         self.TRADING_EXCHANGE = "ZERODHA"
 
         self.orig_sod_n_intraday_pos_dict = None
-        self.market = Market(MarketID.IN)
+        self.market = Market([MarketID.IN])
         self._static_data: Final[SecurityRecordManager] = static_data
         self.symbols_n_sec_id_source_dict: Dict[str, str] = {}
         self.sec_positions_header_str = (

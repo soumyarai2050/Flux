@@ -20,6 +20,7 @@ import { useURLParams, useWebSocketWorker } from '../../hooks';
 import { BaseColor, cssVar, baseColorPalettes, Theme, DEFAULT_BASE_COLOR } from '../../theme';
 import GlobalScrollbarStyle from '../GlobalScrollbarStyle';
 import DropdownButton from '../DropdownButton';
+import { useDraggableContext } from '../../contexts/DraggableContext';
 
 const defaultGridProps = {
   className: 'layout',
@@ -73,13 +74,14 @@ const Layout = ({ projectName, theme, onThemeToggle, baseColor, onBaseColorChang
   const { storedArray, storedObj, isLoading } = useSelector(Selectors.selectUILayout);
   const [layout, setLayout] = useState(null);
   const [visibleComponents, setVisibleComponents] = useState([]);
-  const [isDraggable, setIsDraggable] = useState(false);
   const [anchorEl, setAnchorEl] = useState(null);
   const [isNavbarVisible, setIsNavbarVisible] = useState(true);
   const [isSaveLayoutPopupOpen, setIsSaveLayoutPopupOpen] = useState(false);
   const [reconnectCounter, setReconnectCounter] = useState(0);
   const [profileId, setProfileId] = useState(''); // save layout by profile input
   const dispatch = useDispatch();
+
+  const { isDraggable, setIsDraggable } = useDraggableContext();
 
   // internal state for selected base color, synced with prop
   const [selectedBaseColor, setSelectedBaseColor] = useState(baseColor || DEFAULT_BASE_COLOR);
@@ -90,7 +92,7 @@ const Layout = ({ projectName, theme, onThemeToggle, baseColor, onBaseColorChang
   const showAdminControl = urlParams && urlParams.admin_control === 'true';
 
   // Calculate dropdown selected index
-  const profileOptions = ['reset', ...(storedArray || []).map(profile => profile.profile_id)];
+  const profileOptions = ['reset', ...(storedArray || []).map((profile) => profile.profile_id)];
   const currentProfileValue = profileId || 'reset';
   const dropdownSelectedIndex = profileOptions.indexOf(currentProfileValue);
 
@@ -132,22 +134,22 @@ const Layout = ({ projectName, theme, onThemeToggle, baseColor, onBaseColorChang
       // Reset to default if no layout parameter (inline logic instead of calling handleReset)
       sessionStorage.removeItem(COOKIE_NAME);
       setLayout(defaultLayouts);
-      const newVisibleComponents = defaultLayouts.map(item => item.i);
+      const newVisibleComponents = defaultLayouts.map((item) => item.i);
       setVisibleComponents(newVisibleComponents);
       dispatch(LayoutActions.setStoredObj({ profile_id: 'default', widget_ui_data_elements: defaultLayouts, base_color: DEFAULT_BASE_COLOR }));
       setProfileId('');
-      
+
       // Reset base color to default
       setSelectedBaseColor(DEFAULT_BASE_COLOR);
       if (onBaseColorChange) {
         onBaseColorChange(DEFAULT_BASE_COLOR);
       }
-      
+
       // Clear the layout parameter from URL
       const currentUrl = new URL(window.location);
       currentUrl.searchParams.delete('layout');
       window.history.pushState({}, '', currentUrl.toString());
-      
+
       return;
     }
     let newLayout;
@@ -451,12 +453,12 @@ const Layout = ({ projectName, theme, onThemeToggle, baseColor, onBaseColorChang
             options={Object.values(BaseColor)}
             renderButtonContent={(color) => (
               <span>
-                {color === BaseColor.GREEN ? '🟩' : color === BaseColor.BLUE ? '🟦' : '🟫'}
+                {color === BaseColor.GREEN ? '\u{1F7E9}' : color === BaseColor.BLUE ? '\u{1F7E6}' : '\u1F7EB'}
               </span>
             )}
             renderOption={(color) => (
               <>
-                {color === BaseColor.GREEN ? '🟩' : color === BaseColor.BLUE ? '🟦' : '🟫'}
+                {color === BaseColor.GREEN ? '\u{1F7E9}' : color === BaseColor.BLUE ? '\u{1F7E6}' : '\u1F7EB'}
               </>
             )}
             initialSelectedIndex={Object.values(BaseColor).indexOf(selectedBaseColor)}
@@ -466,10 +468,10 @@ const Layout = ({ projectName, theme, onThemeToggle, baseColor, onBaseColorChang
         )}
         {/* Profile Dropdown - replacing load popup */}
         <DropdownButton
-          options={['reset', ...(storedArray || []).map(profile => profile.profile_id)]}
+          options={['reset', ...(storedArray || []).map((profile) => profile.profile_id)]}
           renderButtonContent={(option) => (
-            <span style={{ fontSize: '0.75rem', color: navbarTextColorValue }}>
-              <SpaceDashboard fontSize='medium' sx={{marginRight: '4px'}} />
+            <span style={{ fontSize: '0.75rem', color: navbarTextColorValue, display: 'flex' }}>
+              <SpaceDashboard fontSize='medium' sx={{ marginRight: '4px' }} />
               {option === 'reset' ? 'Default' : option}
             </span>
           )}

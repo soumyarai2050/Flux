@@ -15,7 +15,7 @@
  * - VisibilityMenu: Allows toggling visibility of additional fields.
  */
 
-export { default as ColumnSettingsMenu } from './ColumnSettingsMenu';
+export { default as TableSettingsMenu } from './TableSettingsMenu';
 export { default as CreateMenu } from './CreateMenu';
 export { default as DataSourceColorMenu } from './DataSourceColorMenu';
 export { default as DownloadMenu } from './DownloadMenu';

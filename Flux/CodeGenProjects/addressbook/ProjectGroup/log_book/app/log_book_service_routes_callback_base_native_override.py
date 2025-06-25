@@ -158,7 +158,7 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         self.symbol_side_pattern: str = get_symbol_side_pattern()
         self.log_file_no_activity_dict: Dict[str, LogNoActivityData] = {}
         self.no_activity_timeout_secs: int | None = config_yaml_dict.get("no_activity_timeout_secs")
-        self.market: Market = Market(MarketID.IN)
+        self.market: Market = Market([MarketID.IN])
         self.model_type_name_to_patch_queue_cache_dict: Dict[str, Queue] = {}
         self.max_fetch_from_queue = config_yaml_dict.get("max_fetch_from_patch_queue_for_db_updates")
         if self.max_fetch_from_queue is None:

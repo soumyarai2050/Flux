@@ -58,7 +58,7 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
 
     def __init__(self):
         super().__init__()
-        self.market = Market(MarketID.IN)
+        self.market = Market([MarketID.IN])
         self.datetime_fmt_str: Final[str] = datetime.datetime.now().strftime("%Y%m%d")
         self.all_services_up: bool = False
         self.service_ready: bool = False

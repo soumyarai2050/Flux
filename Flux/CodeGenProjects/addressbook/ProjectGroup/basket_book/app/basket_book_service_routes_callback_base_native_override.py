@@ -68,7 +68,7 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         self.port: int | None = None
         self.service_up: bool = False
         self.service_ready: bool = False
-        self.market = Market(MarketID.IN)
+        self.market = Market([MarketID.IN])
         self.config_yaml_last_modified_timestamp = os.path.getmtime(config_yaml_path)
         self.asyncio_loop: asyncio.AbstractEventLoop | None = None
         self.project_config_yaml_path = config_yaml_path
@@ -597,7 +597,7 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             elif self.plan_cache.basket_id != baskets[0].id:
                 logging.error(f"unsupported! Found basket_id: {baskets[0].id} in DB, whereas app "
                               f"{self.plan_cache.basket_id=}; cancel_all_basket_chores may not work as "
-                              f"expected;;{baskets[0]=}")
+                              f"expected;;;{baskets[0]=}")
             # else not required - basket_id found is same as basket_id in cache
             bartering_link_chores_to_cxl: List[NewChore] = []
             chore_needing_update: List[NewChore] = []
@@ -637,8 +637,8 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         elif len(basket_chores) == 1:
             if self.plan_cache.basket_id != basket_chores[0].id:
                 logging.error(f"unsupported! Found basket_id: {basket_chores[0].id} in DB, whereas app "
-                              f"{self.plan_cache.basket_id=};;;create_or_update_basket_chore may not work as "
-                              f"expected;;;{basket_chores[0]=}")
+                              f"{self.plan_cache.basket_id=}; create_or_update_basket_chore may not work as expected"
+                              f";;;{basket_chores[0]=}")
                 return
             # else not required - same basket_id as in cache
 
@@ -662,7 +662,7 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
 
         upload_filename: str = f"{upload_file.filename}"
         upload_file_path: PurePath = CURRENT_PROJECT_DIR / "data" / upload_filename
-        # check if duplicate file is uploaded (filename includes last modified time, checksum, size)
+        # check if duplicate file is uploaded (filename includes last_modified_time, checksum, size)
         if os.path.exists(str(upload_file_path)):
             err_str_ = f"duplicate file found, {upload_file_path=} already exists"
             logging.error(err_str_)
@@ -711,9 +711,9 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             await self.create_or_update_basket_chore(new_chores)
         else:
             err_str_ = (f"No valid chores found in file, total records: {pl_df.height}. Either figi (figi_or_ticker) "
-                       f"or chore_qty found None for all records, {upload_file.filename=}")
+                        f"or chore_qty found None for all records, {upload_file.filename=}")
             logging.error(err_str_)
-            return []
+        return []
 
     def get_residual_mark_secs(self):
         pass

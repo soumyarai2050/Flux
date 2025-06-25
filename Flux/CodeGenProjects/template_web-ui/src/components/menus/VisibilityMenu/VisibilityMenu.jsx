@@ -91,7 +91,7 @@ const VisibilityMenu = ({
             onClick={handleClick}
             onDoubleClick={handleDoubleClick}
           >
-            <Visibility fontSize='small' color={visibilityColor} />
+            <Visibility fontSize='small' color={visibilityColor === 'inherit' ? 'white' : visibilityColor} />
           </Icon>
         );
     }

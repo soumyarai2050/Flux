@@ -107,16 +107,16 @@ export const DATA_TYPES = Object.freeze({
 
 // Define and export primitiveDataTypes here
 export const primitiveDataTypes = Object.freeze([
-    DATA_TYPES.STRING,
-    DATA_TYPES.NUMBER,
-    DATA_TYPES.BOOLEAN,
-    DATA_TYPES.ENUM, // Enums are often treated as primitives for UI input fields
-    DATA_TYPES.INT32,
-    DATA_TYPES.INT64,
-    DATA_TYPES.FLOAT,
-    DATA_TYPES.DATE_TIME,
-    DATA_TYPES.INTEGER,
-    // Add DATA_TYPES.DATE if you have it and consider it primitive
+  DATA_TYPES.STRING,
+  DATA_TYPES.NUMBER,
+  DATA_TYPES.BOOLEAN,
+  DATA_TYPES.ENUM, // Enums are often treated as primitives for UI input fields
+  DATA_TYPES.INT32,
+  DATA_TYPES.INT64,
+  DATA_TYPES.FLOAT,
+  DATA_TYPES.DATE_TIME,
+  DATA_TYPES.INTEGER,
+  // Add DATA_TYPES.DATE if you have it and consider it primitive
 ]);
 
 /**
@@ -216,4 +216,10 @@ export const WEBSOCKET_RETRY_CODES = [
   WEBSOCKET_CLOSE_CODES.BAD_GATEWAY
 ]
 
-export const ITEMS_PER_PAGE = 10; 
+export const ITEMS_PER_PAGE = 10;
+
+export const HIGHLIGHT_STATES = {
+  NONE: 'NONE',
+  HIGH_LOW: 'HIGH_LOW',
+  CHANGE: 'CHANGE'
+}

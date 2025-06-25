@@ -24,11 +24,12 @@ class BaseBook(Service):
     bartering_link: ClassVar[BarteringLinkBase] = get_bartering_link()
     asyncio_loop: asyncio.AbstractEventLoop
 
-    def __init__(self, bartering_data_manager_: BaseBarteringDataManagerType, plan_cache: BasePlanCacheType):
+    def __init__(self, bartering_data_manager_: BaseBarteringDataManagerType, plan_cache: BasePlanCacheType,
+                 market_id_list: List[MarketID] | None = None):
         super().__init__()
         self.bartering_data_manager = bartering_data_manager_
         self.plan_cache = plan_cache
-        self.market = Market(MarketID.IN)
+        self.market = Market([MarketID.IN] if market_id_list is None else market_id_list)
         self.usd_fx = None
         self.internal_new_chore_count: int = 0
         # internal rejects to use:  -ive internal_reject_count + current date time as chore id
@@ -88,7 +89,7 @@ class BaseBook(Service):
     @classmethod
     def bartering_link_place_new_chore(cls, px: float, qty: int, side: Side, bartering_symbol: str, system_symbol: str,
                                      symbol_type: str, account: str, exchange: str,
-                                     client_ord_id: str | None = None, **kwargs):
+                                     client_ord_id: str | None = None, **kwargs) -> Tuple[bool, str]:
         run_coro = cls.bartering_link.place_new_chore(px, qty, side, bartering_symbol, system_symbol, symbol_type,
                                                     account, exchange, client_ord_id=client_ord_id, **kwargs)
         future = asyncio.run_coroutine_threadsafe(run_coro, cls.asyncio_loop)
@@ -99,9 +100,9 @@ class BaseBook(Service):
             chore_sent_status, _id_or_err_str = future.result()
             return chore_sent_status, _id_or_err_str
         except Exception as e:
-            logging.exception(f"bartering_link_place_new_chore failed for {system_symbol=} px-qty-side: {px}-{qty}-{side}"
-                              f" with exception;;;{e}")
-            return False
+            err = f"bartering_link_place_new_chore failed; {system_symbol=} px-qty-side: {px}-{qty}-{side} with exp;;;{e}"
+            logging.exception(err)
+            return False, err
 
     def process_cxl_request(self, force_cxl_only: bool = False):
         cancel_chores_and_date_tuple = self.plan_cache.get_cancel_chore(self._cancel_chores_update_date_time)

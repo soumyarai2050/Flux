@@ -1,10 +1,11 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React from 'react';
 import styles from './ModelCardContent.module.css';
 import { BeatLoader } from 'react-spinners';
 import { AlertErrorMessage } from '../../Alert';
 import { LinkOff } from '@mui/icons-material';
 import { Backdrop, Button, LinearProgress } from '@mui/material';
 import { useTheme } from '@emotion/react';
+// import { useBoundaryScrollDetection } from '../../../hooks';
 
 const ModelCardContent = ({
   children,
@@ -16,86 +17,21 @@ const ModelCardContent = ({
   isDownloading = false,
   progress = 0
 }) => {
-  const [isScrollable, setIsScrollable] = useState(false);
+  // const { containerRef, isScrollable, enableScrolling, disableScrolling } = useBoundaryScrollDetection();
   const theme = useTheme();
 
-  // TODO: commented implementation to scroll body due to lag
-  // const [isBouncing, setIsBouncing] = useState(false);
-  // const cardRef = useRef(null);
-  // const scrollCount = useRef(0);
-  // const scrollTimeout = useRef(null);
-  // const isScrollScheduled = useRef(false);
-  // const deltaYRef = useRef(0);
+  const handleClick = () => {
+    // enableScrolling();
+  };
 
-  // const updateScrollState = () => {
-  //   if (!cardRef.current) return;
-  //   const deltaY = deltaYRef.current;
-  //   deltaYRef.current = 0;
-  //   const { scrollTop, scrollHeight, clientHeight } = cardRef.current;
-  //   const maxScrollTop = scrollHeight - clientHeight;
-
-  //   // Check if at the top or near the bottom
-  //   if (scrollTop === 0 || scrollTop > (maxScrollTop * 0.95)) {
-  //     setIsBouncing(true);
-
-  //     // If scrolled repeatedly, disable scroll
-  //     if (scrollCount.current > 2) {
-  //       // setIsScrollable(false);
-  //       document.documentElement.scrollBy({
-  //         top: deltaY,
-  //         behavior: 'smooth',
-  //       });
-  //       // Reset the scroll counter after 1 second
-  //       setTimeout(() => {
-  //         scrollCount.current = 0;
-  //       }, 1000);
-  //     }
-
-  //     // Use a timeout to aggregate scroll events
-  //     if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
-  //     scrollTimeout.current = setTimeout(() => {
-  //       scrollCount.current += 1;
-  //     }, 250);
-  //   } else {
-  //     setIsBouncing(false);
-  //   }
-  //   isScrollScheduled.current = false;
-  // };
-
-  // const handleScroll = useCallback((event) => {
-  //   // Use requestAnimationFrame to throttle scroll event work
-  //   deltaYRef.current += event.deltaY;
-  //   if (!isScrollScheduled.current) {
-  //     isScrollScheduled.current = true;
-  //     window.requestAnimationFrame(updateScrollState);
-  //   }
-  // }, []);
-
-  // useEffect(() => {
-  //   const card = cardRef.current;
-  //   if (!card) return;
-
-  //   // Attach the scroll event with passive option for better performance
-  //   card.addEventListener('wheel', handleScroll, { passive: true });
-
-  //   return () => {
-  //     card.removeEventListener('wheel', handleScroll);
-  //     if (scrollTimeout.current) clearTimeout(scrollTimeout.current);
-  //   };
-  // }, [handleScroll]);
-
-  const handleClick = useCallback(() => {
-    setIsScrollable(true);
-  }, []);
-
-  const handleDoubleClick = useCallback(() => {
-    setIsScrollable(false);
-  }, []);
+  const handleDoubleClick = () => {
+    // disableScrolling();
+  };
 
   let cardContentClass = styles.card_content;
-  if (!isScrollable) {
-    cardContentClass += ` ${styles.no_scroll}`;
-  }
+  // if (!isScrollable) {
+  //   cardContentClass += ` ${styles.no_scroll}`;
+  // }
   // if (isBouncing) {
   //   cardContentClass += ` ${styles.bounce}`;
   // }
@@ -112,10 +48,10 @@ const ModelCardContent = ({
     <div className={styles.card_content_container}>
       <div
         className={`${cardContentClass} card-content`}
-        style={{ background : theme.palette.background.primary}}
+        style={{ background: theme.palette.background.primary }}
         onClick={handleClick}
         onDoubleClick={handleDoubleClick}
-        // ref={cardRef}
+        // ref={containerRef}
       >
         {isDownloading && (
           <LinearProgress

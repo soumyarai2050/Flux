@@ -1,24 +1,6 @@
-/* .cell {
-    padding: 2px 4px !important;
-    line-height: 1.2;
-    background-color: transparent;
-    overflow: hidden;
-    color: var(--red-error);
-    /* color: #212121; 
-*/
-
-
-/* .cell_positive {
-    padding: 2px 4px !important;
-    line-height: 1.2;
-    background-color: transparent;
-    overflow: hidden;
-    color: var(--green-success);
-} */
-
 .cell {
-    padding: 6px 2px !important;
-    padding-right: 24px !important;
+    padding: 6px 8px !important;
+    /* padding-right: 24px !important; */
 }
 
 .previous {
@@ -148,7 +130,20 @@
 }
 
 .new_update {
-    color: var(--red-critical) !important;
+    color: var(--blue-info);
+    font-weight: bold;
+    animation: blink 0.5s step-start infinite;
+}
+
+.new_update_increase {
+    color: var(--green-success);
+    font-weight: bold;
+    animation: blink 0.5s step-start infinite;
+}
+
+.new_update_decrease {
+    color: var(--red-error);
+    font-weight: bold;
     animation: blink 0.5s step-start infinite;
 }
 

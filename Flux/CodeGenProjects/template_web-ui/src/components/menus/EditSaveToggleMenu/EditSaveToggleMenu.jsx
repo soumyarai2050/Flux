@@ -63,7 +63,7 @@ const EditSaveToggleMenu = ({
       default:
         return (
           <Icon name={menuName} title={menuName} onClick={handleClick}>
-            <IconComponent fontSize='small' />
+            <IconComponent fontSize='small' color='white' />
           </Icon>
         );
     }

@@ -1,5 +1,5 @@
-import React, { Fragment, useState } from 'react';
-import { Box, Tooltip, ClickAwayListener, IconButton } from '@mui/material';
+import React, { Fragment, useRef, useState } from 'react';
+import { Box, Tooltip, ClickAwayListener, IconButton, Collapse } from '@mui/material';
 import PropTypes from 'prop-types';
 import {
     clearxpath, getColorTypeFromValue, isValidJsonString, floatToInt, groupCommonKeys,
@@ -8,6 +8,7 @@ import {
 } from '../utils';
 import { DATA_TYPES, MODES } from '../constants';
 import JsonView from './JsonView';
+import VerticalJsonTable from './tables/VerticalJsonTable/VerticalJsonTable';
 import _, { cloneDeep, isObject } from 'lodash';
 import classes from './CommonKeyWidget.module.css';
 import dayjs from 'dayjs';
@@ -23,6 +24,7 @@ const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 const CommonKeyWidget = React.forwardRef((props, ref) => {
     const theme = useTheme();
+    const { collapse = false } = props;
 
     if (props.mode === MODES.EDIT || props.commonkeys.length === 0) return null;
     // filter unset or null values from common keys
@@ -32,6 +34,7 @@ const CommonKeyWidget = React.forwardRef((props, ref) => {
         if (Array.isArray(value) && value.length === 0) return false;
         if (isObject(value) && Object.keys(value) === 0) return false;
         if (!obj.displayZero && value === 0) return false;
+        if (obj.type === 'button') return false;
 
         return true;
     })
@@ -48,17 +51,19 @@ const CommonKeyWidget = React.forwardRef((props, ref) => {
     commonkeys = groupCommonKeys(commonkeys);
 
     return (
-        <Box ref={ref} className={classes.container} sx={{ backgroundColor: theme.palette.background.commonKey }}>
-            {commonkeys.map((collection, i) => {
-                return (
-                    <Fragment key={i}>
-                        {props.lineBreakStart && collection.groupStart && <div className={classes.break_line} />}
-                        <CommonKey collection={collection} truncateDateTime={props.truncateDateTime} />
-                        {props.lineBreakEnd && collection.groupEnd && <div className={classes.break_line} />}
-                    </Fragment>
-                )
-            })}
-        </Box>
+        <Collapse in={!collapse} timeout="auto" unmountOnExit sx={{ minHeight: 'auto !important', backgroundColor: theme.palette.background.commonKey }}>
+            <Box ref={ref} className={classes.container} sx={{ bgcolor: 'background.commonKey' }}>
+                {commonkeys.map((collection, i) => {
+                    return (
+                        <Fragment key={i}>
+                            {props.lineBreakStart && collection.groupStart && <div className={classes.break_line} />}
+                            <CommonKey collection={collection} truncateDateTime={props.truncateDateTime} />
+                            {props.lineBreakEnd && collection.groupEnd && <div className={classes.break_line} />}
+                        </Fragment>
+                    )
+                })}
+            </Box>
+        </Collapse>
     )
 })
 
@@ -69,6 +74,7 @@ CommonKeyWidget.propTypes = {
 const CommonKey = (props) => {
     const [open, setOpen] = useState(false);
     const [clipboardText, setClipboardText] = useState(null);
+    const jsonTableRef = useRef(null);
     const { collection } = props;
 
     const theme = useTheme();
@@ -103,7 +109,19 @@ const CommonKey = (props) => {
                 updatedData = JSON.parse(updatedData);
             }
             excludeNullFromObject(updatedData);
-            abbreviatedField = (<JsonView open={open} onClose={onCloseAbbreviatedField} src={updatedData} />)
+            abbreviatedField = (
+                <div className={classes.abbreviated_json} ref={jsonTableRef}>
+                    <span>{JSON.stringify(updatedData)}</span>
+                    <VerticalJsonTable 
+                        isOpen={open}
+                        data={updatedData}
+                        onClose={onCloseAbbreviatedField}
+                        anchorEl={jsonTableRef.current}
+                        usePopover={true}
+                    />
+                </div>
+                // <JsonView open={open} onClose={onCloseAbbreviatedField} src={updatedData} />
+            )
         } else if (collection.type === DATA_TYPES.STRING && !isValidJsonString(updatedData)) {
             let tooltipText = "";
             if (updatedData !== null && updatedData !== undefined) {
@@ -146,7 +164,7 @@ const CommonKey = (props) => {
     }
 
     let commonkeyColor = 'var(--dark-text-primary)';
-    
+
     if (collection.color && !collection.progressBar && !collection.button) {
         const color = getColorTypeFromValue(collection, collection.value);
         if (theme.palette.text[color]) {
@@ -186,6 +204,13 @@ const CommonKey = (props) => {
 
     const groupIndicatorColor = theme.palette.text.tertiary;
 
+    let columnName = collection.title ?? collection.key;
+    if (collection.displayName) {
+        columnName = collection.displayName;
+    } else if (collection.elaborateTitle) {
+        columnName = collection.tableTitle;
+    }
+
     return (
         <Box className={classes.item}>
             {collection.groupStart && (
@@ -194,7 +219,7 @@ const CommonKey = (props) => {
                 </span>
             )}
             <span style={{ color: `${commonkeyTitleColor}` }}>
-                {collection.elaborateTitle ? collection.tableTitle : collection.title ? collection.title : collection.key}:
+                {columnName}:
             </span>
             {collection.abbreviated && collection.abbreviated === "JSON" ? (
                 <span className={abbreviatedJsonClass} onClick={onOpenAbbreviatedField}>

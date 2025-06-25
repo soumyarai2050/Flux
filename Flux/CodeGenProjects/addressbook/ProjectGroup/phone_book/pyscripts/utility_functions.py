@@ -40,7 +40,7 @@ def unload_plan(plan_id: int, force: bool = False):
         time.sleep(5)
 
     email_book_service_http_client.unload_plan_from_plan_id_query_client(plan_id)
-    market: Market = Market(MarketID.IN)
+    market: Market = Market([MarketID.IN])
     if not market.is_test_run and not market.is_sanity_test_run:
         # remove plan lock files if no chores found
         delete_plan_lock_files_if_no_barters(plan_id, active_plan)

@@ -54,7 +54,7 @@ const MaximizeRestoreToggleMenu = ({
       default:
         return (
           <Icon name={menuName} title={menuName} onClick={handleMaximizeToggle}>
-            <IconComponent fontSize='small' />
+            <IconComponent fontSize='small' color='white' />
           </Icon>
         );
     }

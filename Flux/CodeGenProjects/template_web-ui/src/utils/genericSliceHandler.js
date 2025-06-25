@@ -33,7 +33,7 @@ export function setStoredArrayHandler(state, action, config) {
   const { storedArrayKey, storedObjKey, updatedObjKey, objIdKey } = modelKeys;
   state[storedArrayKey] = action.payload;
   if (modelName === 'ui_layout') return;
-  if (state[objIdKey]) {
+  if (state[objIdKey] && state[objIdKey] !== NEW_ITEM_ID) {
     const storedObj = action.payload.find((o) => o[DB_ID] === state[objIdKey]);
     if (!storedObj) {
       // Active entity was deleted; reset to initial state.

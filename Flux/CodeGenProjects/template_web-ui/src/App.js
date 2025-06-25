@@ -12,6 +12,8 @@ import { getTheme, BaseColor, Theme as ThemeModes, DEFAULT_BASE_COLOR } from './
 import { PROJECT_NAME } from './constants';
 import ErrorBoundary from './components/ErrorBoundary';
 import Layout from './components/Layout';
+import { DraggableProvider } from './contexts/DraggableContext';
+// import { ScrollableProvider } from './contexts/ScrollableContext';
 
 const THEME_MODE_STORAGE_KEY = 'appThemeMode';
 const BASE_COLOR_STORAGE_KEY = 'appBaseColor';
@@ -77,13 +79,17 @@ function App() {
         <ThemeProvider theme={muiTheme}>
             <CssBaseline /> {/* Ensures consistent baseline styling */}
             <ErrorBoundary>
-                <Layout 
-                    theme={themeMode} 
-                    onThemeToggle={handleThemeToggle} 
-                    baseColor={currentBaseColor}
-                    onBaseColorChange={handleBaseColorChange}
-                    projectName={PROJECT_NAME} 
-                />
+                <DraggableProvider>
+                    {/* <ScrollableProvider> */}
+                    <Layout
+                        theme={themeMode}
+                        onThemeToggle={handleThemeToggle}
+                        baseColor={currentBaseColor}
+                        onBaseColorChange={handleBaseColorChange}
+                        projectName={PROJECT_NAME}
+                    />
+                    {/* </ScrollableProvider> */}
+                </DraggableProvider>
             </ErrorBoundary>
         </ThemeProvider>
     );

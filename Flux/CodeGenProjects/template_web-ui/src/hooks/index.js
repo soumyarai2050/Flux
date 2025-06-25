@@ -4,4 +4,6 @@ export { default as useWebSocketWorker } from './useWebSocketWorker';
 export { default as useDataSourcesWebsocketWorker } from './useDataSourcesWebSocketWorker';
 export { default as useDownload } from './useDownload';
 export { default as useDebugger } from './useDebugger';
+export { default as useBoundaryScrollDetection } from './useBoundaryScrollDetection';
+export { default as useClickHandler } from './useClickHandler';
 export { default as useScrollIndicators } from './useScrollIndicators';

@@ -48,7 +48,7 @@ const ReloadMenu = ({
       default:
         return (
           <Icon name={menuName} title={menuName} onClick={handleReload}>
-            <Refresh fontSize='small' />
+            <Refresh fontSize='small' color='white' />
           </Icon>
         );
     }

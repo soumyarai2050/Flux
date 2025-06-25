@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { cloneDeep, get, set } from 'lodash';
 import {
@@ -15,13 +15,23 @@ import {
   TextField
 } from '@mui/material';
 import { Download } from '@mui/icons-material';
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+} from '@dnd-kit/sortable';
 import { DB_ID, DATA_TYPES, MODES, MODEL_TYPES } from '../../constants';
 import TableHead from '../../components/TableHead';
 import Cell from '../../components/Cell';
 import { getBufferAbbreviatedOptionLabel } from '../../utils';
 import styles from './AbbreviationMergeView.module.css';
 import { flux_toggle, flux_trigger_strat } from '../../projectSpecificUtils';
-import ClipboardCopier from '../ClipboardCopier';
+// import { useBoundaryScrollDetection } from '../../hooks';
 
 /**
  * BufferedView renders an autocomplete dropdown and a load button
@@ -145,45 +155,58 @@ const LoadedView = ({
   onModeToggle,
   onUpdate,
   onButtonToggle,
-  onUserChange
+  onUserChange,
+  onColumnOrdersChange,
+  stickyHeader = true,
+  frozenColumns,
+  filters,
+  onFiltersChange,
+  uniqueValues
 }) => {
-  const [clipboardText, setClipboardText] = useState(null);
+  const [columns, setColumns] = useState(cells);
+  const [columnWidths, setColumnWidths] = useState({});
+  const columnRefs = useRef({});
 
-  const handleSortRequest = (e, property, retainSortLevel = false) => {
-    let updatedSortOrders = cloneDeep(sortOrders);
-    if (!retainSortLevel) {
-      updatedSortOrders = updatedSortOrders.filter(o => o.order_by === property);
-    }
-    const sortOrder = updatedSortOrders.find(o => o.order_by === property);
-    if (sortOrder) {
-      // sort level already exists for this property
-      sortOrder.sort_type = sortOrder.sort_type === 'asc' ? 'desc' : 'asc';
-    } else {
-      // add a new sort level
-      updatedSortOrders.push({ order_by: property, sort_type: 'asc' });
-    }
-    onSortOrdersChange(updatedSortOrders);
-  }
+  // const { containerRef, isScrollable, enableScrolling, disableScrolling } = useBoundaryScrollDetection();
 
-  const handleSortRemove = (property) => {
-    const updatedSortOrders = sortOrders.filter(o => o.order_by !== property);
-    onSortOrdersChange(updatedSortOrders);
-  }
+  useEffect(() => {
+    setColumns(cells);
+  }, [cells])
 
-  const handleCopy = (column) => {
-    const columnName = column.key;
-    let sourceIndex = column.sourceIndex;
-    if (sourceIndex === null || sourceIndex === undefined) {
-      sourceIndex = 0;
+  // Sort sensors for drag-and-drop
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 10 } })
+  );
+
+  // Measure column widths after render
+  useEffect(() => {
+    const widths = {};
+    cells.forEach(column => {
+      if (columnRefs.current[column.key]) {
+        widths[column.key] = columnRefs.current[column.key].getBoundingClientRect().width;
+      }
+    });
+    setColumnWidths(widths);
+  }, [columns]);
+
+  const handleDragEnd = (event) => {
+    const { active, over } = event;
+
+    if (active.id !== over?.id) {
+      const oldIndex = cells.findIndex((col) => col.key === active.id);
+      const newIndex = cells.findIndex((col) => col.key === over?.id);
+
+      const reorderedColumns = arrayMove(cells, oldIndex, newIndex);
+      const columnOrders = reorderedColumns.map(
+        (column, index) => ({
+          column_name: column.key,
+          sequence: index
+        })
+      );
+      setColumns(reorderedColumns);
+      onColumnOrdersChange(columnOrders);
     }
-    const values = [columnName];
-    rows.forEach((groupedRow) => {
-      const row = groupedRow[sourceIndex];
-      values.push(row[columnName]);
-    })
-    const text = values.join('\n');
-    setClipboardText(text);
-  }
+  };
 
   const handleButtonClick = (e, action, xpath, value, dataSourceId, source, force = false) => {
     if (action === 'flux_toggle') {
@@ -250,166 +273,212 @@ const LoadedView = ({
     onRowsPerPageChange(updatedRowsPerPage);
   }
 
+  // Function to calculate left position for sticky columns
+  const getStickyPosition = (columnId) => {
+    if (!frozenColumns.includes(columnId)) return null;
+
+    let leftPosition = 0;
+    for (const id of frozenColumns) {
+      if (id === columnId) break;
+      // Approximate width for each preceding sticky column (adjust as needed)
+      leftPosition += columnWidths[id] || 0;
+    }
+    return `${leftPosition}px`;
+  }
+
+  const handleClick = () => {
+    // enableScrolling();
+  }
+
+  const handleDoubleClick = () => {
+    // disableScrolling();
+  }
+
   if (!activeRows || activeRows.length === 0) return null;
 
+  let tableContainerClasses = styles.container;
+  // if (!isScrollable) {
+  //   tableContainerClasses += ` ${styles.no_scroll}`;
+  // }
+
   return (
-    <TableContainer className={styles.container}>
-      <Table className={styles.table} size='medium'>
-        <TableHead
-          headCells={cells}
-          mode={mode}
-          sortOrders={sortOrders}
-          onRequestSort={handleSortRequest}
-          onRemoveSort={handleSortRemove}
-          copyColumnHandler={handleCopy}
-          collectionView={true}
-        />
-        <TableBody>
-          {activeRows.map((groupedRow, rowIdx) => {
-            let rowKey = groupedRow[0]['data-id'];
-            if (Number.isInteger(rowKey)) {
-              rowKey = rowIdx;
-            }
-            const dataSourcesStoredObjDict = {};
+    <div className={styles.dataTableWrapper}>
+      <TableContainer
+        className={tableContainerClasses}
+        // ref={containerRef}
+        // onDoubleClick={handleDoubleClick}  
+        onClick={handleClick}
+      >
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <Table className={styles.table} size='medium'>
+            <TableHead
+              columns={columns}
+              uniqueValues={uniqueValues}
+              filters={filters}
+              sortOrders={sortOrders}
+              onFiltersChange={onFiltersChange}
+              onSortOrdersChange={onSortOrdersChange}
+              collectionView={true}
+              columnRefs={columnRefs}
+              stickyHeader={stickyHeader}
+              getStickyPosition={getStickyPosition}
+              groupedRows={rows}
+            />
+            <TableBody>
+              {activeRows.map((groupedRow, rowIdx) => {
+                let rowKey = groupedRow[0]['data-id'];
+                if (Number.isInteger(rowKey)) {
+                  rowKey = rowIdx;
+                }
+                const dataSourcesStoredObjDict = {};
 
-            return (
-              <TableRow
-                key={rowKey}
-                className={styles.row}
-                onDoubleClick={handleRowDoubleClick}
-              >
-                {cells.map((cell, cellIndex) => {
-                  // Get row data based on the cell's source index.
-                  const row = groupedRow[cell.sourceIndex];
-                  const isNullCell = !row || (row && Object.keys(row).length === 0 && !cell.commonGroupKey);
+                return (
+                  <TableRow
+                    key={rowKey}
+                    className={styles.row}
+                    onDoubleClick={handleRowDoubleClick}
+                  >
+                    {columns.map((cell, cellIndex) => {
+                      // Get row data based on the cell's source index.
+                      const row = groupedRow[cell.sourceIndex];
+                      const isNullCell = !row || (row && Object.keys(row).length === 0 && !cell.commonGroupKey);
 
-                  // Update stored objects for this row.
-                  if (row) {
-                    Object.keys(dataSourcesStoredArrayDict).forEach((source) => {
-                      dataSourcesStoredObjDict[source] =
-                        dataSourcesStoredArrayDict[source].find(
-                          (o) => o[DB_ID] === row['data-id']
-                        );
-                    });
-                  }
-                  const isSelected = row?.['data-id'] === selectedId;
-                  const isButtonDisabled = !isSelected;
-                  const rowIdx = row ? row['data-id'] : cellIndex;
+                      // Update stored objects for this row.
+                      if (row) {
+                        Object.keys(dataSourcesStoredArrayDict).forEach((source) => {
+                          dataSourcesStoredObjDict[source] =
+                            dataSourcesStoredArrayDict[source].find(
+                              (o) => o[DB_ID] === row['data-id']
+                            );
+                        });
+                      }
+                      const isSelected = row?.['data-id'] === selectedId;
+                      const isButtonDisabled = !isSelected;
+                      const rowIdx = row ? row['data-id'] : cellIndex;
 
-                  // Process cells of type 'progressBar'
-                  const cellCopy = cloneDeep(cell);
-                  if (cell.type === 'progressBar') {
-                    // Process the minimum value if it's a string.
-                    if (typeof cellCopy.min === DATA_TYPES.STRING) {
-                      const min = cellCopy.min;
-                      const source = min.split('.')[0];
-                      cellCopy.minFieldName = min.split('.').pop();
-                      const updatedArray = dataSourcesUpdatedArrayDict[source];
-                      if (updatedArray && row) {
-                        const updatedObj = updatedArray.find(
-                          (o) => o[DB_ID] === row['data-id']
-                        );
-                        if (updatedObj) {
-                          cellCopy.min = get(
-                            updatedObj,
-                            min.substring(min.indexOf('.') + 1)
-                          );
+                      // Process cells of type 'progressBar'
+                      const cellCopy = cloneDeep(cell);
+                      if (cell.type === 'progressBar') {
+                        // Process the minimum value if it's a string.
+                        if (typeof cellCopy.min === DATA_TYPES.STRING) {
+                          const min = cellCopy.min;
+                          const source = min.split('.')[0];
+                          cellCopy.minFieldName = min.split('.').pop();
+                          const updatedArray = dataSourcesUpdatedArrayDict[source];
+                          if (updatedArray && row) {
+                            const updatedObj = updatedArray.find(
+                              (o) => o[DB_ID] === row['data-id']
+                            );
+                            if (updatedObj) {
+                              cellCopy.min = get(
+                                updatedObj,
+                                min.substring(min.indexOf('.') + 1)
+                              );
+                            }
+                          }
+                        }
+                        // Process the maximum value if it's a string.
+                        if (typeof cellCopy.max === DATA_TYPES.STRING) {
+                          const max = cellCopy.max;
+                          const source = max.split('.')[0];
+                          cellCopy.maxFieldName = max.split('.').pop();
+                          const updatedArray = dataSourcesUpdatedArrayDict[source];
+                          if (updatedArray && row) {
+                            const updatedObj = updatedArray.find(
+                              (o) => o[DB_ID] === row['data-id']
+                            );
+                            if (updatedObj) {
+                              cellCopy.max = get(
+                                updatedObj,
+                                max.substring(max.indexOf('.') + 1)
+                              );
+                            }
+                          }
                         }
                       }
-                    }
-                    // Process the maximum value if it's a string.
-                    if (typeof cellCopy.max === DATA_TYPES.STRING) {
-                      const max = cellCopy.max;
-                      const source = max.split('.')[0];
-                      cellCopy.maxFieldName = max.split('.').pop();
-                      const updatedArray = dataSourcesUpdatedArrayDict[source];
-                      if (updatedArray && row) {
-                        const updatedObj = updatedArray.find(
-                          (o) => o[DB_ID] === row['data-id']
-                        );
-                        if (updatedObj) {
-                          cellCopy.max = get(
-                            updatedObj,
-                            max.substring(max.indexOf('.') + 1)
+
+                      // Determine the value and stored value using the cell's xpath.
+                      const xpath = cellCopy.xpath;
+                      let value = row?.[cellCopy.key] ?? undefined;
+                      let storedValue;
+                      if (xpath.indexOf('-') !== -1) {
+                        const storedValueArray = xpath
+                          .split('-')
+                          .map((path) =>
+                            get(dataSourcesStoredObjDict[cellCopy.source], path)
+                          )
+                          .filter((val) => val !== null && val !== undefined);
+                        storedValue = storedValueArray.join('-');
+                      } else {
+                        storedValue = get(dataSourcesStoredObjDict[cellCopy.source], xpath);
+                      }
+                      // If the cell is part of a joined group, attempt to derive a value.
+                      if (cellCopy.joinKey || cellCopy.commonGroupKey) {
+                        if (!value) {
+                          const joinedKeyCellRow = groupedRow.find(
+                            (r) =>
+                              r?.[cellCopy.key] !== null && r?.[cellCopy.key] !== undefined
                           );
+                          if (joinedKeyCellRow) {
+                            value = joinedKeyCellRow[cellCopy.key];
+                          }
                         }
                       }
-                    }
-                  }
 
-                  // Determine the value and stored value using the cell's xpath.
-                  const xpath = cellCopy.xpath;
-                  let value = row?.[cellCopy.key] ?? undefined;
-                  let storedValue;
-                  if (xpath.indexOf('-') !== -1) {
-                    const storedValueArray = xpath
-                      .split('-')
-                      .map((path) =>
-                        get(dataSourcesStoredObjDict[cellCopy.source], path)
-                      )
-                      .filter((val) => val !== null && val !== undefined);
-                    storedValue = storedValueArray.join('-');
-                  } else {
-                    storedValue = get(dataSourcesStoredObjDict[cellCopy.source], xpath);
-                  }
-                  // If the cell is part of a joined group, attempt to derive a value.
-                  if (cellCopy.joinKey || cellCopy.commonGroupKey) {
-                    if (!value) {
-                      const joinedKeyCellRow = groupedRow.find(
-                        (r) =>
-                          r?.[cellCopy.key] !== null && r?.[cellCopy.key] !== undefined
+                      const stickyPosition = getStickyPosition(cell.key);
+
+                      return (
+                        <Cell
+                          key={cellIndex}
+                          mode={mode}
+                          selected={isSelected}
+                          rowindex={rowIdx}
+                          name={cellCopy.key}
+                          elaborateTitle={cellCopy.tableTitle}
+                          currentValue={value}
+                          previousValue={storedValue}
+                          collection={cellCopy}
+                          xpath={xpath}
+                          dataxpath={xpath}
+                          dataAdd={false}
+                          dataRemove={false}
+                          disabled={false}
+                          buttonDisable={isButtonDisabled}
+                          ignoreDisable={true}
+                          onButtonClick={handleButtonClick}
+                          onTextChange={handleTextChange}
+                          forceUpdate={mode === MODES.READ}
+                          truncateDateTime={false}
+                          modelType={MODEL_TYPES.ABBREVIATION_MERGE}
+                          onForceSave={onForceSave}
+                          onRowSelect={handleRowSelect}
+                          dataSourceId={row?.['data-id'] || null}
+                          nullCell={isNullCell}
+                          dataSourceColors={dataSourceColors}
+                          onUpdate={() => { }}
+                          onDoubleClick={() => { }}
+                          onCheckboxChange={() => { }}
+                          onSelectItemChange={() => { }}
+                          onAutocompleteOptionChange={() => { }}
+                          onDateTimeChange={() => { }}
+                          stickyPosition={stickyPosition}
+                        />
                       );
-                      if (joinedKeyCellRow) {
-                        value = joinedKeyCellRow[cellCopy.key];
-                      }
-                    }
-                  }
-
-                  return (
-                    <Cell
-                      key={cellIndex}
-                      mode={mode}
-                      selected={isSelected}
-                      rowindex={rowIdx}
-                      name={cellCopy.key}
-                      elaborateTitle={cellCopy.tableTitle}
-                      currentValue={value}
-                      previousValue={storedValue}
-                      collection={cellCopy}
-                      xpath={xpath}
-                      dataxpath={xpath}
-                      dataAdd={false}
-                      dataRemove={false}
-                      disabled={false}
-                      buttonDisable={isButtonDisabled}
-                      ignoreDisable={true}
-                      onButtonClick={handleButtonClick}
-                      onTextChange={handleTextChange}
-                      forceUpdate={mode === MODES.READ}
-                      truncateDateTime={false}
-                      modelType={MODEL_TYPES.ABBREVIATION_MERGE}
-                      onForceSave={onForceSave}
-                      onRowSelect={handleRowSelect}
-                      dataSourceId={row?.['data-id'] || null}
-                      nullCell={isNullCell}
-                      dataSourceColors={dataSourceColors}
-                      onUpdate={() => { }}
-                      onDoubleClick={() => { }}
-                      onCheckboxChange={() => { }}
-                      onSelectItemChange={() => { }}
-                      onAutocompleteOptionChange={() => { }}
-                      onDateTimeChange={() => { }}
-                    />
-                  );
-                })}
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+                    })}
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </DndContext>
+      </TableContainer>
       {rows.length > 6 && (
         <TablePagination
-          rowsPerPageOptions={[25, 50]}
+          rowsPerPageOptions={[25, 50, 100]}
           component='div'
           count={rows.length}
           rowsPerPage={rowsPerPage}
@@ -418,8 +487,7 @@ const LoadedView = ({
           onRowsPerPageChange={handleRowsPerPageChange}
         />
       )}
-      <ClipboardCopier text={clipboardText} />
-    </TableContainer>
+    </div>
   );
 };
 
@@ -500,6 +568,12 @@ const AbbreviationMergeView = ({
   onUpdate,
   onUserChange,
   onButtonToggle,
+  onColumnOrdersChange,
+  stickyHeader,
+  frozenColumns,
+  filters,
+  onFiltersChange,
+  uniqueValues
 }) => {
   return (
     <>
@@ -514,9 +588,9 @@ const AbbreviationMergeView = ({
             onSearchQueryChange={onSearchQueryChange}
             onLoad={onLoad}
           />
-          <Divider textAlign='left'>
+          {/* <Divider textAlign='left'>
             <Chip label={loadedFieldMetadata.title} />
-          </Divider>
+          </Divider> */}
         </>
       )}
       <LoadedView
@@ -541,6 +615,12 @@ const AbbreviationMergeView = ({
         onUpdate={onUpdate}
         onUserChange={onUserChange}
         onButtonToggle={onButtonToggle}
+        onColumnOrdersChange={onColumnOrdersChange}
+        stickyHeader={stickyHeader}
+        frozenColumns={frozenColumns}
+        filters={filters}
+        onFiltersChange={onFiltersChange}
+        uniqueValues={uniqueValues}
       />
     </>
   );

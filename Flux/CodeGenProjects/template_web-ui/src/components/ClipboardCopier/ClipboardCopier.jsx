@@ -25,6 +25,7 @@ const ClipboardCopier = ({ text }) => {
         // Fallback for older browsers
         const textArea = textRef.current;
         if (!textArea) return;
+        textArea.focus();
         textArea.select();
         try {
           if (document.queryCommandSupported && document.queryCommandSupported('copy')) {
@@ -50,7 +51,7 @@ const ClipboardCopier = ({ text }) => {
         opacity: 0,
       }}
       readOnly
-      aria-hidden='true'
+      // aria-hidden='true'
     />
   );
 };

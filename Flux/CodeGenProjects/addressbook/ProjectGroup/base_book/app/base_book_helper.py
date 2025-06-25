@@ -54,7 +54,7 @@ def create_symbol_overview_pre_helper(static_data: SecurityRecordManager, symbol
 
     # check and add last update datetime to current time if not present [log warning]
     if not symbol_overview_obj.last_update_date_time:
-        local_now: DateTime = DateTime.now(tz="Asia/Shanghai")
+        local_now: DateTime = DateTime.now(tz="Asia/Singapore")
         symbol_overview_obj.last_update_date_time = local_now
         logging.warning(f"symbol_overview_obj.last_update_date_time not found, set to local: {local_now}")
 

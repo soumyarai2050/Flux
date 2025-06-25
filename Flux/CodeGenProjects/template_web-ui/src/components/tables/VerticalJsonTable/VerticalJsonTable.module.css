@@ -1,0 +1,117 @@
+.dialog {
+  overflow: hidden;
+}
+
+.dialogTitle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-right: 8px;
+}
+
+.dialogContent {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+}
+
+.popoverContainer {
+  min-width: 320px;
+  max-width: 80vw;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.tableContainer {
+  overflow-x: auto;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.table {
+  min-width: 300px;
+}
+
+.tableHeaderCell {
+  font-weight: 700;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 6px 8px !important;
+}
+
+.headerCell {
+  font-weight: 600;
+  vertical-align: top;
+  background: var(--dynamic-navbar-bg);
+  word-break: break-word;
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  padding: 6px 8px !important;
+}
+
+.dataCell {
+  word-break: break-all;
+  padding: 6px 8px !important;
+}
+
+@media (max-width: 600px) {
+  .headerCell {
+    min-width: 120px;
+  }
+
+  .dataCell {
+    min-width: 150px;
+  }
+}
+
+.complexValueContainer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.expandButton {
+  margin-left: 8px;
+}
+
+.typeIndicator {
+  color: #757575;
+  font-style: italic;
+}
+
+.nullValue {
+  color: #9e9e9e;
+  font-style: italic;
+}
+
+.undefinedValue {
+  color: #9e9e9e;
+  font-style: italic;
+}
+
+.booleanValue {
+  font-weight: 600;
+}
+
+.trueValue {
+  /*color: #388e3c;*/
+}
+
+.falseValue {
+  /*color: #d32f2f;*/
+}
+
+.stringValue {
+  /*color: #2196f3;*/
+}
+
+.primitiveValue {
+  /*color: #ff9800;*/
+}
+
+.popover {
+  overflow: hidden;
+}

@@ -24,6 +24,11 @@ import {
     pinnedChangeHandler,
     filtersChangeHandler,
     absoluteSortOverrideChangeHandler,
+    stickyHeaderToggleHandler,
+    commonKeyCollapseToggleHandler,
+    frozenColumnsChangeHandler,
+    columnNameOverrideHandler,
+    highlightUpdateOverrideHandler
 } from '../../utils/genericModelHandler';
 import CommonKeyWidget from '../../components/CommonKeyWidget';
 import { ConfirmSavePopup, FormValidation } from '../../components/Popup';
@@ -48,11 +53,13 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
     const [isWsDisabled, setIsWsDisabled] = useState(false);
     const [page, setPage] = useState(0);
     const [rows, setRows] = useState([]);
+    const [groupedRows, setGroupedRows] = useState([]);
     const [activeRows, setActiveRows] = useState([]);
     const [maxRowSize, setMaxRowSize] = useState(null);
     const [headCells, setHeadCells] = useState([]);
     const [commonKeys, setCommonKeys] = useState([]);
     const [sortedCells, setSortedCells] = useState([]);
+    const [uniqueValues, setUniqueValues] = useState({});
     const [showHidden, setShowHidden] = useState(false);
     const [showMore, setShowMore] = useState(false);
     const [showAll, setShowAll] = useState(false);
@@ -146,15 +153,17 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
         workerRef.current = new Worker(new URL("../../workers/non-root-model.worker.js", import.meta.url));
 
         workerRef.current.onmessage = (event) => {
-            const { rows, activeRows, maxRowSize, headCells, commonKeys, sortedCells } = event.data;
+            const { rows, groupedRows, activeRows, maxRowSize, headCells, commonKeys, uniqueValues, sortedCells } = event.data;
 
             startTransition(() => {
                 setRows(rows);
+                setGroupedRows(groupedRows);
                 setActiveRows(activeRows);
                 setMaxRowSize(maxRowSize);
                 setHeadCells(headCells);
                 setCommonKeys(commonKeys);
                 setSortedCells(sortedCells);
+                setUniqueValues(uniqueValues);
 
                 // If a new update came in while the worker was busy, send it now.
                 if (pendingUpdateRef.current) {
@@ -210,6 +219,9 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
                 showHidden,
                 showAll,
                 absoluteSortOverride: modelLayoutData.absolute_sort_override || [],
+                frozenColumns: modelLayoutData.frozen_columns || [],
+                columnNameOverride: modelLayoutData.column_name_override || [],
+                highlightUpdateOverride: modelLayoutData.highlight_update_override || [],
                 columnOrders: modelLayoutData.column_orders || [],
                 xpath: modelName
             }
@@ -364,6 +376,27 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
         absoluteSortOverrideChangeHandler(modelHandlerConfig, updatedAbsoluteSort);
     }
 
+    const handleStickyHeaderToggle = () => {
+        stickyHeaderToggleHandler(modelHandlerConfig, !modelLayoutData.sticky_header);
+    }
+
+    const handleCommonKeyCollapseToggle = () => {
+        commonKeyCollapseToggleHandler(modelHandlerConfig, !modelLayoutData.common_key_collapse);
+    }
+
+    const handleFrozenColumnsChange = (updatedFrozenColumns, updatedColumns) => {
+        setHeadCells(updatedColumns);
+        frozenColumnsChangeHandler(modelHandlerConfig, updatedFrozenColumns);
+    }
+
+    const handleColumnNameOverrideChange = (updatedColumnNameOverride) => {
+        columnNameOverrideHandler(modelHandlerConfig, updatedColumnNameOverride)
+    }
+
+    const handleHighlightUpdateOverrideChange = (updatedHighlightUpdateOverride) => {
+        highlightUpdateOverrideHandler(modelHandlerConfig, updatedHighlightUpdateOverride);
+    }
+
     const handleDownload = async () => {
         const fileName = getCSVFileName(modelName);
         try {
@@ -509,9 +542,9 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
             case LAYOUT_TYPES.TABLE:
                 return (
                     <>
-                        <CommonKeyWidget mode={mode} commonkeys={commonKeys} />
+                        <CommonKeyWidget mode={mode} commonkeys={commonKeys} collapse={modelLayoutData.common_key_collapse} />
                         <DataTable
-                            rows={rows}
+                            rows={groupedRows}
                             activeRows={activeRows}
                             cells={sortedCells}
                             mode={mode}
@@ -534,6 +567,12 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
                             modelName={modelName}
                             fieldsMetadata={fieldsMetadata}
                             isReadOnly={modelLayoutOption.is_read_only}
+                            onColumnOrdersChange={handleColumnOrdersChange}
+                            stickyHeader={modelLayoutData.sticky_header}
+                            frozenColumns={modelLayoutData.frozen_columns || []}
+                            filters={modelLayoutData.filters || []}
+                            onFiltersChange={handleFiltersChange}
+                            uniqueValues={uniqueValues}
                         />
                     </>
                 );
@@ -565,7 +604,7 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
             open={isMaximized}
             onClose={handleFullScreenToggle}
         >
-            <ModelCard>
+            <ModelCard id={modelName}>
                 <ModelCardHeader name={modelTitle}>
                     <MenuGroup
                         // column settings
@@ -584,6 +623,7 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
                         filters={modelLayoutOption.filters || []}
                         fieldsMetadata={fieldsMetadata || []}
                         onFiltersChange={handleFiltersChange}
+                        uniqueValues={uniqueValues}
                         // visibility
                         showMore={showMore}
                         showHidden={showHidden}
@@ -635,6 +675,20 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
                         isAbbreviationSource={isAbbreviationSource}
                         isCreating={isCreating}
                         onReload={handleReload}
+                        // table settings
+                        stickyHeader={modelLayoutData.sticky_header ?? true}
+                        onStickyHeaderToggle={handleStickyHeaderToggle}
+                        frozenColumns={modelLayoutData.frozen_columns || []}
+                        onFrozenColumnsChange={handleFrozenColumnsChange}
+                        commonKeyCollapse={modelLayoutData.common_key_collapse ?? false}
+                        onCommonKeyCollapseToggle={handleCommonKeyCollapseToggle}
+                        columnNameOverride={modelLayoutData.column_name_override || []}
+                        onColumnNameOverrideChange={handleColumnNameOverrideChange}
+                        highlightUpdateOverride={modelLayoutData.highlight_update_override || []}
+                        onHighlightUpdateOverrideChange={handleHighlightUpdateOverrideChange}
+                        sortOrders={modelLayoutData.sort_orders || []}
+                        onSortOrdersChange={handleSortOrdersChange}
+                        groupedRows={groupedRows}
                     />
                 </ModelCardHeader>
                 <ModelCardContent

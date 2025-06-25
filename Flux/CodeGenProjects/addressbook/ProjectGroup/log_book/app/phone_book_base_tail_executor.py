@@ -73,7 +73,7 @@ class PhoneBookBaseTailExecutor(AppTailExecutor):
         super().__init__(log_detail, regex_file_dir_path, config_yaml_dict,
                          log_prefix_regex_pattern_to_callable_name_dict, debug_mode=debug_mode)
         PhoneBookBaseTailExecutor.initialize_underlying_http_callables()
-        self.market: Market = Market(MarketID.IN)
+        self.market: Market = Market([MarketID.IN])
         self.simulation_mode = simulation_mode
         self.contact_alerts_model_exist: bool = False
         self.contact_alerts_cache_dict: Dict[str, ContactAlertBaseModel] = {}

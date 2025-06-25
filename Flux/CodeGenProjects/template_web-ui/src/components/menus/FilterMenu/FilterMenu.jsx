@@ -33,14 +33,18 @@ const FilterMenu = ({
   modelType,
   filters,
   onFiltersChange,
-  onMenuClose
+  onMenuClose,
+  uniqueValues,
+  sortOrders,
+  onSortOrdersChange,
+  groupedRows
 }) => {
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const menuName = 'filter';
 
-  const filterFieldsMetadata = useMemo(() => fieldsMetadata.filter(meta => meta.filterEnable), []);
+  // const filterFieldsMetadata = useMemo(() => fieldsMetadata.filter(meta => meta.filterEnable), []);
 
-  if (filterFieldsMetadata.length === 0) return null;
+  // if (filterFieldsMetadata.length === 0) return null;
 
   const handlePopoverOpen = () => {
     setIsPopoverOpen(true);
@@ -64,7 +68,8 @@ const FilterMenu = ({
           <MenuItem name={menuName} onClick={handlePopoverOpen}>
             <span>
               <FilterAlt sx={{ marginRight: '5px' }} fontSize='small' />
-              {menuName}
+              {/* {menuName} */}
+              filter/sort
             </span>
             {<PinCompononent onClick={handlePinToggle} fontSize='small' />}
           </MenuItem>
@@ -72,8 +77,8 @@ const FilterMenu = ({
       case 'icon':
       default:
         return (
-          <Icon name={menuName} title={menuName} onClick={handlePopoverOpen}>
-            <FilterAlt fontSize='small' />
+          <Icon name={menuName} title={'filter/sort'} onClick={handlePopoverOpen}>
+            <FilterAlt fontSize='small' color='white' />
           </Icon>
         );
     }
@@ -86,9 +91,13 @@ const FilterMenu = ({
         isOpen={isPopoverOpen}
         filters={filters}
         fieldsMetadata={fieldsMetadata}
+        uniqueValues={uniqueValues}
         isCollectionModel={modelType === MODEL_TYPES.ABBREVIATION_MERGE}
         onFiltersChange={onFiltersChange}
         onClose={handlePopoverClose}
+        sortOrders={sortOrders}
+        onSortOrdersChange={onSortOrdersChange}
+        groupedRows={groupedRows}
       />
     </>
   );
@@ -105,6 +114,7 @@ FilterMenu.propTypes = {
       title: PropTypes.string,
     })
   ).isRequired,
+  onOpen: PropTypes.func.isRequired
 };
 
 export default FilterMenu;

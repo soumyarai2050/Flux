@@ -208,6 +208,7 @@ message Position {
   optional float accrual_local = 18 [(FluxFldNumberFormat) = "%", (FluxFldHide) = "True"];
   optional float accrual_usd = 19 [(FluxFldNumberFormat) = "%", (FluxFldHide) = "True"];
   optional float prev_mark_usd = 20 [(FluxFldNumberFormat) = "%", (FluxFldHide) = "True"];
+  optional int64 create_ts = 21 [(FluxFldValIsDateTime) = true, (FluxFldHelp) = "when was the position first created. Note: merged/compressed position cases: the value will be any one of the create_ts of merged position"];
 }
 
 message SecPosition {

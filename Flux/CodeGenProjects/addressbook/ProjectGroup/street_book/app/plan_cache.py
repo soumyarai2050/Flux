@@ -30,7 +30,7 @@ class PlanCache(BasePlanCache, EmailBookServiceBasePlanCache, StreetBookServiceB
         BasePlanCache.__init__(self)
         EmailBookServiceBasePlanCache.__init__(self)
         StreetBookServiceBasePlanCache.__init__(self)
-        self.market = Market(MarketID.IN)
+        self.market = Market([MarketID.IN])
         self.notify_semaphore = Semaphore()
         self.stopped = True  # used by consumer thread to stop processing
         self.leg1_bartering_symbol: str | None = None

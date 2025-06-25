@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-    ChartSettingsMenu, ColumnSettingsMenu, CreateMenu, DataSourceColorMenu, DownloadMenu, DynamicMenu,
+    ChartSettingsMenu, TableSettingsMenu, CreateMenu, DataSourceColorMenu, DownloadMenu, DynamicMenu,
     EditSaveToggleMenu, FilterMenu, JoinMenu, LayoutSwitchMenu, MaximizeRestoreToggleMenu, PivotSettingsMenu, ReloadMenu, VisibilityMenu
 } from './menus';
 import { MODEL_TYPES } from '../constants';
@@ -9,8 +9,6 @@ import { Menu } from '@mui/material';
 import Icon from './Icon';
 import { MenuOpen, Menu as MenuIcon } from '@mui/icons-material';
 import ButtonQuery from './ButtonQuery';
-import { FilterDialog } from './menus/FilterMenu';
-import { DataSourceHexColorPopup } from './Popup';
 
 const MenuGroup = ({
     columns,
@@ -72,7 +70,21 @@ const MenuGroup = ({
     pivotEnableOverride = [],
     absoluteSortOverride = [],
     onAbsoluteSortChange,
-    disableCreate = false
+    disableCreate = false,
+    commonKeyCollapse = false,
+    onCommonKeyCollapseToggle,
+    stickyHeader = true,
+    onStickyHeaderToggle,
+    frozenColumns = [],
+    onFrozenColumnsChange,
+    uniqueValues = {},
+    columnNameOverride = [],
+    onColumnNameOverrideChange,
+    highlightUpdateOverride = [],
+    onHighlightUpdateOverrideChange,
+    sortOrders = [],
+    onSortOrdersChange,
+    groupedRows = []
 }) => {
     const [anchorEl, setAnchorEl] = useState(null);
 
@@ -177,6 +189,28 @@ const MenuGroup = ({
         }
     }
 
+    const handleFrozenToggle = (e, xpath, key, value, ...rest) => {
+        const isFrozen = !value;
+        const fieldKey = modelType === MODEL_TYPES.ABBREVIATION_MERGE ? 'key' : 'tableTitle';
+        const updatedColumns = columns.map((o) => o[fieldKey] === key ? { ...o, frozenColumn: isFrozen } : o);
+        const meta = fieldsMetadata.find((o) => o[fieldKey] === key);
+        if (!meta) return;
+        const updatedFrozenColumns = cloneDeep(frozenColumns);
+        if (isFrozen) {
+            if (!updatedFrozenColumns.includes(key)) {
+                updatedFrozenColumns.push(key);
+            }
+        } else {
+            const idx = updatedFrozenColumns.indexOf(key);
+            if (idx !== -1) {
+                updatedFrozenColumns.splice(idx, 1);
+            }
+        }
+        if (onFrozenColumnsChange) {
+            onFrozenColumnsChange(updatedFrozenColumns, updatedColumns);
+        }
+    }
+
     const isMenuOpen = Boolean(anchorEl);
     const IconComponent = isMenuOpen ? MenuOpen : MenuIcon;
 
@@ -197,7 +231,7 @@ const MenuGroup = ({
     }
 
     const menus = [
-        'column-settings',
+        'table-settings',
         'chart-settings',
         'pivot-settings',
         'filter',
@@ -215,9 +249,9 @@ const MenuGroup = ({
     const renderMenu = (menuName, menuType = 'icon') => {
         const menuKey = `${menuName}_${menuType}`;
         switch (menuName) {
-            case 'column-settings':
+            case 'table-settings':
                 return (
-                    <ColumnSettingsMenu
+                    <TableSettingsMenu
                         key={menuKey}
                         columns={columns}
                         columnOrders={columnOrders}
@@ -235,6 +269,15 @@ const MenuGroup = ({
                         onMenuClose={handleMenuClose}
                         onPinToggle={handlePinToggle}
                         onAbsoluteSortToggle={handleAbsoluteSortToggle}
+                        commonKeyCollapse={commonKeyCollapse}
+                        onCommonKeyCollapseToggle={onCommonKeyCollapseToggle}
+                        stickyHeader={stickyHeader}
+                        onStickyHeaderToggle={onStickyHeaderToggle}
+                        onFrozenToggle={handleFrozenToggle}
+                        columnNameOverride={columnNameOverride}
+                        onColumnNameOverrideChange={onColumnNameOverrideChange}
+                        highlightUpdateOverride={highlightUpdateOverride}
+                        onHighlightUpdateOverrideChange={onHighlightUpdateOverrideChange}
                     />
                 );
             case 'filter':
@@ -249,6 +292,10 @@ const MenuGroup = ({
                         onPinToggle={handlePinToggle}
                         onMenuClose={handleMenuClose}
                         onFiltersChange={onFiltersChange}
+                        uniqueValues={uniqueValues}
+                        sortOrders={sortOrders}
+                        onSortOrdersChange={onSortOrdersChange}
+                        groupedRows={groupedRows}
                     />
                 );
             case 'visibility':
@@ -428,7 +475,7 @@ const MenuGroup = ({
             ))}
             {pinned && pinned.map((menuName) => renderMenu(menuName, 'icon'))}
             <Icon name={'show-all'} title={'show-all'} onClick={handleMenuOpen}>
-                <IconComponent fontSize='small' />
+                <IconComponent fontSize='small' color='white' />
             </Icon>
             <Menu
                 anchorEl={anchorEl}

@@ -15,8 +15,9 @@ import {
     getDateTimeFromInt
 } from '../utils';
 import { getDataSourceColor } from '../utils/themeHelper';
-import { COLOR_TYPES, DATA_TYPES, MODEL_TYPES, MODES } from '../constants';
+import { COLOR_TYPES, DATA_TYPES, HIGHLIGHT_STATES, MODEL_TYPES, MODES } from '../constants';
 import JsonView from './JsonView';
+import VerticalJsonTable from './tables/VerticalJsonTable/VerticalJsonTable';
 import ValueBasedToggleButton from './ValueBasedToggleButton';
 import { ValueBasedProgressBarWithHover } from './ValueBasedProgressBar';
 import classes from './Cell.module.css';
@@ -41,7 +42,8 @@ const Cell = (props) => {
         previousValue,
         buttonDisable,
         dataSourceId,
-        selected
+        selected,
+        stickyPosition
     } = props;
 
     const theme = useTheme();
@@ -74,6 +76,7 @@ const Cell = (props) => {
     const inputRef = useRef(null);
     const cursorPos = useRef(null);
     const autocompleteRef = useRef(null);
+    const jsonTableRef = useRef(null);
     const onTextChangeRef = useRef(props.onTextChange);
 
     useEffect(() => {
@@ -105,17 +108,32 @@ const Cell = (props) => {
     // }, [validationError.current])
 
     useEffect(() => {
-        if (props.highlightUpdate && currentValue !== oldValue) {
-            setNewUpdateClass(classes.new_update);
+        if (collection.highlightUpdate && collection.highlightUpdate !== HIGHLIGHT_STATES.NONE && mode === MODES.READ && currentValue !== oldValue) {
+            if (collection.highlightUpdate === HIGHLIGHT_STATES.HIGH_LOW) {
+                if (currentValue > oldValue) {
+                    setNewUpdateClass(classes.new_update_increase);
+                } else if (currentValue < oldValue) {
+                    setNewUpdateClass(classes.new_update_decrease);
+                }
+            } else if (collection.highlightUpdate === HIGHLIGHT_STATES.CHANGE) {
+                setNewUpdateClass(classes.new_update);
+            }
+
             if (timeoutRef.current !== null) {
                 clearTimeout(timeoutRef.current);
             }
             timeoutRef.current = setTimeout(() => {
                 setNewUpdateClass("");
-            }, 1500);
+            }, 2000);
             setOldValue(currentValue);
         }
-    }, [currentValue, oldValue, timeoutRef, classes, props.highlightUpdate])
+    }, [currentValue, oldValue, timeoutRef, classes, mode, collection.highlightUpdate])
+
+    const stickyClass = {
+        position: collection.frozenColumn ? 'sticky' : 'static',
+        left: stickyPosition,
+        zIndex: collection.frozenColumn ? 2 : 1
+    }
 
     const onRowSelect = (e) => {
         if (!collection.commonGroupKey) {
@@ -255,7 +273,7 @@ const Cell = (props) => {
     if (props.nullCell) {
         const classesStr = `${classes.cell} ${disabledClass}`;
         return (
-            <TableCell className={classesStr} size='small' data-xpath={xpath} />
+            <TableCell sx={stickyClass} className={classesStr} size='small' data-xpath={xpath} />
         )
     }
 
@@ -282,7 +300,7 @@ const Cell = (props) => {
         return (
             <TableCell
                 className={classesStr}
-                sx={{ backgroundColor: dataSourceColor }}
+                sx={{ backgroundColor: dataSourceColor, ...stickyClass }}
                 align={textAlign}
                 size='small'
                 data-xpath={xpath}
@@ -321,7 +339,7 @@ const Cell = (props) => {
             return (
                 <TableCell
                     className={classesStr}
-                    sx={{ backgroundColor: dataSourceColor }}
+                    sx={{ backgroundColor: dataSourceColor, ...stickyClass }}
                     align='center'
                     size='small'
                     onKeyDown={onKeyDown}
@@ -382,7 +400,7 @@ const Cell = (props) => {
             return (
                 <TableCell
                     className={classesStr}
-                    sx={{ backgroundColor: dataSourceColor }}
+                    sx={{ backgroundColor: dataSourceColor, ...stickyClass }}
                     align='center'
                     size='small'
                     onKeyDown={onKeyDown}
@@ -411,7 +429,7 @@ const Cell = (props) => {
             return (
                 <TableCell
                     className={classesStr}
-                    sx={{ backgroundColor: dataSourceColor }}
+                    sx={{ backgroundColor: dataSourceColor, ...stickyClass }}
                     align='center'
                     size='small'
                     onKeyDown={onKeyDown}
@@ -491,7 +509,7 @@ const Cell = (props) => {
             return (
                 <TableCell
                     className={classesStr}
-                    sx={{ backgroundColor: dataSourceColor }}
+                    sx={{ backgroundColor: dataSourceColor, ...stickyClass }}
                     align='center'
                     size='small'
                     onKeyDown={onKeyDown}
@@ -552,7 +570,7 @@ const Cell = (props) => {
             return (
                 <TableCell
                     className={classesStr}
-                    sx={{ backgroundColor: dataSourceColor }}
+                    sx={{ backgroundColor: dataSourceColor, ...stickyClass }}
                     align='center'
                     size='small'
                     onKeyDown={onKeyDown}
@@ -636,7 +654,7 @@ const Cell = (props) => {
             return (
                 <TableCell
                     className={classesStr}
-                    sx={{ backgroundColor: dataSourceColor }}
+                    sx={{ backgroundColor: dataSourceColor, ...stickyClass }}
                     align='center'
                     size='small'
                     onKeyDown={onKeyDown}
@@ -694,7 +712,7 @@ const Cell = (props) => {
         return (
             <TableCell
                 className={classesStr}
-                sx={{ backgroundColor: dataSourceColor }}
+                sx={{ backgroundColor: dataSourceColor, ...stickyClass }}
                 // sx={{ width: 20 }}
                 align='center'
                 size='small'
@@ -710,7 +728,7 @@ const Cell = (props) => {
         return (
             <TableCell
                 className={classesStr}
-                sx={{ backgroundColor: dataSourceColor }}
+                sx={{ backgroundColor: dataSourceColor, ...stickyClass }}
                 align='center'
                 size='small'
                 onClick={onFocusIn}>
@@ -736,7 +754,7 @@ const Cell = (props) => {
             return (
                 <TableCell
                     className={classesStr}
-                    sx={{ backgroundColor: dataSourceColor }}
+                    sx={{ backgroundColor: dataSourceColor, ...stickyClass }}
                     align='center'
                     size='small'
                     onClick={(e) => onRowSelect(e)}
@@ -773,7 +791,7 @@ const Cell = (props) => {
         return (
             <TableCell
                 className={classesStr}
-                sx={{ backgroundColor: dataSourceColor }}
+                sx={{ backgroundColor: dataSourceColor, ...stickyClass }}
                 align='center'
                 size='small'
                 onClick={(e) => onRowSelect(e)}>
@@ -808,7 +826,7 @@ const Cell = (props) => {
             return (
                 <TableCell
                     className={classesStr}
-                    sx={{ backgroundColor: dataSourceColor }}
+                    sx={{ backgroundColor: dataSourceColor, ...stickyClass }}
                     size='small'
                     onClick={(e) => onRowSelect(e)}
                 />
@@ -833,7 +851,7 @@ const Cell = (props) => {
         return (
             <TableCell
                 className={classesStr}
-                sx={{ backgroundColor: dataSourceColor }}
+                sx={{ backgroundColor: dataSourceColor, ...stickyClass }}
                 align='center'
                 size='small'
                 onClick={(e) => onRowSelect(e)}>
@@ -872,11 +890,21 @@ const Cell = (props) => {
             return (
                 <TableCell
                     className={classesStr}
-                    sx={{ backgroundColor: dataSourceColor }}
+                    sx={{ backgroundColor: dataSourceColor, ...stickyClass }}
                     align='center'
                     size='small'
                     onClick={onOpenTooltip}>
-                    <JsonView open={open} onClose={onCloseTooltip} src={updatedData} />
+                    <div className={classes.abbreviated_json_cell} ref={jsonTableRef}>
+                        <span>{JSON.stringify(updatedData)}</span>
+                    </div>
+                    <VerticalJsonTable
+                        isOpen={open}
+                        data={updatedData}
+                        onClose={onCloseTooltip}
+                        usePopover={true}
+                        anchorEl={jsonTableRef.current}
+                    />
+                    {/* <JsonView open={open} onClose={onCloseTooltip} src={updatedData} /> */}
                 </TableCell >
             )
         } else if (type === DATA_TYPES.STRING && !isValidJsonString(updatedData)) {
@@ -904,7 +932,7 @@ const Cell = (props) => {
             return (
                 <TableCell
                     className={classesStr}
-                    sx={{ backgroundColor: dataSourceColor }}
+                    sx={{ backgroundColor: dataSourceColor, ...stickyClass }}
                     align='center'
                     size='small'
                     onClick={onOpenTooltip}>
@@ -982,7 +1010,7 @@ const Cell = (props) => {
         return (
             <TableCell
                 className={classesStr}
-                sx={{ backgroundColor: dataSourceColor }}
+                sx={{ backgroundColor: dataSourceColor, ...stickyClass }}
                 align={textAlign}
                 size='small'
                 onClick={onFocusIn}
@@ -1008,7 +1036,7 @@ const Cell = (props) => {
         return (
             <TableCell
                 className={classesStr}
-                sx={{ backgroundColor: dataSourceColor }}
+                sx={{ backgroundColor: dataSourceColor, ...stickyClass }}
                 align={textAlign}
                 size='small'
                 onClick={onFocusIn}

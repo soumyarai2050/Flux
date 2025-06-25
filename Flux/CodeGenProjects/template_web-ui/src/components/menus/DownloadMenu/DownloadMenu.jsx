@@ -48,7 +48,7 @@ const DownloadMenu = ({
       default:
         return (
           <Icon name={menuName} title={menuName} onClick={handleDownload}>
-            <FileDownload fontSize='small' />
+            <FileDownload fontSize='small' color='white' />
           </Icon>
         );
     }

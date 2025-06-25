@@ -130,7 +130,7 @@ const PivotSettingsMenu = ({
       default:
         return (
           <Icon name={menuName} title={menuName} onClick={handlePopoverOpen}>
-            <Settings fontSize='small' />
+            <Settings fontSize='small' color='white' />
           </Icon>
         )
     }

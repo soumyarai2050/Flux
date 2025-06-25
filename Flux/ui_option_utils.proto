@@ -70,6 +70,13 @@ message JoinSort {
   repeated string placeholders = 2;
 }
 
+message ColumnFilter {
+  required string column_name = 1;
+  optional string filtered_values = 2;
+  optional string text_filter = 3;
+  optional string text_filter_type = 4;
+}
+
 message WidgetUIDataElement {
   // key string connects Widget with Model - future better name via: [(FluxFldAlias) = 'i']
   optional string i = 1;
@@ -90,7 +97,7 @@ message WidgetUIDataElement {
   optional string dynamic_widget_title_fld = 12;
   repeated WidgetUIData widget_ui_data = 13;
   repeated ChartData chart_data = 14;
-  repeated UIFilter filters = 15;
+  repeated ColumnFilter filters = 15;
   optional string depending_proto_model_name = 16;   // other project's proto model name present in proto_file_name
                                           // on which current model is dependent
   optional bool depends_on_other_model_for_id = 17 [default=false];
@@ -141,7 +148,7 @@ message WidgetUIData{
   repeated string show_less = 11;
   repeated string data_source_colors = 12;
   optional int32 rows_per_page = 13;
-  optional bool highlight_update = 14 [default = false];
+  repeated string highlight_update_override = 14;
   optional bool truncate_date_time = 15 [default = false];
   repeated string pinned = 16;
   optional string selected_chart_name = 17;

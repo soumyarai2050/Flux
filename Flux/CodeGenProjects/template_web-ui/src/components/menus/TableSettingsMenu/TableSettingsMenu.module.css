@@ -1,0 +1,27 @@
+.content {
+    padding: 16px;
+    width: 100%;
+    max-height: 600px;
+}
+
+.item {
+    display: flex;
+    align-items: center;
+    margin: 5px 0px;
+}
+
+.item_large {
+    display: flex;
+    align-items: center;
+    margin: 10px 0px;
+}
+
+.item_label {
+    display: flex;
+    flex: 1;
+    align-items: center;
+}
+
+.text_field {
+    flex: 1;
+}

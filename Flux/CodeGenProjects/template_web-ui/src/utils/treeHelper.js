@@ -1,8 +1,8 @@
 import { cloneDeep, get, isEqual } from 'lodash';
-import { MODES, DATA_TYPES ,ITEMS_PER_PAGE} from '../constants';
+import { MODES, DATA_TYPES, ITEMS_PER_PAGE } from '../constants';
 import {
     getEnumValues, getModelSchema, hasxpath, setAutocompleteValue, primitiveDataTypes, getDataxpath,
-    isNodeInSubtree, complexFieldProps, treeState, fieldProps, getAutocompleteDict, getMetaFieldDict, 
+    isNodeInSubtree, complexFieldProps, treeState, fieldProps, getAutocompleteDict, getMetaFieldDict,
     getMappingSrcDict, compareNodes
 } from '../utils';
 
@@ -55,23 +55,23 @@ function getSchemaForPath(projectSchema, modelName, path) {
             const mainSchemaContainer = refParts.length === 3 ? refParts[1] : null; // e.g. "definitions"
 
             if (mainSchemaContainer && projectSchema[mainSchemaContainer] && projectSchema[mainSchemaContainer][refSchemaName]) {
-                 currentSchema = projectSchema[mainSchemaContainer][refSchemaName];
+                currentSchema = projectSchema[mainSchemaContainer][refSchemaName];
             } else if (projectSchema[refSchemaName]) {
-                 currentSchema = projectSchema[refSchemaName];
+                currentSchema = projectSchema[refSchemaName];
             } else {
                 return null; // Referenced schema not found
             }
-        } else if (currentSchema.type === DATA_TYPES.OBJECT && currentSchema.items && currentSchema.items.$ref && i < parts.length -1) {
+        } else if (currentSchema.type === DATA_TYPES.OBJECT && currentSchema.items && currentSchema.items.$ref && i < parts.length - 1) {
             // This handles objects that are defined by a $ref in their 'items' property (uncommon but possible)
-             const refParts = currentSchema.items.$ref.split('/');
+            const refParts = currentSchema.items.$ref.split('/');
             if (refParts.length < 2) return null;
             const refSchemaName = refParts.length === 2 ? refParts[1] : refParts[2];
             const mainSchemaContainer = refParts.length === 3 ? refParts[1] : null;
 
             if (mainSchemaContainer && projectSchema[mainSchemaContainer] && projectSchema[mainSchemaContainer][refSchemaName]) {
-                 currentSchema = projectSchema[mainSchemaContainer][refSchemaName];
+                currentSchema = projectSchema[mainSchemaContainer][refSchemaName];
             } else if (projectSchema[refSchemaName]) {
-                 currentSchema = projectSchema[refSchemaName];
+                currentSchema = projectSchema[refSchemaName];
             } else {
                 return null;
             }
@@ -115,8 +115,8 @@ function objectMatchesAllFilters(node, projectSchema, modelName, activeFilters) 
             if (!(currentNode.isObjectContainer || currentNode.isArrayContainer) && currentNode.xpath && currentNode.value !== undefined) {
                 const genericPath = stripIndices(currentNode.xpath);
                 const fieldSchema = getSchemaForPath(projectSchema, modelName, genericPath);
-                if (fieldSchema && fieldSchema.filter_enable && filter.fld_name === genericPath) {
-                    if (checkMatch(currentNode.value, filter.fld_value)) {
+                if (fieldSchema && fieldSchema.filter_enable && filter.column_name === genericPath) {
+                    if (checkMatch(currentNode.value, filter.filtered_values)) {
                         matchFoundForThisFilter = true;
                         return;
                     }
@@ -157,8 +157,8 @@ function filterNodeRecursive(node, projectSchema, modelName, filters) {
         const genericPath = stripIndices(node.xpath);
         const fieldSchema = getSchemaForPath(projectSchema, modelName, genericPath);
         if (fieldSchema && fieldSchema.filter_enable) {
-            const relevantFilter = filters.find(f => f.fld_name === genericPath && f.fld_value && f.fld_value.trim() !== '');
-            if (relevantFilter && checkMatch(node.value, relevantFilter.fld_value)) {
+            const relevantFilter = filters.find(f => f.column_name === genericPath && f.filtered_values && f.filtered_values.trim() !== '');
+            if (relevantFilter && checkMatch(node.value, relevantFilter.filtered_values)) {
                 isDirectFieldMatch = true;
             }
         }
@@ -184,8 +184,8 @@ function filterNodeRecursive(node, projectSchema, modelName, filters) {
                     const genericChildPath = stripIndices(originalChild.xpath);
                     const childSchema = getSchemaForPath(projectSchema, modelName, genericChildPath);
                     if (childSchema && childSchema.filter_enable) {
-                        const relevantChildFilter = filters.find(f => f.fld_name === genericChildPath && f.fld_value && f.fld_value.trim() !== '');
-                        if (relevantChildFilter && checkMatch(originalChild.value, relevantChildFilter.fld_value)) {
+                        const relevantChildFilter = filters.find(f => f.column_name === genericChildPath && f.filtered_values && f.filtered_values.trim() !== '');
+                        if (relevantChildFilter && checkMatch(originalChild.value, relevantChildFilter.filtered_values)) {
                             hasDirectPrimitiveChildMatch = true;
                             break;
                         }
@@ -210,7 +210,7 @@ function filterNodeRecursive(node, projectSchema, modelName, filters) {
                         // This child container (originalChild) and its descendants did NOT match ANY active filters.
                         // If the parent object (node) was kept due to a direct primitive match OR a descendant match,
                         // then we should include this originalChild container as it was (unfiltered by this pass).
-                        if (hasDirectPrimitiveChildMatch || hasMatchingDescendant) { 
+                        if (hasDirectPrimitiveChildMatch || hasMatchingDescendant) {
                             finalChildren.push(cloneDeep(originalChild));
                         }
                     }
@@ -222,11 +222,11 @@ function filterNodeRecursive(node, projectSchema, modelName, filters) {
         return null; // Object not kept
 
     } else if (node.isArrayContainer) {
-        const activeFilters = filters.filter(f => f.fld_value && f.fld_value.trim() !== '');
+        const activeFilters = filters.filter(f => f.filtered_values && f.filtered_values.trim() !== '');
         if (activeFilters.length === 0) {
             return newNode; // No filters, so don't filter this array at all.
         }
-        
+
         const itemMatches = [];
         if (node.children) {
             for (const item of node.children) {
@@ -256,12 +256,12 @@ export function generateTreeStructure(schema, currentSchemaName, callerProps) {
 
     const currentSchema = getModelSchema(currentSchemaName, schema);
     let tree = [];
-    
+
     const childNode = addHeaderNode(tree, currentSchema, currentSchemaName, DATA_TYPES.OBJECT, callerProps, currentSchemaName, currentSchemaName);
-    
+
     Object.keys(currentSchema.properties).forEach(propname => {
         if (callerProps.xpath && callerProps.xpath !== propname) return;
-        
+
         const metadataProp = currentSchema.properties[propname];
         metadataProp.required = currentSchema.required.includes(propname) ? metadataProp.required : [];
 
@@ -275,9 +275,9 @@ export function generateTreeStructure(schema, currentSchemaName, callerProps) {
     });
 
     // Apply filtering if filters are provided and at least one filter is active
-    if (callerProps.filters && callerProps.filters.length > 0 && 
-        callerProps.filters.some(f => f.fld_value && f.fld_value.trim() !== '')) {
-        
+    if (callerProps.filters && callerProps.filters.length > 0 &&
+        callerProps.filters.some(f => f.filtered_values && f.filtered_values.trim() !== '')) {
+
         const filteredResultTree = [];
         for (const topLevelNode of tree) { // Assuming `tree` contains the root(s) of your generated structure
             const filteredNode = filterNodeRecursive(topLevelNode, schema, currentSchemaName, callerProps.filters);
@@ -301,11 +301,11 @@ function addNode(tree, schema, currentSchema, propname, callerProps, dataxpath, 
     // Handle object type with items
     if (currentSchema.items && currentSchemaType === DATA_TYPES.OBJECT) {
         handleObjectWithItems(tree, schema, currentSchema, propname, callerProps, dataxpath, xpath);
-    } 
+    }
     // Handle array type with items
     else if (currentSchema.items && currentSchema.type === DATA_TYPES.ARRAY) {
         handleArrayWithItems(tree, schema, currentSchema, propname, callerProps, dataxpath, xpath);
-    } 
+    }
     // Handle simple array type
     else if (currentSchema.type === DATA_TYPES.ARRAY) {
         handleSimpleArray(tree, schema, currentSchema, propname, callerProps, dataxpath, xpath);
@@ -339,7 +339,7 @@ function handleObjectWithItems(tree, schema, currentSchema, propname, callerProp
 
     // Create the header node and add it to the tree. addHeaderNode pushes the node into 'tree'.
     addHeaderNode(
-        tree, 
+        tree,
         schemaForHeaderNode,
         effectivePropName,
         DATA_TYPES.OBJECT,
@@ -358,7 +358,7 @@ function handleObjectWithItems(tree, schema, currentSchema, propname, callerProp
     if (isNull) {
         // Set properties on the actualHeaderNode itself, not its children array
         actualHeaderNode.canInitialize = true;
-        actualHeaderNode.schemaRef = itemRefForHeaderNode; 
+        actualHeaderNode.schemaRef = itemRefForHeaderNode;
         // actualHeaderNode.children is already initialized as [] by addHeaderNode and should remain empty
         return; // No children properties processed if null
     }
@@ -390,20 +390,20 @@ function handleArrayWithItems(tree, schema, currentSchema, propname, callerProps
     // Create a container node for the array (e.g., "eligible brokers")
     // addHeaderNode pushes the main array container node into the 'tree' array.
     addHeaderNode(
-        tree, 
-        currentSchema, 
-        propname, 
-        DATA_TYPES.ARRAY, 
-        callerProps, 
-        dataxpath, 
-        xpath, 
+        tree,
+        currentSchema,
+        propname,
+        DATA_TYPES.ARRAY,
+        callerProps,
+        dataxpath,
+        xpath,
         currentSchema.items?.$ref
     );
 
     // If the array is empty, we've added its container.
     // The container itself (via HeaderField UI) will show the "+" to add items.
     if (hasEmptyData) {
-        return; 
+        return;
     }
 
     // If data is not empty, process the actual items.
@@ -417,31 +417,31 @@ function handleSimpleArray(tree, schema, currentSchema, propname, callerProps, d
 
     const arrayDataType = getArrayDataType(currentSchema);
     const additionalProps = buildArrayAdditionalProps(schema, currentSchema);
-    
+
     // Create container node first
     const containerNode = addHeaderNode(
-        tree, 
-        currentSchema, 
-        propname, 
+        tree,
+        currentSchema,
+        propname,
         DATA_TYPES.ARRAY, // Type as object for the container
-        callerProps, 
-        dataxpath, 
-        xpath, 
+        callerProps,
+        dataxpath,
+        xpath,
         currentSchema.items?.$ref,
     );
-    
+
     const childxpath = `${dataxpath}[-1]`;
     const updatedxpath = `${xpath}[-1]`;
     const objectState = { add: true, remove: false }; // Replaced by dataStatus logic
-    
+
     const childNode = addHeaderNode(
         containerNode, // Add to container node instead of tree
-        currentSchema, 
-        propname, 
-        currentSchema.type, 
-        callerProps, 
-        childxpath, 
-        updatedxpath, 
+        currentSchema,
+        propname,
+        currentSchema.type,
+        callerProps,
+        childxpath,
+        updatedxpath,
         arrayDataType,
         objectState // Replaced by dataStatus logic
     );
@@ -450,7 +450,7 @@ function handleSimpleArray(tree, schema, currentSchema, propname, callerProps, d
         const items = get(callerProps.data, dataxpath);
         const totalItems = items.length;
         const needsPagination = totalItems > ITEMS_PER_PAGE;
-        
+
         if (needsPagination) {
             // Add pagination info to the parent node
             containerNode[containerNode.length - 1].pagination = {
@@ -459,7 +459,7 @@ function handleSimpleArray(tree, schema, currentSchema, propname, callerProps, d
                 currentPage: 0,
                 paginationId: `pagination_${xpath}`
             };
-            
+
             // Create pagination controls
             const paginationNode = {
                 id: containerNode[containerNode.length - 1].pagination.paginationId,
@@ -471,14 +471,14 @@ function handleSimpleArray(tree, schema, currentSchema, propname, callerProps, d
                 nextPage: 1,
                 onPageChange: true // Flag to handle pagination in the component
             };
-            
+
             // Add the pagination node
             containerNode.push(paginationNode);
-            
+
             // Only process items for the first page
             const startIndex = 0;
             const endIndex = Math.min(ITEMS_PER_PAGE, totalItems);
-            
+
             for (let i = startIndex; i < endIndex; i++) {
                 const itemXpath = `${dataxpath}[${i}]`;
                 const updatedItemXpath = `${xpath}[${i}]`;
@@ -509,7 +509,7 @@ function addHeaderNode(node, currentSchema, propname, type, callerProps, dataxpa
         dataxpath,
         children: []
     };
-    
+
     // Determine dataStatus for the header node itself - REPLACED by data-add/remove/modified flags
     const oldValue = get(callerProps.originalData, xpath);
     const newValue = get(callerProps.data, dataxpath);
@@ -570,10 +570,10 @@ function addHeaderNode(node, currentSchema, propname, type, callerProps, dataxpa
             // If object exists, can it be removed (set to null)? If null, can it be initialized?
             const isCurrentlyNull = get(callerProps.data, dataxpath) === null;
             if (isCurrentlyNull && !currentSchema.required && ref) { // Optional and has a schema to initialize from
-                 headerNode['object-add'] = true; // Can initialize
+                headerNode['object-add'] = true; // Can initialize
             }
             if (!isCurrentlyNull && !currentSchema.required) {
-                 headerNode['object-remove'] = true; // Can remove (set to null)
+                headerNode['object-remove'] = true; // Can remove (set to null)
             }
         }
     }
@@ -612,7 +612,7 @@ function addSimpleNode(tree, schema, currentSchema, propname, callerProps, datax
     const nodeDataPath = dataxpath ? `${dataxpath}.${propname}` : propname;
 
     if (propname !== null && // For array items where propname might be null
-        get(data, nodeDataPath) === undefined && 
+        get(data, nodeDataPath) === undefined &&
         get(originalData, nodeSchemaPath) === undefined) {
         return;
     }
@@ -634,9 +634,36 @@ function addSimpleNode(tree, schema, currentSchema, propname, callerProps, datax
     if (!attributes?.type || !primitiveDataTypes.includes(attributes.type)) return;
 
     const node = createSimpleNode(attributes, propname, dataxpath, xpath, data, currentSchema, callerProps);
-    
+
     // Add field properties
     addNodeProperties(node, attributes, currentSchema, schema, data, callerProps);
+
+    if (attributes.visible_if) {
+        let invisible = true;
+        const [fieldNamePath, fieldValuesStr] = attributes.visible_if.split('=');
+        let fieldName;
+        let dataSource;
+        if (fieldNamePath.includes('.')) {
+            dataSource = data;
+            fieldName = fieldNamePath.substring(fieldNamePath.indexOf('.') + 1);
+        } else {
+            dataSource = get(data, dataxpath);
+            fieldName = fieldNamePath;
+        }
+        const fieldValues = fieldValuesStr
+            .split(',')
+            .map((val) => {
+                if (val === 'true') return true;
+                if (val === 'false') return false;
+                // todo: add support for numerical values
+                return val;
+            });
+
+        if (dataSource && fieldValues.includes(get(dataSource, fieldName))) {
+            invisible = false;
+        }
+        node.data_invisible = invisible;
+    }
 
     // Compare with original data - replaced by dataStatus
     const comparedProps = compareNodes(originalData, data, dataxpath, propname, xpath);
@@ -675,11 +702,11 @@ function addPrimitiveNode(tree, type, dataxpath, xpath, callerProps, additionalP
 
 
     if (type === DATA_TYPES.ENUM) {
-            node.dropdowndataset = additionalProps.options;
-            node.onSelectItemChange = callerProps.onSelectItemChange;
-        }
+        node.dropdowndataset = additionalProps.options;
+        node.onSelectItemChange = callerProps.onSelectItemChange;
+    }
 
-        tree.push(node);
+    tree.push(node);
 }
 
 function createSimpleNode(attributes, propname, dataxpath, xpath, data, currentSchema, callerProps) {
@@ -706,8 +733,8 @@ function createSimpleNode(attributes, propname, dataxpath, xpath, data, currentS
 }
 
 function shouldAddNode(node, callerProps) {
-    if ((node.serverPopulate && callerProps.mode === MODES.EDIT) || 
-        (node.hide && callerProps.hide) || 
+    if ((node.serverPopulate && callerProps.mode === MODES.EDIT) ||
+        (node.hide && callerProps.hide) ||
         (node.uiUpdateOnly && node.value === undefined)) {
         return false;
     }
@@ -727,29 +754,32 @@ function addNodeProperties(node, attributes, currentSchema, schema, data, caller
         }
     });
 
+    node.quickFilter = callerProps.quickFilter;
+    node.isQuickFilterView = callerProps.isQuickFilterView;
+
     // Add complex field properties
     complexFieldProps.forEach(({ propertyName, usageName }) => {
-            if (currentSchema.hasOwnProperty(propertyName) || attributes.hasOwnProperty(propertyName)) {
+        if (currentSchema.hasOwnProperty(propertyName) || attributes.hasOwnProperty(propertyName)) {
             const propertyValue = attributes[propertyName] || currentSchema[propertyName];
 
-                if (propertyName === 'auto_complete') {
+            if (propertyName === 'auto_complete') {
                 const autocompleteDict = getAutocompleteDict(propertyValue);
                 setAutocompleteValue(schema, node, autocompleteDict, node.key, usageName);
-                
+
                 if (node.options) {
-                        if (node.hasOwnProperty('dynamic_autocomplete')) {
-                            const dynamicValuePath = node.autocomplete.substring(node.autocomplete.indexOf('.') + 1);
-                            const dynamicValue = get(data, dynamicValuePath);
-                            if (dynamicValue && schema.autocomplete.hasOwnProperty(dynamicValue)) {
-                                node.options = schema.autocomplete[schema.autocomplete[dynamicValue]];
-                                if (!node.options.includes(node.value) && callerProps.mode === MODES.EDIT && !node.ormNoUpdate && !node.serverPopulate) {
-                                    node.value = null;
-                                }
+                    if (node.hasOwnProperty('dynamic_autocomplete')) {
+                        const dynamicValuePath = node.autocomplete.substring(node.autocomplete.indexOf('.') + 1);
+                        const dynamicValue = get(data, dynamicValuePath);
+                        if (dynamicValue && schema.autocomplete.hasOwnProperty(dynamicValue)) {
+                            node.options = schema.autocomplete[schema.autocomplete[dynamicValue]];
+                            if (!node.options.includes(node.value) && callerProps.mode === MODES.EDIT && !node.ormNoUpdate && !node.serverPopulate) {
+                                node.value = null;
                             }
                         }
-                        node.customComponentType = 'autocomplete';
-                        node.onAutocompleteOptionChange = callerProps.onAutocompleteOptionChange;
                     }
+                    node.customComponentType = 'autocomplete';
+                    node.onAutocompleteOptionChange = callerProps.onAutocompleteOptionChange;
+                }
             } else if (propertyName === 'mapping_underlying_meta_field') {
                 const dict = getMetaFieldDict(propertyValue);
                 for (const field in dict) {
@@ -759,15 +789,15 @@ function addNodeProperties(node, attributes, currentSchema, schema, data, caller
                 }
             } else if (propertyName === 'mapping_src') {
                 const dict = getMappingSrcDict(propertyValue);
-                    for (const field in dict) {
-                        if (node.xpath.endsWith(field)) {
-                            node[usageName] = dict[field];
-                        }
+                for (const field in dict) {
+                    if (node.xpath.endsWith(field)) {
+                        node[usageName] = dict[field];
                     }
-            } else {
-                    node[usageName] = propertyValue;
                 }
+            } else {
+                node[usageName] = propertyValue;
             }
+        }
     });
 
     // Add type-specific handlers
@@ -827,14 +857,14 @@ function determineHeaderState(data, originalData, xpath, currentSchema) {
     }
     // Ensure required fields that are null (but shouldn't be if not optional) don't show 'add'
     if (currentSchema.required && currentSchema.required.includes(xpath.split('.').pop()) && get(data, xpath) === null) {
-      // This logic might be too simplistic for complex paths
+        // This logic might be too simplistic for complex paths
     }
     return headerState;
 }
 
 function processMetadata(metadata, currentSchema) {
     const propertiesToCopy = ['orm_no_update', 'server_populate', 'ui_update_only', 'auto_complete'];
-    
+
     propertiesToCopy.forEach(prop => {
         if (currentSchema.hasOwnProperty(prop) || metadata.hasOwnProperty(prop)) {
             metadata[prop] = metadata[prop] || currentSchema[prop];
@@ -872,19 +902,19 @@ function processMetadataProperties(metadata, childNodes, schema, callerProps, da
 }
 
 function isEmptyArrayData(data, originalData, dataxpath, xpath) {
-    return ((get(data, dataxpath) && get(data, dataxpath).length === 0) || 
-            (Object.keys(data).length > 0 && !get(data, dataxpath))) &&
-           ((get(originalData, xpath) && get(originalData, xpath).length === 0) || 
+    return ((get(data, dataxpath) && get(data, dataxpath).length === 0) ||
+        (Object.keys(data).length > 0 && !get(data, dataxpath))) &&
+        ((get(originalData, xpath) && get(originalData, xpath).length === 0) ||
             !get(originalData, xpath));
 }
 
 function processArrayItems(tree, schema, currentSchema, propname, callerProps, dataxpath, xpath) {
     const paths = [];
     const { data, originalData } = callerProps;
-    
+
     // First, collect all items that need to be processed
     const itemsToProcess = [];
-    
+
     // Process original data items
     if (get(originalData, xpath)) {
         for (let i = 0; i < get(originalData, xpath).length; i++) {
@@ -892,9 +922,9 @@ function processArrayItems(tree, schema, currentSchema, propname, callerProps, d
             let childxpath = `${dataxpath}[${i}]`;
             childxpath = getDataxpath(data, updatedxpath);
             paths.push(updatedxpath);
-            
+
             if (!isNodeInSubtree(callerProps, xpath, updatedxpath)) continue;
-            
+
             itemsToProcess.push({
                 index: i,
                 childxpath,
@@ -909,16 +939,16 @@ function processArrayItems(tree, schema, currentSchema, propname, callerProps, d
         get(data, dataxpath).forEach((childobject, i) => {
             const subpropname = Object.keys(childobject).find(key => key.startsWith('xpath_'));
             if (!subpropname) return;
-            
+
             const propxpath = childobject[subpropname];
             const propindex = propxpath.substring(propxpath.lastIndexOf('[') + 1, propxpath.lastIndexOf(']'));
             const updatedxpath = `${xpath}[${propindex}]`;
-            
+
             if (paths.includes(updatedxpath)) return;
-            
+
             const childxpath = `${dataxpath}[${i}]`;
             if (!isNodeInSubtree(callerProps, xpath, updatedxpath)) return;
-            
+
             itemsToProcess.push({
                 index: i,
                 childxpath,
@@ -928,11 +958,11 @@ function processArrayItems(tree, schema, currentSchema, propname, callerProps, d
             paths.push(childxpath);
         });
     }
-    
+
     // Add pagination information to the parent node
     const totalItems = itemsToProcess.length;
     const needsPagination = totalItems > ITEMS_PER_PAGE;
-    
+
     // If we need pagination, create pagination controls
     if (needsPagination) {
         // Find the parent node (assuming it's the last one added to tree)
@@ -943,7 +973,7 @@ function processArrayItems(tree, schema, currentSchema, propname, callerProps, d
                 break;
             }
         }
-        
+
         if (parentNode) {
             // Add pagination info to the parent node
             parentNode.pagination = {
@@ -952,7 +982,7 @@ function processArrayItems(tree, schema, currentSchema, propname, callerProps, d
                 currentPage: 0,
                 paginationId: `pagination_${xpath}`
             };
-            
+
             // Create pagination controls
             const paginationNode = {
                 id: parentNode.pagination.paginationId,
@@ -964,10 +994,10 @@ function processArrayItems(tree, schema, currentSchema, propname, callerProps, d
                 nextPage: 1,
                 onPageChange: true // Flag to handle pagination in the component
             };
-            
+
             // Add the pagination node to the tree
             tree.push(paginationNode);
-            
+
             // Only process items for the current page (first page)
             const startIndex = 0;
             const endIndex = Math.min(ITEMS_PER_PAGE, totalItems);
@@ -1000,13 +1030,13 @@ function buildArrayAdditionalProps(schema, currentSchema) {
     const additionalProps = {
         underlyingtype: currentSchema.underlying_type
     };
-    
+
     if (currentSchema.underlying_type === DATA_TYPES.ENUM) {
         const ref = currentSchema.items.$ref;
         const refSplit = ref.split('/');
         const metadata = refSplit.length === 2 ? schema[refSplit[1]] : schema[refSplit[1]][refSplit[2]];
         additionalProps.options = metadata.enum;
     }
-    
+
     return additionalProps;
 }

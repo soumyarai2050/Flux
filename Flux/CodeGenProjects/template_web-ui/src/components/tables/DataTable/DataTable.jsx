@@ -1,10 +1,20 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ListItemIcon, ListItemText, Menu, MenuItem, Table, TableBody, TableContainer, TableRow, FormControl, InputLabel, Box } from '@mui/material';
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+} from '@dnd-kit/sortable';
 import TableHead from '../../TableHead';
 import Cell from '../../Cell';
 import styles from './DataTable.module.css';
 import { ClearAll, Save } from '@mui/icons-material';
-import { getDataxpath, generateRowTrees } from '../../../utils';
+import { getDataxpathV2, generateRowTrees } from '../../../utils';
 import { cloneDeep, get, set } from 'lodash';
 import { DB_ID, MODES, DATA_TYPES, MODEL_TYPES } from '../../../constants';
 import { flux_toggle, flux_trigger_strat } from '../../../projectSpecificUtils';
@@ -12,11 +22,11 @@ import FullScreenModal from '../../Modal';
 import { ModelCard, ModelCardHeader, ModelCardContent } from '../../cards';
 import { useSelector } from 'react-redux';
 import DataTree from '../../trees/DataTree/DataTree';
-import ClipboardCopier from '../../ClipboardCopier';
 import Icon from '../../Icon';
 import { useScrollIndicators } from '../../../hooks';
-import TablePaginationControl from '../../TableControls/TablePaginationControl'
-import ScrollIndicators from '../../TableControls/ScrollIndicators'
+import TablePaginationControl from '../../TableControls/TablePaginationControl';
+import ScrollIndicators from '../../TableControls/ScrollIndicators';
+// import { useBoundaryScrollDetection } from '../../hooks';
 
 const DataTable = ({
   rows,
@@ -43,9 +53,14 @@ const DataTable = ({
   onRowSelect,
   onButtonToggle,
   onModeToggle,
+  onColumnOrdersChange,
+  stickyHeader = true,
+  frozenColumns,
+  filters,
+  onFiltersChange,
+  uniqueValues
 }) => {
   const { schema: projectSchema } = useSelector((state) => state.schema);
-  const [clipboardText, setClipboardText] = useState(null);
   const [selectedRows, setSelectedRows] = useState([]);
   const [lastSelectedRowId, setLastSelectedRowId] = useState(null);
   // const [contextMenuAnchorEl, setContextMenuAnchorEl] = useState(null);
@@ -54,7 +69,51 @@ const DataTable = ({
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newlyAddedRowId, setNewlyAddedRowId] = useState(null);
   const [rowsBeforeUpdate, setRowsBeforeUpdate] = useState(null);
+  const [columns, setColumns] = useState(cells);
+  const [columnWidths, setColumnWidths] = useState({});
+  const columnRefs = useRef({});
   const tableWrapperRef = useRef(null);
+
+  // const { containerRef, isScrollable, enableScrolling, disableScrolling } = useBoundaryScrollDetection();
+
+  useEffect(() => {
+    setColumns(cells);
+  }, [cells])
+
+  // Sort sensors for drag-and-drop
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 10 } })
+  );
+
+  // Measure column widths after render
+  useEffect(() => {
+    const widths = {};
+    cells.forEach(column => {
+      if (columnRefs.current[column.tableTitle]) {
+        widths[column.tableTitle] = columnRefs.current[column.tableTitle].getBoundingClientRect().width;
+      }
+    });
+    setColumnWidths(widths);
+  }, [columns]);
+
+  const handleDragEnd = (event) => {
+    const { active, over } = event;
+
+    if (active.id !== over?.id) {
+      const oldIndex = cells.findIndex((col) => col.tableTitle === active.id);
+      const newIndex = cells.findIndex((col) => col.tableTitle === over?.id);
+
+      const reorderedColumns = arrayMove(cells, oldIndex, newIndex);
+      const columnOrders = reorderedColumns.map(
+        (column, index) => ({
+          column_name: column.tableTitle,
+          sequence: index
+        })
+      );
+      setColumns(reorderedColumns);
+      onColumnOrdersChange(columnOrders);
+    }
+  };
 
   // Use the scroll indicators hook
   const {
@@ -66,42 +125,6 @@ const DataTable = ({
     handleLeftScrollClick,
     checkHorizontalScroll,
   } = useScrollIndicators([activeRows, cells]);
-
-  const handleSortRequest = (e, property, retainSortLevel = false) => {
-    let updatedSortOrders = cloneDeep(sortOrders);
-    if (!retainSortLevel) {
-      updatedSortOrders = updatedSortOrders.filter(o => o.order_by === property);
-    }
-    const sortOrder = updatedSortOrders.find(o => o.order_by === property);
-    if (sortOrder) {
-      // sort level already exists for this property
-      sortOrder.sort_type = sortOrder.sort_type === 'asc' ? 'desc' : 'asc';
-    } else {
-      // add a new sort level
-      updatedSortOrders.push({ order_by: property, sort_type: 'asc' });
-    }
-    onSortOrdersChange(updatedSortOrders);
-  }
-
-  const handleSortRemove = (property) => {
-    const updatedSortOrders = sortOrders.filter(o => o.order_by !== property);
-    onSortOrdersChange(updatedSortOrders);
-  }
-
-  const handleCopy = (column) => {
-    const columnName = column.key;
-    let sourceIndex = column.sourceIndex;
-    if (sourceIndex === null || sourceIndex === undefined) {
-      sourceIndex = 0;
-    }
-    const values = [columnName];
-    rows.forEach((groupedRow) => {
-      const row = groupedRow[sourceIndex];
-      values.push(row[column.tableTitle]);
-    })
-    const text = values.join('\n');
-    setClipboardText(text);
-  }
 
   // const handleContextMenuOpen = (e) => {
   //     setContextMenuAnchorEl(e.currentTarget);
@@ -210,7 +233,6 @@ const DataTable = ({
   }
 
   const handleUpdate = (updatedObj, updateType) => {
-
     if (updateType === 'add' || updateType === 'remove') {
       setIsModalOpen(false);
     }
@@ -262,8 +284,10 @@ const DataTable = ({
     } else if (e.ctrlKey) {
       // Ctrl+Click: Toggle individual row selection
       if (selectedRows.find(row => row === rowId)) {
+        // rowId already selected. unselect the row
         updatedSelectedRows = selectedRows.filter(row => row !== rowId);
       } else {
+        // new selected row. add it to selected array
         updatedSelectedRows = [...selectedRows, rowId];
       }
       setSelectionAnchorId(rowId);
@@ -561,6 +585,27 @@ const DataTable = ({
     }
   }, [activeRows, newlyAddedRowId, page, rowsPerPage]);
 
+  // Function to calculate left position for sticky columns
+  const getStickyPosition = (columnId) => {
+    if (!frozenColumns.includes(columnId)) return null;
+
+    let leftPosition = 0;
+    for (const id of frozenColumns) {
+      if (id === columnId) break;
+      // Approximate width for each preceding sticky column (adjust as needed)
+      leftPosition += columnWidths[id] || 0;
+    }
+    return `${leftPosition}px`;
+  }
+
+  const handleClick = () => {
+    // enableScrolling();
+  }
+
+  const handleDoubleClick = () => {
+    // disableScrolling();
+  }
+
   if (!activeRows || activeRows.length === 0) return null;
 
   // Calculate total pages for the select dropdown
@@ -569,6 +614,11 @@ const DataTable = ({
 
   // const isContextMenuOpen = Boolean(contextMenuAnchorEl);
 
+  let tableContainerClasses = styles.container;
+  // if (!isScrollable) {
+  //   tableContainerClasses += ` ${styles.no_scroll}`;
+  // }
+
   return (
     <div
       ref={tableWrapperRef}
@@ -576,22 +626,33 @@ const DataTable = ({
       onKeyDown={handleKeyDown}
       tabIndex={-1}
     >
-      <div className={styles.tableContainerWrapper}>
-        <TableContainer
-          ref={tableContainerRef}
-          className={styles.scrollableTableContainer}
-          onScroll={checkHorizontalScroll}
+      <TableContainer
+        ref={tableContainerRef}
+        className={tableContainerClasses}
+        onScroll={checkHorizontalScroll}
+        // ref={containerRef}
+        // onDoubleClick={handleDoubleClick}
+        onClick={handleClick}
+      >
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
         >
           <Table
             className={styles.table}
             size='medium'>
             <TableHead
-              headCells={cells}
-              mode={mode}
+              columns={columns}
+              uniqueValues={uniqueValues}
+              filters={filters}
               sortOrders={sortOrders}
-              onRequestSort={handleSortRequest}
-              onRemoveSort={handleSortRemove}
-              copyColumnHandler={handleCopy}
+              onFiltersChange={onFiltersChange}
+              onSortOrdersChange={onSortOrdersChange}
+              columnRefs={columnRefs}
+              stickyHeader={stickyHeader}
+              getStickyPosition={getStickyPosition}
+              groupedRows={rows}
             />
             <TableBody>
               {activeRows.map((groupedRow, idx) => {
@@ -604,7 +665,7 @@ const DataTable = ({
                     className={styles.row}
                     onDoubleClick={handleRowDoubleClick}
                   >
-                    {cells.map((cell) => {
+                    {columns.map((cell) => {
                       // Get row data based on the cell's source index.
                       const row = groupedRow[cell.sourceIndex];
                       const isSelected = row && (
@@ -633,7 +694,7 @@ const DataTable = ({
                         }
                       }
 
-                      const dataxpath = getDataxpath(updatedData, xpath);
+                      const dataxpath = getDataxpathV2(updatedData, xpath);
                       const dataAdd = row?.['data-add'] ?? false;
                       const dataRemove = row?.['data-remove'] ?? false;
                       let value = row?.[cell.tableTitle];
@@ -661,7 +722,8 @@ const DataTable = ({
 
                       const isButtonDisabled = modelType === MODEL_TYPES.REPEATED_ROOT && (!isSelected || (isSelected && xpath?.startsWith('[')));
                       const rowIdx = modelType === MODEL_TYPES.REPEATED_ROOT ? row?.['data-id'] : row?.['data-id'] || cell.tableTitle;
-                      const cellKey = `${rowIdx}_${cell.tableTitle}`
+                      const cellKey = `${rowIdx}_${cell.tableTitle}`;
+                      const stickyPosition = getStickyPosition(cell.tableTitle);
 
                       return (
                         <Cell
@@ -697,6 +759,7 @@ const DataTable = ({
                           onSelectItemChange={handleSelectItemChange}
                           onAutocompleteOptionChange={handleAutocompleteChange}
                           onDateTimeChange={handleDateTimeChange}
+                          stickyPosition={stickyPosition}
                         />
                       );
                     })}
@@ -705,39 +768,39 @@ const DataTable = ({
               })}
             </TableBody>
           </Table>
-        </TableContainer>
+        </DndContext>
+      </TableContainer>
 
-        <ScrollIndicators
-          showRightScrollIndicator={showRightScrollIndicator}
-          showLeftScrollIndicator={showLeftScrollIndicator}
-          indicatorRightOffset={indicatorRightOffset}
-          onRightScrollClick={handleRightScrollClick}
-          onLeftScrollClick={handleLeftScrollClick}
-        />
-      </div>
-
-      {rows.length > 6 && (
-        <TablePaginationControl
-          rows={rows}
-          page={page}
-          rowsPerPage={rowsPerPage}
-          onPageChange={onPageChange}
-          onRowsPerPageChange={handleRowsPerPageChange}
-          rowsPerPageOptions={[25, 50, 100]} // Optional
-        />
-      )}
-      <ClipboardCopier text={clipboardText} />
+      <ScrollIndicators
+        showRightScrollIndicator={showRightScrollIndicator}
+        showLeftScrollIndicator={showLeftScrollIndicator}
+        indicatorRightOffset={indicatorRightOffset}
+        onRightScrollClick={handleRightScrollClick}
+        onLeftScrollClick={handleLeftScrollClick}
+      />
+      {
+        rows.length > 6 && (
+          <TablePaginationControl
+            rows={rows}
+            page={page}
+            rowsPerPage={rowsPerPage}
+            onPageChange={onPageChange}
+            onRowsPerPageChange={handleRowsPerPageChange}
+            rowsPerPageOptions={[25, 50, 100]} // Optional
+          />
+        )
+      }
       {/* <Menu
-                open={isContextMenuOpen}
-                onClose={handleContextMenuClose}
-            >
-                <MenuItem dense onClick={handleClearAll}>
-                    <ListItemIcon>
-                        <ClearAll fontSize='small' />
-                    </ListItemIcon>
-                    <ListItemText>Clear All</ListItemText>
-                </MenuItem>
-            </Menu> */}
+        open={isContextMenuOpen}
+        onClose={handleContextMenuClose}
+      >
+        <MenuItem dense onClick={handleClearAll}>
+          <ListItemIcon>
+            <ClearAll fontSize='small' />
+          </ListItemIcon>
+          <ListItemText>Clear All</ListItemText>
+        </MenuItem>
+      </Menu> */}
       <FullScreenModal
         id={`${modelName}-modal`}
         open={isModalOpen}
@@ -745,7 +808,7 @@ const DataTable = ({
       >
         <ModelCard>
           <ModelCardHeader name={modelName}>
-            <Icon name='save' title='save' onClick={handleModalToggle}><Save fontSize='small' /></Icon>
+            <Icon name='save' title='save' onClick={handleModalToggle}><Save fontSize='small' color='white' /></Icon>
           </ModelCardHeader>
           <ModelCardContent>
             <DataTree
@@ -764,7 +827,7 @@ const DataTable = ({
           </ModelCardContent>
         </ModelCard>
       </FullScreenModal>
-    </div>
+    </div >
   )
 }
 

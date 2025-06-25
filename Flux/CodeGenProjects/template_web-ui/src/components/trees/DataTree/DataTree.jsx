@@ -7,6 +7,8 @@ import Node from '../../Node';
 import HeaderField from '../../HeaderField';
 import NodeBaseClasses from '../../Node.module.css';
 import PropTypes from 'prop-types';
+import styles from './DataTree.module.css';
+import { Warning } from '@mui/icons-material';
 
 
 const DataTree = ({
@@ -23,7 +25,10 @@ const DataTree = ({
     showHidden,
     enableObjectPagination = false,
     treeLevel,
-    filters
+    filters,
+    quickFilter = null,
+    onQuickFilterChange,
+    isQuickFilterView = false
 }) => {
 
     const [treeData, setTreeData] = useState([]);
@@ -98,12 +103,13 @@ const DataTree = ({
             projectSchema, modelName, updatedData, storedData, subtree, mode, xpath,
             selectedId, showHidden, paginatedNodes,
             ITEMS_PER_PAGE, DATA_TYPES,
-            enableObjectPagination, filters
+            enableObjectPagination, filters,
+            quickFilter, isQuickFilterView
             // expandedNodeXPaths is managed locally, no need to send to worker for basic tree generation
         };
     }, [
         projectSchema, modelName, updatedData, storedData, subtree, mode, xpath,
-        selectedId, showHidden, paginatedNodes, enableObjectPagination, filters
+        selectedId, showHidden, paginatedNodes, enableObjectPagination, filters, quickFilter, isQuickFilterView
     ]);
 
     // Main effect to communicate with the worker when props change.
@@ -148,7 +154,7 @@ const DataTree = ({
         // isWorkerProcessing is NOT in the dependency array to avoid loops.
     }, [
         projectSchema, modelName, updatedData, storedData, subtree, mode, xpath,
-        selectedId, showHidden, paginatedNodes, enableObjectPagination, filters
+        selectedId, showHidden, paginatedNodes, enableObjectPagination, filters, quickFilter, isQuickFilterView
     ]);
 
     // Effect to update previous prop refs *after* all other effects for the render cycle.
@@ -854,6 +860,7 @@ const DataTree = ({
             onCheckboxChange: handleCheckboxToggle,
             onAutocompleteOptionChange: handleAutocompleteChange,
             onDateTimeChange: handleDateTimeChange,
+            onQuickFilterChange: onQuickFilterChange,
             updatedDataForColor: updatedData,
             storedDataForColor: storedData,
             visualState: visualState,
@@ -954,13 +961,13 @@ const DataTree = ({
             const expandNewlyCreatedObjects = (node) => {
                 let shouldExpand = false;
                 let expansionReason = '';
-                
+
                 // Check if this node has data-add status (newly created via + button)
                 if (node['data-add'] === true && node.xpath) {
                     shouldExpand = true;
                     expansionReason = 'data-add status';
                 }
-                
+
                 // Additional check: if object exists in updatedData but not in storedData
                 // This catches objects created via Strat Collection create button
                 if (!shouldExpand && node.xpath && (node.isObjectContainer || node.isArrayContainer)) {
@@ -968,7 +975,7 @@ const DataTree = ({
                     const nodeDataInStored = get(storedData, node.xpath);
 
                     // If object exists in updated but not in stored, it's newly created
-                    if (nodeDataInUpdated && !nodeDataInStored && 
+                    if (nodeDataInUpdated && !nodeDataInStored &&
                         typeof nodeDataInUpdated === 'object' && nodeDataInUpdated !== null) {
                         shouldExpand = true;
                         expansionReason = 'exists in updated but not in stored data';
@@ -1047,6 +1054,16 @@ const DataTree = ({
 
     if (!treeData || treeData.length === 0) return null;
 
+    if (filters?.length > 0 && filters.find((filter) => filter?.filtered_values)) {
+        return (
+            <div className={styles.unsupported}>
+                <Warning fontSize='large' color='warning' />
+                <h3>Work in progress...</h3>
+                <span>Filters not supported on Tree. Clear filters to view in Tree</span>
+            </div>
+        )
+    }
+
     const activeNodeIdsSet = new Set(treeData.map((node) => node.id));
     const updatedExpandedIds = Object.keys(expandedNodeXPaths)
         .filter(xpath => expandedNodeXPaths[xpath] && activeNodeIdsSet.has(xpath));
@@ -1054,18 +1071,26 @@ const DataTree = ({
     const treeViewKey = counter;
 
     return (
-        <TreeView
-            key={treeViewKey}
-            data={treeData}
-            aria-label={modelName}
-            nodeRenderer={nodeRenderer}
-            expandedIds={updatedExpandedIds} // Control TreeView expansion
-            multiSelect={false}
-            onKeyDown={(e) => {
-                e.stopPropagation();
-                e.preventDefault(); // Fully disables default keyboard behavior
-            }}
-        />
+        <div style={{ overflow: 'auto', height: '100%' }}>
+            {filters?.length > 0 && filters.find((filter) => filter?.filtered_values) && (
+                <div style={{ padding: '10px' }}>
+                    <Warning fontSize='small' color='warning' />
+                    Filters not supported on Tree
+                </div>
+            )}
+            <TreeView
+                key={treeViewKey}
+                data={treeData}
+                aria-label={modelName}
+                nodeRenderer={nodeRenderer}
+                expandedIds={updatedExpandedIds} // Control TreeView expansion
+                multiSelect={false}
+                onKeyDown={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault(); // Fully disables default keyboard behavior
+                }}
+            />
+        </div>
     );
 };
 

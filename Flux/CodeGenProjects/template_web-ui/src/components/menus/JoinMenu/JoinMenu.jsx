@@ -126,7 +126,7 @@ const JoinMenu = ({
               selected={flip}
               onClick={onFlipToggle}
             >
-              <SwapHoriz fontSize='small' />
+              <SwapHoriz fontSize='small' color='white' />
             </Icon>
           )
         }

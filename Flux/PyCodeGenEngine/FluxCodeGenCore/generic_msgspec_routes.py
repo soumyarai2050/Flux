@@ -986,9 +986,6 @@ async def generic_projection_query_ws(ws: WebSocket, project_name: str, msgspec_
                 send_json_to_websocket(json_str, ws)
         # else not required: no initial snapshot is provided on this connection
         need_disconnect = await handle_ws(ws, is_new_ws)
-    except WebSocketException as e:
-        need_disconnect = True
-        logging.info(f"WebSocketException in ws {ws.client}: {e}")
     except ConnectionClosedOK as e:
         need_disconnect = True
         logging.info(f"ConnectionClosedOK: web socket connection closed gracefully "
@@ -1000,13 +997,17 @@ async def generic_projection_query_ws(ws: WebSocket, project_name: str, msgspec_
     except websockets.ConnectionClosed as e:
         need_disconnect = True
         logging.info(f"generic_beanie_get_ws - connection closed by client in ws {ws.client}: {e}")
+    except WebSocketException as e:
+        need_disconnect = True
+        logging.exception(f"WebSocketException in ws {ws.client}: {e}")
+        raise HTTPException(status_code=404, detail=str(e))
     except WebSocketDisconnect as e:
         need_disconnect = True
         logging.exception(f"generic_beanie_get_ws - unexpected connection close in ws {ws.client}: {e}")
         raise HTTPException(status_code=404, detail=str(e))
     except RuntimeError as e:
         need_disconnect = True
-        logging.info(f"RuntimeError: web socket raised runtime error within while loop in ws {ws.client}: {e}")
+        logging.exception(f"RuntimeError: web socket raised runtime error within while loop in ws {ws.client}: {e}")
         raise HTTPException(status_code=404, detail=str(e))
     except HTTPException as http_e:
         need_disconnect = True

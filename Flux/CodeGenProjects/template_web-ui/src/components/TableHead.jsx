@@ -1,101 +1,283 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
-import { Box, TableHead, TableSortLabel, TableRow, TableCell, IconButton, Tooltip } from '@mui/material';
-import { ContentCopy, LibraryAddCheckRounded } from '@mui/icons-material';
-import { visuallyHidden } from '@mui/utils';
+import { SortableContext, useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { TableHead, TableRow, TableCell } from '@mui/material';
 import { useTheme } from '@emotion/react';
-import classes from './TableHead.module.css';
+import { useDraggableContext } from '.././contexts/DraggableContext';
+import styles from './TableHead.module.css';
+import FilterSortPopup from './FilterSortPopup/FilterSortPopup';
 
-const CustomHeadCell = ({
-    sortOrders,
-    onRemoveSort,
-    onRequestSort,
-    headCells,
-    copyColumnHandler,
-    collectionView
+function getFilterDict(filters) {
+    return filters.reduce((acc, item) => {
+        acc[item.column_name] = {
+            ...item,
+            filtered_values: item.filtered_values?.split(',') ?? null
+        };
+        return acc;
+    }, {});
+}
+
+function getSortOrderDict(sortOrders) {
+    return sortOrders.reduce((acc, { order_by, sort_type }) => {
+        acc[order_by] = sort_type ?? null;
+        return acc;
+    }, {});
+}
+
+const SortableHeaderCell = ({
+    isDraggable = false,
+    column,
+    columnId,
+    theme,
+    stickyPosition,
+    columnRefs,
+    uniqueValues,
+    selectedFilters,
+    textFilter,
+    textFilterType,
+    sortDirection,
+    onApply,
+    onCopy,
+    clipboardText
 }) => {
-    const theme = useTheme();
-    const [copiedCellId, setCopiedCellId] = useState(null);
+    const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
+        id: columnId,
+    });
 
-    const createSortHandler = (property) => (event) => {
-        let retainSortLevel = false;
-        if (event.ctrlKey) {
-            retainSortLevel = true;
-        }
-        onRequestSort(event, property, retainSortLevel);
+    const style = {
+        transform: isDraggable ? CSS.Transform.toString(transform) : undefined,
+        transition: isDraggable ? transition : undefined,
+        cursor: isDraggable ? 'grab' : 'default',
     };
 
-    const removeSortHandler = (property) => {
-        onRemoveSort(property);
+    const handleDragStart = (e) => {
+        e.stopPropagation();
+    };
+
+    const mergeRefs = (...refs) => {
+        return (el) => {
+            refs.forEach((ref) => {
+                if (!ref) return;
+                if (typeof ref === 'function') {
+                    ref(el);
+                } else {
+                    ref.current = el;
+                }
+            });
+        };
+    };
+
+    let tableHeadColor = 'white';
+    if (column.nameColor) {
+        const color = column.nameColor.toLowerCase();
+        tableHeadColor = theme.palette.text[color];
     }
 
-    const handleColumnCopy = (cell) => {
-        const cellKey = collectionView ? cell.key : cell.tableTitle;
-        setCopiedCellId(cellKey);
-        copyColumnHandler(cell);
-        setTimeout(() => {
-            setCopiedCellId((prev) => prev === cellKey ? null : prev);
-        }, 5000)
+    let columnName = column.title ?? column.key;
+    if (column.displayName) {
+        columnName = column.displayName;
+    } else if (column.elaborateTitle) {
+        columnName = column.elaborateTitle;
     }
 
     return (
-        <TableHead className={classes.head}>
-            <TableRow>
-                {headCells.map((cell) => {
-                    // don't add cells which starts with xpath or cells that are hidden
-                    // if (cell.key.startsWith('xpath_')) {
-                    //     return;
-                    // }
-                    // if (cell.showLess) return;
-                    let tableHeadColor = 'white';
-                    if (cell.nameColor) {
-                        const color = cell.nameColor.toLowerCase();
-                        tableHeadColor = theme.palette.text[color];
-                    }
-                    const cellKey = collectionView ? cell.key : cell.tableTitle;
-                    const sortOrder = sortOrders.find(o => o.order_by === cellKey);
-                    const isSelected = copiedCellId === cellKey;
-                    const iconText = isSelected ? 'Column copied!' : 'Click to copy column';
-                    const uniqueCellKey = cellKey + cell.sourceIndex;
-                    return (
-                        <TableCell
-                            key={uniqueCellKey}
-                            className={`${classes.cell}`}
-                            sx={{ color: `${tableHeadColor}` }}
-                            align='center'
-                            padding='normal'
-                            sortDirection={sortOrder ? sortOrder.sort_type : false}>
-                            {copyColumnHandler && (
-                                <Tooltip title={iconText} disableInteractive>
-                                    <IconButton className={classes.icon} size='small' sx={{ color: 'inherit' }} onClick={() => handleColumnCopy(cell)}>
-                                        {isSelected ? <LibraryAddCheckRounded sx={{ color: 'success.main' }} fontSize='small' /> : <ContentCopy fontSize='small' />}
-                                    </IconButton>
-                                </Tooltip>
-                            )}
-                            <TableSortLabel
-                                active={sortOrder !== undefined}
-                                direction={sortOrder ? sortOrder.sort_type : 'asc'}
-                                onClick={createSortHandler(cellKey)}
-                                onDoubleClick={() => removeSortHandler(cellKey)}>
-                                {cell.absoluteSort && '│ '}
-                                {cell.elaborateTitle ? cell.tableTitle : cell.title ? cell.title : cell.key}
-                                {cell.absoluteSort && ' │'}
-                                {sortOrder && sortOrder.order_by === cellKey ? (
-                                    <Box component='span' sx={visuallyHidden}>
-                                        {sortOrder.sort_type === 'desc' ? 'sorted descending' : 'sorted ascending'}
-                                    </Box>
-                                ) : null}
-                            </TableSortLabel>
-                        </TableCell>
-                    )
-                })}
-            </TableRow>
-        </TableHead>
+        <TableCell
+            className={styles.cell}
+            sx={{
+                color: tableHeadColor,
+                position: column.frozenColumn ? 'sticky' : 'static',
+                zIndex: column.frozenColumn ? 2 : 1,
+                left: stickyPosition,
+                background: column.frozenColumn ? theme.palette.background.nodeHeader : 'inherit'
+            }}
+            align='center'
+            padding='normal'
+            ref={mergeRefs(setNodeRef, (el) => columnRefs.current[columnId] = el)}
+            style={style}
+            {...(isDraggable ? attributes : {})}
+            {...(isDraggable ? listeners : {})}
+            onMouseDown={handleDragStart}
+        >
+            <span>
+                {column.absoluteSort && '| '}
+                {columnName}
+                {column.absoluteSort && ' |'}
+            </span>
+            <FilterSortPopup
+                columnId={columnId}
+                columnName={columnName}
+                valueCounts={uniqueValues ?? new Map()}
+                uniqueValues={Array.from(uniqueValues?.keys() || [])}
+                selectedFilters={selectedFilters}
+                textFilter={textFilter}
+                textFilterType={textFilterType}
+                sortDirection={sortDirection}
+                onApply={onApply}
+                onCopy={onCopy}
+                filterEnable={column.filterEnable ?? false}
+                clipboardText={clipboardText}
+            />
+        </TableCell>
     );
-}
-
-CustomHeadCell.propTypes = {
-    onRequestSort: PropTypes.func.isRequired,
 };
 
-export default CustomHeadCell;
+const TableHeader = ({
+    columns = [],
+    uniqueValues = [],
+    filters = [],
+    sortOrders = [],
+    onFiltersChange,
+    onSortOrdersChange,
+    collectionView = false,
+    columnRefs,
+    stickyHeader = true,
+    getStickyPosition,
+    groupedRows = []
+}) => {
+    const { isDraggable } = useDraggableContext();
+    const theme = useTheme();
+
+    // Lazy initializer for filterDict to avoid recomputation on every render.
+    const [filterDict, setFilterDict] = useState(() => getFilterDict(filters));
+    const [sortOrderDict, setSortOrderDict] = useState(() => getSortOrderDict(sortOrders));
+    const [clipboardText, setClipboardText] = useState(null);
+
+    const keyField = collectionView ? 'key' : 'tableTitle';
+
+    // Update filterDict whenever the filters prop changes.
+    useEffect(() => {
+        const updatedFilterDict = getFilterDict(filters);
+        setFilterDict(updatedFilterDict);
+    }, [filters]);
+
+    useEffect(() => {
+        const updatedSortOrderDict = getSortOrderDict(sortOrders);
+        setSortOrderDict(updatedSortOrderDict);
+    }, [sortOrders]);
+
+    const handleApply = useCallback((filterName, values, textFilter, textFilterType, sortDirection, multiSort = false) => {
+        let updatedFilterDict;
+        let updatedSortOrderDict;
+
+        setFilterDict((prev) => {
+            updatedFilterDict = {
+                ...prev,
+                [filterName]: {
+                    ...prev[filterName],
+                    column_name: filterName,
+                    filtered_values: values,
+                    text_filter: textFilter,
+                    text_filter_type: textFilterType
+                }
+            };
+            return updatedFilterDict;
+        });
+
+        setSortOrderDict((prev) => {
+            updatedSortOrderDict = multiSort ? {
+                ...prev,
+                [filterName]: sortDirection
+            } : { [filterName]: sortDirection };
+            if (!sortDirection) {
+                delete updatedSortOrderDict[filterName];
+            }
+
+            const updatedFilters = Object.keys(updatedFilterDict).map((filterName) => ({
+                ...updatedFilterDict[filterName],
+                filtered_values: updatedFilterDict[filterName].filtered_values?.join(',') ?? null,
+            }));
+            const updatedSortOrders = Object.keys(updatedSortOrderDict).map((sortBy) => ({
+                order_by: sortBy,
+                sort_type: updatedSortOrderDict[sortBy]
+            }));
+            onFiltersChange(updatedFilters);
+            onSortOrdersChange(updatedSortOrders);
+
+            return updatedSortOrderDict;
+        });
+    }, [onFiltersChange, onSortOrdersChange]);
+
+    const handleCopy = (columnId, columnName) => {
+        const column = columns.find((meta) => meta[keyField] === columnId);
+
+        if (!column) {
+            console.error(`handleCopy failed, no column found with columnId: ${columnId}`);
+            return;
+        }
+
+        let sourceIndex = column.sourceIndex;
+        if (sourceIndex == null) {
+            sourceIndex = 0;
+        }
+        const values = [columnName];
+        groupedRows.forEach((groupedRow) => {
+            const row = groupedRow[sourceIndex];
+            values.push(row[columnId]);
+        });
+
+        const text = values.join('\n');
+        setClipboardText(text);
+        setTimeout(() => {
+            // to allow same column to be copied again even if there is no text change
+            setClipboardText(null);
+        }, 2000);
+    };
+
+    let tableHeadClasses = styles.head;
+    if (stickyHeader) {
+        tableHeadClasses += ` ${styles.sticky}`;
+    }
+
+    const sortableItems = useMemo(() => columns.map((column) => column[keyField]), [columns]);
+
+    return (
+        <TableHead className={tableHeadClasses}>
+            <SortableContext items={sortableItems}>
+                <TableRow>
+                    {columns.map((column) => {
+                        const columnKey = column[keyField];
+                        const uniqueColumnKey = columnKey + column.sourceIndex;
+                        const columnFilter = filterDict[columnKey];
+                        const columnSort = sortOrderDict[columnKey];
+                        const columnUniqueValues = uniqueValues[columnKey];
+                        return (
+                            <SortableHeaderCell
+                                key={uniqueColumnKey}
+                                column={column}
+                                columnId={columnKey}
+                                isDraggable={isDraggable}
+                                theme={theme}
+                                stickyPosition={getStickyPosition(columnKey)}
+                                columnRefs={columnRefs}
+                                uniqueValues={columnUniqueValues ?? []}
+                                selectedFilters={columnFilter?.filtered_values ?? []}
+                                textFilter={columnFilter?.text_filter ?? null}
+                                textFilterType={columnFilter?.text_filter_type ?? 'contains'}
+                                sortDirection={columnSort ?? null}
+                                onApply={handleApply}
+                                onCopy={handleCopy}
+                                clipboardText={clipboardText}
+                            />
+                        );
+                    })}
+                </TableRow>
+            </SortableContext>
+        </TableHead>
+    );
+};
+
+TableHeader.propTypes = {
+    columns: PropTypes.array,
+    uniqueValues: PropTypes.object,
+    filters: PropTypes.array,
+    sortOrders: PropTypes.array,
+    onFiltersChange: PropTypes.func,
+    onSortOrdersChange: PropTypes.func,
+    collectionView: PropTypes.bool,
+    stickyHeader: PropTypes.bool,
+    getStickyPosition: PropTypes.func,
+    groupedRows: PropTypes.array
+};
+
+export default TableHeader;

@@ -6,8 +6,11 @@ import time
 import subprocess
 import math
 import copy
-from typing import Set
+from typing import Set, Dict, List, Tuple, Callable, Any, Final, ClassVar, cast
 from enum import auto
+from pathlib import PurePath
+import os
+import pendulum
 
 # 3rd party imports
 from fastapi_restful.enums import StrEnum
@@ -20,7 +23,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.app.basket_barter
     BasketBarteringDataManager)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.app.basket_cache import BasketCache
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
-    get_symbol_side_key, get_usd_px, email_book_service_http_client, config_yaml_dict)
+    get_symbol_side_key, get_usd_px, email_book_service_http_client)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.pos_cache import PosCache, SecPosExtended
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import (
     ChoreLimitsBaseModel, ChoreLimits)
@@ -105,7 +108,8 @@ class BasketBook(BaseBook):
     @staticmethod
     def executor_trigger(basket_bartering_data_manager_: BasketBarteringDataManager, basket_cache: BasketCache):
         basket_book: BasketBook = BasketBook(basket_bartering_data_manager_, basket_cache)
-        street_book_thread = Thread(target=basket_book.run, daemon=True).start()
+        street_book_thread = Thread(target=basket_book.run, daemon=True)
+        street_book_thread.start()
         # block_bartering_symbol_side_events: Dict[str, Tuple[Side, str]]
         # sedol_symbols, ric_symbols, block_bartering_symbol_side_events, mplan = basket_book.get_subscription_data()
         # listener_sedol_key = [f'{sedol_symbol}-' for sedol_symbol in sedol_symbols]
@@ -135,7 +139,9 @@ class BasketBook(BaseBook):
     def check_algo_chore_limits(chore_limits: ChoreLimits | ChoreLimitsBaseModel, new_ord: NewChore | NewChoreBaseModel,
                                 chore_usd_notional: float, symbol_cache: SymbolCache,
                                 check_mask: int = ChoreControl.ORDER_CONTROL_SUCCESS):
+        """
         # no contact checks for algo chore
+        """
         sys_symbol = new_ord.ticker
         checks_passed: int = ChoreControl.ORDER_CONTROL_SUCCESS
         is_algo: bool = True
@@ -396,7 +402,7 @@ class BasketBook(BaseBook):
             pos_cache.return_availability(new_chore_obj.ticker, sec_pos_extended)
 
     @staticmethod
-    def get_chore_id_from_ret_id_or_err_desc(ret_id_or_err_desc) -> Tuple[str | None, any]:
+    def get_chore_id_from_ret_id_or_err_desc(ret_id_or_err_desc: str) -> Tuple[str | None, any]:
         parts = ret_id_or_err_desc.split("---")
         match len(parts):
             case 2:
@@ -419,13 +425,14 @@ class BasketBook(BaseBook):
                 logging.error(f"no stop_md_script found for {symbol=};;;{stop_md_script_path=}")
 
     def bartering_link_check_is_chore_open_n_modifiable(self, chore: NewChore) -> \
-            Tuple[bool, bool, str | None, int | None, float | None, int | None]:
+            Tuple[bool, bool, str | None, int | None, float | None, int | None] | None:
         run_coro = self.bartering_link_check_is_chore_open_n_modifiable_(chore)
         future = asyncio.run_coroutine_threadsafe(run_coro, BasketBook.asyncio_loop)
         try:
             return future.result()
         except Exception as exp:
             logging.exception(f"bartering_link_check_is_chore_open_n_modifiable_ failed with exception: {exp}")
+            return None
 
     @staticmethod
     async def bartering_link_check_is_chore_open_n_modifiable_(chore: NewChore) -> \
@@ -653,7 +660,8 @@ class BasketBook(BaseBook):
                     # stop MD for recovered chores, MD may still be running - step brings chores back to clean state
                     self.md_streaming_mgr.force_stop_md_for_symbols(list(recovered_chores_symbol_n_type_list))
                     for sys_symbol, _ in recovered_chores_symbol_n_type_list:
-                        del self.sys_symbol_to_md_trigger_time_dict[sys_symbol]
+                        if self.sys_symbol_to_md_trigger_time_dict.get(sys_symbol):
+                            del self.sys_symbol_to_md_trigger_time_dict[sys_symbol]
                     # partial update forces recovery of chores from DB and applies any correction chores
                 if len(updated_recovered_new_chores) == 0:
                     self.plan_cache.is_recovered_n_reconciled = True
@@ -662,12 +670,12 @@ class BasketBook(BaseBook):
                 else:
                     # until self.is_recovered_n_reconciled == True, only update update_id=-1 is handled - rest
                     # throw exception in pre-call. update_id=-1 implies NO-OP in self._handle_basket_chore call.
-                    # this allows for persist first as recovered / reconciled is persisted
+                    # this allows for persist first as recovered / reconciled [then process]
                     partial_updated_basket_chore: BasketChore = BasketChore(
                         id=self.plan_cache.basket_id, processing_level=1, new_chores=updated_recovered_new_chores)
                     await BasketBook.underlying_partial_update_basket_chore_http(
                         partial_updated_basket_chore.to_json_dict(exclude_none=True))
-                    # now allow standard basket chore processing recovered / reconciled [then process]
+                    # now allow standard basket chore processing recovered / reconciled is persisted
                     self.plan_cache.is_recovered_n_reconciled = True
                     # just new update_id is fine
                     partial_updated_basket_chore: BasketChore = BasketChore(
@@ -743,105 +751,211 @@ class BasketBook(BaseBook):
             logging.exception(f"bartering_link.place_amend_chore failed with exception: {exp}")
             return False
 
-    def trigger_amend_chore(self, chore, amend_chore, remove_chore_list, processable_algo_market_chore,
-                            symbol_cache: SymbolCache, sys_symbol_n_new_submit_chore_list, sys_symbol) -> bool:
-        is_open, is_unack, text, filled_qty, posted_px, posted_qty = (
-            self.bartering_link_check_is_chore_open_n_modifiable(chore))
-        if not (self.check_if_amendable(chore, amend_chore, remove_chore_list, is_open, is_unack, text, filled_qty)):
-            return False
-        # else all good continue
+    def trigger_amend_chore(self, chore: NewChore, amend_chore: NewChore | None, remove_chore_list: List[NewChore],
+                            processable_algo_market_chore: bool,
+                            symbol_cache: SymbolCache, sys_symbol_n_new_submit_chore_list: List[Tuple[str, NewChore]],
+                            sys_symbol: str) -> bool:
+        """
+        Attempts to amend an existing chore based on various conditions.
 
+        Args:
+            chore: The original chore to be amended
+            amend_chore: Optional amendment chore with new parameters
+            remove_chore_list: List to track chores that should be removed
+            processable_algo_market_chore: Flag indicating if this is a market algo chore that needs price adjustment
+            symbol_cache: Cache containing market data
+            sys_symbol_n_new_submit_chore_list: List to track new chores to be added to management
+            sys_symbol: The symbol identifier
+
+        Returns:
+            bool: True if amendment was successful, False otherwise
+        """
+        # Check if chore is open and amendable
+        return_tuple = self.bartering_link_check_is_chore_open_n_modifiable(chore)
+        if return_tuple is None:
+            # Amendment failed
+            logging.error(f"amend attempt failed - we'll retry! Basket {chore.chore_id=};;;{chore=}; {amend_chore=}")
+            return False  # no further processing for this chore, error logged in call
+        is_open, is_unack, text, filled_qty, posted_px, posted_qty = return_tuple
+        if not self.check_if_amendable(chore, amend_chore, remove_chore_list, is_open, is_unack, text, filled_qty):
+            return False
+        # else proceed further processing, chore is in modifiable state
+        # Initialize amendment parameters
         generated_px = None
         generated_qty = chore.qty
-        # if we are here - chore is in modifiable state
+
+        # If explicit amendment chore exists, use its parameters
         if amend_chore:
             if not math.isclose(amend_chore.px, chore.px):
                 generated_px = amend_chore.px
             generated_qty = amend_chore.qty
 
+        # For market algo chores, generate a new price based on market conditions
         if processable_algo_market_chore:
             chore_limits_tuple = self.bartering_data_manager.bartering_cache.get_chore_limits()
             if chore_limits_tuple is not None:
                 chore_limits, _ = chore_limits_tuple
-                # we are to manage the price [market algo] - till chore remains open and modifiable
+                # Assuming self._generate_algo_market_chore_price is defined elsewhere
                 generated_px = self.generate_algo_market_chore_price(chore, chore_limits, symbol_cache)
-        # even if not an amend chore - if new price generated - we amend the chore
+
+        # Proceed with amendment if we have either an amend chore or a new generated price
         if amend_chore or generated_px is not None:
             if self.soft_amend:
-                res = self.bartering_link_place_cxl_chore(chore.chore_id, None, None, None, None)
-                if res:
-                    # get chore state again to get filled qty after chore is cancelled
+                # Soft amend: cancel existing chore and create a new one
+                res = self.bartering_link.place_cxl_chore(chore.chore_id, None, None, None)
+                if not res:
+                    # Verify chore cancellation with retries [get filled qty after chore is cancelled]
                     for retry_count in range(self.max_post_cxl_chore_check_retry_count):
-                        is_open, is_unack, text, filled_qty, posted_px, posted_qty = (
-                            self.bartering_link_check_is_chore_open_n_modifiable_(chore))
+                        return_tuple = self.bartering_link_check_is_chore_open_n_modifiable(chore)
+                        if return_tuple is None:
+                            # CXL for Soft Amendment failed
+                            logging.error(
+                                f"Failed for Soft amendment attempt failed - we'll retry! Basket {chore.chore_id};;;"
+                                f"{chore=}; {amend_chore=}")
+                            return False  # no further processing for this chore, error logged in call
+                        is_open, is_unack, text, filled_qty, posted_px, posted_qty = return_tuple
                         if is_open:
                             time.sleep(1)
-                            logging.warning(f"post place_cxl_chore: chore found in non-cancelled state,"
-                                            f" {retry_count=}")
+                            logging.warning(f"post place_cxl_chore: chore found in non-cancelled state, {retry_count=}")
                         else:
                             break
+
                     if is_open:
-                        logging.error(f"unexpected: post place_cxl_chore: chore found in non cancelled "
+                        logging.error(f"Unexpected: post_place_cxl_chore: chore found in non cancelled "
                                       f"state in spite exhausting retries, the chore will be dropped "
                                       f"from management")
                         return False
-                    # else all good - compute remaining qty place new chore then add it for management
+
+                    # else:  # res_cxl was True, CXL accepted. Re-check status for final filled_qty.
+                    #     return_tuple_after_cxl = self.bartering_link.check_is_chore_open_n_modifiable(chore)
+                    #     if return_tuple_after_cxl is None:
+                    #         logging.warning(
+                    #             f"SoftAmend: Could not get chore status after CXL for {chore.chore_id}. Using potentially stale filled_qty from initial check.")
+                    #         # filled_qty remains from before CXL call or initial check
+                    #     else:
+                    #         is_open_after_cxl, _, text_after_cxl, filled_qty_after_cxl, posted_px_after_cxl, _ = return_tuple_after_cxl
+                    #         filled_qty = filled_qty_after_cxl
+                    #         posted_px = posted_px_after_cxl
+                    #         text = text_after_cxl  # update text
+                    #         if is_open_after_cxl:
+                    #             logging.warning(
+                    #                 f"SoftAmend: Chore {chore.chore_id} still reported open after CXL success confirmation. State: {is_open_after_cxl=}")
+
+                    # else: Compute remaining quantity, place new chore and then add it for management
                     remaining_qty = generated_qty - filled_qty
                     if remaining_qty > 0:
                         px = generated_px if generated_px is not None else chore.px
                         usd_px = get_usd_px(px, self.usd_fx)
                         amend_as_new_ord = NewChore(
-                            security=chore.security, side=chore.side, px=px, usd_px=usd_px,
-                            qty=remaining_qty, lot_size=chore.lot_size, force_bkr=chore.force_bkr,
-                            mplan=chore.mplan, chore_submit_state=ChoreSubmitType.ORDER_SUBMIT_RETRY,
-                            algo=chore.algo, pov=chore.pov, activate_dt=chore.activate_dt,
+                            security=chore.security,
+                            side=chore.side,
+                            px=px,
+                            usd_px=usd_px,
+                            qty=remaining_qty,
+                            lot_size=chore.lot_size,
+                            force_bkr=chore.force_bkr,
+                            mplan=chore.mplan,
+                            chore_submit_type=ChoreSubmitType.ORDER_SUBMIT_RETRY,
+                            algo=chore.algo,
+                            pov=chore.pov,
+                            activate_dt=chore.activate_dt,
                             deactivate_dt=chore.deactivate_dt,
                             ord_entry_time=pendulum.DateTime.utcnow())
                     else:
-                        logging.error(f"unexpected: post place_cxl_chore: chore found {is_open=}"
-                                      f" state but with invalid {remaining_qty=} computed by "
+                        logging.error(f"Unexpected: post_place_cxl_chore: chore found {is_open=} "
+                                      f"state but with invalid {remaining_qty=} computed by "
                                       f"{generated_qty=} - {filled_qty=}, the chore will be "
                                       f"dropped from management")
                         return False
+
+                    # Get the position and try to place the new chore
                     sec_pos_extended = self.id_to_sec_pos_extended_dict[chore.id]
+
+                    # Find the appropriate position cache based on chore side
+                    if chore.side == Side.BUY:
+                        pos_cache = symbol_cache.buy_pos_cache
+                    elif chore.side == Side.SELL:
+                        pos_cache = symbol_cache.sell_pos_cache
+                    else:
+                        logging.error(f"Invalid side {chore.side} for chore {chore.id}")
+                        return False
+
+                    # Place the new chore
                     res = self.place_checked_new_chore(amend_as_new_ord, sec_pos_extended)
                     self.update_chore_in_db_n_cache(amend_as_new_ord)
+
                     if not res:
                         logging.error(f"failed to send {amend_as_new_ord=}")
+                        # Return availability on failure
+                        pos_cache.return_availability(amend_as_new_ord.ticker, sec_pos_extended)
                     else:
-                        pass  # TODO AMEND Amend done
-                    # amended or not: needed in managed, to be removed later after cyclic state-check
+                        pass  # aids debug
+                    # Add to managed chores list regardless of success (will be cleaned up later)
                     sys_symbol_n_new_submit_chore_list.append((sys_symbol, amend_as_new_ord))
                 else:
-                    text = capped_by_size_text(text)
+                    # Cancel for amend failed - update chore state to reflect this
+                    text = capped_by_size_text(text) if 'text' in locals() else "Cancel for soft amendment failed"
+                    px_str = f"{generated_px:.3f}" if generated_px is not None else "None"
+                    error_message = (f"Cancel for soft amend attempt failed! Basket {chore.chore_id=} from px: "
+                                     f"{chore.px:.3f} to generated_px: {px_str} for {chore.ticker} "
+                                     f"{chore.security.sec_id}, {chore.side}, {text=}, retry in next iteration")
+                    logging.error(error_message)
 
-                    logging.error(f"cancel for amend attempt failed! Basket {chore.chore_id=} from px: "
-                                  f"{chore.px:.3f} to generated px: {generated_px:.3f} for {chore.ticker} "
-                                  f"{chore.security.sec_id}, {chore.side}, {text=}, we'll retry in next"
-                                  f" iteration")
+                    # Update chore state to reflect failed amendment
+                    chore.text = f"{chore.text or ''}; {error_message}"
+                    chore.text = capped_by_size_text(chore.text)
+
+                    # Track that an amendment was attempted but failed
+                    if amend_chore:
+                        # Store the intended amendment for retry
+                        if amend_chore.px is not None and not math.isclose(amend_chore.px, chore.px):
+                            chore.pending_amend_px = amend_chore.px
+                        if amend_chore.qty is not None and amend_chore.qty != chore.qty:
+                            chore.pending_amend_qty = amend_chore.qty
+
+                    # Update the chore in the DB to reflect the failed amendment attempt
+                    self.update_chore_in_db_n_cache(chore)
+
                     return False
-            else:
-                res = self.bartering_link_place_amend_chore(chore_id=chore.chore_id, px=generated_px, qty=generated_qty,
-                                                          bartering_sec_id=chore.security.sec_id,
-                                                          system_sec_id=chore.ticker,
-                                                          bartering_sec_type=chore.security.sec_id_source)
-            if res:
-                soft_amend_spaced_str = " " if not self.soft_amend else f" {self.soft_amend=} "
-                px_amend_str = (f"from {chore.px:.3f} to new px: {generated_px:.3f}"
-                                f"") if generated_px and not math.isclose(chore.px, generated_px) else ''
-                qty_amend_str = (f"from {chore.qty} to new qty: {generated_qty}"
-                                 f"") if generated_qty and chore.qty != generated_qty else ''
-                logging.info(f"amended {soft_amend_spaced_str}{chore.chore_id=} {px_amend_str} {qty_amend_str} for "
-                             f"{chore.ticker} {chore.security.sec_id}, {chore.side}, {text=}")
-                if generated_px is not None:
-                    chore.px = generated_px
-                    if amend_chore and generated_px is not None:
-                        amend_chore.px = generated_px
-            else:
-                logging.error(f"amend attempt failed - we'll retry! Basket {chore.chore_id=} from px: "
-                              f"{chore.px:.3f} to generated px: {generated_px:.3f} for {chore.ticker} "
-                              f"{chore.security.sec_id}, {chore.side}, {text=}")
-                return False
+            else:  # Hard amend: directly modify existing chore
+                res = self.bartering_link_place_amend_chore(
+                    chore_id=chore.chore_id,
+                    px=generated_px,
+                    qty=generated_qty,
+                    bartering_sec_id=chore.security.sec_id,
+                    system_sec_id=chore.ticker,
+                    bartering_sec_type=chore.security.sec_id_source
+                )
+
+                if res:
+                    # Log successful amendment
+                    soft_amend_spaced_str = " " if not self.soft_amend else f" {self.soft_amend=} "
+
+                    px_amend_str = (f"from {chore.px:.3f} to new px: {generated_px:.3f}"
+                                    ) if generated_px and not math.isclose(chore.px, generated_px) else ''
+                    qty_amend_str = (f"from {chore.qty} to new qty: {generated_qty}"
+                                     ) if generated_qty and chore.qty != generated_qty else ''
+
+                    logging.info(f"amended {soft_amend_spaced_str}{chore.chore_id=} {px_amend_str} {qty_amend_str} for "
+                                 f"{chore.ticker} {chore.security.sec_id}, {chore.side}, {text=}")
+
+                    # Update chore px if needed
+                    if generated_px is not None:
+                        chore.px = generated_px
+                        if amend_chore:
+                            amend_chore.px = generated_px
+
+                    # Update chore qty if needed
+                    if generated_qty != chore.qty:
+                        chore.qty = generated_qty
+                else:
+                    # Amendment failed
+                    px_str = f"{generated_px:.3f}" if generated_px is not None else "None"
+                    logging.error(f"amend attempt failed - we'll retry! Basket {chore.chore_id=} from px: "
+                                  f"{chore.px:.3f} to generated_px: {px_str} for {chore.ticker} "
+                                  f"{chore.security.sec_id}, {chore.side}, {text=}")
+                    return False
+
         return True
 
     @staticmethod
@@ -930,7 +1044,14 @@ class BasketBook(BaseBook):
     async def bartering_link_submit_cxl_chore_tasks(pending_cxl_tasks, symbol_to_cxl_chores):  # : Set[str, NewChore]
         orig_pending_cxl_tasks_count = len(pending_cxl_tasks)
         timeout: float = 20.0
+        remaining_ext_retry: int = 5
         while len(pending_cxl_tasks):
+            remaining_ext_retry -= 1
+            if 0 == remaining_ext_retry:
+                logging.error(f"dropping pending submit_cxl_chore_tasks: {len(pending_cxl_tasks)} of total: "
+                              f"{orig_pending_cxl_tasks_count} tasks; retries exhausted: {remaining_ext_retry=};;;"
+                              f"{pending_cxl_tasks}, {symbol_to_cxl_chores=}")
+                break
             try:
                 # wait doesn't raise TimeoutError!
                 # Futures that aren't done when timeout occurs are returned in 2nd set
@@ -954,7 +1075,7 @@ class BasketBook(BaseBook):
                                             f"{task_name=};;;{exp=}")
             if len(pending_cxl_tasks):
                 logging.error(f"unexpected, submitted {orig_pending_cxl_tasks_count} cxl task, found "
-                              f"{len(pending_cxl_tasks)=} post {timeout=:.1f}, going for retry")
+                              f"{len(pending_cxl_tasks)=} post {timeout=:.1f}, attempting retry")
 
     @staticmethod
     def handle_pending_amd_qty(chore) -> bool:
@@ -966,8 +1087,10 @@ class BasketBook(BaseBook):
             return True  # DB update needed for qty [caller may set fast cycle with this indicator]
         return False  # no DB update required
 
-    def manage_chore(self, chore, chore_limits, remove_chore_list, symbol_cache, sys_symbol_n_new_submit_chore_list,
-                     sys_symbol, is_algo) -> CallerLoopReturns:
+    def manage_chore(self, chore: NewChore, chore_limits: ChoreLimits | ChoreLimitsBaseModel,
+                     remove_chore_list: List[NewChore], symbol_cache: SymbolCache,
+                     sys_symbol_n_new_submit_chore_list: List[Tuple[str, NewChore]],
+                     sys_symbol: str, is_algo: bool) -> CallerLoopReturns:
         if chore.chore_submit_state == ChoreSubmitType.ORDER_SUBMIT_RETRY:
             if self.retry_if_failed:
                 chore.chore_submit_state = ChoreSubmitType.ORDER_SUBMIT_PENDING
@@ -975,13 +1098,12 @@ class BasketBook(BaseBook):
         if chore.chore_submit_state == ChoreSubmitType.ORDER_SUBMIT_DONE:
             is_open: bool
             is_unack: bool
-            processable_algo_market_chore = self.maintain_in_limit_price and self.is_market_algo_chore(
-                chore)
-            amend_chore = self.extract_amend_chore(chore)
+            processable_algo_market_chore: bool = self.maintain_in_limit_price and self.is_market_algo_chore(chore)
+            amend_chore: NewChore | None = self.extract_amend_chore(chore)
+
             if amend_chore is not None or processable_algo_market_chore:
                 amended: bool = self.trigger_amend_chore(chore, amend_chore, remove_chore_list,
-                                                         processable_algo_market_chore,
-                                                         symbol_cache,
+                                                         processable_algo_market_chore, symbol_cache,
                                                          sys_symbol_n_new_submit_chore_list, sys_symbol)
                 if not amended:
                     return CallerLoopReturns.CONTINUE  # no further processing for this chore, error logged in call
@@ -990,26 +1112,26 @@ class BasketBook(BaseBook):
                         chore.qty = amend_chore.qty
                         chore.px = amend_chore.px
                         chore.pending_amd_qty = 0
-                        chore.pending_amd_px = 0
-            else:
+                        chore.pending_amd_px = 0.0
+            else:  # ORDER_SUBMIT_DONE - No amend
                 # meaningful support logs
-                is_open, is_unack, text, filled_qty, posted_px, posted_qty = (
-                    self.bartering_link_check_is_chore_open_n_modifiable(chore))
+                return_tuple = self.bartering_link_check_is_chore_open_n_modifiable(chore)
+                if return_tuple is None:
+                    return CallerLoopReturns.CONTINUE  # no further processing for this chore, error logged in call
+                is_open, is_unack, text, filled_qty, posted_px, posted_qty = return_tuple
                 if is_unack:
                     logging.warning(f"found non-market unack {chore.chore_id} for {chore.ticker} "
                                     f"{chore.security.sec_id} on {chore.algo}; not managing this; monitor till "
                                     f"it remains unack, {text=}, {filled_qty=}")
                     return CallerLoopReturns.CONTINUE  # no further processing for this chore, error logged in call
-                if not math.isclose(filled_qty, 0):
-                    filled_qty_str = f"{filled_qty=}; "
-                else:
-                    filled_qty_str = ''
+
+                filled_qty_str = f"{filled_qty=}; " if not math.isclose(filled_qty, 0) else ''
+
                 # update text - chore is getting removed
-                chore.text = f"{filled_qty_str}{text if text and text not in chore.text else ''} {chore.text};"
+                chore.text = f"{filled_qty_str}{text if text and text not in chore.text else ''} {chore.text or ''};"
                 if not is_open:
-                    logging.info(f"removing non-market {chore.chore_id} for {chore.ticker} "
-                                 f"{chore.security.sec_id} on {chore.algo}; chore not in open state "
-                                 f"{chore.text=}")
+                    logging.info(f"removing non-market {chore.chore_id} for {chore.ticker} {chore.security.sec_id} on "
+                                 f"{chore.algo}; chore not in open state {chore.text=}")
                     if chore.chore_submit_state != ChoreSubmitType.ORDER_SUBMIT_NA:
                         self.mark_chore_closed(chore, posted_qty, filled_qty)
                         self.update_chore_in_db_n_cache(chore)
@@ -1017,8 +1139,8 @@ class BasketBook(BaseBook):
                 elif not chore.pending_cxl:
                     remove_chore_list.append(chore)
                     logging.info(f"ignoring: {chore.chore_id} for {chore.ticker} {chore.security.sec_id}, "
-                                 f"we don't manage/monitor non-market, non-pending[SUBMIT-DONE] or pending_cxl,"
-                                 f" non-unack algo chores; removed from managed chore list, {chore.text=}")
+                                 f"we don't manage/monitor non-market, non-pending[SUBMIT-DONE] or pending_cxl, "
+                                 f"non-unack algo chores; removed from managed chore list, {chore.text=}")
         elif chore.chore_submit_state == ChoreSubmitType.ORDER_SUBMIT_PENDING:
             # chore is yet to go to the market
             if chore.pending_cxl:
@@ -1107,6 +1229,7 @@ class BasketBook(BaseBook):
         elif chore.chore_submit_state == ChoreSubmitType.ORDER_SUBMIT_NA:  # chore is closed
             remove_chore_list.append(chore)
         # else not required, chore.chore_submit_state == ChoreSubmitType.ORDER_SUBMIT_RETRY are to be retried
+        return CallerLoopReturns.RESUME  # Explicitly return RESUME for normal flow
 
     def trigger_or_manage_algo_chores(self) -> bool:
         """
@@ -1127,16 +1250,16 @@ class BasketBook(BaseBook):
         # checking and setting usd_fx if not exists
         self.get_usd_fx()
 
-        chore_limits: ChoreLimitsBaseModel
+        chore_limits: ChoreLimitsBaseModel | None
         chore_limits_tuple = self.bartering_data_manager.bartering_cache.get_chore_limits()
-        if chore_limits_tuple:
-            chore_limits, _ = chore_limits_tuple
-            if chore_limits is None:
-                logging.error(f"Can't proceed: chore_limits/plan_limit not found for bartering_cache: "
-                              f"{self.bartering_data_manager.bartering_cache}; {self.plan_cache=}")
-                return next_cycle_not_fast
-        else:
+        if not chore_limits_tuple:
             logging.error(f"chore_limits_tuple not found for plan: {self.plan_cache}, can't proceed")
+            return next_cycle_not_fast
+        # else proceed further
+        chore_limits, _ = chore_limits_tuple
+        if chore_limits is None:
+            logging.error(f"Can't proceed: chore_limits/plan_limit not found for bartering_cache: "
+                          f"{self.bartering_data_manager.bartering_cache}; {self.plan_cache=}")
             return next_cycle_not_fast
 
         is_algo: Final[bool] = True
@@ -1145,27 +1268,24 @@ class BasketBook(BaseBook):
         # used to clear closed / unmanaged chore chores
         remove_sys_sym_n_type_list: List[Tuple[str, str]] = []
         restart_sys_sym_n_type_list: List[Tuple[str, str]] = []
-        ord_delayed_compare_time = pendulum.DateTime.utcnow() - pendulum.duration(seconds=60)
+        ord_delayed_compare_time = pendulum.DateTime.utcnow().subtract(seconds=60)
         chore_list: List[NewChore]
         with BasketBook.manage_chores_lock:
-            for sys_symbol, chore_list in self.managed_chores_by_symbol.items():
-                if chore_list is None or len(chore_list) <= 0:
+            # Iterate over of copy of keys to allow safe modification during iteration
+            for sys_symbol in list(self.managed_chores_by_symbol.keys()):
+                chore_list = self.managed_chores_by_symbol.get(sys_symbol)
+                if not chore_list:
                     remove_sys_sym_n_type_list.append((sys_symbol, self.system_symbol_type))
                     continue  # nothing to do for this symbol
+
                 self.drop_dup_older_chores(chore_list)  # retain the latest change - drop all else
                 self.check_n_place_cancel_chore(chore_list)
                 symbol_cache: SymbolCache | None
                 symbol_cache = self.get_symbol_cache_cont(sys_symbol)
                 if symbol_cache is None or symbol_cache.so is None:
-                    delayed_chore_list = [chore for chore in chore_list if
-                                          chore.ord_entry_time < ord_delayed_compare_time]
-                    if delayed_chore_list is None or 0 == len(delayed_chore_list):
-                        pass
-                    else:
-                        md_retry_count: int | None = self.sys_symbol_to_md_retry_count.get(sys_symbol)
-                        if md_retry_count is None:
-                            md_retry_count = 0
-                            self.sys_symbol_to_md_retry_count[sys_symbol] = 0
+                    delayed_chore_list = [chore for chore in chore_list if chore.ord_entry_time < ord_delayed_compare_time]
+                    if delayed_chore_list:
+                        md_retry_count: int | None = self.sys_symbol_to_md_retry_count.get(sys_symbol, 0)
                         if md_retry_count > self.max_md_retry_count:
                             logging.error(f"None or missing so in {symbol_cache=} for chores triggered over 120 sec ago"
                                           f" for {sys_symbol=} - re-trigger market data failed; "
@@ -1175,7 +1295,8 @@ class BasketBook(BaseBook):
                             md_elapsed_duration: int | None = None
                             if md_trigger_time is not None:
                                 md_elapsed_duration = (DateTime.utcnow() - md_trigger_time).seconds
-                            # else - md not running for symbol
+
+                            # Restart MD if no trigger time or enough time has elapsed
                             if md_elapsed_duration is None or md_elapsed_duration > self.md_trigger_wait_sec:
                                 md_retry_count += 1
                                 self.sys_symbol_to_md_retry_count[sys_symbol] = md_retry_count
@@ -1187,44 +1308,57 @@ class BasketBook(BaseBook):
                                 logging.debug(f"ignored re-trigger market data for {sys_symbol=}, "
                                               f"{md_elapsed_duration=} < {self.md_trigger_wait_sec=}")
 
-                    if self.is_stabilization_period_past() and self.market.is_uat_or_bartering_time():
+                    if self.is_stabilization_period_past() and market.is_uat_or_bartering_time():
                         next_cycle_not_fast = False  # check again quicker - till the cache is ready
                     continue  # cache not ready for this symbol yet
 
-                # if we are here - cache is ready
+                # Track chores to be removed after processing
                 chore: NewChore
                 remove_chore_list: List[NewChore] = []
-                # now chore list is clean to process
-                for idx, chore in enumerate(chore_list):
+
+                # Process each chore
+                for chore in chore_list:
                     ret = CallerLoopReturns.REDO_CONTINUE
                     while ret == CallerLoopReturns.REDO_CONTINUE:
                         ret = self.manage_chore(chore, chore_limits, remove_chore_list, symbol_cache,
                                                 sys_symbol_n_new_submit_chore_list, sys_symbol, is_algo)
+                    if ret == CallerLoopReturns.BREAK:
+                        break  # Honor the BREAK signal if returned
 
+                # Remove processed chores from the list
                 for chore in remove_chore_list:
-                    chore_list.remove(chore)  # chore list is from managed_chores_by_symbol: remove is impacting that
-                    self.update_chore_in_db_n_cache(chore)
-                    if len(chore_list) == 0:  # removing symbol itself from dict - no more chores in list
-                        remove_sys_sym_n_type_list.append((sys_symbol, self.system_symbol_type))
+                    if chore in chore_list:
+                        chore_list.remove(chore)  # chore list is from managed_chores_by_symbol: remove is impacting that
+                        self.update_chore_in_db_n_cache(chore)
 
-            # dropping symbol altogether - stop corresponding market data and delete it from managed_chores_by_symbol
-            if len(remove_sys_sym_n_type_list) > 0:
+                # If no chores remain for this symbol, mark for removal
+                if not chore_list:  # removing symbol itself from dict - no more chores in list
+                    remove_sys_sym_n_type_list.append((sys_symbol, self.system_symbol_type))
+
+            # Process symbol removals and restarts
+            if remove_sys_sym_n_type_list:
+                # stop corresponding market data and delete it from managed_chores_by_symbol
                 self.md_streaming_mgr.force_stop_md_for_symbols(remove_sys_sym_n_type_list)
-            if len(restart_sys_sym_n_type_list) > 0:
-                self.md_streaming_mgr.restart_md_for_symbols(restart_sys_sym_n_type_list)
-                for sys_symbol, _ in restart_sys_sym_n_type_list:
-                    self.sys_symbol_to_md_trigger_time_dict[sys_symbol] = DateTime.utcnow()
-            for sys_symbol, _ in remove_sys_sym_n_type_list:
-                del self.managed_chores_by_symbol[sys_symbol]
-                del self.sys_symbol_to_md_trigger_time_dict[sys_symbol]
-            if len(remove_sys_sym_n_type_list) > 0:
+                for sys_symbol, _ in remove_sys_sym_n_type_list:
+                    self.managed_chores_by_symbol.pop(sys_symbol, None)
+                    self.sys_symbol_to_md_trigger_time_dict.pop(sys_symbol, None)
+                    self.sys_symbol_to_md_retry_count.pop(sys_symbol, None)
+                    logging.debug(f"Cleaned up resources for symbol: {sys_symbol}")
+
                 logging.warning(f"dropped symbols from management and stopped corresponding market data: "
                                 f"{remove_sys_sym_n_type_list}")
 
+            if restart_sys_sym_n_type_list:
+                self.md_streaming_mgr.restart_md_for_symbols(restart_sys_sym_n_type_list)
+                for sys_symbol, _ in restart_sys_sym_n_type_list:
+                    # Always update trigger time to avoid stale data
+                    self.sys_symbol_to_md_trigger_time_dict[sys_symbol] = DateTime.utcnow()
+
+            # Add new chores to management
             for sys_symbol, chore in sys_symbol_n_new_submit_chore_list:
                 self.add_chore_to_managed_chores_by_symbol(sys_symbol, chore)
 
-            return next_cycle_not_fast
+        return next_cycle_not_fast
 
     def run(self):
         while True:

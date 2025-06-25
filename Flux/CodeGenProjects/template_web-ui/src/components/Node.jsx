@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { Box, Tooltip } from '@mui/material';
 import { capitalizeFirstLetter } from '../utils';
-import { HelpOutline, HelpSharp, LiveHelp, NotListedLocationOutlined, RemoveCircle } from '@mui/icons-material';
+import { HelpOutline, HelpSharp, LiveHelp, RemoveCircle, FilterAlt, FilterAltOff } from '@mui/icons-material';
 import { Icon } from './Icon';
 import NodeField from './NodeField';
 import PropTypes from 'prop-types';
@@ -10,7 +10,7 @@ import { MODES } from '../constants';
 import { useTheme } from '@emotion/react';
 
 const Node = (props) => {
-    const theme = useTheme(); 
+    const theme = useTheme();
     const rootRef = useRef(null);
     const glowTimerIdRef = useRef(null);
 
@@ -23,7 +23,7 @@ const Node = (props) => {
         nodeClass = classes.modified;
     }
 
-    let nodeTitleColor = theme.palette.mode === "dark" ? theme.palette.common.white:theme.palette.common.black;
+    let nodeTitleColor = theme.palette.mode === "dark" ? theme.palette.common.white : theme.palette.common.black;
     if (props.data.nameColor) {
         let nameColor = props.data.nameColor.toLowerCase();
         nodeTitleColor = theme.palette.text[nameColor];
@@ -59,20 +59,39 @@ const Node = (props) => {
         };
     }, [props.triggerGlowForXPath, props.data, classes.newlyAddedGlow]);
 
+    let FilterIcon = FilterAltOff;
+    let filterColor = 'default';
+    if (props.data.quickFilter && props.data.quickFilter[props.data.key]) {
+        FilterIcon = FilterAlt;
+        filterColor = 'info';
+    }
+
+    if (props.data.data_invisible) return;
+
+    if (props.data.isQuickFilterView && !props.data.quickFilter?.[props.data.key]) return;
+
     return (
         <Box className={classes.container} ref={rootRef}>
             {/* <span className={classes.dash}>-</span> */}
             <Box className={classes.node_container} data-xpath={props.data.xpath} data-dataxpath={props.data.dataxpath}>
                 {props.data.key && (
                     <div className={`${classes.node} ${nodeClass}`}>
-                        <span className={classes.node_title} style={{color: nodeTitleColor}}>{props.data.title ? props.data.title : props.data.name}</span>
+                        <span className={classes.node_title} style={{ color: nodeTitleColor }}>{props.data.title ? props.data.title : props.data.name}</span>
                         {props.data.showDataType && <span className={classes.type}>{capitalizeFirstLetter(props.data.type)}</span>}
                         <div style={{ minWidth: '20px', display: 'flex', alignItems: 'center', marginLeft: '10px' }}>
-                            {props.data.help && <Tooltip title={props.data.help} disableInteractive><HelpOutline sx={{cursor: 'pointer'}} fontSize='small' /></Tooltip>}
+                            {props.data.help && <Tooltip title={props.data.help} disableInteractive><HelpOutline sx={{ cursor: 'pointer' }} fontSize='small' /></Tooltip>}
                         </div>
                     </div>
                 )}
                 <NodeField data={props.data} />
+                {props.data.quickFilter && (
+                    <Icon
+                        title='quick filter'
+                        onClick={() => props.data.onQuickFilterChange(props.data.key, !props.data.quickFilter[props.data.key])}
+                    >
+                        <FilterIcon fontSize='small' color={filterColor} />
+                    </Icon>
+                )}
             </Box>
             {props.data.mode === MODES.EDIT && props.data.key == undefined && !props.data['data-remove'] && (
                 <Box className={classes.menu}>

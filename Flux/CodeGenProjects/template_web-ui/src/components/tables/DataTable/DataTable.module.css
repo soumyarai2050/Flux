@@ -1,7 +1,20 @@
+.container {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}
+
+.no_scroll {
+  overflow: hidden;
+}
+
 .dataTableWrapper {
+  /* Take remaining space */
+  flex: 1;
+  /* Important for flex child */
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  height: 100%;
 }
 
 .tableContainerWrapper {
@@ -15,7 +28,6 @@
   flex: 1;
   overflow: auto;
 }
-
 
 .table {
   /* for any future table-specific styles */

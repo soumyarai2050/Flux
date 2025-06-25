@@ -476,5 +476,6 @@ class BarterSimulator(BarteringLinkBase):
         """
         returns chore_status (ChoreStatusType), any_chore_text, filled-Qty, chore-px and chore-qty as seen by bartering
         link, caller may use these for reconciliation
+        returns None if chore not found by Bartering Link
         """
         raise NotImplementedError

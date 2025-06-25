@@ -80,6 +80,36 @@ export function absoluteSortOverrideChangeHandler(config, updatedAbsoluteSortOve
   layoutDataChangeHandler(config, layoutDataUpdateDict);
 }
 
+export function quickFiltersChangeHandler(config, updatedQuickFilters) {
+  const layoutDataUpdateDict = { quick_filters: updatedQuickFilters };
+  layoutDataChangeHandler(config, layoutDataUpdateDict);
+}
+
+export function stickyHeaderToggleHandler(config, updatedStickyHeader) {
+  const layoutDataUpdateDict = { sticky_header: updatedStickyHeader };
+  layoutDataChangeHandler(config, layoutDataUpdateDict);
+}
+
+export function commonKeyCollapseToggleHandler(config, updatedCollapse) {
+  const layoutDataUpdateDict = { common_key_collapse: updatedCollapse };
+  layoutDataChangeHandler(config, layoutDataUpdateDict);
+}
+
+export function frozenColumnsChangeHandler(config, updatedFrozenColumns) {
+  const layoutDataUpdateDict = { frozen_columns: updatedFrozenColumns };
+  layoutDataChangeHandler(config, layoutDataUpdateDict);
+}
+
+export function columnNameOverrideHandler(config, updatedColumnNameOverride) {
+  const layoutDataUpdateDict = { column_name_override_override: updatedColumnNameOverride };
+  layoutDataChangeHandler(config, layoutDataUpdateDict);
+}
+
+export function highlightUpdateOverrideHandler(config, updatedHighlightUpdateOverride) {
+  const layoutDataUpdateDict = { highlight_update_override: updatedHighlightUpdateOverride };
+  layoutDataChangeHandler(config, layoutDataUpdateDict);
+}
+
 export function joinSortChangeHandler(config, updatedJoinSort) {
   const layoutOptionUpdateDict = { join_sort: updatedJoinSort };
   layoutOptionChangeHandler(config, layoutOptionUpdateDict);

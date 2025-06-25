@@ -1,13 +1,15 @@
 .card_header {
     min-height: 40px;
+    height: 40px;
     display: flex;
     align-items: center;
+    flex-shrink: 0;
     padding: 0 10px;
     justify-content: space-between;
 }
 
 .card_header span button svg path {
-    fill: white !important;
+    /* fill: white !important; */
 }
 
 .card_title {
