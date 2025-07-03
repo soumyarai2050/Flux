@@ -91,9 +91,14 @@ if __name__ == "__main__":
                                                              "PluginJsLayout", env_var_dict)
     call_plugin_with_multiple_projects()
 
-    env_var_dict["PLUGIN_FILE_NAME"] = "model_component_loader_gen_plugin.py"
-    env_var_dict["TEMPLATE_FILE_NAME"] = "model_component_loder_temp.txt"
+    env_var_dict["PLUGIN_FILE_NAME"] = "slice_map_gen_plugin.py"
+    env_var_dict["TEMPLATE_FILE_NAME"] = "slice_map_temp.txt"
     code_gen_engine_env_manager.init_env_and_update_sys_path("template_project_name", "_",
                                                              "PluginJsLayout", env_var_dict)
     call_plugin_with_multiple_projects()
 
+    env_var_dict["PLUGIN_FILE_NAME"] = "component_map_gen_plugin.py"
+    env_var_dict["TEMPLATE_FILE_NAME"] = "component_map_temp.txt"
+    code_gen_engine_env_manager.init_env_and_update_sys_path("template_project_name", "_",
+                                                             "PluginJsLayout", env_var_dict)
+    call_plugin_with_multiple_projects()

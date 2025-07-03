@@ -9,11 +9,15 @@ import { ErrorBoundary as Boundary } from 'react-error-boundary';
 import { ErrorOutline } from '@mui/icons-material';
 
 /**
- * Fallback component to display when an error occurs.
- * @param {Object} error - The error object.
- * @param {Function} onReset - Function to reset the error boundary.
+ * @function ErrorFallback
+ * @description Fallback component to display when an error occurs within an ErrorBoundary.
+ * It shows a user-friendly message, the error details, and a retry button.
+ * @param {object} props - The properties for the component.
+ * @param {Error} props.error - The error object caught by the ErrorBoundary.
+ * @param {Function} props.resetErrorBoundary - Function provided by react-error-boundary to reset the error state.
+ * @returns {React.ReactElement} The rendered error fallback UI.
  */
-function ErrorFallback({ error, onReset }) {
+function ErrorFallback({ error, resetErrorBoundary }) {
     // Log the error for debugging or external monitoring
     console.error('ErrorBoundary caught an error:', error);
 
@@ -36,7 +40,7 @@ function ErrorFallback({ error, onReset }) {
                     )}
                 </Alert>
 
-                <Button variant="contained" color="primary" onClick={onReset}>
+                <Button variant="contained" color="primary" onClick={resetErrorBoundary}>
                     Retry
                 </Button>
             </Stack>
@@ -51,14 +55,22 @@ ErrorFallback.propTypes = {
 };
 
 /**
- * ErrorBoundary component to wrap around application parts prone to errors.
- * @param {Object} props - Component props.
- * @param {React.ReactNode} props.children - Child components to be wrapped.
+ * @function ErrorBoundary
+ * @description A higher-order component that catches JavaScript errors anywhere in its child component tree,
+ * logs those errors, and displays a fallback UI instead of the crashed component tree.
+ * It uses `react-error-boundary` internally.
+ * @param {object} props - Component props.
+ * @param {React.ReactNode} props.children - Child components to be wrapped by the error boundary.
+ * @returns {React.ReactElement} The wrapped children or the error fallback UI.
  */
 const ErrorBoundary = ({ children }) => {
+    /**
+     * Handles the reset of the error boundary by reloading the entire window.
+     * This is a common strategy for top-level error boundaries to ensure a clean state.
+     */
     const handleReset = () => {
         window.location.reload();
-    }
+    };
 
     return (
         <Boundary
@@ -67,8 +79,8 @@ const ErrorBoundary = ({ children }) => {
         >
             {children}
         </Boundary>
-    )
-}
+    );
+};
 
 // Prop validation for ErrorBoundary
 ErrorBoundary.propTypes = {

@@ -11,6 +11,7 @@ from enum import auto
 from pathlib import PurePath
 import os
 import pendulum
+import posix_ipc
 
 # 3rd party imports
 from fastapi_restful.enums import StrEnum
@@ -34,10 +35,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.app.basket_book_h
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import (
     SecurityRecord)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book import BaseBook
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.symbol_cache import (
-    SymbolCache)
-# below import is required to symbol_cache to work - SymbolCacheContainer must import from base_plan_cache
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_plan_cache import SymbolCacheContainer
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.app.mobile_book_shared_memory_consumer import SymbolCacheContainer, SymbolCache
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.md_streaming_manager import MDStreamingManager
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.generated.ORMModel.basket_book_service_model_imports import *
@@ -46,7 +44,7 @@ from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_basket_book_core_ms
 from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_post_book_core_msgspec_model import *
 from Flux.CodeGenProjects.AddressBook.ORMModel.phone_book_n_street_book_core_msgspec_model import *
 from Flux.CodeGenProjects.AddressBook.ORMModel.dept_book_n_mobile_book_n_street_book_n_basket_book_core_msgspec_model import *
-
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.app.algo_handlers import AlgoHandler
 
 class CallerLoopReturns(StrEnum):  # used to manage loops in caller via called return's
     BREAK = auto()  # break caller loop
@@ -68,7 +66,7 @@ class BasketBook(BaseBook):
 
     @classmethod
     def initialize_underlying_http_callables(cls):
-        from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.generated.FastApi.basket_book_service_http_msgspec_routes import (
+        from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.generated.FastApi.basket_book_service_http_routes_imports import (
             underlying_read_basket_chore_http, underlying_partial_update_basket_chore_http)
         cls.underlying_partial_update_basket_chore_http = underlying_partial_update_basket_chore_http
         cls.underlying_read_basket_chore_http = underlying_read_basket_chore_http
@@ -86,8 +84,12 @@ class BasketBook(BaseBook):
         self.system_symbol_type: str = "ticker"
         self.algo_exchange: str = "TRADING_EXCHANGE"
         self.usd_fx = None
+        self.basket_book_semaphore_path = "BO_sem"
+        self.basket_book_semaphore = posix_ipc.Semaphore(self.basket_book_semaphore_path,
+                                                             flags=posix_ipc.O_CREAT, initial_value=0)
         self.md_streaming_mgr: MDStreamingManager = MDStreamingManager(CURRENT_PROJECT_DIR, be_host, be_port,
-                                                                       "basket_book")
+                                                                       "basket_book",
+                                                                       self.basket_book_semaphore_path)
         self.md_streaming_mgr.static_data = self.plan_cache.static_data
         self.sys_symbol_to_md_trigger_time_dict: Dict[str, DateTime] = {}
         self.sys_symbol_to_md_retry_count: Dict[str, int] = {}
@@ -98,7 +100,7 @@ class BasketBook(BaseBook):
         thread: Thread = Thread(name="basket_chore_queue", target=self.handle_non_cached_basket_chore_from_queue,
                                 daemon=True)
         thread.start()
-        SymbolCacheContainer.release_semaphore()   # releasing it once so that if is recovery, data can be loaded
+        self.basket_book_semaphore.release()  # releasing it once so that if is recovery, data can be loaded
         BasketBook.initialize_underlying_http_callables()
 
     @property
@@ -250,7 +252,7 @@ class BasketBook(BaseBook):
         # now add to managed_chores_by_symbol
         self.add_chore_to_managed_chores_by_symbol(system_symbol, new_chore_obj)
         # releasing semaphore to get added chores executed
-        SymbolCacheContainer.release_semaphore()
+        self.basket_book_semaphore.release()
         return is_enriched
 
     def add_chore_to_managed_chores_by_symbol(self, system_symbol: str, in_chore_obj: NewChore):
@@ -261,6 +263,13 @@ class BasketBook(BaseBook):
                 self.managed_chores_by_symbol[system_symbol] = [in_chore_obj]
 
     def get_symbol_cache_cont(self, system_symbol: str, side: Side | None = None) -> SymbolCache | None:
+        shared_memory_found = SymbolCacheContainer.check_if_shared_memory_exists(system_symbol)
+        if not shared_memory_found:
+            return None
+        else:
+            # updating symbol cache using shm
+            SymbolCacheContainer.update_md_cache_from_shared_memory(system_symbol)
+
         # we expect md cache to be present if reached here
         symbol_cache: SymbolCache
         symbol_cache = SymbolCacheContainer.get_symbol_cache(system_symbol)
@@ -339,9 +348,9 @@ class BasketBook(BaseBook):
         # failed or not - chore posting is done - we'll not support retry until after chore snapshot integration
         new_chore_obj.chore_submit_state = ChoreSubmitType.ORDER_SUBMIT_DONE
         if res:
-            err_, new_chore_obj.chore_id = self.get_chore_id_from_ret_id_or_err_desc(ret_id_or_err_desc)
-            err_ = capped_by_size_text(err_)
-            new_chore_obj.text = err_
+            msg_, new_chore_obj.chore_id = self.get_chore_id_from_ret_id_or_err_desc(ret_id_or_err_desc)
+            msg_ = capped_by_size_text(msg_)
+            new_chore_obj.text = msg_
             self.id_to_sec_pos_extended_dict[new_chore_obj.id] = sec_pos_extended
         else:
             ret_id_or_err_desc = capped_by_size_text(ret_id_or_err_desc)
@@ -358,7 +367,7 @@ class BasketBook(BaseBook):
         usd_notional: float = new_chore_obj.usd_px * new_chore_obj.qty
         checks_passed: int = ChoreControl.ORDER_CONTROL_SUCCESS
         if market.is_not_uat_nor_bartering_time():
-            return
+            return None
         else:
             # no contact checks
             checks_passed |= self.check_algo_chore_limits(chore_limits, new_chore_obj, usd_notional,
@@ -372,7 +381,7 @@ class BasketBook(BaseBook):
             new_chore_obj.text = err_str_
             new_chore_obj.chore_submit_state = ChoreSubmitType.ORDER_SUBMIT_RETRY
             logging.error(err_str_)
-            return
+            return None
         # else - chore checks passed
 
         # we don't use extract availability list here - assumption 1 chore, maps to 1 position
@@ -393,13 +402,16 @@ class BasketBook(BaseBook):
             new_chore_obj.text = err_str_
             new_chore_obj.chore_submit_state = ChoreSubmitType.ORDER_SUBMIT_RETRY
             logging.error(err_str_)
-            return
+            return None
         else:
             logging.info(f"extracted position for {new_chore_obj=}, extracted {sec_pos_extended=}")
 
-        res = self.place_checked_new_chore(new_chore_obj, sec_pos_extended)
-        if not res:
-            pos_cache.return_availability(new_chore_obj.ticker, sec_pos_extended)
+        if AlgoHandler.should_tigger_chore(new_chore_obj, symbol_cache):
+            res = self.place_checked_new_chore(new_chore_obj, sec_pos_extended)
+            if not res:
+                pos_cache.return_availability(new_chore_obj.security.sec_id, sec_pos_extended)
+        # else not required: not placing chore if market not suiting this chore
+        return None
 
     @staticmethod
     def get_chore_id_from_ret_id_or_err_desc(ret_id_or_err_desc: str) -> Tuple[str | None, any]:
@@ -578,8 +590,8 @@ class BasketBook(BaseBook):
     async def update_chore_in_db_n_cache_(self, chore: NewChore, processing_level: int = 1):
         # update processed new chore cache dict
         self.plan_cache.id_to_new_chore_dict[chore.id] = chore
-        basket_chore: BasketChore = BasketChore(id=self.plan_cache.basket_id, new_chores=[chore],
-                                                processing_level=processing_level)
+        basket_chore: BasketChore = BasketChore.from_kwargs(_id=self.plan_cache.basket_id, new_chores=[chore],
+                                                            processing_level=processing_level)
         basket_chore_json = basket_chore.to_json_dict(exclude_none=True)
         await BasketBook.underlying_partial_update_basket_chore_http(basket_chore_json)
 
@@ -665,20 +677,20 @@ class BasketBook(BaseBook):
                     # partial update forces recovery of chores from DB and applies any correction chores
                 if len(updated_recovered_new_chores) == 0:
                     self.plan_cache.is_recovered_n_reconciled = True
-                    partial_updated_basket_chore: BasketChore = BasketChore(
+                    partial_updated_basket_chore: BasketChore = BasketChore.from_kwargs(
                         id=self.plan_cache.basket_id, update_id=recovered_baskets[0].update_id + 1)
                 else:
                     # until self.is_recovered_n_reconciled == True, only update update_id=-1 is handled - rest
                     # throw exception in pre-call. update_id=-1 implies NO-OP in self._handle_basket_chore call.
                     # this allows for persist first as recovered / reconciled [then process]
-                    partial_updated_basket_chore: BasketChore = BasketChore(
+                    partial_updated_basket_chore: BasketChore = BasketChore.from_kwargs(
                         id=self.plan_cache.basket_id, processing_level=1, new_chores=updated_recovered_new_chores)
                     await BasketBook.underlying_partial_update_basket_chore_http(
                         partial_updated_basket_chore.to_json_dict(exclude_none=True))
                     # now allow standard basket chore processing recovered / reconciled is persisted
                     self.plan_cache.is_recovered_n_reconciled = True
                     # just new update_id is fine
-                    partial_updated_basket_chore: BasketChore = BasketChore(
+                    partial_updated_basket_chore: BasketChore = BasketChore.from_kwargs(
                         id=self.plan_cache.basket_id, processing_level=0)
 
                 await BasketBook.underlying_partial_update_basket_chore_http(
@@ -1282,7 +1294,9 @@ class BasketBook(BaseBook):
                 self.check_n_place_cancel_chore(chore_list)
                 symbol_cache: SymbolCache | None
                 symbol_cache = self.get_symbol_cache_cont(sys_symbol)
-                if symbol_cache is None or symbol_cache.so is None:
+                if (symbol_cache is None or
+                        symbol_cache.top_of_book is None or symbol_cache.top_of_book.last_update_date_time is None or
+                        symbol_cache.so is None or symbol_cache.so.last_update_date_time is None):
                     delayed_chore_list = [chore for chore in chore_list if chore.ord_entry_time < ord_delayed_compare_time]
                     if delayed_chore_list:
                         md_retry_count: int | None = self.sys_symbol_to_md_retry_count.get(sys_symbol, 0)
@@ -1362,7 +1376,7 @@ class BasketBook(BaseBook):
 
     def run(self):
         while True:
-            SymbolCacheContainer.semaphore.acquire()
+            self.basket_book_semaphore.acquire()
             logging.debug("basket_book signaled")
 
             self.trigger_or_manage_algo_chores()

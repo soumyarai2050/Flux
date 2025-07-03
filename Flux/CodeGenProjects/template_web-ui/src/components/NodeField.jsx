@@ -5,7 +5,7 @@ import { Select, MenuItem, TextField, Autocomplete, Checkbox, InputAdornment, To
 import { Error, Clear } from '@mui/icons-material';
 import PropTypes from 'prop-types';
 import { NumericFormat } from 'react-number-format';
-import { getColorTypeFromValue, getValueFromReduxStoreFromXpath, isAllowedNumericValue, floatToInt, validateConstraints, getReducerArrrayFromCollections, capitalizeCamelCase, getDateTimeFromInt } from '../utils';
+import { getColorTypeFromValue, getValueFromReduxStoreFromXpath, isAllowedNumericValue, floatToInt, validateConstraints, getReducerArrayFromCollections, capitalizeCamelCase, getDateTimeFromInt } from '../utils/index.js';
 import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import classes from './NodeField.module.css';
@@ -18,9 +18,9 @@ dayjs.extend(timezone);
 const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 const NodeField = (props) => {
-     
+
     // const state = useSelector(state => state);
-    const reducerArray = useMemo(() => getReducerArrrayFromCollections([props.data]), [props.data]);
+    const reducerArray = useMemo(() => getReducerArrayFromCollections([props.data]), [props.data]);
     const reducerDict = useSelector(state => {
         const selected = {};
         reducerArray.forEach(reducerName => {
@@ -42,10 +42,15 @@ const NodeField = (props) => {
     const cursorPos = useRef(null);
     const autocompleteRef = useRef(null);
     const onTextChangeRef = useRef(props.data.onTextChange);
+    const onSelectItemChangeRef = useRef(props.data.onSelectItemChange);
 
     useEffect(() => {
         onTextChangeRef.current = props.data.onTextChange;
     }, [props.data.onTextChange])
+
+    useEffect(() => {
+        onSelectItemChangeRef.current = props.data.onSelectItemChange;
+    }, [props.data.onSelectItemChange])
 
     useEffect(() => {
         setInputValue(props.data.value);
@@ -69,7 +74,7 @@ const NodeField = (props) => {
     const debouncedTransform = useRef(
         debounce((e, type, xpath, value, dataxpath, validationRes) => {
             onTextChangeRef.current(e, type, xpath, value, dataxpath, validationRes);
-        }, 300)
+        }, 800)
     ).current;
 
     const handleBlur = (e) => {
@@ -130,8 +135,6 @@ const NodeField = (props) => {
     } else if (props.data.dataStatus === 'modified') {
         colorClass = `${colorClass} ${classes.modified_node_field}`.trim();
     }
-    // dataStatus === 'deleted' might not be relevant for NodeField as deleted nodes are typically not rendered as fields.
-    // If they are (e.g. grayed out), you would add a class for it here.
 
     let nodeFieldRemove = props.data['data-remove'] ? classes.remove : '';
     const placeholder = props.data.placeholder ? props.data.placeholder : !props.data.required ? 'optional' : null;
@@ -195,6 +198,21 @@ const NodeField = (props) => {
                             }}
                         />
                     )
+                }}
+                componentsProps={{
+                    popper: {
+                        modifiers: [
+                            {
+                                name: 'setWidth',
+                                enabled: true,
+                                phase: 'beforeWrite',
+                                requires: ['computeStyles'],
+                                fn({ state }) {
+                                    state.styles.popper.width = 'auto';
+                                },
+                            },
+                        ],
+                    },
                 }}
             />
         )
@@ -260,7 +278,7 @@ const NodeField = (props) => {
                 error={validationError.current !== null}
                 required={props.data.required}
                 disabled={disabled}>
-        
+
                 {props.data.dropdowndataset && props.data.dropdowndataset.map((val) => {
                     return <MenuItem key={val} value={val}>
                         {val}

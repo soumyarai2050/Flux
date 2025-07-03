@@ -22,6 +22,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.barter_simulator import (
     BarterSimulator, BarteringLinkBase)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.log_barter_simulator import LogBarterSimulator
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.ib_bartering_link import IBBarteringLink
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book_helper import (
      create_symbol_overview_pre_helper, update_symbol_overview_pre_helper,
      partial_update_symbol_overview_pre_helper)
@@ -45,8 +46,9 @@ from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_basket_book_core_ms
 from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_post_book_core_msgspec_model import *
 from Flux.CodeGenProjects.AddressBook.ORMModel.phone_book_n_street_book_core_msgspec_model import *
 from Flux.CodeGenProjects.AddressBook.ORMModel.dept_book_n_mobile_book_n_street_book_n_basket_book_core_msgspec_model import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.symbol_cache import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.app.mobile_book_shared_memory_consumer import (
     SymbolCacheContainer, SymbolCache)
+
 
 class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCallbackBaseNativeOverride,
                                                             BasketBookServiceRoutesCallback):
@@ -58,6 +60,7 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
     underlying_get_top_of_book_from_symbol_query_http: Callable[..., Any] | None = None
     underlying_create_chore_ledger_http: Callable[..., Any] | None = None
     underlying_create_deals_ledger_http: Callable[..., Any] | None = None
+    underlying_read_chore_snapshot_http: Callable[..., Any] | None = None
     underlying_read_basket_chore_http: Callable[..., Any] | None = None
     underlying_create_basket_chore_http: Callable[..., Any] | None = None
     underlying_partial_update_basket_chore_http: Callable[..., Any] | None = None
@@ -90,16 +93,17 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
 
     @classmethod
     def initialize_underlying_http_callables(cls):
-        from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.generated.FastApi.basket_book_service_http_msgspec_routes import (
+        from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.generated.FastApi.basket_book_service_http_routes_imports import (
             underlying_read_symbol_overview_http, underlying_read_top_of_book_http,
             underlying_get_symbol_overview_from_symbol_query_http,
             underlying_get_top_of_book_from_symbol_query_http,
             underlying_create_deals_ledger_http, underlying_create_chore_ledger_http,
             residual_compute_shared_lock, ledger_shared_lock, underlying_create_chore_snapshot_http,
-            get_underlying_account_cumulative_fill_qty_query_http, underlying_update_chore_snapshot_http,
+            underlying_get_underlying_account_cumulative_fill_qty_query_http, underlying_update_chore_snapshot_http,
             underlying_read_chore_ledger_http, underlying_read_symbol_overview_by_id_http,
             underlying_get_symbol_side_underlying_account_cumulative_fill_qty_query_http,
-            underlying_read_deals_ledger_http,
+            underlying_read_deals_ledger_http, underlying_read_top_of_book_http,
+            underlying_read_chore_snapshot_http, underlying_partial_update_chore_snapshot_http,
             underlying_partial_update_basket_chore_http, underlying_read_basket_chore_http,
             underlying_create_basket_chore_http)
         cls.residual_compute_shared_lock = residual_compute_shared_lock
@@ -111,7 +115,7 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         cls.underlying_read_symbol_overview_by_id_http = underlying_read_symbol_overview_by_id_http
         cls.underlying_create_chore_ledger_http = underlying_create_chore_ledger_http
         cls.underlying_create_chore_snapshot_http = underlying_create_chore_snapshot_http
-        cls.get_underlying_account_cumulative_fill_qty_query_http = get_underlying_account_cumulative_fill_qty_query_http
+        cls.underlying_get_underlying_account_cumulative_fill_qty_query_http = underlying_get_underlying_account_cumulative_fill_qty_query_http
         cls.underlying_update_chore_snapshot_http = underlying_update_chore_snapshot_http
         cls.underlying_read_chore_ledger_http = underlying_read_chore_ledger_http
         cls.underlying_read_symbol_overview_by_id_http = underlying_read_symbol_overview_by_id_http
@@ -119,6 +123,8 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         cls.underlying_read_deals_ledger_http = underlying_read_deals_ledger_http
         cls.underlying_read_top_of_book_http = underlying_read_top_of_book_http
         cls.underlying_create_deals_ledger_http = underlying_create_deals_ledger_http
+        cls.underlying_read_chore_snapshot_http = underlying_read_chore_snapshot_http
+        cls.underlying_partial_update_chore_snapshot_http = underlying_partial_update_chore_snapshot_http
         cls.underlying_partial_update_basket_chore_http = underlying_partial_update_basket_chore_http
         cls.underlying_read_basket_chore_http = underlying_read_basket_chore_http
         cls.underlying_create_basket_chore_http = underlying_create_basket_chore_http
@@ -139,6 +145,7 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             error_prefix=error_prefix + "static_data_service failed, exception: ")
         service_up_no_error_retry_count = 3  # minimum retries that shouldn't raise error on UI dashboard
         should_sleep: bool = False
+        recovery_done = False
         while True:
             try:
                 if should_sleep:
@@ -158,8 +165,7 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                 res = future.result()
                                 if res:  # recovery case
                                     self.bartering_data_manager.handle_basket_chore_get_all_ws_(res[0])
-                                else:  # no basket chore exists to recover
-                                    self.bartering_data_manager.handle_basket_chore_get_all_ws_(None)
+                                # else not required: no basket chore exists to recover
                             except Exception as exp:
                                 logging.exception(f"underlying_read_basket_chore_http failed, exception: {exp}")
                                 self.service_ready = False
@@ -237,6 +243,11 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                                 logging.warning(f"street_book_thread is not alive anymore - returning from "
                                                 f"_app_launch_pre_thread_func for executor {self.port=}")
                                 return
+
+                            if not recovery_done:
+                                # recover cache for bartering_link
+                                self.handle_bartering_link_cache_recovery()
+                                recovery_done = True
 
                         last_modified_timestamp = os.path.getmtime(config_yaml_path)
                         if self.config_yaml_last_modified_timestamp != last_modified_timestamp:
@@ -316,6 +327,37 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         except Exception as e:
             logging.exception(f"start_mongo_streamer failed with exception: {e}")
 
+    async def _handle_bartering_link_cache_recovery(self):
+        # updating chore_ledgers
+        chore_ledgers: List[ChoreLedger] = \
+            await BasketBookServiceRoutesCallbackBaseNativeOverride.underlying_read_chore_ledger_http()
+        for chore_ledger in chore_ledgers:
+            self.bartering_data_manager.handle_recovery_chore_ledger(chore_ledger)
+
+        # updating chore_snapshots
+        chore_snapshots: List[ChoreSnapshot] = \
+            await BasketBookServiceRoutesCallbackBaseNativeOverride.underlying_read_chore_snapshot_http()
+        for chore_snapshot in chore_snapshots:
+            self.bartering_data_manager.handle_chore_snapshot_get_all_ws(chore_snapshot)
+
+        kwargs = {
+            "chore_snapshots": chore_snapshots,
+            "chore_ledger_create_callable": BasketBookServiceRoutesCallbackBaseNativeOverride.underlying_create_chore_ledger_http,
+            "deals_ledger_create_callable": BasketBookServiceRoutesCallbackBaseNativeOverride.underlying_create_deals_ledger_http,
+            "chore_snapshot_patch_callable": BasketBookServiceRoutesCallbackBaseNativeOverride.underlying_partial_update_chore_snapshot_http,
+        }
+        await BasketBook.bartering_link.recover_cache(**kwargs)
+
+    def handle_bartering_link_cache_recovery(self):
+        run_coro = self._handle_bartering_link_cache_recovery()
+        future = asyncio.run_coroutine_threadsafe(run_coro, self.asyncio_loop)
+
+        # block for task to finish
+        try:
+            future.result()
+        except Exception as e:
+            logging.exception(f"_handle_bartering_link_cache_recovery failed for with exception: {e}")
+
     def set_log_simulator_file_name_n_path(self):
         self.simulate_config_yaml_file_path = (
                 CURRENT_PROJECT_DIR / "data" / f"basket_simulate_config.yaml")
@@ -338,6 +380,10 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             BarterSimulator.chore_create_async_callable = (
                 BasketBookServiceRoutesCallbackBaseNativeOverride.underlying_create_chore_ledger_http)
             BarterSimulator.fill_create_async_callable = (
+                BasketBookServiceRoutesCallbackBaseNativeOverride.underlying_create_deals_ledger_http)
+            IBBarteringLink.chore_create_async_callable = (
+                BasketBookServiceRoutesCallbackBaseNativeOverride.underlying_create_chore_ledger_http)
+            IBBarteringLink.fill_create_async_callable = (
                 BasketBookServiceRoutesCallbackBaseNativeOverride.underlying_create_deals_ledger_http)
 
         logging.debug("Triggered server launch pre override")

@@ -10,11 +10,11 @@ import {
 import {
   arrayMove,
 } from '@dnd-kit/sortable';
-import TableHead from '../../TableHead';
+import TableHeader from '../TableHeader';
 import Cell from '../../Cell';
 import styles from './DataTable.module.css';
 import { ClearAll, Save } from '@mui/icons-material';
-import { getDataxpathV2, generateRowTrees } from '../../../utils';
+import { getDataxpathV2, generateRowTrees } from '../../../utils/index.js';
 import { cloneDeep, get, set } from 'lodash';
 import { DB_ID, MODES, DATA_TYPES, MODEL_TYPES } from '../../../constants';
 import { flux_toggle, flux_trigger_strat } from '../../../projectSpecificUtils';
@@ -23,10 +23,10 @@ import { ModelCard, ModelCardHeader, ModelCardContent } from '../../cards';
 import { useSelector } from 'react-redux';
 import DataTree from '../../trees/DataTree/DataTree';
 import Icon from '../../Icon';
-import { useScrollIndicators } from '../../../hooks';
+import { useScrollIndicators, useKeyboardNavigation } from '../../../hooks';
 import TablePaginationControl from '../../TableControls/TablePaginationControl';
 import ScrollIndicators from '../../TableControls/ScrollIndicators';
-// import { useBoundaryScrollDetection } from '../../hooks';
+// import { useBoundaryScrollDetection } from '../../../hooks';
 
 const DataTable = ({
   rows,
@@ -58,7 +58,8 @@ const DataTable = ({
   frozenColumns,
   filters,
   onFiltersChange,
-  uniqueValues
+  uniqueValues,
+  highlightDuration
 }) => {
   const { schema: projectSchema } = useSelector((state) => state.schema);
   const [selectedRows, setSelectedRows] = useState([]);
@@ -125,6 +126,45 @@ const DataTable = ({
     handleLeftScrollClick,
     checkHorizontalScroll,
   } = useScrollIndicators([activeRows, cells]);
+
+  // Define getRowRange function before using it in the hook
+  const getRowRange = (startRowId, endRowId) => {
+    // Get all row IDs from activeRows
+    const allRowIds = activeRows.map(groupedRow => groupedRow[0]['data-id']);
+    const startIndex = allRowIds.indexOf(startRowId);
+    const endIndex = allRowIds.indexOf(endRowId);
+    if (startIndex === -1 || endIndex === -1) {
+      return [endRowId];
+    }
+    const minIndex = Math.min(startIndex, endIndex);
+    const maxIndex = Math.max(startIndex, endIndex);
+    return allRowIds.slice(minIndex, maxIndex + 1);
+  }
+
+  // Use the keyboard navigation hook
+  const { handleKeyDown } = useKeyboardNavigation({
+    mode,
+    activeRows,
+    tableContainerRef,
+    capabilities: {
+      editModeScrolling: true,
+      readModeSelection: true,
+      shiftSelection: true,
+      ctrlShiftSelection: true
+    },
+    callbacks: {
+      onRowSelect: onRowSelect
+    },
+    // DataTable specific state
+    selectedRows,
+    lastSelectedRowId,
+    selectionAnchorId,
+    setSelectedRows,
+    setLastSelectedRowId,
+    setSelectionAnchorId,
+    getRowRange,
+    modelType
+  });
 
   // const handleContextMenuOpen = (e) => {
   //     setContextMenuAnchorEl(e.currentTarget);
@@ -254,19 +294,6 @@ const DataTable = ({
     }
   }
 
-  const getRowRange = (startRowId, endRowId) => {
-    // Get all row IDs from activeRows
-    const allRowIds = activeRows.map(groupedRow => groupedRow[0]['data-id']);
-    const startIndex = allRowIds.indexOf(startRowId);
-    const endIndex = allRowIds.indexOf(endRowId);
-    if (startIndex === -1 || endIndex === -1) {
-      return [endRowId];
-    }
-    const minIndex = Math.min(startIndex, endIndex);
-    const maxIndex = Math.max(startIndex, endIndex);
-    return allRowIds.slice(minIndex, maxIndex + 1);
-  }
-
   const handleRowSelect = (e, rowId) => {
     // row select only allowed in READ mode
     if (mode !== MODES.READ) {
@@ -309,171 +336,7 @@ const DataTable = ({
     }
   }
 
-  const handleKeyDown = (event) => {
-    const isCtrlPressed = event.ctrlKey || event.metaKey;
 
-    // Ctrl+Shift+Up/Down to select to page start/end
-    if (isCtrlPressed && event.shiftKey && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
-      if (mode !== MODES.READ) return;
-      event.preventDefault();
-
-      const allRowIdsOnPage = activeRows.map(groupedRow => groupedRow[0]['data-id']);
-      if (allRowIdsOnPage.length === 0) return;
-
-      // The anchor is the fixed point of the selection. If not set, use the first selected row or the top of the page.
-      const currentAnchorId = selectionAnchorId || (selectedRows.length > 0 ? selectedRows[0] : allRowIdsOnPage[0]);
-      if (!selectionAnchorId) {
-        setSelectionAnchorId(currentAnchorId);
-      }
-
-      let targetRowId;
-      if (event.key === 'ArrowDown') {
-        // Select to the last row on the current page
-        targetRowId = allRowIdsOnPage[allRowIdsOnPage.length - 1];
-      } else { // ArrowUp
-        // Select to the first row on the current page
-        targetRowId = allRowIdsOnPage[0];
-      }
-
-      const newSelectedRange = getRowRange(currentAnchorId, targetRowId);
-      setSelectedRows(newSelectedRange);
-      setLastSelectedRowId(targetRowId); // The new "last selected" is the target at the page boundary
-    }
-    // Original Shift+Arrow logic, now in an else-if block
-    else if (event.shiftKey && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
-      if (mode !== MODES.READ) return;
-
-      event.preventDefault();
-      const allRowIds = activeRows.map(groupedRow => groupedRow[0]['data-id']);
-      if (allRowIds.length === 0) return;
-
-      if (!lastSelectedRowId || !selectionAnchorId) {
-        const firstRowId = allRowIds[0];
-        setSelectedRows([firstRowId]);
-        setLastSelectedRowId(firstRowId);
-        setSelectionAnchorId(firstRowId);
-        return;
-      }
-
-      const currentIndex = allRowIds.indexOf(lastSelectedRowId);
-      if (currentIndex === -1) return;
-
-      let nextIndex = event.key === 'ArrowDown'
-        ? Math.min(currentIndex + 1, allRowIds.length - 1)
-        : Math.max(currentIndex - 1, 0);
-
-      if (nextIndex === currentIndex) return;
-
-      const nextRowId = allRowIds[nextIndex];
-      const newSelectedRange = getRowRange(selectionAnchorId, nextRowId);
-      setSelectedRows(newSelectedRange);
-      setLastSelectedRowId(nextRowId);
-    }
-    // MODIFIED: Original Ctrl+Arrow logic, now in an else-if block
-    else if (isCtrlPressed && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
-      event.preventDefault();
-
-      if (mode === MODES.EDIT) {
-        if (!tableContainerRef.current) return;
-        const container = tableContainerRef.current;
-        switch (event.key) {
-          case 'ArrowUp':
-            const tbody = container.querySelector('tbody');
-            if (tbody) {
-              const firstRow = tbody.querySelector('tr:first-child');
-              if (firstRow) {
-                firstRow.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              } else {
-                container.scrollTo({ top: 0, behavior: 'smooth' });
-              }
-            } else {
-              container.scrollTo({ top: 0, behavior: 'smooth' });
-            }
-            break;
-          case 'ArrowDown':
-            const tbodyDown = container.querySelector('tbody');
-            if (tbodyDown) {
-              const lastRow = tbodyDown.querySelector('tr:last-child');
-              if (lastRow) {
-                lastRow.scrollIntoView({ behavior: 'smooth', block: 'end' });
-              } else {
-                container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
-              }
-            } else {
-              container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
-            }
-            break;
-          case 'ArrowLeft':
-            container.scrollTo({ left: 0, behavior: 'smooth' });
-            break;
-          case 'ArrowRight':
-            container.scrollTo({ left: container.scrollWidth, behavior: 'smooth' });
-            break;
-          default:
-            break;
-        }
-      }
-      else if (mode === MODES.READ) {
-        if (!activeRows || activeRows.length === 0) return;
-
-        let targetRowId = null;
-
-        if (event.key === 'ArrowUp') {
-          const firstRow = activeRows[0];
-          if (firstRow && firstRow[0] && firstRow[0]['data-id']) {
-            targetRowId = firstRow[0]['data-id'];
-          }
-        } else if (event.key === 'ArrowDown') {
-          const lastRowIndex = activeRows.length - 1;
-          const lastRow = activeRows[lastRowIndex];
-          if (lastRow && lastRow[0] && lastRow[0]['data-id']) {
-            targetRowId = lastRow[0]['data-id'];
-          }
-        }
-
-        if (targetRowId) {
-          setSelectedRows([targetRowId]);
-          setLastSelectedRowId(targetRowId);
-          setSelectionAnchorId(targetRowId);
-          if (modelType === MODEL_TYPES.REPEATED_ROOT) {
-            onRowSelect(targetRowId);
-          }
-
-          setTimeout(() => {
-            const tableContainer = tableContainerRef.current;
-            if (tableContainer) {
-              let selectedRowElement = tableContainer.querySelector(`tr[data-row-id="${targetRowId}"]`);
-
-              if (!selectedRowElement) {
-                const tbody = tableContainer.querySelector('tbody');
-                if (tbody) {
-                  const rows = tbody.querySelectorAll('tr');
-                  if (event.key === 'ArrowUp' && rows.length > 0) {
-                    selectedRowElement = rows[0];
-                  } else if (event.key === 'ArrowDown' && rows.length > 0) {
-                    selectedRowElement = rows[rows.length - 1];
-                  }
-                }
-              }
-
-              if (selectedRowElement) {
-                selectedRowElement.scrollIntoView({
-                  behavior: 'smooth',
-                  block: 'center'
-                });
-              } else {
-                if (event.key === 'ArrowUp') {
-                  tableContainer.scrollTo({ top: 0, behavior: 'smooth' });
-                } else {
-                  tableContainer.scrollTo({ top: tableContainer.scrollHeight, behavior: 'smooth' });
-                }
-              }
-            }
-          }, 50);
-        }
-      }
-    }
-  };
 
   const handleRowDoubleClick = (e) => {
     if (mode === MODES.READ && !isReadOnly) {
@@ -642,7 +505,7 @@ const DataTable = ({
           <Table
             className={styles.table}
             size='medium'>
-            <TableHead
+            <TableHeader
               columns={columns}
               uniqueValues={uniqueValues}
               filters={filters}
@@ -760,6 +623,7 @@ const DataTable = ({
                           onAutocompleteOptionChange={handleAutocompleteChange}
                           onDateTimeChange={handleDateTimeChange}
                           stickyPosition={stickyPosition}
+                          highlightDuration={highlightDuration}
                         />
                       );
                     })}
@@ -827,7 +691,7 @@ const DataTable = ({
           </ModelCardContent>
         </ModelCard>
       </FullScreenModal>
-    </div >
+    </div>
   )
 }
 

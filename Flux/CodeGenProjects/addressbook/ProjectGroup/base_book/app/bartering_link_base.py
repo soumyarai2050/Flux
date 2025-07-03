@@ -5,6 +5,7 @@ from typing import List, ClassVar, final, Dict, Final, Callable, Any, Tuple
 from pendulum import DateTime
 import os
 
+os.environ["ModelType"] = "msgspec"
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import (
     Security, Side)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.ORMModel.street_book_service_model_imports import (
@@ -42,6 +43,13 @@ class BarteringLinkBase(ABC):
     def __init__(self, inst_id: str | None = None):
         self.inst_id = inst_id
         self.log_key: str | None = None
+
+    @classmethod
+    @abstractmethod
+    async def recover_cache(cls, **kwargs):
+        """
+        derived to implement recovering of any cache required for derived class
+        """
 
     def subscribe(self, listener_id: str, asyncio_loop: asyncio.AbstractEventLoop,
                   ric_filters: List[str] | None, sedol_filters: List[str] | None,

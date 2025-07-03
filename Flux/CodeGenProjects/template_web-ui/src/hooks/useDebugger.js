@@ -1,5 +1,11 @@
 import { useEffect, useRef } from 'react';
 
+/**
+ * @function useDebugger
+ * @description A custom React hook for debugging state changes.
+ * It logs changes in a provided dictionary of states by comparing current values with their previous values.
+ * @param {object} statesDict - A dictionary where keys are state names and values are the corresponding state values to be tracked.
+ */
 const useDebugger = (statesDict) => {
     const prevStateRef = useRef(statesDict);
 
@@ -13,9 +19,9 @@ const useDebugger = (statesDict) => {
             }
         })
         if (logStr.length > 0) {
-            console.log(logStr);
+            console.log('State changes detected:\n' + logStr);
         } else {
-            console.log('no change detected');
+            console.log('No state changes detected.');
         }
         prevStateRef.current = JSON.parse(JSON.stringify(statesDict));
     }, [JSON.stringify(statesDict)])

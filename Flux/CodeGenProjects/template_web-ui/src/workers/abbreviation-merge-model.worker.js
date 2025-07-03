@@ -3,14 +3,14 @@ import {
     getRowsFromAbbreviation, applyFilter, getActiveRows, getGroupedTableRows, getMaxRowSize,
     getCommonKeyCollections, getGroupedTableColumns, getTableColumns,
     getFilteredCells
-} from '../workerUtils';
-import { sortColumns, getActiveIds, applyRowIdsFilter, getSortOrdersWithAbs, getUniqueValues } from '../utils';
+} from '../utils/index.js';
+import { sortColumns, getActiveIds, applyRowIdsFilter, getSortOrdersWithAbs, getUniqueValues } from '../utils/index.js';
 
 onmessage = (e) => {
     const {
         items, itemsDataDict, itemProps, abbreviation, loadedProps, page, pageSize, sortOrders, filters,
         joinBy, joinSort, mode, enableOverride, disableOverride, showMore, showLess, showAll, moreAll, showHidden,
-        columnOrders, absoluteSortOverride, frozenColumns, columnNameOverride, highlightUpdateOverride,
+        columnOrders, frozenColumns, columnNameOverride, highlightUpdateOverride, noCommonKeyOverride,
         centerJoin, flip, rowIds
     } = e.data;
     const rows = getRowsFromAbbreviation(items, itemsDataDict, itemProps, abbreviation, loadedProps);  // not used externally
@@ -18,13 +18,20 @@ onmessage = (e) => {
     const filteredRows = applyFilter(rows, filters);
     const rowIdsFilteredRows = applyRowIdsFilter(filteredRows, rowIds);
     const groupedRows = getGroupedTableRows(rowIdsFilteredRows, joinBy, joinSort);
-    const sortOrdersWithAbs = getSortOrdersWithAbs(sortOrders, absoluteSortOverride);
-    const { sortedRows, activeRows } = getActiveRows(groupedRows, page, pageSize, sortOrdersWithAbs, true);
+    const { sortedRows, activeRows } = getActiveRows(groupedRows, page, pageSize, sortOrders, true);
     const modelItemIdField = itemProps.find(meta => meta.tableTitle === DB_ID)?.key;
     const activeIds = getActiveIds(activeRows, modelItemIdField);
     const maxRowSize = getMaxRowSize(activeRows);
     const updatedMode = mode === MODES.EDIT && !rowIds ? mode : MODES.READ;
-    const columns = getTableColumns(itemProps, updatedMode, enableOverride, disableOverride, showLess, absoluteSortOverride, frozenColumns, columnNameOverride, highlightUpdateOverride, true);  // not used externally
+    const columns = getTableColumns(itemProps, updatedMode, {
+        enableOverride,
+        disableOverride,
+        showLess,
+        frozenColumns,
+        columnNameOverride,
+        highlightUpdateOverride,
+        noCommonKeyOverride,
+    }, true);  // not used externally
     const groupedColumns = getGroupedTableColumns(columns, maxRowSize, groupedRows, joinBy, updatedMode, true);  // headCells
     if (updatedMode === MODES.EDIT) {
         var commonKeys = [];

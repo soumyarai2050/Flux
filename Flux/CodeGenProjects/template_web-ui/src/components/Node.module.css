@@ -35,6 +35,7 @@
     /* background-color: #fefbd8; */
     border-radius: 5px;
     box-shadow: 0px 0px 1px 0px #999;
+    max-height: 2.1rem;
 }
 
 .node_title {
@@ -118,25 +119,28 @@
     margin-left: 2px;
 }
 
-ul{
+ul {
     list-style: none;
-    padding: 2px 2px 2px 3px ;
+    padding: 2px 2px 2px 3px;
 }
 
 
 @keyframes temporaryGlowBorder {
     0% {
-      background-color: rgba(var(--brand-new-node-rgb), 0.2); /* low-opacity background */
-      border-radius: 4px;
+        background-color: rgba(var(--brand-new-node-rgb), 0.2);
+        /* low-opacity background */
+        border-radius: 4px;
     }
+
     90% {
-              background-color: rgba(var(--brand-new-node-rgb), 0.2);
+        background-color: rgba(var(--brand-new-node-rgb), 0.2);
     }
+
     100% {
-      background-color: transparent;
-      border-radius: 4px;
+        background-color: transparent;
+        border-radius: 4px;
     }
-  }
+}
 
 /* 
   The CSS Modules system will hash .datanodeNewlyAddedGlowTarget.
@@ -145,5 +149,6 @@ ul{
 */
 :global(li.tree-branch-wrapper):has(> .datanodeNewlyAddedGlowTarget) {
     animation: temporaryGlowBorder 3s ease-out forwards;
-    border-radius: 4px; /* Ensure border radius is consistent if not part of animation keyframes fully */
+    border-radius: 4px;
+    /* Ensure border radius is consistent if not part of animation keyframes fully */
 }

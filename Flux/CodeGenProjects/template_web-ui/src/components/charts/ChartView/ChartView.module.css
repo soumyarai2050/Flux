@@ -20,3 +20,13 @@
     height: 85%;
     overflow: auto;
 }
+
+.pinned_filters_container {
+    display: flex;
+    flex-wrap: wrap;
+    padding: 8px;
+    background-color: rgba(0, 0, 0, 0.02);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    min-height: 48px;
+    align-items: center;
+}

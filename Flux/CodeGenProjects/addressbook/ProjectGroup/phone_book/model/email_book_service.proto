@@ -219,7 +219,8 @@ message ContactStatus {
     QueryParams: {
       QueryParamName: "open_chore_count",
       QueryParamDataType: "int | None = None"
-    }
+    },
+    QueryRouteType: PATCH
   };
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
@@ -364,8 +365,8 @@ message PlanCollection {
     },
     join_sort: {
       sort_chore: {
-        chore_by: 'Side',
-        sort_type: 'asc'
+        sort_by: 'Side',
+        sort_direction: 'asc'
       },
       placeholders: "BUY"
     },

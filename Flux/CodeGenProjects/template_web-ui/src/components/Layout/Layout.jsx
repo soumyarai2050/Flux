@@ -7,8 +7,7 @@ import { Brightness4, Brightness7, DashboardCustomize, DoNotTouch, PanTool, Save
 import { defaultLayouts } from '../../projectSpecificUtils';
 import { actions as LayoutActions } from '../../features/uiLayoutSlice';
 import * as Selectors from '../../selectors';
-import { getModelComponent } from '../../utils/modelComponentLoader';
-import { fastClone, getIconText, snakeToTitle } from '../../utils';
+import { fastClone, getIconText, snakeToTitle } from '../../utils/index.js';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 import styles from './Layout.module.css';
@@ -21,6 +20,7 @@ import { BaseColor, cssVar, baseColorPalettes, Theme, DEFAULT_BASE_COLOR } from 
 import GlobalScrollbarStyle from '../GlobalScrollbarStyle';
 import DropdownButton from '../DropdownButton';
 import { useDraggableContext } from '../../contexts/DraggableContext';
+import { componentMap } from '../../models/componentMap';
 
 const defaultGridProps = {
   className: 'layout',
@@ -453,12 +453,12 @@ const Layout = ({ projectName, theme, onThemeToggle, baseColor, onBaseColorChang
             options={Object.values(BaseColor)}
             renderButtonContent={(color) => (
               <span>
-                {color === BaseColor.GREEN ? '\u{1F7E9}' : color === BaseColor.BLUE ? '\u{1F7E6}' : '\u1F7EB'}
+                {color === BaseColor.GREEN ? '\u{1F7E9}' : color === BaseColor.BLUE ? '\u{1F7E6}' : '\u{1F7EB}'}
               </span>
             )}
             renderOption={(color) => (
               <>
-                {color === BaseColor.GREEN ? '\u{1F7E9}' : color === BaseColor.BLUE ? '\u{1F7E6}' : '\u1F7EB'}
+                {color === BaseColor.GREEN ? '\u{1F7E9}' : color === BaseColor.BLUE ? '\u{1F7E6}' : '\u{1F7EB}'}
               </>
             )}
             initialSelectedIndex={Object.values(BaseColor).indexOf(selectedBaseColor)}
@@ -534,16 +534,19 @@ const Layout = ({ projectName, theme, onThemeToggle, baseColor, onBaseColorChang
           layouts={{ lg: layout ?? [] }}
           onLayoutChange={handleLayoutChange}
         >
-          {visibleComponents.map((key) => (
-            <div
-              key={key}
-              className={styles.gridItem}
-              aria-label={`${key}_model`}
-            // data-grid={layout.find((item) => key === item.i)}
-            >
-              {getModelComponent(key)}
-            </div>
-          ))}
+          {visibleComponents.map((key) => {
+            const Component = componentMap[key];
+            return (
+              <div
+                key={key}
+                className={styles.gridItem}
+                aria-label={`${key}_model`}
+              // data-grid={layout.find((item) => key === item.i)}
+              >
+                <Component />
+              </div>
+            )
+          })}
         </ResponsiveGridLayout>
       </div>
       <SaveLayoutPopup

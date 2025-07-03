@@ -10,7 +10,6 @@ import {
   Table,
   TableBody,
   TableContainer,
-  TablePagination,
   TableRow,
   TextField
 } from '@mui/material';
@@ -26,11 +25,15 @@ import {
   arrayMove,
 } from '@dnd-kit/sortable';
 import { DB_ID, DATA_TYPES, MODES, MODEL_TYPES } from '../../constants';
-import TableHead from '../../components/TableHead';
+import TableHeader from '../tables/TableHeader';
 import Cell from '../../components/Cell';
-import { getBufferAbbreviatedOptionLabel } from '../../utils';
+import { getBufferAbbreviatedOptionLabel } from '../../utils/index.js';
 import styles from './AbbreviationMergeView.module.css';
 import { flux_toggle, flux_trigger_strat } from '../../projectSpecificUtils';
+import { useScrollIndicators, useKeyboardNavigation } from '../../hooks';
+import TablePaginationControl from '../TableControls/TablePaginationControl';
+import ScrollIndicators from '../TableControls/ScrollIndicators';
+
 // import { useBoundaryScrollDetection } from '../../hooks';
 
 /**
@@ -166,6 +169,34 @@ const LoadedView = ({
   const [columns, setColumns] = useState(cells);
   const [columnWidths, setColumnWidths] = useState({});
   const columnRefs = useRef({});
+  const tableWrapperRef = useRef(null);
+
+  // Use the scroll indicators hook
+  const {
+    showRightScrollIndicator,
+    showLeftScrollIndicator,
+    indicatorRightOffset,
+    tableContainerRef,
+    handleRightScrollClick,
+    handleLeftScrollClick,
+    checkHorizontalScroll,
+  } = useScrollIndicators([activeRows, cells]);
+
+  // Use the keyboard navigation hook
+  const { handleKeyDown } = useKeyboardNavigation({
+    mode,
+    activeRows,
+    tableContainerRef,
+    capabilities: {
+      editModeScrolling: true,
+      readModeSelection: true,
+      shiftSelection: false,  // AbbreviationMergeView doesn't support multi-selection
+      ctrlShiftSelection: false
+    },
+    callbacks: {
+      onRowSelect: onRowSelect
+    }
+  });
 
   // const { containerRef, isScrollable, enableScrolling, disableScrolling } = useBoundaryScrollDetection();
 
@@ -302,11 +333,16 @@ const LoadedView = ({
   // }
 
   return (
-    <div className={styles.dataTableWrapper}>
+    <div
+      ref={tableWrapperRef}
+      className={styles.dataTableWrapper}
+      onKeyDown={handleKeyDown}
+      tabIndex={-1}
+    >
       <TableContainer
+        ref={tableContainerRef}
         className={tableContainerClasses}
-        // ref={containerRef}
-        // onDoubleClick={handleDoubleClick}  
+        onScroll={checkHorizontalScroll}
         onClick={handleClick}
       >
         <DndContext
@@ -315,7 +351,7 @@ const LoadedView = ({
           onDragEnd={handleDragEnd}
         >
           <Table className={styles.table} size='medium'>
-            <TableHead
+            <TableHeader
               columns={columns}
               uniqueValues={uniqueValues}
               filters={filters}
@@ -339,6 +375,7 @@ const LoadedView = ({
                 return (
                   <TableRow
                     key={rowKey}
+                    data-row-id={rowKey}
                     className={styles.row}
                     onDoubleClick={handleRowDoubleClick}
                   >
@@ -476,15 +513,22 @@ const LoadedView = ({
           </Table>
         </DndContext>
       </TableContainer>
+
+      <ScrollIndicators
+        showRightScrollIndicator={showRightScrollIndicator}
+        showLeftScrollIndicator={showLeftScrollIndicator}
+        indicatorRightOffset={indicatorRightOffset}
+        onRightScrollClick={handleRightScrollClick}
+        onLeftScrollClick={handleLeftScrollClick}
+      />
       {rows.length > 6 && (
-        <TablePagination
-          rowsPerPageOptions={[25, 50, 100]}
-          component='div'
-          count={rows.length}
-          rowsPerPage={rowsPerPage}
+        <TablePaginationControl
+          rows={rows}
           page={page}
-          onPageChange={handlePageChange}
+          rowsPerPage={rowsPerPage}
+          onPageChange={onPageChange}
           onRowsPerPageChange={handleRowsPerPageChange}
+          rowsPerPageOptions={[25, 50]}
         />
       )}
     </div>

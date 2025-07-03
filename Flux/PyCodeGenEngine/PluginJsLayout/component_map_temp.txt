@@ -1,0 +1,33 @@
+/**
+ * @file componentMap.js
+ * @description
+ * Maps model names to lazily loaded and HOC-wrapped React components.
+ *
+ * Each widget is loaded using `React.lazy()` to enable code-splitting and improve performance,
+ * and wrapped with `withModelLoader` to inject model-specific data (schema, selectors, etc.).
+ *
+ * Used to dynamically render model-driven widgets in schema-based UIs.
+ */
+
+import { lazy } from 'react';
+import { withModelLoader } from '../hoc/withModelLoader';
+
+/**
+ * Lazily imported widget components.
+ * Each should default export a component and reside under `widgets/` folder.
+ */
+const widgetImports = {
+# @@protoc_insertion_point(handle_widget_imports)
+};
+
+/**
+ * Maps model keys to lazily loaded, HOC-wrapped components.
+ *
+ * @type {Record<string, React.LazyExoticComponent<React.ComponentType<any>>>}
+ */
+export const componentMap = Object.fromEntries(
+  Object.entries(widgetImports).map(([modelName, Component]) => [
+    modelName,
+    withModelLoader(Component, { modelName }),
+  ])
+);

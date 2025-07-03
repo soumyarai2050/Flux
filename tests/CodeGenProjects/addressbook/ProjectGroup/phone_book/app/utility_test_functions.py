@@ -40,6 +40,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.ORMModel
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.FastApi.photo_book_service_http_client import PhotoBookServiceHttpClient
 from Flux.CodeGenProjects.performance_benchmark.generated.FastApi.performance_benchmark_service_http_client import PerformanceBenchmarkServiceHttpClient
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.generated.FastApi.basket_book_service_http_client import BasketBookServiceHttpClient
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.generated.FastApi.mobile_book_service_http_client import MobileBookServiceHttpClient
 
 code_gen_projects_dir_path = (PurePath(__file__).parent.parent.parent.parent.parent.parent.parent
                               / "Flux" / "CodeGenProjects")
@@ -67,6 +68,10 @@ plan_view_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(s
 BASKET_EXECUTOR_DIR = code_gen_projects_dir_path / "AddressBook" / "ProjectGroup" / "basket_book"
 basket_book_config_yaml_path: PurePath = BASKET_EXECUTOR_DIR / "data" / "config.yaml"
 basket_book_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(basket_book_config_yaml_path))
+
+MARKET_DATA_DIR = code_gen_projects_dir_path / "AddressBook" / "ProjectGroup" / "mobile_book"
+mobile_book_config_yaml_path: PurePath = MARKET_DATA_DIR / "data" / "config.yaml"
+mobile_book_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(mobile_book_config_yaml_path))
 
 HOST: Final[str] = "127.0.0.1"
 
@@ -98,6 +103,11 @@ BASKET_EXECUTOR_BEANIE_HOST: Final[str] = basket_book_config_yaml_dict.get("serv
 BASKET_EXECUTOR_CACHE_PORT: Final[str] = basket_book_config_yaml_dict.get("main_server_cache_port")
 BASKET_EXECUTOR_BEANIE_PORT: Final[str] = basket_book_config_yaml_dict.get("main_server_beanie_port")
 
+MARKET_DATA_CACHE_HOST: Final[str] = mobile_book_config_yaml_dict.get("server_host")
+MARKET_DATA_BEANIE_HOST: Final[str] = mobile_book_config_yaml_dict.get("server_host")
+MARKET_DATA_CACHE_PORT: Final[str] = mobile_book_config_yaml_dict.get("main_server_cache_port")
+MARKET_DATA_BEANIE_PORT: Final[str] = mobile_book_config_yaml_dict.get("main_server_beanie_port")
+
 perf_benchmark_web_client: PerformanceBenchmarkServiceHttpClient = (
     PerformanceBenchmarkServiceHttpClient(host=PERF_BENCH_BEANIE_HOST, port=parse_to_int(PERF_BENCH_BEANIE_PORT)))
 email_book_service_native_web_client: EmailBookServiceHttpClient = \
@@ -115,6 +125,9 @@ photo_book_web_client: PhotoBookServiceHttpClient = (
 basket_book_web_client: BasketBookServiceHttpClient = (
     BasketBookServiceHttpClient.set_or_get_if_instance_exists(host=BASKET_EXECUTOR_BEANIE_HOST,
                                                                    port=parse_to_int(BASKET_EXECUTOR_BEANIE_PORT)))
+mobile_book_web_client: MobileBookServiceHttpClient = (
+    MobileBookServiceHttpClient.set_or_get_if_instance_exists(host=MARKET_DATA_BEANIE_HOST,
+                                                              port=parse_to_int(MARKET_DATA_BEANIE_PORT)))
 
 static_data = SecurityRecordManager.get_loaded_instance(from_cache=True)
 project_dir_path = (PurePath(__file__).parent.parent.parent.parent.parent.parent.parent / "Flux" / "CodeGenProjects" / "AddressBook" / "ProjectGroup" / "phone_book")

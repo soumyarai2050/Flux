@@ -124,8 +124,9 @@ message ColumnOrder {
 }
 
 message SortOrder {
-  required string order_by = 1;
-  required string sort_type = 2;
+  required string sort_by = 1;
+  required string sort_direction = 2;
+  optional bool is_absolute_sort = 3 [default = false];
 }
 
 message QuickFilter {
@@ -155,12 +156,13 @@ message WidgetUIData{
   repeated string chart_enable_override = 18;
   optional string selected_pivot_name = 19;
   repeated string pivot_enable_override = 20;
-  repeated string absolute_sort_override = 21;
-  repeated QuickFilter quick_filters = 22;
-  optional bool sticky_header = 23 [default = true];
-  optional bool common_key_collapse = 24 [default = false];
-  repeated string frozen_columns = 25;
-  repeated string column_name_override = 26;
+  repeated QuickFilter quick_filters = 21;
+  optional bool sticky_header = 22 [default = true];
+  optional bool common_key_collapse = 23 [default = false];
+  repeated string frozen_columns = 24;
+  repeated string column_name_override = 25;
+  optional string highlight_duration = 26;
+  repeated string no_common_key_override = 27;
 }
 
 message UIButton{

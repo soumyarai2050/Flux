@@ -5,10 +5,10 @@ import {
     clearxpath, getColorTypeFromValue, isValidJsonString, floatToInt, groupCommonKeys,
     getLocalizedValueAndSuffix, excludeNullFromObject, formatJSONObjectOrArray,
     getDateTimeFromInt
-} from '../utils';
+} from '../utils/index.js';
 import { DATA_TYPES, MODES } from '../constants';
 import JsonView from './JsonView';
-import VerticalJsonTable from './tables/VerticalJsonTable/VerticalJsonTable';
+import VerticalDataTable from './tables/VerticalDataTable';
 import _, { cloneDeep, isObject } from 'lodash';
 import classes from './CommonKeyWidget.module.css';
 import dayjs from 'dayjs';
@@ -112,7 +112,7 @@ const CommonKey = (props) => {
             abbreviatedField = (
                 <div className={classes.abbreviated_json} ref={jsonTableRef}>
                     <span>{JSON.stringify(updatedData)}</span>
-                    <VerticalJsonTable 
+                    <VerticalDataTable 
                         isOpen={open}
                         data={updatedData}
                         onClose={onCloseAbbreviatedField}

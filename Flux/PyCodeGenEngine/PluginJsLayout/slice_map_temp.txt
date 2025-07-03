@@ -1,0 +1,27 @@
+/**
+ * @file sliceMap.js
+ * @description
+ * This file imports all Redux slice actions and corresponding selectors,
+ * and organizes them into a central `sliceMap` object. This map allows dynamic
+ * access to Redux actions and selectors based on string keys (usually model names).
+ *
+ * This structure is useful in schema-driven or dynamically generated UIs where
+ * Redux entities need to be resolved at runtime based on configuration.
+ */
+
+# @@protoc_insertion_point(handle_slice_map_imports)
+
+import * as Selectors from '../selectors';
+
+/**
+ * A map of Redux slice keys to their respective actions and selectors.
+ * Used to dynamically resolve Redux functionality based on a known schema/model key.
+ *
+ * @example
+ * const { actions, selector } = sliceMap['admin_control'];
+ * dispatch(actions.setSomething(...));
+ * const data = useSelector(selector);
+ */
+export const sliceMap = {
+# @@protoc_insertion_point(handle_slice_map)
+};

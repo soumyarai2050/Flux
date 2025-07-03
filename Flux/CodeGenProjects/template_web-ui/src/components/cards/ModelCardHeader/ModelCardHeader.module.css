@@ -14,4 +14,12 @@
 
 .card_title {
     color: var(--dark-text-primary);
+    flex: 1;
+}
+
+.card_menu {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    max-width: 60%;
 }

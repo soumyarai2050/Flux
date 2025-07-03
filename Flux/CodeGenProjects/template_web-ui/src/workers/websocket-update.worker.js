@@ -1,5 +1,5 @@
 import { DB_ID } from '../constants';
-import { sortAlertArray } from '../workerUtils';
+import { sortAlertArray } from '../utils/index.js';
 
 onmessage = (event) => {
     const { messages, storedArray, uiLimit, isAlertModel, activeItemIdMap = null } = event.data;

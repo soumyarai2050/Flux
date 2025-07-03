@@ -31,6 +31,7 @@ cd - # back in script folder
 mkdir -p  ../log
 mkdir -p ../generated
 mkdir -p ../web-ui/src/widgets
+mkdir -p ../web-ui/src/models
 python gen_json_sample.py
 python gen_msgspec_model.py
 python gen_msgspec_fastapi.py

@@ -5,8 +5,8 @@ import { Box } from '@mui/material';
 import { DATA_TYPES } from '../../../constants';
 import {
     getColorTypeFromValue, getShapeFromValue, getSizeFromValue, capitalizeCamelCase,
-    getHoverTextType, getValueFromReduxStoreFromXpath, getReducerArrrayFromCollections
-} from '../../../utils';
+    getHoverTextType, getValueFromReduxStoreFromXpath, getReducerArrayFromCollections
+} from '../../../utils/index.js';
 import { flux_toggle, flux_trigger_strat } from '../../../projectSpecificUtils';
 import ValueBasedToggleButton from '../../ValueBasedToggleButton';
 import { ValueBasedProgressBarWithHover } from '../../ValueBasedProgressBar';
@@ -17,7 +17,7 @@ const DynamicMenu = ({
     commonKeys,
     onButtonToggle
 }) => {
-    const reducerArray = useMemo(() => getReducerArrrayFromCollections(fieldsMetadata), [fieldsMetadata]);
+    const reducerArray = useMemo(() => getReducerArrayFromCollections(fieldsMetadata), [fieldsMetadata]);
     const reducerDict = useSelector(state => {
         const selected = {};
         reducerArray.forEach(reducerName => {

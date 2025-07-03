@@ -839,10 +839,15 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
     # Example: Soft API Query Interfaces
 
     async def update_contact_status_by_chore_or_fill_data_query_pre(
-            self, contact_status_class_type: Type[ContactStatus], overall_buy_notional: float | None = None,
-            overall_sell_notional: float | None = None, overall_buy_fill_notional: float | None = None,
-            overall_sell_fill_notional: float | None = None, open_chore_count: int | None = None):
+            self, contact_status_class_type: Type[ContactStatus], payload: Dict[str, Any]):
+
         async with ContactStatus.reentrant_lock:
+            overall_buy_notional = payload.get("overall_buy_notional")
+            overall_sell_notional = payload.get("overall_sell_notional")
+            overall_buy_fill_notional = payload.get("overall_buy_fill_notional")
+            overall_sell_fill_notional = payload.get("overall_sell_fill_notional")
+            open_chore_count = payload.get("open_chore_count")
+
             contact_status: ContactStatus = (
                 await EmailBookServiceRoutesCallbackBaseNativeOverride.underlying_read_contact_status_by_id_http(
                     1))

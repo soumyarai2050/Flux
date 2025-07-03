@@ -1,0 +1,124 @@
+.pin_container {
+    display: inline-block;
+    margin: 2px 4px;
+}
+
+.pin_chip {
+    background-color: #3f51b5;
+    border: none;
+    border-radius: 4px;
+    max-height: 32px;
+    min-height: 32px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+    transition: all 0.2s ease;
+}
+
+.pin_chip:hover {
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.16), 0 2px 4px rgba(0, 0, 0, 0.32);
+    transform: translateY(-1px);
+}
+
+.pin_content {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 8px;
+    height: 100%;
+}
+
+.pin_title {
+    font-size: 11px;
+    font-weight: 600;
+    color: white;
+    white-space: nowrap;
+    min-width: fit-content;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.pin_input_container {
+    display: flex;
+    align-items: center;
+    min-width: 60px;
+    background-color: rgba(255, 255, 255, 0.15);
+    border-radius: 3px;
+    padding: 2px 6px;
+}
+
+.pin_input {
+    min-width: 60px !important;
+    max-width: 100px !important;
+}
+
+.pin_input .MuiInputBase-root {
+    height: 24px;
+    font-size: 11px;
+    color: white;
+    background-color: transparent;
+    border: none;
+}
+
+.pin_input .MuiInputBase-input {
+    padding: 2px 4px;
+    font-size: 11px;
+    color: white;
+}
+
+.pin_input .MuiInputBase-input::placeholder {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.pin_input .MuiOutlinedInput-notchedOutline {
+    border: none;
+}
+
+.pin_select {
+    min-width: 60px !important;
+    max-width: 100px !important;
+    height: 24px;
+    font-size: 11px;
+    color: white;
+    background-color: transparent;
+}
+
+.pin_select .MuiSelect-select {
+    padding: 2px 4px;
+    font-size: 11px;
+    line-height: 1.2;
+    color: white;
+}
+
+.pin_select .MuiSelect-icon {
+    color: white;
+    right: 2px;
+}
+
+.pin_select .MuiOutlinedInput-notchedOutline {
+    border: none;
+}
+
+.pin_select:hover .MuiOutlinedInput-notchedOutline {
+    border: none;
+}
+
+.pin_select.Mui-focused .MuiOutlinedInput-notchedOutline {
+    border: none;
+}
+
+.close_button {
+    padding: 2px;
+    color: rgba(255, 255, 255, 0.8);
+    margin-left: 2px;
+    min-width: 18px;
+    min-height: 18px;
+    border-radius: 2px;
+}
+
+.close_button:hover {
+    color: white;
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.close_button svg {
+    font-size: 14px;
+} 

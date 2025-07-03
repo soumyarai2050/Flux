@@ -12,6 +12,8 @@ from pendulum import DateTime
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecordManager
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     MDShellEnvData, create_md_shell_script, create_stop_md_script)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.generated.ORMModel.mobile_book_service_model_imports import SymbolInterestsBaseModel
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.app.mobile_book_service_helper import mobile_book_service_http_client
 
 class SymbolStreamingData:
 
@@ -65,13 +67,14 @@ class SymbolStreamingData:
 
 class MDStreamingManager:
     def __init__(self, CURRENT_PROJECT_DIR: PurePath, host: str, port: int,
-                 db_name: str):
+                 db_name: str, consumer_semaphore_path: str):
         self.static_data: SecurityRecordManager | None = None
         self.symbol_to_symbol_streaming_data: Dict[str, SymbolStreamingData] = {}
         self.CURRENT_PROJECT_DIR: PurePath = CURRENT_PROJECT_DIR
         self.host = host
         self.port = port
         self.db_name: Final[str] = db_name
+        self.consumer_semaphore_path = consumer_semaphore_path
 
     def restart_md_for_symbols(self, system_symbol_n_sec_id_source_list: List[Tuple[str, Any]]) -> None:
         self.force_stop_md_for_symbols(system_symbol_n_sec_id_source_list)
@@ -121,9 +124,16 @@ class MDStreamingManager:
             trigger_time, proc = symbol_streaming_data.stop_so_streaming(force=True)
             processes.append(proc)
             logging.info(f"stop_md_for_symbols: {trigger_req_time=}, {trigger_time=}")
+
+            # deregistering symbol from market data service
+            self.deregister_symbol_from_md(system_symbol)
+
         self._wait_if_running(processes)
         logging.info(f"force_stop_md_for_symbols done for {len(system_symbol_n_sec_id_source_list)=} symbols;;;"
                      f"{system_symbol_n_sec_id_source_list=}")
+
+    def deregister_symbol_from_md(self, symbol: str):
+        mobile_book_service_http_client.remove_symbol_interest_by_symbol_query_client(symbol)
 
     def stop_md_for_symbols(self, symbols: List[str]):
         # called for all fully closed chores where no other chore exist on same symbol
@@ -139,6 +149,9 @@ class MDStreamingManager:
             else:
                 logging.error(f"symbol_streaming_data not found for {system_symbol=} in symbol_to_symbol_streaming_data"
                               f" in run_stop_md_by_symbol call;;;{symbols=}")
+
+            # deregistering symbol from market data service
+            self.deregister_symbol_from_md(system_symbol)
         self._wait_if_running(processes)
         logging.info(f"run stop_md_by_symbol done for {len(symbols)=} {symbols};;;{symbols=}")
 
@@ -159,6 +172,11 @@ class MDStreamingManager:
         if self.static_data is None:
             raise Exception(f"Unexpected: trigger_md_for_symbols is invoked while self.static_data is None, this call"
                             f" assumes static data is ready")
+
+        # register for this symbol
+        symbol_interest = SymbolInterestsBaseModel.from_kwargs(symbol_name=sec_id,
+                                                               semaphore_full_path=self.consumer_semaphore_path)
+        mobile_book_service_http_client.create_symbol_interests_client(symbol_interest)
 
         # create and run so shell script
         exch_id: str | None

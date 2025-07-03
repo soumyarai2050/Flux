@@ -11,13 +11,12 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import {
     clearxpath, isValidJsonString, getSizeFromValue, getShapeFromValue, getColorTypeFromValue,
     getHoverTextType, getValueFromReduxStoreFromXpath, floatToInt,
-    validateConstraints, getLocalizedValueAndSuffix, excludeNullFromObject, formatJSONObjectOrArray, toCamelCase, capitalizeCamelCase, getReducerArrrayFromCollections,
-    getDateTimeFromInt
-} from '../utils';
-import { getDataSourceColor } from '../utils/themeHelper';
+    validateConstraints, getLocalizedValueAndSuffix, excludeNullFromObject, formatJSONObjectOrArray, toCamelCase, capitalizeCamelCase, getReducerArrayFromCollections,
+    getDateTimeFromInt, getDataSourceColor
+} from '../utils/index.js';
 import { COLOR_TYPES, DATA_TYPES, HIGHLIGHT_STATES, MODEL_TYPES, MODES } from '../constants';
 import JsonView from './JsonView';
-import VerticalJsonTable from './tables/VerticalJsonTable/VerticalJsonTable';
+import VerticalDataTable from './tables/VerticalDataTable';
 import ValueBasedToggleButton from './ValueBasedToggleButton';
 import { ValueBasedProgressBarWithHover } from './ValueBasedProgressBar';
 import classes from './Cell.module.css';
@@ -26,6 +25,7 @@ import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
 import ClipboardCopier from './ClipboardCopier';
 import AlertBubble from './AlertBubble';
+import LinkText from './LinkText';
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
@@ -43,13 +43,14 @@ const Cell = (props) => {
         buttonDisable,
         dataSourceId,
         selected,
-        stickyPosition
+        stickyPosition,
+        highlightDuration
     } = props;
 
     const theme = useTheme();
     const collection = cloneDeep(props.collection);
     // const state = useSelector(state => state);
-    const reducerArray = useMemo(() => getReducerArrrayFromCollections([props.collection]), [props.collection]);
+    const reducerArray = useMemo(() => getReducerArrayFromCollections([props.collection]), [props.collection]);
     const reducerDict = useSelector(state => {
         const selected = {};
         reducerArray.forEach(reducerName => {
@@ -78,6 +79,7 @@ const Cell = (props) => {
     const autocompleteRef = useRef(null);
     const jsonTableRef = useRef(null);
     const onTextChangeRef = useRef(props.onTextChange);
+    const initialValueChangeRef = useRef(true);
 
     useEffect(() => {
         onTextChangeRef.current = props.onTextChange;
@@ -124,10 +126,10 @@ const Cell = (props) => {
             }
             timeoutRef.current = setTimeout(() => {
                 setNewUpdateClass("");
-            }, 2000);
+            }, highlightDuration * 1000);
             setOldValue(currentValue);
         }
-    }, [currentValue, oldValue, timeoutRef, classes, mode, collection.highlightUpdate])
+    }, [currentValue, oldValue, timeoutRef, classes, mode, collection.highlightUpdate, highlightDuration])
 
     const stickyClass = {
         position: collection.frozenColumn ? 'sticky' : 'static',
@@ -390,6 +392,21 @@ const Cell = (props) => {
                                     }}
                                 />
                             )
+                        }}
+                        componentsProps={{
+                            popper: {
+                                modifiers: [
+                                    {
+                                        name: 'setWidth',
+                                        enabled: true,
+                                        phase: 'beforeWrite',
+                                        requires: ['computeStyles'],
+                                        fn({ state }) {
+                                            state.styles.popper.width = 'auto';
+                                        },
+                                    },
+                                ],
+                            },
                         }}
                     />
                 </TableCell>
@@ -897,7 +914,7 @@ const Cell = (props) => {
                     <div className={classes.abbreviated_json_cell} ref={jsonTableRef}>
                         <span>{JSON.stringify(updatedData)}</span>
                     </div>
-                    <VerticalJsonTable
+                    <VerticalDataTable
                         isOpen={open}
                         data={updatedData}
                         onClose={onCloseTooltip}
@@ -926,7 +943,7 @@ const Cell = (props) => {
                     </>
                 )
             }
-            classesArray.push(classes.abbreviated_json_cell);
+            // classesArray.push(classes.abbreviated_json_cell);
             const classesStr = classesArray.join(' ');
 
             return (
@@ -937,7 +954,7 @@ const Cell = (props) => {
                     size='small'
                     onClick={onOpenTooltip}>
                     <ClipboardCopier text={clipboardText} />
-                    <ClickAwayListener onClickAway={onCloseTooltip}>
+                    {/* <ClickAwayListener onClickAway={onCloseTooltip}>
                         <div className={classes.abbreviated_json_cell}>
                             <Tooltip
                                 title={tooltipText}
@@ -950,7 +967,8 @@ const Cell = (props) => {
                                 <span>{updatedData}</span>
                             </Tooltip >
                         </div>
-                    </ClickAwayListener>
+                    </ClickAwayListener> */}
+                    <LinkText text={updatedData} />
                 </TableCell>
             )
         }

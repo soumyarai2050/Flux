@@ -71,6 +71,10 @@ class LogBarterSimulator(BarteringLinkBase):
         super(LogBarterSimulator, self).__init__(executor_config_yaml_dict.get("inst_id"))
 
     @classmethod
+    async def recover_cache(cls, **kwargs):
+        pass
+
+    @classmethod
     def load_positions_by_symbols_dict(cls, symbol_type_dict: Dict[str, str]):
         symbol_list: List[str] = [symbol for symbol in symbol_type_dict]
         broker_sec_pos_dict: Dict[str, Dict[str, List[Position]]] = {}

@@ -211,6 +211,8 @@ message BarMetaData {
   required string symbol = 1;
   required string exch_id = 2;
   optional string bar_type = 3;
+  optional string symbol_type = 4;
+  optional string ticker = 5;
 }
 
 message BarData {

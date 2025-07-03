@@ -43,14 +43,12 @@ const JsonView = (props) => {
 }
 
 JsonView.propTypes = {
-    text: PropTypes.string.isRequired,
     open: PropTypes.bool.isRequired,
     src: PropTypes.oneOfType([PropTypes.array, PropTypes.object]).isRequired,
     onClose: PropTypes.func.isRequired
 }
 
 JsonView.defaultProps = {
-    text: JSON.stringify({}),
     open: false,
     src: {}
 }

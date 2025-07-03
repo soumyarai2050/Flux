@@ -43,7 +43,7 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
     KeyHandler = None   # must be set by derived class
     residual_compute_shared_lock: AsyncRLock | None = None
     ledger_shared_lock: AsyncRLock | None = None
-    get_underlying_account_cumulative_fill_qty_query_http: Callable[..., Any] | None = None
+    underlying_get_underlying_account_cumulative_fill_qty_query_http: Callable[..., Any] | None = None
     underlying_update_chore_snapshot_http: Callable[..., Any] | None = None
     underlying_create_chore_snapshot_http: Callable[..., Any] | None = None
     underlying_read_chore_ledger_http: Callable[..., Any] | None = None
@@ -195,7 +195,7 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
     async def get_list_of_underlying_account_n_cumulative_fill_qty(self, symbol: str, side: Side):
         underlying_account_cum_fill_qty_obj_list = \
             await (self.derived_class_type.
-                   get_underlying_account_cumulative_fill_qty_query_http(symbol, side))
+                   underlying_get_underlying_account_cumulative_fill_qty_query_http(symbol, side))
         return underlying_account_cum_fill_qty_obj_list[0].underlying_account_n_cumulative_fill_qty
 
     ##############################

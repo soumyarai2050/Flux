@@ -1,5 +1,6 @@
 from pendulum import DateTime
 from typing import List
+from Flux.PyCodeGenEngine.FluxCodeGenCore.base_aggregate import *
 
 
 def get_symbol_overview_from_symbol(symbol: str):
@@ -30,6 +31,16 @@ def get_limited_objs(limit: int):
         ]
     else:
         return []
+
+
+def get_symbol_interest_from_symbol(symbol: str):
+    return {"aggregate": [
+        {
+            "$match": {
+                "symbol": symbol
+            }
+        }
+    ]}
 
 
 # Market Depth cumulative average

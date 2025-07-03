@@ -64,6 +64,12 @@ message NewChore{
     allow_force_update: true,
     hide_caption: true
   }];
+  repeated AlgoParams algo_params = 23;
+}
+
+message AlgoParams{
+  required string param_name = 1;
+  required string param_val = 2;
 }
 
 message CancelChore{

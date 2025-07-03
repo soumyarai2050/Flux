@@ -21,7 +21,7 @@ const TablePaginationControl = (
       gap: 1,
       paddingY: 0.25,
       paddingX: 1,
-      justifyContent: 'space-between',
+      justifyContent: 'flex-end',
       borderTop: '1px solid',
       borderColor: 'divider',
       position: 'sticky',

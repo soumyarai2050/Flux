@@ -39,8 +39,8 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         message_name = message.proto.name
         message_name_camel_cased = capitalized_to_camel_case(message_name)
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
-        output_str = "import createGenericSlice from '../utils/genericSlice';\n"
-        output_str += "import { MODEL_TYPES } from '../constants.js';\n"
+        output_str = "import { MODEL_TYPES } from '../constants.js';\n"
+        output_str += "import createGenericSlice from '../utils/redux/sliceFactory.js';\n"
         if message_name == "UILayout":
             output_str += "import { defaultLayouts } from '../projectSpecificUtils.js';\n\n"
             output_str += "const injectedReducers = {\n"

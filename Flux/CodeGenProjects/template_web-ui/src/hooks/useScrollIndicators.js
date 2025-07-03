@@ -20,14 +20,14 @@ const useScrollIndicators = (dependencies = []) => {
       const isAtEnd = scrollLeft + clientWidth >= scrollWidth - 1; // Account for floating point precision
       const isAtStart = scrollLeft <= 1; // Account for floating point precision
       const hasVerticalScroll = scrollHeight > clientHeight;
-      
+
       // Adjust indicator position if there's a vertical scrollbar
       const rightOffset = hasVerticalScroll ? 32 : 16; // Account for vertical scrollbar width
       setIndicatorRightOffset(rightOffset);
-      
+
       // Show right indicator when not at end and has horizontal scroll
       setShowRightScrollIndicator(hasHorizontalScroll && !isAtEnd);
-      
+
       // Show left indicator when not at start and has horizontal scroll
       setShowLeftScrollIndicator(hasHorizontalScroll && !isAtStart);
     }
@@ -40,7 +40,7 @@ const useScrollIndicators = (dependencies = []) => {
       const scrollAmount = Math.min(300, clientWidth * 0.8); // Scroll by 300px or 80% of visible width, whichever is smaller
       const maxScrollLeft = scrollWidth - clientWidth;
       const newScrollLeft = Math.min(scrollLeft + scrollAmount, maxScrollLeft);
-      
+
       tableContainerRef.current.scrollTo({
         left: newScrollLeft,
         behavior: 'smooth'
@@ -54,7 +54,7 @@ const useScrollIndicators = (dependencies = []) => {
       const { clientWidth, scrollLeft } = tableContainerRef.current;
       const scrollAmount = Math.min(300, clientWidth * 0.8); // Scroll by 300px or 80% of visible width, whichever is smaller
       const newScrollLeft = Math.max(scrollLeft - scrollAmount, 0);
-      
+
       tableContainerRef.current.scrollTo({
         left: newScrollLeft,
         behavior: 'smooth'
@@ -81,10 +81,10 @@ const useScrollIndicators = (dependencies = []) => {
     showRightScrollIndicator,
     showLeftScrollIndicator,
     indicatorRightOffset,
-    
+
     // Ref
     tableContainerRef,
-    
+
     // Handlers
     handleRightScrollClick,
     handleLeftScrollClick,

@@ -1,5 +1,5 @@
 import { createSelector } from 'reselect';
-import { getDataSourceSelector, getModelLayoutOption } from './utils/reselectHelper';
+import { getDataSourceSelector, getModelLayoutOption } from './utils/index.js';
 
 // Basic selectors
 const stateSelector = (state) => state;

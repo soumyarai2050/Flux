@@ -12,7 +12,7 @@ import {
     addxpath, applyFilter, clearxpath, genChartDatasets, genMetaFilters, generateObjectFromSchema,
     getChartOption, getCollectionByName, getFilterDict, getIdFromAbbreviatedKey, getModelSchema, mergeTsData, tooltipFormatter,
     updateChartDataObj, updateChartSchema, updatePartitionFldSchema
-} from '../../../utils';
+} from '../../../utils/index.js';
 // custom component imports
 import Icon from '../../Icon';
 import FullScreenModal from '../../Modal';
@@ -21,7 +21,7 @@ import styles from './ChartView.module.css';
 import { useTheme } from '@emotion/react';
 import DataTree from '../../trees/DataTree/DataTree';
 import { ModelCard, ModelCardContent, ModelCardHeader } from '../../cards';
-import { FilterAlt } from '@mui/icons-material';
+import QuickFilterPin from '../../QuickFilterPin';
 
 const CHART_SCHEMA_NAME = 'chart_data';
 
@@ -69,7 +69,9 @@ function ChartView({
     const [schema, setSchema] = useState(updateChartSchema(projectSchema, fieldsMetadata, modelType === MODEL_TYPES.ABBREVIATION_MERGE));
     const [selectedData, setSelectedData] = useState();
     const [isCreate, setIsCreate] = useState(false);
-    const [isQuickFilterView, setIsQuickFilterView] = useState(false);
+    const [pinnedFilters, setPinnedFilters] = useState([]);
+    const [pinnedFiltersByChart, setPinnedFiltersByChart] = useState({});
+    const pinnedFilterUpdateRef = useRef(false);
     const socketList = useRef([]);
     const getAllWsDict = useRef({});
 
@@ -140,7 +142,18 @@ function ChartView({
 
     useEffect(() => {
         setData(updatedChartObj);
-    }, [updatedChartObj])
+        // Also sync pinned filters when data object changes
+        if (updatedChartObj && Object.keys(updatedChartObj).length > 0) {
+            // Update current pinned filters to show only the ones for this chart
+            const chartSpecificFilters = pinnedFiltersByChart[updatedChartObj.chart_name] || [];
+            setPinnedFilters(chartSpecificFilters);
+            
+            // Only sync if not currently updating from a pinned filter change
+            if (!pinnedFilterUpdateRef.current) {
+                syncPinnedFiltersWithData(updatedChartObj);
+            }
+        }
+    }, [updatedChartObj, pinnedFiltersByChart])
 
     useEffect(() => {
         // identify if the chart configuration obj selected has a time series or not
@@ -330,7 +343,6 @@ function ChartView({
     const handleChartOptionClose = (e, reason) => {
         if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;
         setIsCreate(false);
-        setIsQuickFilterView(false);
         if (!isEqual(updatedChartObj, data)) {
             setIsConfirmPopupOpen(true);
         } else {
@@ -353,7 +365,6 @@ function ChartView({
         // setMode(MODES.READ);
         onModeToggle();
         setIsCreate(false);
-        setIsQuickFilterView(false);
         setIsChartOptionOpen(false);
         setIsConfirmPopupOpen(false);
         const updatedObj = clearxpath(cloneDeep(data));
@@ -376,7 +387,6 @@ function ChartView({
             setIsChartOptionOpen(false);
             setIsConfirmPopupOpen(false);
             setIsCreate(false);
-            setIsQuickFilterView(false);
             // setMode(MODES.READ);
             onModeToggle();
         }
@@ -406,6 +416,15 @@ function ChartView({
 
     const handleUpdate = (updatedData) => {
         setData(updatedData);
+        
+        // Only sync pinned filters if this update is NOT coming from a pinned filter change
+        // We can detect this by checking if we're in the middle of handling a pinned filter change
+        const isFromPinnedFilterChange = pinnedFilterUpdateRef.current;
+        
+        if (!isFromPinnedFilterChange) {
+            syncPinnedFiltersWithData(updatedData);
+        }
+        
         const updatedSchema = cloneDeep(schema);
         const chartEncodeSchema = getModelSchema('chart_encode', updatedSchema);
         const filterSchema = getModelSchema('ui_filter', updatedSchema);
@@ -435,7 +454,15 @@ function ChartView({
         e.stopPropagation();
         const updatedChartData = chartData.filter((o) => o.chart_name !== chartName);
         onChartDataChange(updatedChartData);
+        // Clear pinned filters for the deleted chart
+        setPinnedFiltersByChart(prev => {
+            const newObj = { ...prev };
+            delete newObj[chartName];
+            return newObj;
+        });
+        // If the deleted chart was selected, also clear the visible pinned filters
         if (index === selectedIndex) {
+            setPinnedFilters([]);
             setSelectedIndex();
             setStoredChartObj({});
             setUpdatedChartObj({});
@@ -447,7 +474,6 @@ function ChartView({
         if (mode === MODES.READ) {
             onModeToggle();
             setIsChartOptionOpen(true);
-            setIsQuickFilterView(true);
         }
     }
 
@@ -456,7 +482,7 @@ function ChartView({
         const quickFilter = updatedQuickFilters.find((quickFilter) => quickFilter.chart_name === data.chart_name);
         const newValue = value ? true : false;
         if (quickFilter) {
-            quickFilter.filters = JSON.stringify({ ...quickFilter.filters, [key]: newValue });
+            quickFilter.filters = JSON.stringify({ ...JSON.parse(quickFilter.filters || '{}'), [key]: newValue });
         } else {
             updatedQuickFilters.push({
                 chart_name: data.chart_name,
@@ -466,9 +492,259 @@ function ChartView({
         onQuickFiltersChange(updatedQuickFilters);
     }
 
-    const handleQuickFilterViewToggle = () => {
-        setIsQuickFilterView((prev) => !prev);
-    }
+    const handleQuickFilterPin = (key, title, currentValue, nodeData) => {
+
+        const uniqueId = nodeData.dataxpath || key;
+        const currentChartName = data?.chart_name;
+        const existingPin = pinnedFilters.find(pin => pin.uniqueId === uniqueId);
+        
+        if (!existingPin && currentChartName) {
+            // Get current value from chart data or use provided value
+            const currentChartValue = getCurrentChartFieldValue(key, nodeData) || currentValue || getDefaultValueForField(nodeData);
+            
+            const newPin = { 
+                key, 
+                uniqueId,
+                title, 
+                value: currentChartValue,
+                nodeData: nodeData // Store field metadata for rendering the correct input type
+            };
+            
+            // Update chart-specific storage
+            setPinnedFiltersByChart(prev => ({
+                ...prev,
+                [currentChartName]: [...(prev[currentChartName] || []), newPin]
+            }));
+            
+            // Update current display
+            setPinnedFilters(prev => [...prev, newPin]);
+        }
+    };
+
+    // Helper function to get current value from chart configuration data using xpath
+    const getCurrentChartFieldValue = (key, nodeData) => {
+        if (!data || !nodeData || !nodeData.dataxpath) return null;
+        
+        const dataxpath = nodeData.dataxpath;
+        const pathParts = dataxpath.split('.');
+        let target = data;
+        
+        // Navigate through the path to get the current value
+        for (const part of pathParts) {
+            if (part.includes('[') && part.includes(']')) {
+                // Handle array notation like 'series[0]'
+                const arrayName = part.substring(0, part.indexOf('['));
+                const index = parseInt(part.substring(part.indexOf('[') + 1, part.indexOf(']')));
+                
+                if (target[arrayName] && Array.isArray(target[arrayName]) && target[arrayName][index] !== undefined) {
+                    target = target[arrayName][index];
+                } else {
+                    return null;
+                }
+            } else {
+                if (target[part] !== undefined) {
+                    target = target[part];
+                } else {
+                    return null;
+                }
+            }
+        }
+        
+        return target;
+    };
+
+    // Helper function to determine default value based on field type
+    const getDefaultValueForField = (nodeData) => {
+        if (!nodeData) return false;
+        
+        switch (nodeData.type) {
+            case 'boolean':
+                return false;
+            case 'enum':
+                return nodeData.options?.[0] || nodeData.dropdowndataset?.[0] || null;
+            case 'string':
+                return '';
+            case 'number':
+                return 0;
+            default:
+                return null;
+        }
+    };
+
+    // Function to sync pinned filter values with current data values
+    const syncPinnedFiltersWithData = useCallback((updatedData) => {
+        setPinnedFilters(prev => {
+            if (prev.length === 0) return prev;
+            
+            const updatedPins = prev.map(pin => {
+                // Get the current value from the updated data
+                const currentValue = getCurrentChartFieldValueFromData(pin.key, pin.nodeData, updatedData);
+                
+                // Only update if the value has actually changed AND it's not undefined
+                if (currentValue !== undefined && currentValue !== pin.value) {
+                    return { ...pin, value: currentValue };
+                }
+                return pin;
+            });
+            
+            // Only set state if something actually changed to avoid unnecessary re-renders
+            const hasChanges = updatedPins.some((pin, index) => pin.value !== prev[index].value);
+            return hasChanges ? updatedPins : prev;
+        });
+    }, []); // Empty dependency array since it only uses setPinnedFilters
+
+    // Helper function to get current value from specific data object (used for syncing)
+    const getCurrentChartFieldValueFromData = (key, nodeData, dataSource) => {
+        if (!dataSource || !nodeData || !nodeData.dataxpath) return null;
+        
+        const dataxpath = nodeData.dataxpath;
+        const pathParts = dataxpath.split('.');
+        let target = dataSource;
+        
+        // Navigate through the path to get the current value
+        for (const part of pathParts) {
+            if (part.includes('[') && part.includes(']')) {
+                // Handle array notation like 'series[0]'
+                const arrayName = part.substring(0, part.indexOf('['));
+                const index = parseInt(part.substring(part.indexOf('[') + 1, part.indexOf(']')));
+                
+                if (target[arrayName] && Array.isArray(target[arrayName]) && target[arrayName][index] !== undefined) {
+                    target = target[arrayName][index];
+                } else {
+                    return null;
+                }
+            } else {
+                if (target[part] !== undefined) {
+                    target = target[part];
+                } else {
+                    return null;
+                }
+            }
+        }
+        
+        return target;
+    };
+
+    const handlePinnedFilterChange = (uniqueId, value) => {
+        const currentChartName = data?.chart_name;
+        if (!currentChartName) {
+            return;
+        }
+        
+        // Set flag to indicate we're updating from a pinned filter
+        pinnedFilterUpdateRef.current = true;
+        
+        // Update the pinned filter state for current display
+        setPinnedFilters(prev => {
+            const updated = prev.map(pin => 
+                pin.uniqueId === uniqueId ? { ...pin, value } : pin
+            );
+            return updated;
+        });
+        
+        // Update chart-specific storage
+        setPinnedFiltersByChart(prev => {
+            const updated = {
+                ...prev,
+                [currentChartName]: (prev[currentChartName] || []).map(pin => 
+                    pin.uniqueId === uniqueId ? { ...pin, value } : pin
+                )
+            };
+            return updated;
+        });
+
+        // Update the actual chart configuration data using xpath
+        const updatedChartData = cloneDeep(data);
+        const pinnedFilter = pinnedFilters.find(pin => pin.uniqueId === uniqueId);
+        
+        if (pinnedFilter && pinnedFilter.nodeData && pinnedFilter.nodeData.dataxpath) {
+            // Use the dataxpath from nodeData to update the correct location
+            const dataxpath = pinnedFilter.nodeData.dataxpath;
+            
+            // Split the path and navigate to set the value
+            const pathParts = dataxpath.split('.');
+            let target = updatedChartData;
+            
+            // Navigate to the parent object
+            for (let i = 0; i < pathParts.length - 1; i++) {
+                const part = pathParts[i];
+                if (part.includes('[') && part.includes(']')) {
+                    // Handle array notation like 'series[0]'
+                    const arrayName = part.substring(0, part.indexOf('['));
+                    const index = parseInt(part.substring(part.indexOf('[') + 1, part.indexOf(']')));
+                    
+                    if (!target[arrayName]) {
+                        target[arrayName] = [];
+                    }
+                    if (!target[arrayName][index]) {
+                        target[arrayName][index] = {};
+                    }
+                    target = target[arrayName][index];
+                } else {
+                    if (!target[part]) {
+                        target[part] = {};
+                    }
+                    target = target[part];
+                }
+            }
+            
+            // Set the final value
+            const finalKey = pathParts[pathParts.length - 1];
+            if (finalKey.includes('[') && finalKey.includes(']')) {
+                // Handle array notation in final key
+                const arrayName = finalKey.substring(0, finalKey.indexOf('['));
+                const index = parseInt(finalKey.substring(finalKey.indexOf('[') + 1, finalKey.indexOf(']')));
+                
+                if (!target[arrayName]) {
+                    target[arrayName] = [];
+                }
+                target[arrayName][index] = value;
+            } else {
+                target[finalKey] = value;
+            }
+            
+            // Update the chart configuration in the main chartData array and call onChartDataChange
+            const idx = chartData.findIndex((o) => o.chart_name === updatedChartData.chart_name);
+            const updatedChartDataArray = [...chartData];
+            if (idx !== -1) {
+                updatedChartDataArray[idx] = clearxpath(cloneDeep(updatedChartData));
+            } else {
+                updatedChartDataArray.push(clearxpath(cloneDeep(updatedChartData)));
+            }
+            onChartDataChange(updatedChartDataArray);
+
+            // Also update the local state for immediate UI feedback
+            handleUpdate(updatedChartData);
+            
+            // Reset the flag after a short delay to allow the update to complete
+            setTimeout(() => {
+                pinnedFilterUpdateRef.current = false;
+            }, 100);
+        } else {
+            // Reset flag even if update failed
+            pinnedFilterUpdateRef.current = false;
+        }
+
+        // Also update the main quick filters for backward compatibility
+        handleQuickFilterChange(uniqueId, value);
+    };
+
+    const handleUnpinFilter = (uniqueId) => {
+        const currentChartName = data?.chart_name;
+        if (!currentChartName) return;
+        
+        // Update current display
+        setPinnedFilters(prev => {
+            const newFilters = prev.filter(pin => pin.uniqueId !== uniqueId);
+            return newFilters;
+        });
+        
+        // Update chart-specific storage
+        setPinnedFiltersByChart(prev => ({
+            ...prev,
+            [currentChartName]: (prev[currentChartName] || []).filter(pin => pin.uniqueId !== uniqueId)
+        }));
+    };
 
     const options = useMemo(() => getChartOption(clearxpath(cloneDeep(chartOption))), [chartOption]);
     const chartQuickFilter = quickFilters.find((quickFilter) => quickFilter.chart_name === data?.chart_name);
@@ -510,6 +786,23 @@ function ChartView({
                 </Box>
                 <Divider orientation='vertical' flexItem />
                 <Box className={styles.chart_container}>
+                    {/* Pinned Filters Section */}
+                    {pinnedFilters.length > 0 && (
+                        <Box className={styles.pinned_filters_container}>
+                            {pinnedFilters.map((pin) => (
+                                <QuickFilterPin
+                                    key={pin.uniqueId}
+                                    nodeKey={pin.key}
+                                    uniqueId={pin.uniqueId}
+                                    nodeTitle={pin.title}
+                                    nodeValue={pin.value}
+                                    nodeData={pin.nodeData}
+                                    onValueChange={handlePinnedFilterChange}
+                                    onUnpin={handleUnpinFilter}
+                                />
+                            ))}
+                        </Box>
+                    )}
                     <Box className={styles.chart}>
                         {storedChartObj.chart_name && (
                             <EChart
@@ -564,9 +857,6 @@ function ChartView({
             >
                 <ModelCard>
                     <ModelCardHeader name={CHART_SCHEMA_NAME} >
-                        <Icon name='QuickFilterView' title='quickFilterView' onClick={handleQuickFilterViewToggle}>
-                            <FilterAlt fontSize='small' color={isQuickFilterView ? 'info' : 'white'} />
-                        </Icon>
                         <Icon name='save' title='save' onClick={handleSave}><Save fontSize='small' color='white' /></Icon>
                         <Icon name='close' title='close' onClick={handleChartOptionClose}><Close fontSize='small' color='white' /></Icon>
                     </ModelCardHeader>
@@ -582,9 +872,12 @@ function ChartView({
                             onUpdate={handleUpdate}
                             onUserChange={handleUserChange}
                             quickFilter={!isCreate ? filterDict : null}
-                            onQuickFiltersChange={handleQuickFilterChange}
-                            isQuickFilterView={isQuickFilterView}
+                            onQuickFilterChange={handleQuickFilterChange}
+                            onQuickFilterPin={handleQuickFilterPin}
+                            onQuickFilterUnpin={handleUnpinFilter}
+                            pinnedFilters={pinnedFilters}
                             treeLevel={4}
+                            enableQuickFilterPin={true}
                         />
                     </ModelCardContent>
                 </ModelCard>

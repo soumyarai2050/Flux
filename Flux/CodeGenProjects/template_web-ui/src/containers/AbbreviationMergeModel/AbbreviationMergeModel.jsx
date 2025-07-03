@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { cloneDeep, get, isEqual, set } from 'lodash';
-import { DB_ID, LAYOUT_TYPES, MODEL_TYPES, MODES, NEW_ITEM_ID } from '../../constants';
+import { DB_ID, DEFAULT_HIGHLIGHT_DURATION, LAYOUT_TYPES, MODEL_TYPES, MODES, NEW_ITEM_ID } from '../../constants';
 import * as Selectors from '../../selectors';
 import {
     clearxpath, getWidgetOptionById, generateObjectFromSchema,
@@ -9,11 +9,11 @@ import {
     getDataSourcesCrudOverrideDict, getCSVFileName, isWebSocketActive, removeRedundantFieldsFromRows,
     getAbbreviatedCollections, getNewItem, getDataSourceObj,
     updateFormValidation
-} from '../../utils';
+} from '../../utils/index.js';
 import { FullScreenModalOptional } from '../../components/Modal';
 import { ModelCard, ModelCardHeader, ModelCardContent } from '../../components/cards';
 import MenuGroup from '../../components/MenuGroup';
-import { cleanAllCache } from '../../utility/attributeCache';
+import { cleanAllCache } from '../../cache/attributeCache';
 import { actions as LayoutActions } from '../../features/uiLayoutSlice';
 import {
     sortOrdersChangeHandler,
@@ -24,12 +24,13 @@ import {
     overrideChangeHandler,
     pinnedChangeHandler,
     filtersChangeHandler,
-    absoluteSortOverrideChangeHandler,
     stickyHeaderToggleHandler,
     commonKeyCollapseToggleHandler,
     frozenColumnsChangeHandler,
     columnNameOverrideHandler,
     highlightUpdateOverrideHandler,
+    highlightDurationChangeHandler,
+    noCommonKeyOverrideChangeHandler,
     dataSourceColorsChangeHandler,
     joinByChangeHandler,
     centerJoinToggleHandler,
@@ -41,15 +42,15 @@ import {
     pivotEnableOverrideChangeHandler,
     pivotDataChangeHandler,
     quickFiltersChangeHandler
-} from '../../utils/genericModelHandler';
+} from '../../utils/index.js';
 import CommonKeyWidget from '../../components/CommonKeyWidget';
 import { ConfirmSavePopup, FormValidation } from '../../components/Popup';
 import { PivotTable } from '../../components/tables';
 import { ChartView } from '../../components/charts';
 import AbbreviationMergeView from '../../components/AbbreviationMergeView';
-import { getIdFromAbbreviatedKey } from '../../workerUtils';
+import { getIdFromAbbreviatedKey } from '../../utils/index.js';
 import { useWebSocketWorker, useDataSourcesWebsocketWorker, useDownload } from '../../hooks';
-import { dataSourcesSelectorEquality } from '../../utils/reselectHelper';
+import { dataSourcesSelectorEquality } from '../../utils/index.js';
 import { saveAs } from 'file-saver';
 
 function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
@@ -279,11 +280,11 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                 showLess: modelLayoutData.show_less || [],
                 showHidden,
                 showAll,
-                absoluteSortOverride: modelLayoutData.absolute_sort_override || [],
                 frozenColumns: modelLayoutData.frozen_columns || [],
                 columnNameOverride: modelLayoutData.column_name_override || [],
                 highlightUpdateOverride: modelLayoutData.highlight_update_override || [],
                 columnOrders: modelLayoutData.column_orders || [],
+                noCommonKeyOverride: modelLayoutData.no_common_key_override || [],
                 centerJoin: modelLayoutData.joined_at_center,
                 flip: modelLayoutData.flip,
                 rowIds
@@ -518,11 +519,6 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         filtersChangeHandler(modelHandlerConfig, updatedFilters);
     }
 
-    const handleAbsoluteSortChange = (updatedAbsoluteSort, updatedColumns) => {
-        setHeadCells(updatedColumns);
-        absoluteSortOverrideChangeHandler(modelHandlerConfig, updatedAbsoluteSort);
-    }
-
     const handleStickyHeaderToggle = () => {
         stickyHeaderToggleHandler(modelHandlerConfig, !modelLayoutData.sticky_header);
     }
@@ -537,11 +533,20 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     }
 
     const handleColumnNameOverrideChange = (updatedColumnNameOverride) => {
-        columnNameOverrideHandler(modelHandlerConfig, updatedColumnNameOverride)
+        columnNameOverrideHandler(modelHandlerConfig, updatedColumnNameOverride);
     }
 
     const handleHighlightUpdateOverrideChange = (updatedHighlightUpdateOverride) => {
         highlightUpdateOverrideHandler(modelHandlerConfig, updatedHighlightUpdateOverride);
+    }
+
+    const handleHighlightDurationChange = (updatedHighlightDuration) => {
+        highlightDurationChangeHandler(modelHandlerConfig, updatedHighlightDuration);
+    }
+
+    const handleNoCommonKeyOverrideChange = (updatedNoCommonKeyOverride, updatedColumns) => {
+        setHeadCells(updatedColumns);
+        noCommonKeyOverrideChangeHandler(modelHandlerConfig, updatedNoCommonKeyOverride);
     }
 
     const handleDataSourceColorsChange = (updatedDataSourceColors) => {
@@ -887,11 +892,12 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                     onButtonToggle={handleButtonToggle}
                     isReadOnly={isReadOnly}
                     onColumnOrdersChange={handleColumnOrdersChange}
-                    stickyHeader={modelLayoutData.sticky_header}
+                    stickyHeader={modelLayoutData.sticky_header ?? true}
                     frozenColumns={modelLayoutData.frozen_columns || []}
-                    filters={modelLayoutData.filters || []}
+                    filters={modelLayoutOption.filters || []}
                     onFiltersChange={handleFiltersChange}
                     uniqueValues={uniqueValues}
+                    highlightDuration={modelLayoutData.highlight_duration ?? DEFAULT_HIGHLIGHT_DURATION}
                 />
             </Wrapper>
         )
@@ -916,8 +922,6 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                         onColumnsChange={handleOverrideChange}
                         onColumnOrdersChange={handleColumnOrdersChange}
                         onShowLessChange={handleShowLessChange}
-                        absoluteSortOverride={modelLayoutData.absolute_sort_override ?? []}
-                        onAbsoluteSortChange={handleAbsoluteSortChange}
                         // filter
                         filters={modelLayoutOption.filters || []}
                         fieldsMetadata={modelItemFieldsMetadata || []}
@@ -990,6 +994,10 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                         sortOrders={modelLayoutData.sort_orders || []}
                         onSortOrdersChange={handleSortOrdersChange}
                         groupedRows={groupedRows}
+                        highlightDuration={modelLayoutData.highlight_duration}
+                        onHighlightDurationChange={handleHighlightDurationChange}
+                        noCommonKeyOverride={modelLayoutData.no_common_key_override || []}
+                        onNoCommonKeyOverrideChange={handleNoCommonKeyOverrideChange}
                     />
                 </ModelCardHeader>
                 <ModelCardContent
@@ -1022,4 +1030,4 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     )
 }
 
-export default React.memo(AbbreviationMergeModel);
+export default AbbreviationMergeModel;

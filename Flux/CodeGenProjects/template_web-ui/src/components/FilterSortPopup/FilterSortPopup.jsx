@@ -24,6 +24,8 @@ const FilterSortPopup = ({
   textFilter,
   textFilterType,
   sortDirection,
+  absoluteSort,
+  sortLevel,
   onApply,
   onCopy,
   filterEnable,
@@ -35,11 +37,12 @@ const FilterSortPopup = ({
   const [localTextFilter, setLocalTextFilter] = useState('');
   const [localTextFilterType, setLocalTextFilterType] = useState('contains');
   const [localSortDirection, setLocalSortDirection] = useState(null);
+  const [localAbsoluteSort, setLocalAbsoluteSort] = useState(null);
   const [searchValue, setSearchValue] = useState('');
   const [showTextFilter, setShowTextFilter] = useState(false);
   const [addCurrentSelectionToFilter, setAddCurrentSelectionToFilter] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
-  const multiSortRef = useRef(false);
+  const multiSortRef = useRef(true);
 
   // Internal state for popup open/close
   const [anchorEl, setAnchorEl] = useState(null);
@@ -58,6 +61,7 @@ const FilterSortPopup = ({
       setLocalTextFilter(textFilter || '');
       setLocalTextFilterType(textFilterType || 'contains');
       setLocalSortDirection(sortDirection);
+      setLocalAbsoluteSort(absoluteSort);
       setSearchValue('');
       setShowTextFilter(textFilter && textFilter.length > 0);
       setAddCurrentSelectionToFilter(false);
@@ -138,6 +142,11 @@ const FilterSortPopup = ({
     setLocalSortDirection(localSortDirection === direction ? null : direction);
   };
 
+  // Handle absolute sorting
+  const handleAbsoluteSortToggle = () => {
+    setLocalAbsoluteSort(!localAbsoluteSort);
+  }
+
   // Handle text filter type change
   const handleTextFilterTypeChange = (e) => {
     setLocalTextFilterType(e.target.value);
@@ -151,11 +160,10 @@ const FilterSortPopup = ({
   // Handle search input for filtering the value list
   const handleSearchChange = (e) => {
     const newSearchValue = e.target.value;
-    setSearchValue(newSearchValue);
 
     if (newSearchValue) {
       // When entering a search term, auto-select all search results by default
-      // in Excel behavior
+      // in Excel's behavior
       const newFilteredValues = uniqueValues.filter(value => {
         const stringValue = String(value === null || value === undefined ? '' : value);
         return stringValue.toLowerCase().includes(newSearchValue.toLowerCase());
@@ -167,7 +175,7 @@ const FilterSortPopup = ({
         const nonFilteredValues = uniqueValues.filter(value => !newFilteredValues.includes(value));
         setLocalSelectedFilters([
           ...newFilteredValues,
-          // ...localSelectedFilters.filter(item => !nonFilteredValues.includes(item))
+          // ...localSelectedFilters.filter(item => nonFilteredValues.includes(item))
         ]);
       } else {
         // If "Add current selection" is checked, we merge the selections
@@ -190,7 +198,7 @@ const FilterSortPopup = ({
     setSearchValue('');
   };
 
-  // Handle Popup close
+  // Handle popup close
   const handleClose = () => {
     setAnchorEl(null);
   };
@@ -198,7 +206,7 @@ const FilterSortPopup = ({
   // Handle Apply button click
   const handleApply = () => {
     onApply && onApply(columnId, localSelectedFilters.length !== uniqueValues.length ? localSelectedFilters : null, localTextFilter,
-      localTextFilterType, localSortDirection, multiSortRef.current);
+      localTextFilterType, localSortDirection, localAbsoluteSort, multiSortRef.current);
     handleClose();
   };
 
@@ -221,6 +229,8 @@ const FilterSortPopup = ({
     setLocalSelectedFilters([...uniqueValues]);
     setLocalTextFilter('');
     setLocalSortDirection(null);
+    setLocalAbsoluteSort(null);
+    setSearchValue('');
   };
 
   const handleCopy = () => {
@@ -241,6 +251,7 @@ const FilterSortPopup = ({
   // Calculate if any filter is actually applied
   const hasFilters = uniqueValues.length > 0;
   const isFiltered = selectedFilters.length !== 0 && selectedFilters.length < uniqueValues.length || textFilter;
+  const hasLocalFilterOrSort = localSelectedFilters.length !== 0 && localSelectedFilters.length < uniqueValues.length || localTextFilter || localSortDirection;
 
   // Count occurrences of each value
   // const valueCounts = {};
@@ -248,7 +259,7 @@ const FilterSortPopup = ({
   //   valueCounts[value] = (valueCounts[value] || 0) + 1;
   // });
 
-  // Set text for filter operator
+  // Get text for filter operator
   const getTextFilterOperatorLabel = (type) => {
     switch (type) {
       case 'equals': return 'Equals...';
@@ -263,6 +274,7 @@ const FilterSortPopup = ({
 
   // Check if search is active
   const hasActiveSearch = searchValue.length > 0;
+  const sortLevelClass = sortLevel && sortLevel > 2 ? styles.multiLevelSort : sortLevel === 1 ? styles.firstLevelSort : sortLevel === 2 ? styles.secondLevelSort : '';
 
   return (
     <>
@@ -270,15 +282,20 @@ const FilterSortPopup = ({
       <div className={styles.filterIconWrapper}>
         <IconButton
           size="small"
-          className={`${styles.filterButton} ${(isFiltered || sortDirection) ? styles.activeFilter : hasFilters ? styles.hasFilter : ''}`}
+          className={`${styles.filterButton} ${(isFiltered) ? styles.activeFilter : hasFilters ? styles.hasFilter : ''}`}
           onClick={handleIconClick}
           aria-label="Filter and sort"
         >
           {sortDirection && (
-            <div className={styles.sortIndicator}>
-              {sortDirection === 'asc' && <div className={styles.ascArrow}>{'\u2191'}</div>}
-              {sortDirection === 'desc' && <div className={styles.descArrow}>{'\u2193'}</div>}
-            </div>
+            <>
+              <div className={styles.sortIndicator}>
+                {sortDirection === 'asc' && <div className={`${styles.sortArrow} ${sortLevelClass}`}>{'\u2191'}</div>}
+                {sortDirection === 'desc' && <div className={`${styles.sortArrow} ${sortLevelClass}`}>{'\u2193'}</div>}
+              </div>
+              <div className={styles.absoluteSortIndicator}>
+                {absoluteSort && <div className={sortLevelClass}>{'\u00B1'}</div>}
+              </div>
+            </>
           )}
           <ArrowDropDown />
         </IconButton>
@@ -339,6 +356,16 @@ const FilterSortPopup = ({
               <Typography>Sort Z to A</Typography>
             </div>
 
+            <div className={styles.sortOption} onClick={handleAbsoluteSortToggle}>
+              <div className={styles.sortIcon}>
+                {localAbsoluteSort && <div className={styles.checkMark}>{'\u2713'}</div>}
+              </div>
+              <div className={styles.sortIconPlaceholder}>
+                {'\u00B1'}
+              </div>
+              <Typography>Absolute Sort</Typography>
+            </div>
+
             <Divider className={styles.menuDivider} />
 
             {/* Text Filters dropdown */}
@@ -359,9 +386,9 @@ const FilterSortPopup = ({
                         variant="outlined"
                       >
                         <MenuItem value="equals">Equals</MenuItem>
-                        <MenuItem value="notEqual">Does not Equal</MenuItem>
+                        <MenuItem value="notEqual">Does not equal</MenuItem>
                         <MenuItem value="contains">Contains</MenuItem>
-                        <MenuItem value="notContains">Does not Contain</MenuItem>
+                        <MenuItem value="notContains">Does not contain</MenuItem>
                         <MenuItem value="beginsWith">Begins with</MenuItem>
                         <MenuItem value="endsWith">Ends with</MenuItem>
                       </Select>
@@ -382,12 +409,15 @@ const FilterSortPopup = ({
               </>
             )}
 
-            <div className={styles.filterOption} onClick={clearAllFilters}>
+            <div className={styles.clearFilterOption}
+              onClick={hasLocalFilterOrSort ? clearAllFilters : undefined}
+              style={{ opacity: hasLocalFilterOrSort ? 1 : 0.5, pointerEvents: hasLocalFilterOrSort ? 'auto' : 'none' }}
+            >
               <div className={styles.sortIcon}></div>
               <div className={styles.sortIconPlaceholder}>
                 <FilterAlt fontSize="small" className={styles.menuIcon} />
               </div>
-              <Typography>{`Clear Filter from "${columnName}"`}</Typography>
+              <Typography>{`Clear Filter/Sort from "${columnName}"`}</Typography>
             </div>
           </div>
 
@@ -417,7 +447,7 @@ const FilterSortPopup = ({
                           <Clear fontSize="small" />
                         </IconButton>
                       </InputAdornment>
-                    ) : null,
+                    ) : null
                   }}
                 />
               </div>
@@ -456,7 +486,7 @@ const FilterSortPopup = ({
                 </div>
 
                 <div className={styles.checkboxListContainer}>
-                  <List className={styles.checkboxList} dense disablePadding >
+                  <List className={styles.checkboxList} dense disablePadding>
                     {filteredUniqueValues.length > 0 ? (
                       filteredUniqueValues.map((value, index) => (
                         <ListItem key={index} dense disablePadding className={styles.checkboxItem}>
@@ -511,7 +541,7 @@ const FilterSortPopup = ({
           </div>
         </div>
         <ClipboardCopier text={clipboardText} />
-      </Popover >
+      </Popover>
     </>
   );
 };

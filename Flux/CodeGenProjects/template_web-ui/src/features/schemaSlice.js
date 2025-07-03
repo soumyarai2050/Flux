@@ -2,7 +2,7 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import axios from 'axios';
 import _ from 'lodash';
 import { API_PUBLIC_URL, MODES, SCHEMA_AUTOCOMPLETE_XPATH, SCHEMA_DEFINITIONS_XPATH } from '../constants';
-import { createCollections, getParentSchema, FileOptions } from '../utils';
+import { createCollections, getParentSchema, FileOptions } from '../utils/index.js';
 
 const initialState = {
     schema: {},

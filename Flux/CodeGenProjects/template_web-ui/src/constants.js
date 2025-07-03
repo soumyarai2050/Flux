@@ -223,3 +223,9 @@ export const HIGHLIGHT_STATES = {
   HIGH_LOW: 'HIGH_LOW',
   CHANGE: 'CHANGE'
 }
+
+export const DEFAULT_HIGHLIGHT_DURATION = 2; // in sec
+
+export const THEME_MODE_STORAGE_KEY = 'appThemeMode';
+
+export const BASE_COLOR_STORAGE_KEY = 'appBaseColor';

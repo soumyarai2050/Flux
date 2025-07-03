@@ -1,18 +1,18 @@
 import React, { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { cloneDeep, get, isEqual, set } from 'lodash';
-import { DB_ID, LAYOUT_TYPES, MODEL_TYPES, MODES } from '../../constants';
+import { DB_ID, DEFAULT_HIGHLIGHT_DURATION, LAYOUT_TYPES, MODEL_TYPES, MODES } from '../../constants';
 import * as Selectors from '../../selectors';
 import {
     clearxpath, getWidgetOptionById, generateObjectFromSchema,
     addxpath, compareJSONObjects, getServerUrl, getWidgetTitle,
     getCrudOverrideDict, getCSVFileName, isWebSocketActive, removeRedundantFieldsFromRows,
     updateFormValidation
-} from '../../utils';
+} from '../../utils/index.js';
 import { FullScreenModalOptional } from '../../components/Modal';
 import { ModelCard, ModelCardHeader, ModelCardContent } from '../../components/cards';
 import MenuGroup from '../../components/MenuGroup';
-import { cleanAllCache } from '../../utility/attributeCache';
+import { cleanAllCache } from '../../cache/attributeCache';
 import { actions as LayoutActions } from '../../features/uiLayoutSlice';
 import {
     sortOrdersChangeHandler,
@@ -23,12 +23,13 @@ import {
     overrideChangeHandler,
     pinnedChangeHandler,
     filtersChangeHandler,
-    absoluteSortOverrideChangeHandler,
     stickyHeaderToggleHandler,
     commonKeyCollapseToggleHandler,
     frozenColumnsChangeHandler,
     columnNameOverrideHandler,
     highlightUpdateOverrideHandler,
+    highlightDurationChangeHandler,
+    noCommonKeyOverrideChangeHandler,
     dataSourceColorsChangeHandler,
     joinByChangeHandler,
     centerJoinToggleHandler,
@@ -40,7 +41,7 @@ import {
     pivotEnableOverrideChangeHandler,
     pivotDataChangeHandler,
     quickFiltersChangeHandler
-} from '../../utils/genericModelHandler';
+} from '../../utils/index.js';
 import CommonKeyWidget from '../../components/CommonKeyWidget';
 import { ConfirmSavePopup, FormValidation } from '../../components/Popup';
 import { DataTable, PivotTable } from '../../components/tables';
@@ -232,11 +233,11 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                 showLess: modelLayoutData.show_less || [],
                 showHidden,
                 showAll,
-                absoluteSortOverride: modelLayoutData.absolute_sort_override || [],
                 frozenColumns: modelLayoutData.frozen_columns || [],
                 columnNameOverride: modelLayoutData.column_name_override || [],
                 highlightUpdateOverride: modelLayoutData.highlight_update_override || [],
                 columnOrders: modelLayoutData.column_orders || [],
+                noCommonKeyOverride: modelLayoutData.no_common_key_override || [],
                 centerJoin: modelLayoutData.joined_at_center,
                 flip: modelLayoutData.flip,
                 rowIds
@@ -387,11 +388,6 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
         filtersChangeHandler(modelHandlerConfig, updatedFilters);
     }
 
-    const handleAbsoluteSortChange = (updatedAbsoluteSort, updatedColumns) => {
-        setHeadCells(updatedColumns);
-        absoluteSortOverrideChangeHandler(modelHandlerConfig, updatedAbsoluteSort);
-    }
-
     const handleStickyHeaderToggle = () => {
         stickyHeaderToggleHandler(modelHandlerConfig, !modelLayoutData.sticky_header);
     }
@@ -406,11 +402,20 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
     }
 
     const handleColumnNameOverrideChange = (updatedColumnNameOverride) => {
-        columnNameOverrideHandler(modelHandlerConfig, updatedColumnNameOverride)
+        columnNameOverrideHandler(modelHandlerConfig, updatedColumnNameOverride);
     }
 
     const handleHighlightUpdateOverrideChange = (updatedHighlightUpdateOverride) => {
         highlightUpdateOverrideHandler(modelHandlerConfig, updatedHighlightUpdateOverride);
+    }
+
+    const handleHighlightDurationChange = (updatedHighlightDuration) => {
+        highlightDurationChangeHandler(modelHandlerConfig, updatedHighlightDuration);
+    }
+
+    const handleNoCommonKeyOverrideChange = (updatedNoCommonKeyOverride, updatedColumns) => {
+        setHeadCells(updatedColumns);
+        noCommonKeyOverrideChangeHandler(modelHandlerConfig, updatedNoCommonKeyOverride);
     }
 
     const handleDataSourceColorsChange = (updatedDataSourceColors) => {
@@ -690,11 +695,12 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                     fieldsMetadata={fieldsMetadata}
                     isReadOnly={isReadOnly}
                     onColumnOrdersChange={handleColumnOrdersChange}
-                    stickyHeader={modelLayoutData.sticky_header}
+                    stickyHeader={modelLayoutData.sticky_header ?? true}
                     frozenColumns={modelLayoutData.frozen_columns || []}
-                    filters={modelLayoutData.filters || []}
+                    filters={modelLayoutOption.filters || []}
                     onFiltersChange={handleFiltersChange}
                     uniqueValues={uniqueValues}
+                    highlightDuration={modelLayoutData.highlight_duration ?? DEFAULT_HIGHLIGHT_DURATION}
                 />
             </Wrapper>
         )
@@ -719,8 +725,6 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                         onColumnsChange={handleOverrideChange}
                         onColumnOrdersChange={handleColumnOrdersChange}
                         onShowLessChange={handleShowLessChange}
-                        absoluteSortOverride={modelLayoutData.absolute_sort_override ?? []}
-                        onAbsoluteSortChange={handleAbsoluteSortChange}
                         // filter
                         filters={modelLayoutOption.filters || []}
                         fieldsMetadata={fieldsMetadata || []}
@@ -796,6 +800,10 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                         sortOrders={modelLayoutData.sort_orders || []}
                         onSortOrdersChange={handleSortOrdersChange}
                         groupedRows={groupedRows}
+                        highlightDuration={modelLayoutData.highlight_duration}
+                        onHighlightDurationChange={handleHighlightDurationChange}
+                        noCommonKeyOverride={modelLayoutData.no_common_key_override || []}
+                        onNoCommonKeyOverrideChange={handleNoCommonKeyOverrideChange}
                     />
                 </ModelCardHeader>
                 <ModelCardContent

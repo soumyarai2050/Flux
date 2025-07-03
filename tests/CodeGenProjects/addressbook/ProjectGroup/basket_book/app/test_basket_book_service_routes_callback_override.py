@@ -4,9 +4,11 @@ import random
 import orjson
 
 import pytest
+from ib_insync import ChoreStatus
 
 # project imports
-from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import basket_book_web_client
+from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.utility_test_functions import (
+    basket_book_web_client, BASKET_EXECUTOR_DIR, mobile_book_web_client)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.generated.ORMModel.basket_book_service_model_imports import *
 from tests.CodeGenProjects.AddressBook.ProjectGroup.phone_book.conftest import *
 import timeit
@@ -25,10 +27,14 @@ def test_sanity_new_chores(static_data_, clean_and_set_limits,
         side = random.choice([Side.BUY, Side.SELL])
         px = random.randint(90, 100)
         qty = random.randint(80, 90)
-        security = SecurityOptional(sec_id=sec_id, sec_id_source=SecurityIdSource.TICKER)
-        new_chore_obj = NewChoreBaseModel(security=security, side=side, px=px, qty=qty)
+        security = SecurityBaseModel(sec_id=sec_id, sec_id_source=SecurityIdSource.TICKER)
+        if side == Side.BUY:
+            algo_param = AlgoParamsBaseModel(param_name="target_px", param_val="101")
+        else:
+            algo_param = AlgoParamsBaseModel(param_name="target_px", param_val="99")
+        new_chore_obj = NewChoreBaseModel(security=security, side=side, px=px, qty=qty,
+                                          algo="sniper", algo_params=[algo_param])
         new_chore_list.append(new_chore_obj)
-
     basket_chore = BasketChoreBaseModel(new_chores=new_chore_list)
     created_basket_chore = basket_book_web_client.create_basket_chore_client(basket_chore)
 
@@ -37,18 +43,27 @@ def test_sanity_new_chores(static_data_, clean_and_set_limits,
             (f"Mismatched: Expected chore_submit_state {ChoreSubmitType.ORDER_SUBMIT_PENDING}, "
              f"found: {new_chore.chore_submit_state}")
 
+    time.sleep(10)
+
     # updating market data for this symbol
     symbol_list = set([new_chore.security.sec_id for new_chore in created_basket_chore.new_chores])
     t1 = timeit.default_timer()
     for symbol in symbol_list:
-        last_barter = QuoteBaseModel(px=100, qty=90)
-        bid_quote = QuoteBaseModel(px=100, qty=90)
-        ask_quote = QuoteBaseModel(px=100, qty=90)
-        tob = TopOfBookBaseModel(symbol=symbol, last_barter=last_barter, bid_quote=bid_quote, ask_quote=ask_quote)
-        basket_book_web_client.create_top_of_book_client(tob)   # creating tob
+        market_depth = MarketDepthBaseModel.from_kwargs(symbol=symbol, position=0, px=99, qty=90, side=TickType.BID,
+                                                        exch_time=DateTime.utcnow(), arrival_time=DateTime.utcnow())
+        mobile_book_web_client.create_market_depth_client(market_depth)
 
-        symbol_overview = SymbolOverviewBaseModel(symbol=symbol)
-        basket_book_web_client.create_symbol_overview_client(symbol_overview)   # creating symbol overview
+        market_depth = MarketDepthBaseModel.from_kwargs(symbol=symbol, position=0, px=101, qty=90, side=TickType.ASK,
+                                                        exch_time=DateTime.utcnow(), arrival_time=DateTime.utcnow())
+        mobile_book_web_client.create_market_depth_client(market_depth)
+
+        symbol_n_exch_id = SymbolNExchIdBaseModel(symbol=symbol, exch_id="Y")
+        last_barter = LastBarterBaseModel.from_kwargs(symbol_n_exch_id=symbol_n_exch_id, px=100, qty=90,
+                                                    exch_time=DateTime.utcnow(), arrival_time=DateTime.utcnow())
+        mobile_book_web_client.create_last_barter_client(last_barter)
+
+        symbol_overview = SymbolOverviewBaseModel.from_kwargs(symbol=symbol, last_update_date_time=DateTime.utcnow())
+        mobile_book_web_client.create_symbol_overview_client(symbol_overview)   # creating symbol overview
     t2 = timeit.default_timer()
     print(f"MD: {t2-t1}")
 
@@ -67,16 +82,23 @@ def test_sanity_new_chores(static_data_, clean_and_set_limits,
         assert False, "some new_chores in basket chore has either states not set to SUBMIT_DONE or has no chore_id"
 
     time.sleep(10)
-    datetime_str = datetime.datetime.now().strftime("%Y%m%d")
-    basket_chore_simulator_log_file = BASKET_EXECUTOR_DIR / 'log' / f"log_simulator_basket_logs_{datetime_str}.log"
-    with open(basket_chore_simulator_log_file, "r") as f:
-        # content = f.read()
-        # for new_chore in basket_chore.new_chores:
-        #     check_str = f"~~internal_ord_id^^{new_chore.chore_id}"
-        #     if check_str not in content:
-        #         assert False, f"ChoreId: {new_chore.chore_id} not found in basket_book log file"
-        lines = f.readlines()
-        assert len(lines) == len(basket_chore.new_chores), \
-            ("Mismatched: Len of log file lines must be equal to total new_chores in basket_chore, "
-             f"log file length: {len(lines)}, new_chores count: {len(basket_chore.new_chores)}")
+    # datetime_str = datetime.datetime.now().strftime("%Y%m%d")
+    # basket_chore_simulator_log_file = BASKET_EXECUTOR_DIR / 'log' / f"log_simulator_basket_logs_{datetime_str}.log"
+    # with open(basket_chore_simulator_log_file, "r") as f:
+    #     # content = f.read()
+    #     # for new_chore in basket_chore.new_chores:
+    #     #     check_str = f"~~internal_ord_id^^{new_chore.chore_id}"
+    #     #     if check_str not in content:
+    #     #         assert False, f"ChoreId: {new_chore.chore_id} not found in basket_book log file"
+    #     lines = f.readlines()
+    #     assert len(lines) == len(basket_chore.new_chores), \
+    #         ("Mismatched: Len of log file lines must be equal to total new_chores in basket_chore, "
+    #          f"log file length: {len(lines)}, new_chores count: {len(basket_chore.new_chores)}")
 
+    chore_snapshot_list = basket_book_web_client.get_all_chore_snapshot_client()
+    assert len(chore_snapshot_list) == len(basket_chore.new_chores), \
+        "ChoreSnapshot list length must be equal to total new_chores in basket_chore"
+    for chore_snapshot in chore_snapshot_list:
+        assert chore_snapshot.chore_status == ChoreStatusType.OE_ACKED, \
+            (f"Mismatched: Expected chore_status {ChoreStatusType.OE_ACKED}, "
+             f"found: {chore_snapshot.chore_status}")

@@ -1,10 +1,12 @@
 # standard imports
 from typing import Dict, Any, List, ClassVar, Tuple, Final
 from ctypes import *
+import os
 
 # 3rd party imports
 import pendulum
 
+os.environ['ModelType'] = 'msgspec'
 # project imports
 from FluxPythonUtils.scripts.pthread_shm_mutex import pthread_mutex_t, PThreadShmMutex
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.ORMModel.street_book_service_model_imports import (

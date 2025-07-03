@@ -584,7 +584,7 @@ class ChoreControl:
         return top_of_book.last_barter.px
 
     @staticmethod
-    def get_breach_threshold_px_ext(top_of_book: TopOfBookBaseModel | TopOfBook, sym_ovrw: SymbolOverviewBaseModel,
+    def get_breach_threshold_px_ext(top_of_book: TopOfBookBaseModel | TopOfBook, sym_ovrw: SymbolOverview | SymbolOverviewBaseModel,
                                     chore_limits: ChoreLimits | ChoreLimitsBaseModel, side: Side, system_symbol: str,
                                     symbol_cache=None, is_algo: bool = False, is_limit_up: bool = False,
                                     is_limit_dn: bool = False) -> float | None:

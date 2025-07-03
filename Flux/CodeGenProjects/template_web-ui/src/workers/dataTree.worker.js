@@ -1,5 +1,5 @@
 import { cloneDeep, get } from 'lodash';
-import { generateTreeStructure } from '../utils/treeHelper';
+import { generateTreeStructure } from '../utils/index.js';
 // Assuming DATA_TYPES and ITEMS_PER_PAGE are available globally or passed if not using a module loader that handles this.
 // For robustness, they can be passed in the message payload or explicitly imported if your setup supports it.
 // Fallback to constants imported here if not provided in payload.
@@ -80,7 +80,7 @@ onmessage = (e) => {
     const {
         projectSchema, modelName, updatedData, storedData, subtree, mode, xpath,
         selectedId, showHidden, paginatedNodes, filters,
-        quickFilter, isQuickFilterView,
+        quickFilter,
         enableObjectPagination
     } = e.data.payload;
 
@@ -122,8 +122,8 @@ onmessage = (e) => {
         'index': selectedId,
         'forceUpdate': false,
         'filters': filters,
-        'quickFilter': quickFilter ?? null,
-        'isQuickFilterView': isQuickFilterView
+        'paginatedNodes': paginatedNodes, // Pass pagination state to tree generation
+        'quickFilter': quickFilter ?? null
     };
 
     const generatedTree = generateTreeStructure(cloneDeep(projectSchema), modelName, callerPropsForWorker);

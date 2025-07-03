@@ -7,3 +7,5 @@ export { default as useDebugger } from './useDebugger';
 export { default as useBoundaryScrollDetection } from './useBoundaryScrollDetection';
 export { default as useClickHandler } from './useClickHandler';
 export { default as useScrollIndicators } from './useScrollIndicators';
+export { default as useKeyboardNavigation } from './useKeyboardNavigation';
+export { default as useTreeExpansion } from './useTreeExpansion';

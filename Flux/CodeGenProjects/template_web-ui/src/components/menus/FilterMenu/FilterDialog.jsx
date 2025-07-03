@@ -4,7 +4,7 @@ import { Box, Dialog, DialogTitle, DialogContent } from '@mui/material';
 import styles from './FilterDialog.module.css';
 import FilterSortPopup from '../../FilterSortPopup/FilterSortPopup';
 import LinkText from '../../LinkText';
-import { getFilterDict, getSortOrderDict } from '../../../workerUtils';
+import { getFilterDict, getSortOrderDict } from '../../../utils/index.js';
 import { FilterAlt } from '@mui/icons-material';
 
 /**
@@ -57,16 +57,16 @@ const FilterDialog = ({
   useEffect(() => {
     const updatedSortOrderDict = getSortOrderDict(sortOrders);
     setSortOrderDict(updatedSortOrderDict);
-  }, [sortOrders])
+  }, [sortOrders]);
 
   const handlePopupClose = (e, reason) => {
     // if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;
     onClose();
   };
 
-  const handleApply = useCallback((filterName, values, textFilter, textFilterType, sortDirection, multiSort = false) => {
-    let updatedFilterDict;
-    let updatedSortOrderDict;
+  const handleApply = useCallback((filterName, values, textFilter, textFilterType, sortDirection, isAbsoluteSort, multiSort = false) => {
+    let updatedFilterDict = {};
+    let updatedSortOrderDict = {};
 
     setFilterDict((prev) => {
       updatedFilterDict = {
@@ -85,8 +85,16 @@ const FilterDialog = ({
     setSortOrderDict((prev) => {
       updatedSortOrderDict = multiSort ? {
         ...prev,
-        [filterName]: sortDirection
-      } : { [filterName]: sortDirection };
+        [filterName]: {
+          ...prev[filterName],
+          sort_direction: sortDirection,
+          is_absolute_sort: isAbsoluteSort
+        }
+      } : { [filterName]: {
+        ...prev[filterName],
+        sort_direction: sortDirection,
+        is_absolute_sort: isAbsoluteSort
+      } };
       if (!sortDirection) {
         delete updatedSortOrderDict[filterName];
       }
@@ -96,8 +104,9 @@ const FilterDialog = ({
         filtered_values: updatedFilterDict[filterName].filtered_values?.join(',') ?? null,
       }));
       const updatedSortOrders = Object.keys(updatedSortOrderDict).map((sortBy) => ({
-        order_by: sortBy,
-        sort_type: updatedSortOrderDict[sortBy]
+        sort_by: sortBy,
+        sort_direction: updatedSortOrderDict[sortBy].sort_direction,
+        is_absolute_sort: updatedSortOrderDict[sortBy].is_absolute_sort
       }));
       onFiltersChange(updatedFilters);
       onSortOrdersChange(updatedSortOrders);
@@ -190,7 +199,9 @@ const FilterDialog = ({
                   selectedFilters={filterDict[fieldName]?.filtered_values ?? []}
                   textFilter={filterDict[fieldName]?.text_filter ?? null}
                   textFilterType={filterDict[fieldName]?.text_filter_type ?? null}
-                  sortDirection={sortOrderDict[fieldName] ?? null}
+                  sortDirection={sortOrderDict[fieldName]?.sort_direction ?? null}
+                  absoluteSort={sortOrderDict[fieldName]?.is_absolute_sort ?? null}
+                  sortLevel={sortOrderDict[fieldName]?.sort_level ?? null}
                   onApply={handleApply}
                   onCopy={handleCopy}
                   filterEnable={meta.filterEnable ?? false}
@@ -199,7 +210,6 @@ const FilterDialog = ({
                 {filterDict[fieldName]?.filtered_values && (
                   <LinkText
                     text={JSON.stringify(filterDict[fieldName]?.filtered_values)}
-                    linkText={JSON.stringify(filterDict[fieldName]?.filtered_values)}
                   />
                 )}
               </Box>

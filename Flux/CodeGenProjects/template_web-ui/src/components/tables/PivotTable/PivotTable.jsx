@@ -9,7 +9,7 @@ import { Add, Close, Delete, Done, Save } from '@mui/icons-material';
 import Icon from '../../Icon';
 import 'react-pivottable/pivottable.css';
 import styles from './PivotTable.module.css';
-import { updatePivotSchema, addxpath, clearxpath, generateObjectFromSchema, getModelSchema } from '../../../utils';
+import { updatePivotSchema, addxpath, clearxpath, generateObjectFromSchema, getModelSchema } from '../../../utils/index.js';
 import { MODES } from '../../../constants';
 import DataTree from '../../trees/DataTree/DataTree';
 import { ModelCard, ModelCardContent, ModelCardHeader } from '../../cards';

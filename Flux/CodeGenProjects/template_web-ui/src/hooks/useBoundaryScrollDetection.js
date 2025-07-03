@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 function useBoundaryScrollDetection(options = {}) {
   const {
     timeWindow = 2000, // Time window to count boundary hits (1 second)
-    hitThreshold = 5, // Number of boundary hits to trigger disabling
+    hitThreshold = 3, // Number of boundary hits to trigger disabling
     bottomThreshold = 10, // Pixels threshold for bottom detection
     gestureTimeout = 500, // Time to consider wheel events as part of the same gesture
   } = options;
@@ -22,7 +22,7 @@ function useBoundaryScrollDetection(options = {}) {
     let gestureTimer = null;
 
     const handleWheel = (e) => {
-      if (isScrollable) {
+      if (!isScrollable) {
         // e.preventDefault();
         return;
       }
@@ -36,8 +36,8 @@ function useBoundaryScrollDetection(options = {}) {
 
       // Precise boundary detection
       const isAtTop = scrollTop <= 0;
-      const distanceFroBottom = scrollHeight - scrollTop - clientHeight;
-      const isAtBottom = distanceFroBottom <= bottomThreshold;
+      const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+      const isAtBottom = distanceFromBottom <= bottomThreshold;
 
       // Check if we're at boundary AND trying to scroll beyond it
       const isAttemptingPastBoundary =
@@ -50,37 +50,37 @@ function useBoundaryScrollDetection(options = {}) {
         // Only register this as a new boundary hit if not already in a gesture
         if (!gestureInProgressRef.current) {
           console.log(`New boundary hit at ${isAtTop ? 'top' : 'bottom'}`);
+
+          // Mark that we're in an active gesture
+          gestureInProgressRef.current = true;
+          lastGestureTimeRef.current = now;
+
+          // Add this gesture as a boundary hit
+          boundaryHitsRef.current.push(now);
+
+          // Filter to keep only hits within time window
+          boundaryHitsRef.current = boundaryHitsRef.current.filter(
+            time => now - time < timeWindow
+          );
+
+          // If hit threshold reached, disable scrolling
+          if (boundaryHitsRef.current.length >= hitThreshold) {
+            console.log(`Disabling scroll after ${boundaryHitsRef.current.length} boundary hits`);
+            setIsScrollable(false);
+            e.preventDefault();
+          }
         }
 
-        // Mark that we're in an active gesture
-        gestureInProgressRef.current = true;
-        lastGestureTimeRef.current = now;
+        // Reset timer that tracks the end of a scroll gesture
+        clearTimeout(gestureTimer);
+        gestureTimer = setTimeout(() => {
+          gestureInProgressRef.current = false;
+          console.log('Scroll gesture ended');
+        }, gestureTimeout);
 
-        // Add this gesture as a boundary hit
-        boundaryHitsRef.current.push(now);
-
-        // Filter to keep only hits within time window
-        boundaryHitsRef.current = boundaryHitsRef.current.filter(
-          time => now - time < timeWindow
-        );
-
-        // If hit threshold reached, disable scrolling
-        if (boundaryHitsRef.current.length >= hitThreshold) {
-          console.log(`Disabling scroll after ${boundaryHitsRef.current.length} boundary hits`);
-          setIsScrollable(false);
-          e.preventDefault();
-        }
+        // Always prevent default when at boundary
+        e.preventDefault();
       }
-
-      // Reset timer that tracks the end of a scroll gesture
-      clearTimeout(gestureTimer);
-      gestureTimer = setTimeout(() => {
-        gestureInProgressRef.current = false;
-        console.log('Scroll gesture ended');
-      }, gestureTimeout);
-
-      // Always prevent default when at boundary
-      e.preventDefault();
     };
 
     // Add wheel event listener

@@ -55,6 +55,12 @@ class BasketBarteringDataManager(BaseBarteringDataManager, BasketBookServiceData
                 self.executor_trigger_method(self, self.plan_cache))
         if basket_chore_ is None:  # startup case - no basket chore is present
             return
+        self.basket_id: int | None = None
+        # Triggering executor to recover existing basket chore
+        self.street_book, self.street_book_thread = (
+            self.executor_trigger_method(self, self.plan_cache))
+
+    def handle_basket_chore_get_all_ws_(self, basket_chore_: BasketChoreBaseModel | BasketChore, **kwargs):
         self.plan_cache.set_basket_chore(basket_chore_)
         logging.debug(f"Updated basket_chore;;; {basket_chore_=}")
 
@@ -68,3 +74,9 @@ class BasketBarteringDataManager(BaseBarteringDataManager, BasketBookServiceData
             BasketCache.fx_symbol_overview_dict[fx_symbol_overview_.symbol] = fx_symbol_overview_
             BasketCache.notify_all()
         super().handle_fx_symbol_overview_get_all_ws(fx_symbol_overview_)
+
+    def handle_recovery_chore_ledger(self, chore_ledger_: ChoreLedger | ChoreLedgerBaseModel):
+        # interface to update chore_ledger in crash recovery, Must be used only if required
+        with self.plan_cache.re_ent_lock:
+            self.plan_cache.set_chore_ledger(chore_ledger_)
+        logging.debug(f"Updated chore_ledger cache in recovery;;; {chore_ledger_ = }")

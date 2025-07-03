@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTheme } from '@emotion/react';
-import { snakeToTitle } from '../../../utils';
+import { snakeToTitle } from '../../../utils/index.js';
 import styles from './ModelCardHeader.module.css';
 
 const ModelCardHeader = ({ name, children }) => {
@@ -9,8 +9,8 @@ const ModelCardHeader = ({ name, children }) => {
     const backgroundColor = theme.palette.primary.dark;
     return (
         <div className={styles.card_header} style={{ background: backgroundColor }}>
-            <span className={styles.card_title}>{snakeToTitle(name)}</span>
-            <span>{children}</span>
+            <div className={styles.card_title}>{snakeToTitle(name)}</div>
+            <div className={styles.card_menu}>{children}</div>
         </div>
     )
 }

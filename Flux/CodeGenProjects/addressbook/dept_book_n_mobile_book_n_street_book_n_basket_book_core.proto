@@ -156,8 +156,8 @@ message MarketDepth {
     server_running_status_lvl: 3,
     join_sort: {
       sort_chore: {
-        chore_by: 'side',
-        sort_type: 'desc'
+        sort_by: 'side',
+        sort_direction: 'desc'
       }
     },
     depending_proto_model_name: "PairPlan",

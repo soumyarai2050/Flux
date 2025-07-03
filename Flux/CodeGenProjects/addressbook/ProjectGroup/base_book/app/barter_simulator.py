@@ -40,6 +40,10 @@ class BarterSimulator(BarteringLinkBase):
     intraday_bartering_chores_lock_file: PurePath = EXECUTOR_PROJECT_DATA_DIR / intraday_bartering_chores_lock_file_name
 
     @classmethod
+    async def recover_cache(cls, **kwargs):
+        pass
+
+    @classmethod
     def reload_symbol_configs(cls):
         # reloading executor configs
         BarteringLinkBase.reload_executor_configs()

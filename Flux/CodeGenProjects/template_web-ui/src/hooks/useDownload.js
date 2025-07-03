@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
-import { getApiUrlMetadata } from '../utils';
+import { getApiUrlMetadata, getErrorDetails } from '../utils/index.js';
 
 // --- Start of new shared logic ---
 
@@ -32,9 +32,20 @@ sharedWorker.onerror = (error) => {
 
 // --- End of new shared logic ---
 
-
+/**
+ * @function useDownload
+ * @description A custom React hook for managing CSV file downloads, leveraging a Web Worker for background processing.
+ * It handles data fetching (if needed), CSV generation, progress tracking, and error handling.
+ * @param {string} modelName - The name of the model associated with the download.
+ * @param {Array<object>} fieldsMetadata - Metadata for the fields to be included in the CSV.
+ * @param {string|null} xpath - The XPath for the data, if applicable.
+ * @param {string|null} [modelType=null] - The type of the model (e.g., MODEL_TYPES.ABBREVIATION_MERGE).
+ * @returns {object} An object containing download control functions and status.
+ * @property {function(Array<object>, object): Promise<string>} downloadCSV - Function to initiate the CSV download.
+ * @property {boolean} isDownloading - True if a download is currently in progress.
+ * @property {number} progress - The current download progress as a percentage (0-100).
+ */
 const useDownload = (modelName, fieldsMetadata, xpath, modelType = null) => {
-    // The hook's state remains the same.
     const [isDownloading, setIsDownloading] = useState(false);
     const [progress, setProgress] = useState(0);
 
@@ -51,32 +62,43 @@ const useDownload = (modelName, fieldsMetadata, xpath, modelType = null) => {
         };
     }, []);
 
+    /**
+     * @function downloadCSV
+     * @description Initiates the CSV download process. Fetches data if not provided, then sends it to a Web Worker for CSV generation.
+     * @param {Array<object>} [storedData=null] - Optional: The data array to convert to CSV. If null, data will be fetched via API.
+     * @param {object} [args={}] - Arguments for API call if data needs to be fetched.
+     * @param {string} [args.url] - Base URL for the API call.
+     * @param {string} [args.endpoint] - Specific API endpoint to use.
+     * @param {number} [args.uiLimit] - UI limit for the number of items.
+     * @param {object} [args.params] - Query parameters for the API call.
+     * @returns {Promise<string>} A promise that resolves with the generated CSV content string.
+     */
     const downloadCSV = (storedData = null, args = {}) => {
         return new Promise(async (resolve, reject) => {
             if (isDownloading) {
-                console.warn('Download already in progress. ignoring this request');
+                console.warn('Download already in progress. Ignoring this request.');
                 reject(new Error('Download already in progress.'));
                 return;
             }
             setIsDownloading(true);
 
-            let data;
-            // Fetch data if not provided.
+            let dataToProcess;
             if (!storedData) {
                 const defaultEndpoint = `get-all-${modelName}`;
                 const { url, endpoint, uiLimit = null, params } = args;
                 const [apiUrl, apiParams] = getApiUrlMetadata(defaultEndpoint, url, endpoint, uiLimit, params, true);
                 try {
                     const res = await axios.get(apiUrl, { params: apiParams });
-                    data = res.data;
-                } catch (error) {
-                    console.error(error);
+                    dataToProcess = res.data;
+                } catch (err) {
+                    const errorDetails = getErrorDetails(err);
+                    console.error('API data fetch failed:', errorDetails);
                     setIsDownloading(false);
-                    reject(error);
+                    reject(errorDetails);
                     return;
                 }
             } else {
-                data = storedData;
+                dataToProcess = storedData;
             }
 
             let csvResult = "";
@@ -84,13 +106,13 @@ const useDownload = (modelName, fieldsMetadata, xpath, modelType = null) => {
 
             // Generate a new unique ID for this specific download.
             const downloadId = ++downloadIdCounter;
-            downloadIdRef.current = downloadId; // Store it for potential cleanup.
+            downloadIdRef.current = downloadId;
 
             // Define the callback for this specific download.
             const onMessageCallback = ({ csvChunk, currentRow, totalRows, done, error }) => {
                 if (error) {
                     setIsDownloading(false);
-                    listeners.delete(downloadId); // Clean up listener
+                    listeners.delete(downloadId);
                     downloadIdRef.current = null;
                     reject(error);
                     return;
@@ -103,7 +125,7 @@ const useDownload = (modelName, fieldsMetadata, xpath, modelType = null) => {
 
                 if (done) {
                     setIsDownloading(false);
-                    listeners.delete(downloadId); // Clean up listener
+                    listeners.delete(downloadId);
                     downloadIdRef.current = null;
                     resolve(csvResult);
                 }
@@ -112,8 +134,7 @@ const useDownload = (modelName, fieldsMetadata, xpath, modelType = null) => {
             // Register the callback in our shared map.
             listeners.set(downloadId, onMessageCallback);
 
-            // Send the data to the worker, now including the unique downloadId.
-            sharedWorker.postMessage({ fieldsMetadata, data, xpath, modelType, downloadId });
+            sharedWorker.postMessage({ fieldsMetadata, data: dataToProcess, xpath, modelType, downloadId });
         });
     };
 

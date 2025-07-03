@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { debounce } from 'lodash';
 import PropTypes from 'prop-types';
 import { Popover, Select, Box, Tabs, Tab, TextField, Tooltip } from '@mui/material';
@@ -6,7 +6,6 @@ import { Help, PushPin, PushPinOutlined, Settings } from '@mui/icons-material';
 import Icon from '../../Icon';
 import MenuItem from '../../MenuItem';
 import ValueBasedToggleButton from '../../ValueBasedToggleButton';
-
 import { LAYOUT_TYPES, MODEL_TYPES, HIGHLIGHT_STATES } from '../../../constants';
 import styles from './TableSettingsMenu.module.css';
 
@@ -29,7 +28,6 @@ import styles from './TableSettingsMenu.module.css';
  * @param {function} props.onColumnOrdersChange - Callback when an individual column's order is changed.
  *   Receives the new sequence (number) and the column key (string) as arguments.
  * @param {function} props.onShowLessToggle - Callback when an individual column's "show less" toggle is clicked.
- *
  *
  * @returns {JSX.Element} The rendered component.
  */
@@ -54,7 +52,10 @@ const TableSettingsMenu = ({
   columnNameOverride = [],
   onColumnNameOverrideChange,
   highlightUpdateOverride = [],
-  onHighlightUpdateOverrideChange
+  onHighlightUpdateOverrideChange,
+  highlightDuration,
+  onHighlightDurationChange,
+  onNoCommonKeyToggle
 }) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const [tabIndex, setTabIndex] = useState(0);
@@ -74,6 +75,12 @@ const TableSettingsMenu = ({
       return acc;
     }, {})
   );
+  const [localHighlightDuration, setLocalHighlightDuration] = useState(highlightDuration);
+  const onHighlightDurationChangeRef = useRef(onHighlightDurationChange);
+
+  useEffect(() => {
+    onHighlightDurationChangeRef.current = onHighlightDurationChange;
+  }, [onHighlightDurationChange])
 
   const fieldKey = modelType === MODEL_TYPES.ABBREVIATION_MERGE ? 'key' : 'tableTitle';
 
@@ -97,6 +104,12 @@ const TableSettingsMenu = ({
         setFilteredColumns(columns);
       }
     }, 300)
+  ).current;
+
+  const deboucedOnHighlightDurationChange = useRef(
+    debounce((value) => {
+      onHighlightDurationChangeRef.current(value);
+    }, 1000)
   ).current;
 
   const menuName = 'table-settings';
@@ -124,8 +137,15 @@ const TableSettingsMenu = ({
   };
 
   const handleSearchValueChange = (e) => {
-    setSearchValue(e.target.value);
-    debouncedTransform(e.target.value);
+    const { value } = e.target;
+    setSearchValue(value);
+    debouncedTransform(value);
+  };
+
+  const handleHighlightDurationChange = (e) => {
+    const { value } = e.target;
+    setLocalHighlightDuration(value);
+    deboucedOnHighlightDurationChange(value);
   };
 
   const handleKeyDown = (e) => {
@@ -212,27 +232,28 @@ const TableSettingsMenu = ({
             onChange={(e, newValue) => setTabIndex(newValue)}
             sx={{ borderRight: 1, borderColor: 'divider', minWidth: 100 }}
           >
-            <Tab label="Settings" />
+            <Tab label="Table Config" />
             <Tab label="Show/More" />
-            <Tab label="Absolute Sort" />
             <Tab label="Freeze" />
             <Tab label="Column Name/Help" />
             <Tab label="Highlight" />
-            {/* <Tab label="Sequence" /> */}
+            <Tab label="No Common Key" />
           </Tabs>
           {/* Tab Content */}
           <Box className={styles.content}>
-            <TextField
-              size="small"
-              label="Column Name"
-              value={searchValue}
-              onChange={handleSearchValueChange}
-              onKeyDown={handleKeyDown}
-              autoFocus
-              InputProps={{
-                style: { padding: '6px 10px' },
-              }}
-            />
+            {columns.length > 5 && tabIndex !== 0 && (
+              <TextField
+                size="small"
+                label="Column Name"
+                value={searchValue}
+                onChange={handleSearchValueChange}
+                onKeyDown={handleKeyDown}
+                autoFocus
+                InputProps={{
+                  style: { padding: '6px 10px' },
+                }}
+              />
+            )}
             {tabIndex === 0 && (
               <>
                 <Box className={styles.item}>
@@ -243,7 +264,7 @@ const TableSettingsMenu = ({
                     selected={commonKeyCollapse}
                     disabled={false}
                     value={commonKeyCollapse}
-                    captions={commonKeyCollapse ? 'Expand' : 'Collapse'}
+                    caption={commonKeyCollapse ? 'Expand' : 'Collapse'}
                     xpath="common_key_collapse"
                     color={commonKeyCollapse ? 'debug' : 'info'}
                     onClick={onCommonKeyCollapseToggle}
@@ -257,10 +278,23 @@ const TableSettingsMenu = ({
                     selected={stickyHeader}
                     disabled={false}
                     value={stickyHeader}
-                    captions={stickyHeader ? 'Disable' : 'Enable'}
+                    caption={stickyHeader ? 'Disable' : 'Enable'}
                     xpath="sticky_header"
                     color={stickyHeader ? 'info' : 'debug'}
                     onClick={onStickyHeaderToggle}
+                  />
+                </Box>
+                <Box className={styles.item}>
+                  <span className={styles.item_label}>Highlight Duration (Sec)</span>
+                  <TextField
+                    size="small"
+                    value={localHighlightDuration ?? ''}
+                    onChange={handleHighlightDurationChange}
+                    onKeyDown={handleKeyDown}
+                    autoFocus
+                    InputProps={{
+                      style: { padding: '6px 10px' },
+                    }}
                   />
                 </Box>
               </>
@@ -320,37 +354,6 @@ const TableSettingsMenu = ({
 
                   const columnLabel = column.elaborateTitle ? column[fieldKey] : column.key;
                   // Determine the toggle states and captions.
-                  const absoluteSort = column.absoluteSort ?? false;
-                  const showCaption = absoluteSort ? 'Disable' : 'Enable';
-                  const showColor = absoluteSort ? 'success' : 'debug';
-
-                  return (
-                    <Box key={column[fieldKey]} className={styles.item}>
-                      <span className={styles.item_label}>{columnLabel}</span>
-                      <ValueBasedToggleButton
-                        name={column[fieldKey]}
-                        size="small"
-                        selected={absoluteSort}
-                        disabled={false}
-                        value={absoluteSort}
-                        caption={showCaption}
-                        xpath={column[fieldKey]}
-                        color={showColor}
-                        onClick={onAbsoluteSortToggle}
-                      />
-                    </Box>
-                  );
-                })}
-              </>
-            )}
-            {tabIndex === 3 && (
-              <>
-                {filteredColumns.map((column) => {
-                  // Only render columns with a sourceIndex of 0.
-                  if (column.sourceIndex !== 0) return null;
-
-                  const columnLabel = column.elaborateTitle ? column[fieldKey] : column.key;
-                  // Determine the toggle states and captions.
                   const frozen = column.frozenColumn ?? false;
                   const showCaption = frozen ? 'Unfreeze' : 'Freeze';
                   const showColor = frozen ? 'info' : 'debug';
@@ -374,7 +377,7 @@ const TableSettingsMenu = ({
                 })}
               </>
             )}
-            {tabIndex === 4 && (
+            {tabIndex === 3 && (
               <>
                 {filteredColumns.map((column) => {
                   // Only render columns with a sourceIndex of 0.
@@ -386,7 +389,7 @@ const TableSettingsMenu = ({
                     if (!helpText) {
                       helpText = '';
                     }
-                    helpText += `${column.tableTitle} - ${helpText}`;
+                    helpText = `${column.tableTitle} - ${helpText}`;
                   }
 
                   return (
@@ -396,7 +399,7 @@ const TableSettingsMenu = ({
                         <span style={{ margin: '0 10px' }}>
                           {helpText && (
                             <Tooltip title={helpText} disableInteractive>
-                              <Help name="help" sx={{ cursor: 'pointer' }} color="info" fontSize="small" />
+                              <Help sx={{ cursor: 'pointer' }} color="info" fontSize="small" />
                             </Tooltip>
                           )}
                         </span>
@@ -422,7 +425,7 @@ const TableSettingsMenu = ({
                 })}
               </>
             )}
-            {tabIndex === 5 && (
+            {tabIndex === 4 && (
               <>
                 {filteredColumns.map((column) => {
                   // Only render columns with a sourceIndex of 0.
@@ -462,6 +465,37 @@ const TableSettingsMenu = ({
                 })}
               </>
             )}
+            {tabIndex === 5 && (
+              <>
+                {filteredColumns.map((column) => {
+                  // Only render columns with a sourceIndex of 0.
+                  if (column.sourceIndex !== 0) return null;
+
+                  const columnLabel = column.elaborateTitle ? column[fieldKey] : column.key;
+                  // Determine the toggle states and captions.
+                  const isNoCommonKey = column.noCommonKeyDeduced ?? false;
+                  const showCaption = isNoCommonKey ? 'Disable' : 'Enable';
+                  const showColor = isNoCommonKey ? 'info' : 'debug';
+
+                  return (
+                    <Box key={column[fieldKey]} className={styles.item}>
+                      <span className={styles.item_label}>{columnLabel}</span>
+                      <ValueBasedToggleButton
+                        name={column[fieldKey]}
+                        size="small"
+                        selected={isNoCommonKey}
+                        disabled={false}
+                        value={isNoCommonKey}
+                        caption={showCaption}
+                        xpath={column[fieldKey]}
+                        color={showColor}
+                        onClick={onNoCommonKeyToggle}
+                      />
+                    </Box>
+                  );
+                })}
+              </>
+            )}
           </Box>
         </Box>
       </Popover>
@@ -487,7 +521,6 @@ TableSettingsMenu.propTypes = {
       elaborateTitle: PropTypes.bool, // Added from usage
       tableTitle: PropTypes.string, // Added from usage (part of fieldKey logic)
       help: PropTypes.string, // Added from usage
-      absoluteSort: PropTypes.bool, // Added from usage
       frozen: PropTypes.bool, // Added from usage
     })
   ).isRequired,

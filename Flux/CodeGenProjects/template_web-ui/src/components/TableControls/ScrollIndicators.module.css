@@ -1,11 +1,13 @@
 .rightScrollIndicator {
   position: absolute;
-  top: 12px;
+  top: 5px;
   right: 10px;
   transform: translateY(0);
   width: 20px;
   height: 20px;
-  background: rgba(25, 118, 210, 0.9);
+  /* background: rgba(173, 135, 121, 0.4); */
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -13,16 +15,15 @@
   cursor: pointer;
   z-index: 100;
   color: white;
-  box-shadow: 0 0 20px rgba(25, 118, 210, 0.6);
+  box-shadow: 0 0 30px rgba(173, 135, 121, 0.8), 0 0 15px rgba(173, 135, 121, 1);
   animation: glow 2s ease-in-out infinite alternate;
   transition: all 0.3s ease;
   pointer-events: auto;
-  background-color: rgba(255, 255, 255, 0.4);
 }
 
 .rightScrollIndicator:hover {
-  background: rgba(25, 118, 210, 1);
-  box-shadow: 0 0 30px rgba(25, 118, 210, 0.8);
+  background: rgba(173, 135, 121, 0.7);
+  box-shadow: 0 0 40px rgba(173, 135, 121, 1), 0 0 20px rgba(173, 135, 121, 1);
   transform: translateY(0) scale(1.1);
 }
 
@@ -32,28 +33,30 @@
 
 .leftScrollIndicator {
   position: absolute;
-  top: 12px;
+  top: 5px;
   left: 10px;
   transform: translateY(0);
   width: 20px;
   height: 20px;
-  background: rgba(25, 118, 210, 0.9);
-  background-color: rgba(255, 255, 255, 0.4);
+  /* background: rgba(173, 135, 121, 0.4); */
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   z-index: 100;
-  box-shadow: 0 0 20px rgba(25, 118, 210, 0.6);
+  color: white;
+  box-shadow: 0 0 30px rgba(173, 135, 121, 0.8), 0 0 15px rgba(173, 135, 121, 1);
   animation: glow 2s ease-in-out infinite alternate;
   transition: all 0.3s ease;
   pointer-events: auto;
 }
 
 .leftScrollIndicator:hover {
-  background: rgba(25, 118, 210, 1);
-  box-shadow: 0 0 30px rgba(25, 118, 210, 0.8);
+  background: rgba(173, 135, 121, 0.7);
+  box-shadow: 0 0 40px rgba(173, 135, 121, 1), 0 0 20px rgba(173, 135, 121, 1);
   transform: translateY(0) scale(1.1);
 }
 
@@ -63,41 +66,41 @@
 
 @keyframes glow {
   from {
-    box-shadow: 0 0 20px rgba(25, 118, 210, 0.6);
+    box-shadow: 0 0 25px rgba(173, 135, 121, 0.7), 0 0 12px rgba(173, 135, 121, 0.9);
   }
   to {
-    box-shadow: 0 0 30px rgba(25, 118, 210, 0.9), 0 0 40px rgba(25, 118, 210, 0.4);
+    box-shadow: 0 0 45px rgba(173, 135, 121, 1), 0 0 25px rgba(173, 135, 121, 1), 0 0 60px rgba(173, 135, 121, 0.6);
   }
 }
 
 /* Dark theme - properly override background color */
 @media (prefers-color-scheme: dark) {
   .rightScrollIndicator {
-    background: rgba(144, 202, 249, 0.9);
-    box-shadow: 0 0 20px rgba(144, 202, 249, 0.6);
+    background: rgba(173, 135, 121, 0.5);
+    box-shadow: 0 0 35px rgba(173, 135, 121, 0.9), 0 0 18px rgba(173, 135, 121, 1);
   }
   
   .rightScrollIndicator:hover {
-    background: rgba(144, 202, 249, 1);
-    box-shadow: 0 0 30px rgba(144, 202, 249, 0.8);
+    background: rgba(173, 135, 121, 0.8);
+    box-shadow: 0 0 50px rgba(173, 135, 121, 1), 0 0 25px rgba(173, 135, 121, 1);
   }
 
   .leftScrollIndicator {
-    background: rgba(144, 202, 249, 0.9);
-    box-shadow: 0 0 20px rgba(144, 202, 249, 0.6);
+    background: rgba(173, 135, 121, 0.5);
+    box-shadow: 0 0 35px rgba(173, 135, 121, 0.9), 0 0 18px rgba(173, 135, 121, 1);
   }
   
   .leftScrollIndicator:hover {
-    background: rgba(144, 202, 249, 1);
-    box-shadow: 0 0 30px rgba(144, 202, 249, 0.8);
+    background: rgba(173, 135, 121, 0.8);
+    box-shadow: 0 0 50px rgba(173, 135, 121, 1), 0 0 25px rgba(173, 135, 121, 1);
   }
 
   @keyframes glow {
     from {
-      box-shadow: 0 0 20px rgba(144, 202, 249, 0.6);
+      box-shadow: 0 0 30px rgba(173, 135, 121, 0.8), 0 0 15px rgba(173, 135, 121, 1);
     }
     to {
-      box-shadow: 0 0 30px rgba(144, 202, 249, 0.9), 0 0 40px rgba(144, 202, 249, 0.4);
+      box-shadow: 0 0 55px rgba(173, 135, 121, 1), 0 0 30px rgba(173, 135, 121, 1), 0 0 70px rgba(173, 135, 121, 0.7);
     }
   }
 } 

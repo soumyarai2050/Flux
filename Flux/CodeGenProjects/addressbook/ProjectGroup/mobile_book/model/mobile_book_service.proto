@@ -5,44 +5,35 @@ import "ui_option_utils.proto";
 import "projects_core.proto";
 import "barter_core.proto";
 import "dept_book_n_mobile_book_n_street_book_n_basket_book_core.proto";
-import "street_book_n_post_book_core.proto";
-import "street_book_n_post_book_n_basket_book_core.proto";
 
 package mobile_book;
 
 option (FluxFileDateTimeGranularity) = MILLI_SEC;
 option (FluxFileDateTimePrintTimezone) = "LOCAL";
-
-option (FluxFileImportDependencyModel) = {
-  ImportFileName: "dept_book_n_mobile_book_n_street_book_n_basket_book_core.proto",
-  ImportModelName: "TopOfBook",
-  ImportModelName: "MarketDepth",
-  ImportModelName: "LastBarter",
-  ImportModelName: "TopOfBookList",
-  ImportModelName: "MarketDepthList",
-  ImportModelName: "LastBarterList",
-  ImportModelName: "RawLastBarterHistory",
-  ImportModelName: "RawLastBarterHistoryList",
-  ImportModelName: "SymbolOverview",
-  ImportModelName: "SymbolOverviewList"
-};
-
-option (FluxFileImportDependencyModel) = {
-    ImportFileName: "street_book_n_post_book_n_basket_book_core.proto",
-    ImportModelName: "ChoreLedger",
-    ImportModelName: "ChoreLedgerList",
-    ImportModelName: "ChoreSnapshot",
-    ImportModelName: "ChoreSnapshotList",
-
-};
-
-// option (FluxFileImportDependencyModel) = {
-//     ImportFileName: "street_book_service.proto",
-//     ImportModelName: "DealsLedger",
-//    ImportModelName: "DealsLedgerList"
-// };
-
 option (FluxFileCRUDPortOffset) = 40;
+
+
+message SymbolInterests{
+  option (FluxMsgJsonRoot) = {
+    CreateOp: AggregateType_UNSPECIFIED,
+    CreateAllOp: AggregateType_UNSPECIFIED,
+    ReadOp: AggregateType_UNSPECIFIED,
+    PatchOp: AggregateType_UNSPECIFIED,
+    DeleteOp: AggregateType_UNSPECIFIED,
+    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
+  };
+  option (FluxMsgJsonQuery) = {
+      QueryName: "remove_symbol_interest_by_symbol"
+      QueryParams: {
+        QueryParamName: "symbol",
+        QueryParamDataType: "str"
+      },
+      QueryRouteType: PATCH
+  };
+  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  required string symbol_name = 2 [(FluxFldIndex) = true];
+  required string semaphore_full_path = 3;
+}
 
 message SideSpecificMobileBookBrief{
   optional float allowed_px_by_max_basis_points = 1 [(FluxFldHelp) = "(bbo_aggressive / 100) * (max_basis_points/100) + bbo_aggressive"];
@@ -143,8 +134,9 @@ message RawMarketDepthHistoryList {
   repeated RawMarketDepthHistory raw_market_depth_history = 1;
 }
 
-// TODO: Add message
-// DealsLedger
-// ChoreBrief
-// inside Security add InstrumentType
-// ChoreLedger
+// used to avoid unused import warning by using any random msg or enum from imported file causing warning
+message ImportWarningAvoidDummyMessage {
+    optional ButtonType temp = 1;
+  optional DummyEnumDMSB temp2 = 2;
+  optional Severity temp4 = 3;
+}

@@ -1,0 +1,122 @@
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+.app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.react-grid-layout {
+  position: sticky !important;
+}
+
+.infinity-menu-container {
+  padding: 10px;
+  border-radius: 5px;
+}
+
+.infinity-menu-display-tree-container ul {
+  margin: 0;
+  padding-left: 15px;
+}
+
+.infinity-menu-display-tree-container ul>div {
+  margin: 1px 0;
+}
+
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+
+/* Track */
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+/* Handle */
+::-webkit-scrollbar-thumb {
+  /* background: #888; */
+  background-color: var(--dark-bg-secondary);
+}
+
+/* Handle on hover */
+::-webkit-scrollbar-thumb:hover {
+  /* background: #555; */
+  background-color: var(--dark-bg-primary);
+}
+
+@keyframes blink {
+  from {
+    opacity: 1
+  }
+
+  50% {
+    opacity: 0.8
+  }
+
+  to {
+    opacity: 1
+  }
+}
+
+.pvtAxisContainer {
+  background-color: inherit !important;
+}
+
+.pvtVals {
+  background-color: inherit !important;
+}
+
+.MuiButtonBase-root {
+  text-transform: none !important;
+}
+
+div.MuiModal-root:has(> div[style*="opacity: 0"]) {
+  pointer-events: none;
+  z-index: -1;
+}
+
+div.MuiBackdrop-root:has(> div[style*="opacity: 0"]) {
+  pointer-events: none;
+  z-index: -1;
+}
+
+.pvtRowLabel {
+  vertical-align: top;
+}
+
+.react-resizable-handle {
+  background: yellow;
+  border-radius: 5px;
+  box-shadow: -2px -2px 3px rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+}
+
+.react-json-view .copy-to-clipboard-container {
+  display: inline-block !important;
+}
+
+.react-json-view .string-value {
+  overflow-wrap: anywhere;
+}
+
+.react-json-view {
+  /* background-color: var(--grey-200) !important; */
+  padding: 5px;
+  border-radius: 5px;
+}

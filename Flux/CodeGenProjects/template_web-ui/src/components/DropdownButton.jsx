@@ -4,6 +4,7 @@ import Button from '@mui/material/Button';
 import Menu from '@mui/material/Menu';
 import MenuItem from '@mui/material/MenuItem';
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
+import classes from './DropdownButton.module.css';
 
 export default function DropdownButton({
   options,
@@ -53,14 +54,8 @@ export default function DropdownButton({
     setAnchorEl(null);
   };
 
-  const dropdownContainer = {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    margin: '0 4px',
-    borderRadius: '5px'
-  }
-
   return (
-    <div style={dropdownContainer}>
+    <div className={classes.dropdown_container}>
       <Button
         aria-haspopup="true"
         aria-expanded={open ? 'true' : undefined}
