@@ -308,6 +308,16 @@
   font-size: 13px !important;
 }
 
+.popupOpen {
+  background-color: #dbee32; /* A standard MUI subtle highlight */
+  /* You could also use a more prominent color if you prefer */
+  /*gr backound-color: #e3f2fd; */ /* A light blue, for example */
+}
+
+/* Optional but recommended: Keep the highlight on hover */
+.popupOpen:hover {
+  background-color: #8dc2e9; /* A standard MUI subtle highlight */}
+
 /* Responsive adjustments */
 @media (max-width: 600px) {
   .popoverPaper {

@@ -61,7 +61,7 @@ class UpdateWebUIConfiguration:
 
         content = re.sub(
             r'const API_VIEW_ROOT = [^;]+;',
-            f"const API_ROOT = `http://{self.server_host}:{self.view_port}/"+"${PROJECT_NAME}`;", content)
+            f"const API_VIEW_ROOT = `http://{self.server_host}:{self.view_port}/"+"${PROJECT_NAME}`;", content)
 
         content = re.sub(
             r'export const API_PUBLIC_URL = [^;]+;',

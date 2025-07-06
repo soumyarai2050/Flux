@@ -1,10 +1,11 @@
 import { DB_ID, MODES } from '../constants';
 import {
-    getRowsFromAbbreviation, applyFilter, getActiveRows, getGroupedTableRows, getMaxRowSize,
-    getCommonKeyCollections, getGroupedTableColumns, getTableColumns,
-    getFilteredCells
-} from '../utils/index.js';
-import { sortColumns, getActiveIds, applyRowIdsFilter, getSortOrdersWithAbs, getUniqueValues } from '../utils/index.js';
+    getRowsFromAbbreviation, getActiveRows, getCommonKeyCollections, getGroupedTableColumns,
+    getTableColumns, getFilteredCells
+} from '../utils/ui/tableUtils';
+import { applyFilter } from '../utils/core/dataFiltering';
+import { getGroupedTableRows, getMaxRowSize } from '../utils/core/dataGrouping';
+import { sortColumns, getActiveIds, applyRowIdsFilter, getSortOrdersWithAbs, getUniqueValues } from '../utils/ui/uiUtils';
 
 onmessage = (e) => {
     const {

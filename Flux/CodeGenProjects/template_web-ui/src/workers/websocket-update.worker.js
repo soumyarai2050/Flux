@@ -1,5 +1,5 @@
 import { DB_ID } from '../constants';
-import { sortAlertArray } from '../utils/index.js';
+import { sortAlertArray } from '../utils/network/websocketUtils';
 
 onmessage = (event) => {
     const { messages, storedArray, uiLimit, isAlertModel, activeItemIdMap = null } = event.data;

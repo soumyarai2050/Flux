@@ -78,6 +78,8 @@ export const complexFieldProps = [
      * @property {string} usageName - The standardized name used in the UI code.
      */
     { propertyName: "hide", usageName: "hide" },
+
+    { propertyName: "array_obj_identifier", usageName: "array_obj_identifier" },
 ]
 
 
@@ -297,7 +299,8 @@ export const fieldProps = [
      * @property {string} propertyName - The original property name from the schema.
      * @property {string} usageName - The standardized name used in the UI code.
      */
-    { propertyName: "visible_if", usageName: "visible_if" }
+    { propertyName: "visible_if", usageName: "visible_if" },
+
 ]
 
 

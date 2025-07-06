@@ -213,6 +213,7 @@ class BaseProtoPlugin(ABC):
     flux_fld_diff_threshold: ClassVar[str] = "FluxFldDiffThreshold"
     flux_fld_zero_as_none: ClassVar[str] = "FluxFldZeroAsNone"
     flux_fld_visible_if: ClassVar[str] = "FluxFldVisibleIf"
+    flux_fld_array_obj_identifier: ClassVar[str] = "FluxFldArrayObjIdentifier"
     executor_option_is_websocket_model_field: ClassVar[str] = "IsWebSocketModel"
     executor_option_enable_notify_all_field: ClassVar[str] = "EnableNotifyAll"
     executor_option_is_top_lvl_model_field: ClassVar[str] = "IsTopLvlModel"

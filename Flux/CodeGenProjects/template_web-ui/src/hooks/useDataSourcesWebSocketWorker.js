@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useDispatch } from 'react-redux';
 import { WEBSOCKET_CLOSE_CODES, WEBSOCKET_RETRY_CODES } from '../constants';
-import { isWebSocketAlive } from '../utils/index.js';
+import { isWebSocketAlive } from '../utils/network/websocketUtils';
 import { clearWebSocketConnection, setWebSocketConnection } from '../cache/websocketConnectionCache';
 
 /**

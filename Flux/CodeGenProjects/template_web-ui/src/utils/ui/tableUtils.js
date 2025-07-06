@@ -185,81 +185,130 @@ export function getTableRows(collections, mode, originalData, data, xpath, repea
  * @returns {Array<Object>} An array of column definition objects that have common keys across the rows.
  */
 export function getCommonKeyCollections(rows, tableColumns, hide = true, collectionView = false, repeatedView = false, showLess = false) {
-    if (rows.length > 1 || (rows.length === 1 && (collectionView || repeatedView))) {
-        // exclude column with 'noCommonKey' as it cannot be added in common key
-        tableColumns = tableColumns.map(column => Object.assign({}, column)).filter(column => !column.noCommonKeyDeduced);
-    }
-    let commonKeyCollections = [];
-    if (rows.length === 1 && (collectionView || repeatedView)) {
-        const hasButtonType = tableColumns.find(obj => obj.type === 'button');
-        if (hasButtonType) {
-            tableColumns.forEach((column) => {
-                if (hide && column.hide) return;
-                if (column.joinKey || column.commonGroupKey) return;
-                if (showLess && column.showLess) return;
-                let fieldName = column.tableTitle;
-                if (collectionView) {
-                    if ((column.type === 'button' || column.type === 'progressBar' || column.type === 'alert_bubble')) {
-                        return;
-                    }
-                    fieldName = column.key;
-                }
-                const value = rows[0][column.sourceIndex]?.[fieldName];
-                if (!column.noCommonKeyDeduced) {
-                    if (value === null || value === undefined) {
-                        commonKeyCollections.push(column);
-                    } else if (value === 0 && !column.displayZero) {
-                        commonKeyCollections.push(column);
-                    }
-                }
-            })
-            return commonKeyCollections;
-        }
-    }
-    if (rows.length > 0) {
-        tableColumns.map((column) => {
-            if (hide && column.hide) return;
-            if (column.joinKey || column.commonGroupKey) return;
-            if (showLess && column.showLess) return;
-            let fieldName = column.tableTitle;
-            if (collectionView) {
-                if (rows.length > 1 && (column.type === 'button' || column.type === 'progressBar' || column.type === 'alert_bubble')) {
-                    return;
-                }
-                fieldName = column.key;
-            }
-            let found = true;
-            let firstValue = null;
-            for (let i = 0; i < rows.length; i++) {
-                const value = rows[i][column.sourceIndex]?.[fieldName];
-                if (!(value === null || value === undefined || value === '')) {
-                    firstValue = value;
-                    break;
-                }
-            }
-            for (let i = 0; i < rows.length; i++) {
-                const value = rows[i][column.sourceIndex]?.[fieldName];
-                if (value !== firstValue && firstValue !== null) {
-                    if (column.type === DATA_TYPES.NUMBER && column.zeroAsNone && firstValue === 0 && value === null) {
-                        continue;
-                    } else {
-                        found = false;
-                        break;
-                    }
-                }
-                if (!found) {
-                    break;
-                }
-            }
-            if (found) {
-                let collection = column;
-                collection.value = firstValue;
-                commonKeyCollections.push(collection);
-            }
-            return column;
+    const filteredColumns = tableColumns
+        .filter((column) => {
+            if (column.noCommonKeyDeduced) return false;
+            if (hide && column.hide) return false;
+            if (showLess && column.showLess) return false;
+            if (column.joinKey || column.commonGroupKey) return false;
+            return true;
         })
-    }
-    return commonKeyCollections;
+        .map((column) => Object.assign({}, column));
+
+    if (!rows || rows.length === 0) return [];
+
+    const commonKeyColumns = [];
+    filteredColumns.forEach((column) => {
+        const keyField = collectionView ? column.key : column.tableTitle;
+        if (rows.length === 1) {
+            if (['button', 'progressBar', 'alert_bubble'].includes(column.type) && collectionView) return false;
+
+            const value = rows[0][column.sourceIndex]?.[keyField];
+            column.value = value;
+            commonKeyColumns.push(column);
+        } else {
+            if (['button', 'progressBar', 'alert_bubble'].includes(column.type)) return;
+
+            const valueSet = new Set();
+            for (let i = 0; i < rows.length; i++) {
+                const value = rows[i][column.sourceIndex]?.[keyField];
+                if (value == null || value === '') {
+                    valueSet.add(null);
+                } else {
+                    // non-null value found
+                    if (value === 0 && column.zeroAsNone) {
+                        valueSet.add(null);
+                    } else {
+                        valueSet.add(value);
+                    }
+                }
+                if (valueSet.size > 1) {
+                    break;
+                }
+            }
+            if (valueSet.size > 1) return;
+
+            column.value = valueSet.size === 1 ? [...valueSet][0] : null;
+            commonKeyColumns.push(column);
+        }
+    })
+    return commonKeyColumns;
+
+    // if (rows.length > 1 || (rows.length === 1 && (collectionView || repeatedView))) {
+    //     // exclude column with 'noCommonKey' as it cannot be added in common key
+    //     tableColumns = tableColumns.map(column => Object.assign({}, column)).filter(column => !column.noCommonKeyDeduced);
+    // }
+    // let commonKeyCollections = [];
+    // if (rows.length === 1 && (collectionView || repeatedView)) {
+    //     const hasButtonType = tableColumns.find(obj => obj.type === 'button');
+    //     if (hasButtonType) {
+    //         tableColumns.forEach((column) => {
+    //             if (hide && column.hide) return;
+    //             if (column.joinKey || column.commonGroupKey) return;
+    //             if (showLess && column.showLess) return;
+    //             let fieldName = column.tableTitle;
+    //             if (collectionView) {
+    //                 if ((column.type === 'button' || column.type === 'progressBar' || column.type === 'alert_bubble')) {
+    //                     return;
+    //                 }
+    //                 fieldName = column.key;
+    //             }
+    //             const value = rows[0][column.sourceIndex]?.[fieldName];
+    //             if (!column.noCommonKeyDeduced) {
+    //                 if (value === null || value === undefined) {
+    //                     commonKeyCollections.push(column);
+    //                 } else if (value === 0 && !column.displayZero) {
+    //                     commonKeyCollections.push(column);
+    //                 }
+    //             }
+    //         })
+    //         return commonKeyCollections;
+    //     }
+    // }
+    // if (rows.length > 0) {
+    //     tableColumns.map((column) => {
+    //         if (hide && column.hide) return;
+    //         if (column.joinKey || column.commonGroupKey) return;
+    //         if (showLess && column.showLess) return;
+    //         let fieldName = column.tableTitle;
+    //         if (collectionView) {
+    //             if (rows.length > 1 && (column.type === 'button' || column.type === 'progressBar' || column.type === 'alert_bubble')) {
+    //                 return;
+    //             }
+    //             fieldName = column.key;
+    //         }
+    //         let found = true;
+    //         let firstValue = null;
+    //         for (let i = 0; i < rows.length; i++) {
+    //             const value = rows[i][column.sourceIndex]?.[fieldName];
+    //             if (!(value === null || value === undefined || value === '')) {
+    //                 firstValue = value;
+    //                 break;
+    //             }
+    //         }
+    //         for (let i = 0; i < rows.length; i++) {
+    //             const value = rows[i][column.sourceIndex]?.[fieldName];
+    //             if (value !== firstValue && firstValue !== null) {
+    //                 if (column.type === DATA_TYPES.NUMBER && column.zeroAsNone && firstValue === 0 && value === null) {
+    //                     continue;
+    //                 } else {
+    //                     found = false;
+    //                     break;
+    //                 }
+    //             }
+    //             if (!found) {
+    //                 break;
+    //             }
+    //         }
+    //         if (found) {
+    //             let collection = column;
+    //             collection.value = firstValue;
+    //             commonKeyCollections.push(collection);
+    //         }
+    //         return column;
+    //     })
+    // }
+    // return commonKeyCollections;
 }
 
 

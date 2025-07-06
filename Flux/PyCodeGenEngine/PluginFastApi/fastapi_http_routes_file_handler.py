@@ -50,6 +50,9 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         indent_count = indent_times * 4
         return output_str, indent_count
 
+    def get_avoid_db_n_ws_update_var_name(self, message_name_snake_cased: str):
+        return f"avoid_{message_name_snake_cased}_db_n_ws_update"
+
     def _handle_msgspec_common_underlying_post_gen(self, message: protogen.Message, aggregation_type, msg_has_links,
                                                    shared_lock_list) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
@@ -63,9 +66,11 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str += mutex_handling_str
         output_str += (" " * indent_count + f"    await callback_class.create_{message_name_snake_cased}_pre("
                        f"{message_name_snake_cased}_msgspec_obj)\n")
-        output_str += (" " * indent_count + f"    avoid_{message_name_snake_cased}_db_update = config_yaml_dict.get("
-                       f"'avoid_{message_name_snake_cased}_db_update')\n")
-        output_str += " " * indent_count + f"    if not avoid_{message_name_snake_cased}_db_update:\n"
+        output_str += (" " * indent_count + f"    {self.get_avoid_db_n_ws_update_var_name(message_name_snake_cased)}"
+                                            f" = config_yaml_dict.get("
+                       f"'{self.get_avoid_db_n_ws_update_var_name(message_name_snake_cased)}')\n")
+        output_str += (" " * indent_count +
+                       f"    if not {self.get_avoid_db_n_ws_update_var_name(message_name_snake_cased)}:\n")
         indent_count += 4
         output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
         output_str += " " * indent_count + \
@@ -260,9 +265,10 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             else:
                 output_str += " " * indent_count + \
                               f"    await callback_class.create_{message_name_snake_cased}_pre({message_name_snake_cased})\n"
-            output_str += " " * indent_count + (f"    avoid_{message_name_snake_cased}_db_update = config_yaml_dict.get("
-                                                f"'avoid_{message_name_snake_cased}_db_update')\n")
-            output_str += " " * indent_count + f"    if not avoid_{message_name_snake_cased}_db_update:\n"
+            output_str += " " * indent_count + (
+                f"    {self.get_avoid_db_n_ws_update_var_name(message_name_snake_cased)} = config_yaml_dict.get("
+                f"'{self.get_avoid_db_n_ws_update_var_name(message_name_snake_cased)}')\n")
+            output_str += " " * indent_count + f"    if not {self.get_avoid_db_n_ws_update_var_name(message_name_snake_cased)}:\n"
             indent_count += 4
             output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
             if model_type == ModelType.Dataclass:
@@ -435,7 +441,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                       f"    await callback_class.create_all_{message_name_snake_cased}_pre(" \
                       f"{message_name_snake_cased}_msgspec_obj_list)\n"
         output_str += " " * indent_count + (f"    if not config_yaml_dict.get("
-                                            f"'avoid_{message_name_snake_cased}_db_update'):\n")
+                                            f"'{self.get_avoid_db_n_ws_update_var_name(message_name_snake_cased)}'):\n")
         indent_count += 4
         output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
         output_str += " " * indent_count + \
@@ -634,7 +640,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                               f"    await callback_class.create_all_{message_name_snake_cased}_pre(" \
                               f"{message_name_snake_cased}_list)\n"
             output_str += " " * indent_count + (f"    if not config_yaml_dict.get("
-                                                f"'avoid_{message_name_snake_cased}_db_update'):\n")
+                                                f"'{self.get_avoid_db_n_ws_update_var_name(message_name_snake_cased)}'):\n")
             indent_count += 4
             output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
             if model_type == ModelType.Dataclass:
@@ -839,9 +845,9 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                                 f"await callback_class.update_{message_name_snake_cased}_pre("
                                                 f"{message_name_snake_cased}_update_msgspec_obj)\n")
         output_str += " " * indent_count + (
-            f"    avoid_{message_name_snake_cased}_db_update = config_yaml_dict.get("
-            f"'avoid_{message_name_snake_cased}_db_update')\n")
-        output_str += " " * indent_count + f"    if not avoid_{message_name_snake_cased}_db_update:\n"
+            f"    {self.get_avoid_db_n_ws_update_var_name(message_name_snake_cased)} = config_yaml_dict.get("
+            f"'{self.get_avoid_db_n_ws_update_var_name(message_name_snake_cased)}')\n")
+        output_str += " " * indent_count + f"    if not {self.get_avoid_db_n_ws_update_var_name(message_name_snake_cased)}:\n"
         indent_count += 4
         output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
         output_str += " " * indent_count + \
@@ -1042,9 +1048,11 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                 output_str += " " * indent_count + (f"        raise HTTPException(status_code=503, detail="
                                                     f"'callback_class.partial_update_{message_name_snake_cased}_pre returned "
                                                     f"None instead of updated {message_name_snake_cased}_updated  ')\n")
-            output_str += " " * indent_count + (f"    avoid_{message_name_snake_cased}_db_update = config_yaml_dict.get("
-                                                f"'avoid_{message_name_snake_cased}_db_update')\n")
-            output_str += " " * indent_count + (f"    if not avoid_{message_name_snake_cased}_db_update:\n")
+            output_str += " " * indent_count + (
+                f"    {self.get_avoid_db_n_ws_update_var_name(message_name_snake_cased)} = config_yaml_dict.get("
+                f"'{self.get_avoid_db_n_ws_update_var_name(message_name_snake_cased)}')\n")
+            output_str += " " * indent_count + (
+                          f"    if not {self.get_avoid_db_n_ws_update_var_name(message_name_snake_cased)}:\n")
             indent_count += 4
             output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
             if model_type == ModelType.Dataclass:
@@ -1242,9 +1250,9 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += " " * indent_count + (f"    {message_name_snake_cased}_update_msgspec_obj_list = "
                                                 f"await callback_class.update_all_{message_name_snake_cased}_pre("
                                                 f"{message_name_snake_cased}_update_msgspec_obj_list)\n")
-        output_str += " " * indent_count + (f"    avoid_{message_name_snake_cased}_db_update = config_yaml_dict.get("
-                                            f"'avoid_{message_name_snake_cased}_db_update')\n")
-        output_str += " " * indent_count + f"    if not avoid_{message_name_snake_cased}_db_update:\n"
+        output_str += " " * indent_count + (f"    {self.get_avoid_db_n_ws_update_var_name(message_name_snake_cased)} = config_yaml_dict.get("
+                                            f"'{self.get_avoid_db_n_ws_update_var_name(message_name_snake_cased)}')\n")
+        output_str += " " * indent_count + f"    if not {self.get_avoid_db_n_ws_update_var_name(message_name_snake_cased)}:\n"
         indent_count += 4
         output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
         output_str += " " * indent_count + \
@@ -1481,9 +1489,9 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                                     f"'callback_class.update_all_{message_name_snake_cased}_pre returned "
                                                     f"empty list instead of updated "
                                                     f"{message_name_snake_cased}_updated_list ')\n")
-            output_str += " " * indent_count + (f"    avoid_{message_name_snake_cased}_db_update = config_yaml_dict.get("
-                                                f"'avoid_{message_name_snake_cased}_db_update')\n")
-            output_str += " " * indent_count + f"    if not avoid_{message_name_snake_cased}_db_update:\n"
+            output_str += " " * indent_count + (f"    {self.get_avoid_db_n_ws_update_var_name(message_name_snake_cased)} = config_yaml_dict.get("
+                                                f"'{self.get_avoid_db_n_ws_update_var_name(message_name_snake_cased)}')\n")
+            output_str += " " * indent_count + f"    if not {self.get_avoid_db_n_ws_update_var_name(message_name_snake_cased)}:\n"
             indent_count += 4
             output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
             if model_type == ModelType.Dataclass:
@@ -1695,7 +1703,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             f"await callback_class.partial_update_{message_name_snake_cased}_pre("
             f"{fetch_json_dict_variable_name}, {message_name_snake_cased}_update_json_dict)\n")
         output_str += " " * indent_count + (f"    if not config_yaml_dict.get("
-                                            f"'avoid_{message_name_snake_cased}_db_update'):\n")
+                                            f"'{self.get_avoid_db_n_ws_update_var_name(message_name_snake_cased)}'):\n")
         indent_count += 4
         output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
         output_str += " " * indent_count + \
@@ -1891,7 +1899,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                                     f"'callback_class.partial_update_{message_name_snake_cased}_pre returned "
                                                     f"None instead of updated {message_name_snake_cased}_update_req_json ')\n")
             output_str += " " * indent_count + (f"    if not config_yaml_dict.get("
-                                                f"'avoid_{message_name_snake_cased}_db_update'):\n")
+                                                f"'{self.get_avoid_db_n_ws_update_var_name(message_name_snake_cased)}'):\n")
             indent_count += 4
             output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
             if model_type == ModelType.Dataclass:
@@ -2388,7 +2396,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             f"await callback_class.partial_update_all_{message_name_snake_cased}_pre("
             f"{fetch_json_dict_variable_name}, {message_name_snake_cased}_update_json_dict_list)\n")
         output_str += " " * indent_count + (f"    if not config_yaml_dict.get("
-                                            f"'avoid_{message_name_snake_cased}_db_update'):\n")
+                                            f"'{self.get_avoid_db_n_ws_update_var_name(message_name_snake_cased)}'):\n")
         indent_count += 4
         output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
         output_str += " " * indent_count + \
@@ -2601,7 +2609,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                                     f"empty list instead of updated "
                                                     f"{message_name_snake_cased}_update_req_json_list ')\n")
             output_str += " " * indent_count + (f"    if not config_yaml_dict.get("
-                                                f"'avoid_{message_name_snake_cased}_db_update'):\n")
+                                                f"'{self.get_avoid_db_n_ws_update_var_name(message_name_snake_cased)}'):\n")
             indent_count += 4
             output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
             if model_type == ModelType.Dataclass:

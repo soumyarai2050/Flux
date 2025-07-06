@@ -40,6 +40,7 @@ class SecurityRecord(MsgspecBaseModel):
     tick_size: float | None = None
     figi: str | None = None
     secondary_figi: str | None = None
+    barteringCurrency: str | None = None
 
 
 class SecurityRecordManager:

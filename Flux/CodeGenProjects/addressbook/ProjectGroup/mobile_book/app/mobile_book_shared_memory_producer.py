@@ -28,12 +28,13 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.app.mobile_book_s
 )
 from FluxPythonUtils.scripts.pthread_shm_mutex import PThreadShmMutex, pthread_mutex_t
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.generated.ORMModel.mobile_book_service_ts_utils import (
-    get_epoch_from_pendulum_dt)
+    get_epoch_from_pendulum_dt, get_pendulum_dt_from_epoch)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.generated.ORMModel.mobile_book_service_msgspec_model import (
     LastBarter as LastBarterMsgspec, LastBarterBaseModel as LastBarterMsgspecBaseModel,
     TopOfBook as TopOfBookMsgspec, TopOfBookBaseModel as TopOfBookMsgspecBaseModel,
     MarketDepth as MarketDepthMsgspec, MarketDepthBaseModel as MarketDepthMsgspecBaseModel,
-    SymbolOverview as SymbolOverviewMsgspec, SymbolOverviewBaseModel as SymbolOverviewMsgspecBaseModel)
+    SymbolOverview as SymbolOverviewMsgspec, SymbolOverviewBaseModel as SymbolOverviewMsgspecBaseModel,
+    Quote as QuoteMsgspec, MarketBarterVolume as MarketBarterVolumeMsgspec)
 
 EXPECTED_SHM_SIGNATURE: int = 0xFAFAFAFAFAFAFAFA
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -107,11 +108,11 @@ class MobileBookSharedMemoryProducer:
 
     # --- Public Interface Methods (symbol arg is no longer needed) ---
 
-    def update_market_depth(self, md_id: int, side: TickType, position: int,
-                            px: float, qty: int, exch_time_ns: int, arrival_time_ns: int,
-                            market_maker: Optional[str] = None, is_smart_depth: Optional[bool] = None,
-                            cumulative_notional: Optional[float] = None, cumulative_qty: Optional[int] = None,
-                            cumulative_avg_px: Optional[float] = None):
+    def update_market_depth_shm(self, md_id: int, side: TickType, position: int,
+                                px: float, qty: int, exch_time_ns: int, arrival_time_ns: int,
+                                market_maker: Optional[str] = None, is_smart_depth: Optional[bool] = None,
+                                cumulative_notional: Optional[float] = None, cumulative_qty: Optional[int] = None,
+                                cumulative_avg_px: Optional[float] = None):
         # if not self.mutex_wrapper or not self.semaphore or not self.shm_root_ptr or not self._mobile_book_struct:
         #     return logging.error(f"Producer for '{self.instrument_symbol}' not ready for market depth update.")
 
@@ -139,38 +140,25 @@ class MobileBookSharedMemoryProducer:
             else:
                 logging.error(f"Invalid position for market depth: {position}"); return
 
-            if position == 0:  # Update Top-Of-Book
-                tob_container = md_container.top_of_book
-                # self._populate_string(tob_container, "symbol_", self.instrument_symbol) # Already set in init, but good for safety
-                tob_quote_data = {"px": px, "qty": qty, "last_update_date_time": exch_time_ns}
-                if side == TickType.BID:
-                    self._populate_quote(tob_container.bid_quote_, tob_quote_data)
-                    tob_container.is_bid_quote_set_ = True
-                elif side == TickType.ASK:
-                    self._populate_quote(tob_container.ask_quote_, tob_quote_data)
-                    tob_container.is_ask_quote_set_ = True
-                tob_container.last_update_date_time_ = exch_time_ns
-                tob_container.is_last_update_date_time_set_ = True
-
             md_container.update_counter += 1
             self.shm_root_ptr.shm_update_signature = EXPECTED_SHM_SIGNATURE
         finally:
             self.mutex_wrapper.unlock()
         # self.semaphore.release()
 
-    def update_market_depth_from_msgspec_obj(self, market_depth_obj: MarketDepthMsgspec):
-        self.update_market_depth(market_depth_obj.id, market_depth_obj.side, market_depth_obj.position,
-                                 market_depth_obj.px, market_depth_obj.qty,
-                                 get_epoch_from_pendulum_dt(market_depth_obj.exch_time),
-                                 get_epoch_from_pendulum_dt(market_depth_obj.arrival_time),
-                                 market_depth_obj.market_maker, market_depth_obj.is_smart_depth,
-                                 market_depth_obj.cumulative_notional, market_depth_obj.cumulative_qty,
-                                 market_depth_obj.cumulative_avg_px)
+    def update_market_depth_shm_from_msgspec_obj(self, market_depth_obj: MarketDepthMsgspec):
+        self.update_market_depth_shm(market_depth_obj.id, market_depth_obj.side, market_depth_obj.position,
+                                     market_depth_obj.px, market_depth_obj.qty,
+                                     get_epoch_from_pendulum_dt(market_depth_obj.exch_time),
+                                     get_epoch_from_pendulum_dt(market_depth_obj.arrival_time),
+                                     market_depth_obj.market_maker, market_depth_obj.is_smart_depth,
+                                     market_depth_obj.cumulative_notional, market_depth_obj.cumulative_qty,
+                                     market_depth_obj.cumulative_avg_px)
 
-    def update_last_barter(self, barter_id: int, exch_id: str,
-                          px: float, qty: int, exch_time_ns: int, arrival_time_ns: int,
-                          premium: Optional[float] = None,
-                          market_barter_volume_data: Optional[Dict] = None):
+    def update_last_barter_shm(self, barter_id: int, exch_id: str,
+                              px: float, qty: int, exch_time_ns: int, arrival_time_ns: int,
+                              premium: Optional[float] = None,
+                              market_barter_volume_data: Optional[Dict] = None):
         # if not self.mutex_wrapper or not self.semaphore or not self.shm_root_ptr or not self._mobile_book_struct:
         #     return logging.error(f"Producer for '{self.instrument_symbol}' not ready for last barter update.")
 
@@ -184,32 +172,19 @@ class MobileBookSharedMemoryProducer:
             }
             self._populate_last_barter(md_container.last_barter, last_barter_data)
 
-            tob_container = md_container.top_of_book
-            # self._populate_string(tob_container, "symbol_", self.instrument_symbol) # Safety
-            tob_lt_quote_data = {"px": px, "qty": qty, "premium": premium, "last_update_date_time": exch_time_ns}
-            self._populate_quote(tob_container.last_barter_, tob_lt_quote_data)
-            tob_container.is_last_barter_set_ = True
-            tob_container.last_update_date_time_ = exch_time_ns
-            tob_container.is_last_update_date_time_set_ = True
-            if market_barter_volume_data:
-                self._populate_market_barter_volume(tob_container.market_barter_volume_, market_barter_volume_data)
-                tob_container.is_market_barter_volume_set_ = True
-            else:
-                tob_container.is_market_barter_volume_set_ = False
-
             md_container.update_counter += 1
             self.shm_root_ptr.shm_update_signature = EXPECTED_SHM_SIGNATURE
         finally:
             self.mutex_wrapper.unlock()
         # self.semaphore.release()
 
-    def update_last_barter_from_msgspec_obj(self, last_barter_obj: LastBarterMsgspec):
-        self.update_last_barter(last_barter_obj.id, last_barter_obj.symbol_n_exch_id.exch_id,
-                               last_barter_obj.px, last_barter_obj.qty, get_epoch_from_pendulum_dt(last_barter_obj.exch_time),
-                               get_epoch_from_pendulum_dt(last_barter_obj.arrival_time),
-                               last_barter_obj.premium, last_barter_obj.market_barter_volume)
+    def update_last_barter_shm_from_msgspec_obj(self, last_barter_obj: LastBarterMsgspec):
+        self.update_last_barter_shm(last_barter_obj.id, last_barter_obj.symbol_n_exch_id.exch_id,
+                                   last_barter_obj.px, last_barter_obj.qty, get_epoch_from_pendulum_dt(last_barter_obj.exch_time),
+                                   get_epoch_from_pendulum_dt(last_barter_obj.arrival_time),
+                                   last_barter_obj.premium, last_barter_obj.market_barter_volume)
 
-    def update_symbol_overview(
+    def update_symbol_overview_shm(
             self,
             so_id: int,  # id is required
             # symbol is implicitly self.instrument_symbol
@@ -277,15 +252,101 @@ class MobileBookSharedMemoryProducer:
 
         # self.semaphore.release()  # Release semaphore after update
 
-    def update_symbol_overview_from_msgspec_obj(self, symbol_overview_obj: SymbolOverviewMsgspec):
+    def update_symbol_overview_shm_from_msgspec_obj(self, symbol_overview_obj: SymbolOverviewMsgspec):
         last_update_date_time = get_epoch_from_pendulum_dt(symbol_overview_obj.last_update_date_time) if symbol_overview_obj.last_update_date_time else None
-        self.update_symbol_overview(symbol_overview_obj.id, symbol_overview_obj.company,
-                                    symbol_overview_obj.status, symbol_overview_obj.lot_size,
-                                    symbol_overview_obj.limit_up_px, symbol_overview_obj.limit_dn_px,
-                                    symbol_overview_obj.conv_px, symbol_overview_obj.closing_px, symbol_overview_obj.open_px,
-                                    symbol_overview_obj.high, symbol_overview_obj.low, symbol_overview_obj.volume,
-                                    symbol_overview_obj.tick_size, last_update_date_time,
-                                    symbol_overview_obj.force_publish)
+        self.update_symbol_overview_shm(symbol_overview_obj.id, symbol_overview_obj.company,
+                                        symbol_overview_obj.status, symbol_overview_obj.lot_size,
+                                        symbol_overview_obj.limit_up_px, symbol_overview_obj.limit_dn_px,
+                                        symbol_overview_obj.conv_px, symbol_overview_obj.closing_px, symbol_overview_obj.open_px,
+                                        symbol_overview_obj.high, symbol_overview_obj.low, symbol_overview_obj.volume,
+                                        symbol_overview_obj.tick_size, last_update_date_time,
+                                        symbol_overview_obj.force_publish)
+
+    def update_top_of_book_shm(
+            self,
+            tob_id: int,
+            bid_quote_data: Optional[Dict] = None,
+            ask_quote_data: Optional[Dict] = None,
+            last_barter_data: Optional[Dict] = None,
+            total_bartering_security_size: Optional[int] = None,
+            market_barter_volume_data: Optional[Dict] = None,
+            last_update_date_time_ns: Optional[int] = None
+    ):
+        self.mutex_wrapper.lock()
+        try:
+            md_container = self._mobile_book_struct
+            tob_container = md_container.top_of_book
+
+            data = {
+                "id": tob_id,
+                "bid_quote": bid_quote_data,
+                "ask_quote": ask_quote_data,
+                "last_barter": last_barter_data,
+                "total_bartering_security_size": total_bartering_security_size,
+                "market_barter_volume": market_barter_volume_data,
+                "last_update_date_time": last_update_date_time_ns
+            }
+            self._populate_top_of_book(tob_container, data)
+
+            md_container.update_counter += 1
+            self.shm_root_ptr.shm_update_signature = EXPECTED_SHM_SIGNATURE
+
+        finally:
+            self.mutex_wrapper.unlock()
+
+    def update_top_of_book_shm_from_msgspec_obj(self, top_of_book_obj: TopOfBookMsgspec):
+        bid_quote_data = None
+        if top_of_book_obj.bid_quote:
+            bid_quote_data = {"px": top_of_book_obj.bid_quote.px, "qty": top_of_book_obj.bid_quote.qty,
+                              "premium": top_of_book_obj.bid_quote.premium,
+                              "last_update_date_time": get_epoch_from_pendulum_dt(
+                                  top_of_book_obj.bid_quote.last_update_date_time) if top_of_book_obj.bid_quote.last_update_date_time else None}
+
+        ask_quote_data = None
+        if top_of_book_obj.ask_quote:
+            ask_quote_data = {"px": top_of_book_obj.ask_quote.px, "qty": top_of_book_obj.ask_quote.qty,
+                              "premium": top_of_book_obj.ask_quote.premium,
+                              "last_update_date_time": get_epoch_from_pendulum_dt(
+                                  top_of_book_obj.ask_quote.last_update_date_time) if top_of_book_obj.ask_quote.last_update_date_time else None}
+
+        last_barter_data = None
+        if top_of_book_obj.last_barter:
+            last_barter_data = {"px": top_of_book_obj.last_barter.px, "qty": top_of_book_obj.last_barter.qty,
+                               "premium": top_of_book_obj.last_barter.premium,
+                               "last_update_date_time": get_epoch_from_pendulum_dt(
+                                   top_of_book_obj.last_barter.last_update_date_time) if top_of_book_obj.last_barter.last_update_date_time else None}
+
+        market_barter_volume_data = None
+        if top_of_book_obj.market_barter_volume and top_of_book_obj.market_barter_volume[0]:
+            mtv = top_of_book_obj.market_barter_volume[0]
+            market_barter_volume_data = {"id": mtv.id,
+                                        "participation_period_last_barter_qty_sum": mtv.participation_period_last_barter_qty_sum,
+                                        "applicable_period_seconds": mtv.applicable_period_seconds}
+
+        last_update_date_time_ns = get_epoch_from_pendulum_dt(
+            top_of_book_obj.last_update_date_time) if top_of_book_obj.last_update_date_time else None
+
+        self.update_top_of_book_shm(
+            tob_id=top_of_book_obj.id,
+            bid_quote_data=bid_quote_data,
+            ask_quote_data=ask_quote_data,
+            last_barter_data=last_barter_data,
+            total_bartering_security_size=top_of_book_obj.total_bartering_security_size,
+            market_barter_volume_data=market_barter_volume_data,
+            last_update_date_time_ns=last_update_date_time_ns
+        )
+
+    def _convert_c_mtv_to_msgspec_mtv(self, c_mtv: MarketBarterVolume) -> Optional[MarketBarterVolumeMsgspec]:
+        if not c_mtv:
+            return None
+
+        return MarketBarterVolumeMsgspec(
+            id=c_mtv.id_.decode('utf-8'),
+            participation_period_last_barter_qty_sum=(
+                c_mtv.participation_period_last_barter_qty_sum_ if c_mtv.is_participation_period_last_barter_qty_sum_set_ else None),
+            applicable_period_seconds=(
+                c_mtv.applicable_period_seconds_ if c_mtv.is_applicable_period_seconds_set_ else None)
+        )
 
     # --- Private _populate_* methods (identical to previous versions) ---
     def _populate_string(self, parent_struct: Structure, field_name_str: str, python_string: str):
@@ -365,6 +426,50 @@ class MobileBookSharedMemoryProducer:
             lt_struct.is_market_barter_volume_set_ = True
         else:
             lt_struct.is_market_barter_volume_set_ = False
+
+    def _populate_top_of_book(self, tob_struct: TopOfBook, data: Dict[str, Any]):
+        if data.get("id") is not None:
+            tob_struct.id_ = int(data["id"])
+            tob_struct.is_id_set_ = True
+        else:
+            tob_struct.is_id_set_ = False
+
+        if data.get("bid_quote") is not None:
+            self._populate_quote(tob_struct.bid_quote_, data["bid_quote"])
+            tob_struct.is_bid_quote_set_ = True
+        else:
+            tob_struct.is_bid_quote_set_ = False
+
+        if data.get("ask_quote") is not None:
+            self._populate_quote(tob_struct.ask_quote_, data["ask_quote"])
+            tob_struct.is_ask_quote_set_ = True
+        else:
+            tob_struct.is_ask_quote_set_ = False
+
+        if data.get("last_barter") is not None:
+            self._populate_quote(tob_struct.last_barter_, data["last_barter"])
+            tob_struct.is_last_barter_set_ = True
+        else:
+            tob_struct.is_last_barter_set_ = False
+
+        if data.get("total_bartering_security_size") is not None:
+            tob_struct.total_bartering_security_size_ = int(data["total_bartering_security_size"])
+            tob_struct.is_total_bartering_security_size_set_ = True
+        else:
+            tob_struct.is_total_bartering_security_size_set_ = False
+
+        if data.get("market_barter_volume") is not None:
+            self._populate_market_barter_volume(tob_struct.market_barter_volume_, data["market_barter_volume"])
+            tob_struct.is_market_barter_volume_set_ = True
+        else:
+            tob_struct.is_market_barter_volume_set_ = False
+
+        if data.get("last_update_date_time") is not None:
+            dt_val = data["last_update_date_time"]
+            tob_struct.last_update_date_time_ = int(dt_val.timestamp() * 1_000_000_000) if isinstance(dt_val, pendulum.DateTime) else int(dt_val)
+            tob_struct.is_last_update_date_time_set_ = True
+        else:
+            tob_struct.is_last_update_date_time_set_ = False
 
     def _populate_symbol_overview(self, so_struct: SymbolOverview, data: Dict[str, Any]):
         # ... (Implementation from previous correct version)
@@ -523,26 +628,26 @@ if __name__ == "__main__":
             "lot_size": 1, "tick_size": 0.01, "last_update_date_time": now_ns,
             "closing_px": 450.00, "open_px": 450.50, "high": 451.00, "low": 449.00, "volume": 5000000
         }
-        producer.update_symbol_overview(**spy_so_data)
+        producer.update_symbol_overview_shm(**spy_so_data)
         time.sleep(0.1)
 
         # Market Depth
-        producer.update_market_depth(md_id=1, side=TickType.BID, position=0, px=450.55, qty=200, exch_time_ns=now_ns,
-                                     arrival_time_ns=now_ns)
-        producer.update_market_depth(md_id=2, side=TickType.BID, position=1, px=450.54, qty=300, exch_time_ns=now_ns,
-                                     arrival_time_ns=now_ns)
-        producer.update_market_depth(md_id=3, side=TickType.ASK, position=0, px=450.60, qty=150, exch_time_ns=now_ns,
-                                     arrival_time_ns=now_ns)
+        producer.update_market_depth_shm(md_id=1, side=TickType.BID, position=0, px=450.55, qty=200, exch_time_ns=now_ns,
+                                         arrival_time_ns=now_ns)
+        producer.update_market_depth_shm(md_id=2, side=TickType.BID, position=1, px=450.54, qty=300, exch_time_ns=now_ns,
+                                         arrival_time_ns=now_ns)
+        producer.update_market_depth_shm(md_id=3, side=TickType.ASK, position=0, px=450.60, qty=150, exch_time_ns=now_ns,
+                                         arrival_time_ns=now_ns)
         time.sleep(0.1)
 
         # Last Barter
-        producer.update_last_barter(barter_id=1001, exch_id="ARCA", px=450.58, qty=50, exch_time_ns=now_ns,
-                                   arrival_time_ns=now_ns)
+        producer.update_last_barter_shm(barter_id=1001, exch_id="ARCA", px=450.58, qty=50, exch_time_ns=now_ns,
+                                       arrival_time_ns=now_ns)
         time.sleep(0.1)
 
         # Update L0 Bid
-        producer.update_market_depth(md_id=4, side=TickType.BID, position=0, px=450.56, qty=250, exch_time_ns=now_ns,
-                                     arrival_time_ns=now_ns)
+        producer.update_market_depth_shm(md_id=4, side=TickType.BID, position=0, px=450.56, qty=250, exch_time_ns=now_ns,
+                                         arrival_time_ns=now_ns)
 
         logging.info(f"\nFinished producing market data for {SYMBOL}.")
         logging.info(f"Run visualizer with: --shm_name {SHM_NAME_FOR_SYMBOL} --sem_name {SEM_NAME_FOR_SYMBOL}")

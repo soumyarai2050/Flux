@@ -1,11 +1,13 @@
 import React, { Fragment, useRef, useState } from 'react';
 import { Box, Tooltip, ClickAwayListener, IconButton, Collapse } from '@mui/material';
 import PropTypes from 'prop-types';
-import {
-    clearxpath, getColorTypeFromValue, isValidJsonString, floatToInt, groupCommonKeys,
-    getLocalizedValueAndSuffix, excludeNullFromObject, formatJSONObjectOrArray,
-    getDateTimeFromInt
-} from '../utils/index.js';
+import { clearxpath } from '../utils/core/dataAccess';
+import { getColorTypeFromValue } from '../utils/ui/colorUtils';
+import { isValidJsonString } from '../utils/core/stringUtils';
+import { floatToInt, getLocalizedValueAndSuffix } from '../utils/formatters/numberUtils';
+import { groupCommonKeys } from '../utils/core/dataGrouping';
+import { excludeNullFromObject, formatJSONObjectOrArray } from '../utils/core/objectUtils';
+import { getDateTimeFromInt } from '../utils/formatters/dateUtils';
 import { DATA_TYPES, MODES } from '../constants';
 import JsonView from './JsonView';
 import VerticalDataTable from './tables/VerticalDataTable';

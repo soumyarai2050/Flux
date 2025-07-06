@@ -1,57 +1,37 @@
-import React, { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import React, { useEffect, useRef, useState, useTransition } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { cloneDeep, get, isEqual, set } from 'lodash';
+import { saveAs } from 'file-saver';
+// project imports
 import { DB_ID, DEFAULT_HIGHLIGHT_DURATION, LAYOUT_TYPES, MODEL_TYPES, MODES } from '../../constants';
-import * as Selectors from '../../selectors';
+import { clearxpath, addxpath } from '../../utils/core/dataAccess';
+import { generateObjectFromSchema } from '../../utils/core/schemaUtils';
+import { compareJSONObjects } from '../../utils/core/objectUtils';
+import { getServerUrl, isWebSocketActive } from '../../utils/network/networkUtils';
 import {
-    clearxpath, getWidgetOptionById, generateObjectFromSchema,
-    addxpath, compareJSONObjects, getServerUrl, getWidgetTitle,
-    getCrudOverrideDict, getCSVFileName, isWebSocketActive,
+    getWidgetTitle, getCrudOverrideDict, getCSVFileName,
     updateFormValidation
-} from '../../utils/index.js';
+} from '../../utils/ui/uiUtils';
+import { cleanAllCache } from '../../cache/attributeCache';
+import { useWebSocketWorker, useDownload, useModelLayout } from '../../hooks';
+// custom components
 import { FullScreenModalOptional } from '../../components/Modal';
 import { ModelCard, ModelCardHeader, ModelCardContent } from '../../components/cards';
 import MenuGroup from '../../components/MenuGroup';
-import { cleanAllCache } from '../../cache/attributeCache';
-import { actions as LayoutActions } from '../../features/uiLayoutSlice';
-import {
-    sortOrdersChangeHandler,
-    rowsPerPageChangeHandler,
-    layoutTypeChangeHandler,
-    columnOrdersChangeHandler,
-    showLessChangeHandler,
-    overrideChangeHandler,
-    pinnedChangeHandler,
-    filtersChangeHandler,
-    stickyHeaderToggleHandler,
-    commonKeyCollapseToggleHandler,
-    frozenColumnsChangeHandler,
-    columnNameOverrideHandler,
-    highlightUpdateOverrideHandler,
-    highlightDurationChangeHandler,
-    noCommonKeyOverrideChangeHandler,
-} from '../../utils/index.js';
-import CommonKeyWidget from '../../components/CommonKeyWidget';
 import { ConfirmSavePopup, FormValidation } from '../../components/Popup';
+import CommonKeyWidget from '../../components/CommonKeyWidget';
 import { DataTable } from '../../components/tables';
-import DataTree from '../../components/trees/DataTree';
-import { useWebSocketWorker, useDownload } from '../../hooks';
-import { saveAs } from 'file-saver';
+import { DataTree } from '../../components/trees';
 
 function RootModel({ modelName, modelDataSource, dataSource }) {
     const { schema: projectSchema } = useSelector((state) => state.schema);
-    const modelLayoutOption = useSelector((state) => Selectors.selectModelLayout(state, modelName), (prev, curr) => {
-        return JSON.stringify(prev) === JSON.stringify(curr);
-    });
+
     const { schema: modelSchema, fieldsMetadata, actions, selector, isAbbreviationSource = false } = modelDataSource;
     const { storedObj, updatedObj, objId, mode, isCreating, error, isLoading, popupStatus } = useSelector(selector);
     const { storedObj: dataSourceStoredObj } = useSelector(dataSource?.selector ?? (() => ({ storedObj: null })), (prev, curr) => {
         return JSON.stringify(prev) === JSON.stringify(curr);
     });
 
-    const [isMaximized, setIsMaximized] = useState(false);
-    const [isWsDisabled, setIsWsDisabled] = useState(false);
-    const [page, setPage] = useState(0);
     const [rows, setRows] = useState([]);
     const [groupedRows, setGroupedRows] = useState([]);
     const [activeRows, setActiveRows] = useState([]);
@@ -60,18 +40,58 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
     const [commonKeys, setCommonKeys] = useState([]);
     const [sortedCells, setSortedCells] = useState([]);
     const [uniqueValues, setUniqueValues] = useState({});
-    const [showHidden, setShowHidden] = useState(false);
-    const [showMore, setShowMore] = useState(false);
-    const [showAll, setShowAll] = useState(false);
-    const [moreAll, setMoreAll] = useState(false);
     const [url, setUrl] = useState(modelDataSource.url);
     const [viewUrl, setViewUrl] = useState(modelDataSource.viewUrl);
     const [isProcessingUserActions, setIsProcessingUserActions] = useState(false);
     const [reconnectCounter, setReconnectCounter] = useState(0);
     const [params, setParams] = useState(null);
-    const modelLayoutData = useMemo(() => getWidgetOptionById(modelLayoutOption.widget_ui_data, objId), [modelLayoutOption, objId]);
-    // layout type initial only available after getting modelLayoutOption
-    const [layoutType, setLayoutType] = useState(modelLayoutData.view_layout);
+
+    const {
+        modelLayoutOption,
+        modelLayoutData,
+        isMaximized,
+        page,
+        showHidden,
+        showMore,
+        showAll,
+        moreAll,
+        layoutType,
+        setLayoutType,
+        handleFullScreenToggle,
+        handlePageChange,
+        handleRowsPerPageChange,
+        handleColumnOrdersChange,
+        handleSortOrdersChange,
+        handleShowLessChange,
+        handlePinnedChange,
+        handleOverrideChange,
+        handleLayoutTypeChange,
+        handleFiltersChange,
+        handleStickyHeaderToggle,
+        handleCommonKeyCollapseToggle,
+        handleFrozenColumnsChange,
+        handleColumnNameOverrideChange,
+        handleHighlightUpdateOverrideChange,
+        handleHighlightDurationChange,
+        handleNoCommonKeyOverrideChange,
+        // handleDataSourceColorsChange,
+        // handleJoinByChange,
+        // handleCenterJoinToggle,
+        // handleFlipToggle,
+        // handleSelectedChartNameChange,
+        // handleChartEnableOverrideChange,
+        // handleChartDataChange,
+        // handleSelectedPivotNameChange,
+        // handlePivotEnableOverrideChange,
+        // handlePivotDataChange,
+        // handleQuickFiltersChange,
+        handleVisibilityMenuClick,
+        handleVisibilityMenuDoubleClick,
+        handleShowAllToggle,
+        handleMoreAllToggle,
+        handleShowHiddenToggle,
+        handleShowMoreToggle,
+    } = useModelLayout(modelName, objId, MODEL_TYPES.ROOT, setHeadCells, mode);
 
     const dispatch = useDispatch();
     const [, startTransition] = useTransition();
@@ -92,17 +112,7 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
     const optionsRef = useRef(null);
 
     // calculated fields
-    const modelTitle = useMemo(() => getWidgetTitle(modelLayoutOption, modelSchema, modelName, storedObj), [storedObj]);
-    const modelHandlerConfig = useMemo(() => (
-        {
-            modelName,
-            modelType: MODEL_TYPES.ROOT,
-            dispatch,
-            objId,
-            layoutOption: modelLayoutOption,
-            onLayoutChangeCallback: LayoutActions.setStoredObjByName
-        }
-    ), [objId, modelLayoutOption])
+    const modelTitle = getWidgetTitle(modelLayoutOption, modelSchema, modelName, storedObj);
 
     const { downloadCSV, isDownloading, progress } = useDownload(modelName, fieldsMetadata, null);
 
@@ -271,7 +281,7 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
     socketRef.current = useWebSocketWorker({
         url: (modelSchema.is_large_db_object || modelSchema.is_time_series) ? url : viewUrl,
         modelName,
-        isDisabled: isWsDisabled,
+        isDisabled: false,
         reconnectCounter,
         isAbbreviationSource,
         selector,
@@ -281,27 +291,13 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
         crudOverrideDict: crudOverrideDictRef.current,
     })
 
-    useEffect(() => {
-        // const { disable_ws_on_edit } = modelLayoutOption;
-        const { edit_layout, view_layout } = modelLayoutData;
-        if (mode === MODES.EDIT) {
-            if (edit_layout && view_layout !== edit_layout) {
-                handleLayoutTypeChange(edit_layout);
-                setLayoutType(edit_layout);
-            }
-            // if (disable_ws_on_edit) {
-            //     setIsWsDisabled(true);
-            // }
-        } else if (mode === MODES.READ) {
-            // if (disable_ws_on_edit) {
-            //     setIsWsDisabled(false);
-            // }
-            setLayoutType(view_layout);
+    const handleModeToggle = () => {
+        const updatedMode = mode === MODES.READ ? MODES.EDIT : MODES.READ;
+        dispatch(actions.setMode(updatedMode));
+        const layoutTypeKey = updatedMode === MODES.READ ? 'view_layout' : 'edit_layout';
+        if (modelLayoutData[layoutTypeKey] && modelLayoutData[layoutTypeKey] !== layoutType) {
+            handleLayoutTypeChange(modelLayoutData[layoutTypeKey], updatedMode);
         }
-    }, [mode, modelLayoutOption, modelLayoutData])
-
-    const handleFullScreenToggle = () => {
-        setIsMaximized((prev) => !prev);
     }
 
     const handleReload = () => {
@@ -325,81 +321,6 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
         cleanAllCache(modelName);
     }
 
-    const handlePageChange = (updatedPage) => {
-        setPage(updatedPage);
-    }
-
-    const handleRowsPerPageChange = (updatedRowsPerPage) => {
-        rowsPerPageChangeHandler(modelHandlerConfig, updatedRowsPerPage);
-    }
-
-    const handleColumnOrdersChange = (updatedColumnOrders) => {
-        columnOrdersChangeHandler(modelHandlerConfig, updatedColumnOrders);
-    }
-
-    const handleSortOrdersChange = (updatedSortOrders) => {
-        setPage(0);
-        sortOrdersChangeHandler(modelHandlerConfig, updatedSortOrders);
-    }
-
-    const handleShowLessChange = (updatedShowLess, updatedColumns) => {
-        setHeadCells(updatedColumns);
-        showLessChangeHandler(modelHandlerConfig, updatedShowLess);
-    }
-
-    const handlePinnedChange = (updatedPinned) => {
-        pinnedChangeHandler(modelHandlerConfig, updatedPinned);
-    }
-
-    const handleOverrideChange = (updatedEnableOverride, updatedDisableOverride, updatedColumns) => {
-        setHeadCells(updatedColumns);
-        overrideChangeHandler(modelHandlerConfig, updatedEnableOverride, updatedDisableOverride);
-    }
-
-    const handleLayoutTypeChange = (updatedLayoutType) => {
-        const layoutTypeKey = mode === MODES.READ ? 'view_layout' : 'edit_layout';
-        layoutTypeChangeHandler(modelHandlerConfig, updatedLayoutType, layoutTypeKey);
-        setLayoutType(updatedLayoutType);
-    }
-
-    const handleModeToggle = () => {
-        dispatch(actions.setMode(mode === MODES.READ ? MODES.EDIT : MODES.READ));
-    }
-
-    const handleFiltersChange = (updatedFilters) => {
-        filtersChangeHandler(modelHandlerConfig, updatedFilters);
-    }
-
-    const handleStickyHeaderToggle = () => {
-        stickyHeaderToggleHandler(modelHandlerConfig, !modelLayoutData.sticky_header);
-    }
-
-    const handleCommonKeyCollapseToggle = () => {
-        commonKeyCollapseToggleHandler(modelHandlerConfig, !modelLayoutData.common_key_collapse);
-    }
-
-    const handleFrozenColumnsChange = (updatedFrozenColumns, updatedColumns) => {
-        setHeadCells(updatedColumns);
-        frozenColumnsChangeHandler(modelHandlerConfig, updatedFrozenColumns);
-    }
-
-    const handleColumnNameOverrideChange = (updatedColumnNameOverride) => {
-        columnNameOverrideHandler(modelHandlerConfig, updatedColumnNameOverride);
-    }
-
-    const handleHighlightUpdateOverrideChange = (updatedHighlightUpdateOverride) => {
-        highlightUpdateOverrideHandler(modelHandlerConfig, updatedHighlightUpdateOverride);
-    }
-
-    const handleHighlightDurationChange = (updatedHighlightDuration) => {
-        highlightDurationChangeHandler(modelHandlerConfig, updatedHighlightDuration);
-    }
-
-    const handleNoCommonKeyOverrideChange = (updatedNoCommonKeyOverride, updatedColumns) => {
-        setHeadCells(updatedColumns);
-        noCommonKeyOverrideChangeHandler(modelHandlerConfig, updatedNoCommonKeyOverride);
-    }
-
     const handleDownload = async () => {
         const fileName = getCSVFileName(modelName);
         try {
@@ -409,42 +330,6 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
         } catch (error) {
             console.error('CSV download failed:', error);
         }
-    }
-
-    const handleVisibilityMenuClick = (isChecked) => {
-        if (isChecked) {
-            setShowHidden(false);
-            setShowMore(false);
-        } else {
-            setShowMore(true);
-            setShowHidden(false);
-        }
-    }
-
-    const handleVisibilityMenuDoubleClick = (isChecked) => {
-        if (isChecked) {
-            setShowHidden(false);
-            setShowMore(false);
-        } else {
-            setShowHidden(true);
-            setShowMore(true);
-        }
-    }
-
-    const handleShowAllToggle = () => {
-        setShowAll((prev) => !prev);
-    }
-
-    const handleMoreAllToggle = () => {
-        setMoreAll((prev) => !prev);
-    }
-
-    const handleShowHiddenToggle = () => {
-        setShowHidden((prev) => !prev);
-    }
-
-    const handleShowMoreToggle = () => {
-        setShowMore((prev) => !prev);
     }
 
     const handlePopupClose = (popupName) => {
@@ -595,7 +480,7 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
                         selectedId={objId}
                         showHidden={showHidden}
                         filters={modelLayoutOption.filters || []}
-                        isDisabled ={isLoading || isProcessingUserActions}
+                        isDisabled={isLoading || isProcessingUserActions}
                     />
                 );
             default:

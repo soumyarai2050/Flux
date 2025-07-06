@@ -4,7 +4,7 @@ import { Edit, Delete, ThumbUp, Save } from '@mui/icons-material';
 import ReactJson from 'react-json-view';
 import classes from './Popup.module.css';
 import { useTheme } from '@mui/material/styles';
-import { getDataSourceColor } from '../utils/index.js';
+import { getDataSourceColor } from '../utils/ui/themeUtils';
 import { cloneDeep } from 'lodash';
 import VerticalDataTable from './tables/VerticalDataTable';
 import PropTypes from 'prop-types';

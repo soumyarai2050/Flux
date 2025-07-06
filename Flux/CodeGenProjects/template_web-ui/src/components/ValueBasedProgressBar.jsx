@@ -1,7 +1,8 @@
 import React from 'react';
 import { LinearProgress, Tooltip } from '@mui/material';
 import { HOVER_TEXT_TYPES } from '../constants';
-import { getColorTypeFromPercentage, normalise } from '../utils/index.js';
+import { getColorTypeFromPercentage } from '../utils/ui/colorUtils';
+import { normalise } from '../utils/formatters/numberUtils';
 import classes from './ValueBasedProgressBar.module.css';
 
 export const ValueBasedProgressBarWithHover = (props) => {

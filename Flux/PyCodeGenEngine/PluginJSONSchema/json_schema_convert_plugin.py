@@ -81,7 +81,8 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         BaseProtoPlugin.flux_fld_server_ready_status,
         BaseProtoPlugin.flux_fld_diff_threshold,
         BaseProtoPlugin.flux_fld_zero_as_none,
-        BaseProtoPlugin.flux_fld_visible_if
+        BaseProtoPlugin.flux_fld_visible_if,
+        BaseProtoPlugin.flux_fld_array_obj_identifier
     ]
     flx_fld_simple_repeated_attribute_options: List[str] = [
         BaseProtoPlugin.flux_fld_mapping_underlying_meta_field,

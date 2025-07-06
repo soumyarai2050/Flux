@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { Box, Tooltip } from '@mui/material';
-import { capitalizeFirstLetter } from '../utils/index.js';
+import { capitalizeFirstLetter } from '../utils/core/stringUtils';
 import { HelpOutline, HelpSharp, LiveHelp, RemoveCircle, PushPin, PushPinOutlined } from '@mui/icons-material';
 import { Icon } from './Icon';
 import NodeField from './NodeField';

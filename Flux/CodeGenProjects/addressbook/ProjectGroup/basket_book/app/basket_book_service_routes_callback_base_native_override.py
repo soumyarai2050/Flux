@@ -17,7 +17,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.app.basket_book_h
     config_yaml_path, parse_to_int, config_yaml_dict, be_host, be_port, is_all_service_up, is_all_view_service_up,
     CURRENT_PROJECT_DIR, CURRENT_PROJECT_DATA_DIR, get_new_chores_from_pl_df, get_figi_to_sec_rec_dict, be_view_port)
 from FluxPythonUtils.scripts.general_utility_functions import (
-    except_n_log_alert, handle_refresh_configurable_data_members, set_package_logger_level, create_logger)
+    except_n_log_alert, handle_refresh_configurable_data_members, set_package_logger_level, get_all_subclasses)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.barter_simulator import (
     BarterSimulator, BarteringLinkBase)
@@ -372,19 +372,21 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         set_package_logger_level("filelock", logging.WARNING)
 
         if self.market.is_test_run:
-            LogBarterSimulator.chore_create_async_callable = (
+            chore_callable = (
                 BasketBookServiceRoutesCallbackBaseNativeOverride.underlying_create_chore_ledger_http)
-            LogBarterSimulator.fill_create_async_callable = (
+            fill_callable = (
                 BasketBookServiceRoutesCallbackBaseNativeOverride.underlying_create_deals_ledger_http)
+
+            # Get the base class plus all of its descendants
+            all_bartering_link_classes = [BarteringLinkBase] + get_all_subclasses(BarteringLinkBase)
+
+            # Iterate and configure each class
+            for link_class in all_bartering_link_classes:
+                link_class.chore_create_async_callable = chore_callable
+                link_class.fill_create_async_callable = fill_callable
+
+            # Handle any attributes that are specific to a single subclass
             LogBarterSimulator.executor_port = be_port
-            BarterSimulator.chore_create_async_callable = (
-                BasketBookServiceRoutesCallbackBaseNativeOverride.underlying_create_chore_ledger_http)
-            BarterSimulator.fill_create_async_callable = (
-                BasketBookServiceRoutesCallbackBaseNativeOverride.underlying_create_deals_ledger_http)
-            IBBarteringLink.chore_create_async_callable = (
-                BasketBookServiceRoutesCallbackBaseNativeOverride.underlying_create_chore_ledger_http)
-            IBBarteringLink.fill_create_async_callable = (
-                BasketBookServiceRoutesCallbackBaseNativeOverride.underlying_create_deals_ledger_http)
 
         logging.debug("Triggered server launch pre override")
         self.port = be_port

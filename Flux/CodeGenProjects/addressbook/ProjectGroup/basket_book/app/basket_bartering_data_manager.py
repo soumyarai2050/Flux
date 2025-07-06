@@ -47,14 +47,6 @@ class BasketBarteringDataManager(BaseBarteringDataManager, BasketBookServiceData
 
         self.executor_trigger_method = executor_trigger_method
         self.ws_thread = Thread(target=WSReader.start, daemon=True).start()
-
-    def handle_basket_chore_get_all_ws_(self, basket_chore_: BasketChoreBaseModel | BasketChore | None, **kwargs):
-        if self.street_book is None:
-            # Triggering executor when basket_chore is created
-            self.street_book, self.street_book_thread = (
-                self.executor_trigger_method(self, self.plan_cache))
-        if basket_chore_ is None:  # startup case - no basket chore is present
-            return
         self.basket_id: int | None = None
         # Triggering executor to recover existing basket chore
         self.street_book, self.street_book_thread = (

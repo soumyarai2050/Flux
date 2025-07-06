@@ -8,7 +8,8 @@
 
 import React, { useMemo } from 'react';
 import { useSelector } from 'react-redux';
-import { getModelSchema, getServerUrl } from '../utils/index.js';
+import { getModelSchema } from '../utils/core/schemaUtils';
+import { getServerUrl } from '../utils/network/networkUtils';
 import { sliceMap } from '../models/sliceMap';
 
 /**

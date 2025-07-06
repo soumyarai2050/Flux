@@ -5,7 +5,13 @@ import { Select, MenuItem, TextField, Autocomplete, Checkbox, InputAdornment, To
 import { Error, Clear } from '@mui/icons-material';
 import PropTypes from 'prop-types';
 import { NumericFormat } from 'react-number-format';
-import { getColorTypeFromValue, getValueFromReduxStoreFromXpath, isAllowedNumericValue, floatToInt, validateConstraints, getReducerArrayFromCollections, capitalizeCamelCase, getDateTimeFromInt } from '../utils/index.js';
+import { getColorTypeFromValue } from '../utils/ui/colorUtils';
+import { getValueFromReduxStoreFromXpath } from '../utils/redux/reduxUtils';
+import { isAllowedNumericValue, floatToInt } from '../utils/formatters/numberUtils';
+import { validateConstraints } from '../utils/validation/validationUtils';
+import { getReducerArrayFromCollections } from '../utils/ui/uiUtils';
+import { capitalizeCamelCase } from '../utils/core/stringUtils';
+import { getDateTimeFromInt } from '../utils/formatters/dateUtils';
 import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import classes from './NodeField.module.css';

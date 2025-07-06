@@ -27,7 +27,7 @@ import {
 import { DB_ID, DATA_TYPES, MODES, MODEL_TYPES } from '../../constants';
 import TableHeader from '../tables/TableHeader';
 import Cell from '../../components/Cell';
-import { getBufferAbbreviatedOptionLabel } from '../../utils/index.js';
+import { getBufferAbbreviatedOptionLabel } from '../../utils/ui/uiUtils.js';
 import styles from './AbbreviationMergeView.module.css';
 import { flux_toggle, flux_trigger_strat } from '../../projectSpecificUtils';
 import { useScrollIndicators, useKeyboardNavigation } from '../../hooks';

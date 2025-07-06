@@ -14,7 +14,7 @@ import TableHeader from '../TableHeader';
 import Cell from '../../Cell';
 import styles from './DataTable.module.css';
 import { ClearAll, Save } from '@mui/icons-material';
-import { getDataxpathV2, generateRowTrees } from '../../../utils/index.js';
+import { getDataxpathV2, generateRowTrees } from '../../../utils/core/dataAccess';
 import { cloneDeep, get, set } from 'lodash';
 import { DB_ID, MODES, DATA_TYPES, MODEL_TYPES } from '../../../constants';
 import { flux_toggle, flux_trigger_strat } from '../../../projectSpecificUtils';
@@ -246,6 +246,7 @@ const DataTable = ({
     if (mode === MODES.EDIT) {
       setIsModalOpen(true);
       setSelectedRows([rowId]);
+
       if (modelType === MODEL_TYPES.REPEATED_ROOT) {
         const updatedTreeObj = updatedData.find((o) => o['data-id'] === rowId);
         setDataTree(updatedTreeObj ?? {});
@@ -255,6 +256,7 @@ const DataTable = ({
         const updatedTreeObj = updatedTrees.find((o) => o['data-id'] === rowId);
         setDataTree(updatedTreeObj ?? {});
       }
+
       setTimeout(() => {
         const modalId = `${modelName}-modal`;
         const element = document.getElementById(modalId).querySelectorAll("[data-xpath='" + xpath + "']")[0];
@@ -266,11 +268,11 @@ const DataTable = ({
           });
           setTimeout(() => {
             element.classList.remove(styles.highlight);
-          }, 3000);
+          }, 2500);
         }
-      }, 500)
+      }, 1200);
     }
-  }
+  };
 
   const handleUpdate = (updatedObj, updateType) => {
     if (updateType === 'add' || updateType === 'remove') {

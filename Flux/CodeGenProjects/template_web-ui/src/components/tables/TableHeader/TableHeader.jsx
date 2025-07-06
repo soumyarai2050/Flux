@@ -5,7 +5,8 @@ import { CSS } from '@dnd-kit/utilities';
 import { TableHead, TableRow, TableCell } from '@mui/material';
 import { useTheme } from '@emotion/react';
 import { useDraggableContext } from '../../../contexts/DraggableContext';
-import { getFilterDict, getSortOrderDict } from '../../../utils/index.js';
+import { getFilterDict } from '../../../utils/core/dataFiltering';
+import { getSortOrderDict } from '../../../utils/core/dataSorting';
 import FilterSortPopup from '../../FilterSortPopup';
 import styles from './TableHeader.module.css';
 

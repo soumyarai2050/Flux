@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
-import { getApiUrlMetadata, getErrorDetails } from '../utils/index.js';
+import { getApiUrlMetadata } from '../utils/network/networkUtils';
+import { getErrorDetails } from '../utils/core/errorUtils';
 
 // --- Start of new shared logic ---
 

@@ -1,5 +1,5 @@
 import { cloneDeep, get } from 'lodash';
-import { generateTreeStructure } from '../utils/index.js';
+import { generateTreeStructure } from '../utils/core/treeUtils';
 // Assuming DATA_TYPES and ITEMS_PER_PAGE are available globally or passed if not using a module loader that handles this.
 // For robustness, they can be passed in the message payload or explicitly imported if your setup supports it.
 // Fallback to constants imported here if not provided in payload.
@@ -87,6 +87,26 @@ onmessage = (e) => {
     // Use constants from payload if provided, otherwise use imported ones.
     const ITEMS_PER_PAGE = e.data.payload.ITEMS_PER_PAGE || ITEMS_PER_PAGE_CONSTANT;
     const DATA_TYPES = e.data.payload.DATA_TYPES || DATA_TYPES_CONSTANT; // Not directly used in this snippet but good practice
+
+    // Add a guard to prevent processing when data is empty
+    if (!projectSchema || !modelName || !updatedData || !storedData || (Object.keys(updatedData).length === 0 && Object.keys(storedData).length === 0)) {
+        // Just return, don't post a message, to avoid potential loops.
+        // The main thread should manage loading state.
+        postMessage({
+            type: 'TREE_GENERATED',
+            payload: {
+                originalTree: [],
+                treeData: [{
+                    name: modelName || 'Root',
+                    children: [],
+                    id: "root",
+                    parent: null,
+                    metadata: { name: modelName || 'Root', isRoot: true }
+                }]
+            }
+        });
+        return;
+    }
 
     // Handle subtree processing for optimized updates
     if (e.data.type === 'PROCESS_SUBTREE') {

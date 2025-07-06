@@ -8,11 +8,15 @@ import { cloneDeep, get, isEqual } from 'lodash';
 import { Add, Close, Delete, Save } from '@mui/icons-material';
 // project constants and common utility function imports
 import { DATA_TYPES, MODES, API_ROOT_URL, MODEL_TYPES, DB_ID } from '../../../constants';
+import { addxpath, clearxpath } from '../../../utils/core/dataAccess';
+import { applyFilter, getFilterDict } from '../../../utils/core/dataFiltering';
 import {
-    addxpath, applyFilter, clearxpath, genChartDatasets, genMetaFilters, generateObjectFromSchema,
-    getChartOption, getCollectionByName, getFilterDict, getIdFromAbbreviatedKey, getModelSchema, mergeTsData, tooltipFormatter,
+    genChartDatasets, genMetaFilters, getChartOption, mergeTsData, tooltipFormatter,
     updateChartDataObj, updateChartSchema, updatePartitionFldSchema
-} from '../../../utils/index.js';
+} from '../../../utils/core/chartUtils';
+import { generateObjectFromSchema, getModelSchema } from '../../../utils/core/schemaUtils';
+import { getIdFromAbbreviatedKey } from '../../../utils/core/dataUtils';
+import { getCollectionByName } from '../../../utils/core/dataUtils.js';
 // custom component imports
 import Icon from '../../Icon';
 import FullScreenModal from '../../Modal';
@@ -147,7 +151,7 @@ function ChartView({
             // Update current pinned filters to show only the ones for this chart
             const chartSpecificFilters = pinnedFiltersByChart[updatedChartObj.chart_name] || [];
             setPinnedFilters(chartSpecificFilters);
-            
+
             // Only sync if not currently updating from a pinned filter change
             if (!pinnedFilterUpdateRef.current) {
                 syncPinnedFiltersWithData(updatedChartObj);
@@ -162,29 +166,35 @@ function ChartView({
         if (storedChartObj.series) {
             let updatedQueryDict = {};
             storedChartObj.series.forEach((series, index) => {
-                const collection = getCollectionByName(fieldsMetadata, series.encode.y, modelType === MODEL_TYPES.ABBREVIATION_MERGE);
-                if (storedChartObj.time_series && collection.hasOwnProperty('mapping_src')) {
-                    const [seriesWidgetName, ...mappingSrcField] = collection.mapping_src.split('.');
-                    const srcField = mappingSrcField.join('.');
-                    const seriesCollections = schemaCollections[seriesWidgetName];
-                    const mappedCollection = seriesCollections.find(col => col.tableTitle === srcField);
-                    // fetch query details for time series
-                    let name;
-                    let params = [];
-                    mappedCollection.projections.forEach(projection => {
-                        // if query is found, dont proceed
-                        if (name) return;
-                        const [fieldName, queryName] = projection.split(':');
-                        if (fieldName === srcField) {
-                            name = queryName;
+                if (series.encode && series.encode.y) {
+                    const collection = getCollectionByName(fieldsMetadata, series.encode.y, modelType === MODEL_TYPES.ABBREVIATION_MERGE);
+                    if (storedChartObj.time_series && collection && collection.hasOwnProperty('mapping_src')) {
+                        const [seriesWidgetName, ...mappingSrcField] = collection.mapping_src.split('.');
+                        const srcField = mappingSrcField.join('.');
+                        const seriesCollections = schemaCollections[seriesWidgetName];
+                        if (seriesCollections) {
+                            const mappedCollection = seriesCollections.find(col => col.tableTitle === srcField);
+                            // fetch query details for time series
+                            let name;
+                            let params = [];
+                            if (mappedCollection && mappedCollection.projections) {
+                                mappedCollection.projections.forEach(projection => {
+                                    // if query is found, dont proceed
+                                    if (name) return;
+                                    const [fieldName, queryName] = projection.split(':');
+                                    if (fieldName === srcField) {
+                                        name = queryName;
+                                    }
+                                });
+                            }
+                            seriesCollections.forEach(col => {
+                                if (col.val_meta_field && col.required && ![DATA_TYPES.OBJECT, DATA_TYPES.ARRAY].includes(col.type)) {
+                                    params.push(col.tableTitle);
+                                }
+                            })
+                            updatedQueryDict[index] = { name, params };
                         }
-                    })
-                    seriesCollections.forEach(col => {
-                        if (col.val_meta_field && col.required && ![DATA_TYPES.OBJECT, DATA_TYPES.ARRAY].includes(col.type)) {
-                            params.push(col.tableTitle);
-                        }
-                    })
-                    updatedQueryDict[index] = { name, params };
+                    }
                 }
             })
             setQueryDict(updatedQueryDict);
@@ -342,12 +352,25 @@ function ChartView({
     // on closing of modal, open a pop up to confirm/discard changes
     const handleChartOptionClose = (e, reason) => {
         if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;
-        setIsCreate(false);
         if (!isEqual(updatedChartObj, data)) {
             setIsConfirmPopupOpen(true);
         } else {
+            if (isCreate) {
+                // If we cancel creation, restore the previously selected chart
+                if (selectedIndex !== null && chartData[selectedIndex]) {
+                    const selectedChartOption = chartData[selectedIndex];
+                    setStoredChartObj(selectedChartOption);
+                    setUpdatedChartObj(addxpath(cloneDeep(selectedChartOption)));
+                    setData(addxpath(cloneDeep(selectedChartOption)));
+                } else {
+                    // Or clear if nothing was selected
+                    setStoredChartObj({});
+                    setUpdatedChartObj({});
+                    setData({});
+                }
+            }
             setIsChartOptionOpen(false);
-            // setMode(MODES.READ);
+            setIsCreate(false);
             onModeToggle();
         }
     }
@@ -364,6 +387,7 @@ function ChartView({
     const handleSave = () => {
         // setMode(MODES.READ);
         onModeToggle();
+        const wasCreating = isCreate; // Check if we were in create mode
         setIsCreate(false);
         setIsChartOptionOpen(false);
         setIsConfirmPopupOpen(false);
@@ -376,6 +400,12 @@ function ChartView({
             updatedChartData.push(updatedObj);
         }
         onChartDataChange(updatedChartData);
+
+        if (wasCreating) {
+            // If a new chart was created, select it.
+            const newIndex = updatedChartData.findIndex((o) => o.chart_name === updatedObj.chart_name);
+            setSelectedIndex(newIndex);
+        }
         setChartUpdateCounter((prevCount) => prevCount + 1);
     }
 
@@ -383,11 +413,26 @@ function ChartView({
     const handleConfirmClose = (e, reason) => {
         if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;
         else {
-            setData(updatedChartObj);
+            if (isCreate) {
+                // If we were creating, restore previous selection
+                if (selectedIndex !== null && chartData[selectedIndex]) {
+                    const selectedChartOption = chartData[selectedIndex];
+                    setStoredChartObj(selectedChartOption);
+                    setUpdatedChartObj(addxpath(cloneDeep(selectedChartOption)));
+                    setData(addxpath(cloneDeep(selectedChartOption)));
+                } else {
+                    // Or clear if nothing was selected
+                    setStoredChartObj({});
+                    setUpdatedChartObj({});
+                    setData({});
+                }
+            } else {
+                // If we were editing, just revert to the state before edits
+                setData(updatedChartObj);
+            }
             setIsChartOptionOpen(false);
             setIsConfirmPopupOpen(false);
             setIsCreate(false);
-            // setMode(MODES.READ);
             onModeToggle();
         }
     }
@@ -416,15 +461,15 @@ function ChartView({
 
     const handleUpdate = (updatedData) => {
         setData(updatedData);
-        
+
         // Only sync pinned filters if this update is NOT coming from a pinned filter change
         // We can detect this by checking if we're in the middle of handling a pinned filter change
         const isFromPinnedFilterChange = pinnedFilterUpdateRef.current;
-        
+
         if (!isFromPinnedFilterChange) {
             syncPinnedFiltersWithData(updatedData);
         }
-        
+
         const updatedSchema = cloneDeep(schema);
         const chartEncodeSchema = getModelSchema('chart_encode', updatedSchema);
         const filterSchema = getModelSchema('ui_filter', updatedSchema);
@@ -497,25 +542,25 @@ function ChartView({
         const uniqueId = nodeData.dataxpath || key;
         const currentChartName = data?.chart_name;
         const existingPin = pinnedFilters.find(pin => pin.uniqueId === uniqueId);
-        
+
         if (!existingPin && currentChartName) {
             // Get current value from chart data or use provided value
             const currentChartValue = getCurrentChartFieldValue(key, nodeData) || currentValue || getDefaultValueForField(nodeData);
-            
-            const newPin = { 
-                key, 
+
+            const newPin = {
+                key,
                 uniqueId,
-                title, 
+                title,
                 value: currentChartValue,
                 nodeData: nodeData // Store field metadata for rendering the correct input type
             };
-            
+
             // Update chart-specific storage
             setPinnedFiltersByChart(prev => ({
                 ...prev,
                 [currentChartName]: [...(prev[currentChartName] || []), newPin]
             }));
-            
+
             // Update current display
             setPinnedFilters(prev => [...prev, newPin]);
         }
@@ -524,18 +569,18 @@ function ChartView({
     // Helper function to get current value from chart configuration data using xpath
     const getCurrentChartFieldValue = (key, nodeData) => {
         if (!data || !nodeData || !nodeData.dataxpath) return null;
-        
+
         const dataxpath = nodeData.dataxpath;
         const pathParts = dataxpath.split('.');
         let target = data;
-        
+
         // Navigate through the path to get the current value
         for (const part of pathParts) {
             if (part.includes('[') && part.includes(']')) {
                 // Handle array notation like 'series[0]'
                 const arrayName = part.substring(0, part.indexOf('['));
                 const index = parseInt(part.substring(part.indexOf('[') + 1, part.indexOf(']')));
-                
+
                 if (target[arrayName] && Array.isArray(target[arrayName]) && target[arrayName][index] !== undefined) {
                     target = target[arrayName][index];
                 } else {
@@ -549,14 +594,14 @@ function ChartView({
                 }
             }
         }
-        
+
         return target;
     };
 
     // Helper function to determine default value based on field type
     const getDefaultValueForField = (nodeData) => {
         if (!nodeData) return false;
-        
+
         switch (nodeData.type) {
             case 'boolean':
                 return false;
@@ -575,18 +620,18 @@ function ChartView({
     const syncPinnedFiltersWithData = useCallback((updatedData) => {
         setPinnedFilters(prev => {
             if (prev.length === 0) return prev;
-            
+
             const updatedPins = prev.map(pin => {
                 // Get the current value from the updated data
                 const currentValue = getCurrentChartFieldValueFromData(pin.key, pin.nodeData, updatedData);
-                
+
                 // Only update if the value has actually changed AND it's not undefined
                 if (currentValue !== undefined && currentValue !== pin.value) {
                     return { ...pin, value: currentValue };
                 }
                 return pin;
             });
-            
+
             // Only set state if something actually changed to avoid unnecessary re-renders
             const hasChanges = updatedPins.some((pin, index) => pin.value !== prev[index].value);
             return hasChanges ? updatedPins : prev;
@@ -596,18 +641,18 @@ function ChartView({
     // Helper function to get current value from specific data object (used for syncing)
     const getCurrentChartFieldValueFromData = (key, nodeData, dataSource) => {
         if (!dataSource || !nodeData || !nodeData.dataxpath) return null;
-        
+
         const dataxpath = nodeData.dataxpath;
         const pathParts = dataxpath.split('.');
         let target = dataSource;
-        
+
         // Navigate through the path to get the current value
         for (const part of pathParts) {
             if (part.includes('[') && part.includes(']')) {
                 // Handle array notation like 'series[0]'
                 const arrayName = part.substring(0, part.indexOf('['));
                 const index = parseInt(part.substring(part.indexOf('[') + 1, part.indexOf(']')));
-                
+
                 if (target[arrayName] && Array.isArray(target[arrayName]) && target[arrayName][index] !== undefined) {
                     target = target[arrayName][index];
                 } else {
@@ -621,7 +666,7 @@ function ChartView({
                 }
             }
         }
-        
+
         return target;
     };
 
@@ -630,23 +675,23 @@ function ChartView({
         if (!currentChartName) {
             return;
         }
-        
+
         // Set flag to indicate we're updating from a pinned filter
         pinnedFilterUpdateRef.current = true;
-        
+
         // Update the pinned filter state for current display
         setPinnedFilters(prev => {
-            const updated = prev.map(pin => 
+            const updated = prev.map(pin =>
                 pin.uniqueId === uniqueId ? { ...pin, value } : pin
             );
             return updated;
         });
-        
+
         // Update chart-specific storage
         setPinnedFiltersByChart(prev => {
             const updated = {
                 ...prev,
-                [currentChartName]: (prev[currentChartName] || []).map(pin => 
+                [currentChartName]: (prev[currentChartName] || []).map(pin =>
                     pin.uniqueId === uniqueId ? { ...pin, value } : pin
                 )
             };
@@ -656,15 +701,15 @@ function ChartView({
         // Update the actual chart configuration data using xpath
         const updatedChartData = cloneDeep(data);
         const pinnedFilter = pinnedFilters.find(pin => pin.uniqueId === uniqueId);
-        
+
         if (pinnedFilter && pinnedFilter.nodeData && pinnedFilter.nodeData.dataxpath) {
             // Use the dataxpath from nodeData to update the correct location
             const dataxpath = pinnedFilter.nodeData.dataxpath;
-            
+
             // Split the path and navigate to set the value
             const pathParts = dataxpath.split('.');
             let target = updatedChartData;
-            
+
             // Navigate to the parent object
             for (let i = 0; i < pathParts.length - 1; i++) {
                 const part = pathParts[i];
@@ -672,7 +717,7 @@ function ChartView({
                     // Handle array notation like 'series[0]'
                     const arrayName = part.substring(0, part.indexOf('['));
                     const index = parseInt(part.substring(part.indexOf('[') + 1, part.indexOf(']')));
-                    
+
                     if (!target[arrayName]) {
                         target[arrayName] = [];
                     }
@@ -687,14 +732,14 @@ function ChartView({
                     target = target[part];
                 }
             }
-            
+
             // Set the final value
             const finalKey = pathParts[pathParts.length - 1];
             if (finalKey.includes('[') && finalKey.includes(']')) {
                 // Handle array notation in final key
                 const arrayName = finalKey.substring(0, finalKey.indexOf('['));
                 const index = parseInt(finalKey.substring(finalKey.indexOf('[') + 1, finalKey.indexOf(']')));
-                
+
                 if (!target[arrayName]) {
                     target[arrayName] = [];
                 }
@@ -702,7 +747,7 @@ function ChartView({
             } else {
                 target[finalKey] = value;
             }
-            
+
             // Update the chart configuration in the main chartData array and call onChartDataChange
             const idx = chartData.findIndex((o) => o.chart_name === updatedChartData.chart_name);
             const updatedChartDataArray = [...chartData];
@@ -715,7 +760,7 @@ function ChartView({
 
             // Also update the local state for immediate UI feedback
             handleUpdate(updatedChartData);
-            
+
             // Reset the flag after a short delay to allow the update to complete
             setTimeout(() => {
                 pinnedFilterUpdateRef.current = false;
@@ -732,13 +777,13 @@ function ChartView({
     const handleUnpinFilter = (uniqueId) => {
         const currentChartName = data?.chart_name;
         if (!currentChartName) return;
-        
+
         // Update current display
         setPinnedFilters(prev => {
             const newFilters = prev.filter(pin => pin.uniqueId !== uniqueId);
             return newFilters;
         });
-        
+
         // Update chart-specific storage
         setPinnedFiltersByChart(prev => ({
             ...prev,

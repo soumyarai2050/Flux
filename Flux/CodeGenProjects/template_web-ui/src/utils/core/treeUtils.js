@@ -608,6 +608,7 @@ function addNode(tree, schema, currentSchema, propname, callerProps, dataxpath, 
  * @param {string} xpath - The schema XPath of the current object node.
  */
 function handleObjectWithItems(tree, schema, currentSchema, propname, callerProps, dataxpath, xpath) {
+
     // Always create the container node
     let schemaForHeaderNode = currentSchema;
     let itemRefForHeaderNode = currentSchema.items?.$ref;
@@ -617,7 +618,7 @@ function handleObjectWithItems(tree, schema, currentSchema, propname, callerProp
     if (currentSchema.type === DATA_TYPES.ARRAY && currentSchema.items && currentSchema.items.$ref) {
         const ref = currentSchema.items.$ref.split('/');
         schemaForHeaderNode = ref.length === 2 ? cloneDeep(schema[ref[1]]) : cloneDeep(schema[ref[1]][ref[2]]);
-        const propertiesToInherit = ['orm_no_update', 'server_populate', 'ui_update_only', 'help'];
+        const propertiesToInherit = ['orm_no_update', 'server_populate', 'ui_update_only', 'help', 'array_obj_identifier'];
         propertiesToInherit.forEach(p => {
             if (currentSchema.hasOwnProperty(p) && !schemaForHeaderNode.hasOwnProperty(p)) {
                 schemaForHeaderNode[p] = currentSchema[p];
@@ -642,7 +643,7 @@ function handleObjectWithItems(tree, schema, currentSchema, propname, callerProp
         dataxpath,
         xpath,
         itemRefForHeaderNode,
-        headerState // Removed: will be handled by dataStatus logic within addHeaderNode
+        headerState
     );
 
     // Get the actual header node that was just added (it's the last one in the 'tree' array)
@@ -697,7 +698,6 @@ function handleObjectWithItems(tree, schema, currentSchema, propname, callerProp
 function handleArrayWithItems(tree, schema, currentSchema, propname, callerProps, dataxpath, xpath) {
 
     if (callerProps.mode === MODES.EDIT && currentSchema.server_populate) {
-        console.log(`Skipping ${xpath} due to server_populate in EDIT mode`);
         return;
     }
 
@@ -705,7 +705,6 @@ function handleArrayWithItems(tree, schema, currentSchema, propname, callerProps
     const hasEmptyData = isEmptyArrayData(data, originalData, dataxpath, xpath);
 
     if (get(callerProps.data, dataxpath) === undefined && get(callerProps.originalData, xpath) === undefined) {
-        console.log(`Both data and original data undefined for ${xpath}, returning`);
         return;
     }
 
@@ -719,7 +718,8 @@ function handleArrayWithItems(tree, schema, currentSchema, propname, callerProps
         callerProps,
         dataxpath,
         xpath,
-        currentSchema.items?.$ref
+        currentSchema.items?.$ref,
+        undefined // objectState
     );
 
     // If the array is empty, we've added its container.
@@ -845,8 +845,14 @@ function handleSimpleArray(tree, schema, currentSchema, propname, callerProps, d
  * @returns {Array<Object>} The `children` array of the newly added header node, allowing for chaining.
  */
 function addHeaderNode(node, currentSchema, propname, type, callerProps, dataxpath, xpath, ref, objectState) {
+
     if (currentSchema.server_populate && callerProps.mode === MODES.EDIT) {
         return; // Don't render server-populated containers in edit mode
+    }
+
+    let headerState = objectState;
+    if (headerState === undefined) {
+        headerState = determineHeaderState(callerProps.data, callerProps.originalData, xpath, currentSchema);
     }
 
     const headerNode = {
@@ -1418,27 +1424,45 @@ function processArrayItems(tree, schema, currentSchema, propname, callerProps, d
         return;
     }
 
-    // OPTIMIZATION: Fast count calculation to determine if we need pagination
-    const originalDataArray = get(originalData, xpath) || [];
-    const currentDataArray = get(data, dataxpath) || [];
+    //  Use subtree data when available (modal context)
+    let sourceData = data;
+    let sourceOriginalData = originalData;
 
-    // Calculate maxItems based on the highest schema index, not just physical length
-    let maxSchemaIndex = -1;
-    const findMaxIndex = (item) => {
-        if (!item || typeof item !== 'object') return;
-        const subpropname = Object.keys(item).find(key => key.startsWith('xpath_'));
-        if (!subpropname) return;
-        const propxpath = item[subpropname];
-        try {
-            const propindex = parseInt(propxpath.substring(propxpath.lastIndexOf('[') + 1, propxpath.lastIndexOf(']')));
-            if (!isNaN(propindex) && propindex > maxSchemaIndex) {
-                maxSchemaIndex = propindex;
-            }
-        } catch (e) { /* ignore */ }
-    };
-    originalDataArray.forEach(findMaxIndex);
-    currentDataArray.forEach(findMaxIndex);
-    const maxItems = maxSchemaIndex > -1 ? maxSchemaIndex + 1 : Math.max(originalDataArray.length, currentDataArray.length);
+    const isModalContext = callerProps.subtree !== null && callerProps.subtree !== undefined;
+    if (isModalContext) {
+        // In modal context, use subtree as both data sources since it contains the scoped data
+        sourceData = callerProps.subtree;
+        sourceOriginalData = callerProps.subtree; // Use same for both since subtree is the "current" scoped data
+    }
+
+    // OPTIMIZATION: Fast count calculation to determine if we need pagination
+    const originalDataArray = get(sourceOriginalData, xpath) || [];
+    const currentDataArray = get(sourceData, dataxpath) || [];
+
+    let maxItems;
+    if (isModalContext) {
+        // In modal context, use actual array lengths since we have scoped data
+        // This prevents pagination miscalculation when array indices reflect original dataset positions
+        maxItems = Math.max(originalDataArray.length, currentDataArray.length);
+    } else {
+        // Calculate maxItems based on the highest schema index, not just physical length
+        let maxSchemaIndex = -1;
+        const findMaxIndex = (item) => {
+            if (!item || typeof item !== 'object') return;
+            const subpropname = Object.keys(item).find(key => key.startsWith('xpath_'));
+            if (!subpropname) return;
+            const propxpath = item[subpropname];
+            try {
+                const propindex = parseInt(propxpath.substring(propxpath.lastIndexOf('[') + 1, propxpath.lastIndexOf(']')));
+                if (!isNaN(propindex) && propindex > maxSchemaIndex) {
+                    maxSchemaIndex = propindex;
+                }
+            } catch (e) { /* ignore */ }
+        };
+        originalDataArray.forEach(findMaxIndex);
+        currentDataArray.forEach(findMaxIndex);
+        maxItems = maxSchemaIndex > -1 ? maxSchemaIndex + 1 : Math.max(originalDataArray.length, currentDataArray.length);
+    }
 
     const needsPagination = maxItems > ITEMS_PER_PAGE;
 
@@ -1533,13 +1557,13 @@ function processArrayItems(tree, schema, currentSchema, propname, callerProps, d
             // Get the actual data for this item to check against filters
             let itemData;
             if (item.dataPath) {
-                itemData = get(data, item.dataPath);
+                itemData = get(sourceData, item.dataPath);
             } else if (lazyXpathCache.has(item.schemaPath)) {
                 const currentIdx = lazyXpathCache.get(item.schemaPath);
-                itemData = get(data, `${dataxpath}[${currentIdx}]`);
+                itemData = get(sourceData, `${dataxpath}[${currentIdx}]`);
             } else {
                 // Fallback to original data if current data not available
-                itemData = get(originalData, item.schemaPath);
+                itemData = get(sourceOriginalData, item.schemaPath);
             }
 
             if (!itemData) return false;
@@ -1698,16 +1722,16 @@ function processArrayItems(tree, schema, currentSchema, propname, callerProps, d
     const originalItemIds = new Set();
     const updatedItemIds = new Set();
 
-    if (get(originalData, xpath)) {
-        get(originalData, xpath).forEach(item => {
+    if (get(sourceOriginalData, xpath)) {
+        get(sourceOriginalData, xpath).forEach(item => {
             if (item && typeof item === 'object' && item._id) {
                 originalItemIds.add(item._id);
             }
         });
     }
 
-    if (get(data, dataxpath)) {
-        get(data, dataxpath).forEach(item => {
+    if (get(sourceData, dataxpath)) {
+        get(sourceData, dataxpath).forEach(item => {
             if (item && typeof item === 'object' && item._id) {
                 updatedItemIds.add(item._id);
             }
@@ -1722,7 +1746,7 @@ function processArrayItems(tree, schema, currentSchema, propname, callerProps, d
 
         // Check if this item was deleted (exists in original but not in updated)
         if (item.fromOriginal) {
-            const originalItem = get(originalData, item.schemaPath);
+            const originalItem = get(sourceOriginalData, item.schemaPath);
             if (originalItem && typeof originalItem === 'object' && originalItem._id) {
                 isDeleted = originalItemIds.has(originalItem._id) && !updatedItemIds.has(originalItem._id);
             }
@@ -1735,7 +1759,7 @@ function processArrayItems(tree, schema, currentSchema, propname, callerProps, d
             childDataPath = `${dataxpath}[${currentIdx}]`;
         } else {
             // Fallback to traditional resolution only for this specific item
-            childDataPath = getDataxpath(data, item.schemaPath);
+            childDataPath = getDataxpath(sourceData, item.schemaPath);
         }
 
         // If item exists in originalData but not in updatedData (deleted), show it from originalData
@@ -1751,14 +1775,16 @@ function processArrayItems(tree, schema, currentSchema, propname, callerProps, d
                 // For deleted items, we want to show data from originalData with data-remove flag
                 modifiedCallerProps = {
                     ...callerProps,
-                    // Force the node creation to use originalData for deleted items
-                    data: originalData,
+                    // Force the node creation to use sourceOriginalData for deleted items
+                    data: sourceOriginalData,
                     // Mark that this item should get data-remove flag
                     forceDataRemove: item.schemaPath
                 };
                 // Use the original data path for deleted items
                 childDataPath = item.schemaPath;
             }
+
+            // The complexFieldProps system automatically passes array_obj_identifier down to children
 
             addNode(tree, schema, currentSchema, propname, modifiedCallerProps,
                 childDataPath, DATA_TYPES.OBJECT, item.schemaPath);
@@ -1772,11 +1798,22 @@ function processArrayItems(tree, schema, currentSchema, propname, callerProps, d
 function processArrayItemsSimple(tree, schema, currentSchema, propname, callerProps, dataxpath, xpath) {
     const paths = [];
     const { data, originalData } = callerProps;
+
+    // Use subtree data when available (modal context)
+    let sourceData = data;
+    let sourceOriginalData = originalData;
+
+    const isModalContext = callerProps.subtree !== null && callerProps.subtree !== undefined;
+    if (isModalContext) {
+        sourceData = callerProps.subtree;
+        sourceOriginalData = callerProps.subtree;
+    }
+
     const itemMetadata = [];
 
     // Collect all items (since array is small)
-    if (get(originalData, xpath)) {
-        for (let i = 0; i < get(originalData, xpath).length; i++) {
+    if (get(sourceOriginalData, xpath)) {
+        for (let i = 0; i < get(sourceOriginalData, xpath).length; i++) {
             const updatedxpath = `${xpath}[${i}]`;
             paths.push(updatedxpath);
 
@@ -1792,8 +1829,8 @@ function processArrayItemsSimple(tree, schema, currentSchema, propname, callerPr
 
     // Build xpath resolution cache for current data
     const xpathCache = new Map();
-    if (get(data, dataxpath)) {
-        get(data, dataxpath).forEach((childobject, currentIndex) => {
+    if (get(sourceData, dataxpath)) {
+        get(sourceData, dataxpath).forEach((childobject, currentIndex) => {
             if (!childobject || typeof childobject !== 'object') return;
 
             const subpropname = Object.keys(childobject).find(key => key.startsWith('xpath_'));
@@ -1834,12 +1871,12 @@ function processArrayItemsSimple(tree, schema, currentSchema, propname, callerPr
         filteredItemMetadata = itemMetadata.filter(item => {
             let itemData;
             if (item.dataPath) {
-                itemData = get(data, item.dataPath);
+                itemData = get(sourceData, item.dataPath);
             } else if (xpathCache.has(item.schemaPath)) {
                 const currentIdx = xpathCache.get(item.schemaPath);
-                itemData = get(data, `${dataxpath}[${currentIdx}]`);
+                itemData = get(sourceData, `${dataxpath}[${currentIdx}]`);
             } else {
-                itemData = get(originalData, item.schemaPath);
+                itemData = get(sourceOriginalData, item.schemaPath);
             }
 
             if (!itemData) {
@@ -1918,16 +1955,16 @@ function processArrayItemsSimple(tree, schema, currentSchema, propname, callerPr
     const originalItemIds = new Set();
     const updatedItemIds = new Set();
 
-    if (get(originalData, xpath)) {
-        get(originalData, xpath).forEach(item => {
+    if (get(sourceOriginalData, xpath)) {
+        get(sourceOriginalData, xpath).forEach(item => {
             if (item && typeof item === 'object' && item._id) {
                 originalItemIds.add(item._id);
             }
         });
     }
 
-    if (get(data, dataxpath)) {
-        get(data, dataxpath).forEach(item => {
+    if (get(sourceData, dataxpath)) {
+        get(sourceData, dataxpath).forEach(item => {
             if (item && typeof item === 'object' && item._id) {
                 updatedItemIds.add(item._id);
             }
@@ -1936,12 +1973,12 @@ function processArrayItemsSimple(tree, schema, currentSchema, propname, callerPr
 
     // Create nodes for all filtered items
     filteredItemMetadata.forEach(item => {
-        let childDataPath = item.dataPath || getDataxpath(data, item.schemaPath);
+        let childDataPath = item.dataPath || getDataxpath(sourceData, item.schemaPath);
         let isDeleted = false;
 
         // Check if this item was deleted (exists in original but not in updated)
         if (item.fromOriginal) {
-            const originalItem = get(originalData, item.schemaPath);
+            const originalItem = get(sourceOriginalData, item.schemaPath);
             if (originalItem && typeof originalItem === 'object' && originalItem._id) {
                 isDeleted = originalItemIds.has(originalItem._id) && !updatedItemIds.has(originalItem._id);
             }
@@ -1962,14 +1999,16 @@ function processArrayItemsSimple(tree, schema, currentSchema, propname, callerPr
                 // For deleted items, we want to show data from originalData with data-remove flag
                 modifiedCallerProps = {
                     ...callerProps,
-                    // Force the node creation to use originalData for deleted items
-                    data: originalData,
+                    // Force the node creation to use sourceOriginalData for deleted items
+                    data: sourceOriginalData,
                     // Mark that this item should get data-remove flag
                     forceDataRemove: item.schemaPath
                 };
                 // Use the original data path for deleted items
                 childDataPath = item.schemaPath;
             }
+
+            // The complexFieldProps system automatically passes array_obj_identifier down to children
 
             addNode(tree, schema, currentSchema, propname, modifiedCallerProps,
                 childDataPath, DATA_TYPES.OBJECT, item.schemaPath);

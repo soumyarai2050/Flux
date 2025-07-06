@@ -8,12 +8,16 @@ import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { ContentCopy, Error, Clear } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-import {
-    clearxpath, isValidJsonString, getSizeFromValue, getShapeFromValue, getColorTypeFromValue,
-    getHoverTextType, getValueFromReduxStoreFromXpath, floatToInt,
-    validateConstraints, getLocalizedValueAndSuffix, excludeNullFromObject, formatJSONObjectOrArray, toCamelCase, capitalizeCamelCase, getReducerArrayFromCollections,
-    getDateTimeFromInt, getDataSourceColor
-} from '../utils/index.js';
+import { clearxpath } from '../utils/core/dataAccess';
+import { isValidJsonString, toCamelCase, capitalizeCamelCase } from '../utils/core/stringUtils';
+import { getSizeFromValue, getShapeFromValue, getHoverTextType, getReducerArrayFromCollections } from '../utils/ui/uiUtils';
+import { getColorTypeFromValue } from '../utils/ui/colorUtils';
+import { getValueFromReduxStoreFromXpath } from '../utils/redux/reduxUtils';
+import { floatToInt, getLocalizedValueAndSuffix } from '../utils/formatters/numberUtils';
+import { validateConstraints } from '../utils/validation/validationUtils';
+import { excludeNullFromObject, formatJSONObjectOrArray } from '../utils/core/objectUtils';
+import { getDateTimeFromInt } from '../utils/formatters/dateUtils';
+import { getDataSourceColor } from '../utils/ui/themeUtils';
 import { COLOR_TYPES, DATA_TYPES, HIGHLIGHT_STATES, MODEL_TYPES, MODES } from '../constants';
 import JsonView from './JsonView';
 import VerticalDataTable from './tables/VerticalDataTable';

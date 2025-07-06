@@ -4,7 +4,8 @@ import { Box, Dialog, DialogTitle, DialogContent } from '@mui/material';
 import styles from './FilterDialog.module.css';
 import FilterSortPopup from '../../FilterSortPopup/FilterSortPopup';
 import LinkText from '../../LinkText';
-import { getFilterDict, getSortOrderDict } from '../../../utils/index.js';
+import { getFilterDict } from '../../../utils/core/dataFiltering';
+import { getSortOrderDict } from '../../../utils/core/dataSorting';
 import { FilterAlt } from '@mui/icons-material';
 
 /**

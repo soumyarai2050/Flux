@@ -168,12 +168,12 @@ class SymbolCacheContainer:
                         md_shared_memory_container_: MDSharedMemoryContainer = (
                             MDSharedMemoryContainer.from_buffer_copy(shm))
                         mobile_book_container_ = md_shared_memory_container_.mobile_book_container
+                        break
                     except Exception as e:
                         logging.exception(f"get_base_md_shared_memory_container failed: exception {e}")
                         return None
                     finally:
                         pthread_shm_mutex.unlock()
-                        break
                 else:
                     lock_timed_out_time = DateTime.utcnow()
                     logging.error(f"pthread lock tried to take lock at {lock_try_time}, but timed-out at "

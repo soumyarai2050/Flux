@@ -67,7 +67,7 @@ message ContactLimits {
   optional RollingMaxChoreCount rolling_max_chore_count = 6 [(FluxFldHelp) = "Allowed chore count (symbol side agnostic) within configured interval; no time window implies SOD: window-start & checking-time as end"];
   optional RollingMaxChoreCount rolling_max_reject_count = 7 [(FluxFldHelp) = "Allowed rejection count (symbol side agnostic) within configured interval; no time window implies SOD: window-start & checking-time as end"];
   // auto update symbol's availability when allocated/consumed by plan(block plan creation if not enough availability), this has both limit and status in Position
-  repeated Broker eligible_brokers = 8;
+  repeated Broker eligible_brokers = 8 [(FluxFldArrayObjIdentifier) = "broker"];
   optional int64 eligible_brokers_update_count = 9;
 }
 

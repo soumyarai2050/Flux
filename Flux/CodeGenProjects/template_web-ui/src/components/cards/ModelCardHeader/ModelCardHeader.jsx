@@ -1,6 +1,6 @@
 import React from 'react';
 import { useTheme } from '@emotion/react';
-import { snakeToTitle } from '../../../utils/index.js';
+import { snakeToTitle } from '../../../utils/ui/uiUtils';
 import styles from './ModelCardHeader.module.css';
 
 const ModelCardHeader = ({ name, children }) => {

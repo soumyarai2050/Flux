@@ -27,6 +27,71 @@ const HeaderField = (props) => {
 
     const title = props.data.title ? props.data.title : props.name;
 
+    /**
+     * Helper function: Get the identifier value from the actual data
+     * 
+     * The identifier tells us which field in the data contains the meaningful value to display.
+     * For example, if identifier is "broker", we look for data.broker
+     * If identifier is "security.sec_id", we look for data.security.sec_id
+     * 
+     * @param {string} identifierPath - The path to the identifier field (like "broker" or "security.sec_id")
+     * @param {object} nodeData - The tree node data containing paths and metadata
+     * @param {object} updatedData - The actual data object containing values
+     * @returns {string|number|null} - The identifier value or null if not found
+     */
+    const getIdentifierValue = (identifierPath, nodeData, updatedData) => {
+        if (!identifierPath || !nodeData || !updatedData) return null;
+
+        try {
+            // Method 1: Get the value from the current node's data
+            // The node has a "dataxpath" that tells us where its data is located
+            const nodeDataPath = nodeData.dataxpath;
+            if (nodeDataPath) {
+                const nodeValue = get(updatedData, nodeDataPath);
+                if (nodeValue && typeof nodeValue === 'object') {
+                    // Look for the identifier field within this node's data
+                    const identifierValue = get(nodeValue, identifierPath);
+                    if (typeof identifierValue === 'string' || typeof identifierValue === 'number') {
+                        return identifierValue;
+                    }
+                }
+            }
+
+            // Method 2: Fallback - try to get the value directly from the identifier path
+            const value = get(updatedData, identifierPath);
+            return (typeof value === 'string' || typeof value === 'number') ? value : null;
+        } catch (error) {
+            console.warn('Error getting identifier value:', error);
+            return null;
+        }
+    };
+
+    /**
+     * Main function: Calculate the display title with identifier value
+     * 
+     * Here we check if this header has an identifier,
+     * and if so, we add the actual value in parentheses next to the title.
+     * 
+     * Example: "Broker" becomes "Broker (ZERODHA)" if the broker field contains "ZERODHA"
+     * 
+     * @returns {string} - The display title with or without identifier value
+     */
+    const getDisplayTitle = () => {
+        let displayTitle = title;
+        // Check if this node has inherited array_obj_identifier from parent array , we have set this in complex props 
+        if (props.data.array_obj_identifier) {
+            const identifierValue = getIdentifierValue(
+                props.data.array_obj_identifier,
+                props.data,
+                props.data.updatedDataForColor
+            );
+            if (identifierValue) {
+                displayTitle = `${title} [${identifierValue}]`;
+            }
+        }
+        return displayTitle;
+    };
+
     let passToAddActiveContext = false;
     let passToRemoveActiveContext = false;
 
@@ -94,7 +159,7 @@ const HeaderField = (props) => {
                     )}
                 </span>
                 <Typography variant="subtitle1" sx={{ display: 'flex', flex: '1', textDecoration: textDecoration }} data-header-title="true"> {/* data-header-title is used by DataTree's handleClick */}
-                    {title}
+                    {getDisplayTitle()}
                 </Typography>
 
                 {/* Add Expand/Collapse All controls for nodes with children */}
@@ -106,7 +171,7 @@ const HeaderField = (props) => {
                     onNodeToggle={props.data.onNodeToggle}
                     hasChildren={props.data.hasChildren}
                     expandedNodeXPaths={props.data.expandedNodeXPaths}
-                    // disabled={props.data.mode !== MODES.EDIT}
+                // disabled={props.data.mode !== MODES.EDIT}
                 />
 
                 {
@@ -121,9 +186,9 @@ const HeaderField = (props) => {
             {/* Pagination Controls */}
             {props.data.pagination && (
                 // Use displayPages when filtering is active, otherwise use totalPages
-                (props.data.pagination.hasActiveFilters ? 
-                 props.data.pagination.displayPages > 1 : 
-                 props.data.pagination.totalPages > 1)
+                (props.data.pagination.hasActiveFilters ?
+                    props.data.pagination.displayPages > 1 :
+                    props.data.pagination.totalPages > 1)
             ) && (
                 <Box
                     className={`${classes.paginationControls} ${props.data.isContainer ? classes.containerPagination : classes.childPagination}`}

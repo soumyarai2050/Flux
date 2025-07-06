@@ -236,7 +236,7 @@ message Broker {
   option (FluxMsgStringLength) = 128;
 
   // per security positions
-  repeated SecPosition sec_positions = 3;
+  repeated SecPosition sec_positions = 3 [(FluxFldArrayObjIdentifier) = "security.sec_id"];
   // broker identifier
   required string broker = 4 [(FluxFldFilterEnable) = true];
   optional int32 bkr_priority = 5 [default = 10, (FluxFldHelp) = "default priority 10, embedded position priorities are relative within broker priority level group; chores respect specified priority (lower value is higher priority), duplicates allowed"];

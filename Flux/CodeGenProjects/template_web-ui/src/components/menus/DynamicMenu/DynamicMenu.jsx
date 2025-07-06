@@ -3,10 +3,10 @@ import { useSelector } from 'react-redux';
 import PropTypes from 'prop-types';
 import { Box } from '@mui/material';
 import { DATA_TYPES } from '../../../constants';
-import {
-    getColorTypeFromValue, getShapeFromValue, getSizeFromValue, capitalizeCamelCase,
-    getHoverTextType, getValueFromReduxStoreFromXpath, getReducerArrayFromCollections
-} from '../../../utils/index.js';
+import { getColorTypeFromValue } from '../../../utils/ui/colorUtils';
+import { getShapeFromValue, getSizeFromValue, getHoverTextType, getReducerArrayFromCollections } from '../../../utils/ui/uiUtils';
+import { capitalizeCamelCase } from '../../../utils/core/stringUtils';
+import { getValueFromReduxStoreFromXpath } from '../../../utils/redux/reduxUtils';
 import { flux_toggle, flux_trigger_strat } from '../../../projectSpecificUtils';
 import ValueBasedToggleButton from '../../ValueBasedToggleButton';
 import { ValueBasedProgressBarWithHover } from '../../ValueBasedProgressBar';

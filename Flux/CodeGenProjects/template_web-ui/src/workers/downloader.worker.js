@@ -1,4 +1,4 @@
-import { getTableRowsFromData } from '../utils/index.js';
+import { getTableRowsFromData } from '../utils/ui/tableUtils';
 import { DATA_TYPES, MODEL_TYPES } from '../constants';
 
 onmessage = (e) => {

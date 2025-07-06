@@ -191,6 +191,16 @@ const FilterSortPopup = ({
     setSearchValue(newSearchValue);
   };
 
+  // Handle key down events
+  const handleKeyDown = (e) => {
+    if (e.key.length === 1 || e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === 'Escape') {
+      // Let Escape still close the popover/menu potentially? Maybe not stop propagation for Escape.
+      if (e.key !== 'Escape') {
+        e.stopPropagation();
+      }
+    }
+  };
+
   // Clear search text
   const handleClearSearch = () => {
     // When clearing search in Excel, it restores the original selection
@@ -282,7 +292,7 @@ const FilterSortPopup = ({
       <div className={styles.filterIconWrapper}>
         <IconButton
           size="small"
-          className={`${styles.filterButton} ${(isFiltered) ? styles.activeFilter : hasFilters ? styles.hasFilter : ''}`}
+          className={`${styles.filterButton} ${(isFiltered) ? styles.activeFilter : hasFilters ? styles.hasFilter : ''} ${open ? styles.popupOpen : ''}`}
           onClick={handleIconClick}
           aria-label="Filter and sort"
         >
@@ -328,7 +338,7 @@ const FilterSortPopup = ({
               <div className={styles.sortIconPlaceholder}>
                 <ContentCopy fontSize="small" className={styles.menuIcon} />
               </div>
-              <Typography>{`Copy "${columnName}"`}</Typography>
+              <Typography>{`Copy`}</Typography>
             </div>
           </div>
 
@@ -401,6 +411,7 @@ const FilterSortPopup = ({
                       value={localTextFilter}
                       onChange={handleTextFilterChange}
                       className={styles.textFilterField}
+                      onKeyDown={handleKeyDown}
                     />
                   </div>
                 )}
@@ -417,7 +428,7 @@ const FilterSortPopup = ({
               <div className={styles.sortIconPlaceholder}>
                 <FilterAlt fontSize="small" className={styles.menuIcon} />
               </div>
-              <Typography>{`Clear Filter/Sort from "${columnName}"`}</Typography>
+              <Typography>{`Clear Filter/Sort`}</Typography>
             </div>
           </div>
 
@@ -434,6 +445,7 @@ const FilterSortPopup = ({
                   fullWidth
                   value={searchValue}
                   onChange={handleSearchChange}
+                  onKeyDown={handleKeyDown}
                   className={styles.searchField}
                   InputProps={{
                     startAdornment: (

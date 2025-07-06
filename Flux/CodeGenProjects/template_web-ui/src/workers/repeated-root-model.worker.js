@@ -1,11 +1,13 @@
 import { cloneDeep } from 'lodash';
 import { DB_ID, MODES } from '../constants';
+import { applyFilter } from '../utils/core/dataFiltering';
 import {
-    applyFilter, getActiveRows, getCommonKeyCollections, getFilteredCells,
-    getGroupedTableColumns, getGroupedTableRows, getMaxRowSize,
-    getTableColumns
-} from '../utils/index.js';
-import { addxpath, getTableRows, sortColumns, applyRowIdsFilter, getSortOrdersWithAbs, getUniqueValues } from '../utils/index.js';
+    getActiveRows, getCommonKeyCollections, getFilteredCells, getGroupedTableColumns,
+    getTableColumns, getTableRows
+} from '../utils/ui/tableUtils';
+import { getGroupedTableRows, getMaxRowSize } from '../utils/core/dataGrouping';
+import { addxpath } from '../utils/core/dataAccess';
+import { sortColumns, applyRowIdsFilter, getSortOrdersWithAbs, getUniqueValues } from '../utils/ui/uiUtils';
 
 onmessage = (e) => {
     const { storedArray, updatedObj, fieldsMetadata, filters, mode, page, rowsPerPage, sortOrders,

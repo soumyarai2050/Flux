@@ -7,7 +7,9 @@ import { Brightness4, Brightness7, DashboardCustomize, DoNotTouch, PanTool, Save
 import { defaultLayouts } from '../../projectSpecificUtils';
 import { actions as LayoutActions } from '../../features/uiLayoutSlice';
 import * as Selectors from '../../selectors';
-import { fastClone, getIconText, snakeToTitle } from '../../utils/index.js';
+import { fastClone } from '../../utils/core/dataUtils';
+import { getIconText } from '../../utils/core/stringUtils';
+import { snakeToTitle } from '../../utils/ui/uiUtils';
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 import styles from './Layout.module.css';

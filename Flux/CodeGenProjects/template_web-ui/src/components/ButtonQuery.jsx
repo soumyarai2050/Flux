@@ -14,9 +14,12 @@ import { PlayArrow, Delete } from '@mui/icons-material';
 import ValueBasedToggleButton from './ValueBasedToggleButton';
 import { API_ROOT_URL, API_ROOT_VIEW_URL } from '../constants';
 import Alert, { AlertErrorMessage } from './Alert';
-import { getColorTypeFromValue, getSizeFromValue, getShapeFromValue, getErrorDetails, getAxiosMethod } from '../utils/index.js';
+import { getColorTypeFromValue } from '../utils/ui/colorUtils';
+import { getSizeFromValue, getShapeFromValue } from '../utils/ui/uiUtils';
+import { getErrorDetails } from '../utils/core/errorUtils';
+import { getAxiosMethod } from '../utils/network/networkUtils';
 import classes from './ButtonQuery.module.css';
-import { computeFileChecksum } from '../utils/index.js';
+import { computeFileChecksum } from '../utils/file/fileUtils';
 
 // Add UTC support for datetime
 dayjs.extend(utc);
