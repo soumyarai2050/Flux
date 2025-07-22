@@ -30,11 +30,11 @@ export function withModelLoader(Component, config = {}) {
     }
 
     return (
-      <ErrorBoundary>
+      // <ErrorBoundary>
         <Suspense fallback={<Skeleton name={modelName} />}>
           <Component {...config} {...props} />
         </Suspense>
-      </ErrorBoundary>
+      // </ErrorBoundary>
     );
   };
 }

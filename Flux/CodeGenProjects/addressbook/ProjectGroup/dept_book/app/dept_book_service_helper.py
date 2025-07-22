@@ -58,13 +58,3 @@ def is_all_view_service_up(ignore_error: bool = False) -> bool:
         # else not required - silently ignore error is trues
         return False
 
-
-def get_latest_bar_data_as_df(exch_id_list: List[str] | None = None, bar_type_list: List[BarType] | None = None,
-                              start_time: DateTime | None = None, end_time: DateTime | None = None) -> pd.DataFrame:
-    bar_data_list: List[BarDataBaseModel] = (
-        dashboard_service_http_client.get_latest_bar_data_query_client(exch_id_list, bar_type_list, start_time, end_time))
-    json_list = []
-    for bar_data in bar_data_list:
-        json_list.append(bar_data.to_json_dict())
-    df = pl.DataFrame(json_list)
-    return df

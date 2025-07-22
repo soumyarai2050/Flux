@@ -20,6 +20,7 @@ export function getDataSourceSelector(dataSourceName, selector) {
         updatedObj: selector?.[`updated${capDataSourceName}Obj`] ?? {},
         objId: selector?.[`selected${capDataSourceName}Id`] ?? null,
         mode: selector?.mode ?? MODES.READ,
+        allowUpdates: selector?.allowUpdates ?? true,
         isCreating: selector?.isCreating ?? false,
         isLoading: selector?.isLoading ?? false,
         error: selector?.error ?? null,

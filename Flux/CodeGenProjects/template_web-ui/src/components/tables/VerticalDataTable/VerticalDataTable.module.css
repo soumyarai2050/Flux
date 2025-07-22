@@ -44,7 +44,8 @@
 .headerCell {
   font-weight: 600;
   vertical-align: top;
-  background: var(--dynamic-navbar-bg);
+  background: var(--brown-theme-medium);
+  color: var(--table-header-text);
   word-break: break-word;
   position: sticky;
   left: 0;

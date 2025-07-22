@@ -14,10 +14,10 @@ import { ErrorOutline } from '@mui/icons-material';
  * It shows a user-friendly message, the error details, and a retry button.
  * @param {object} props - The properties for the component.
  * @param {Error} props.error - The error object caught by the ErrorBoundary.
- * @param {Function} props.resetErrorBoundary - Function provided by react-error-boundary to reset the error state.
+ * @param {Function} props.onReset - Function provided by react-error-boundary to reset the error state.
  * @returns {React.ReactElement} The rendered error fallback UI.
  */
-function ErrorFallback({ error, resetErrorBoundary }) {
+function ErrorFallback({ error, onReset }) {
     // Log the error for debugging or external monitoring
     console.error('ErrorBoundary caught an error:', error);
 
@@ -40,7 +40,7 @@ function ErrorFallback({ error, resetErrorBoundary }) {
                     )}
                 </Alert>
 
-                <Button variant="contained" color="primary" onClick={resetErrorBoundary}>
+                <Button variant="contained" color="primary" onClick={onReset}>
                     Retry
                 </Button>
             </Stack>
@@ -51,7 +51,7 @@ function ErrorFallback({ error, resetErrorBoundary }) {
 // Prop validation for ErrorFallback
 ErrorFallback.propTypes = {
     error: PropTypes.object.isRequired,
-    resetErrorBoundary: PropTypes.func.isRequired,
+    onReset: PropTypes.func.isRequired,
 };
 
 /**

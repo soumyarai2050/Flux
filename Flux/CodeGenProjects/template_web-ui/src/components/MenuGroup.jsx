@@ -95,6 +95,7 @@ import ButtonQuery from './ButtonQuery';
  * @param {function} props.onHighlightDurationChange - Callback for highlight duration change.
  * @param {Array<string>} props.noCommonKeyOverride - No common key override list.
  * @param {function} props.onNoCommonKeyOverrideChange - Callback for no common key override change.
+ * @param {function} props.onDiscard - Callback for discard action.
  * @returns {React.ReactElement} The rendered MenuGroup component.
  */
 const MenuGroup = ({
@@ -149,6 +150,7 @@ const MenuGroup = ({
     isAbbreviationSource,
     isCreating,
     onReload,
+    onDiscard,
     charts = [],
     onChartToggle,
     chartEnableOverride = [],
@@ -461,6 +463,7 @@ const MenuGroup = ({
                         mode={mode}
                         onModeToggle={onModeToggle}
                         onSave={onSave}
+                        onDiscard={onDiscard}
                         menuType={menuType}
                         isPinned={pinned.includes(menuName)}
                         onMenuClose={handleMenuClose}
@@ -628,6 +631,7 @@ MenuGroup.propTypes = {
     isAbbreviationSource: PropTypes.bool.isRequired,
     isCreating: PropTypes.bool.isRequired,
     onReload: PropTypes.func.isRequired,
+    onDiscard: PropTypes.func,
     charts: PropTypes.array,
     onChartToggle: PropTypes.func.isRequired,
     chartEnableOverride: PropTypes.array,

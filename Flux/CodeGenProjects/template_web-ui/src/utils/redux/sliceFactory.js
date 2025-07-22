@@ -76,6 +76,7 @@ export function createGenericSlice({
     [updatedObjKey]: {},
     [objIdKey]: null,
     mode: MODES.READ,
+    allowUpdates: true,
     isCreating: false,
     error: null,
     isLoading: false,
@@ -239,6 +240,9 @@ export function createGenericSlice({
       },
       setMode(state, action) {
         setModeHandler(state, action, sliceConfig);
+      },
+      setAllowUpdates(state, action) {
+        state.allowUpdates = action.payload;
       },
       setIsCreating(state, action) {
         setIsCreatingHandler(state, action, sliceConfig);

@@ -207,7 +207,7 @@ export function getCommonKeyCollections(rows, tableColumns, hide = true, collect
             column.value = value;
             commonKeyColumns.push(column);
         } else {
-            if (['button', 'progressBar', 'alert_bubble'].includes(column.type)) return;
+            if (['button', 'progressBar', 'alert_bubble'].includes(column.type) && !column.rootLevel) return;
 
             const valueSet = new Set();
             for (let i = 0; i < rows.length; i++) {
@@ -479,6 +479,9 @@ export function getTableColumns(fieldsMetadata, mode, overrideProps = {}, collec
             }
             if (highlightUpdateOverrideDict[fieldName]) {
                 collection.highlightUpdate = highlightUpdateOverrideDict[fieldName];
+            }
+            if (collection.noCommonKey) {
+                collection.noCommonKeyDeduced = true;
             }
             if (noCommonKeyOverride.includes(fieldName)) {
                 if (collection.noCommonKey) {

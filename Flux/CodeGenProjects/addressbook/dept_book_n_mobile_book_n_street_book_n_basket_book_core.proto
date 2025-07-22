@@ -108,7 +108,8 @@ message TopOfBook {
       }
   };
   option (FluxMsgJsonQuery) = {
-      QueryName: "get_tob_of_book_from_cache"
+    QueryName: "get_tob_of_book_from_cache"
+    QueryRouteType: PATCH
   };
   option (FluxMsgStringLength) = 128;
   option (FluxMsgIsShmModel) = true;

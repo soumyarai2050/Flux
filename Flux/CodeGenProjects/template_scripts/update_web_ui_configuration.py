@@ -37,7 +37,9 @@ class UpdateWebUIConfiguration:
             self.is_proxy_server = str(self.is_proxy_server).lower()
         self.main_server_beanie_port: str = self.project_config_yaml_dict.get("main_server_beanie_port")
         self.main_server_cache_port: str = self.project_config_yaml_dict.get("main_server_cache_port")
-        self.view_port: str = self.project_config_yaml_dict.get("view_port")
+        self.use_view_clients: bool = self.project_config_yaml_dict.get("use_view_clients", False)
+        self.view_port: str = self.project_config_yaml_dict.get("view_port") if (
+            self.use_view_clients) else self.main_server_beanie_port
         self.ui_port: str = self.project_config_yaml_dict.get("ui_port")
 
         self._update_config_js()
@@ -78,9 +80,9 @@ class UpdateWebUIConfiguration:
             dynamic_url: bool = connection_details["dynamic_url"]
             if not dynamic_url:
                 project_name: str = connection_details["project_name"]
-                host_and_port: Tuple[str, int] = (
+                host_and_port_tuple: Tuple[str, int, int] = (
                     self.__get_host_and_port_from_specific_project_config(project_name=project_name))
-                connection_details["host"], connection_details["port"] = host_and_port
+                connection_details["host"], connection_details["port"], connection_details["view_port"] = host_and_port_tuple
 
     def _update_schema_json(self):
         with open(str(self.project_schema_path), 'r') as f:
@@ -97,13 +99,15 @@ class UpdateWebUIConfiguration:
 
         logging.debug(f"schema.json updated successfully for {self.project_name}")
 
-    def __get_host_and_port_from_specific_project_config(self, project_name: str) -> Tuple[str, int]:
+    def __get_host_and_port_from_specific_project_config(self, project_name: str) -> Tuple[str, int, int]:
         project_dir: PurePath = self.root_dir / project_name
         config_path: PurePath = project_dir / "data" / "config.yaml"
         config_yaml_dict: Dict = YAMLConfigurationManager.load_yaml_configurations(str(config_path))
         host: str = config_yaml_dict.get("server_host")
         beanie_port: int = int(config_yaml_dict.get("main_server_beanie_port"))
-        return host, beanie_port
+        use_view_clients: bool = config_yaml_dict.get("use_view_clients", False)
+        view_port: int = int(config_yaml_dict.get("view_port")) if use_view_clients else beanie_port
+        return host, beanie_port, view_port
 
     def _update_package_json(self):
         with open(str(self.project_package_json_path), 'r') as file:

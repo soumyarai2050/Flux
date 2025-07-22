@@ -164,7 +164,8 @@ const LoadedView = ({
   frozenColumns,
   filters,
   onFiltersChange,
-  uniqueValues
+  uniqueValues,
+  highlightDuration
 }) => {
   const [columns, setColumns] = useState(cells);
   const [columnWidths, setColumnWidths] = useState({});
@@ -503,6 +504,7 @@ const LoadedView = ({
                           onAutocompleteOptionChange={() => { }}
                           onDateTimeChange={() => { }}
                           stickyPosition={stickyPosition}
+                          highlightDuration={highlightDuration}
                         />
                       );
                     })}
@@ -617,7 +619,8 @@ const AbbreviationMergeView = ({
   frozenColumns,
   filters,
   onFiltersChange,
-  uniqueValues
+  uniqueValues,
+  highlightDuration
 }) => {
   return (
     <>
@@ -665,6 +668,7 @@ const AbbreviationMergeView = ({
         filters={filters}
         onFiltersChange={onFiltersChange}
         uniqueValues={uniqueValues}
+        highlightDuration={highlightDuration}
       />
     </>
   );

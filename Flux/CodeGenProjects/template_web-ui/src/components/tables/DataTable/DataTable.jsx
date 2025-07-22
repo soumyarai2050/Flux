@@ -689,6 +689,7 @@ const DataTable = ({
               onUserChange={handleUserChange}
               selectedId={selectedId}
               treeLevel={10}
+              disablePagination={true}
             />
           </ModelCardContent>
         </ModelCard>

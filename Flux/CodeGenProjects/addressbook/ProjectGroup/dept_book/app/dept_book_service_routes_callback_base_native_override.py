@@ -24,7 +24,6 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
     underlying_read_dash_collection_by_id_http: Callable[..., Any] | None = None
     underlying_create_dash_collection_http: Callable[..., Any] | None = None
     underlying_update_dash_collection_http: Callable[..., Any] | None = None
-    underlying_read_bar_data_http: Callable[Any, Any] | None = None
     underlying_read_dash_filters_http: Callable[Any, Any] | None = None
     underlying_read_dash_http: Callable[Any, Any] | None = None
     underlying_filtered_dash_by_dash_filters_query_http: Callable[Any, Any] | None = None
@@ -46,9 +45,8 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
             underlying_read_contact_limits_http_json_dict, underlying_create_contact_limits_http,
             underlying_read_dash_filters_collection_http_json_dict, underlying_create_dash_filters_collection_http,
             underlying_read_dash_collection_by_id_http, underlying_create_dash_collection_http,
-            underlying_update_dash_collection_http, underlying_read_bar_data_http, underlying_read_dash_filters_http,
-            underlying_read_dash_http, underlying_filtered_dash_by_dash_filters_query_http,
-            underlying_read_bar_data_http)
+            underlying_update_dash_collection_http, underlying_read_dash_filters_http,
+            underlying_read_dash_http, underlying_filtered_dash_by_dash_filters_query_http)
         cls.underlying_read_contact_limits_http_json_dict = underlying_read_contact_limits_http_json_dict
         cls.underlying_create_contact_limits_http = underlying_create_contact_limits_http
         cls.underlying_read_dash_filters_collection_http_json_dict = underlying_read_dash_filters_collection_http_json_dict
@@ -56,7 +54,6 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
         cls.underlying_read_dash_collection_by_id_http = underlying_read_dash_collection_by_id_http
         cls.underlying_create_dash_collection_http = underlying_create_dash_collection_http
         cls.underlying_update_dash_collection_http = underlying_update_dash_collection_http
-        cls.underlying_read_bar_data_http = underlying_read_bar_data_http
         cls.underlying_read_dash_filters_http = underlying_read_dash_filters_http
         cls.underlying_read_dash_http = underlying_read_dash_http
         cls.underlying_filtered_dash_by_dash_filters_query_http = underlying_filtered_dash_by_dash_filters_query_http
@@ -259,81 +256,6 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
         dash_obj = dash_class_type(**dash)
         return [dash_obj]
 
-    async def get_vwap_projection_from_bar_data_query_pre(self, bar_data_class_type: Type[BarData], symbol: str,
-                                                          exch_id: str, bar_type: str | None = None,
-                                                          start_date_time: int | None = None,
-                                                          end_date_time: int | None = None):
-        bar_data_projection_list = await DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_read_bar_data_http(
-            get_vwap_projection_from_bar_data_agg_pipeline(symbol, exch_id, bar_type, start_date_time, end_date_time),
-            projection_read_http, projection_model=BarDataProjectionContainerForVwap)
-        return bar_data_projection_list
-
-    async def get_vwap_projection_from_bar_data_query_ws_pre(self):
-        return get_vwap_projection_from_bar_data_filter_callable, get_vwap_projection_from_bar_data_agg_pipeline
-
-    async def get_vwap_n_vwap_change_projection_from_bar_data_query_pre(
-            self, bar_data_class_type: Type[BarData], symbol: str, exch_id: str, bar_type: str | None = None,
-            start_date_time: int | None = None, end_date_time: int | None = None):
-        bar_data_projection_list = await DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_read_bar_data_http(
-            get_vwap_n_vwap_change_projection_from_bar_data_agg_pipeline(symbol, exch_id, bar_type, start_date_time,
-                                                                         end_date_time), projection_read_http,
-            projection_model=BarDataProjectionContainerForVwapNVwapChange)
-        return bar_data_projection_list
-
-    async def get_vwap_n_vwap_change_projection_from_bar_data_query_ws_pre(self):
-        return (get_vwap_n_vwap_change_projection_from_bar_data_filter_callable,
-                get_vwap_n_vwap_change_projection_from_bar_data_agg_pipeline)
-
-    async def get_vwap_change_projection_from_bar_data_query_pre(
-            self, bar_data_class_type: Type[BarData], symbol: str, exch_id: str, bar_type: str | None = None,
-            start_date_time: int | None = None, end_date_time: int | None = None):
-        bar_data_projection_list = await DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_read_bar_data_http(
-            get_vwap_change_projection_from_bar_data_agg_pipeline(symbol, exch_id, bar_type,
-                                                                  start_date_time, end_date_time),
-            projection_read_http, projection_model=BarDataProjectionContainerForVwapChange)
-        return bar_data_projection_list
-
-    async def get_vwap_change_projection_from_bar_data_query_ws_pre(self):
-        return (get_vwap_change_projection_from_bar_data_filter_callable,
-                get_vwap_change_projection_from_bar_data_agg_pipeline)
-
-    async def get_premium_projection_from_bar_data_query_pre(
-            self, bar_data_class_type: Type[BarData], symbol: str, exch_id: str, bar_type: str | None = None,
-            start_date_time: int | None = None, end_date_time: int | None = None):
-        bar_data_projection_list = await DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_read_bar_data_http(
-            get_premium_projection_from_bar_data_agg_pipeline(symbol, exch_id, bar_type, start_date_time, end_date_time),
-            projection_read_http, projection_model=BarDataProjectionContainerForPremium)
-        return bar_data_projection_list
-
-    async def get_premium_projection_from_bar_data_query_ws_pre(self):
-        return get_premium_projection_from_bar_data_filter_callable, get_premium_projection_from_bar_data_agg_pipeline
-
-    async def get_premium_n_premium_change_projection_from_bar_data_query_pre(
-            self, bar_data_class_type: Type[BarData], symbol: str, exch_id: str, bar_type: str | None = None,
-            start_date_time: int | None = None, end_date_time: int | None = None):
-        bar_data_projection_list = await DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_read_bar_data_http(
-            get_premium_n_premium_change_projection_from_bar_data_agg_pipeline(symbol, exch_id, bar_type,
-                                                                               start_date_time, end_date_time),
-            projection_read_http, projection_model=BarDataProjectionContainerForPremiumNPremiumChange)
-        return bar_data_projection_list
-
-    async def get_premium_n_premium_change_projection_from_bar_data_query_ws_pre(self):
-        return (get_premium_n_premium_change_projection_from_bar_data_filter_callable,
-                get_premium_n_premium_change_projection_from_bar_data_agg_pipeline)
-
-    async def get_premium_change_projection_from_bar_data_query_pre(
-            self, bar_data_class_type: Type[BarData], symbol: str, exch_id: str, bar_type: str | None = None,
-            start_date_time: int | None = None, end_date_time: int | None = None):
-        bar_data_projection_list = await DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_read_bar_data_http(
-            get_premium_change_projection_from_bar_data_agg_pipeline(symbol, exch_id, bar_type,
-                                                                     start_date_time, end_date_time),
-            projection_read_http, projection_model=BarDataProjectionContainerForPremiumChange)
-        return bar_data_projection_list
-
-    async def get_premium_change_projection_from_bar_data_query_ws_pre(self):
-        return (get_premium_change_projection_from_bar_data_filter_callable,
-                get_premium_change_projection_from_bar_data_agg_pipeline)
-
     async def filtered_dash_by_dash_filters_query_pre(self, dash_class_type: Type[Dash], dash_name: str):
         filtered_dash_list: List[Dash] = await self.underlying_filtered_dash_by_dash_filters(dash_name)
         return filtered_dash_list
@@ -375,56 +297,3 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
             return_obj_json_str = return_obj_bytes.decode("utf-8")
             return return_obj_json_str
         return None
-
-    async def get_latest_bar_data_query_pre(self, bar_data_class_type: Type[BarData], payload: Dict[str, Any]):
-        exch_id_list: List[str] | None = payload.get("exch_id_list")
-        bar_type_list: List[str] | None = payload.get("bar_type_list")
-        start_time = payload.get("start_time")
-        if start_time:
-            start_time = get_pendulum_dt_from_epoch(start_time)
-        end_time = payload.get("end_time")
-        if end_time:
-            end_time = get_pendulum_dt_from_epoch(end_time)
-        bar_data_list = await DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_read_bar_data_http(
-            get_latest_bar_data_agg(exch_id_list, bar_type_list, start_time, end_time))
-        return bar_data_list
-
-    async def get_aggregated_bar_data_query_pre(self, bar_data_class_type: Type[BarData], payload: Dict[str, Any]):
-        target_bar_type: str = payload.get("target_bar_type")
-        exch_id_list: List[str] | None = payload.get("exch_id_list")
-        symbol_list: List[str] | None = payload.get("symbol_list")
-        target_bar_counts: int | None = payload.get("target_bar_counts")
-        start_time = payload.get("start_time")
-        if start_time:
-            start_time = get_pendulum_dt_from_epoch(start_time)
-        end_time = payload.get("end_time")
-        if end_time:
-            end_time = get_pendulum_dt_from_epoch(end_time)
-        bar_data_list = await DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_read_bar_data_http(
-            get_bar_aggregation_pipeline(target_bar_type, end_time, start_time, target_bar_counts,
-                                         exch_id_list, symbol_list))
-        return bar_data_list
-
-async def get_vwap_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str, obj_id_or_list: int | List[int], **kwargs):
-    return bar_data_obj_json_str
-
-
-async def get_vwap_n_vwap_change_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str, obj_id_or_list: int | List[int], **kwargs):
-    return bar_data_obj_json_str
-
-
-async def get_vwap_change_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str, obj_id_or_list: int | List[int], **kwargs):
-    return bar_data_obj_json_str
-
-
-async def get_premium_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str, obj_id_or_list: int | List[int], **kwargs):
-    return bar_data_obj_json_str
-
-
-async def get_premium_n_premium_change_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str, obj_id_or_list: int | List[int], **kwargs):
-    return bar_data_obj_json_str
-
-
-async def get_premium_change_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str, obj_id_or_list: int | List[int], **kwargs):
-    return bar_data_obj_json_str
-

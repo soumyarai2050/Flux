@@ -17,6 +17,10 @@ log_mongo_uri: True
 mongo_server: "mongodb://localhost:27017/?replicaSet=rs0&authSource=admin"
 market_depth_count: 10
 
+avoid_top_of_book_db_n_ws_update: True  # to be used in routes to bypass db updates if True
+avoid_market_depth_db_n_ws_update: True  # to be used in routes to bypass db updates if True
+avoid_last_barter_db_n_ws_update: True  # to be used in routes to bypass db updates if True
+
 # below 2 configs are used to check types of override files to be initialized by fastapi launch script
 # supported values: "native" or "bare"
 msgspec_override_type: "native"
@@ -36,3 +40,4 @@ collection: "BarData"
 bar_data_df_start_datetime: "2018-11-02T16:00:00.000+00:00"
 bar_data_df_end_datetime: "none"
 ticker_suffix: ".SI"
+ibkr_connection_enabled: False

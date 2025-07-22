@@ -56,6 +56,25 @@ message PlanAlert {
       query_param_value_src: "PairPlan.id"
     }
   };
+  option (FluxMsgButtonQuery) = {
+    query_data: {
+      QueryName: "dismiss_all_plan_alert_by_plan_id"
+      QueryType: HTTP
+      QueryParams: {
+        QueryParamName: "plan_id",
+        QueryParamDataType: "int"
+      }
+    };
+    ui_button: {
+      unpressed_caption: "DISMISS ALL",
+      pressed_caption: "DISMISS ALL IN PROGRESS",
+      value_color_map: "true=DEBUG,false=INFO",
+      button_type: BUTTON_TYPE_RECTANGLE,
+      button_size: BUTTON_SIZE_MEDIUM,
+      action: "flux_toggle",
+      pressed_value_as_text: "true"
+    }
+  };
   option (FluxMsgJsonQuery) = {
       QueryName: "create_or_update_plan_alert"
       QueryParams: {
@@ -157,6 +176,7 @@ message ContactAlert {
     query_data: {
       QueryName: "dismiss_all_contact_alerts"
       QueryType: HTTP
+      QueryRouteType: PATCH
     };
     ui_button: {
       unpressed_caption: "DISMISS ALL",
@@ -237,6 +257,7 @@ message ContactAlertFailLogger {
         QueryParamName: "log_msg",
         QueryParamDataType: "str"
       }
+      QueryRouteType: PATCH
   };
   optional bool temp = 1;
 }
@@ -251,7 +272,8 @@ message DismissPlanAlertByBriefStr {
     QueryParams: {
       QueryParamName: "brief_str",
       QueryParamDataType: "str"
-    }
+    },
+    QueryRouteType: PATCH
   };
   optional bool temp = 1;
 }
@@ -269,7 +291,8 @@ message ContactAlertIdToObjCache {
     QueryParams: {
       QueryParamName: "contact_alert_id",
       QueryParamDataType: "int"
-    }
+    },
+    QueryRouteType: PATCH
   };
   optional bool is_id_present = 1;
 }
@@ -284,7 +307,8 @@ message PlanAlertCacheDictByPlanIdDict {
     QueryParams: {
       QueryParamName: "plan_cache_key",
       QueryParamDataType: "str"
-    }
+    },
+    QueryRouteType: PATCH
   };
   optional bool is_key_present = 1;
 }
@@ -295,7 +319,8 @@ message ContactAlertCacheDict {
     QueryParams: {
       QueryParamName: "plan_cache_key",
       QueryParamDataType: "str"
-    }
+    },
+    QueryRouteType: PATCH
   };
   optional bool is_key_present = 1;
 }

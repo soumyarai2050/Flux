@@ -63,7 +63,7 @@ const FilterMenu = ({
   const renderMenu = () => {
     switch (menuType) {
       case 'item':
-        const PinCompononent = isPinned ? PushPin : PushPinOutlined;
+        const PinComponent = isPinned ? PushPin : PushPinOutlined;
         return (
           <MenuItem name={menuName} onClick={handlePopoverOpen}>
             <span>
@@ -71,7 +71,7 @@ const FilterMenu = ({
               {/* {menuName} */}
               filter/sort
             </span>
-            {<PinCompononent onClick={handlePinToggle} fontSize='small' />}
+            {<PinComponent onClick={handlePinToggle} fontSize='small' />}
           </MenuItem>
         );
       case 'icon':

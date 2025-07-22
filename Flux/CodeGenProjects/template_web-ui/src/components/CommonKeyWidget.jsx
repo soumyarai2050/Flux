@@ -103,15 +103,17 @@ const CommonKey = (props) => {
         let updatedData = collection.value;
         if (collection.type === DATA_TYPES.OBJECT || collection.type === DATA_TYPES.ARRAY || (collection.type === DATA_TYPES.STRING && isValidJsonString(updatedData))) {
             if (collection.type === DATA_TYPES.OBJECT || collection.type === DATA_TYPES.ARRAY) {
-                updatedData = cloneDeep(updatedData);
-                formatJSONObjectOrArray(updatedData, collection.subCollections, props.truncateDateTime);
-                updatedData = clearxpath(updatedData);
+                updatedData = updatedData ? cloneDeep(updatedData) : null;
+                if (updatedData) {
+                    formatJSONObjectOrArray(updatedData, collection.subCollections, props.truncateDateTime);
+                    updatedData = clearxpath(updatedData);
+                }
             } else {
                 updatedData = updatedData.replace(/\\/g, '');
                 updatedData = JSON.parse(updatedData);
             }
             excludeNullFromObject(updatedData);
-            abbreviatedField = (
+            abbreviatedField = updatedData ? (
                 <div className={classes.abbreviated_json} ref={jsonTableRef}>
                     <span>{JSON.stringify(updatedData)}</span>
                     <VerticalDataTable 
@@ -123,7 +125,7 @@ const CommonKey = (props) => {
                     />
                 </div>
                 // <JsonView open={open} onClose={onCloseAbbreviatedField} src={updatedData} />
-            )
+            ) : null;
         } else if (collection.type === DATA_TYPES.STRING && !isValidJsonString(updatedData)) {
             let tooltipText = "";
             if (updatedData !== null && updatedData !== undefined) {

@@ -897,9 +897,11 @@ const Cell = (props) => {
         let updatedData = currentValue;
         if (type === DATA_TYPES.OBJECT || type === DATA_TYPES.ARRAY || (type === DATA_TYPES.STRING && isValidJsonString(updatedData))) {
             if (type === DATA_TYPES.OBJECT || type === DATA_TYPES.ARRAY) {
-                updatedData = updatedData ? cloneDeep(updatedData) : {};
-                formatJSONObjectOrArray(updatedData, collection.subCollections, props.truncateDateTime);
-                updatedData = clearxpath(updatedData);
+                updatedData = updatedData ? cloneDeep(updatedData) : null;
+                if (updatedData) {
+                    formatJSONObjectOrArray(updatedData, collection.subCollections, props.truncateDateTime);
+                    updatedData = clearxpath(updatedData);
+                }
             } else {
                 updatedData = updatedData.replace(/\\/g, '');
                 updatedData = JSON.parse(updatedData);
@@ -915,16 +917,20 @@ const Cell = (props) => {
                     align='center'
                     size='small'
                     onClick={onOpenTooltip}>
-                    <div className={classes.abbreviated_json_cell} ref={jsonTableRef}>
-                        <span>{JSON.stringify(updatedData)}</span>
-                    </div>
-                    <VerticalDataTable
-                        isOpen={open}
-                        data={updatedData}
-                        onClose={onCloseTooltip}
-                        usePopover={true}
-                        anchorEl={jsonTableRef.current}
-                    />
+                    {updatedData && (
+                        <>
+                            <div className={classes.abbreviated_json_cell} ref={jsonTableRef}>
+                                <span>{JSON.stringify(updatedData)}</span>
+                            </div>
+                            <VerticalDataTable
+                                isOpen={open}
+                                data={updatedData}
+                                onClose={onCloseTooltip}
+                                usePopover={true}
+                                anchorEl={jsonTableRef.current}
+                            />
+                        </>
+                    )}
                     {/* <JsonView open={open} onClose={onCloseTooltip} src={updatedData} /> */}
                 </TableCell >
             )

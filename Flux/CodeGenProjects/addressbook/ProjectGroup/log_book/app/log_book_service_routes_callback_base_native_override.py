@@ -30,24 +30,17 @@ from FluxPythonUtils.scripts.general_utility_functions import (
     get_pid_from_port, is_process_running, parse_to_float, get_symbol_side_pattern,
     get_transaction_counts_n_timeout_from_config, find_files_with_regex, ClientError)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_helper import (
-    photo_book_service_http_view_client, photo_book_service_http_main_client)
+    photo_book_service_http_client)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_client import StreetBookServiceHttpClient
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.markets.market import Market, MarketID
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book_service_helper import (
     get_plan_id_from_executor_log_file_name, get_symbol_n_side_from_log_line)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import symbol_side_key, get_symbol_side_key
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.app.basket_book_helper import (
-    be_port, basket_book_service_http_view_client, basket_book_service_http_main_client)
+    be_port, basket_book_service_http_client)
 from Flux.PyCodeGenEngine.FluxCodeGenCore.log_book_utils import *
 from Flux.PyCodeGenEngine.FluxCodeGenCore.generic_msgspec_routes import watch_specific_collection_with_stream
 
-
-if config_yaml_dict.get("use_view_clients"):
-    basket_book_service_http_client = basket_book_service_http_view_client
-    photo_book_service_http_client = photo_book_service_http_view_client
-else:
-    basket_book_service_http_client = basket_book_service_http_main_client
-    photo_book_service_http_client = photo_book_service_http_main_client
 
 # standard imports
 from datetime import datetime
@@ -475,6 +468,7 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
     async def enable_disable_plan_alert_create_query_pre(
             self, enable_disable_plan_alert_create_class_type: Type[EnableDisablePlanAlertCreate],
             payload: List[Dict[str, Any]]):
+        # Note: Patch type query as internally doing delete calls - delete type query not supported yet
         async with self.loaded_unload_plan_list_async_rlock:
             async with PlanAlert.reentrant_lock:
                 for log_data in payload:
@@ -1191,25 +1185,30 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         photo_book_service_http_client.reset_all_plan_view_count_n_severity_query_client()
 
     async def verify_contact_alert_id_in_get_contact_alert_id_to_obj_cache_dict_query_pre(
-            self, contact_alert_id_to_obj_cache_class_type: Type[ContactAlertIdToObjCache],
-            contact_alert_id: int):
+            self, contact_alert_id_to_obj_cache_class_type: Type[ContactAlertIdToObjCache], payload: Dict[str, Any]):
+        # This query uses local cache so to avoid call from view server this query is kept as PATCH type
         async with self.contact_alerts_cache_dict_async_rlock:
+            contact_alert_id = parse_to_int(payload.get("contact_alert_id"))
             is_id_present = contact_alert_id in self.contact_alerts_id_to_obj_cache_dict
             return [ContactAlertIdToObjCache(is_id_present=is_id_present)]
 
     async def verify_plan_alert_id_in_plan_alert_cache_dict_by_plan_id_dict_query_pre(
-            self, plan_alert_cache_dict_by_plan_id_dict_class_type: Type[PlanAlertCacheDictByPlanIdDict],
-            plan_id: int, plan_cache_key: str):
+            self, plan_alert_cache_dict_by_plan_id_dict_class_type: Type[PlanAlertCacheDictByPlanIdDict], payload: Dict[str, Any]):
+        # This query uses local cache so to avoid call from view server this query is kept as PATCH type
         is_key_present = False
         async with self.loaded_unload_plan_list_async_rlock:
+            plan_id = parse_to_int(payload.get("plan_id"))
+            plan_cache_key = payload.get("plan_cache_key")
             plan_alert_cache_dict = self.plan_alert_cache_dict_by_plan_id_dict.get(plan_id)
             if plan_alert_cache_dict is not None:
                 is_key_present = plan_cache_key in plan_alert_cache_dict
             return [PlanAlertCacheDictByPlanIdDict(is_key_present=is_key_present)]
 
     async def verify_contact_alerts_cache_dict_query_pre(
-            self, contact_alert_cache_dict_class_type: Type[ContactAlertCacheDict], plan_cache_key: str):
+            self, contact_alert_cache_dict_class_type: Type[ContactAlertCacheDict], payload: Dict[str, Any]):
+        # This query uses local cache so to avoid call from view server this query is kept as PATCH type
         async with self.contact_alerts_cache_dict_async_rlock:
+            plan_cache_key = payload.get("plan_cache_key")
             is_key_present = plan_cache_key in self.contact_alerts_cache_dict
             return [ContactAlertCacheDict(is_key_present=is_key_present)]
 
@@ -1244,8 +1243,10 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         await self.plan_view_update_handling(plan_alert_obj_list)
 
     async def dismiss_plan_alert_by_brief_str_query_pre(
-            self, dismiss_plan_alert_by_brief_str_class_type: Type[DismissPlanAlertByBriefStr],
-            plan_id: int, brief_str: str):
+            self, dismiss_plan_alert_by_brief_str_class_type: Type[DismissPlanAlertByBriefStr], payload: Dict[str, Any]):
+        plan_id: int = parse_to_int(payload.get("plan_id"))
+        brief_str: str = payload.get("brief_str")
+
         plan_alerts: List[PlanAlert] = \
             await LogBookServiceRoutesCallbackBaseNativeOverride.underlying_read_plan_alert_http(
                 get_plan_alert_from_plan_id_n_alert_brief_regex(plan_id, brief_str))
@@ -1276,8 +1277,10 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         return filtered_plan_alert_by_plan_id_query_callable, filter_agg_pipeline
 
     async def contact_alert_fail_logger_query_pre(
-            self, contact_alert_fail_logger_class_type: Type[ContactAlertFailLogger], log_msg: str):
+            self, contact_alert_fail_logger_class_type: Type[ContactAlertFailLogger], payload: Dict[str, Any]):
+        # Logger is initialized in main server so keeping this query PATCH type to avoid call from view client
         # logs msg to contact alert fail logs - listener mails if any log is found
+        log_msg = payload.get("log_msg")
         self.contact_alert_fail_logger.error(log_msg)
         return []
 
@@ -1718,6 +1721,9 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         email_book_service_http_client.patch_all_pair_plan_client(update_pair_plan_json_list)
         err_ = f"Force paused {plan_id_list=}"
         logging.critical(err_)
+        return []
+
+    async def dismiss_all_plan_alert_by_plan_id_query_pre(self, plan_alert_class_type: Type[PlanAlert], plan_id: int):
         return []
 
     async def handle_plan_pause_from_symbol_side_log_query_pre(

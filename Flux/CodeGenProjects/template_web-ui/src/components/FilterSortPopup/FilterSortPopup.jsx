@@ -289,10 +289,10 @@ const FilterSortPopup = ({
   return (
     <>
       {/* Filter Icon */}
-      <div className={styles.filterIconWrapper}>
+      <div className={`${styles.filterIconWrapper} ${open ? styles.popupOpen : ''}`}>
         <IconButton
           size="small"
-          className={`${styles.filterButton} ${(isFiltered) ? styles.activeFilter : hasFilters ? styles.hasFilter : ''} ${open ? styles.popupOpen : ''}`}
+          className={`${styles.filterButton} ${(isFiltered) ? styles.activeFilter : hasFilters ? styles.hasFilter : ''}`}
           onClick={handleIconClick}
           aria-label="Filter and sort"
         >
@@ -419,17 +419,18 @@ const FilterSortPopup = ({
                 <Divider className={styles.menuDivider} />
               </>
             )}
-
-            <div className={styles.clearFilterOption}
-              onClick={hasLocalFilterOrSort ? clearAllFilters : undefined}
-              style={{ opacity: hasLocalFilterOrSort ? 1 : 0.5, pointerEvents: hasLocalFilterOrSort ? 'auto' : 'none' }}
-            >
-              <div className={styles.sortIcon}></div>
-              <div className={styles.sortIconPlaceholder}>
-                <FilterAlt fontSize="small" className={styles.menuIcon} />
+            {hasLocalFilterOrSort && (
+              <div className={styles.clearFilterOption}
+                onClick={hasLocalFilterOrSort ? clearAllFilters : undefined}
+                style={{ opacity: hasLocalFilterOrSort ? 1 : 0.5, pointerEvents: hasLocalFilterOrSort ? 'auto' : 'none' }}
+              >
+                <div className={styles.sortIcon}></div>
+                <div className={styles.sortIconPlaceholder}>
+                  <FilterAlt fontSize="small" className={styles.menuIcon} />
+                </div>
+                <Typography>{`Clear Filter/Sort`}</Typography>
               </div>
-              <Typography>{`Clear Filter/Sort`}</Typography>
-            </div>
+            )}
           </div>
 
           <Divider />

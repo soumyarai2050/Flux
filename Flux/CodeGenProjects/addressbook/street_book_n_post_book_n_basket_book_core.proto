@@ -80,7 +80,8 @@ message ChoreLedger {
       }
   };
   option (FluxMsgJsonQuery) = {
-      QueryName: "get_chore_ledgers_from_cache"
+    QueryName: "get_chore_ledgers_from_cache"
+    QueryRouteType: PATCH
   };
   option (FluxMsgCRUDSharedLock) = "ledger_shared_lock";
   option (FluxMsgUIGetAllLimit) = "-100";
@@ -134,7 +135,8 @@ message ChoreSnapshot {
     is_read_only: true
   };
   option (FluxMsgJsonQuery) = {
-      QueryName: "get_chore_snapshots_from_cache"
+    QueryName: "get_chore_snapshots_from_cache"
+    QueryRouteType: PATCH
   };
   option (FluxMsgExecutorOptions) = {
     IsWebSocketModel: true,

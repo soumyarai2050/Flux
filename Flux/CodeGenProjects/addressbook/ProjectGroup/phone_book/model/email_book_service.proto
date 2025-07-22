@@ -290,17 +290,20 @@ message PairPlan {
     QueryParams: {
       QueryParamName: "pair_plan_id",
       QueryParamDataType: "int"
-    }
+    },
+    QueryRouteType: PATCH
   };
   option (FluxMsgJsonQuery) = {
     QueryName: "pause_all_active_plans"
+    QueryRouteType: PATCH
   };
   option (FluxMsgJsonQuery) = {
     QueryName: "register_pair_plan_for_recovery",
     QueryParams: {
       QueryParamName: "pair_plan_id",
       QueryParamDataType: "int"
-    }
+    },
+    QueryRouteType: PATCH
   };
   option (FluxMsgJsonQuery) = {
     QueryName: "get_loaded_plans"
@@ -610,7 +613,8 @@ message PairPlanList {
 
 message LogSimulatorReloadConfig{
   option (FluxMsgJsonQuery) = {
-    QueryName: "log_simulator_reload_config"
+    QueryName: "log_simulator_reload_config",
+    QueryRouteType: PATCH
   };
   required bool resp = 1;
 }
@@ -618,6 +622,7 @@ message LogSimulatorReloadConfig{
 message ReloadBarteringData{
   option (FluxMsgJsonQuery) = {
     QueryName: "reload_bartering_data",
+    QueryRouteType: PATCH
   };
   required bool resp = 1;
 }

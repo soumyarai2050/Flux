@@ -21,6 +21,10 @@ function useWebSocketWorker({
   const { storedArray } = useSelector(selector);
   const connectionRef = useRef(null);
   const storedArrayRef = useRef(storedArray);
+  
+  // New refs for snapshot logic
+  const snapshotRef = useRef(null);
+  const isNewlyConnectedRef = useRef(false);
 
   // State to notify UI about connection status changes
   const [, setIsConnected] = useState(false);
@@ -66,10 +70,18 @@ function useWebSocketWorker({
     // Update state when connection opens
     ws.onopen = () => {
       setIsConnected(true);
+      isNewlyConnectedRef.current = true;
     };
 
     ws.onmessage = (event) => {
-      messageBuffer.push(event.data);
+      if (isNewlyConnectedRef.current && !snapshotRef.current) {
+        // First message after connection - save as snapshot
+        snapshotRef.current = event.data;
+        isNewlyConnectedRef.current = false;
+      } else {
+        // Subsequent messages go to buffer
+        messageBuffer.push(event.data);
+      }
     };
 
     ws.onerror = (e) => {
@@ -78,7 +90,8 @@ function useWebSocketWorker({
 
     ws.onclose = (e) => {
       const { code, reason, wasClean } = e;
-      // Notify UI that the connection is closed
+      // Clear messageBuffer on disconnection
+      connection.messageBuffer.length = 0;
       setIsConnected(false);
 
       if (WEBSOCKET_RETRY_CODES.includes(code)) {
@@ -101,6 +114,10 @@ function useWebSocketWorker({
       if (connectionRef.current.ws) {
         connectionRef.current.ws.close(1000, 'Normal closure on useEffect cleanup');
         connectionRef.current.ws = null;
+        // Clear messageBuffer and reset connection state on cleanup
+        connectionRef.current.messageBuffer.length = 0;
+        snapshotRef.current = null;
+        isNewlyConnectedRef.current = false;
         clearWebSocketConnection(modelName);
         // Update state to notify UI
         setIsConnected(false);
@@ -108,18 +125,37 @@ function useWebSocketWorker({
     };
   }, [url, isDisabled, params, reconnectCounter]);
 
-  // Periodically send accumulated messages and the current storedArray to the worker
+  // Periodically send snapshot or accumulated messages to the worker
   useEffect(() => {
     const interval = setInterval(() => {
       const connection = connectionRef.current;
       const { messageBuffer, isWorkerBusy, worker } = connection;
-      if (messageBuffer.length > 0 && !isWorkerBusy) {
-        const messages = [...messageBuffer];
-        connection.messageBuffer.length = 0;
-        connection.isWorkerBusy = true;
-        worker.postMessage({ messages, storedArray: storedArrayRef.current, uiLimit, isAlertModel });
+      
+      if (!isWorkerBusy) {
+        // Send snapshot if available, otherwise send messageBuffer
+        if (snapshotRef.current) {
+          const snapshot = snapshotRef.current;
+          snapshotRef.current = null;
+          connection.isWorkerBusy = true;
+          worker.postMessage({ 
+            snapshot,
+            storedArray: storedArrayRef.current, 
+            uiLimit, 
+            isAlertModel
+          });
+        } else if (messageBuffer.length > 0) {
+          const messages = [...messageBuffer];
+          connection.messageBuffer.length = 0;
+          connection.isWorkerBusy = true;
+          worker.postMessage({ 
+            messages, 
+            storedArray: storedArrayRef.current, 
+            uiLimit, 
+            isAlertModel
+          });
+        }
       }
-    }, 1000); // Dispatch every 1 sec
+    }, 1000); // Check every 1 sec
 
     return () => clearInterval(interval);
   }, []);

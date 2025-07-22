@@ -22,6 +22,8 @@ multi_project_plugin:
       - "ContactAlert"
   - phone_book:
       - "SystemControl"
+  - address_data_manager:
+      - "BarData"
 
 # below 2 configs are used to check types of override files to be initialized by fastapi launch script
 # supported values: "native" or "bare"

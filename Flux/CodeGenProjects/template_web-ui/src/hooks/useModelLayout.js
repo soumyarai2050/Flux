@@ -31,7 +31,15 @@ import {
     pivotDataChangeHandler,
     quickFiltersChangeHandler
 } from '../utils/redux/modelHandlers';
-import { MODES } from '../constants';
+import { LAYOUT_TYPES, MODEL_TYPES, MODES } from '../constants';
+
+function getDefaultViewLayout(layoutData, modelType) {
+    return layoutData.view_layout ?? (
+        modelType === MODEL_TYPES.ABBREVIATION_MERGE
+            ? LAYOUT_TYPES.ABBREVIATION_MERGE
+            : LAYOUT_TYPES.TABLE
+    );
+}
 
 const useModelLayout = (modelName, objId, modelType, onColumnsChange, mode) => {
     const dispatch = useDispatch();
@@ -40,7 +48,7 @@ const useModelLayout = (modelName, objId, modelType, onColumnsChange, mode) => {
         return JSON.stringify(prev) === JSON.stringify(curr);
     });
 
-    const modelLayoutData = useMemo(() => getWidgetOptionById(modelLayoutOption.widget_ui_data, objId), [modelLayoutOption, objId]);
+    const modelLayoutData = useMemo(() => getWidgetOptionById(modelLayoutOption.widget_ui_data, objId, modelLayoutOption.bind_id_fld), [modelLayoutOption, objId]);
 
     const [isMaximized, setIsMaximized] = useState(false);
     const [page, setPage] = useState(0);
@@ -48,7 +56,7 @@ const useModelLayout = (modelName, objId, modelType, onColumnsChange, mode) => {
     const [showMore, setShowMore] = useState(false);
     const [showAll, setShowAll] = useState(false);
     const [moreAll, setMoreAll] = useState(false);
-    const [layoutType, setLayoutType] = useState(modelLayoutData.view_layout);
+    const [layoutType, setLayoutType] = useState(getDefaultViewLayout(modelLayoutData, modelType));
     const modelHandlerConfigRef = useRef();
     modelHandlerConfigRef.current = {
         modelName,
@@ -60,6 +68,12 @@ const useModelLayout = (modelName, objId, modelType, onColumnsChange, mode) => {
         layoutData: modelLayoutData,
         mode
     }
+
+    useEffect(() => {
+        const viewLayout = getDefaultViewLayout(modelLayoutData, modelType);
+        const editLayout = modelLayoutData.edit_layout ?? viewLayout;
+        setLayoutType(mode === MODES.READ ? viewLayout : editLayout);
+    }, [mode, modelLayoutData.view_layout, modelLayoutData.edit_layout])
 
     const handleFullScreenToggle = useCallback(() => {
         setIsMaximized((prev) => !prev);

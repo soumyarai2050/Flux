@@ -50,8 +50,8 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_ser
     compute_max_single_leg_notional, get_premium)
 from FluxPythonUtils.scripts.general_utility_functions import (
     avg_of_new_val_sum_to_avg, find_free_port, except_n_log_alert, handle_http_response, HTTPRequestType,
-    handle_refresh_configurable_data_members, set_package_logger_level, parse_to_int, YAMLConfigurationManager,
-    find_pids_by_command, terminate_process)
+    handle_refresh_configurable_data_members, set_package_logger_level, parse_to_int, parse_to_float,
+    YAMLConfigurationManager, find_pids_by_command, terminate_process)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import (
     SecurityRecordManager)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.service_state import ServiceState
@@ -173,7 +173,6 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
     underlying_read_cancel_chore_http: Callable[..., Any] | None = None
     underlying_read_plan_limits_http: Callable[..., Any] | None = None
     underlying_delete_plan_status_http: Callable[..., Any] | None = None
-    underlying_barter_simulator_place_cxl_chore_query_http: Callable[..., Any] | None = None
     underlying_create_chore_ledger_http: Callable[..., Any] | None = None
     underlying_create_deals_ledger_http: Callable[..., Any] | None = None
 
@@ -200,8 +199,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             underlying_delete_plan_brief_http, underlying_read_market_depth_http, underlying_read_plan_status_http,
             underlying_read_plan_status_by_id_http, underlying_read_cancel_chore_http,
             underlying_read_plan_limits_http, underlying_delete_plan_status_http,
-            underlying_barter_simulator_place_cxl_chore_query_http, underlying_create_deals_ledger_http,
-            underlying_read_symbol_overview_by_id_http,
+            underlying_create_deals_ledger_http, underlying_read_symbol_overview_by_id_http,
             underlying_get_symbol_side_underlying_account_cumulative_fill_qty_query_http)
 
         cls.residual_compute_shared_lock = residual_compute_shared_lock
@@ -248,8 +246,6 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         cls.underlying_read_cancel_chore_http = underlying_read_cancel_chore_http
         cls.underlying_read_plan_limits_http = underlying_read_plan_limits_http
         cls.underlying_delete_plan_status_http = underlying_delete_plan_status_http
-        cls.underlying_barter_simulator_place_cxl_chore_query_http = (
-            underlying_barter_simulator_place_cxl_chore_query_http)
         cls.underlying_create_chore_ledger_http = underlying_create_chore_ledger_http
         cls.underlying_create_deals_ledger_http = underlying_create_deals_ledger_http
 
@@ -1263,8 +1259,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             applicable_period_second = plan_limits.market_barter_volume_participation.applicable_period_seconds
             executor_check_snapshot_list = \
                 await (StreetBookServiceRoutesCallbackBaseNativeOverride.
-                       underlying_get_executor_check_snapshot_query_http(symbol, side,
-                                                                         applicable_period_second))
+                       underlying_get_executor_check_snapshot_query_http({"symbol": symbol, "side": side,
+                                                                          "last_n_sec": applicable_period_second}))
             if len(executor_check_snapshot_list) == 1:
                 indicative_consumable_participation_qty = \
                     get_consumable_participation_qty(
@@ -1668,7 +1664,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                 applicable_period_seconds = plan_limits.market_barter_volume_participation.applicable_period_seconds
                 last_n_sec_market_barter_vol_obj_list = \
                     await (StreetBookServiceRoutesCallbackBaseNativeOverride.
-                           underlying_get_last_n_sec_total_barter_qty_query_http(symbol, applicable_period_seconds))
+                           underlying_get_last_n_sec_total_barter_qty_query_http(
+                           {"symbol": symbol, "last_n_sec": applicable_period_seconds}))
                 if last_n_sec_market_barter_vol_obj_list:
                     last_n_sec_barter_qty = last_n_sec_market_barter_vol_obj_list[0].last_n_sec_barter_vol
                     logging.debug(
@@ -3174,7 +3171,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                         executor_check_snapshot_list = \
                             (await StreetBookServiceRoutesCallbackBaseNativeOverride.
                              underlying_get_executor_check_snapshot_query_http(
-                                symbol, side, applicable_period_second))
+                                {"symbol": symbol, "side": side, "last_n_sec": applicable_period_second}))
                         if len(executor_check_snapshot_list) == 1:
                             participation_period_chore_qty_sum = \
                                 executor_check_snapshot_list[0].last_n_sec_chore_qty
@@ -4471,27 +4468,30 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
 
         return symbol_side_snapshot_objs
 
-    async def update_residuals_query_pre(self, pair_plan_class_type: Type[PlanStatus], security_id: str, side: Side,
-                                         residual_qty: int):
+    async def update_residuals_query_pre(self, plan_status_class_type: Type[PlanStatus], payload: Dict[str, Any]):
         async with StreetBookServiceRoutesCallbackBaseNativeOverride.ledger_shared_lock:
             async with (StreetBookServiceRoutesCallbackBaseNativeOverride.residual_compute_shared_lock):
+                residual_qty = parse_to_int(payload.get("residual_qty"))
+                side = Side(payload.get("side"))
+                security_id = payload.get("security_id")
+
                 plan_brief_tuple = self.plan_cache.get_plan_brief()
 
                 if plan_brief_tuple is not None:
                     plan_brief_obj, _ = plan_brief_tuple
                     if side == Side.BUY:
                         update_bartering_side_brief = \
-                            PairSideBarteringBriefOptional(
+                            PairSideBarteringBriefBaseModel.from_kwargs(
                                 residual_qty=int(plan_brief_obj.pair_buy_side_bartering_brief.residual_qty + residual_qty))
-                        update_plan_brief = PlanBriefBaseModel(id=plan_brief_obj.id,
-                                                                 pair_buy_side_bartering_brief=update_bartering_side_brief)
+                        update_plan_brief = PlanBriefBaseModel.from_kwargs(_id=plan_brief_obj.id,
+                                                                             pair_buy_side_bartering_brief=update_bartering_side_brief)
 
                     else:
                         update_bartering_side_brief = \
-                            PairSideBarteringBriefOptional(
+                            PairSideBarteringBriefBaseModel.from_kwargs(
                                 residual_qty=int(plan_brief_obj.pair_sell_side_bartering_brief.residual_qty + residual_qty))
-                        update_plan_brief = PlanBriefBaseModel(id=plan_brief_obj.id,
-                                                                 pair_sell_side_bartering_brief=update_bartering_side_brief)
+                        update_plan_brief = PlanBriefBaseModel.from_kwargs(_id=plan_brief_obj.id,
+                                                                             pair_sell_side_bartering_brief=update_bartering_side_brief)
 
                     update_plan_brief_dict = update_plan_brief.to_dict(exclude_none=True)
                     updated_plan_brief = (
@@ -4575,8 +4575,12 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             get_plan_brief_from_symbol(security_id), self.get_generic_read_route())
 
     async def get_executor_check_snapshot_query_pre(
-            self, executor_check_snapshot_class_type: Type[ExecutorCheckSnapshot],
-            symbol: str, side: str, last_n_sec: int):
+            self, executor_check_snapshot_class_type: Type[ExecutorCheckSnapshot], payload: Dict[str, Any]):
+        # Query internally uses plan cache which is only updated by main server - kept this query as PATCH type
+        # to avoid view server call by client
+        symbol = payload.get("symbol")
+        side = payload.get("side")
+        last_n_sec = parse_to_int(payload.get("last_n_sec"))
 
         # avoid logging - both logged in call
         last_n_sec_chore_qty = await self.get_last_n_sec_chore_qty(symbol, Side(side), last_n_sec)
@@ -4661,14 +4665,17 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         return [LastNSecMarketBarterVol(last_n_sec_barter_vol=last_n_sec_trd_vol)]
 
     async def get_last_n_sec_total_barter_qty_query_pre(
-            self, last_sec_market_barter_vol_class_type: Type[LastNSecMarketBarterVol],
-            symbol: str, last_n_sec: int) -> List[LastNSecMarketBarterVol]:
+            self, last_n_sec_market_barter_vol_class_type: Type[LastNSecMarketBarterVol], payload: Dict[str, Any]):
+        # Query internally uses plan cache which is only updated by main server - kept this query as PATCH type
+        # to avoid view server call by client
+        symbol = payload.get("symbol")
+        last_n_sec = parse_to_int(payload.get("last_n_sec"))
         if self.total_barter_qty_by_aggregated_window_first_n_lst_barters:
             last_n_sec_trd_vol_list = await self.get_last_n_sec_total_barter_qty_by_aggregated_window_first_n_lst_barters(
-                last_sec_market_barter_vol_class_type, symbol, last_n_sec)
+                last_n_sec_market_barter_vol_class_type, symbol, last_n_sec)
         else:
             last_n_sec_trd_vol_list = await self.get_last_n_sec_total_barter_qty_by_aggregated_window_all_barters(
-                last_sec_market_barter_vol_class_type, symbol, last_n_sec)
+                last_n_sec_market_barter_vol_class_type, symbol, last_n_sec)
         return last_n_sec_trd_vol_list
 
     async def delete_symbol_overview_pre(self, obj_id: int):
@@ -4759,6 +4766,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         return market_depth_list
 
     async def get_plan_status_from_cache_query_pre(self, plan_status_class_type: Type[PlanStatus]):
+        # Query internally uses plan cache which is only updated by main server - kept this query as PATCH type
+        # to avoid view server call by client
         cached_plan_status_tuple = self.plan_cache.get_plan_status()
         if cached_plan_status_tuple is not None:
             cached_plan_status, _ = cached_plan_status_tuple
@@ -4768,6 +4777,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
 
     async def get_symbol_side_snapshots_from_cache_query_pre(self,
                                                              symbol_side_snapshot_class_type: Type[SymbolSideSnapshot]):
+        # Query internally uses plan cache which is only updated by main server - kept this query as PATCH type
+        # to avoid view server call by client
         cached_symbol_side_snapshot_tuple = self.plan_cache.get_symbol_side_snapshot()
         if cached_symbol_side_snapshot_tuple is not None:
             cached_symbol_side_snapshot, _ = cached_symbol_side_snapshot_tuple
@@ -4776,6 +4787,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         return []
 
     async def get_plan_brief_from_cache_query_pre(self, plan_brief_class_type: Type[PlanBrief]):
+        # Query internally uses plan cache which is only updated by main server - kept this query as PATCH type
+        # to avoid view server call by client
         cached_plan_brief_tuple = self.plan_cache.get_plan_brief()
         if cached_plan_brief_tuple is not None:
             cached_plan_brief, _ = cached_plan_brief_tuple
@@ -4784,6 +4797,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         return []
 
     async def get_new_chore_from_cache_query_pre(self, new_chore_class_type: Type[NewChore]):
+        # Query internally uses plan cache which is only updated by main server - kept this query as PATCH type
+        # to avoid view server call by client
         cached_new_chore_tuple = self.plan_cache.get_new_chore()
         if cached_new_chore_tuple is not None:
             cached_new_chore, _ = cached_new_chore_tuple
@@ -4792,6 +4807,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         return []
 
     async def get_plan_limits_from_cache_query_pre(self, plan_limits_class_type: Type[PlanLimits]):
+        # Query internally uses plan cache which is only updated by main server - kept this query as PATCH type
+        # to avoid view server call by client
         cached_plan_limits_tuple = self.plan_cache.get_plan_limits()
         if cached_plan_limits_tuple is not None:
             cached_plan_limits, _ = cached_plan_limits_tuple
@@ -4800,6 +4817,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         return []
 
     async def get_chore_ledgers_from_cache_query_pre(self, chore_ledger_class_type: Type[ChoreLedger]):
+        # Query internally uses plan cache which is only updated by main server - kept this query as PATCH type
+        # to avoid view server call by client
         cached_chore_ledger_tuple = self.plan_cache.get_chore_ledger()
         if cached_chore_ledger_tuple is not None:
             cached_chore_ledger, _ = cached_chore_ledger_tuple
@@ -4808,6 +4827,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         return []
 
     async def get_deals_ledger_from_cache_query_pre(self, deals_ledger_class_type: Type[DealsLedger]):
+        # Query internally uses plan cache which is only updated by main server - kept this query as PATCH type
+        # to avoid view server call by client
         cached_deals_ledger_tuple = self.plan_cache.get_deals_ledger()
         if cached_deals_ledger_tuple is not None:
             cached_deals_ledger, _ = cached_deals_ledger_tuple
@@ -4816,6 +4837,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         return []
 
     async def get_chore_snapshots_from_cache_query_pre(self, chore_snapshot_class_type: Type[ChoreSnapshot]):
+        # Query internally uses plan cache which is only updated by main server - kept this query as PATCH type
+        # to avoid view server call by client
         cached_chore_snapshot_tuple = self.plan_cache.get_chore_snapshot()
         if cached_chore_snapshot_tuple is not None:
             cached_chore_snapshot, _ = cached_chore_snapshot_tuple
@@ -4824,6 +4847,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         return []
 
     async def get_tob_of_book_from_cache_query_pre(self, top_of_book_class_type: Type[TopOfBookBaseModel]):
+        # Query internally uses plan cache which is only updated by main server - kept this query as PATCH type
+        # to avoid view server call by client
         # used in test case to verify cache after recovery
         tob_list = []
 
@@ -4842,9 +4867,16 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
     #########################
 
     async def barter_simulator_place_new_chore_query_pre(
-            self, barter_simulator_process_new_chore_class_type: Type[BarterSimulatorProcessNewChore],
-            px: float, qty: int, side: Side, bartering_sec_id: str, system_sec_id: str, symbol_type: str,
-            underlying_account: str, exchange: str | None = None, internal_ord_id: str | None = None):
+            self, barter_simulator_process_new_chore_class_type: Type[BarterSimulatorProcessNewChore], payload: Dict[str, Any]):
+        px = parse_to_float(payload.get("px"))
+        qty = parse_to_int(payload.get("qty"))
+        side = Side(payload.get("side"))
+        bartering_sec_id = payload.get("bartering_sec_id")
+        system_sec_id = payload.get("system_sec_id")
+        symbol_type = payload.get("bartering_sec_type")
+        underlying_account = payload.get("account")
+        exchange = payload.get("exchange")
+        internal_ord_id = payload.get("client_ord_id")
         try:
             return await self.handle_barter_simulator_place_new_chore_query_pre(
                 px, qty, side, bartering_sec_id, system_sec_id, symbol_type, underlying_account, exchange, internal_ord_id)
@@ -4854,9 +4886,15 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             raise HTTPException(detail=err_str_, status_code=500)
 
     async def barter_simulator_place_cxl_chore_query_pre(
-            self, barter_simulator_process_cxl_chore_class_type: Type[BarterSimulatorProcessCxlChore],
-            chore_id: str, side: Side | None = None, bartering_sec_id: str | None = None,
-            system_sec_id: str | None = None, underlying_account: str | None = None):
+            self, barter_simulator_process_cxl_chore_class_type: Type[BarterSimulatorProcessCxlChore], payload: Dict[str, Any]):
+        chore_id = payload.get("chore_id")
+        side = payload.get("side")
+        if side is not None:
+            side = Side(side)
+        bartering_sec_id = payload.get("bartering_sec_id")
+        system_sec_id = payload.get("system_sec_id")
+        underlying_account = payload.get("underlying_account")
+
         try:
             return await self.handle_barter_simulator_place_cxl_chore_query_pre(chore_id, side, bartering_sec_id,
                                                                                system_sec_id, underlying_account)
@@ -4867,15 +4905,25 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
 
 
     async def barter_simulator_process_chore_ack_query_pre(
-            self, barter_simulator_process_chore_ack_class_type: Type[BarterSimulatorProcessChoreAck], chore_id: str,
-            px: float, qty: int, side: Side, sec_id: str, underlying_account: str):
+            self, barter_simulator_process_chore_ack_class_type: Type[BarterSimulatorProcessChoreAck], payload: Dict[str, Any]):
+        chore_id = payload.get("chore_id")
+        px = payload.get("px")
+        qty = payload.get("qty")
+        side = payload.get("side")
+        sec_id = payload.get("sec_id")
+        underlying_account = payload.get("underlying_account")
         return await self.handle_barter_simulator_process_chore_ack_query_pre(chore_id, px, qty, side,
                                                                              sec_id, underlying_account)
 
     async def barter_simulator_process_fill_query_pre(
-            self, barter_simulator_process_fill_class_type: Type[BarterSimulatorProcessFill], chore_id: str,
-            px: float, qty: int, side: Side, sec_id: str, underlying_account: str,
-            use_exact_passed_qty: bool | None = None):
+            self, barter_simulator_process_fill_class_type: Type[BarterSimulatorProcessFill], payload: Dict[str, Any]):
+        chore_id = payload.get("chore_id")
+        px = payload.get("px")
+        qty = payload.get("qty")
+        side = payload.get("side")
+        sec_id = payload.get("sec_id")
+        underlying_account = payload.get("underlying_account")
+        use_exact_passed_qty = payload.get("use_exact_passed_qty")
         return await self.handle_barter_simulator_process_fill_query_pre(chore_id, px, qty, side, sec_id,
                                                                         underlying_account, use_exact_passed_qty)
 
@@ -4884,25 +4932,46 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         return await self.handle_barter_simulator_reload_config_query_pre()
 
     async def barter_simulator_process_amend_req_query_pre(
-            self, barter_simulator_process_amend_req_class_type: Type[BarterSimulatorProcessAmendReq],
-            chore_id: str, side: Side, sec_id: str, underlying_account: str, chore_event: ChoreEventType,
-            px: float | None = None, qty: int | None = None):
+            self, barter_simulator_process_amend_req_class_type: Type[BarterSimulatorProcessAmendReq], payload: Dict[str, Any]):
+        chore_id = payload.get("chore_id")
+        px = payload.get("px")
+        if px is not None:
+            px = parse_to_float(px)
+        qty = payload.get("qty")
+        if qty is not None:
+            qty = parse_to_int(qty)
+        side = Side(payload.get("side"))
+        sec_id = payload.get("sec_id")
+        underlying_account = payload.get("underlying_account")
+        chore_event = payload.get("chore_event")
         return await self.handle_barter_simulator_process_amend_req_query_pre(chore_id, side, sec_id,
                                                                              underlying_account, chore_event, px, qty)
 
     async def barter_simulator_process_amend_ack_query_pre(
-            self, barter_simulator_process_amend_ack_class_type: Type[BarterSimulatorProcessAmendAck],
-            chore_id: str, side: Side, sec_id: str, underlying_account: str):
+            self, barter_simulator_process_amend_ack_class_type: Type[BarterSimulatorProcessAmendAck], payload: Dict[str, Any]):
+        chore_id = payload.get("chore_id")
+        side = Side(payload.get("side"))
+        sec_id = payload.get("sec_id")
+        underlying_account = payload.get("underlying_account")
         return await self.handle_barter_simulator_process_amend_ack_query_pre(chore_id, side, sec_id, underlying_account)
 
     async def barter_simulator_process_amend_rej_query_pre(
-            self, barter_simulator_process_amend_ack_class_type: Type[BarterSimulatorProcessAmendAck],
-            chore_id: str, side: Side, sec_id: str, underlying_account: str):
+            self, barter_simulator_process_amend_rej_class_type: Type[BarterSimulatorProcessAmendREJ], payload: Dict[str, Any]):
+        chore_id = payload.get("chore_id")
+        side = Side(payload.get("side"))
+        sec_id = payload.get("sec_id")
+        underlying_account = payload.get("underlying_account")
         return await self.handle_barter_simulator_process_amend_rej_query_pre(chore_id, side, sec_id, underlying_account)
 
     async def barter_simulator_process_lapse_query_pre(
-            self, barter_simulator_process_lapse_class_type: Type[BarterSimulatorProcessLapse],
-            chore_id: str, side: Side, sec_id: str, underlying_account: str, qty: int | None = None):
+            self, barter_simulator_process_lapse_class_type: Type[BarterSimulatorProcessLapse], payload: Dict[str, Any]):
+        chore_id = payload.get("chore_id")
+        side = Side(payload.get("side"))
+        sec_id = payload.get("sec_id")
+        underlying_account = payload.get("underlying_account")
+        qty = payload.get("qty")
+        if qty is not None:
+            qty = parse_to_int(qty)
         return await self.handle_barter_simulator_process_lapse_query_pre(chore_id, side, sec_id,
                                                                          underlying_account, qty)
 

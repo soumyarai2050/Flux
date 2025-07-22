@@ -13,12 +13,6 @@ package dept_book;
 option (FluxFileDateTimeGranularity) = MILLI_SEC;
 option (FluxFileDateTimePrintTimezone) = "LOCAL";
 
-enum BarType {
-  OneDay = 1;
-  OneHour = 2;
-  OneMin = 3;
-  FiveMin = 4;
-}
 
 message RTDash {
   option (FluxMsgWidgetUIDataElement) = {
@@ -206,125 +200,6 @@ message DashFiltersCollection {
   repeated string buffered_dash_filters = 3 [(FluxFldHide) = "True", (FluxFldAbbreviated) = "Dashboard:DashFilters.dash_name"];
 }
 
-message BarMetaData {
-  option (FluxMsgStringLength) = 128;
-  required string symbol = 1;
-  required string exch_id = 2;
-  optional string bar_type = 3;
-  optional string symbol_type = 4;
-  optional string ticker = 5;
-}
-
-message BarData {
-  option (FluxMsgJsonRootTimeSeries) = {
-    MongoVersion: 7.0,
-    CreateOp: AggregateType_UNSPECIFIED,
-    CreateAllOp: AggregateType_UNSPECIFIED,
-    ReadOp: AggregateType_UNSPECIFIED,
-    DeleteAllOp: AggregateType_UNSPECIFIED,
-    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED,
-    Granularity: Sec,
-    ExpireAfterSeconds: 31536000,  // one year worth of seconds
-    IncludeDataframeClients: true
-  };
-  option (FluxMsgJsonQuery) = {
-    QueryName: "get_latest_bar_data",
-    QueryParams: {
-      QueryParamName: "exch_id_list",
-      QueryParamDataType: "List[str] | None = None"
-    },
-    QueryParams: {
-      QueryParamName: "bar_type_list",
-      QueryParamDataType: "List[BarType] | None = None"
-    },
-    QueryParams: {
-      QueryParamName: "start_time",
-      QueryParamDataType: "pendulum.DateTime | None = None"
-    },
-    QueryParams: {
-      QueryParamName: "end_time",
-      QueryParamDataType: "pendulum.DateTime | None = None"
-    },
-    QueryRouteType: PATCH
-  };
-    option (FluxMsgJsonQuery) = {
-    QueryName: "get_aggregated_bar_data",
-    QueryParams: {
-      QueryParamName: "target_bar_type",
-      QueryParamDataType: "str"
-    },
-    QueryParams: {
-      QueryParamName: "end_time",
-      QueryParamDataType: "pendulum.DateTime | None = None"
-    },
-    QueryParams: {
-      QueryParamName: "start_time",
-      QueryParamDataType: "pendulum.DateTime | None = None"
-    },
-    QueryParams: {
-      QueryParamName: "target_bar_counts",
-      QueryParamDataType: "int | None = None"
-    },
-    QueryParams: {
-      QueryParamName: "exch_id_list",
-      QueryParamDataType: "List[str] | None = None"
-    },
-    QueryParams: {
-      QueryParamName: "symbol_list",
-      QueryParamDataType: "List[str] | None = None"
-    },
-    QueryRouteType: PATCH
-  };
-  option (FluxMsgStringLength) = 128;
-  required int32 id = 1;
-  required BarMetaData bar_meta_data = 2 [(FluxFldPk) = "symbol", (FluxFldValMetaField) = true];
-  required int64 start_time = 3 [(FluxFldValTimeField) = true, (FluxFldValIsDateTime) = true];
-  required int64 end_time = 4 [(FluxFldValIsDateTime) = true];
-  optional float vwap = 5 [(FluxFldProjections) = "1", (FluxFldProjections) = "3", (FluxFldHelp) = "cumulative vwap since SOD, vwap=(sum(vol * px) of all bars from SOD till now) / (total_vol, i.e., sum of vol since SOD)"];
-  optional float vwap_change = 6 [(FluxFldProjections) = "2", (FluxFldProjections) = "3", (FluxFldNumberFormat) = "%", (FluxFldHelp) = "Against previous-day close px"];
-  optional float premium = 7 [(FluxFldProjections) = "4", (FluxFldProjections) = "6"];
-  optional float premium_change = 8 [(FluxFldProjections) = "5", (FluxFldProjections) = "6", (FluxFldNumberFormat) = "%"];
-  optional float iv = 9 [(FluxFldProjections) = "7", (FluxFldProjections) = "9"];
-  optional float iv_change = 10 [(FluxFldProjections) = "8", (FluxFldProjections) = "9", (FluxFldNumberFormat) = "%"];
-  optional float open = 11;
-  optional float high = 12;
-  optional float low = 13;
-  optional float close = 14;
-  optional int32 volume = 15;
-  optional int32 cum_volume = 16 [(FluxFldHelp) = "cumulative volume since SOD"];
-  optional int32 bar_count = 17;
-  optional string source = 18;
-}
-
-message ErrorBarData {
-  option (FluxMsgJsonRoot) = {
-    CreateOp: AggregateType_UNSPECIFIED,
-    CreateAllOp: AggregateType_UNSPECIFIED
-    IncludeDataframeClients: true
-  };
-  option (FluxMsgStringLength) = 128;
-  required int32 id = 1;
-  required BarMetaData bar_meta_data = 2 [(FluxFldPk) = "symbol"];
-  required int64 start_time = 3 [(FluxFldValIsDateTime) = true];
-  required int64 end_time = 4 [(FluxFldValIsDateTime) = true];
-  optional float vwap = 5;
-  optional float vwap_change = 6 [(FluxFldNumberFormat) = "%", (FluxFldHelp) = "Against previous-day close px"];
-  optional float premium = 7;
-  optional float premium_change = 8 [(FluxFldNumberFormat) = "%"];
-  optional float iv = 9;
-  optional float iv_change = 10 [(FluxFldNumberFormat) = "%"];
-  optional float open = 11;
-  optional float high = 12;
-  optional float low = 13;
-  optional float close = 14;
-  optional int32 volume = 15;
-  optional int32 cum_volume = 16 [(FluxFldHelp) = "Bar`s day`s cumulative volume"];
-  optional int32 bar_count = 17;
-  optional string source = 18;
-  optional string error_source = 19;
-  optional int64 current_timestamp = 20 [(FluxFldValIsDateTime) = true];
-}
-
 message ImpliedVolData {
   option (FluxMsgJsonRootTimeSeries) = {
     MongoVersion: 7.0,
@@ -345,24 +220,6 @@ message ImpliedVolData {
   optional float underlying_vwap = 6 [(FluxFldProjections) = "2", (FluxFldProjections) = "3"];
   optional float iv = 7 [(FluxFldProjections) = "4", (FluxFldProjections) = "6"];
   optional float iv_change = 8 [(FluxFldProjections) = "5", (FluxFldProjections) = "6"];
-}
-
-message BarDataSymbolNLatestUpdateDateTime{
-  option (FluxMsgStringLength) = 128;
-
-  required string symbol = 1;
-  required int64 last_update_datetime = 2 [(FluxFldValIsDateTime) = true];
-}
-
-message BarDataNLatestUpdateDateTime{
-  option (FluxMsgJsonQuery) = {
-      QueryName: "get_bar_data_all_symbols_n_last_update_time"
-  };
-  repeated BarDataSymbolNLatestUpdateDateTime symbol_n_last_update_datetime = 1;
-}
-
-message BarDataList {
-  repeated BarData bar_data = 1;
 }
 
 // model to be deleted if/when Severity + InventoryCSVRequest is used anywhere else in md model (these are internal
@@ -427,51 +284,28 @@ message Rank {
   optional int32 hot_rank = 4;  // driven from last bartering day bar notional
 }
 
-message HistoricalSymbolOverview {
-  option (FluxMsgJsonRoot) = {
-    CreateOp: AggregateType_UNSPECIFIED,
-    ReadOp: AggregateType_UNSPECIFIED,
-    UpdateOp: AggregateType_UNSPECIFIED,
-    DeleteOp: AggregateType_UNSPECIFIED,
-    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
-  };
-  option (FluxMsgStringLength) = 128;
-
-  //Server generated unique Id
-  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  optional string symbol = 2;
-  optional string description = 3;
-  optional string currency = 4;
-  optional string product = 5;
-  repeated string exchange = 6;
-  repeated Rank ranks = 9;
-  optional BarData last_bar = 13;
-  optional SymbolOverview symbol_overview = 14;
-}
-
-message BarAvailability {
-  required string start_ts = 1;
-  required string end_ts = 2;
-  required string source = 3;
-  required int64 pred_gap = 4; // number of missing bars before current availability, for eg, if BarType is OneDay then counts of days missing between last availability's end_ts to current availability's start_ts
-}
-
-message BarDataAvailability {
-  option (FluxMsgJsonRoot) = {
-    CreateOp: AggregateType_UNSPECIFIED,
-    ReadOp: AggregateType_UNSPECIFIED,
-    UpdateOp: AggregateType_UNSPECIFIED,
-    DeleteOp: AggregateType_UNSPECIFIED,
-    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
-    IncludeDataframeClients: true
-  };
-  option (FluxMsgStringLength) = 128;
-
-  //Server generated unique Id
-  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  required string key = 2; // key combination of symbol~exch_id~BarType
-  repeated BarAvailability availability_list = 3; // availability of bar data from start_ts to end_ts with source
-}
+// todo: uses bar_data - kept commented for now
+//message HistoricalSymbolOverview {
+//  option (FluxMsgJsonRoot) = {
+//    CreateOp: AggregateType_UNSPECIFIED,
+//    ReadOp: AggregateType_UNSPECIFIED,
+//    UpdateOp: AggregateType_UNSPECIFIED,
+//    DeleteOp: AggregateType_UNSPECIFIED,
+//    ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
+//  };
+//  option (FluxMsgStringLength) = 128;
+//
+//  //Server generated unique Id
+//  required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+//  optional string symbol = 2;
+//  optional string description = 3;
+//  optional string currency = 4;
+//  optional string product = 5;
+//  repeated string exchange = 6;
+//  repeated Rank ranks = 9;
+//  optional BarData last_bar = 13;
+//  optional SymbolOverview symbol_overview = 14;
+//}
 
 message DashList {
   repeated Dash dash = 1 [(FluxFldPk) = "true"];

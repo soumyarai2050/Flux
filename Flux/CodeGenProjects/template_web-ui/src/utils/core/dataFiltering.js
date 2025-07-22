@@ -112,3 +112,10 @@ export function getFilterDict(filters) {
         return acc;
     }, {});
 }
+
+export function getChartFilterDict(filters) {
+    return filters.reduce((acc, item) => {
+        acc[item.fld_name] = item.fld_value;
+        return acc;
+    }, {});
+}

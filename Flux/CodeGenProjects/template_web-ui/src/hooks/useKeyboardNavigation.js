@@ -219,6 +219,55 @@ const useKeyboardNavigation = ({
         }
       }
     }
+    // Plain Up/Down arrow navigation in Read Mode (single selection)
+    else if (
+      mode === MODES.READ &&
+      (event.key === 'ArrowUp' || event.key === 'ArrowDown') &&
+      !event.ctrlKey && !event.metaKey && !event.shiftKey
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const allRowIds = activeRows?.map(groupedRow => groupedRow[0]['data-id']) || [];
+      if (allRowIds.length === 0) return;
+
+      let currentIndex = -1;
+      if (selectedRows && selectedRows.length > 0) {
+        currentIndex = allRowIds.indexOf(selectedRows[0]);
+      }
+
+      let nextIndex;
+      if (event.key === 'ArrowDown') {
+        nextIndex = currentIndex < allRowIds.length - 1 ? currentIndex + 1 : 0;
+      } else {
+        nextIndex = currentIndex > 0 ? currentIndex - 1 : allRowIds.length - 1;
+      }
+
+      const nextRowId = allRowIds[nextIndex];
+
+      if (setSelectedRows && setLastSelectedRowId && setSelectionAnchorId) {
+        setSelectedRows([nextRowId]);
+        setLastSelectedRowId(nextRowId);
+        setSelectionAnchorId(nextRowId);
+      }
+      if (onRowSelect) {
+        onRowSelect(nextRowId);
+      }
+
+      // Scroll to the selected row
+      setTimeout(() => {
+        const tableContainer = tableContainerRef?.current;
+        if (tableContainer) {
+          let selectedRowElement = tableContainer.querySelector(`tr[data-row-id="${nextRowId}"]`);
+          if (selectedRowElement) {
+            selectedRowElement.scrollIntoView({
+              behavior: 'smooth',
+              block: 'center'
+            });
+          }
+        }
+      }, SCROLL_DELAY);
+    }
   }, [
     mode,
     activeRows,

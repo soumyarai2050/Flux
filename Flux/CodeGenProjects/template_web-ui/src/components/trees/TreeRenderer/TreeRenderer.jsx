@@ -8,8 +8,11 @@ import { clearId } from '../../../utils/core/objectUtils';
 import { DATA_TYPES, ITEMS_PER_PAGE } from '../../../constants';
 import { xpathCacheManager } from '../../../cache/xpathCache';
 import Node from '../../Node';
+import '../TreeRenderer/TreeRenderer.module.css';
 import HeaderField from '../../HeaderField';
-import NodeBaseClasses from '../../Node.module.css';
+
+import AnimatedTreeNode from '../AnimatedTreeNode/AnimatedTreeNode';
+import classes from './TreeRenderer.module.css';
 
 const TreeRenderer = ({
     element,
@@ -18,7 +21,6 @@ const TreeRenderer = ({
     level,
     // From DataTree state and props
     itemVisualStates,
-    newlyAddedOrDuplicatedXPath,
     expandedNodeXPaths,
     levelRef,
     treeData,
@@ -44,16 +46,39 @@ const TreeRenderer = ({
     setPaginatedNodes,
     expandNodeAndAllChildren,
     onUpdate,
-    setNewlyAddedOrDuplicatedXPath,
     setItemVisualStates,
     setCounter,
+    // Animation props
+    isNodeAnimating,
+    getNodeTargetState,
+    getNodeAnimationProps,
+    animatingNodes,
+    // Original toggle function for default expansion
+    originalHandleNodeToggle,
+    // Glow props
+    newlyAddedOrDuplicatedXPath,
+    setNewlyAddedOrDuplicatedXPath,
 }) => {
     if (element.id === "root") return null;
 
+
+    const nodeXPath = element.metadata?.xpath;
+    // Glow for the node itself or any descendant of the newly added/duplicated node
+    // const shouldGlow = newlyAddedOrDuplicatedXPath && nodeXPath && nodeXPath.startsWith(newlyAddedOrDuplicatedXPath);
+    const shouldGlow = newlyAddedOrDuplicatedXPath && newlyAddedOrDuplicatedXPath === nodeXPath;
     const nodeProps = getNodeProps();
+
+    // Apply glow class to the li element (tree branch wrapper) for newly added/duplicated items
+    if (shouldGlow) {
+        nodeProps.className = `${nodeProps.className || ''} ${classes['datanode-newly-added-glow']}`.trim();
+    }
+
     const originalNode = element.metadata;
     const visualState = itemVisualStates[originalNode?.xpath];
-    const nodeXPath = originalNode?.xpath; // Get node's XPath
+
+    // Get animation properties for this node
+    // const animationProps = getNodeAnimationProps ? getNodeAnimationProps(nodeXPath) : {};
+    const nodeIsAnimating = isNodeAnimating ? isNodeAnimating(nodeXPath) : false;
 
     if (!originalNode) {
         console.warn("Node metadata is missing for element:", element);
@@ -63,11 +88,19 @@ const TreeRenderer = ({
     // Determine if the node should be rendered as a HeaderField (container) or a Node (simple field)
     // Prioritize isObjectContainer and isArrayContainer flags from treeHelper
     let ComponentToRender;
+    let componentSpecificProps = {};
+
     if (originalNode.isObjectContainer || originalNode.isArrayContainer) {
         ComponentToRender = HeaderField;
     } else {
         // Fallback for primitive types or other simple nodes
         ComponentToRender = Node;
+        // For Node, we enrich the data prop with the live storedValue
+        const storedValue = get(storedData, originalNode.dataxpath);
+        componentSpecificProps.data = {
+            ...originalNode,
+            storedValue: storedValue
+        };
     }
 
     /**
@@ -135,10 +168,11 @@ const TreeRenderer = ({
                         setItemVisualStates(prev => ({ ...prev, [xpathAttr]: 'added' }));
                     }
 
+                    // Set the glow effect for the newly created object
+                    setNewlyAddedOrDuplicatedXPath(xpathAttr);
 
                     expandNodeAndAllChildren(xpathAttr, newObjectInstance, itemSchemaForObject, projectSchema);
                     onUpdate(updatedObj, 'add');
-                    setNewlyAddedOrDuplicatedXPath(xpathAttr); // Scroll to the initialized object
 
                     // Mark that full regeneration is needed for structural changes
                     needsFullRegenerationRef.current = true;
@@ -209,13 +243,16 @@ const TreeRenderer = ({
 
                 const schemaXpathForNewItem = `${xpathAttr}[${nextIndex}]`;
                 setItemVisualStates(prev => ({ ...prev, [schemaXpathForNewItem]: 'added' }));
+
+                // Set the glow effect for the newly created array item
+                setNewlyAddedOrDuplicatedXPath(schemaXpathForNewItem);
+
                 handleNodeToggle(xpathAttr, true);
                 expandNodeAndAllChildren(schemaXpathForNewItem, newArrayItem, arrayItemSchema, projectSchema);
 
                 const newItemPageIndex = Math.floor(nextIndex / ITEMS_PER_PAGE);
                 setPaginatedNodes(prev => ({ ...prev, [xpathAttr]: { page: newItemPageIndex } }));
                 onUpdate(updatedObj, 'add');
-                setNewlyAddedOrDuplicatedXPath(schemaXpathForNewItem); // Scroll to the new array item
 
                 // Mark that full regeneration is needed for structural changes
                 needsFullRegenerationRef.current = true;
@@ -278,58 +315,15 @@ const TreeRenderer = ({
 
             const refParts = ref.split('/');
             let currentItemSchema = refParts.length === 2 ? projectSchema[refParts[1]] : projectSchema[refParts[1]][refParts[2]];
-            let duplicatedObject = generateObjectFromSchema(projectSchema, cloneDeep(currentItemSchema), additionalProps, null, objectToCopy);
-
-            // Regenerate nested objects fresh from schema to ensure proper initialization
-            // Keep broker-level fields from original, but create nested structures fresh
-            if (duplicatedObject.sec_positions && Array.isArray(duplicatedObject.sec_positions)) {
-                duplicatedObject.sec_positions.forEach(secPos => {
-                    if (secPos) {
-                        // Regenerate security object fresh from schema
-                        const securityRefParts = projectSchema.definitions?.sec_position?.properties?.security?.items?.$ref?.split('/');
-                        if (securityRefParts && securityRefParts.length >= 2) {
-                            const securitySchema = securityRefParts.length === 2 ?
-                                projectSchema[securityRefParts[1]] :
-                                projectSchema[securityRefParts[1]][securityRefParts[2]];
-                            if (securitySchema) {
-                                secPos.security = generateObjectFromSchema(
-                                    projectSchema,
-                                    cloneDeep(securitySchema),
-                                    null,
-                                    null,
-                                    null  // No objToDup - create fresh from schema
-                                );
-                            }
-                        }
-
-                        // Regenerate positions array fresh from schema
-                        const positionRefParts = projectSchema.definitions?.sec_position?.properties?.positions?.items?.$ref?.split('/');
-                        if (positionRefParts && positionRefParts.length >= 2) {
-                            const positionSchema = positionRefParts.length === 2 ?
-                                projectSchema[positionRefParts[1]] :
-                                projectSchema[positionRefParts[1]][positionRefParts[2]];
-                            if (positionSchema) {
-                                const freshPosition = generateObjectFromSchema(
-                                    projectSchema,
-                                    cloneDeep(positionSchema),
-                                    null,
-                                    null,
-                                    null  // No objToDup - create fresh from schema
-                                );
-                                secPos.positions = [freshPosition];
-                            } else {
-                                secPos.positions = [];
-                            }
-                        } else {
-                            secPos.positions = [];
-                        }
-                    }
-                });
-            }
+            let duplicatedObject = generateObjectFromSchema(projectSchema, cloneDeep(currentItemSchema), additionalProps, null, objectToCopy, false);
 
             duplicatedObject = addxpath(duplicatedObject, parentDataXpath + '[' + nextIndex + ']');
             const schemaXpathForDuplicatedItem = parentOriginalXpath + '[' + nextIndex + ']';
             setItemVisualStates(prev => ({ ...prev, [schemaXpathForDuplicatedItem]: 'duplicated' }));
+
+            // Set the glow effect for the newly duplicated item
+            setNewlyAddedOrDuplicatedXPath(schemaXpathForDuplicatedItem);
+
             parentObject.push(duplicatedObject);
             handleNodeToggle(parentOriginalXpath, true); // Expand parent
             expandNodeAndAllChildren(schemaXpathForDuplicatedItem, duplicatedObject, currentItemSchema, projectSchema);
@@ -337,7 +331,6 @@ const TreeRenderer = ({
             const newItemPageIndex = Math.floor((totalItems - 1) / ITEMS_PER_PAGE);
             setPaginatedNodes(prev => ({ ...prev, [parentDataXpath]: { page: newItemPageIndex } }));
             onUpdate(updatedObj, 'add');
-            setNewlyAddedOrDuplicatedXPath(schemaXpathForDuplicatedItem); // Scroll to the duplicated item
 
             // Mark that full regeneration is needed for structural changes
             needsFullRegenerationRef.current = true;
@@ -486,11 +479,13 @@ const TreeRenderer = ({
 
 
     if (isChanged) {
-        handleNodeToggle(nodeXPath, true);
+        // Use original toggle function for default expansion to avoid animation delays
+        if (originalHandleNodeToggle) {
+            originalHandleNodeToggle(nodeXPath, true);
+        } else {
+            handleNodeToggle(nodeXPath, true, true); // Skip animation flag
+        }
     }
-
-
-    const shouldGlow = newlyAddedOrDuplicatedXPath && newlyAddedOrDuplicatedXPath === nodeXPath;
 
 
     const dataPayload = {
@@ -544,16 +539,59 @@ const TreeRenderer = ({
     };
 
 
-    return (
-        <div
-            {...nodeProps}
-            style={{ paddingLeft: `${(level - 1) * 20}px`, width: 'max-content' }}
-            className={shouldGlow ? NodeBaseClasses.datanodeNewlyAddedGlowTarget : ''}
-            data-xpath={nodeXPath}
-        >
-            <ComponentToRender {...commonProps} onClick={handleClick} />
-        </div>
-    );
+
+
+    // Use AnimatedTreeNode only for container nodes during normal operations
+    // Use regular div during tree regeneration to avoid unwanted animations
+    const shouldUseAnimation = !needsFullRegenerationRef.current && (ComponentToRender === HeaderField);
+
+    const nodeStyle = {
+        paddingLeft: `${(level - 1) * 20}px`,
+        width: 'max-content',
+        ...(nodeIsAnimating && { transform: 'translateZ(0)' }) // Hardware acceleration during animation
+    };
+
+    if (shouldUseAnimation) {
+        // Use AnimatedTreeNode for smooth accordion animation during expand/collapse
+        return (
+            <AnimatedTreeNode
+                animationKey={`${nodeXPath}-${level}`}
+                level={level}
+                isContainer={ComponentToRender === HeaderField}
+                style={nodeStyle}
+                data-xpath={nodeXPath}
+                {...nodeProps}
+            >
+                <ComponentToRender {...commonProps} onClick={handleClick} />
+            </AnimatedTreeNode>
+        );
+    } else {
+        // Use regular div during tree regeneration or for simple nodes
+        return (
+            <li {...nodeProps} style={nodeStyle}>
+                <ComponentToRender
+                    data={
+                        ComponentToRender === Node ?
+                            { ...originalNode, storedValue: get(storedData, originalNode.dataxpath) } :
+                            originalNode
+                    }
+                    onClick={handleClick}
+                    onTextChange={handleTextChange}
+                    onSelectItemChange={handleSelectItemChange}
+                    onCheckboxChange={handleCheckboxToggle}
+                    onAutocompleteChange={handleAutocompleteChange}
+                    onDateTimeChange={handleDateTimeChange}
+                    onQuickFilterChange={onQuickFilterChange}
+                    onQuickFilterPin={onQuickFilterPin}
+                    onQuickFilterUnpin={onQuickFilterUnpin}
+                    visualState={visualState}
+                    pinnedFilters={pinnedFilters}
+                    enableQuickFilterPin={enableQuickFilterPin}
+                    triggerGlowForXPath={newlyAddedOrDuplicatedXPath}
+                />
+            </li>
+        );
+    }
 };
 
 TreeRenderer.propTypes = {
@@ -562,7 +600,6 @@ TreeRenderer.propTypes = {
     getNodeProps: PropTypes.func.isRequired,
     level: PropTypes.number.isRequired,
     itemVisualStates: PropTypes.object.isRequired,
-    newlyAddedOrDuplicatedXPath: PropTypes.string,
     expandedNodeXPaths: PropTypes.object.isRequired,
     levelRef: PropTypes.object.isRequired,
     treeData: PropTypes.array.isRequired,
@@ -587,9 +624,17 @@ TreeRenderer.propTypes = {
     setPaginatedNodes: PropTypes.func.isRequired,
     expandNodeAndAllChildren: PropTypes.func.isRequired,
     onUpdate: PropTypes.func.isRequired,
-    setNewlyAddedOrDuplicatedXPath: PropTypes.func.isRequired,
     setItemVisualStates: PropTypes.func.isRequired,
     setCounter: PropTypes.func.isRequired,
+    // Animation props
+    isNodeAnimating: PropTypes.func,
+    getNodeTargetState: PropTypes.func,
+    getNodeAnimationProps: PropTypes.func,
+    animatingNodes: PropTypes.instanceOf(Set),
+    originalHandleNodeToggle: PropTypes.func,
+    // Glow props
+    newlyAddedOrDuplicatedXPath: PropTypes.string,
+    setNewlyAddedOrDuplicatedXPath: PropTypes.func.isRequired,
 };
 
 export default TreeRenderer; 

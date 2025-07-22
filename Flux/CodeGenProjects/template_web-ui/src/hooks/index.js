@@ -10,3 +10,4 @@ export { default as useScrollIndicators } from './useScrollIndicators';
 export { default as useKeyboardNavigation } from './useKeyboardNavigation';
 export { default as useTreeExpansion } from './useTreeExpansion';
 export { default as useModelLayout } from './useModelLayout';
+export { default as useConflictDetection } from './useConflictDetection';

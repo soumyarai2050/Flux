@@ -81,7 +81,8 @@ onmessage = (e) => {
         projectSchema, modelName, updatedData, storedData, subtree, mode, xpath,
         selectedId, showHidden, paginatedNodes, filters,
         quickFilter,
-        enableObjectPagination
+        enableObjectPagination,
+        disablePagination
     } = e.data.payload;
 
     // Use constants from payload if provided, otherwise use imported ones.
@@ -143,7 +144,8 @@ onmessage = (e) => {
         'forceUpdate': false,
         'filters': filters,
         'paginatedNodes': paginatedNodes, // Pass pagination state to tree generation
-        'quickFilter': quickFilter ?? null
+        'quickFilter': quickFilter ?? null,
+        'disablePagination': disablePagination // <-- Pass to tree logic
     };
 
     const generatedTree = generateTreeStructure(cloneDeep(projectSchema), modelName, callerPropsForWorker);

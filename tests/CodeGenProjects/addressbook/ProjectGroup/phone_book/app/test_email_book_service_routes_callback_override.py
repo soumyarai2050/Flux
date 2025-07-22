@@ -1698,6 +1698,16 @@ def test_plan_gets_deleted_even_when_symbol_overview_is_not_found(
     created_pair_plan = create_plan(buy_symbol, sell_symbol, pair_plan_)
     time.sleep(30)
 
+    # Unloading Plan
+    plan_view_obj = photo_book_web_client.get_plan_view_client(created_pair_plan.id)
+    # simulating ui button update - making unload_plan True
+    plan_view_obj.unload_plan = True
+    update_plan_view = photo_book_web_client.put_plan_view_client(plan_view_obj)
+    assert update_plan_view == plan_view_obj, \
+        f"Mismatched plan_view: expected {plan_view_obj}, updated {update_plan_view}"
+
+    time.sleep(20)
+
     # deleting plan without creating symbol overview
     expected_delete_res = {'msg': 'Deletion Successful', 'id': created_pair_plan.id}
     delete_res = email_book_service_native_web_client.delete_pair_plan_client(created_pair_plan.id)
@@ -12551,7 +12561,7 @@ def test_risky_amend_dn_based_on_px_and_qty_with_amend_making_filled(
 
             # Checking alert in plan_alert
             time.sleep(5)
-            check_str = "Received ChoreEventType.OE_AMD_DN_UNACK for amend qty which makes chore DOD"
+            check_str = "Received OE_AMD_DN_UNACK for amend qty which makes chore DOD"
 
             assert_fail_msg = f"Can't find alert of {check_str} in neither plan_alert nor contact_alert"
             check_alert_str_in_plan_alerts_n_contact_alerts(active_pair_plan.id, check_str, assert_fail_msg)

@@ -71,7 +71,8 @@ message PlanBrief {
       }
   };
   option (FluxMsgJsonQuery) = {
-      QueryName: "get_plan_brief_from_cache"
+    QueryName: "get_plan_brief_from_cache"
+    QueryRouteType: PATCH
   };
   option (FluxMsgCRUDSharedLock) = "residual_compute_shared_lock";
   option (FluxMsgExecutorOptions) = {

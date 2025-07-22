@@ -2,7 +2,22 @@ import { DB_ID } from '../constants';
 import { sortAlertArray } from '../utils/network/websocketUtils';
 
 onmessage = (event) => {
-    const { messages, storedArray, uiLimit, isAlertModel, activeItemIdMap = null } = event.data;
+    const { messages, snapshot, storedArray, uiLimit, isAlertModel, activeItemIdMap = null } = event.data;
+    
+    // If snapshot is provided, process it as full replacement
+    if (snapshot) {
+        try {
+            const snapshotData = JSON.parse(snapshot);
+            // Send snapshot data as the new full array
+            postMessage(Array.isArray(snapshotData) ? snapshotData : [snapshotData]);
+            return;
+        } catch (e) {
+            console.error('Error parsing snapshot:', e);
+            postMessage(storedArray); // Fallback to stored array
+            return;
+        }
+    }
+
     const updatesMap = new Map();
 
     // Build update map from the messages

@@ -90,3 +90,49 @@ ul {
   box-sizing: border-box;
 }
 
+/* Animation support for smooth accordion animations */
+.container {
+  transition: all 0.2s ease-in-out;
+  will-change: transform, opacity;
+}
+
+.header {
+  transition: all 0.2s ease-in-out;
+  will-change: transform, opacity, background-color;
+}
+
+.icon {
+  transition: transform 0.2s ease-in-out;
+  will-change: transform;
+}
+
+/* Smooth expand/collapse arrow rotation */
+.icon svg {
+  transition: transform 0.2s ease-in-out;
+}
+
+.menu {
+  transition: all 0.2s ease-in-out;
+  will-change: transform, opacity;
+}
+
+.option {
+  transition: all 0.2s ease-in-out;
+  will-change: transform, opacity;
+}
+
+/* Animation optimizations */
+.animatedHeader {
+  transform: translateZ(0); /* Force hardware acceleration */
+  backface-visibility: hidden;
+}
+
+/* Smooth pagination controls */
+.paginationControls {
+  transition: all 0.2s ease-in-out;
+  will-change: transform, opacity;
+}
+
+
+
+

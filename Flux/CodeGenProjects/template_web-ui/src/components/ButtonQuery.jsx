@@ -1,6 +1,7 @@
 /**
  * @module ButtonQuery
  * @description This module provides a component for a button that executes a query.
+ * It supports user-editable query parameters for GET, POST, and file upload requests.
  */
 
 import React, { useMemo, useRef, useState } from 'react';
@@ -8,12 +9,15 @@ import PropTypes from 'prop-types';
 import axios from 'axios';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, DialogContentText } from '@mui/material';
+import {
+    Dialog, DialogTitle, DialogContent, DialogActions, Button,
+    DialogContentText, TextField, Box, FormControlLabel, Switch
+} from '@mui/material';
 import { PlayArrow, Delete } from '@mui/icons-material';
 
 import ValueBasedToggleButton from './ValueBasedToggleButton';
 import { API_ROOT_URL, API_ROOT_VIEW_URL } from '../constants';
-import Alert, { AlertErrorMessage } from './Alert';
+import { AlertErrorMessage } from './Alert';
 import { getColorTypeFromValue } from '../utils/ui/colorUtils';
 import { getSizeFromValue, getShapeFromValue } from '../utils/ui/uiUtils';
 import { getErrorDetails } from '../utils/core/errorUtils';
@@ -30,7 +34,7 @@ const RUN_BUTTON_TEXT = 'RUN';
 
 /**
  * @function ButtonQuery
- * @description A button component that triggers a query execution flow.
+ * @description A button component that triggers a query execution flow, with support for user-editable query parameters.
  * @param {object} props - The properties for the component.
  * @param {object} props.queryObj - The query object from the schema.
  * @param {string} [props.url] - The base URL for the query.
@@ -41,6 +45,7 @@ const ButtonQuery = ({ queryObj, url, viewUrl }) => {
     const [value, setButtonValue] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
     const [alert, setAlert] = useState(null);
+    const [queryParamsState, setQueryParamsState] = useState({});
     const inputRef = useRef();
 
     const buttonOptions = useMemo(() => {
@@ -80,10 +85,21 @@ const ButtonQuery = ({ queryObj, url, viewUrl }) => {
             console.error(`Unexpected! no query_data found in button query obj, ${JSON.stringify({ query_data })}`);
             return null;
         }
-        const { QueryType: queryType = 'HTTP', QueryRouteType: queryRouteType = 'GET' } = query_data;
+        const {
+            QueryType: queryType = 'HTTP',
+            QueryRouteType: queryRouteType = 'GET',
+            QueryParams: queryParamsArray = []
+        } = query_data;
+
+        // Process array into a more usable key-value object for type-lookups
+        const queryParams = queryParamsArray.reduce((acc, param) => {
+            acc[param.QueryParamName] = { type: param.QueryParamDataType || 'str' };
+            return acc;
+        }, {});
+
         const finalQueryRouteType = queryType === 'HTTP_FILE' ? 'POST' : queryRouteType;
         const queryName = `query-${query_data.QueryName}`;
-        return { queryName, queryType, queryRouteType: finalQueryRouteType };
+        return { queryName, queryType, queryRouteType: finalQueryRouteType, queryParams };
     }, [queryObj]);
 
     const fileUploadOptions = useMemo(() => {
@@ -105,31 +121,94 @@ const ButtonQuery = ({ queryObj, url, viewUrl }) => {
     const { caption, color, isDisabledValue, shape, size } = buttonOptions;
     const { allow_force_update, button_icon_name, hide_caption } = queryObj.ui_button;
 
-    const handleButtonClick = () => setIsOpen(true);
+    const handleButtonClick = () => {
+        const initialParams = {};
+        Object.keys(queryOptions.queryParams).forEach(key => {
+            const paramInfo = queryOptions.queryParams[key];
+            initialParams[key] = paramInfo.type === 'boolean' ? false : '';
+        });
+        setQueryParamsState(initialParams);
+        setIsOpen(true);
+    };
 
-    const handleClose = () => setIsOpen(false);
+    const handleClose = () => {
+        setIsOpen(false);
+        setQueryParamsState({}); // Clear state on close
+    };
 
-    const handleDiscard = () => setIsOpen(false);
+    const handleParamChange = (key, val) => {
+        setQueryParamsState(prevState => ({ ...prevState, [key]: val }));
+    };
+
+    /**
+     * Coerces and validates parameters from their string/UI state to their target data types.
+     * @param {object} paramsToCoerce - The state object with user inputs.
+     * @returns {object} A new object with correctly typed values.
+     * @throws {Error} If a numeric conversion fails.
+     */
+    const coerceParams = (paramsToCoerce) => {
+        const coerced = {};
+        for (const key in paramsToCoerce) {
+            const paramInfo = queryOptions.queryParams[key];
+            if (!paramInfo) continue;
+
+            const { type } = paramInfo;
+            const value = paramsToCoerce[key];
+
+            if (value === '' && type !== 'str') {
+                // Treat empty non-string fields as null or skip them
+                coerced[key] = null;
+                continue;
+            }
+
+            switch (type) {
+                case 'int':
+                    const intVal = parseInt(value, 10);
+                    if (isNaN(intVal)) {
+                        throw new Error(`Invalid integer value for parameter "${key}": ${value}`);
+                    }
+                    coerced[key] = intVal;
+                    break;
+                case 'float':
+                    const floatVal = parseFloat(value);
+                    if (isNaN(floatVal)) {
+                        throw new Error(`Invalid float value for parameter "${key}": ${value}`);
+                    }
+                    coerced[key] = floatVal;
+                    break;
+                case 'boolean':
+                    coerced[key] = !!value; // Ensures it's a strict boolean
+                    break;
+                case 'str':
+                default:
+                    coerced[key] = value;
+                    break;
+            }
+        }
+        return coerced;
+    };
 
     const handleExecute = async () => {
-        const { queryName, queryType, queryRouteType } = queryOptions;
         setButtonValue(true);
         try {
+            const { queryName, queryType, queryRouteType } = queryOptions;
+            const coercedParams = coerceParams(queryParamsState);
+
             if (queryType === 'HTTP_FILE') {
-                await handleHttpFileQuery(queryName, 'POST');
+                await handleHttpFileQuery(queryName, 'POST', coercedParams);
             } else if (queryType === 'HTTP') {
-                await handleHttpQuery(queryName, queryRouteType);
+                await handleHttpQuery(queryName, queryRouteType, coercedParams);
             } else {
                 throw new Error(`QueryType: ${queryType} is not supported`);
             }
         } catch (error) {
             setAlert(getErrorDetails(error));
         }
-        setIsOpen(false);
+        handleClose(); // Close dialog and clear state
         setButtonValue(false);
     };
 
-    const handleHttpFileQuery = async (queryName, queryRouteType) => {
+    const handleHttpFileQuery = async (queryName, queryRouteType, params) => {
         if (!fileUploadOptions?.allowFileUpload) {
             throw new Error(`File upload not allowed`);
         }
@@ -156,18 +235,98 @@ const ButtonQuery = ({ queryObj, url, viewUrl }) => {
         const formData = new FormData();
         formData.append('upload_file', renamedFile);
 
+        // Append other coerced parameters to the form data
+        // if (params) {
+        //     Object.entries(params).forEach(([key, paramValue]) => {
+        //         if (paramValue !== null) {
+        //             formData.append(key, paramValue);
+        //         }
+        //     });
+        // }
+
         await axios.post(`${baseUrl}/${queryName}`, formData);
         setAlert({ type: 'success', detail: 'File uploaded successfully' });
     };
 
-    const handleHttpQuery = async (queryName, queryRouteType) => {
+    const handleHttpQuery = async (queryName, queryRouteType, params) => {
         const axiosFunc = getAxiosMethod(queryRouteType);
-        const url = queryRouteType === 'get' ? baseViewUrl : baseUrl;
-        await axiosFunc(`${url}/${queryName}`);
+        const isGetRequest = queryRouteType.toLowerCase() === 'get';
+        const urlRoot = isGetRequest ? baseViewUrl : baseUrl;
+        let finalUrl = `${urlRoot}/${queryName}`;
+        let requestData = null;
+
+        // Filter out null/undefined params before sending
+        const finalParams = Object.entries(params)
+            .filter(([, value]) => value !== null && value !== undefined)
+            .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
+
+        if (isGetRequest) {
+            // For GET requests, append params to URL
+            if (Object.keys(finalParams).length > 0) {
+                const searchParams = new URLSearchParams(finalParams);
+                finalUrl += `?${searchParams.toString()}`;
+            }
+        } else {
+            // For POST, PUT, etc., send params as request body
+            requestData = finalParams;
+        }
+
+        // The second argument to axiosFunc will be data for POST/PUT, and undefined for GET
+        await axiosFunc(finalUrl, requestData);
         setAlert({ type: 'success', detail: `${queryName} successfully completed` });
     };
 
     const handleAlertClose = () => setAlert(null);
+
+    const renderParamInput = (key, paramInfo) => {
+        const { type } = paramInfo;
+        switch (type) {
+            case 'boolean':
+                return (
+                    <FormControlLabel
+                        key={key}
+                        sx={{ display: 'block', mt: 1 }}
+                        control={
+                            <Switch
+                                checked={!!queryParamsState[key]}
+                                onChange={(e) => handleParamChange(key, e.target.checked)}
+                                name={key}
+                            />
+                        }
+                        label={key}
+                    />
+                );
+            case 'int':
+            case 'float':
+                return (
+                    <TextField
+                        key={key}
+                        margin="dense"
+                        label={key}
+                        type="number"
+                        fullWidth
+                        variant="outlined"
+                        value={queryParamsState[key] || ''}
+                        onChange={(e) => handleParamChange(key, e.target.value)}
+                        inputProps={{ step: type === 'float' ? 'any' : '1' }}
+                    />
+                );
+            case 'str':
+            default:
+                return (
+                    <TextField
+                        key={key}
+                        margin="dense"
+                        label={key}
+                        type="text"
+                        fullWidth
+                        variant="outlined"
+                        value={queryParamsState[key] || ''}
+                        onChange={(e) => handleParamChange(key, e.target.value)}
+                    />
+                );
+        }
+    };
 
     return (
         <>
@@ -192,7 +351,19 @@ const ButtonQuery = ({ queryObj, url, viewUrl }) => {
                 <DialogContent className={classes.dialog_body}>
                     <DialogContentText className={classes.dialog_text}>QueryName: {queryOptions.queryName}</DialogContentText>
                     <DialogContentText className={classes.dialog_text}>QueryType: {queryOptions.queryType}</DialogContentText>
+
+                    {Object.keys(queryOptions.queryParams).length > 0 && (
+                        <Box sx={{ mt: 2 }}>
+                            <DialogContentText className={classes.dialog_text} sx={{ fontWeight: 'bold', mb: 1 }}>
+                                Query Parameters:
+                            </DialogContentText>
+                            {Object.entries(queryOptions.queryParams).map(([key, paramInfo]) =>
+                                renderParamInput(key, paramInfo)
+                            )}
+                        </Box>
+                    )}
                 </DialogContent>
+
                 {queryOptions.queryType === 'HTTP_FILE' && (
                     <DialogContent className={classes.dialog_body}>
                         <DialogContentText className={classes.dialog_text}>Select File to Upload:</DialogContentText>
@@ -200,7 +371,7 @@ const ButtonQuery = ({ queryObj, url, viewUrl }) => {
                     </DialogContent>
                 )}
                 <DialogActions>
-                    <Button variant='contained' color='error' onClick={handleDiscard} startIcon={<Delete />}>{DISCARD_BUTTON_TEXT}</Button>
+                    <Button variant='contained' color='error' onClick={handleClose} startIcon={<Delete />}>{DISCARD_BUTTON_TEXT}</Button>
                     <Button variant='contained' color='success' onClick={handleExecute} startIcon={<PlayArrow />}>{RUN_BUTTON_TEXT}</Button>
                 </DialogActions>
             </Dialog>

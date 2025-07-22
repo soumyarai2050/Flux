@@ -9,14 +9,14 @@ import { Add, Close, Delete, Save } from '@mui/icons-material';
 // project constants and common utility function imports
 import { DATA_TYPES, MODES, API_ROOT_URL, MODEL_TYPES, DB_ID } from '../../../constants';
 import { addxpath, clearxpath } from '../../../utils/core/dataAccess';
-import { applyFilter, getFilterDict } from '../../../utils/core/dataFiltering';
+import { applyFilter, getChartFilterDict } from '../../../utils/core/dataFiltering';
 import {
     genChartDatasets, genMetaFilters, getChartOption, mergeTsData, tooltipFormatter,
     updateChartDataObj, updateChartSchema, updatePartitionFldSchema
 } from '../../../utils/core/chartUtils';
 import { generateObjectFromSchema, getModelSchema } from '../../../utils/core/schemaUtils';
 import { getIdFromAbbreviatedKey } from '../../../utils/core/dataUtils';
-import { getCollectionByName } from '../../../utils/core/dataUtils.js';
+import { getCollectionByName } from '../../../utils/core/dataUtils';
 // custom component imports
 import Icon from '../../Icon';
 import FullScreenModal from '../../Modal';
@@ -212,12 +212,21 @@ function ChartView({
 
     useEffect(() => {
         if (storedChartObj.series && storedChartObj.time_series) {
-            const filterDict = getFilterDict(storedChartObj.filters);
+            const filterDict = getChartFilterDict(storedChartObj.filters);
             if (Object.keys(filterDict).length > 0) {
                 const metaFilters = genMetaFilters(rows, fieldsMetadata, filterDict, Object.keys(filterDict)[0], modelType === MODEL_TYPES.ABBREVIATION_MERGE);
                 storedChartObj.series.forEach((series, index) => {
                     const collection = getCollectionByName(fieldsMetadata, series.encode.y, modelType === MODEL_TYPES.ABBREVIATION_MERGE);
                     if (collection.hasOwnProperty('mapping_src')) {
+                        let rootUrl = API_ROOT_URL;
+                        const mappingModelName = collection.mapping_src?.split('.')[0];
+                        if (mappingModelName) {
+                            const mappingModelSchema = getModelSchema(mappingModelName, projectSchema);
+                            if (mappingModelSchema?.connection_details) {
+                                const { host, port, project_name } = mappingModelSchema.connection_details;
+                                rootUrl = `http://${host}:${port}/${project_name}`;
+                            }
+                        }
                         const query = queryDict[index];
                         if (query) {
                             metaFilters.forEach(metaFilterDict => {
@@ -229,7 +238,7 @@ function ChartView({
                                         paramStr = `${key}=${metaFilterDict[key]}`;
                                     }
                                 }
-                                const socket = new WebSocket(`${API_ROOT_URL.replace('http', 'ws')}/ws-query-${query.name}?${paramStr}`);
+                                const socket = new WebSocket(`${rootUrl.replace('http', 'ws')}/ws-query-${query.name}?${paramStr}`);
                                 socketList.current.push(socket);
                                 socket.onmessage = (event) => {
                                     let updatedData = JSON.parse(event.data);
@@ -849,47 +858,57 @@ function ChartView({
                         </Box>
                     )}
                     <Box className={styles.chart}>
-                        {storedChartObj.chart_name && (
-                            <EChart
-                                loading={false}
-                                theme={theme.palette.mode}
-                                option={{
-                                    legend: {},
-                                    tooltip: {
-                                        trigger: 'axis',
-                                        axisPointer: {
-                                            type: 'cross'
+                        {storedChartObj.chart_name ? (
+                            rows.length > 0 ? (
+                                <EChart
+                                    loading={false}
+                                    theme={theme.palette.mode}
+                                    option={{
+                                        legend: {},
+                                        tooltip: {
+                                            trigger: 'axis',
+                                            axisPointer: {
+                                                type: 'cross'
+                                            },
+                                            valueFormatter: (value) => tooltipFormatter(value)
                                         },
-                                        valueFormatter: (value) => tooltipFormatter(value)
-                                    },
-                                    dataZoom: [
-                                        {
-                                            type: 'inside',
-                                            filterMode: 'filter',
-                                            xAxisIndex: [0, 1]
-                                        },
-                                        {
-                                            type: 'inside',
-                                            filterMode: 'empty',
-                                            yAxisIndex: [0, 1]
-                                        },
-                                        {
-                                            type: 'slider',
-                                            filterMode: 'filter',
-                                            xAxisIndex: [0, 1]
-                                        },
-                                        {
-                                            type: 'slider',
-                                            filterMode: 'empty',
-                                            yAxisIndex: [0, 1]
-                                        }
-                                    ],
-                                    dataset: datasets,
-                                    ...options
-                                }}
-                                setSelectedData={setSelectedData}
-                                isCollectionType={modelType === MODEL_TYPES.ABBREVIATION_MERGE}
-                            />
+                                        dataZoom: [
+                                            {
+                                                type: 'inside',
+                                                filterMode: 'filter',
+                                                xAxisIndex: [0, 1]
+                                            },
+                                            {
+                                                type: 'inside',
+                                                filterMode: 'empty',
+                                                yAxisIndex: [0, 1]
+                                            },
+                                            {
+                                                type: 'slider',
+                                                filterMode: 'filter',
+                                                xAxisIndex: [0, 1]
+                                            },
+                                            {
+                                                type: 'slider',
+                                                filterMode: 'empty',
+                                                yAxisIndex: [0, 1]
+                                            }
+                                        ],
+                                        dataset: datasets,
+                                        ...options
+                                    }}
+                                    setSelectedData={setSelectedData}
+                                    isCollectionType={modelType === MODEL_TYPES.ABBREVIATION_MERGE}
+                                />
+                            ) : (
+                                <Box className={styles.no_data_message}>
+                                    No Data Available
+                                </Box>
+                            )
+                        ) : (
+                            <Box className={styles.no_data_message}>
+                                No Chart Selected
+                            </Box>
                         )}
                     </Box>
                     {children}

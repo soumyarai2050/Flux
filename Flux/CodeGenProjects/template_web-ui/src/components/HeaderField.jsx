@@ -7,7 +7,9 @@ import PropTypes from 'prop-types';
 import classes from './HeaderField.module.css';
 import { get } from 'lodash';
 import { useTheme } from '@emotion/react';
-import TreeExpansionControls from './trees/DataTree/TreeExpansionControls';
+import { ITEMS_PER_PAGE } from '../constants';
+import TreeExpansionControls from './trees/TreeExpansionControls/TreeExpansionControls';
+import './trees/TreeRenderer/TreeRenderer.module.css';
 
 
 const HeaderField = (props) => {
@@ -27,6 +29,8 @@ const HeaderField = (props) => {
 
     const title = props.data.title ? props.data.title : props.name;
 
+
+
     /**
      * Helper function: Get the identifier value from the actual data
      * 
@@ -37,29 +41,39 @@ const HeaderField = (props) => {
      * @param {string} identifierPath - The path to the identifier field (like "broker" or "security.sec_id")
      * @param {object} nodeData - The tree node data containing paths and metadata
      * @param {object} updatedData - The actual data object containing values
+     * @param {object} storedData - The original data object (before edits)
      * @returns {string|number|null} - The identifier value or null if not found
      */
-    const getIdentifierValue = (identifierPath, nodeData, updatedData) => {
-        if (!identifierPath || !nodeData || !updatedData) return null;
+    const getIdentifierValue = (identifierPath, nodeData, updatedData, storedData) => {
+        if (!identifierPath || !nodeData || (!updatedData && !storedData)) return null;
 
         try {
-            // Method 1: Get the value from the current node's data
-            // The node has a "dataxpath" that tells us where its data is located
             const nodeDataPath = nodeData.dataxpath;
+            const isDeleted = nodeData['data-remove'];
+
             if (nodeDataPath) {
-                const nodeValue = get(updatedData, nodeDataPath);
-                if (nodeValue && typeof nodeValue === 'object') {
-                    // Look for the identifier field within this node's data
-                    const identifierValue = get(nodeValue, identifierPath);
-                    if (typeof identifierValue === 'string' || typeof identifierValue === 'number') {
-                        return identifierValue;
+                if (isDeleted) {
+                    // Only use storedData for deleted nodes
+                    let nodeValue = get(storedData, nodeDataPath);
+                    if (nodeValue && typeof nodeValue === 'object') {
+                        const identifierValue = get(nodeValue, identifierPath);
+                        if (typeof identifierValue === 'string' || typeof identifierValue === 'number') {
+                            return identifierValue;
+                        }
                     }
+                } else {
+                    // Only use updatedData for new/active nodes
+                    let nodeValue = get(updatedData, nodeDataPath);
+                    if (nodeValue && typeof nodeValue === 'object') {
+                        const identifierValue = get(nodeValue, identifierPath);
+                        if (typeof identifierValue === 'string' || typeof identifierValue === 'number') {
+                            return identifierValue;
+                        }
+                    }
+                    // Do NOT fall back to storedData for new nodes!
                 }
             }
-
-            // Method 2: Fallback - try to get the value directly from the identifier path
-            const value = get(updatedData, identifierPath);
-            return (typeof value === 'string' || typeof value === 'number') ? value : null;
+            return null;
         } catch (error) {
             console.warn('Error getting identifier value:', error);
             return null;
@@ -83,7 +97,8 @@ const HeaderField = (props) => {
             const identifierValue = getIdentifierValue(
                 props.data.array_obj_identifier,
                 props.data,
-                props.data.updatedDataForColor
+                props.data.updatedDataForColor,
+                props.data.storedDataForColor
             );
             if (identifierValue) {
                 displayTitle = `${title} [${identifierValue}]`;
@@ -143,7 +158,14 @@ const HeaderField = (props) => {
 
     return (
         <Box className={classes.container} data-xpath={props.data.xpath} onClick={onClick}>
-            <Box className={classes.header} data-xpath={props.data.xpath} bgcolor={bgColor} sx={{ color: 'white' }} >
+            <Box 
+                className={classes.header} 
+                data-xpath={props.data.xpath} 
+                sx={{ 
+                    color: 'white',
+                    bgcolor: bgColor
+                }}
+            >
                 <span className={classes.icon}>
                     {props.isOpen ? (
                         <ArrowDropUpSharp
@@ -190,114 +212,112 @@ const HeaderField = (props) => {
                     props.data.pagination.displayPages > 1 :
                     props.data.pagination.totalPages > 1)
             ) && (
-                <Box
-                    className={`${classes.paginationControls} ${props.data.isContainer ? classes.containerPagination : classes.childPagination}`}
-                    onClick={(e) => e.stopPropagation()}
-                    sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'flex-end',
-                        padding: '2px 8px',
-                        borderTop: '1px solid rgba(0,0,0,0.1)',
-                        backgroundColor: 'rgba(0,0,0,0.02)',
-                        gap: 1
-                    }}
-                >
-                    {/* Previous button */}
-                    <IconButton
-                        size="small"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            props.data.pagination.onPageChange('prev');
-                        }}
-                        disabled={props.data.pagination.currentPage === 0}
+                    <Box
+                        className={`${classes.paginationControls} ${props.data.isContainer ? classes.containerPagination : classes.childPagination}`}
+                        onClick={(e) => e.stopPropagation()}
                         sx={{
-                            padding: '2px',
-                            '&.Mui-disabled': {
-                                '& .MuiTypography-root': {
-                                    color: theme.palette.text.disabled
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'flex-end',
+                            padding: '2px 8px',
+                            borderTop: '1px solid rgba(0,0,0,0.1)',
+                            backgroundColor: 'rgba(0,0,0,0.02)',
+                            gap: 1
+                        }}
+                    >
+                        {/* Previous button */}
+                        <IconButton
+                            size="small"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                props.data.pagination.onPageChange('prev');
+                            }}
+                            disabled={props.data.pagination.currentPage === 0}
+                            sx={{
+                                padding: '2px',
+                                '&.Mui-disabled': {
+                                    '& .MuiTypography-root': {
+                                        color: theme.palette.text.disabled
+                                    }
                                 }
-                            }
-                        }}
-                    >
-                        <Typography variant="caption" sx={{
-                            fontWeight: 'bold',
-                            color: theme.palette.mode === 'light' ? theme.palette.text.default : theme.palette.text.primary
-                        }}>◄</Typography>
-                    </IconButton>
-                    
-                    {/* Page dropdown */}
-                    <select
-                        value={props.data.pagination.currentPage}
-                        onChange={(e) => {
-                            e.stopPropagation();
-                            const page = Number(e.target.value);
-                            props.data.pagination.onPageChange(page);
-                        }}
-                        style={{
-                            height: '24px',
-                            fontSize: '12px',
-                            padding: '2px 4px',
-                            border: `1px solid ${theme.palette.divider}`,
-                            borderRadius: '4px',
-                            backgroundColor: theme.palette.background.paper,
-                            color: theme.palette.text.primary,
-                            cursor: 'pointer'
-                        }}
-                    >
-                        {Array.from({ 
-                            length: props.data.pagination.hasActiveFilters ? 
-                                props.data.pagination.displayPages : 
-                                props.data.pagination.totalPages 
-                        }, (_, i) => (
-                            <option key={i} value={i}>
-                                {`Page ${i + 1} of ${props.data.pagination.hasActiveFilters ? 
-                                    props.data.pagination.displayPages : 
-                                    props.data.pagination.totalPages}`}
-                            </option>
-                        ))}
-                    </select>
-                    
-                    {/* Items count display */}
-                    {!props.data.isContainer && (
-                        <Typography variant="caption" sx={{
-                            color: theme.palette.mode === 'light' ? theme.palette.text.default : theme.palette.text.primary,
-                            fontSize: '11px'
-                        }}>
-                            ({props.data.pagination.hasActiveFilters ? 
-                                props.data.pagination.displayItems : 
-                                props.data.pagination.totalItems} items)
-                        </Typography>
-                    )}
-                    
-                    {/* Next button */}
-                    <IconButton
-                        size="small"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            props.data.pagination.onPageChange('next');
-                        }}
-                        disabled={props.data.pagination.currentPage >= (
-                            props.data.pagination.hasActiveFilters ? 
-                            props.data.pagination.displayPages - 1 : 
-                            props.data.pagination.totalPages - 1
-                        )}
-                        sx={{
-                            padding: '2px',
-                            '&.Mui-disabled': {
-                                '& .MuiTypography-root': {
-                                    color: theme.palette.text.disabled
+                            }}
+                        >
+                            <Typography variant="caption" sx={{
+                                fontWeight: 'bold',
+                                color: theme.palette.mode === 'light' ? theme.palette.text.default : theme.palette.text.primary
+                            }}>◄</Typography>
+                        </IconButton>
+                        <select
+                            value={props.data.pagination.currentPage}
+                            onChange={(e) => {
+                                e.stopPropagation();
+                                const page = Number(e.target.value);
+                                props.data.pagination.onPageChange(page);
+                            }}
+                            style={{
+                                height: '24px',
+                                fontSize: '12px',
+                                padding: '2px 4px',
+                                border: `1px solid ${theme.palette.divider}`,
+                                borderRadius: '4px',
+                                backgroundColor: theme.palette.background.paper,
+                                color: theme.palette.text.primary,
+                                cursor: 'pointer'
+                            }}
+                        >
+                            {Array.from({
+                                length: props.data.pagination.hasActiveFilters ?
+                                    props.data.pagination.displayPages :
+                                    props.data.pagination.totalPages
+                            }, (_, i) => {
+                                const totalItems = props.data.pagination.hasActiveFilters ?
+                                    props.data.pagination.displayItems :
+                                    props.data.pagination.totalItems;
+
+                                // Use the imported constant directly
+                                const startItem = (i * ITEMS_PER_PAGE) + 1;
+                                const endItem = Math.min((i + 1) * ITEMS_PER_PAGE, totalItems);
+
+                                if (totalItems === 0) {
+                                    return <option key="0" value="0">0 of 0</option>;
                                 }
-                            }
-                        }}
-                    >
-                        <Typography variant="caption" sx={{
-                            fontWeight: 'bold',
-                            color: theme.palette.mode === 'light' ? theme.palette.text.default : theme.palette.text.primary
-                        }}>►</Typography>
-                    </IconButton>
-                </Box>
-            )}
+
+                                return (
+                                    <option key={i} value={i}>
+                                        {`${startItem}-${endItem} of ${totalItems}`}
+                                    </option>
+                                );
+                            })}
+                        </select>
+
+                        {/* Next button */}
+                        <IconButton
+                            size="small"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                props.data.pagination.onPageChange('next');
+                            }}
+                            disabled={props.data.pagination.currentPage >= (
+                                props.data.pagination.hasActiveFilters ?
+                                    props.data.pagination.displayPages - 1 :
+                                    props.data.pagination.totalPages - 1
+                            )}
+                            sx={{
+                                padding: '2px',
+                                '&.Mui-disabled': {
+                                    '& .MuiTypography-root': {
+                                        color: theme.palette.text.disabled
+                                    }
+                                }
+                            }}
+                        >
+                            <Typography variant="caption" sx={{
+                                fontWeight: 'bold',
+                                color: theme.palette.mode === 'light' ? theme.palette.text.default : theme.palette.text.primary
+                            }}>►</Typography>
+                        </IconButton>
+                    </Box>
+                )}
 
             <HeaderOptions
                 add={passToAddActiveContext}

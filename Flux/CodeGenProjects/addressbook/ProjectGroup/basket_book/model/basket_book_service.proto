@@ -60,6 +60,25 @@ message BasketChore{
       DisallowDuplicateFileUpload: true
     }
   };
+  option (FluxMsgButtonQuery) = {
+    query_data: {
+      QueryName: "update_pos_cache_by_ticker"
+      QueryType: HTTP
+      QueryParams: {
+        QueryParamName: "ticker",
+        QueryParamDataType: "str"
+      },
+    };
+    ui_button: {
+      unpressed_caption: "UPDATE POS CACHE",
+      pressed_caption: "UPDATE IN PROGRESS",
+      value_color_map: "true=DEBUG,false=INFO",
+      button_type: BUTTON_TYPE_RECTANGLE,
+      button_size: BUTTON_SIZE_MEDIUM,
+      action: "flux_toggle",
+      pressed_value_as_text: "true"
+    }
+  };
   option (FluxMsgStringLength) = 128;
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   repeated NewChore new_chores = 2 [(FluxFldAutoComplete) = "algo:ALGO_List, force_bkr:BrokerCode_List, sec_id:CB_List, ticker:CB_List, mplan:Mplan_List, sec_id_source=TICKER"];
@@ -69,17 +88,7 @@ message BasketChore{
 message CancelAllBasketChores {
   option (FluxMsgJsonQuery) = {
     QueryName: "cancel_all_basket_chores"
-  };
-  required bool resp = 1;
-}
-
-message UpdatePosCache {
-  option (FluxMsgJsonQuery) = {
-    QueryName: "update_pos_cache_by_ticker",
-    QueryParams: {
-      QueryParamName: "ticker",
-      QueryParamDataType: "str"
-    },
+    QueryRouteType: PATCH
   };
   required bool resp = 1;
 }

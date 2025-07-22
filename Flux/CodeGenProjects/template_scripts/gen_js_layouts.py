@@ -59,8 +59,10 @@ if __name__ == "__main__":
     env_var_dict["PROXY_SERVER"] = "False" \
         if (proxy_server := config_dict.get("is_proxy_server")) is None else str(proxy_server)
     env_var_dict["HOST"] = config_dict.get("server_host")
-    env_var_dict["BEANIE_PORT"] = config_dict.get("main_server_beanie_port")
-    env_var_dict["VIEW_PORT"] = config_dict.get("view_port")
+    main_server_beanie_port = config_dict.get("main_server_beanie_port")
+    env_var_dict["BEANIE_PORT"] = main_server_beanie_port
+    use_view_clients = config_dict.get("use_view_clients", False)
+    env_var_dict["VIEW_PORT"] = config_dict.get("view_port") if use_view_clients else main_server_beanie_port
     env_var_dict["CACHE_PORT"] = config_dict.get("main_server_cache_port")
     code_gen_engine_env_manager.init_env_and_update_sys_path("template_project_name", "_",
                                                              "PluginJsLayout", env_var_dict)

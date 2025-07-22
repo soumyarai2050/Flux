@@ -39,9 +39,13 @@ export function setStoredArrayHandler(state, action, config) {
       state[storedObjKey] = initialState[storedObjKey];
       state[updatedObjKey] = initialState[updatedObjKey];
     } else {
-      if (state.mode === MODES.READ) {
+      if (state.mode === MODES.READ && state.allowUpdates) {
         state[storedObjKey] = storedObj;
         state[updatedObjKey] = addxpath(fastClone(storedObj));
+      } else {
+        state[storedObjKey] = storedObj;
+        // NOTE: We intentionally do NOT update updatedObj in edit mode to preserve user changes
+        // The conflict detection in RootModel will handle cases where the object was deleted
       }
     }
   } else {

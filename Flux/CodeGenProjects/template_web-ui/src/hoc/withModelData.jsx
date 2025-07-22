@@ -99,7 +99,7 @@ export function withModelData(ModelComponent, config) {
      * NOTE: Relying on component name (ModelComponent?.name) is brittle and should be refactored
      * to a more robust mechanism (e.g., explicit prop in config) if possible.
      */
-    const dataSourceProps = ModelComponent?.name === 'AbbreviationMergeModel'
+    const dataSourceProps = ModelComponent?.displayName === 'AbbreviationMergeModel'
       ? { dataSources, modelRootName }
       : { dataSource: dataSources?.[0] ?? null, modelRootName };
 

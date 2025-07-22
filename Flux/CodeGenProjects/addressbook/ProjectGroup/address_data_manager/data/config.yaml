@@ -1,0 +1,26 @@
+# ui specific configs
+  # ui_port needs code regeneration if changed and it should ideally be symmetric with server port like
+  # if server port is 8020 then ui_port should be 3020
+ui_port: "3010"
+
+# server specific configs
+server_host: "127.0.0.1"
+main_server_beanie_port: "9030"
+view_port: "9035"
+main_server_cache_port: "9036"
+min_refresh_interval: 20
+custom_logger_lvls:
+  - TIMING: 15
+  - JUNK: 5
+
+log_mongo_uri: True
+mongo_server: "mongodb://localhost:27017/?replicaSet=rs0&authSource=admin"
+
+# below 2 configs are used to check types of override files to be initialized by fastapi launch script
+# supported values: "native" or "bare"
+msgspec_override_type: "native"
+dataclass_override_type: "native"
+beanie_override_type: "native"
+cache_override_type: "bare"
+
+log_level: "debug"  # log lvl in int or basic log lvl name

@@ -13,7 +13,7 @@ import {
     updateFormValidation
 } from '../../utils/ui/uiUtils';
 import { cleanAllCache } from '../../cache/attributeCache';
-import { useWebSocketWorker, useDownload, useModelLayout } from '../../hooks';
+import { useWebSocketWorker, useDownload, useModelLayout, useConflictDetection } from '../../hooks';
 // custom components
 import { FullScreenModalOptional } from '../../components/Modal';
 import { ModelCard, ModelCardHeader, ModelCardContent } from '../../components/cards';
@@ -22,13 +22,14 @@ import { ConfirmSavePopup, FormValidation } from '../../components/Popup';
 import CommonKeyWidget from '../../components/CommonKeyWidget';
 import { DataTable } from '../../components/tables';
 import { DataTree } from '../../components/trees';
+import ConflictPopup from '../../components/ConflictPopup';
 
 function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName }) {
     const { schema: projectSchema, schemaCollections } = useSelector((state) => state.schema);
 
     const { schema: modelSchema, fieldsMetadata, actions, selector, isAbbreviationSource = false } = modelDataSource;
     const modelRootFieldsMetadata = schemaCollections[modelRootName];
-    const { storedObj, updatedObj, objId, mode, isCreating, error, isLoading, popupStatus } = useSelector(selector);
+    const { storedObj, updatedObj, objId, mode, isCreating, error, isLoading, allowUpdates,popupStatus } = useSelector(selector);
     const { storedObj: dataSourceStoredObj } = useSelector(dataSource?.selector ?? (() => ({ storedObj: null })), (prev, curr) => {
         return JSON.stringify(prev) === JSON.stringify(curr);
     });
@@ -117,10 +118,22 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
 
     const { downloadCSV, isDownloading, progress } = useDownload(modelName, modelRootFieldsMetadata, modelName);
 
+    // Conflict detection for handling websocket updates during editing
+    const {
+        showConflictPopup,
+        conflicts,
+        effectiveStoredData, // This is now a stable, memoized value
+        takeSnapshot,
+        clearSnapshot,
+        checkAndShowConflicts,
+        closeConflictPopup,
+        getBaselineForComparison,
+    } = useConflictDetection(storedObj, updatedObj, mode, modelRootFieldsMetadata, allowUpdates,isCreating);
+
     useEffect(() => {
         const url = getServerUrl(modelSchema, dataSourceStoredObj, dataSource?.fieldsMetadata);
         setUrl(url);
-        const viewUrl = getServerUrl(modelSchema, dataSourceStoredObj, dataSource?.fieldsMetadata, null, true);
+        const viewUrl = getServerUrl(modelSchema, dataSourceStoredObj, dataSource?.fieldsMetadata, undefined, true);
         setViewUrl(viewUrl);
         let updatedParams = null;
         if (dataSourceStoredObj && Object.keys(dataSourceStoredObj).length > 0 && crudOverrideDictRef.current?.GET_ALL) {
@@ -144,21 +157,21 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
             }
             return updatedParams;
         })
-    }, [dataSourceStoredObj])
+    }, [dataSourceStoredObj]);
 
-    useEffect(() => {
-        if (viewUrl && !isAbbreviationSource) {
-            let args = { url: viewUrl };
-            if (crudOverrideDictRef.current?.GET_ALL) {
-                const { endpoint, paramDict } = crudOverrideDictRef.current.GET_ALL;
-                if (!params && Object.keys(paramDict).length > 0) {
-                    return;
-                }
-                args = { ...args, endpoint, params };
-            }
-            dispatch(actions.getAll({ ...args }));
-        }
-    }, [viewUrl, params])
+    // useEffect(() => {
+    //     if (viewUrl && !isAbbreviationSource) {
+    //         let args = { url: viewUrl };
+    //         if (crudOverrideDictRef.current?.GET_ALL) {
+    //             const { endpoint, paramDict } = crudOverrideDictRef.current.GET_ALL;
+    //             if (!params && Object.keys(paramDict).length > 0) {
+    //                 return;
+    //             }
+    //             args = { ...args, endpoint, params };
+    //         }
+    //         dispatch(actions.getAll({ ...args }));
+    //     }
+    // }, [viewUrl, params])
 
     useEffect(() => {
         workerRef.current = new Worker(new URL("../../workers/non-root-model.worker.js", import.meta.url));
@@ -234,6 +247,7 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
                 highlightUpdateOverride: modelLayoutData.highlight_update_override || [],
                 columnOrders: modelLayoutData.column_orders || [],
                 noCommonKeyOverride: modelLayoutData.no_common_key_override || [],
+                xpath: modelName
             }
 
             const updatedOptionsRef = {
@@ -294,6 +308,12 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
 
     const handleModeToggle = () => {
         const updatedMode = mode === MODES.READ ? MODES.EDIT : MODES.READ;
+
+        // Take snapshot when entering EDIT mode for conflict detection
+        if (updatedMode === MODES.EDIT) {
+            takeSnapshot();
+        }
+
         dispatch(actions.setMode(updatedMode));
         const layoutTypeKey = updatedMode === MODES.READ ? 'view_layout' : 'edit_layout';
         if (modelLayoutData[layoutTypeKey] && modelLayoutData[layoutTypeKey] !== layoutType) {
@@ -302,24 +322,25 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
     }
 
     const handleReload = () => {
-        if (viewUrl) {
-            let args = { url: viewUrl };
-            if (crudOverrideDictRef.current?.GET_ALL) {
-                const { endpoint, paramDict } = crudOverrideDictRef.current.GET_ALL;
-                if (!params && Object.keys(paramDict).length > 0) {
-                    return;
-                }
-                args = { ...args, endpoint, params };
-            }
-            dispatch(actions.getAll({ ...args }));
-        }
+        handleDiscard();
+        dispatch(actions.setIsCreating(false));
+        handleReconnect();
+    }
+
+    const cleanModelCache = () => {
         changesRef.current = {};
         formValidationRef.current = {};
+        cleanAllCache(modelName);
+    }
+
+    const handleDiscard = () => {
+        const updatedObj = addxpath(cloneDeep(storedObj));
+        dispatch(actions.setUpdatedObj(updatedObj));
         if (mode !== MODES.READ) {
             handleModeToggle();
         }
-        dispatch(actions.setIsCreating(false));
-        cleanAllCache(modelName);
+        cleanModelCache();
+        clearSnapshot(); // Clear snapshot on discard
     }
 
     const handleDownload = async () => {
@@ -361,12 +382,26 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
     }
 
     const handleSave = (modifiedObj, force = false) => {
+        if (checkAndShowConflicts()) {
+            return;
+        }
+
         if (Object.keys(formValidationRef.current).length > 0) {
             dispatch(actions.setPopupStatus({ formValidation: true }));
             return;
         }
         const modelUpdatedObj = modifiedObj || clearxpath(cloneDeep(updatedObj));
-        const activeChanges = compareJSONObjects(storedObj, modelUpdatedObj, modelRootFieldsMetadata, isCreating);
+
+        // Use getBaselineForComparison() instead of storedObj directly
+        const baselineForComparison = getBaselineForComparison();
+
+        if (!baselineForComparison || !modelUpdatedObj) {
+            console.warn('Cannot compare objects: baselineForComparison or modelUpdatedObj is null');
+            return;
+        }
+
+        const activeChanges = compareJSONObjects(baselineForComparison, modelUpdatedObj, modelRootFieldsMetadata, isCreating);
+
         if (!activeChanges || Object.keys(activeChanges).length === 0) {
             changesRef.current = {};
             dispatch(actions.setMode(MODES.READ));
@@ -393,8 +428,44 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
             dispatch(actions.setIsCreating(false));
         }
         changesRef.current = {};
-        dispatch(actions.setMode(MODES.READ));
+        // dispatch(actions.setMode(MODES.READ));
+        if (mode !== MODES.READ) {
+            handleModeToggle();
+        }
         dispatch(actions.setPopupStatus({ confirmSave: false }));
+        clearSnapshot(); // Clear snapshot after successful save
+    }
+
+    // Conflict resolution handlers - defined after all dependencies are available
+    const handleDiscardChanges = () => {
+        handleDiscard();
+        closeConflictPopup();
+    }
+
+    const handleOverwriteChanges = () => {
+        closeConflictPopup();
+
+        const modelUpdatedObj = clearxpath(cloneDeep(updatedObj));
+        const baselineForComparison = getBaselineForComparison();
+
+        if (!baselineForComparison || !modelUpdatedObj) {
+            console.warn('Cannot compare objects in handleOverwriteChanges: baselineForComparison or modelUpdatedObj is null');
+            return;
+        }
+
+        const activeChanges = compareJSONObjects(baselineForComparison, modelUpdatedObj, modelRootFieldsMetadata, isCreating);
+        if (!activeChanges || Object.keys(activeChanges).length === 0) {
+            changesRef.current = {};
+            dispatch(actions.setMode(MODES.READ));
+            return;
+        }
+        changesRef.current.active = activeChanges;
+        const changesCount = Object.keys(activeChanges).length;
+        if (changesCount === 1) {
+            executeSave();
+            return;
+        }
+        dispatch(actions.setPopupStatus({ confirmSave: true }));
     }
 
     const handleUpdate = (updatedObj) => {
@@ -413,7 +484,15 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
         const modelUpdatedObj = clearxpath(cloneDeep(updatedObj));
         set(modelUpdatedObj, xpath, value);
         if (force) {
-            const activeChanges = compareJSONObjects(storedObj, modelUpdatedObj, modelRootFieldsMetadata);
+            // Use getBaselineForComparison() instead of storedObj directly
+            const baselineForComparison = getBaselineForComparison();
+
+            if (!baselineForComparison || !modelUpdatedObj) {
+                console.warn('Cannot compare objects in handleButtonToggle: baselineForComparison or modelUpdatedObj is null');
+                return;
+            }
+
+            const activeChanges = compareJSONObjects(baselineForComparison, modelUpdatedObj, modelRootFieldsMetadata);
             changesRef.current.active = activeChanges;
             executeSave();
         } else if (storedObj[DB_ID]) {
@@ -451,7 +530,7 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
                             onUserChange={handleUserChange}
                             onButtonToggle={handleButtonToggle}
                             modelType={MODEL_TYPES.ROOT}
-                            storedData={storedObj}
+                            storedData={effectiveStoredData}
                             updatedData={updatedObj}
                             modelName={modelName}
                             fieldsMetadata={fieldsMetadata}
@@ -472,7 +551,7 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
                         projectSchema={projectSchema}
                         modelName={modelRootName}
                         updatedData={updatedObj}
-                        storedData={storedObj}
+                        storedData={effectiveStoredData}
                         subtree={null}
                         mode={mode}
                         xpath={modelName}
@@ -564,6 +643,7 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
                         isAbbreviationSource={isAbbreviationSource}
                         isCreating={isCreating}
                         onReload={handleReload}
+                        onDiscard={handleDiscard}
                         // table settings
                         stickyHeader={modelLayoutData.sticky_header ?? true}
                         onStickyHeaderToggle={handleStickyHeaderToggle}
@@ -609,6 +689,14 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
                 onClose={handleFormValidationPopupClose}
                 onContinue={handleContinue}
                 src={formValidationRef.current}
+            />
+            <ConflictPopup
+                open={showConflictPopup}
+                onClose={closeConflictPopup}
+                onDiscardChanges={handleDiscardChanges}
+                onOverwriteChanges={handleOverwriteChanges}
+                conflicts={conflicts}
+                title={`Conflict Detected - ${modelTitle}`}
             />
         </FullScreenModalOptional>
     )

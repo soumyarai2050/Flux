@@ -70,7 +70,6 @@ class MobileBookSharedMemoryProducer:
             if self.shm_root_ptr:
                 self._mobile_book_struct = self.shm_root_ptr.mobile_book_container
 
-            # self.semaphore = posix_ipc.Semaphore(self.sem_name, flags=posix_ipc.O_CREAT, initial_value=0)
             self.mutex_wrapper = PThreadShmMutex(self.shm_root_ptr.mutex)  # Mutex is now at the root
 
             # Initialize symbols within the nested MDContainer
@@ -189,6 +188,7 @@ class MobileBookSharedMemoryProducer:
             so_id: int,  # id is required
             # symbol is implicitly self.instrument_symbol
             company: Optional[str] = None,
+            exchange_code: Optional[str] = None,
             status: Optional[str] = None,
             lot_size: Optional[int] = None,
             limit_up_px: Optional[float] = None,
@@ -220,6 +220,7 @@ class MobileBookSharedMemoryProducer:
                 "id": so_id,
                 "symbol": self.instrument_symbol,  # Enforce producer's symbol
                 "company": company,
+                "exchange_code": exchange_code,
                 "status": status,
                 "lot_size": lot_size,
                 "limit_up_px": limit_up_px,
@@ -253,11 +254,13 @@ class MobileBookSharedMemoryProducer:
         # self.semaphore.release()  # Release semaphore after update
 
     def update_symbol_overview_shm_from_msgspec_obj(self, symbol_overview_obj: SymbolOverviewMsgspec):
-        last_update_date_time = get_epoch_from_pendulum_dt(symbol_overview_obj.last_update_date_time) if symbol_overview_obj.last_update_date_time else None
+        last_update_date_time = (get_epoch_from_pendulum_dt(symbol_overview_obj.last_update_date_time)
+                                 if symbol_overview_obj.last_update_date_time else None)
         self.update_symbol_overview_shm(symbol_overview_obj.id, symbol_overview_obj.company,
-                                        symbol_overview_obj.status, symbol_overview_obj.lot_size,
-                                        symbol_overview_obj.limit_up_px, symbol_overview_obj.limit_dn_px,
-                                        symbol_overview_obj.conv_px, symbol_overview_obj.closing_px, symbol_overview_obj.open_px,
+                                        symbol_overview_obj.exchange_code, symbol_overview_obj.status,
+                                        symbol_overview_obj.lot_size, symbol_overview_obj.limit_up_px,
+                                        symbol_overview_obj.limit_dn_px, symbol_overview_obj.conv_px,
+                                        symbol_overview_obj.closing_px, symbol_overview_obj.open_px,
                                         symbol_overview_obj.high, symbol_overview_obj.low, symbol_overview_obj.volume,
                                         symbol_overview_obj.tick_size, last_update_date_time,
                                         symbol_overview_obj.force_publish)
@@ -429,10 +432,8 @@ class MobileBookSharedMemoryProducer:
 
     def _populate_top_of_book(self, tob_struct: TopOfBook, data: Dict[str, Any]):
         if data.get("id") is not None:
-            tob_struct.id_ = int(data["id"])
-            tob_struct.is_id_set_ = True
-        else:
-            tob_struct.is_id_set_ = False
+            tob_struct.id = int(data["id"])
+        # else keeping None
 
         if data.get("bid_quote") is not None:
             self._populate_quote(tob_struct.bid_quote_, data["bid_quote"])
@@ -479,6 +480,10 @@ class MobileBookSharedMemoryProducer:
             self._populate_string(so_struct, "company_", data["company"]); so_struct.is_company_set_ = True
         else:
             so_struct.is_company_set_ = False
+        if data.get("exchange_code") is not None:
+            self._populate_string(so_struct, "exchange_code_", data["exchange_code"]); so_struct.is_exchange_code_set_ = True
+        else:
+            so_struct.is_exchange_code_set_ = False
         if data.get("status") is not None:
             self._populate_string(so_struct, "status_", data["status"]); so_struct.is_status_set_ = True
         else:
@@ -500,9 +505,7 @@ class MobileBookSharedMemoryProducer:
                 setattr(so_struct, f"is_{field_name}_set_", False)
         if data.get("last_update_date_time") is not None:
             dt_val = data["last_update_date_time"]
-            so_struct.last_update_date_time_ = int(dt_val.timestamp() * 1_000_000_000) if isinstance(dt_val,
-                                                                                                     pendulum.DateTime) else int(
-                dt_val)
+            so_struct.last_update_date_time_ = int(dt_val)
             so_struct.is_last_update_date_time_set_ = True
         else:
             so_struct.is_last_update_date_time_set_ = False
@@ -624,7 +627,7 @@ if __name__ == "__main__":
 
         # Symbol Overview
         spy_so_data = {
-            "so_id": 10, "company": "SPDR S&P 500 ETF Trust", "status": "Bartering",
+            "so_id": 10, "company": "SPDR S&P 500 ETF Trust", "exchange_code": "TSE", "status": "Bartering",
             "lot_size": 1, "tick_size": 0.01, "last_update_date_time": now_ns,
             "closing_px": 450.00, "open_px": 450.50, "high": 451.00, "low": 449.00, "volume": 5000000
         }

@@ -79,5 +79,5 @@ EQT,Type2_Sec_37.SS,Type2_Sec_37.SZ,Type2_Sec_37,NYSE,,1000000,,90,80,100,True,F
 EQT,Type2_Sec_38.SS,Type2_Sec_38.SZ,Type2_Sec_38,NYSE,,1000000,,90,80,100,True,False,150,50,0.001,figi,USD
 EQT,Type2_Sec_39.SS,Type2_Sec_39.SZ,Type2_Sec_39,NYSE,,1000000,,90,80,100,True,False,150,50,0.001,figi,USD
 EQT,Type2_Sec_40.SS,Type2_Sec_40.SZ,Type2_Sec_40,NYSE,,1000000,,90,80,100,True,False,150,50,0.001,figi,USD
-,,,SHOP,TSE,,,,,,,,,,,,,CAD
-,,,RY,TSE,,,,,,,,,,,,,CAD
+EQT,SHOP,,SHOP,TSE,,,,,,,,,,,,,CAD
+EQT,RY,,RY,TSE,,,,,,,,,,,,,CAD

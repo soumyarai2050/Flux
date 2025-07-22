@@ -6,7 +6,7 @@ import { DATA_TYPES } from '../constants';
  * Custom hook for managing tree expansion state and operations
  * This separates all expansion logic from the main DataTree component
  */
-const useTreeExpansion = (projectSchema, updatedData, storedData) => {
+const useTreeExpansion = (projectSchema, updatedData, storedData, newlyAddedOrDuplicatedXPath = null) => {
     // State for tracking which nodes are expanded
     const [expandedNodeXPaths, setExpandedNodeXPaths] = useState({ "root": true });
 
@@ -311,39 +311,14 @@ const useTreeExpansion = (projectSchema, updatedData, storedData) => {
     }, []);
 
     /**
-     * Auto-expand newly created objects based on data status
-     * Expands objects that exist in updatedData but not in storedData
+     * Auto-expand newly created objects based on the specific newly added/duplicated XPath
+     * Only expands the most recently created node, not all previously created nodes
      */
     const autoExpandNewlyCreatedObjects = useCallback((originalTree) => {
-        if (originalTree && originalTree.length > 0) {
+        if (originalTree && originalTree.length > 0 && newlyAddedOrDuplicatedXPath) {
             const expandNewlyCreatedObjects = (node) => {
-                let shouldExpand = false;
-
-                // Check if this node has data-add status (newly created via + button)
-                if (node['data-add'] === true && node.xpath) {
-                    shouldExpand = true;
-                }
-
-                // Additional check: if object exists in updatedData but not in storedData
-                if (!shouldExpand && node.xpath && (node.isObjectContainer || node.isArrayContainer)) {
-                    const nodeDataInUpdated = get(updatedData, node.xpath);
-                    const nodeDataInStored = get(storedData, node.xpath);
-
-                    // If object exists in updated but not in stored, it's newly created
-                    if (nodeDataInUpdated && !nodeDataInStored &&
-                        typeof nodeDataInUpdated === 'object' && nodeDataInUpdated !== null) {
-                        shouldExpand = true;
-                    }
-
-                    // Additional check for nested objects: if stored data is null/undefined but updated has object
-                    if (!shouldExpand && nodeDataInUpdated &&
-                        (nodeDataInStored === null || nodeDataInStored === undefined) &&
-                        typeof nodeDataInUpdated === 'object' && nodeDataInUpdated !== null) {
-                        shouldExpand = true;
-                    }
-                }
-
-                if (shouldExpand) {
+                // Only expand if this specific node matches the newly added/duplicated XPath
+                if (node.xpath === newlyAddedOrDuplicatedXPath) {
                     const nodeData = get(updatedData, node.xpath);
                     if (nodeData) {
                         let objectSchema = null;
@@ -387,7 +362,7 @@ const useTreeExpansion = (projectSchema, updatedData, storedData) => {
                 expandNewlyCreatedObjects(node);
             });
         }
-    }, [updatedData, storedData, projectSchema, expandNodeAndAllChildren]);
+    }, [updatedData, storedData, projectSchema, expandNodeAndAllChildren, newlyAddedOrDuplicatedXPath]);
 
     /**
      * Reset expansion state for a new tree instance

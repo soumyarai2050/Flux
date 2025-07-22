@@ -848,7 +848,6 @@ class FastapiOpenapiSchema(BaseFastapiPlugin, ABC):
                     if query_type == "http_file":   # http_file query type is POST type query
                         query_route_type = FastapiOpenapiSchema.flux_json_query_route_post_type_field_val
                     output_str += self._get_query_msg_openapi_schemas_str(message, query_route_type)
-                    break
 
         # ui button query schema and response handling
         for message, query_data_dict_list in self.message_to_button_query_data_dict.items():

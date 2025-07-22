@@ -4,6 +4,7 @@ set -e
 # Generates ui generated files for all projects and also copies them in web-ui dir of each project
 
 project_names=(
+    "address_data_manager"
     "dept_book"
     "mobile_book"
     "post_book"

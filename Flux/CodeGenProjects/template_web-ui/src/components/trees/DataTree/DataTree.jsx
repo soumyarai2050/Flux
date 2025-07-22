@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import TreeView from 'react-accessible-treeview';
 import { cloneDeep, get, set } from 'lodash';
 import { BeatLoader } from 'react-spinners';
+import { AnimatePresence } from 'framer-motion';
 import { generateObjectFromSchema } from '../../../utils/core/schemaUtils';
 import { addxpath, getDataxpath, getDataxpathById, clearxpath } from '../../../utils/core/dataAccess';
 import { clearId } from '../../../utils/core/objectUtils';
@@ -11,9 +12,10 @@ import Node from '../../Node';
 import HeaderField from '../../HeaderField';
 import NodeBaseClasses from '../../Node.module.css';
 import useTreeExpansion from '../../../hooks/useTreeExpansion'; // Import our custom hook
+import useTreeAnimations from '../../../hooks/useTreeAnimations'; // Import our animation hook
 import ProgressOverlay from '../../ProgressOverlay'; // Import the centralized progress overlay
 import PropTypes from 'prop-types';
-import TreeRenderer from './TreeRenderer';
+import TreeRenderer from '../TreeRenderer/TreeRenderer';
 
 
 /**
@@ -41,16 +43,16 @@ const DataTree = ({
     onQuickFilterUnpin,
     pinnedFilters = [],
     isDisabled = false,
-    enableQuickFilterPin = false
+    enableQuickFilterPin = false,
+    disablePagination = false
 }) => {
-
     const [treeData, setTreeData] = useState([]);
     const [originalTree, setOriginalTree] = useState([]);
     const [paginatedNodes, setPaginatedNodes] = useState({});
     const [itemVisualStates, setItemVisualStates] = useState({});
+    const [newlyAddedOrDuplicatedXPath, setNewlyAddedOrDuplicatedXPath] = useState(null); // Track the single node that should glow
     const [isWorkerProcessing, setIsWorkerProcessing] = useState(false);
     const [counter, setCounter] = useState(0);
-    const [newlyAddedOrDuplicatedXPath, setNewlyAddedOrDuplicatedXPath] = useState(null); // Added state for scroll target
     const workerRef = useRef(null);
     const levelRef = useRef(treeLevel ? treeLevel : xpath ? 3 : 2);
     const treeDataRef = useRef([]); //Track current treeData for worker handler
@@ -69,7 +71,17 @@ const DataTree = ({
         updateExpandedStateForTreeData,
         initializeExpansionForTree,
         autoExpandNewlyCreatedObjects,
-    } = useTreeExpansion(projectSchema, updatedData, storedData);
+    } = useTreeExpansion(projectSchema, updatedData, storedData, newlyAddedOrDuplicatedXPath);
+
+    // Use our custom hook for animation management
+    const {
+        animatedNodeToggle,
+        isNodeAnimating,
+        getNodeTargetState,
+        getNodeAnimationProps,
+        batchAnimatedToggle,
+        animatingNodes,
+    } = useTreeAnimations(expandedNodeXPaths, handleNodeToggle);
 
     // ref to track when full regeneration is needed
     const needsFullRegenerationRef = useRef(false);
@@ -148,11 +160,12 @@ const DataTree = ({
             selectedId, showHidden, paginatedNodes,
             ITEMS_PER_PAGE, DATA_TYPES,
             enableObjectPagination, filters,
-            quickFilter, pinnedFilters: cleanPinnedFilters
+            quickFilter, pinnedFilters: cleanPinnedFilters,
+            disablePagination
         };
     }, [
         projectSchema, modelName, updatedData, storedData, subtree, mode, xpath,
-        selectedId, showHidden, paginatedNodes, enableObjectPagination, filters, quickFilter, pinnedFilters
+        selectedId, showHidden, paginatedNodes, enableObjectPagination, filters, quickFilter, pinnedFilters, disablePagination
     ]);
 
     // Main effect to communicate with the worker when props change.
@@ -192,7 +205,7 @@ const DataTree = ({
         }
     }, [
         projectSchema, modelName, updatedData, storedData, subtree, mode, xpath,
-        selectedId, showHidden, paginatedNodes, enableObjectPagination, filters, quickFilter, pinnedFilters
+        selectedId, showHidden, paginatedNodes, enableObjectPagination, filters, quickFilter, pinnedFilters, disablePagination
     ]);
 
     // Resets the full regeneration flag after a forced remount.
@@ -282,70 +295,6 @@ const DataTree = ({
         };
     }, []);
 
-    // Effect to scroll to newly added/duplicated item and manage glow timing
-    // Scrolls to newly added or duplicated items and applies a temporary highlight effect.
-    useEffect(() => {
-        if (newlyAddedOrDuplicatedXPath) {
-            // Timer for scrolling (short delay)
-            const scrollTimer = setTimeout(() => {
-                let finalTargetXPath = newlyAddedOrDuplicatedXPath; // Default target
-
-                // Helper to find a node by its ID (XPath) in the current treeData
-                const findNodeById = (id) => treeData.find(node => node.id === id);
-
-                const parentNode = findNodeById(newlyAddedOrDuplicatedXPath);
-
-                if (parentNode && parentNode.children && parentNode.children.length > 0) {
-                    // Try to go one level down
-                    const firstChildId = parentNode.children[0];
-                    const firstChildNode = findNodeById(firstChildId);
-
-                    if (firstChildNode) {
-                        finalTargetXPath = firstChildId; // Target the first child
-
-                        // Try to go two levels down (grandchild)
-                        if (firstChildNode.children && firstChildNode.children.length > 0) {
-                            const grandChildId = firstChildNode.children[0];
-                            const grandChildNode = findNodeById(grandChildId);
-                            if (grandChildNode) {
-                                finalTargetXPath = grandChildId; // Target the grandchild
-                            }
-                        }
-                    }
-                }
-
-                const elementToScrollTo = document.querySelector(`[data-xpath="${finalTargetXPath}"]`);
-                if (elementToScrollTo) {
-                    elementToScrollTo.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                } else {
-                    // Fallback: if the deeper target isn't found, try original XPath
-                    if (finalTargetXPath !== newlyAddedOrDuplicatedXPath) {
-                        const originalElement = document.querySelector(`[data-xpath="${newlyAddedOrDuplicatedXPath}"]`);
-                        if (originalElement) {
-                            originalElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                        } else {
-                            console.warn(`Scroll Warning: Target element not found for primary XPath: ${newlyAddedOrDuplicatedXPath} nor deeper XPath: ${finalTargetXPath}.`);
-                        }
-                    } else {
-                        console.warn(`Scroll Warning: Target element not found for XPath: ${finalTargetXPath}.`);
-                    }
-                }
-                // DO NOT reset newlyAddedOrDuplicatedXPath here; it's for the glow timer
-            }, 150); // Short delay for DOM updates before scrolling
-
-            // Timer for clearing the glow (long delay)
-            const glowClearTimer = setTimeout(() => {
-                setNewlyAddedOrDuplicatedXPath(null); // Reset after 5 seconds to stop the glow
-            }, 3000); // 3-second glow duration
-
-            return () => {
-                clearTimeout(scrollTimer);
-                clearTimeout(glowClearTimer);
-            };
-        }
-    }, [newlyAddedOrDuplicatedXPath, treeData]);
-
-
     // Handle page change for a paginated node
     // Handles pagination for nodes with a large number of children.
     const handlePageChange = useCallback((nodeId, direction, totalPagesForNode) => {
@@ -421,6 +370,19 @@ const DataTree = ({
      * and attaches all necessary props and event handlers.
      */
     const nodeRenderer = ({ element, isBranch, isExpanded, getNodeProps, level, handleExpand }) => {
+        // Get the value from the element, which is derived from updatedData
+        const value = element.value;
+        
+        // Get the corresponding storedValue from the original storedData prop
+        const storedValue = get(storedData, element.dataxpath);
+
+        const nodeData = {
+            ...element,
+            value: value,
+            storedValue: storedValue, // Add the storedValue to the node's props
+            // ... (other props)
+        };
+
         return (
             <TreeRenderer
                 element={element}
@@ -430,11 +392,10 @@ const DataTree = ({
                 level={level}
                 handleExpand={handleExpand}
                 itemVisualStates={itemVisualStates}
-                newlyAddedOrDuplicatedXPath={newlyAddedOrDuplicatedXPath}
                 expandedNodeXPaths={expandedNodeXPaths}
                 levelRef={levelRef}
                 treeData={treeData}
-                handleNodeToggle={handleNodeToggle}
+                handleNodeToggle={animatedNodeToggle}
                 handleTextChange={handleTextChange}
                 handleSelectItemChange={handleSelectItemChange}
                 handleCheckboxToggle={handleCheckboxToggle}
@@ -455,9 +416,15 @@ const DataTree = ({
                 needsFullRegenerationRef={needsFullRegenerationRef}
                 expandNodeAndAllChildren={expandNodeAndAllChildren}
                 onUpdate={onUpdate}
-                setNewlyAddedOrDuplicatedXPath={setNewlyAddedOrDuplicatedXPath}
                 setItemVisualStates={setItemVisualStates}
                 setCounter={setCounter}
+                isNodeAnimating={isNodeAnimating}
+                getNodeTargetState={getNodeTargetState}
+                getNodeAnimationProps={getNodeAnimationProps}
+                animatingNodes={animatingNodes}
+                originalHandleNodeToggle={handleNodeToggle}
+                newlyAddedOrDuplicatedXPath={newlyAddedOrDuplicatedXPath}
+                setNewlyAddedOrDuplicatedXPath={setNewlyAddedOrDuplicatedXPath}
             />
         );
     };
@@ -475,6 +442,71 @@ const DataTree = ({
     useEffect(() => {
         autoExpandNewlyCreatedObjects(originalTree);
     }, [originalTree, autoExpandNewlyCreatedObjects]);
+
+    // Auto-clear glow effect with timer
+    useEffect(() => {
+        // If a node is marked for glowing...
+        if (newlyAddedOrDuplicatedXPath) {
+            // Set a timer to turn off the glow after 3 seconds
+            const glowClearTimer = setTimeout(() => {
+                setNewlyAddedOrDuplicatedXPath(null); // Resetting state removes the glow on re-render
+            }, 3000); // 3-second glow duration
+
+            // Cleanup function to clear the timer if the component unmounts or the state changes again
+            return () => {
+                clearTimeout(glowClearTimer);
+            };
+        }
+    }, [newlyAddedOrDuplicatedXPath]); // This effect runs only when the glow target changes
+
+    // Auto-scroll to newly added node - moved to DataTree to avoid Framer Motion conflicts
+    useEffect(() => {
+        if (newlyAddedOrDuplicatedXPath) {
+            // Function to find the best element to scroll to
+            const findScrollTarget = () => {
+                // First try to find the animated-tree-node
+                const animatedNode = document.querySelector(`[data-xpath="${newlyAddedOrDuplicatedXPath}"]`);
+                
+                if (animatedNode) {
+                    // Check if it's fully rendered (not mid-animation)
+                    const computedStyle = window.getComputedStyle(animatedNode);
+                    const opacity = parseFloat(computedStyle.opacity);
+                    
+                    if (opacity >= 0.9) { // Fully visible
+                        // Find the parent li.tree-branch-wrapper for better scroll target
+                        const parentLi = animatedNode.closest('.tree-branch-wrapper') || 
+                                       animatedNode.closest('.tree-leaf-list-item');
+                        return parentLi || animatedNode;
+                    }
+                }
+                return null;
+            };
+            
+            // Attempt to scroll with retries
+            const attemptScroll = (attempt = 1, maxAttempts = 5) => {
+                const targetElement = findScrollTarget();
+                
+                if (targetElement) {
+                    targetElement.scrollIntoView({ 
+                        behavior: 'smooth', 
+                        block: 'center', // Scroll to center of the viewport
+                        inline: 'nearest' 
+                    });
+                } else if (attempt < maxAttempts) {
+                    setTimeout(() => {
+                        attemptScroll(attempt + 1, maxAttempts);
+                    }, 300);
+                }
+            };
+            
+            // Start the scroll attempt after initial delay
+            const scrollTimer = setTimeout(() => {
+                attemptScroll();
+            }, 800); // Longer initial delay for Framer Motion animations
+            
+            return () => clearTimeout(scrollTimer);
+        }
+    }, [newlyAddedOrDuplicatedXPath]);
 
     if (!treeData || treeData.length === 0) return null;
 
@@ -562,18 +594,22 @@ const DataTree = ({
                         <BeatLoader color='yellow' size={20} />
                     </div>
                 )}
-                <TreeView
-                    key={treeViewKey}
-                    data={treeData}
-                    aria-label={modelName}
-                    nodeRenderer={nodeRenderer}
-                    expandedIds={updatedExpandedIds} // Control TreeView expansion
-                    multiSelect={false}
-                    onKeyDown={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault(); // Fully disables default keyboard behavior
-                    }}
-                />
+                <AnimatePresence mode="wait">
+                    <div className={`tree-view-container ${needsFullRegenerationRef.current ? 'no-animation' : ''}`}>
+                    <TreeView
+                        key={treeViewKey}
+                        data={treeData}
+                        aria-label={modelName}
+                        nodeRenderer={nodeRenderer}
+                        expandedIds={updatedExpandedIds} // Control TreeView expansion
+                        multiSelect={false}
+                        onKeyDown={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault(); // Fully disables default keyboard behavior
+                        }}
+                    />
+                    </div>
+                </AnimatePresence>
             </div>
 
             {/* Centralized Progress Overlay */}
@@ -609,7 +645,8 @@ DataTree.propTypes = {
     onQuickFilterUnpin: PropTypes.func,
     pinnedFilters: PropTypes.array,
     isDisabled: PropTypes.bool,
-    enableQuickFilterPin: PropTypes.bool
+    enableQuickFilterPin: PropTypes.bool,
+    disablePagination: PropTypes.bool
 };
 
 DataTree.defaultProps = {
@@ -619,7 +656,8 @@ DataTree.defaultProps = {
     treeLevel: null,
     filters: [],
     isDisabled: false,
-    enableQuickFilterPin: false
+    enableQuickFilterPin: false,
+    disablePagination: false
 };
 
 export default DataTree;

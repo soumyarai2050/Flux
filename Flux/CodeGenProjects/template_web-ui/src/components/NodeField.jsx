@@ -416,7 +416,8 @@ const NodeField = (props) => {
                     onChange={(newValue) => {
                         const newDate = new Date(newValue);
                         newDate.setSeconds(0, 0);
-                        props.data.onDateTimeChange(props.data.dataxpath, props.data.xpath, newDate.toISOString());
+                        const newISOString = newDate.toISOString();
+                        props.data.onDateTimeChange(props.data.dataxpath, props.data.xpath, newISOString);
                     }}
                     hideTabs={false}
                     disablePast

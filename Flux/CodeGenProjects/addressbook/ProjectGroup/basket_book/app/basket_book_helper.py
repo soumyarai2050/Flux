@@ -6,7 +6,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.generated.FastApi
     BasketBookServiceHttpClient)
 from FluxPythonUtils.scripts.general_utility_functions import YAMLConfigurationManager, parse_to_int
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
-    email_book_service_http_main_client, email_book_service_http_view_client)
+    email_book_service_http_client)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecordManager, SecurityRecord
 
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.generated.ORMModel.basket_book_service_model_imports import *
@@ -33,10 +33,8 @@ basket_book_service_http_main_client = \
 
 if config_yaml_dict.get("use_view_clients"):
     basket_book_service_http_client = basket_book_service_http_view_client
-    email_book_service_http_client =  email_book_service_http_view_client
 else:
     basket_book_service_http_client = basket_book_service_http_main_client
-    email_book_service_http_client = email_book_service_http_main_client
 
 def is_all_service_up(ignore_error: bool = False) -> bool:
     try:

@@ -345,10 +345,13 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
                         output_str += f"        return []\n"
                         output_str += "\n\n"
                     else:
-                        err_str = f"patch query can't be generated without payload query_param, query {query_name} in " \
-                                  f"message {message.proto.name} found without query params"
-                        logging.exception(err_str)
-                        raise Exception(err_str)
+                        output_str += f"    async def {query_name}_query_pre(self, {msg_name_snake_cased}_class_type: " \
+                                      f"Type[{msg_name}]):\n"
+                        output_str += f"        # To be implemented in main callback override file\n"
+                        output_str += f"        # payload_dict will contain all whole payload with key as set in " \
+                                      f"proto model\n"
+                        output_str += f"        return []\n"
+                        output_str += "\n\n"
 
         # Projection handling
         projection_query_filter_func_req_query_name_n_message: List[Tuple[str, protogen.Message,

@@ -2,6 +2,7 @@
 #set -e
 
 file_paths=(
+    "ProjectGroup/address_data_manager/scripts"
     "ProjectGroup/dept_book/scripts/"
     "ProjectGroup/mobile_book/scripts/"
     "ProjectGroup/post_book/scripts/"

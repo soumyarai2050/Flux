@@ -73,10 +73,17 @@ async def broadcast_all_from_active_ws_data_set(active_ws_data_set: List[WSData]
             db_obj_dict_list = await get_obj_list(msgspec_class_type, db_obj_id_list,
                                                   filter_agg_pipeline=filter_agg_pipeline,
                                                   has_links=has_links, is_projection_type=True)
+            if not db_obj_dict_list:
+                # if this projection filter has some filter param that filters out all available db objs, in that case
+                # db_obj_dict_list will be empty so no ws update is required
+                continue
+            # else not required: all good if fetched projection applied object list - will publish this now
+
             for obj_json in db_obj_dict_list:
                 # handling all datetime fields - converting to epoch int values before passing to ws network
                 msgspec_class_type.convert_ts_fields_from_datetime_to_epoch_int(obj_json)
-        # else not required: passing provided list of dict if ws_data is not of projection type
+        # else not required: passing provided db_obj_dict_list if ws_data is not of projection type to avoid
+        # multiple look-ups as fetched db_obj_dict_list will also be exact same unless some projection is required on it
 
         json_str = orjson.dumps(db_obj_dict_list, default=non_jsonable_types_handler).decode('utf-8')
         await broadcast_callable(json_str, db_obj_id_list, ws_data, tasks_list)
@@ -99,10 +106,17 @@ async def broadcast_from_active_ws_data_set(active_ws_data_set: List[WSData], ms
             db_obj_dict = await get_obj(msgspec_class_type, db_obj_id,
                                         filter_agg_pipeline=filter_agg_pipeline,
                                         has_links=has_links, is_projection_type=True)
+            if db_obj_dict is None:
+                # if this projection filter has some filter param that mismatches to this update, in that case
+                # db_obj_dict will be None so no ws update is required
+                continue
+            # else not required: all good if fetched projection applied object - will publish this now
+
             # handling all datetime fields - converting to epoch int values before passing to ws network
             msgspec_class_type.convert_ts_fields_from_datetime_to_epoch_int(db_obj_dict)
 
-        # else not required: passing provided db_obj_dict if ws_data is not of projection type
+        # else not required: passing provided db_obj_dict if ws_data is not of projection type to avoid
+        # multiple look-ups as fetched object will also be exact same unless some projection is required on it
 
         json_str = orjson.dumps(db_obj_dict, default=non_jsonable_types_handler).decode("utf-8")
         await broadcast_callable(json_str, db_obj_id, ws_data, tasks_list)

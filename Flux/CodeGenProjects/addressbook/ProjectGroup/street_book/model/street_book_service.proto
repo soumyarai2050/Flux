@@ -38,7 +38,8 @@ message SymbolSideSnapshot{
       }
   };
   option (FluxMsgJsonQuery) = {
-      QueryName: "get_symbol_side_snapshots_from_cache"
+    QueryName: "get_symbol_side_snapshots_from_cache",
+    QueryRouteType: PATCH
   };
   option (FluxMsgExecutorOptions) = {
     IsWebSocketModel: true,
@@ -115,7 +116,8 @@ message PlanStatus{
     IsRepeated: false,
   };
   option (FluxMsgJsonQuery) = {
-      QueryName: "get_plan_status_from_cache"
+    QueryName: "get_plan_status_from_cache",
+    QueryRouteType: PATCH
   };
   option (FluxMsgJsonQuery) = {
     QueryName: "update_residuals",
@@ -130,7 +132,8 @@ message PlanStatus{
     QueryParams: {
       QueryParamName: "residual_qty",
       QueryParamDataType: "int"
-    }
+    },
+    QueryRouteType: PATCH
   };
   option (FluxMsgStringLength) = 128;
 
@@ -219,7 +222,8 @@ message PlanLimits{
     IsRepeated: false
   };
   option (FluxMsgJsonQuery) = {
-      QueryName: "get_plan_limits_from_cache"
+    QueryName: "get_plan_limits_from_cache",
+    QueryRouteType: PATCH
   };
   option (FluxMsgStringLength) = 128;
 
@@ -266,7 +270,8 @@ message ExecutorCheckSnapshot{
     QueryParams: {
       QueryParamName: "last_n_sec",
       QueryParamDataType: "int"
-    }
+    },
+    QueryRouteType: PATCH
   };
   optional int32 last_n_sec_barter_qty = 1;
   optional int32 last_n_sec_chore_qty = 2;
@@ -283,14 +288,16 @@ message LastNSecMarketBarterVol{
     QueryParams: {
       QueryParamName: "last_n_sec",
       QueryParamDataType: "int"
-    }
+    },
+    QueryRouteType: PATCH
   };
   optional int64 last_n_sec_barter_vol = 1;
 }
 
 message HandlePlanActivate{
   option (FluxMsgJsonQuery) = {
-    QueryName: "handle_plan_activate"
+    QueryName: "handle_plan_activate",
+    QueryRouteType: PATCH
   };
   required bool resp = 1;
 }

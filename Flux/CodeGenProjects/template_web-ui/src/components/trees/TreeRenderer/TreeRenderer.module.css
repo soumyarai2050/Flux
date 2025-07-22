@@ -1,0 +1,17 @@
+.datanode-newly-added-glow + ul {
+  animation: glow-animation 1.5s ease-out;
+  border: 1px solid var(--green-theme-lighter);
+  box-shadow: 0 0 10px 4px rgba(185, 215, 169, 0.2);
+  border-radius: 6px;
+  background-color: var(--green-theme-lighter);
+  color: inherit;
+}
+
+
+@keyframes simple-glow {
+  0% { box-shadow: 0 0 5px rgba(143, 228, 142, 0.3); }
+  50% { box-shadow: 0 0 15px rgba(143, 228, 142, 0.4); }
+  100% { box-shadow: 0 0 5px rgba(143, 228, 142, 0.3); }
+}
+
+

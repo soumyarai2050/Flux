@@ -14,29 +14,17 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi
     StreetBookServiceHttpClient)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.ORMModel.street_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
-    email_book_service_http_view_client, email_book_service_http_main_client, get_symbol_side_key)
+    email_book_service_http_client, get_symbol_side_key)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import (
-    log_book_service_http_view_client, log_book_service_http_main_client)
+    log_book_service_http_client)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.app.post_book_service_helper import (
-    post_book_service_http_view_client, post_book_service_http_main_client)
+    post_book_service_http_client)
 from FluxPythonUtils.scripts.general_utility_functions import parse_to_int, get_symbol_side_pattern
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.executor_config_loader import executor_config_yaml_dict
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_helper import (
-    photo_book_service_http_view_client, photo_book_service_http_main_client)
+    photo_book_service_http_client)
 
 update_plan_status_lock: threading.Lock = threading.Lock()
-
-
-if executor_config_yaml_dict.get("use_view_clients"):
-    email_book_service_http_client = email_book_service_http_view_client
-    post_book_service_http_client = post_book_service_http_view_client
-    log_book_service_http_client = log_book_service_http_view_client
-    photo_book_service_http_client = photo_book_service_http_view_client
-else:
-    email_book_service_http_client = email_book_service_http_main_client
-    post_book_service_http_client = post_book_service_http_main_client
-    log_book_service_http_client = log_book_service_http_main_client
-    photo_book_service_http_client = photo_book_service_http_main_client
 
 
 def all_service_up_check(executor_client: StreetBookServiceHttpClient, ignore_error: bool = False):
@@ -198,7 +186,7 @@ async def get_consumable_participation_qty_underlying_http(symbol: str, side: Si
         underlying_get_executor_check_snapshot_query_http)
 
     executor_check_snapshot_list: List[ExecutorCheckSnapshot] = \
-        await underlying_get_executor_check_snapshot_query_http(symbol, side, applicable_period_seconds)
+        await underlying_get_executor_check_snapshot_query_http({"symbol": symbol, "side": side, "last_n_sec": applicable_period_seconds})
 
     if len(executor_check_snapshot_list) == 1:
         return get_consumable_participation_qty(executor_check_snapshot_list, max_participation_rate)

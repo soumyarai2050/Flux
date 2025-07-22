@@ -139,12 +139,15 @@ const TreeExpansionControls = ({
                     {isLoading ? (
                         <BeatLoader color="white" size={3} />
                     ) : (
-                        <IconComponent 
-                            fontSize="small" 
-                            sx={expansionState === 'partial' ? { 
-                                transform: 'rotate(0deg)', 
-                                opacity: 0.9 
-                            } : {}}
+                        <IconComponent
+                            fontSize="small"
+                            sx={{
+                                ...(expansionState === 'partial' && {
+                                    transform: 'rotate(0deg)',
+                                    opacity: 0.9
+                                }),
+                                color: 'var(--dark-text-primary)' // or simply 'white'
+                            }}
                         />
                     )}
                 </IconButton>

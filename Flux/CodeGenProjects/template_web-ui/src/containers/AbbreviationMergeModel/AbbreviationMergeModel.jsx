@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { cloneDeep, get, isEqual, set } from 'lodash';
+import { cloneDeep, get, isEqual, set, isObject } from 'lodash';
 import { saveAs } from 'file-saver';
 // project imports
 import { DB_ID, DEFAULT_HIGHLIGHT_DURATION, LAYOUT_TYPES, MODEL_TYPES, MODES, NEW_ITEM_ID } from '../../constants';
@@ -17,7 +17,7 @@ import {
 import { removeRedundantFieldsFromRows } from '../../utils/core/dataTransformation';
 import { dataSourcesSelectorEquality } from '../../utils/redux/selectorUtils';
 import { cleanAllCache } from '../../cache/attributeCache';
-import { useWebSocketWorker, useDataSourcesWebsocketWorker, useDownload, useModelLayout } from '../../hooks';
+import { useWebSocketWorker, useDataSourcesWebsocketWorker, useDownload, useModelLayout, useConflictDetection } from '../../hooks';
 // custom components
 import { FullScreenModalOptional } from '../../components/Modal';
 import { ModelCard, ModelCardHeader, ModelCardContent } from '../../components/cards';
@@ -27,6 +27,27 @@ import CommonKeyWidget from '../../components/CommonKeyWidget';
 import { PivotTable } from '../../components/tables';
 import { ChartView } from '../../components/charts';
 import AbbreviationMergeView from '../../components/AbbreviationMergeView';
+import ConflictPopup from '../../components/ConflictPopup';
+
+function getEffectiveStoredArrayDict(dataSourcesStoredArrayDict, effectiveStoredObjDict) {
+
+    const dict = {};
+    for (const sourceName in dataSourcesStoredArrayDict) {
+        // dict[sourceName] = dataSourcesStoredArrayDict[sourceName].map((o) => effectiveStoredObjDict[sourceName][DB_ID] === o[DB_ID] ? effectiveStoredObjDict[sourceName] : o);
+        dict[sourceName] = dataSourcesStoredArrayDict[sourceName].map((o) => {
+            if (
+                effectiveStoredObjDict &&
+                effectiveStoredObjDict[sourceName] &&
+                effectiveStoredObjDict[sourceName][DB_ID] === o[DB_ID]
+            ) {
+                return effectiveStoredObjDict[sourceName];
+            }
+            return o;
+        });
+    };
+
+    return dict;
+}
 
 function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     const { schema: projectSchema } = useSelector((state) => state.schema);
@@ -133,8 +154,12 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     const allowedLayoutTypesRef = useRef([LAYOUT_TYPES.ABBREVIATION_MERGE, LAYOUT_TYPES.PIVOT_TABLE, LAYOUT_TYPES.CHART]);
     // refs to identify change
     const optionsRef = useRef(null);
+    const baselineDictionaryRef = useRef(null);
+    const baselineUpdatedDictionaryRef = useRef(null); //  stores frozen updated objects
 
     // calculated fields
+    const effectiveStoredArrayDict = getEffectiveStoredArrayDict(dataSourcesStoredArrayDict, baselineDictionaryRef.current || {});
+
     const dataSourcesMetadataDict = useMemo(() => {
         return dataSources.reduce((acc, { name, fieldsMetadata }) => {
             acc[name] = fieldsMetadata;
@@ -150,6 +175,83 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     const modelTitle = getWidgetTitle(modelLayoutOption, modelSchema, modelName, storedObj);
 
     const { downloadCSV, isDownloading, progress } = useDownload(modelName, modelItemFieldsMetadata, null, MODEL_TYPES.ABBREVIATION_MERGE);
+
+    // Conflict detection for handling websocket updates during editing
+    const {
+        showConflictPopup,
+        conflicts,
+        closeConflictPopup,
+        getBaselineForComparison,
+        setConflicts, // needed for manual trigger
+        setShowConflictPopup, // needed for manual trigger
+    } = useConflictDetection(storedObj, updatedObj, mode, modelFieldsMetadata, isCreating);
+
+    const takeSnapshot = () => {
+        dataSources.forEach(({ actions: dsActions }) => {
+            dispatch(dsActions.setAllowUpdates(false));
+        });
+
+        const baselineDict = {};
+        for (const sourceName in dataSourcesStoredObjDict) {
+            baselineDict[sourceName] = cloneDeep(dataSourcesStoredObjDict[sourceName]);
+        }
+        baselineDictionaryRef.current = baselineDict;
+    }
+
+    const clearSnapshot = () => {
+        dataSources.forEach(({ actions: dsActions }) => {
+            dispatch(dsActions.setAllowUpdates(true));
+        })
+        baselineDictionaryRef.current = null;
+    }
+
+    const checkAndShowConflicts = (modifiedObj) => {
+        const sourceName = sourceRef.current;
+        // Check for conflicts by comparing baseline snapshot with current server state.
+        if (baselineDictionaryRef.current) {
+            const baselineSnapshot = baselineDictionaryRef.current[sourceName];
+            const currentServerState = dataSourcesStoredObjDict[sourceName];
+
+            // Detect changes between baseline and server state.
+            if (baselineSnapshot && !isEqual(baselineSnapshot, currentServerState)) {
+                // Prepare user-updated object and compare with baseline for conflicts.
+                const userUpdatedObj = modifiedObj || clearxpath(cloneDeep(dataSourcesUpdatedObjDict[sourceName]));
+                const userChanges = compareJSONObjects(baselineSnapshot, userUpdatedObj, dataSourcesMetadataDict[sourceName], isCreating);
+
+                // Identify and store conflicts if user and server data differ.
+                if (userChanges && Object.keys(userChanges).length > 0) {
+                    console.error("CONFLICT DETECTED! Server data and user data both changed.");
+                    const conflictsResult = [];
+                    // Recursively find exact conflicts in nested objects.
+                    const findExactConflicts = (changes, snapshot, server, path = '') => {
+                        for (const key in changes) {
+                            if (key === DB_ID) continue;
+                            const newPath = path ? `${path}.${key}` : key;
+                            const userValue = get(changes, key);
+                            const snapshotValue = get(snapshot, key);
+                            const serverValue = get(server, key);
+                            // Handle nested objects recursively.
+                            if (isObject(userValue) && !Array.isArray(userValue)) {
+                                if (snapshotValue && serverValue) {
+                                    findExactConflicts(userValue, snapshotValue, serverValue, newPath);
+                                }
+                            } else if (!isEqual(snapshotValue, serverValue)) {
+                                // Log conflicts for differing values.
+                                conflictsResult.push({ field: newPath, yourValue: userValue, serverValue: serverValue });
+                            }
+                        }
+                    };
+                    findExactConflicts(userChanges, baselineSnapshot, currentServerState);
+                    if (conflictsResult.length > 0) {
+                        // Show conflict popup if conflicts are found.
+                        setConflicts(conflictsResult);
+                        setShowConflictPopup(true);
+                        return;
+                    }
+                }
+            }
+        }
+    }
 
     useEffect(() => {
         let updatedParams = null;
@@ -170,8 +272,8 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                                 } else if (!updatedParams[name]) {
                                     updatedParams[name] = {};
                                 }
+                                updatedParams[name][k] = paramValue;
                             }
-                            updatedParams[name][k] = paramValue;
                         })
                     }
                 }
@@ -185,26 +287,26 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         });
     }, [storedObj])
 
-    useEffect(() => {
-        dispatch(actions.getAll());
-    }, [])
+    // useEffect(() => {
+    //     dispatch(actions.getAll());
+    // }, [])
 
-    useEffect(() => {
-        if (dataSourcesCrudOverrideDictRef.current) return;
-        dataSources.forEach(({ actions: dsActions, name, url, viewUrl }) => {
-            let args = { url: viewUrl };
-            const crudOverrideDict = dataSourcesCrudOverrideDictRef.current?.[name];
-            const params = dataSourcesParams?.[name];
-            if (crudOverrideDict?.GET_ALL) {
-                const { endpoint, paramDict } = crudOverrideDict.GET_ALL;
-                if (!params && Object.keys(paramDict).length > 0) {
-                    return;
-                }
-                args = { ...args, endpoint, params };
-            }
-            dispatch(dsActions.getAll({ ...args }));
-        })
-    }, [dataSourcesParams])
+    // useEffect(() => {
+    //     if (dataSourcesCrudOverrideDictRef.current) return;
+    //     dataSources.forEach(({ actions: dsActions, name, url, viewUrl }) => {
+    //         let args = { url: viewUrl };
+    //         const crudOverrideDict = dataSourcesCrudOverrideDictRef.current?.[name];
+    //         const params = dataSourcesParams?.[name];
+    //         if (crudOverrideDict?.GET_ALL) {
+    //             const { endpoint, paramDict } = crudOverrideDict.GET_ALL;
+    //             if (!params && Object.keys(paramDict).length > 0) {
+    //                 return;
+    //             }
+    //             args = { ...args, endpoint, params };
+    //         }
+    //         dispatch(dsActions.getAll({ ...args }));
+    //     })
+    // }, [dataSourcesParams])
 
     useEffect(() => {
         workerRef.current = new Worker(new URL('../../workers/abbreviation-merge-model.worker.js', import.meta.url));
@@ -396,41 +498,51 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
 
     const handleModeToggle = () => {
         const updatedMode = mode === MODES.READ ? MODES.EDIT : MODES.READ;
+
+        // Take snapshot when entering EDIT mode for conflict detection
+        if (updatedMode === MODES.EDIT) {
+            takeSnapshot();
+        }
+
         dispatch(actions.setMode(updatedMode));
         const layoutTypeKey = updatedMode === MODES.READ ? 'view_layout' : 'edit_layout';
         if (modelLayoutData[layoutTypeKey] && modelLayoutData[layoutTypeKey] !== layoutType) {
             handleLayoutTypeChange(modelLayoutData[layoutTypeKey], updatedMode);
         }
-    }
+    };
 
     const handleReload = () => {
-        dispatch(actions.getAll());
-        dataSources.forEach(({ name, url, viewUrl, actions: dsActions }) => {
-            let args = { url: viewUrl };
-            const crudOverrideDict = dataSourcesCrudOverrideDictRef.current?.[name];
-            const params = dataSourcesParams?.[name];
-            if (crudOverrideDict?.GET_ALL) {
-                const { endpoint, paramDict } = crudOverrideDict.GET_ALL;
-                if (!params && Object.keys(paramDict).length > 0) {
-                    return;
-                }
-                args = { ...args, endpoint, params };
-            }
-            dispatch(dsActions.getAll({ ...args }));
+        handleDiscard();
+        setSearchQuery('');
+        dispatch(actions.setIsCreating(false));
+        dataSources.forEach(({ actions: dsActions }) => {
+            dispatch(dsActions.setIsCreating(false));
         })
+        handleReconnect();
+    }
+
+    const cleanModelCache = () => {
         changesRef.current = {};
         formValidationRef.current = {};
         sourceRef.current = null;
+        cleanAllCache(modelName);
+        dataSources.forEach(({ name }) => {
+            cleanAllCache(name);
+        })
+    }
+
+    const handleDiscard = () => {
+        dispatch(actions.setUpdatedObj(storedObj));
+        dataSources.forEach(({ name, actions: dsActions }) => {
+            const dsStoredObj = dataSourcesStoredObjDict[name];
+            const dsUpdatedObj = addxpath(cloneDeep(dsStoredObj));
+            dispatch(dsActions.setUpdatedObj(dsUpdatedObj));
+        })
         if (mode !== MODES.READ) {
             handleModeToggle();
         }
-        setSearchQuery('');
-        cleanAllCache(modelName);
-        dispatch(actions.setIsCreating(false));
-        dataSources.forEach(({ name, actions: dsActions }) => {
-            cleanAllCache(name);
-            dispatch(dsActions.setIsCreating(false));
-        })
+        cleanModelCache();
+        clearSnapshot(); // Clear snapshot on discard
     }
 
     const handleSearchQueryChange = (_, value) => {
@@ -454,10 +566,6 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         } else {
             console.error(`load failed for idx: ${idx}`);
         }
-    }
-
-    const handleDiscard = () => {
-        dispatch(actions.setUpdatedObj(storedObj));
     }
 
     const handleSelectedSourceIdChangeHandler = (updatedSelectedSourceId) => {
@@ -513,9 +621,17 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
 
     const handleSave = (modifiedObj, force = false) => {
         if (!sourceRef.current) {
-            dispatch(actions.setMode(MODES.READ));
+            // If no source name, switch to read mode and clear baseline reference.
+            if (mode !== MODES.READ) {
+                handleModeToggle();
+                clearSnapshot();
+            }
             return;
         }
+        if (checkAndShowConflicts(modifiedObj)) {
+            return;
+        }
+
         if (Object.keys(formValidationRef.current).length > 0) {
             dispatch(actions.setPopupStatus({ formValidation: true }));
             return;
@@ -526,10 +642,13 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         if (isCreating) {
             delete dataSourceUpdatedObj[DB_ID];
         }
+
         const activeChanges = compareJSONObjects(dataSourceStoredObj, dataSourceUpdatedObj, fieldsMetadata, isCreating);
+
         if (!activeChanges || Object.keys(activeChanges).length === 0) {
             changesRef.current = {};
             dispatch(actions.setMode(MODES.READ));
+            baselineDictionaryRef.current = null;
             return;
         }
         changesRef.current.active = activeChanges;
@@ -545,7 +664,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
             return;
         }
         dispatch(actions.setPopupStatus({ confirmSave: true }));
-    }
+    };
 
     const executeSave = () => {
         const changeDict = cloneDeep(changesRef.current.active);
@@ -569,9 +688,43 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
             dispatch(actions.setIsCreating(false));
         }
         changesRef.current = {};
-        dispatch(actions.setMode(MODES.READ));
+        // dispatch(actions.setMode(MODES.READ));
+        if (mode !== MODES.READ) {
+            handleModeToggle();
+        }
         dispatch(actions.setPopupStatus({ confirmSave: false }));
+        clearSnapshot(); // Clear snapshot after successful save
         sourceRef.current = null;
+    }
+
+    // Conflict resolution handlers - defined after all dependencies are available
+    const handleDiscardChanges = () => {
+        handleDiscard();
+        closeConflictPopup();
+    }
+
+    const handleOverwriteChanges = () => {
+        closeConflictPopup();
+        const sourceName = sourceRef.current;
+        if (!sourceName) return;
+
+        const baselineForComparison = baselineDictionaryRef.current?.[sourceName] || dataSourcesStoredObjDict[sourceName];
+        const modelUpdatedObj = clearxpath(cloneDeep(dataSourcesUpdatedObjDict[sourceName]));
+
+        if (!baselineForComparison || !modelUpdatedObj) {
+            console.warn('Cannot compare objects in handleOverwriteChanges: baselineForComparison or modelUpdatedObj is null');
+            return;
+        }
+
+        const activeChanges = compareJSONObjects(baselineForComparison, modelUpdatedObj, dataSourcesMetadataDict[sourceName], isCreating);
+        if (!activeChanges || Object.keys(activeChanges).length === 0) {
+            changesRef.current = {};
+            dispatch(actions.setMode(MODES.READ));
+            return;
+        }
+
+        // Proceed with save by calling handleSave with force=true equivalent logic
+        handleSave(modelUpdatedObj, true);
     }
 
     const handleUpdate = (updatedObj, source) => {
@@ -584,7 +737,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
 
     const handleUserChange = (xpath, updateDict, validationRes, source) => {
         if (sourceRef.current && sourceRef.current !== source) {
-            if (changesRef.current.user && Object.keys(changesRef.current.user) > 0) {
+            if (changesRef.current.user && Object.keys(changesRef.current.user).length > 0) {
                 alert('error');
                 return;
             }
@@ -707,7 +860,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                     cells={sortedCells}
                     sortOrders={modelLayoutData.sort_orders || []}
                     onSortOrdersChange={handleSortOrdersChange}
-                    dataSourcesStoredArrayDict={dataSourcesStoredArrayDict}
+                    dataSourcesStoredArrayDict={effectiveStoredArrayDict}
                     dataSourcesUpdatedArrayDict={dataSourcesUpdatedArrayDict}
                     selectedId={dataSourcesObjIdDict[dataSources[0].name]}
                     onForceSave={() => { }}
@@ -729,6 +882,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                     onFiltersChange={handleFiltersChange}
                     uniqueValues={uniqueValues}
                     highlightDuration={modelLayoutData.highlight_duration ?? DEFAULT_HIGHLIGHT_DURATION}
+                    baselineDictionary={baselineDictionaryRef.current}
                 />
             </Wrapper>
         )
@@ -803,6 +957,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                         pinned={modelLayoutData.pinned || []}
                         onPinToggle={handlePinnedChange}
                         onReload={handleReload}
+                        onDiscard={handleDiscard}
                         // chart
                         charts={modelLayoutOption.chart_data || []}
                         onChartToggle={handleChartEnableOverrideChange}
@@ -857,8 +1012,18 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                 onContinue={handleContinue}
                 src={formValidationRef.current}
             />
+            <ConflictPopup
+                open={showConflictPopup}
+                onClose={closeConflictPopup}
+                onDiscardChanges={handleDiscardChanges}
+                onOverwriteChanges={handleOverwriteChanges}
+                conflicts={conflicts}
+                title={`Conflict Detected - ${modelTitle}`}
+            />
         </FullScreenModalOptional>
     )
 }
 
-export default AbbreviationMergeModel;
+const MemoizedAbbreviationMergeModel = React.memo(AbbreviationMergeModel);
+MemoizedAbbreviationMergeModel.displayName = 'AbbreviationMergeModel';
+export default MemoizedAbbreviationMergeModel;

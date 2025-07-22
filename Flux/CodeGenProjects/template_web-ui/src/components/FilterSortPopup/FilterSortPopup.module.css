@@ -44,7 +44,7 @@
 }
 
 .sortArrow {
-  font-size: 10px;
+  font-size: 16px;
 }
 
 .firstLevelSort {
@@ -52,7 +52,7 @@
 }
 
 .secondLevelSort {
-  color: var(--yellow-warning);
+  color: var(--green-success);
 }
 
 .multiLevelSort {
@@ -309,23 +309,5 @@
 }
 
 .popupOpen {
-  background-color: #dbee32; /* A standard MUI subtle highlight */
-  /* You could also use a more prominent color if you prefer */
-  /*gr backound-color: #e3f2fd; */ /* A light blue, for example */
-}
-
-/* Optional but recommended: Keep the highlight on hover */
-.popupOpen:hover {
-  background-color: #8dc2e9; /* A standard MUI subtle highlight */}
-
-/* Responsive adjustments */
-@media (max-width: 600px) {
-  .popoverPaper {
-    max-width: 90vw;
-    width: 90vw;
-  }
-
-  .checkboxLabel {
-    max-width: 150px;
-  }
+  background-color: #dbee32;
 }

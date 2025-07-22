@@ -1695,15 +1695,19 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                                 f"will add extra load since it requires fetching stored obj from db so "
                                                 f"must\n\t{' ' * indent_count}# be noted before updating and regenerating\n")
             fetch_json_dict_variable_name = f"stored_{message_name_snake_cased}_json_dict"
-        output_str += " " * indent_count + f"    stored_{message_name_snake_cased}_json_dict = await generic_read_by_id_http(" \
+        output_str += " " * indent_count + (f"    {self.get_avoid_db_n_ws_update_var_name(message_name_snake_cased)} = "
+                                            f"config_yaml_dict.get('{self.get_avoid_db_n_ws_update_var_name(message_name_snake_cased)}')\n")
+        output_str += " " * indent_count + f"    if {self.get_avoid_db_n_ws_update_var_name(message_name_snake_cased)}:\n"
+        output_str += " " * indent_count + f"        stored_{message_name_snake_cased}_json_dict = "+"{}\n"
+        output_str += " " * indent_count + f"    else:\n"
+        output_str += " " * indent_count + f"        stored_{message_name_snake_cased}_json_dict = await generic_read_by_id_http(" \
                                            f"{message.proto.name}, {FastapiHttpRoutesFileHandler.proto_package_var_name}, " \
                                            f"obj_id, has_links={msg_has_links})\n"
         output_str += " " * indent_count + (
             f"    {message_name_snake_cased}_update_json_dict = "
             f"await callback_class.partial_update_{message_name_snake_cased}_pre("
             f"{fetch_json_dict_variable_name}, {message_name_snake_cased}_update_json_dict)\n")
-        output_str += " " * indent_count + (f"    if not config_yaml_dict.get("
-                                            f"'{self.get_avoid_db_n_ws_update_var_name(message_name_snake_cased)}'):\n")
+        output_str += " " * indent_count + f"    if not {self.get_avoid_db_n_ws_update_var_name(message_name_snake_cased)}:\n"
         indent_count += 4
         output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
         output_str += " " * indent_count + \
@@ -2229,7 +2233,6 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                     output_str_ += " " * (indent_count*4) + f'        _id = {prefix_fields}.get("_id")\n'
                     output_str_ += " " * (indent_count*4) + f'        if _id is None:\n'
                     output_str_ += " " * (indent_count*4) + f'            {prefix_fields}["_id"] = {message_name}.next_id()\n'
-                    indent_count += 1
                 elif value == "datetime":
                     if not prefix_fields:
                         output_str_ += " " * (indent_count*4) + f'    date_time_field = {message_name_snake_cased}_json.get("{field_name}")\n'
@@ -2237,7 +2240,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                         f'    if date_time_field is not None and isinstance(date_time_field, str):\n')
                         output_str_ += (" " * (indent_count*4) +
                                         f'        {message_name_snake_cased}_json["{field_name}"] = pendulum.parse(date_time_field)\n')
-                        indent_count += 1
+
                     else:
                         output_str_ += " " * (indent_count*4) + f'    if {prefix_fields} is not None:\n'
                         output_str_ += (" " * (indent_count*4) +
@@ -2246,7 +2249,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                         f'        if date_time_field is not None and isinstance(date_time_field, str):\n')
                         output_str_ += (" " * (indent_count*4) +
                                         f'            {prefix_fields}["{field_name}"] = pendulum.parse(date_time_field)\n')
-                        indent_count += 1
+
                 else:
                     if not prefix_fields:
                         output_str_ += " " * (indent_count*4) + (f'    {message_name_snake_cased}__{field_name} '
@@ -2259,29 +2262,29 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                        f'= {prefix_fields}.get("{field_name}")\n')
                         prefix_fields += f"__{field_name}"
 
-                        indent_count += 1
+
                     output_str_ += self._get_fields_having_id_or_date_time_field_str(value, prefix_fields, indent_count)
             else:
                 if loop_count == 1:
                     output_str_ += " " * (indent_count*4) + f"    if {prefix_fields} is not None:\n"
                     output_str_ += " " * (indent_count*4) + f"        for {prefix_fields}_ in {prefix_fields}:\n"
-                    indent_count += 1
+                    indent_count += 2
                 # else not required: for loop block is already open if loop count is more than 1
                 if field_name == "id":
                     # if message_name_snake_cased:
-                    output_str_ += " " * (indent_count*4) + f'        _id = {prefix_fields}_.get("_id")\n'
-                    output_str_ += " " * (indent_count*4) + f'        if _id is None:\n'
+                    output_str_ += (" " * (indent_count*4) + f'    _id = {prefix_fields}_.get("_id")\n')
+                    output_str_ += " " * (indent_count*4) + f'    if _id is None:\n'
                     output_str_ += (" " * (indent_count*4) +
-                                   f'            {prefix_fields}_["_id"] = {message_name}.next_id()\n')
-                    indent_count += 1
+                                   f'        {prefix_fields}_["_id"] = {message_name}.next_id()\n')
+
                 elif value == "datetime":
                     output_str_ += (" " * (indent_count*4) +
-                                    f'        date_time_field = {prefix_fields}_.get("{field_name}")\n')
+                                    f'    date_time_field = {prefix_fields}_.get("{field_name}")\n')
                     output_str_ += (" " * (indent_count*4) +
-                                    f'        if date_time_field is not None and isinstance(date_time_field, str):\n')
+                                    f'    if date_time_field is not None and isinstance(date_time_field, str):\n')
                     output_str_ += (" " * (indent_count*4) +
-                                    f'            {prefix_fields}_["{field_name}"] = pendulum.parse(date_time_field)\n')
-                    indent_count += 1
+                                    f'        {prefix_fields}_["{field_name}"] = pendulum.parse(date_time_field)\n')
+
                 else:
                     output_str_ += " " * (indent_count*4) + (f'    {prefix_fields}__{field_name} '
                                   f'= {prefix_fields}_.get("{field_name}")\n')
@@ -2387,7 +2390,12 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                                 f"from db so must\n\t{' ' * indent_count}# be noted before "
                                                 f"updating and regenerating\n")
             fetch_json_dict_variable_name = f"stored_{message_name_snake_cased}_json_dict_list"
-        output_str += " " * indent_count + (f"    stored_{message_name_snake_cased}_json_dict_list = await "
+        output_str += " " * indent_count + (f"    {self.get_avoid_db_n_ws_update_var_name(message_name_snake_cased)} = "
+                                            f"config_yaml_dict.get('{self.get_avoid_db_n_ws_update_var_name(message_name_snake_cased)}')\n")
+        output_str += " " * indent_count + f"    if {self.get_avoid_db_n_ws_update_var_name(message_name_snake_cased)}:\n"
+        output_str += " " * indent_count + f"        stored_{message_name_snake_cased}_json_dict_list = []\n"
+        output_str += " " * indent_count + f"    else:\n"
+        output_str += " " * indent_count + (f"        stored_{message_name_snake_cased}_json_dict_list = await "
                                             f"generic_read_http({message.proto.name}, "
                                             f"{FastapiHttpRoutesFileHandler.proto_package_var_name}, "
                                             f"has_links={msg_has_links}, read_ids_list=obj_id_list)\n")
@@ -2395,8 +2403,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             f"    {message_name_snake_cased}_update_json_dict_list = "
             f"await callback_class.partial_update_all_{message_name_snake_cased}_pre("
             f"{fetch_json_dict_variable_name}, {message_name_snake_cased}_update_json_dict_list)\n")
-        output_str += " " * indent_count + (f"    if not config_yaml_dict.get("
-                                            f"'{self.get_avoid_db_n_ws_update_var_name(message_name_snake_cased)}'):\n")
+        output_str += " " * indent_count + (f"    if not config_yaml_dict.get('{self.get_avoid_db_n_ws_update_var_name(message_name_snake_cased)}'):\n")
         indent_count += 4
         output_str += " " * indent_count + f"    if filter_agg_pipeline is not None:\n"
         output_str += " " * indent_count + \
@@ -4003,37 +4010,58 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             if model_type in [ModelType.Dataclass, ModelType.Msgspec]:
                 if route_type in [FastapiHttpRoutesFileHandler.flux_json_query_route_patch_all_type_field_val,
                                   FastapiHttpRoutesFileHandler.flux_json_query_route_post_all_type_field_val]:
-                    output_str += f"async def underlying_{query_name}_query_http(payload: List[Dict[str, Any]]):\n"
+                    if query_params_str:
+                        output_str += f"async def underlying_{query_name}_query_http(payload: List[Dict[str, Any]]):\n"
+                    else:
+                        output_str += f"async def underlying_{query_name}_query_http():\n"
                 else:
-                    output_str += f"async def underlying_{query_name}_query_http(payload: Dict[str, Any]):\n"
+                    if query_params_str:
+                        output_str += f"async def underlying_{query_name}_query_http(payload: Dict[str, Any]):\n"
+                    else:
+                        output_str += f"async def underlying_{query_name}_query_http():\n"
             else:
                 if route_type in [FastapiHttpRoutesFileHandler.flux_json_query_route_patch_all_type_field_val,
                                   FastapiHttpRoutesFileHandler.flux_json_query_route_post_all_type_field_val]:
-                    output_str += f"async def underlying_{query_name}_query_http(payload: List[Dict[str, Any]]) -> " \
-                                  f"List[{return_type_str}]:\n"
+                    if query_params_str:
+                        output_str += f"async def underlying_{query_name}_query_http(payload: List[Dict[str, Any]]) -> " \
+                                      f"List[{return_type_str}]:\n"
+                    else:
+                        output_str += f"async def underlying_{query_name}_query_http() -> List[{return_type_str}]:\n"
                 else:
-                    output_str += f"async def underlying_{query_name}_query_http(payload: Dict[str, Any]) -> " \
-                                  f"List[{return_type_str}]:\n"
+                    if query_params_str:
+                        output_str += f"async def underlying_{query_name}_query_http(payload: Dict[str, Any]) -> " \
+                                      f"List[{return_type_str}]:\n"
+                    else:
+                        output_str += f"async def underlying_{query_name}_query_http() -> List[{return_type_str}]:\n"
             output_str += self._add_view_check_code_in_route()
             if query_params_str:
-                output_str += f"    {message_name_snake_cased}_obj = await " \
+                output_str += f"    {message_name_snake_cased}_obj_list = await " \
                               f"callback_class.{query_name}_query_pre({message.proto.name}, payload)\n"
-                output_str += f"    {message_name_snake_cased}_obj = await " \
-                              f"callback_class.{query_name}_query_post({message_name_snake_cased}_obj)\n"
+                output_str += f"    {message_name_snake_cased}_obj_list = await " \
+                              f"callback_class.{query_name}_query_post({message_name_snake_cased}_obj_list)\n"
             else:
-                err_str = f"patch query can't be generated without payload query_param, query {query_name} in " \
-                          f"message {message.proto.name} found without query params"
-                logging.exception(err_str)
-                raise Exception(err_str)
-            output_str += f"    return {message_name_snake_cased}_obj\n\n\n"
+                output_str += f"    {message_name_snake_cased}_obj_list = await " \
+                              f"callback_class.{query_name}_query_pre({message.proto.name})\n"
+                output_str += f"    {message_name_snake_cased}_obj_list = await " \
+                              f"callback_class.{query_name}_query_post({message_name_snake_cased}_obj_list)\n"
+            output_str += f"    return {message_name_snake_cased}_obj_list\n\n\n"
 
             if model_type == ModelType.Msgspec:
                 if route_type in [FastapiHttpRoutesFileHandler.flux_json_query_route_patch_all_type_field_val,
                                   FastapiHttpRoutesFileHandler.flux_json_query_route_post_all_type_field_val]:
-                    output_str += f"async def underlying_{query_name}_query_http_bytes(payload: List[Dict[str, Any]]):\n"
+                    if query_params_str:
+                        output_str += f"async def underlying_{query_name}_query_http_bytes(payload: List[Dict[str, Any]]):\n"
+                        output_str += f"    return_val = await underlying_{query_name}_query_http(payload)\n"
+                    else:
+                        output_str += f"async def underlying_{query_name}_query_http_bytes():\n"
+                        output_str += f"    return_val = await underlying_{query_name}_query_http()\n"
                 else:
-                    output_str += f"async def underlying_{query_name}_query_http_bytes(payload: Dict[str, Any]):\n"
-                output_str += f"    return_val = await underlying_{query_name}_query_http(payload)\n"
+                    if query_params_str:
+                        output_str += f"async def underlying_{query_name}_query_http_bytes(payload: Dict[str, Any]):\n"
+                        output_str += f"    return_val = await underlying_{query_name}_query_http(payload)\n"
+                    else:
+                        output_str += f"async def underlying_{query_name}_query_http_bytes():\n"
+                        output_str += f"    return_val = await underlying_{query_name}_query_http()\n"
                 output_str += f"    return_obj_bytes = msgspec.json.encode(return_val, enc_hook={message.proto.name}.enc_hook)\n"
                 output_str += (f"    return CustomFastapiResponse(content=return_obj_bytes, "
                                f"status_code={status_code})\n\n\n")
@@ -4044,19 +4072,31 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                               f'", status_code={status_code})\n'
                 if route_type in [FastapiHttpRoutesFileHandler.flux_json_query_route_patch_all_type_field_val,
                                   FastapiHttpRoutesFileHandler.flux_json_query_route_post_all_type_field_val]:
-                    output_str += f"async def {query_name}_query_http(payload: List[Dict[str, Any]]):\n"
+                    if query_params_str:
+                        output_str += f"async def {query_name}_query_http(payload: List[Dict[str, Any]]):\n"
+                    else:
+                        output_str += f"async def {query_name}_query_http():\n"
                 else:
-                    output_str += f"async def {query_name}_query_http(payload: Dict[str, Any]):\n"
+                    if query_params_str:
+                        output_str += f"async def {query_name}_query_http(payload: Dict[str, Any]):\n"
+                    else:
+                        output_str += f"async def {query_name}_query_http():\n"
             else:
                 output_str += f'@{self.api_router_app_name}.{route_type_str}("/query-{query_name}' + \
                               f'", response_model=List[{return_type_str}], status_code={status_code})\n'
                 if route_type in [FastapiHttpRoutesFileHandler.flux_json_query_route_patch_all_type_field_val,
                                   FastapiHttpRoutesFileHandler.flux_json_query_route_post_all_type_field_val]:
-                    output_str += f"async def {query_name}_query_http(payload: List[Dict[str, Any]]) -> " \
-                                  f"List[{return_type_str}]:\n"
+                    if query_params_str:
+                        output_str += f"async def {query_name}_query_http(payload: List[Dict[str, Any]]) -> " \
+                                      f"List[{return_type_str}]:\n"
+                    else:
+                        output_str += f"async def {query_name}_query_http() -> List[{return_type_str}]:\n"
                 else:
-                    output_str += f"async def {query_name}_query_http(payload: Dict[str, Any]) -> " \
-                                  f"List[{return_type_str}]:\n"
+                    if query_params_str:
+                        output_str += f"async def {query_name}_query_http(payload: Dict[str, Any]) -> " \
+                                      f"List[{return_type_str}]:\n"
+                    else:
+                        output_str += f"async def {query_name}_query_http() -> List[{return_type_str}]:\n"
             output_str += f'    """\n'
             output_str += f'    {route_type} Query of {message.proto.name} with aggregate - {query_name}\n'
             output_str += f'    """\n'
@@ -4064,9 +4104,15 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
 
             output_str += f"    try:\n"
             if model_type == ModelType.Msgspec:
-                output_str += f"        return await underlying_{query_name}_query_http_bytes(payload)\n"
+                if query_params_str:
+                    output_str += f"        return await underlying_{query_name}_query_http_bytes(payload)\n"
+                else:
+                    output_str += f"        return await underlying_{query_name}_query_http_bytes()\n"
             else:
-                output_str += f"        return await underlying_{query_name}_query_http(payload)\n"
+                if query_params_str:
+                    output_str += f"        return await underlying_{query_name}_query_http(payload)\n"
+                else:
+                    output_str += f"        return await underlying_{query_name}_query_http()\n"
             output_str += f"    except Exception as e:\n"
             output_str += (f"        logging.exception(f'{query_name}_query_http failed in "
                            "client call with exception: {e}')\n")

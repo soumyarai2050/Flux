@@ -40,3 +40,73 @@
   margin: 20px 0;
   padding: 20px;
 }
+
+/* Animation styles for smooth tree expansion/collapse */
+.animated-tree-node {
+  overflow: hidden;
+  will-change: height, opacity;
+}
+
+/* Regular tree node styles (for non-animated nodes) */
+.tree-node {
+  overflow: visible;
+  position: relative;
+}
+
+/* Accordion animation for react-accessible-treeview */
+.tree-view-container ul[role="group"] {
+  overflow: hidden;
+  transition: max-height 0.3s ease-in-out, opacity 0.2s ease-in-out;
+  max-height: 2000px; /* Large enough for expanded content */
+  opacity: 1;
+}
+
+/* Collapsed state - when parent treeitem has aria-expanded="false" */
+.tree-view-container li[aria-expanded="false"] > ul[role="group"] {
+  max-height: 0;
+  opacity: 0;
+  transition: max-height 0.3s ease-in-out, opacity 0.2s ease-in-out;
+}
+
+/* Expanded state - when parent treeitem has aria-expanded="true" */
+.tree-view-container li[aria-expanded="true"] > ul[role="group"] {
+  max-height: 2000px;
+  opacity: 1;
+  transition: max-height 0.3s ease-in-out, opacity 0.2s ease-in-out 0.1s;
+}
+
+/* Disable all animations during tree regeneration */
+.tree-view-container.no-animation ul[role="group"] {
+  transition: none !important;
+}
+
+.tree-view-container.no-animation .animated-tree-node {
+  transition: none !important;
+}
+
+.animated-children {
+  overflow: hidden;
+  will-change: height, opacity;
+}
+
+/* Enhanced smooth scrolling for the tree container */
+.tree-container {
+  scroll-behavior: smooth;
+}
+
+/* Prevent layout shift during animations */
+.tree-node-wrapper {
+  position: relative;
+  contain: layout;
+}
+
+/* Smooth transitions for node states */
+.tree-node-content {
+  transition: all 0.2s ease-in-out;
+}
+
+/* Animation optimizations */
+.tree-view-container {
+  transform: translateZ(0); /* Force hardware acceleration */
+  backface-visibility: hidden;
+}

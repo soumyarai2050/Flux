@@ -201,7 +201,7 @@ const Layout = ({ projectName, theme, onThemeToggle, baseColor, onBaseColorChang
       setLayout(newLayout);
       setVisibleComponents(newVisibleComponents);
     }
-  }, [isLoading]);
+  }, [isLoading, storedArray]);
 
   /**
    * Computes the maximum y-coordinate among the current layout items.

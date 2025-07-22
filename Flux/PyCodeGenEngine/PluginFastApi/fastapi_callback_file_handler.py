@@ -468,10 +468,8 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
                                  f"{message_name_snake_cased}_class_type: Type[{message.proto.name}], " \
                                  f"payload: Dict[str, Any]):\n"
             else:
-                err_str = f"patch query can't be generated without payload query_param, query {query_name} in " \
-                          f"message {message.proto.name} found without query params"
-                logging.exception(err_str)
-                raise Exception(err_str)
+                output_str = f"    async def {query_name}_query_pre(self, " \
+                             f"{message_name_snake_cased}_class_type: Type[{message.proto.name}]):\n"
         output_str += "        return []\n\n"
         output_str += f"    async def {query_name}_query_post(self, " \
                       f"{message_name_snake_cased}_obj_list: List[{message.proto.name}]):\n"

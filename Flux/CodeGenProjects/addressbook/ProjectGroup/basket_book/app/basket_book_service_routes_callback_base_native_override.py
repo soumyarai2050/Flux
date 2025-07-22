@@ -14,10 +14,11 @@ from fastapi import UploadFile
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.generated.FastApi.basket_book_service_routes_msgspec_callback import (
     BasketBookServiceRoutesCallback)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.app.basket_book_helper import (
-    config_yaml_path, parse_to_int, config_yaml_dict, be_host, be_port, is_all_service_up, is_all_view_service_up,
+    config_yaml_path, config_yaml_dict, be_host, be_port, is_all_service_up, is_all_view_service_up,
     CURRENT_PROJECT_DIR, CURRENT_PROJECT_DATA_DIR, get_new_chores_from_pl_df, get_figi_to_sec_rec_dict, be_view_port)
 from FluxPythonUtils.scripts.general_utility_functions import (
-    except_n_log_alert, handle_refresh_configurable_data_members, set_package_logger_level, get_all_subclasses)
+    except_n_log_alert, handle_refresh_configurable_data_members, set_package_logger_level, get_all_subclasses,
+    parse_to_float, parse_to_int)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.barter_simulator import (
     BarterSimulator, BarteringLinkBase)
@@ -280,8 +281,7 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
 
                 if service_up_flag_env_var == "1":
                     # validate essential services are up, if so, set service ready state to true
-                    if (self.service_up and self.static_data is not None and self.usd_fx is not None and
-                            self.bartering_data_manager is not None):
+                    if self.service_up:
                         if not self.service_ready:
                             self.service_ready = True
                             # print is just to manually check if this server is ready - useful when we run
@@ -315,7 +315,7 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                 else:
                     should_sleep = True
             except Exception as exp:
-                err_ = f"exception caught in _app_launch_pre_thread_func, {exp=}, sending again"
+                err_ = f"exception caught in _view_app_launch_pre_thread_func, {exp=}, sending again"
                 logging.exception(err_)
 
     def start_mongo_streamer(self):
@@ -581,11 +581,19 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             await self.handle_partial_update_top_of_book_post(updated_top_of_book_obj_json)
 
     async def barter_simulator_place_new_chore_query_pre(
-            self, barter_simulator_process_new_chore_class_type: Type[BarterSimulatorProcessNewChore],
-            px: float, qty: int, side: Side, bartering_sec_id: str, system_sec_id: str, symbol_type: str,
-            underlying_account: str, exchange: str | None = None, internal_ord_id: str | None = None):
+            self, barter_simulator_process_new_chore_class_type: Type[BarterSimulatorProcessNewChore], payload: Dict[str, Any]):
+        # Note: Post type query as it is making create calls internally
         if BarterSimulator.symbol_configs is None:
             BarterSimulator.reload_symbol_configs()
+        px = parse_to_float(payload.get("px"))
+        qty = parse_to_int(payload.get("qty"))
+        side = Side(payload.get("side"))
+        bartering_sec_id = payload.get("bartering_sec_id")
+        system_sec_id = payload.get("system_sec_id")
+        symbol_type = payload.get("symbol_type")
+        underlying_account = payload.get("underlying_account")
+        exchange = payload.get("exchange")
+        internal_ord_id = payload.get("internal_ord_id")
         await BarterSimulator.place_new_chore(px, qty, side, bartering_sec_id, system_sec_id, symbol_type,
                                              underlying_account, exchange, client_ord_id=internal_ord_id)
         return []
@@ -691,7 +699,7 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             # else not required - same basket_id as in cache
 
             updated_basket_chore_obj: BasketChoreBaseModel = (
-                BasketChoreBaseModel(id=self.plan_cache.basket_id, new_chores=new_chores))
+                BasketChoreBaseModel.from_kwargs(_id=self.plan_cache.basket_id, new_chores=new_chores))
             await BasketBookServiceRoutesCallbackBaseNativeOverride.underlying_partial_update_basket_chore_http(
                 updated_basket_chore_obj.to_json_dict(exclude_none=True))
         else:
@@ -767,7 +775,10 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         pass
 
     async def update_pos_cache_by_ticker_query_pre(self, update_pos_cache_class_type: Type[UpdatePosCache],
-                                                   ticker: str):
+                                                   payload: Dict[str, Any]):
+        # Note: patch type query as it uses plan cache which is only updated by main server - patch type avoids it
+        # to be functional in view server
+        ticker = payload.get("ticker")
         symbol_cache: SymbolCache
         symbol_cache = SymbolCacheContainer.get_symbol_cache(ticker)
         if symbol_cache is None:

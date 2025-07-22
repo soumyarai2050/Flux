@@ -48,13 +48,15 @@ message CheckContactLimits{
 message ReloadCache{
   option (FluxMsgJsonQuery) = {
     QueryName: "reload_cache"
+    QueryRouteType: PATCH
   };
   required bool reload_result = 1;
 }
 
 message IsContactLimitsBreached{
     option (FluxMsgJsonQuery) = {
-    QueryName: "is_contact_limits_breached"
+    QueryName: "is_contact_limits_breached",
+    QueryRouteType: PATCH
   };
   required bool is_contact_limits_breached = 1;
 }

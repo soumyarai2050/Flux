@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { debounce } from 'lodash';
 import PropTypes from 'prop-types';
-import { Box, Dialog, DialogTitle, DialogContent } from '@mui/material';
+import { Box, Dialog, DialogTitle, DialogContent, TextField } from '@mui/material';
 import styles from './FilterDialog.module.css';
 import FilterSortPopup from '../../FilterSortPopup/FilterSortPopup';
 import LinkText from '../../LinkText';
@@ -44,6 +45,8 @@ const FilterDialog = ({
   onSortOrdersChange,
   groupedRows
 }) => {
+  const [filteredColumns, setFilteredColumns] = useState(fieldsMetadata);
+  const [searchValue, setSearchValue] = useState('');
   // Lazy initializer for filterDict to avoid recomputation on every render.
   const [filterDict, setFilterDict] = useState(getFilterDict(filters));
   const [sortOrderDict, setSortOrderDict] = useState(getSortOrderDict(sortOrders));
@@ -59,6 +62,33 @@ const FilterDialog = ({
     const updatedSortOrderDict = getSortOrderDict(sortOrders);
     setSortOrderDict(updatedSortOrderDict);
   }, [sortOrders]);
+
+  const debouncedTransform = useRef(
+    debounce((value) => {
+      if (value) {
+        const lowerCasedValue = value.toLowerCase();
+        const updatedColumns = fieldsMetadata.filter((column) => column[fieldKey]?.toLowerCase().includes(lowerCasedValue));
+        setFilteredColumns(updatedColumns);
+      } else {
+        setFilteredColumns(fieldsMetadata);
+      }
+    }, 300)
+  ).current;
+
+  const handleSearchValueChange = (e) => {
+    const { value } = e.target;
+    setSearchValue(value);
+    debouncedTransform(value);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key.length === 1 || ['ArrowDown', 'ArrowUp', 'Enter', 'Escape'].includes(e.key)) {
+      // Let Escape still close the popover/menu potentially? Maybe not stop propagation for Escape.
+      if (e.key !== 'Escape') {
+        e.stopPropagation();
+      }
+    }
+  };
 
   const handlePopupClose = (e, reason) => {
     // if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;
@@ -91,11 +121,13 @@ const FilterDialog = ({
           sort_direction: sortDirection,
           is_absolute_sort: isAbsoluteSort
         }
-      } : { [filterName]: {
-        ...prev[filterName],
-        sort_direction: sortDirection,
-        is_absolute_sort: isAbsoluteSort
-      } };
+      } : {
+        [filterName]: {
+          ...prev[filterName],
+          sort_direction: sortDirection,
+          is_absolute_sort: isAbsoluteSort
+        }
+      };
       if (!sortDirection) {
         delete updatedSortOrderDict[filterName];
       }
@@ -162,8 +194,23 @@ const FilterDialog = ({
           Filter & Sort
         </span>
       </DialogTitle>
-      <DialogContent style={{ minWidth: '350px' }}>
-        {fieldsMetadata
+      <DialogContent style={{ minWidth: '350px', padding: 10 }}>
+        {fieldsMetadata.length > 5 && (
+          <TextField
+            sx={{ width: '100%', margin: '0 10px' }}
+            size="small"
+            label="Field Name"
+            placeholder='Search a field'
+            value={searchValue}
+            onChange={handleSearchValueChange}
+            onKeyDown={handleKeyDown}
+            // InputProps={{
+            //   style: {},
+            // }}
+            autoFocus
+          />
+        )}
+        {filteredColumns
           .filter((meta) => meta.type !== 'object' && meta.type !== 'array')
           .map((meta) => {
             // Determine display name and a unique field key for the filter.

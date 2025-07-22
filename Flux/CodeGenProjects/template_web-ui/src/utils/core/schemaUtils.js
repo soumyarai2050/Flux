@@ -473,12 +473,10 @@ export function generateObjectFromSchema(schema, currentSchema, additionalProps,
         // do not create fields if populated from server or creation is not allowed on the fields.
         if (metadata.server_populate || metadata.ui_update_only) return;
 
-        if (objToDup) {
-            // if reached here, server_populate and ui_update_only fields are already ignored
-            if ([DATA_TYPES.STRING, DATA_TYPES.NUMBER, DATA_TYPES.BOOLEAN, DATA_TYPES.DATE_TIME, DATA_TYPES.ENUM].includes(metadata.type)) {
-                object[propname] = get(objToDup, xpath);
-                return;
-            }
+        // For primitive types, always copy from objToDup if duplicating
+        if (objToDup && [DATA_TYPES.STRING, DATA_TYPES.NUMBER, DATA_TYPES.BOOLEAN, DATA_TYPES.DATE_TIME, DATA_TYPES.ENUM].includes(metadata.type)) {
+            object[propname] = get(objToDup, xpath);
+            return;
         }
 
         if (metadata.type === DATA_TYPES.STRING) {
@@ -539,7 +537,12 @@ export function generateObjectFromSchema(schema, currentSchema, additionalProps,
         } else if (metadata.type === DATA_TYPES.ARRAY) {
             // for arrays of primitive data types
             if (!metadata.hasOwnProperty('items') || (metadata.hasOwnProperty('items') && primitiveDataTypes.includes(metadata.underlying_type))) {
-                object[propname] = [];
+                //this makes sure when duplicating , array of objects are empty
+                if (objToDup) {
+                    object[propname] = get(objToDup, xpath) || [];
+                } else {
+                    object[propname] = [];
+                }
             } else {
                 let ref = metadata.items.$ref.split('/');
                 let childSchema = ref.length === 2 ? schema[ref[1]] : schema[ref[1]][ref[2]];
@@ -550,9 +553,13 @@ export function generateObjectFromSchema(schema, currentSchema, additionalProps,
                 }
 
                 if (!childSchema.server_populate && !metadata.server_populate) {
-                    let child = generateObjectFromSchema(schema, childSchema, null, xpath, objToDup);
-                    object[propname] = [];
-                    object[propname].push(child);
+                    if (objToDup) {
+                        object[propname] = [];
+                    } else {
+                        let child = generateObjectFromSchema(schema, childSchema, null, xpath, null);
+                        object[propname] = [];
+                        object[propname].push(child);
+                    }
                 }
             }
         } else if (metadata.type === DATA_TYPES.OBJECT) {

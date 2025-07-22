@@ -8,13 +8,18 @@ import pendulum
 
 os.environ['ModelType'] = "msgspec"
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.generated.ORMModel.dept_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.address_data_manager.generated.ORMModel.address_data_manager_service_msgspec_model import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.generated.FastApi.dept_book_service_http_client import (
     DeptBookServiceHttpClient)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.address_data_manager.generated.FastApi.address_data_manager_service_http_client import (
+    AddressDataManagerServiceHttpClient)
 from AddressBook.ProjectGroup.dept_book.conftest import *
 from AddressBook.ProjectGroup.conftest import *
 
 dept_book_service_web_client: DeptBookServiceHttpClient = \
     DeptBookServiceHttpClient.set_or_get_if_instance_exists("127.0.0.1", 8010)
+address_data_manager_service_web_client: AddressDataManagerServiceHttpClient = (
+    AddressDataManagerServiceHttpClient.set_or_get_if_instance_exists("127.0.0.1", 9030))
 
 
 def test_sanity_underlying_time_series(dash_, dash_filter_, bar_data_):
@@ -924,10 +929,10 @@ def clean_result(result_list: List[Dict]) -> List[Dict]:
 @pytest.fixture
 def sample_bar_data_2_set_up():
     """ Pytest fixture to set up with sample data. """
-    dept_book_service_web_client.delete_all_bar_data_client() # Clean up before test
+    address_data_manager_service_web_client.delete_all_bar_data_client() # Clean up before test
 
     bar_data_list = BarDataBaseModel.from_dict_list(SAMPLE_BAR_DATA2)
-    dept_book_service_web_client.create_all_bar_data_client(bar_data_list)
+    address_data_manager_service_web_client.create_all_bar_data_client(bar_data_list)
     yield
 
 
@@ -1462,7 +1467,7 @@ def test_dynamic_target_bar_type_digit_number(sample_bar_data_2_set_up):
     start_time = pendulum.datetime(2023, 10, 26, 9, 0, 0, tz="UTC")
     end_time = pendulum.datetime(2023, 10, 26, 9, 6, 0, tz="UTC")
 
-    result = dept_book_service_web_client.get_aggregated_bar_data_query_client(
+    result = address_data_manager_service_web_client.get_aggregated_bar_data_query_client(
         target_bar_type=dynamic_target_bar_type,
         start_time=start_time,
         end_time=end_time,
@@ -1507,7 +1512,7 @@ def test_dynamic_target_bar_type_implied_one(sample_bar_data_2_set_up):
     start_time = pendulum.datetime(2023, 10, 26, 9, 0, 0, tz="UTC")
     end_time = pendulum.datetime(2023, 10, 26, 10, 30, 0, tz="UTC")
 
-    result = dept_book_service_web_client.get_aggregated_bar_data_query_client(
+    result = address_data_manager_service_web_client.get_aggregated_bar_data_query_client(
         target_bar_type=dynamic_target_bar_type,
         start_time=start_time,
         end_time=end_time
@@ -1547,7 +1552,7 @@ def test_dynamic_target_bar_type_case_variations(sample_bar_data_2_set_up):
     # which requires "hour" to be a key in UNIT_SUFFIX_TO_STANDARD_MAP and "One" in NUMBER_WORD_MAP.
     # And also the parser correctly isolates "One" and "hour".
 
-    result = dept_book_service_web_client.get_aggregated_bar_data_query_client(
+    result = address_data_manager_service_web_client.get_aggregated_bar_data_query_client(
         target_bar_type=dynamic_target_bar_type,
         start_time=start_time,
         end_time=end_time,

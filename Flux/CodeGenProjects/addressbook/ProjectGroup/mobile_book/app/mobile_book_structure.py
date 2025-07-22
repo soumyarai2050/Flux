@@ -387,6 +387,8 @@ class SymbolOverview(Structure): # Renamed to avoid potential import conflicts
         # is_symbol_set_
         ('company_', c_char * MAX_STRING_LENGTH),
         ('is_company_set_', c_bool),
+        ('exchange_code_', c_char * MAX_STRING_LENGTH),
+        ('is_exchange_code_set_', c_bool),
         ('status_', c_char * MAX_STRING_LENGTH),
         ('is_status_set_', c_bool),
         ('lot_size_', c_int64),
@@ -417,6 +419,7 @@ class SymbolOverview(Structure): # Renamed to avoid potential import conflicts
 
     def __str__(self):
         return (f"SymbolOverview(id={self.id_}, symbol={self.symbol}, company={self.company}, "
+                f"exchange_code={self.exchange_code}, "
                 f"status={self.status}, lot_size={self.lot_size}, limit_up_px={self.limit_up_px}, "
                 f"limit_dn_px={self.limit_dn_px}, conv_px={self.conv_px}, closing_px={self.closing_px}, "
                 f"open_px={self.open_px}, high={self.high}, low={self.low}, volume={self.volume}, "
@@ -439,6 +442,15 @@ class SymbolOverview(Structure): # Renamed to avoid potential import conflicts
             self._symbol_decoded = self.symbol_.decode().strip('\x00')
             self._symbol_decoded_val = self.symbol_ # Store original bytes to check for change
         return self._symbol_decoded
+
+    @property
+    def exchange_code(self):
+        if self.is_exchange_code_set_:
+            if not hasattr(self, "_exchange_code_decoded") or self._exchange_code_decoded_val != self.exchange_code_:
+                self._exchange_code_decoded = self.exchange_code_.decode().strip('\x00')
+                self._exchange_code_decoded_val = self.exchange_code_
+            return self._exchange_code_decoded
+        return None
 
     @property
     def company(self):

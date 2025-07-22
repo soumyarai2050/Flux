@@ -37,7 +37,7 @@ def get_symbol_interest_from_symbol(symbol: str):
     return {"aggregate": [
         {
             "$match": {
-                "symbol": symbol
+                "symbol_name": symbol
             }
         }
     ]}

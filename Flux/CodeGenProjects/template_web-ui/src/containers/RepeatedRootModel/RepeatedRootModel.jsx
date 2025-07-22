@@ -4,17 +4,17 @@ import { cloneDeep, get, isEqual, set } from 'lodash';
 import { saveAs } from 'file-saver';
 // project imports
 import { DB_ID, DEFAULT_HIGHLIGHT_DURATION, LAYOUT_TYPES, MODEL_TYPES, MODES } from '../../constants';
-import { clearxpath, addxpath } from '../../utils/core/dataAccess.js';
-import { generateObjectFromSchema } from '../../utils/core/schemaUtils.js';
-import { compareJSONObjects } from '../../utils/core/objectUtils.js';
-import { getServerUrl, isWebSocketActive } from '../../utils/network/networkUtils.js';
+import { clearxpath, addxpath } from '../../utils/core/dataAccess';
+import { generateObjectFromSchema } from '../../utils/core/schemaUtils';
+import { compareJSONObjects } from '../../utils/core/objectUtils';
+import { getServerUrl, isWebSocketActive } from '../../utils/network/networkUtils';
 import {
     getWidgetTitle, getCrudOverrideDict, getCSVFileName,
     updateFormValidation
-} from '../../utils/ui/uiUtils.js';
-import { removeRedundantFieldsFromRows } from '../../utils/core/dataTransformation.js';
+} from '../../utils/ui/uiUtils';
+import { removeRedundantFieldsFromRows } from '../../utils/core/dataTransformation';
 import { cleanAllCache } from '../../cache/attributeCache';
-import { useWebSocketWorker, useDownload, useModelLayout } from '../../hooks';
+import { useWebSocketWorker, useDownload, useModelLayout, useConflictDetection } from '../../hooks';
 // custom components
 import { FullScreenModalOptional } from '../../components/Modal';
 import { ModelCard, ModelCardHeader, ModelCardContent } from '../../components/cards';
@@ -23,6 +23,7 @@ import { ConfirmSavePopup, FormValidation } from '../../components/Popup';
 import CommonKeyWidget from '../../components/CommonKeyWidget';
 import { DataTable, PivotTable } from '../../components/tables';
 import { ChartView } from '../../components/charts';
+import ConflictPopup from '../../components/ConflictPopup';
 
 function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
     const { schema: projectSchema } = useSelector((state) => state.schema);
@@ -119,10 +120,24 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
 
     const { downloadCSV, isDownloading, progress } = useDownload(modelName, fieldsMetadata, null);
 
+    // Conflict detection for handling websocket updates during editing
+    const {
+        showConflictPopup,
+        conflicts,
+        effectiveStoredData, // This is now a stable, memoized value
+        takeSnapshot,
+        clearSnapshot,
+        checkAndShowConflicts,
+        closeConflictPopup,
+        getBaselineForComparison,
+    } = useConflictDetection(storedObj, updatedObj, mode, fieldsMetadata, false);
+
+    const effectiveStoredArray = storedArray.map((obj) => effectiveStoredData && effectiveStoredData[DB_ID] === obj[DB_ID] ? effectiveStoredData : obj)
+
     useEffect(() => {
         const url = getServerUrl(modelSchema, dataSourceStoredObj, dataSource?.fieldsMetadata);
         setUrl(url);
-        const viewUrl = getServerUrl(modelSchema, dataSourceStoredObj, dataSource?.fieldsMetadata, null, true);
+        const viewUrl = getServerUrl(modelSchema, dataSourceStoredObj, dataSource?.fieldsMetadata, undefined, true);
         setViewUrl(viewUrl);
         let updatedParams = null;
         if (dataSourceStoredObj && Object.keys(dataSourceStoredObj).length > 0 && crudOverrideDictRef.current?.GET_ALL) {
@@ -146,21 +161,21 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
             }
             return updatedParams;
         })
-    }, [dataSourceStoredObj])
+    }, [dataSourceStoredObj]);
 
-    useEffect(() => {
-        if (viewUrl) {
-            let args = { url: viewUrl };
-            if (crudOverrideDictRef.current?.GET_ALL) {
-                const { endpoint, paramDict } = crudOverrideDictRef.current.GET_ALL;
-                if (!params && Object.keys(paramDict).length > 0) {
-                    return;
-                }
-                args = { ...args, endpoint, params, uiLimit };
-            }
-            dispatch(actions.getAll({ ...args }));
-        }
-    }, [viewUrl, params])
+    // useEffect(() => {
+    //     if (viewUrl) {
+    //         let args = { url: viewUrl };
+    //         if (crudOverrideDictRef.current?.GET_ALL) {
+    //             const { endpoint, paramDict } = crudOverrideDictRef.current.GET_ALL;
+    //             if (!params && Object.keys(paramDict).length > 0) {
+    //                 return;
+    //             }
+    //             args = { ...args, endpoint, params, uiLimit };
+    //         }
+    //         dispatch(actions.getAll({ ...args }));
+    //     }
+    // }, [viewUrl, params])
 
     useEffect(() => {
         workerRef.current = new Worker(new URL("../../workers/repeated-root-model.worker.js", import.meta.url));
@@ -302,31 +317,39 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
 
     const handleModeToggle = () => {
         const updatedMode = mode === MODES.READ ? MODES.EDIT : MODES.READ;
+
+        // Take snapshot when entering EDIT mode for conflict detection
+        if (updatedMode === MODES.EDIT) {
+            takeSnapshot();
+        }
+
         dispatch(actions.setMode(updatedMode));
         const layoutTypeKey = updatedMode === MODES.READ ? 'view_layout' : 'edit_layout';
         if (modelLayoutData[layoutTypeKey] && modelLayoutData[layoutTypeKey] !== layoutType) {
             handleLayoutTypeChange(modelLayoutData[layoutTypeKey], updatedMode);
         }
-    }
+    };
 
     const handleReload = () => {
-        if (viewUrl) {
-            let args = { url: viewUrl };
-            if (crudOverrideDictRef.current?.GET_ALL) {
-                const { endpoint, paramDict } = crudOverrideDictRef.current.GET_ALL;
-                if (!params && Object.keys(paramDict).length > 0) {
-                    return;
-                }
-                args = { ...args, endpoint, params, uiLimit };
-            }
-            dispatch(actions.getAll({ ...args }));
-        }
+        handleDiscard();
+        dispatch(actions.setIsCreating(false));
+        handleReconnect();
+    }
+
+    const cleanModelCache = () => {
         changesRef.current = {};
         formValidationRef.current = {};
+        cleanAllCache(modelName);
+    }
+
+    const handleDiscard = () => {
+        const updatedObj = addxpath(cloneDeep(storedObj));
+        dispatch(actions.setUpdatedObj(updatedObj));
         if (mode !== MODES.READ) {
             handleModeToggle();
         }
-        cleanAllCache(modelName);
+        cleanModelCache();
+        clearSnapshot(); // Clear snapshot on discard
     }
 
     const handleDownload = async () => {
@@ -375,12 +398,26 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
     }
 
     const handleSave = (modifiedObj, force = false) => {
+        if (checkAndShowConflicts()) {
+            return;
+        }
+
         if (Object.keys(formValidationRef.current).length > 0) {
             dispatch(actions.setPopupStatus({ formValidation: true }));
             return;
         }
         const modelUpdatedObj = modifiedObj || clearxpath(cloneDeep(updatedObj));
-        const activeChanges = compareJSONObjects(storedObj, modelUpdatedObj, fieldsMetadata);
+
+        // Use getBaselineForComparison() instead of storedObj directly
+        const baselineForComparison = getBaselineForComparison();
+
+        if (!baselineForComparison || !modelUpdatedObj) {
+            console.warn('Cannot compare objects: baselineForComparison or modelUpdatedObj is null');
+            return;
+        }
+
+        const activeChanges = compareJSONObjects(baselineForComparison, modelUpdatedObj, fieldsMetadata, false);
+
         if (!activeChanges || Object.keys(activeChanges).length === 0) {
             changesRef.current = {};
             dispatch(actions.setMode(MODES.READ));
@@ -395,7 +432,7 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
             }
         }
         dispatch(actions.setPopupStatus({ confirmSave: true }));
-    }
+    };
 
     const executeSave = () => {
         const changeDict = cloneDeep(changesRef.current.active);
@@ -406,8 +443,44 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
             dispatch(actions.setMode(MODES.READ));
         }
         changesRef.current = {};
-        dispatch(actions.setMode(MODES.READ));
+        // dispatch(actions.setMode(MODES.READ));
+        if (mode !== MODES.READ) {
+            handleModeToggle();
+        }
         dispatch(actions.setPopupStatus({ confirmSave: false }));
+        clearSnapshot(); // Clear snapshot after successful save
+    }
+
+    // Conflict resolution handlers - defined after all dependencies are available
+    const handleDiscardChanges = () => {
+        handleDiscard();
+        closeConflictPopup();
+    }
+
+    const handleOverwriteChanges = () => {
+        closeConflictPopup();
+
+        const modelUpdatedObj = clearxpath(cloneDeep(updatedObj));
+        const baselineForComparison = getBaselineForComparison();
+
+        if (!baselineForComparison || !modelUpdatedObj) {
+            console.warn('Cannot compare objects in handleOverwriteChanges: baselineForComparison or modelUpdatedObj is null');
+            return;
+        }
+
+        const activeChanges = compareJSONObjects(baselineForComparison, modelUpdatedObj, fieldsMetadata, false);
+        if (!activeChanges || Object.keys(activeChanges).length === 0) {
+            changesRef.current = {};
+            dispatch(actions.setMode(MODES.READ));
+            return;
+        }
+        changesRef.current.active = activeChanges;
+        const changesCount = Object.keys(activeChanges).length;
+        if (changesCount === 1) {
+            executeSave();
+            return;
+        }
+        dispatch(actions.setPopupStatus({ confirmSave: true }));
     }
 
     const handleUpdate = (updatedObj) => {
@@ -426,7 +499,15 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
         const modelUpdatedObj = clearxpath(cloneDeep(updatedObj));
         set(modelUpdatedObj, xpath, value);
         if (force) {
-            const activeChanges = compareJSONObjects(storedObj, modelUpdatedObj, fieldsMetadata);
+            // Use getBaselineForComparison() instead of storedObj directly
+            const baselineForComparison = getBaselineForComparison();
+
+            if (!baselineForComparison || !modelUpdatedObj) {
+                console.warn('Cannot compare objects in handleButtonToggle: baselineForComparison or modelUpdatedObj is null');
+                return;
+            }
+
+            const activeChanges = compareJSONObjects(baselineForComparison, modelUpdatedObj, fieldsMetadata);
             changesRef.current.active = activeChanges;
             executeSave();
         } else if (storedObj[DB_ID]) {
@@ -520,7 +601,7 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                     onUserChange={handleUserChange}
                     onButtonToggle={handleButtonToggle}
                     modelType={MODEL_TYPES.REPEATED_ROOT}
-                    storedData={storedArray}
+                    storedData={effectiveStoredArray}
                     updatedData={rows}
                     modelName={modelName}
                     fieldsMetadata={fieldsMetadata}
@@ -609,6 +690,7 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                         pinned={modelLayoutData.pinned || []}
                         onPinToggle={handlePinnedChange}
                         onReload={handleReload}
+                        onDiscard={handleDiscard}
                         // chart
                         charts={modelLayoutOption.chart_data || []}
                         onChartToggle={handleChartEnableOverrideChange}
@@ -662,6 +744,14 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                 onClose={handleFormValidationPopupClose}
                 onContinue={handleContinue}
                 src={formValidationRef.current}
+            />
+            <ConflictPopup
+                open={showConflictPopup}
+                onClose={closeConflictPopup}
+                onDiscardChanges={handleDiscardChanges}
+                onOverwriteChanges={handleOverwriteChanges}
+                conflicts={conflicts}
+                title={`Conflict Detected - ${modelTitle}`}
             />
         </FullScreenModalOptional>
     )

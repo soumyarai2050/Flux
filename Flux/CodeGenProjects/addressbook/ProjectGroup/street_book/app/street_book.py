@@ -70,14 +70,12 @@ def depths_str(depths: List[MarketDepth], notional_fx_rate: float | None = None)
 class StreetBook(BaseBook):
     # Query Callables
     underlying_handle_plan_activate_query_http: Callable[..., Any] | None = None
-    underlying_update_residuals_query_http: Callable[..., Any] | None = None
 
     @classmethod
     def initialize_underlying_http_routes(cls):
         from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_routes_imports import (
-            underlying_handle_plan_activate_query_http, underlying_update_residuals_query_http)
+            underlying_handle_plan_activate_query_http)
         cls.underlying_handle_plan_activate_query_http = underlying_handle_plan_activate_query_http
-        cls.underlying_update_residuals_query_http = underlying_update_residuals_query_http
 
     def update_plan_leg_block(self, plan_leg: PlanLeg, sec_rec: SecurityRecord,
                                block_bartering_symbol_side_events: Dict[str, Tuple[Side, str]]) -> bool:
@@ -548,7 +546,7 @@ class StreetBook(BaseBook):
             bartering_brief = plan_brief.pair_sell_side_bartering_brief
             # Sell - not allowed less than limit dn px
             # limit down - TODO : Important : Upgrade this to support bartering at Limit Dn within the limit Dn limit
-            if new_ord.px <= symbol_overview.limit_dn_px:
+            if new_ord.px < symbol_overview.limit_dn_px:
                 # @@@ below error log is used in specific test case for string matching - if changed here
                 # needs to be changed in test also
                 logging.error(f"blocked generated SELL chore, px expected higher than limit-dn px: "
@@ -560,7 +558,7 @@ class StreetBook(BaseBook):
             bartering_brief = plan_brief.pair_buy_side_bartering_brief
             # Buy - not allowed more than limit up px
             # limit up - TODO : Important : Upgrade this to support bartering at Limit Up within the limit Up limit
-            if new_ord.px >= symbol_overview.limit_up_px:
+            if new_ord.px > symbol_overview.limit_up_px:
                 # @@@ below error log is used in specific test case for string matching - if changed here
                 # needs to be changed in test also
                 logging.error(f"blocked generated BUY chore, px expected lower than limit-up px: "

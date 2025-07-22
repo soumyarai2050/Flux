@@ -36,6 +36,22 @@ const Node = (props) => {
     const theme = useTheme();
     const rootRef = useRef(null);
     const glowTimerIdRef = useRef(null);
+    const { onClick, glow } = props;
+
+    // Combine the data from props with the handler functions passed as separate props
+    // This ensures NodeField receives everything it needs in its 'data' prop.
+    const nodeFieldData = {
+        ...props.data,
+        onTextChange: props.onTextChange,
+        onSelectItemChange: props.onSelectItemChange,
+        onCheckboxChange: props.onCheckboxChange,
+        onAutocompleteOptionChange: props.onAutocompleteChange, // Mapping to the name used in NodeField
+        onDateTimeChange: props.onDateTimeChange,
+        onQuickFilterPin: props.onQuickFilterPin,
+        onQuickFilterUnpin: props.onQuickFilterUnpin,
+        pinnedFilters: props.pinnedFilters,
+        enableQuickFilterPin: props.enableQuickFilterPin,
+    };
 
     let nodeClass = '';
     if (props.data['data-add']) {
@@ -108,9 +124,9 @@ const Node = (props) => {
     if (props.data.data_invisible) return;
 
     return (
-        <Box className={classes.container} ref={rootRef}>
+        <Box className={classes.container} ref={rootRef} onClick={onClick}>
             {/* <span className={classes.dash}>-</span> */}
-            <Box className={classes.node_container} data-xpath={props.data.xpath} data-dataxpath={props.data.dataxpath}>
+            <Box className={`${classes.node_container} ${glow ? classes.glowGreen : ''}`} data-xpath={props.data.xpath} data-dataxpath={props.data.dataxpath}>
                 {props.data.key && (
                     <div className={`${classes.node} ${nodeClass}`}>
                         <span className={classes.node_title} style={{ color: nodeTitleColor }}>{props.data.title ? props.data.title : props.data.name}</span>
@@ -163,7 +179,7 @@ const Node = (props) => {
                         )}
                     </div>
                 )}
-                <NodeField data={props.data} />
+                <NodeField data={nodeFieldData} />
             </Box>
             {props.data.mode === MODES.EDIT && props.data.key == undefined && !props.data['data-remove'] && (
                 <Box className={classes.menu}>
