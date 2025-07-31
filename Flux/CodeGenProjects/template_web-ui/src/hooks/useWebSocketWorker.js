@@ -58,8 +58,12 @@ function useWebSocketWorker({
       const { endpoint, paramDict } = crudOverrideDict.GET_ALL;
       if (!params && Object.keys(paramDict).length > 0) return;
       apiUrl = `${wsUrl}/ws-${endpoint}`;
+      if (uiLimit) {
+        apiUrl += `?limit_obj_count=${uiLimit}`
+      }
       if (params) {
-        const paramsStr = uiLimit ? '&' : '?' + Object.keys(params).map((k) => `${k}=${params[k]}`).join('&');
+        let paramsStr = uiLimit ? '&' : '?';
+        paramsStr += Object.keys(params).map((k) => `${k}=${params[k]}`).join('&');
         apiUrl += paramsStr;
       }
     }

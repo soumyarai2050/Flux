@@ -1,272 +1,106 @@
-/* Enhanced Scroll Indicators - Option 4: Neon Style with Animated Ring */
-
 .rightScrollIndicator {
   position: absolute;
-  top: 10px;
-  right: 15px;
-  width: 30px;
-  height: 30px;
-  background: rgba(20, 20, 20, 0.9);
-  border: 2px solid rgba(173, 135, 121, 1);
+  top: 5px;
+  right: 10px;
+  transform: translateY(0);
+  width: 20px;
+  height: 20px;
+  /* background: rgba(173, 135, 121, 0.4); */
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   z-index: 100;
-  color: rgba(173, 135, 121, 1);
-  font-size: 14px;
-  box-shadow: 
-    0 0 20px rgba(173, 135, 121, 0.8),
-    0 0 40px rgba(173, 135, 121, 0.4),
-    inset 0 0 10px rgba(173, 135, 121, 0.2);
-  animation: neonPulse 2s ease-in-out infinite alternate;
+  color: white;
+  box-shadow: 0 0 30px rgba(173, 135, 121, 0.8), 0 0 15px rgba(173, 135, 121, 1);
+  animation: glow 2s ease-in-out infinite alternate;
   transition: all 0.3s ease;
   pointer-events: auto;
 }
 
-.rightScrollIndicator::before {
-  content: '';
-  position: absolute;
-  top: -4px;
-  left: -4px;
-  right: -4px;
-  bottom: -4px;
-  border: 1px solid rgba(173, 135, 121, 0.5);
-  border-radius: 50%;
-  animation: neonRing 3s linear infinite;
-  pointer-events: none;
-}
-
-.rightScrollIndicator::after {
-  content: '';
-  position: absolute;
-  top: -8px;
-  left: -8px;
-  right: -8px;
-  bottom: -8px;
-  border: 1px solid rgba(173, 135, 121, 0.2);
-  border-radius: 50%;
-  animation: neonRing 4s linear infinite reverse;
-  pointer-events: none;
-}
-
 .rightScrollIndicator:hover {
-  color: white;
-  background: rgba(173, 135, 121, 0.2);
-  border-color: rgba(173, 135, 121, 1);
-  box-shadow: 
-    0 0 30px rgba(173, 135, 121, 1),
-    0 0 60px rgba(173, 135, 121, 0.6),
-    inset 0 0 15px rgba(173, 135, 121, 0.3);
-  transform: scale(1.1);
-}
-
-.rightScrollIndicator:hover::before {
-  border-color: rgba(173, 135, 121, 0.8);
-  animation-duration: 2s;
-}
-
-.rightScrollIndicator:hover::after {
-  border-color: rgba(173, 135, 121, 0.4);
-  animation-duration: 2.5s;
+  background: rgba(173, 135, 121, 0.7);
+  box-shadow: 0 0 40px rgba(173, 135, 121, 1), 0 0 20px rgba(173, 135, 121, 1);
+  transform: translateY(0) scale(1.1);
 }
 
 .rightScrollIndicator:active {
-  transform: scale(0.95);
-  box-shadow: 
-    0 0 25px rgba(173, 135, 121, 0.9),
-    0 0 50px rgba(173, 135, 121, 0.5),
-    inset 0 0 12px rgba(173, 135, 121, 0.25);
+  transform: translateY(0) scale(0.95);
 }
 
 .leftScrollIndicator {
   position: absolute;
-  top: 10px;
-  left: 15px;
-  width: 30px;
-  height: 30px;
-  background: rgba(20, 20, 20, 0.9);
-  border: 2px solid rgba(173, 135, 121, 1);
+  top: 5px;
+  left: 10px;
+  transform: translateY(0);
+  width: 20px;
+  height: 20px;
+  /* background: rgba(173, 135, 121, 0.4); */
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   z-index: 100;
-  color: rgba(173, 135, 121, 1);
-  font-size: 14px;
-  box-shadow: 
-    0 0 20px rgba(173, 135, 121, 0.8),
-    0 0 40px rgba(173, 135, 121, 0.4),
-    inset 0 0 10px rgba(173, 135, 121, 0.2);
-  animation: neonPulse 2s ease-in-out infinite alternate;
+  color: white;
+  box-shadow: 0 0 30px rgba(173, 135, 121, 0.8), 0 0 15px rgba(173, 135, 121, 1);
+  animation: glow 2s ease-in-out infinite alternate;
   transition: all 0.3s ease;
   pointer-events: auto;
 }
 
-.leftScrollIndicator::before {
-  content: '';
-  position: absolute;
-  top: -4px;
-  left: -4px;
-  right: -4px;
-  bottom: -4px;
-  border: 1px solid rgba(173, 135, 121, 0.5);
-  border-radius: 50%;
-  animation: neonRing 3s linear infinite;
-  pointer-events: none;
-}
-
-.leftScrollIndicator::after {
-  content: '';
-  position: absolute;
-  top: -8px;
-  left: -8px;
-  right: -8px;
-  bottom: -8px;
-  border: 1px solid rgba(173, 135, 121, 0.2);
-  border-radius: 50%;
-  animation: neonRing 4s linear infinite reverse;
-  pointer-events: none;
-}
-
 .leftScrollIndicator:hover {
-  color: white;
-  background: rgba(173, 135, 121, 0.2);
-  border-color: rgba(173, 135, 121, 1);
-  box-shadow: 
-    0 0 30px rgba(173, 135, 121, 1),
-    0 0 60px rgba(173, 135, 121, 0.6),
-    inset 0 0 15px rgba(173, 135, 121, 0.3);
-  transform: scale(1.1);
-}
-
-.leftScrollIndicator:hover::before {
-  border-color: rgba(173, 135, 121, 0.8);
-  animation-duration: 2s;
-}
-
-.leftScrollIndicator:hover::after {
-  border-color: rgba(173, 135, 121, 0.4);
-  animation-duration: 2.5s;
+  background: rgba(173, 135, 121, 0.7);
+  box-shadow: 0 0 40px rgba(173, 135, 121, 1), 0 0 20px rgba(173, 135, 121, 1);
+  transform: translateY(0) scale(1.1);
 }
 
 .leftScrollIndicator:active {
-  transform: scale(0.95);
-  box-shadow: 
-    0 0 25px rgba(173, 135, 121, 0.9),
-    0 0 50px rgba(173, 135, 121, 0.5),
-    inset 0 0 12px rgba(173, 135, 121, 0.25);
+  transform: translateY(0) scale(0.95);
 }
 
-/* Neon animations */
-@keyframes neonPulse {
+@keyframes glow {
   from {
-    box-shadow: 
-      0 0 20px rgba(173, 135, 121, 0.8),
-      0 0 40px rgba(173, 135, 121, 0.4),
-      inset 0 0 10px rgba(173, 135, 121, 0.2);
+    box-shadow: 0 0 25px rgba(173, 135, 121, 0.7), 0 0 12px rgba(173, 135, 121, 0.9);
   }
   to {
-    box-shadow: 
-      0 0 30px rgba(173, 135, 121, 1),
-      0 0 60px rgba(173, 135, 121, 0.6),
-      inset 0 0 15px rgba(173, 135, 121, 0.3);
+    box-shadow: 0 0 45px rgba(173, 135, 121, 1), 0 0 25px rgba(173, 135, 121, 1), 0 0 60px rgba(173, 135, 121, 0.6);
   }
 }
 
-@keyframes neonRing {
-  0% { 
-    transform: rotate(0deg) scale(1); 
-    opacity: 1; 
-  }
-  25% { 
-    transform: rotate(90deg) scale(1.05); 
-    opacity: 0.8; 
-  }
-  50% { 
-    transform: rotate(180deg) scale(1.1); 
-    opacity: 0.6; 
-  }
-  75% { 
-    transform: rotate(270deg) scale(1.05); 
-    opacity: 0.8; 
-  }
-  100% { 
-    transform: rotate(360deg) scale(1); 
-    opacity: 1; 
-  }
-}
-
-/* Dark theme - enhanced neon effects */
+/* Dark theme - properly override background color */
 @media (prefers-color-scheme: dark) {
   .rightScrollIndicator {
-    background: rgba(44, 41, 41, 0.95);
-    border: 2px solid rgba(173, 135, 121, 1);
-    color: rgba(173, 135, 121, 1);
-    box-shadow: 
-      0 0 25px rgba(173, 135, 121, 0.9),
-      0 0 50px rgba(173, 135, 121, 0.5),
-      inset 0 0 12px rgba(173, 135, 121, 0.25);
-  }
-  
-  .rightScrollIndicator::before {
-    border-color: rgba(173, 135, 121, 0.6);
-  }
-  
-  .rightScrollIndicator::after {
-    border-color: rgba(173, 135, 121, 0.3);
+    background: rgba(173, 135, 121, 0.5);
+    box-shadow: 0 0 35px rgba(173, 135, 121, 0.9), 0 0 18px rgba(173, 135, 121, 1);
   }
   
   .rightScrollIndicator:hover {
-    color: white;
-    background: rgba(173, 135, 121, 0.25);
-    box-shadow: 
-      0 0 35px rgba(173, 135, 121, 1),
-      0 0 70px rgba(173, 135, 121, 0.7),
-      inset 0 0 18px rgba(173, 135, 121, 0.35);
+    background: rgba(173, 135, 121, 0.8);
+    box-shadow: 0 0 50px rgba(173, 135, 121, 1), 0 0 25px rgba(173, 135, 121, 1);
   }
 
   .leftScrollIndicator {
-    background: rgba(44, 41, 41, 0.95);
-    border: 2px solid rgba(173, 135, 121, 1);
-    color: rgba(173, 135, 121, 1);
-    box-shadow: 
-      0 0 25px rgba(173, 135, 121, 0.9),
-      0 0 50px rgba(173, 135, 121, 0.5),
-      inset 0 0 12px rgba(173, 135, 121, 0.25);
-  }
-  
-  .leftScrollIndicator::before {
-    border-color: rgba(173, 135, 121, 0.6);
-  }
-  
-  .leftScrollIndicator::after {
-    border-color: rgba(173, 135, 121, 0.3);
+    background: rgba(173, 135, 121, 0.5);
+    box-shadow: 0 0 35px rgba(173, 135, 121, 0.9), 0 0 18px rgba(173, 135, 121, 1);
   }
   
   .leftScrollIndicator:hover {
-    color: white;
-    background: rgba(173, 135, 121, 0.25);
-    box-shadow: 
-      0 0 35px rgba(173, 135, 121, 1),
-      0 0 70px rgba(173, 135, 121, 0.7),
-      inset 0 0 18px rgba(173, 135, 121, 0.35);
+    background: rgba(173, 135, 121, 0.8);
+    box-shadow: 0 0 50px rgba(173, 135, 121, 1), 0 0 25px rgba(173, 135, 121, 1);
   }
 
-  @keyframes neonPulse {
+  @keyframes glow {
     from {
-      box-shadow: 
-        0 0 25px rgba(173, 135, 121, 0.9),
-        0 0 50px rgba(173, 135, 121, 0.5),
-        inset 0 0 12px rgba(173, 135, 121, 0.25);
+      box-shadow: 0 0 30px rgba(173, 135, 121, 0.8), 0 0 15px rgba(173, 135, 121, 1);
     }
     to {
-      box-shadow: 
-        0 0 35px rgba(173, 135, 121, 1),
-        0 0 70px rgba(173, 135, 121, 0.7),
-        inset 0 0 18px rgba(173, 135, 121, 0.35);
+      box-shadow: 0 0 55px rgba(173, 135, 121, 1), 0 0 30px rgba(173, 135, 121, 1), 0 0 70px rgba(173, 135, 121, 0.7);
     }
   }
-}
+} 

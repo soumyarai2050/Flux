@@ -58,7 +58,8 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         storedArrayDict: dataSourcesStoredArrayDict,
         storedObjDict: dataSourcesStoredObjDict,
         updatedObjDict: dataSourcesUpdatedObjDict,
-        objIdDict: dataSourcesObjIdDict
+        objIdDict: dataSourcesObjIdDict,
+        modeDict: dataSourcesModeDict,
     } = useSelector((state) => Selectors.selectDataSourcesDictionaries(state, dataSources), dataSourcesSelectorEquality);
     const dataSourcesUpdatedArrayDict = useMemo(() => {
         return dataSources.reduce((acc, { name }) => {
@@ -779,6 +780,9 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     }
 
     const handleRowSelect = (id) => {
+        if (Object.values(dataSourcesModeDict).includes(MODES.EDIT)) {
+            return;
+        }
         dataSources.forEach(({ actions: dsActions }) => {
             dispatch(dsActions.setObjId(id));
         })
@@ -833,7 +837,8 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                     chartEnableOverride: modelLayoutData.chart_enable_override ?? [],
                     onChartPointSelect: setRowIds,
                     quickFilters: modelLayoutData.quick_filters ?? [],
-                    onQuickFiltersChange: handleQuickFiltersChange
+                    onQuickFiltersChange: handleQuickFiltersChange,
+                    selectedRowId: dataSourcesObjIdDict[dataSources[0].name]
                 };
                 wrapperMode = MODES.READ;
                 isReadOnly = true;

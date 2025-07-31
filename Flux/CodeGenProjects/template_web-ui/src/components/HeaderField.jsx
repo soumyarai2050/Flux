@@ -381,56 +381,97 @@ const HeaderOptions = ({ add, remove, show, metadata, onToggle, updatedData, sto
     const showCopy = add && isChildArrayItem && !isEffectivelyDeleted && !isRemoved;
     const showRemove = remove && !isEffectivelyDeleted && !isRemoved;
 
+    // Count how many options are available
+    const availableOptions = [showAdd, showCopy, showRemove].filter(Boolean);
+    const hasMultipleOptions = availableOptions.length > 1;
+    const hasSingleOption = availableOptions.length === 1;
+
     if (showAdd || showCopy || showRemove) {
-        if (show) {
-            return (
-                <ClickAwayListener onClickAway={() => onToggle(false)}>
-                    <Box className={classes.menu} bgcolor={isAdded ? "var(--green-success)" : "background.secondary"}>
-                        {showAdd && (
-                            <IconButton
-                                size='small'
-                                title='Add'
-                                data-add={xpath}
-                                data-ref={ref}
-                                data-prop={JSON.stringify(metadata)}
-                            // onClick={(e) => e.stopPropagation()} // Stop propagation
-                            >
-                                <AddOutlined fontSize='small' />
-                            </IconButton>
-                        )}
-                        {showCopy && (
-                            <IconButton
-                                size='small'
-                                title='Duplicate'
-                                data-duplicate={xpath}
-                                data-ref={ref}
-                                data-prop={JSON.stringify(metadata)}
-                            // onClick={(e) => e.stopPropagation()} // Stop propagation
-                            >
-                                <ContentCopy fontSize='small' />
-                            </IconButton>
-                        )}
-                        {showRemove && (
-                            <IconButton
-                                size='small'
-                                title='Remove'
-                                data-remove={xpath}
-                            // onClick={(e) => e.stopPropagation()} // Stop propagation
-                            >
-                                <RemoveOutlined fontSize='small' />
-                            </IconButton>
-                        )}
+        // If there are multiple options, always show hamburger menu
+        if (hasMultipleOptions) {
+            if (show) {
+                return (
+                    <ClickAwayListener onClickAway={() => onToggle(false)}>
+                        <Box className={classes.menu} bgcolor={isAdded ? "var(--green-success)" : "background.secondary"}>
+                            {showAdd && (
+                                <IconButton
+                                    size='small'
+                                    title='Add'
+                                    data-add={xpath}
+                                    data-ref={ref}
+                                    data-prop={JSON.stringify(metadata)}
+                                >
+                                    <AddOutlined fontSize='small' />
+                                </IconButton>
+                            )}
+                            {showCopy && (
+                                <IconButton
+                                    size='small'
+                                    title='Duplicate'
+                                    data-duplicate={xpath}
+                                    data-ref={ref}
+                                    data-prop={JSON.stringify(metadata)}
+                                >
+                                    <ContentCopy fontSize='small' />
+                                </IconButton>
+                            )}
+                            {showRemove && (
+                                <IconButton
+                                    size='small'
+                                    title='Remove'
+                                    data-remove={xpath}
+                                >
+                                    <RemoveOutlined fontSize='small' />
+                                </IconButton>
+                            )}
+                        </Box>
+                    </ClickAwayListener>
+                );
+            } else {
+                return (
+                    <Box className={classes.option} bgcolor={bgColor}>
+                        <Icon title="More Options" onClick={(e) => { e.stopPropagation(); onToggle(); }}>
+                            <Menu sx={{ color: 'white !important' }} />
+                        </Icon>
                     </Box>
-                </ClickAwayListener>
-            );
-        } else {
+                );
+            }
+        }
+        // If there's only one option, show it directly
+        else if (hasSingleOption) {
             return (
-                <Box className={classes.option} bgcolor={bgColor}
-                >
-                    <Icon title="More Options" onClick={(e) => { e.stopPropagation(); onToggle(); }}>
-                        <Menu
-                            sx={{ color: 'white !important' }} />
-                    </Icon>
+                <Box className={classes.option} bgcolor={bgColor}>
+                    {showAdd && (
+                        <IconButton
+                            size='small'
+                            title='Add'
+                            data-add={xpath}
+                            data-ref={ref}
+                            data-prop={JSON.stringify(metadata)}
+                        >
+                            <AddOutlined sx={{ color: 'white !important' }} fontSize='small' />
+                        </IconButton>
+                    )}
+                    {showCopy && (
+                        <IconButton
+                            size='small'
+                            title='Duplicate'
+                            data-duplicate={xpath}
+                            data-ref={ref}
+                            data-prop={JSON.stringify(metadata)}
+                        >
+                            <ContentCopy sx={{ color: 'white !important' }} fontSize='small' />
+                        </IconButton>
+                    )}
+                    {showRemove && (
+                        <IconButton
+                            size='small'
+                            title='Remove'
+                            data-remove={xpath}
+                        >
+                            <RemoveOutlined sx={{ color: 'white !important' }} fontSize='small' />
+                        </IconButton>
+                    )}
                 </Box>
             );
         }

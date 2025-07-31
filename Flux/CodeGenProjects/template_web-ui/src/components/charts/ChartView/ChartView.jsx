@@ -5,7 +5,7 @@ import {
     Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Divider, List, ListItem, ListItemButton, ListItemText
 } from '@mui/material';
 import { cloneDeep, get, isEqual } from 'lodash';
-import { Add, Close, Delete, Save } from '@mui/icons-material';
+import { Add, Close, Delete, Save, ContentCopy } from '@mui/icons-material';
 // project constants and common utility function imports
 import { DATA_TYPES, MODES, API_ROOT_URL, MODEL_TYPES, DB_ID } from '../../../constants';
 import { addxpath, clearxpath } from '../../../utils/core/dataAccess';
@@ -26,6 +26,7 @@ import { useTheme } from '@emotion/react';
 import DataTree from '../../trees/DataTree/DataTree';
 import { ModelCard, ModelCardContent, ModelCardHeader } from '../../cards';
 import QuickFilterPin from '../../QuickFilterPin';
+import ClipboardCopier from '../../ClipboardCopier';
 
 const CHART_SCHEMA_NAME = 'chart_data';
 
@@ -47,7 +48,8 @@ function ChartView({
     onChartPointSelect,
     children,
     quickFilters = [],
-    onQuickFiltersChange
+    onQuickFiltersChange,
+    selectedRowId
 }) {
     // redux states
     const theme = useTheme();
@@ -71,10 +73,12 @@ function ChartView({
     const [datasetUpdateCounter, setDatasetUpdateCounter] = useState(0);
     const [reloadCounter, setReloadCounter] = useState(0);
     const [schema, setSchema] = useState(updateChartSchema(projectSchema, fieldsMetadata, modelType === MODEL_TYPES.ABBREVIATION_MERGE));
-    const [selectedData, setSelectedData] = useState();
+    const [selectedData, setSelectedData] = useState([]);
+    const [selectedSeriesIdx, setSelectedSeriesIdx] = useState(null);
     const [isCreate, setIsCreate] = useState(false);
     const [pinnedFilters, setPinnedFilters] = useState([]);
     const [pinnedFiltersByChart, setPinnedFiltersByChart] = useState({});
+    const [textToCopy, setTextToCopy] = useState('');
     const pinnedFilterUpdateRef = useRef(false);
     const socketList = useRef([]);
     const getAllWsDict = useRef({});
@@ -97,13 +101,15 @@ function ChartView({
     useEffect(() => {
         // update the local row dataset on update from parent
         if (mode === MODES.READ) {
-            let updatedRows = chartRows;
-            if (storedChartObj.filters && storedChartObj.filters.length > 0) {
-                updatedRows = applyFilter(chartRows, storedChartObj.filters, modelType === MODEL_TYPES.ABBREVIATION_MERGE, fieldsMetadata);
+            let updatedRows;
+            if (storedChartObj.filters?.length > 0) {
+                const updatedFilters = storedChartObj.filters
+                    .map((item) => ({ column_name: item.fld_name, filtered_values: item.fld_value }))
+                updatedRows = applyFilter(chartRows, updatedFilters);
+            } else {
+                updatedRows = chartRows;
             }
-            if (!storedChartObj.time_series || (storedChartObj.time_series && rows.length !== updatedRows.length)) {
-                setRows(updatedRows);
-            }
+            setRows(updatedRows);
         } else {  // mode is EDIT
             setIsChartOptionOpen(true);
         }
@@ -200,15 +206,15 @@ function ChartView({
                 }
             })
             setQueryDict(updatedQueryDict);
-            if (!storedChartObj.time_series) {
-                // if not time series, apply the filters on rows
-                if (storedChartObj.filters && storedChartObj.filters.length > 0) {
-                    const updatedRows = applyFilter(rows, storedChartObj.filters, modelType === MODEL_TYPES.ABBREVIATION_MERGE, fieldsMetadata);
-                    setRows(updatedRows);
-                } else {
-                    setRows(chartRows);
-                }
-            }
+            // if (!storedChartObj.time_series) {
+            //     // if not time series, apply the filters on rows
+            //     if (storedChartObj.filters && storedChartObj.filters.length > 0) {
+            //         const updatedRows = applyFilter(rows, storedChartObj.filters, modelType === MODEL_TYPES.ABBREVIATION_MERGE, fieldsMetadata);
+            //         setRows(updatedRows);
+            //     } else {
+            //         setRows(chartRows);
+            //     }
+            // }
         }
     }, [chartUpdateCounter])
 
@@ -301,64 +307,90 @@ function ChartView({
         }
     }, [tsData, queryDict, mode])
 
-    useEffect(() => {
-        if (modelType === MODEL_TYPES.ABBREVIATION_MERGE && selectedData) {
-            const idField = abbreviation.split(':')[0];
-            if (storedChartObj.time_series) {
-                const query = queryDict[selectedData.seriesIndex];
-                if (query) {
-                    const keys = query.params.map(param => {
-                        const collection = fieldsMetadata.find(col => {
-                            if (col.hasOwnProperty('mapping_underlying_meta_field')) {
-                                const [, ...mappedFieldSplit] = col.mapping_underlying_meta_field.split('.');
-                                const mappedField = mappedFieldSplit.join('.');
-                                if (mappedField === param) {
-                                    return true;
-                                }
-                            }
-                            return false;
-                        })
-                        if (modelType === MODEL_TYPES.ABBREVIATION_MERGE) {
-                            return collection.key;
-                        } else {
-                            return collection.tableTitle;
-                        }
-                    })
-                    const filterCriteria = {};
-                    query.params.forEach((param, index) => {
-                        filterCriteria[keys[index]] = get(selectedData, param);
-                    })
-                    const row = rows.find(row => {
-                        let found = true;
-                        Object.keys(filterCriteria).forEach(field => {
-                            if (row[field] !== filterCriteria[field]) {
-                                found = false;
-                            }
-                        })
-                        if (found) return true;
-                        return false;
-                    })
-                    if (row) {
-                        if (row.hasOwnProperty(idField)) {
-                            let id = row[idField];
-                            if (typeof id === DATA_TYPES.STRING) {
-                                id = getIdFromAbbreviatedKey(abbreviation, id);
-                            }
-                            onRowSelect(id);
-                            onChartPointSelect([id]);
-                        }
-                    }
-                }
+    // useEffect(() => {
+    //     if (modelType === MODEL_TYPES.ABBREVIATION_MERGE && selectedData > 0) {
+    //         const idField = abbreviation.split(':')[0];
+    //         if (storedChartObj.time_series) {
+    //             console.log();
+    //             // const query = queryDict[selectedData.seriesIndex];
+    //             // if (query) {
+    //             //     const keys = query.params.map(param => {
+    //             //         const collection = fieldsMetadata.find(col => {
+    //             //             if (col.hasOwnProperty('mapping_underlying_meta_field')) {
+    //             //                 const [, ...mappedFieldSplit] = col.mapping_underlying_meta_field.split('.');
+    //             //                 const mappedField = mappedFieldSplit.join('.');
+    //             //                 if (mappedField === param) {
+    //             //                     return true;
+    //             //                 }
+    //             //             }
+    //             //             return false;
+    //             //         })
+    //             //         if (modelType === MODEL_TYPES.ABBREVIATION_MERGE) {
+    //             //             return collection.key;
+    //             //         } else {
+    //             //             return collection.tableTitle;
+    //             //         }
+    //             //     })
+    //             //     const filterCriteria = {};
+    //             //     query.params.forEach((param, index) => {
+    //             //         filterCriteria[keys[index]] = get(selectedData, param);
+    //             //     })
+    //             //     const row = rows.find(row => {
+    //             //         let found = true;
+    //             //         Object.keys(filterCriteria).forEach(field => {
+    //             //             if (row[field] !== filterCriteria[field]) {
+    //             //                 found = false;
+    //             //             }
+    //             //         })
+    //             //         if (found) return true;
+    //             //         return false;
+    //             //     })
+    //             //     if (row) {
+    //             //         if (row.hasOwnProperty(idField)) {
+    //             //             let id = row[idField];
+    //             //             if (typeof id === DATA_TYPES.STRING) {
+    //             //                 id = getIdFromAbbreviatedKey(abbreviation, id);
+    //             //             }
+    //             //             onRowSelect(id);
+    //             //             onChartPointSelect([id]);
+    //             //         }
+    //             //     }
+    //             // }
+    //         } else {
+    //             const recentItemId = selectedData[selectedData.length - 1];
+    //             // let id = selectedData[idField];
+    //             // if (typeof id === DATA_TYPES.STRING) {
+    //             //     id = getIdFromAbbreviatedKey(abbreviation, id);
+    //             // }
+    //             onRowSelect(recentItemId);
+    //             onChartPointSelect([id]);
+    //         }
+    //     }
+    // }, [selectedData, queryDict])
+
+    const handleSelectDataChange = (e, dataId, seriesIdx) => {
+        if (storedChartObj.time_series) return;
+
+        let updatedSelectedData;
+        if (e.ctrlKey && selectedSeriesIdx === seriesIdx) {
+            if (selectedData.includes(dataId)) {
+                updatedSelectedData = selectedData.filter((item) => item !== dataId);
             } else {
-                let id = selectedData[idField];
-                if (typeof id === DATA_TYPES.STRING) {
-                    id = getIdFromAbbreviatedKey(abbreviation, id);
-                }
-                onRowSelect(id);
-                onChartPointSelect([id]);
+                updatedSelectedData = [...selectedData, dataId];
             }
+        } else {
+            updatedSelectedData = [dataId];
         }
-    }, [selectedData, queryDict])
+        setSelectedData(updatedSelectedData);
+        setSelectedSeriesIdx(seriesIdx);
+        if (updatedSelectedData.length > 0) {
+            const mostRecentItemId = updatedSelectedData[updatedSelectedData.length - 1];
+            onRowSelect(mostRecentItemId);
+        } else {
+            onRowSelect(null);
+        }
+        onChartPointSelect(updatedSelectedData);
+    }
 
     // on closing of modal, open a pop up to confirm/discard changes
     const handleChartOptionClose = (e, reason) => {
@@ -801,6 +833,11 @@ function ChartView({
         }));
     };
 
+    const handleCopyChartName = (e, chartName) => {
+        e.stopPropagation();
+        setTextToCopy(chartName);
+    };
+
     const options = useMemo(() => getChartOption(clearxpath(cloneDeep(chartOption))), [chartOption]);
     const chartQuickFilter = quickFilters.find((quickFilter) => quickFilter.chart_name === data?.chart_name);
 
@@ -811,6 +848,7 @@ function ChartView({
 
     return (
         <>
+            <ClipboardCopier text={textToCopy} />
             <Box className={styles.container}>
                 <Box className={styles.list_container}>
                     <Button color='warning' variant='contained' onClick={handleChartCreate}>
@@ -827,10 +865,14 @@ function ChartView({
                                     selected={selectedIndex === index}
                                     disablePadding
                                     onClick={() => handleSelect(index)}
+                                    sx={{ color: item.time_series ? 'var(--blue-info)' : undefined }}
                                     onDoubleClick={() => handleDoubleClick(index)}>
                                     <ListItemButton>
                                         <ListItemText>{item.chart_name}</ListItemText>
                                     </ListItemButton>
+                                    <Icon title='Copy chart name' onClick={(e) => handleCopyChartName(e, item.chart_name)}>
+                                        <ContentCopy fontSize='small' />
+                                    </Icon>
                                     <Icon title='Delete' onClick={(e) => handleChartDelete(e, item.chart_name, index)}>
                                         <Delete fontSize='small' />
                                     </Icon>
@@ -898,7 +940,10 @@ function ChartView({
                                         dataset: datasets,
                                         ...options
                                     }}
-                                    setSelectedData={setSelectedData}
+                                    selectedSeriesIdx={selectedSeriesIdx ?? 0}
+                                    selectedData={selectedData}
+                                    activeDataId={selectedRowId}
+                                    onSelectDataChange={handleSelectDataChange}
                                     isCollectionType={modelType === MODEL_TYPES.ABBREVIATION_MERGE}
                                 />
                             ) : (

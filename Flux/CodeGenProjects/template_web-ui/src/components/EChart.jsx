@@ -1,12 +1,17 @@
 import React, { useEffect, useRef } from 'react';
 import { init, getInstanceByDom } from 'echarts';
+import { useTheme } from '@emotion/react';
+import { cssVar } from '../theme';
 
-function EChart({ option, theme, loading, setSelectedData, isCollectionType }) {
+function EChart({ option, theme, loading, selectedData, selectedSeriesIdx, onSelectDataChange, activeDataId, isCollectionType }) {
     const chartRef = useRef(null);
+    const onSelectDataChangeRef = useRef();
+    onSelectDataChangeRef.current = onSelectDataChange;
+    const themeStore = useTheme();
 
     useEffect(() => {
-        function onChartClick(data) {
-            setSelectedData(data.data);
+        function onChartClick(params) {
+            onSelectDataChangeRef.current(params.event.event, params.data['data-id'], params.seriesIndex);
         }
         let chart;
         if (chartRef.current !== null) {
@@ -34,9 +39,25 @@ function EChart({ option, theme, loading, setSelectedData, isCollectionType }) {
         // Update chart
         if (chartRef.current !== null) {
             const chart = getInstanceByDom(chartRef.current);
-            chart.setOption(option, { replaceMerge: ['series', 'xAxis', 'yAxis'] });
+
+            // Deep copy option to avoid mutating original
+            const modifiedOption = JSON.parse(JSON.stringify(option));
+
+            const series = modifiedOption.series?.[selectedSeriesIdx];
+            if (series) {
+                series.itemStyle = series.itemStyle || {};
+                series.itemStyle.color = (params) => {
+                    const dataId = params.data['data-id'];
+                    return dataId === activeDataId
+                        ? themeStore.palette.primary.dark
+                        : selectedData.includes(dataId)
+                            ? themeStore.palette.primary.main
+                            : '#5470C6';
+                }
+            }
+            chart.setOption(modifiedOption, { replaceMerge: ['series', 'xAxis', 'yAxis'] });
         }
-    }, [option, theme]); // Whenever theme changes we need to add option and setting due to it being deleted in cleanup function
+    }, [option, theme, selectedData, selectedSeriesIdx, activeDataId]); // Whenever theme changes we need to add option and setting due to it being deleted in cleanup function
 
     useEffect(() => {
         // Update chart

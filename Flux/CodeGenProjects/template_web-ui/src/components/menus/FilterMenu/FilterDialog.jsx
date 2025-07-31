@@ -197,7 +197,7 @@ const FilterDialog = ({
       <DialogContent style={{ minWidth: '350px', padding: 10 }}>
         {fieldsMetadata.length > 5 && (
           <TextField
-            sx={{ width: '100%', margin: '0 10px' }}
+            sx={{ width: '100%', marginBottom: '10px' }}
             size="small"
             label="Field Name"
             placeholder='Search a field'
