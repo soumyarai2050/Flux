@@ -68,6 +68,7 @@ message BasketChore{
         QueryParamName: "ticker",
         QueryParamDataType: "str"
       },
+      QueryRouteType: PATCH
     };
     ui_button: {
       unpressed_caption: "UPDATE POS CACHE",

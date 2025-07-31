@@ -12,7 +12,7 @@ import { useTheme } from '@emotion/react';
 // Helper function to determine if a field should show the quick filter icon based on metadata
 const isFilterableField = (nodeData) => {
     if (!nodeData || !nodeData.key) return false;
-    
+
     // Field is filterable if it has any of these characteristics from the payload:
     // 1. auto_complete (dropdown options) - shown in payload as 'autocomplete'
     // 2. filter_enable set to true - shown in payload as 'filterEnable'  
@@ -25,10 +25,10 @@ const isFilterableField = (nodeData) => {
     const isBoolean = nodeData.type === 'boolean';
     const isString = nodeData.type === 'string';
     const isNumber = nodeData.type === 'number';
-    
+
     // Also check if it's a primitive type that can be easily modified
     const isSimpleEditableType = isBoolean || isString || isNumber || isEnum;
-    
+
     return hasAutoComplete || hasFilterEnable || isSimpleEditableType;
 };
 
@@ -102,17 +102,17 @@ const Node = (props) => {
     let filterColor = 'default';
     let isPinned = false;
     let isNewlyCreated = false;
-    
+
     // Check if this field has an active filter
     const hasActiveFilter = props.data.quickFilter && props.data.quickFilter[props.data.key];
-    
+
     // Check if this is a newly created node (green state) - should not allow pinning
     isNewlyCreated = props.data['data-add'] || props.data.isNewlyCreated || false;
-    
+
     // Check if this field is currently pinned - use dataxpath or key as uniqueId
     const currentUniqueId = props.data.dataxpath || props.data.key;
     isPinned = props.data.pinnedFilters && props.data.pinnedFilters.some(pin => pin.uniqueId === currentUniqueId);
-    
+
     if (hasActiveFilter || isPinned) {
         FilterIcon = PushPin;
         filterColor = 'info';
@@ -141,39 +141,40 @@ const Node = (props) => {
                         {showPinIcon && (
                             <Icon
                                 title={
-                                    isNewlyCreated 
-                                        ? 'Save the node first to enable pinning' 
+                                    isNewlyCreated
+                                        ? 'Save the node first to enable pinning'
                                         : (isPinned ? 'unpin quick filter' : 'pin quick filter')
                                 }
                                 onClick={() => {
+
                                     if (isNewlyCreated) {
                                         // Do nothing for newly created nodes
                                         return;
                                     }
-                                    
+
                                     if (isPinned) {
                                         // Unpin the filter - use uniqueId to match what's stored
                                         const uniqueIdToUnpin = props.data.dataxpath || props.data.key;
-                                        props.data.onQuickFilterUnpin && props.data.onQuickFilterUnpin(uniqueIdToUnpin);
+                                        props.onQuickFilterUnpin && props.onQuickFilterUnpin(uniqueIdToUnpin);
                                     } else {
                                         // Pin the filter
-                                        props.data.onQuickFilterPin && props.data.onQuickFilterPin(
-                                            props.data.key, 
-                                            props.data.title || props.data.name, 
+                                        props.onQuickFilterPin && props.onQuickFilterPin(
+                                            props.data.key,
+                                            props.data.title || props.data.name,
                                             props.data.value, // Use actual current value
                                             props.data // Pass the full node data for field type information
                                         );
                                     }
                                 }}
-                                style={{ 
-                                    marginLeft: 'auto', 
+                                style={{
+                                    marginLeft: 'auto',
                                     opacity: isNewlyCreated ? 0.3 : 1,
                                     cursor: isNewlyCreated ? 'not-allowed' : 'pointer'
                                 }}
                             >
-                                <FilterIcon 
-                                    fontSize='small' 
-                                    color={isNewlyCreated ? 'disabled' : filterColor} 
+                                <FilterIcon
+                                    fontSize='small'
+                                    color={isNewlyCreated ? 'disabled' : filterColor}
                                 />
                             </Icon>
                         )}

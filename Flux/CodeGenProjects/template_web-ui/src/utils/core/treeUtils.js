@@ -295,9 +295,12 @@ function checkItemAgainstFilter(itemData, filter, schema, itemSchemaRef) {
             const currentPath = pathPrefix ? `${pathPrefix}.${propName}` : propName;
             const propValue = currentData ? currentData[propName] : undefined;
 
-            // Check if this property matches the filter
-            if (propSchema.filter_enable && filter.column_name.endsWith(`.${propName}`)) {
-                if (checkMatch(propValue, filter.filtered_values)) {
+            // Check if this property's path is what the filter is targeting
+            if (propSchema.filter_enable && filter.column_name.endsWith(currentPath)) {
+                
+                const matchResult = checkMatch(propValue, filter.filtered_values);
+               
+                if (matchResult) {
                     return true;
                 }
             }
@@ -1860,29 +1863,38 @@ function processArrayItemsSimple(tree, schema, currentSchema, propname, callerPr
             }
 
             if (!itemData) {
-                return false;
+                return false; // Discard if no data
             }
 
-            return activeFilters.every(filter => {
-                // First check if the item directly matches
-                const directMatch = checkItemAgainstFilter(itemData, filter, schema, currentSchema.items?.$ref);
-                if (directMatch) {
+
+            // The item must satisfy EVERY active filter.
+            const filterResult = activeFilters.every(filter => {
+                const filterPath = filter.column_name;
+                const genericArrayPath = xpath.replace(/\[\d+\]/g, '');
+
+
+                // CHECK 1: Is the filter relevant to this array or its descendants?
+                // If the filter path doesn't start with this array's path, it's for a
+                // different branch. We must keep the item.
+                if (!filterPath.startsWith(genericArrayPath)) {
+                   
                     return true;
                 }
 
-                // Check if this is a nested array that should inherit parent's filter context
-                // If the filter field path doesn't apply to this level, check if parent already matched
-                const filterPath = filter.column_name;
-                const currentArrayPath = xpath;
+                
 
-                // If the filter path doesn't include the current array path, it means this array
-                // is nested under something that should be filtered at a higher level
-                if (!filterPath.includes(currentArrayPath.replace(/\[\d+\]/g, ''))) {
-                    return true; // Keep all items - parent level filtering already applied
+                // CHECK 2: The filter IS relevant. Does this item itself contain the matching field?
+                // This is where the filtering of the `sec_positions` array will happen.
+                const directMatch = checkItemAgainstFilter(itemData, filter, schema, currentSchema.items?.$ref);
+               
+                if (directMatch) {
+                    return true; // Keep the item (e.g., the CB_Sec_7 object).
                 }
 
-                // If no direct match, check if this item contains nested arrays/objects that might match
-                // Get the schema for this item to see if it has nested containers
+                // CHECK 3: The filter is relevant, but no direct match. This happens for the `Broker` item.
+                // We MUST keep the Broker if the filter path points to a field inside one of its children ARRAYS.
+                // We check if any of the Broker's child properties (like `sec_positions`) are ARRAYS
+                // that could contain the filtered field.
                 let itemSchema = null;
                 if (currentSchema.items?.$ref) {
                     const refParts = currentSchema.items.$ref.split('/');
@@ -1893,39 +1905,31 @@ function processArrayItemsSimple(tree, schema, currentSchema, propname, callerPr
                     }
                 }
 
-                // If item has nested arrays/objects, check if they actually contain matching data
                 if (itemSchema && itemSchema.properties) {
-                    for (const propName in itemSchema.properties) {
+                    // Check if any child ARRAY property's path is a prefix of the filter path.
+                    const hasRelevantChildArray = Object.keys(itemSchema.properties).some(propName => {
                         const propSchema = itemSchema.properties[propName];
-                        if (propSchema.type === DATA_TYPES.ARRAY ||
-                            (propSchema.type === DATA_TYPES.OBJECT && propSchema.items)) {
+                        const childGenericPath = `${genericArrayPath}.${propName}`;
+                        const isRelevant = filterPath.startsWith(childGenericPath);
+                        const isArray = propSchema.type === DATA_TYPES.ARRAY;
+                        // Only keep if it's an array that could contain the filter field
+                        return isRelevant && isArray;
+                    });
 
-                            // Check if this nested container actually contains matching data
-                            const nestedData = itemData[propName];
-                            if (nestedData && typeof nestedData === 'object') {
-                                // For nested objects, check if they contain the matching field
-                                if (propSchema.type === DATA_TYPES.OBJECT) {
-                                    const nestedMatch = checkItemAgainstFilter(nestedData, filter, schema, propSchema.items?.$ref);
-                                    if (nestedMatch) {
-                                        return true;
-                                    }
-                                }
-                                // For nested arrays, check if any item in the array matches
-                                else if (propSchema.type === DATA_TYPES.ARRAY && Array.isArray(nestedData)) {
-                                    for (const nestedItem of nestedData) {
-                                        const nestedMatch = checkItemAgainstFilter(nestedItem, filter, schema, propSchema.items?.$ref);
-                                        if (nestedMatch) {
-                                            return true;
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                    if (hasRelevantChildArray) {
+                        // This is TRUE for the Broker, because "rt_dash.eligible_brokers.sec_positions"
+                        // is a prefix of the filter path AND sec_positions is an ARRAY.
+                        return true;
                     }
                 }
-
-                return false; // No direct match and no nested containers
+                
+                // If we reach here, the filter was relevant, but this item didn't match,
+                // and none of its children could possibly contain the match. Discard it.
+                // (This is what will correctly discard the EQT_Sec_7 object).
+                return false;
             });
+
+            return filterResult;
         });
 
     }

@@ -397,8 +397,8 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
         handleModeToggle();
     }
 
-    const handleSave = (modifiedObj, force = false) => {
-        if (checkAndShowConflicts()) {
+    const handleSave = (modifiedObj, force = false, bypassConflictCheck = false) => {
+        if (!bypassConflictCheck && checkAndShowConflicts()) {
             return;
         }
 
@@ -475,12 +475,7 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
             return;
         }
         changesRef.current.active = activeChanges;
-        const changesCount = Object.keys(activeChanges).length;
-        if (changesCount === 1) {
-            executeSave();
-            return;
-        }
-        dispatch(actions.setPopupStatus({ confirmSave: true }));
+        handleSave(modelUpdatedObj, true, true);
     }
 
     const handleUpdate = (updatedObj) => {
@@ -625,7 +620,11 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
             onClose={handleFullScreenToggle}
         >
             <ModelCard id={modelName}>
-                <ModelCardHeader name={modelTitle}>
+                <ModelCardHeader 
+                    name={modelTitle}
+                    isMaximized={isMaximized}
+                    onMaximizeToggle={handleFullScreenToggle}
+                >
                     <MenuGroup
                         // column settings
                         columns={headCells}

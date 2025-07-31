@@ -572,7 +572,7 @@ const TreeRenderer = ({
                 <ComponentToRender
                     data={
                         ComponentToRender === Node ?
-                            { ...originalNode, storedValue: get(storedData, originalNode.dataxpath) } :
+                            { ...originalNode, storedValue: get(storedData, originalNode.dataxpath), enableQuickFilterPin } :
                             originalNode
                     }
                     onClick={handleClick}

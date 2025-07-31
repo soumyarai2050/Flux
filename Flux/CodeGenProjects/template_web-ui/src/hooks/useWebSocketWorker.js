@@ -51,12 +51,15 @@ function useWebSocketWorker({
 
     const wsUrl = url.replace('http', 'ws');
     let apiUrl = `${wsUrl}/get-all-${modelName}-ws`;
+    if (uiLimit) {
+      apiUrl += `?limit_obj_count=${uiLimit}`
+    }
     if (crudOverrideDict?.GET_ALL) {
       const { endpoint, paramDict } = crudOverrideDict.GET_ALL;
       if (!params && Object.keys(paramDict).length > 0) return;
       apiUrl = `${wsUrl}/ws-${endpoint}`;
       if (params) {
-        const paramsStr = '?' + Object.keys(params).map((k) => `${k}=${params[k]}`).join('&');
+        const paramsStr = uiLimit ? '&' : '?' + Object.keys(params).map((k) => `${k}=${params[k]}`).join('&');
         apiUrl += paramsStr;
       }
     }

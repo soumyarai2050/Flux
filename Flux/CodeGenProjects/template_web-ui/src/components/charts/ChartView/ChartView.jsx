@@ -156,6 +156,8 @@ function ChartView({
             if (!pinnedFilterUpdateRef.current) {
                 syncPinnedFiltersWithData(updatedChartObj);
             }
+        } else {
+            setPinnedFilters([]);
         }
     }, [updatedChartObj, pinnedFiltersByChart])
 
@@ -547,7 +549,6 @@ function ChartView({
     }
 
     const handleQuickFilterPin = (key, title, currentValue, nodeData) => {
-
         const uniqueId = nodeData.dataxpath || key;
         const currentChartName = data?.chart_name;
         const existingPin = pinnedFilters.find(pin => pin.uniqueId === uniqueId);

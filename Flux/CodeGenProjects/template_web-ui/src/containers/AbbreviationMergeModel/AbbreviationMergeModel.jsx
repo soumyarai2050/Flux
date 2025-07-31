@@ -155,7 +155,6 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     // refs to identify change
     const optionsRef = useRef(null);
     const baselineDictionaryRef = useRef(null);
-    const baselineUpdatedDictionaryRef = useRef(null); //  stores frozen updated objects
 
     // calculated fields
     const effectiveStoredArrayDict = getEffectiveStoredArrayDict(dataSourcesStoredArrayDict, baselineDictionaryRef.current || {});
@@ -187,6 +186,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     } = useConflictDetection(storedObj, updatedObj, mode, modelFieldsMetadata, isCreating);
 
     const takeSnapshot = () => {
+        // Disable updates for all data sources
         dataSources.forEach(({ actions: dsActions }) => {
             dispatch(dsActions.setAllowUpdates(false));
         });
@@ -246,11 +246,12 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                         // Show conflict popup if conflicts are found.
                         setConflicts(conflictsResult);
                         setShowConflictPopup(true);
-                        return;
+                        return true; // Indicate conflict found
                     }
                 }
             }
         }
+        return false; // Indicate no conflict found
     }
 
     useEffect(() => {
@@ -543,6 +544,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         }
         cleanModelCache();
         clearSnapshot(); // Clear snapshot on discard
+        dispatch(actions.setPopupStatus({ confirmSave: false }));
     }
 
     const handleSearchQueryChange = (_, value) => {
@@ -617,9 +619,10 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         dispatch(actions.setUpdatedObj(clonedUpdatedObj));
         handleModeToggle();
         dispatch(actions.setIsCreating(true));
+        clearSnapshot(); // Clear conflict detection snapshot
     }
 
-    const handleSave = (modifiedObj, force = false) => {
+    const handleSave = (modifiedObj, force = false, bypassConflictCheck = false) => {
         if (!sourceRef.current) {
             // If no source name, switch to read mode and clear baseline reference.
             if (mode !== MODES.READ) {
@@ -628,7 +631,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
             }
             return;
         }
-        if (checkAndShowConflicts(modifiedObj)) {
+        if (!bypassConflictCheck && checkAndShowConflicts(modifiedObj)) {
             return;
         }
 
@@ -642,8 +645,9 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         if (isCreating) {
             delete dataSourceUpdatedObj[DB_ID];
         }
+        const baselineForComparison = baselineDictionaryRef.current?.[sourceRef.current] || dataSourcesStoredObjDict[sourceRef.current];
 
-        const activeChanges = compareJSONObjects(dataSourceStoredObj, dataSourceUpdatedObj, fieldsMetadata, isCreating);
+        const activeChanges = compareJSONObjects(baselineForComparison, dataSourceUpdatedObj, fieldsMetadata, isCreating);
 
         if (!activeChanges || Object.keys(activeChanges).length === 0) {
             changesRef.current = {};
@@ -658,10 +662,6 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                 executeSave();
                 return;
             }
-        }
-        const dataSource = getDataSourceObj(dataSources, sourceRef.current);
-        if (!dataSource) {
-            return;
         }
         dispatch(actions.setPopupStatus({ confirmSave: true }));
     };
@@ -723,8 +723,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
             return;
         }
 
-        // Proceed with save by calling handleSave with force=true equivalent logic
-        handleSave(modelUpdatedObj, true);
+        handleSave(modelUpdatedObj, true, true);
     }
 
     const handleUpdate = (updatedObj, source) => {
@@ -895,7 +894,11 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
             onClose={handleFullScreenToggle}
         >
             <ModelCard id={modelName}>
-                <ModelCardHeader name={modelTitle}>
+                <ModelCardHeader 
+                    name={modelTitle}
+                    isMaximized={isMaximized}
+                    onMaximizeToggle={handleFullScreenToggle}
+                >
                     <MenuGroup
                         // column settings
                         columns={headCells}

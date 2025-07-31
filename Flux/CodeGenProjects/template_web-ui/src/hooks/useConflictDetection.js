@@ -5,7 +5,7 @@ import { compareJSONObjects, getObjectsDiff } from '../utils/core/objectUtils';
 import { clearxpath } from '../utils/core/dataAccess';
 
 // Hook to handle conflict detection logic
-export function useConflictDetection(storedObj, updatedObj, mode, fieldsMetadata, allowUpdates,isCreating = false) {
+export function useConflictDetection(storedObj, updatedObj, mode, fieldsMetadata, allowUpdates, isCreating = false) {
     const originalObjectSnapshotRef = useRef(null); // Keeps snapshot of data before edits.
     const [showConflictPopup, setShowConflictPopup] = useState(false); // Flags if conflict popup is visible.
     const [conflicts, setConflicts] = useState([]); // Holds detected conflicts.

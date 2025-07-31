@@ -372,7 +372,7 @@ const DataTree = ({
     const nodeRenderer = ({ element, isBranch, isExpanded, getNodeProps, level, handleExpand }) => {
         // Get the value from the element, which is derived from updatedData
         const value = element.value;
-        
+
         // Get the corresponding storedValue from the original storedData prop
         const storedValue = get(storedData, element.dataxpath);
 
@@ -466,31 +466,31 @@ const DataTree = ({
             const findScrollTarget = () => {
                 // First try to find the animated-tree-node
                 const animatedNode = document.querySelector(`[data-xpath="${newlyAddedOrDuplicatedXPath}"]`);
-                
+
                 if (animatedNode) {
                     // Check if it's fully rendered (not mid-animation)
                     const computedStyle = window.getComputedStyle(animatedNode);
                     const opacity = parseFloat(computedStyle.opacity);
-                    
+
                     if (opacity >= 0.9) { // Fully visible
                         // Find the parent li.tree-branch-wrapper for better scroll target
-                        const parentLi = animatedNode.closest('.tree-branch-wrapper') || 
-                                       animatedNode.closest('.tree-leaf-list-item');
+                        const parentLi = animatedNode.closest('.tree-branch-wrapper') ||
+                            animatedNode.closest('.tree-leaf-list-item');
                         return parentLi || animatedNode;
                     }
                 }
                 return null;
             };
-            
+
             // Attempt to scroll with retries
             const attemptScroll = (attempt = 1, maxAttempts = 5) => {
                 const targetElement = findScrollTarget();
-                
+
                 if (targetElement) {
-                    targetElement.scrollIntoView({ 
-                        behavior: 'smooth', 
+                    targetElement.scrollIntoView({
+                        behavior: 'smooth',
                         block: 'center', // Scroll to center of the viewport
-                        inline: 'nearest' 
+                        inline: 'nearest'
                     });
                 } else if (attempt < maxAttempts) {
                     setTimeout(() => {
@@ -498,12 +498,12 @@ const DataTree = ({
                     }, 300);
                 }
             };
-            
+
             // Start the scroll attempt after initial delay
             const scrollTimer = setTimeout(() => {
                 attemptScroll();
             }, 800); // Longer initial delay for Framer Motion animations
-            
+
             return () => clearTimeout(scrollTimer);
         }
     }, [newlyAddedOrDuplicatedXPath]);
@@ -596,18 +596,18 @@ const DataTree = ({
                 )}
                 <AnimatePresence mode="wait">
                     <div className={`tree-view-container ${needsFullRegenerationRef.current ? 'no-animation' : ''}`}>
-                    <TreeView
-                        key={treeViewKey}
-                        data={treeData}
-                        aria-label={modelName}
-                        nodeRenderer={nodeRenderer}
-                        expandedIds={updatedExpandedIds} // Control TreeView expansion
-                        multiSelect={false}
-                        onKeyDown={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault(); // Fully disables default keyboard behavior
-                        }}
-                    />
+                        <TreeView
+                            key={treeViewKey}
+                            data={treeData}
+                            aria-label={modelName}
+                            nodeRenderer={nodeRenderer}
+                            expandedIds={updatedExpandedIds} // Control TreeView expansion
+                            multiSelect={false}
+                            onKeyDown={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault(); // Fully disables default keyboard behavior
+                            }}
+                        />
                     </div>
                 </AnimatePresence>
             </div>

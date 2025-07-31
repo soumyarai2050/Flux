@@ -169,6 +169,8 @@ const LoadedView = ({
 }) => {
   const [columns, setColumns] = useState(cells);
   const [columnWidths, setColumnWidths] = useState({});
+  const [selectedRows, setSelectedRows] = useState([]);
+  const [lastSelectedRowId, setLastSelectedRowId] = useState(null);
   const columnRefs = useRef({});
   const tableWrapperRef = useRef(null);
 
@@ -196,7 +198,12 @@ const LoadedView = ({
     },
     callbacks: {
       onRowSelect: onRowSelect
-    }
+    },
+    // Add state tracking for proper up/down navigation
+    selectedRows,
+    lastSelectedRowId,
+    setSelectedRows,
+    setLastSelectedRowId
   });
 
   // const { containerRef, isScrollable, enableScrolling, disableScrolling } = useBoundaryScrollDetection();
@@ -204,6 +211,17 @@ const LoadedView = ({
   useEffect(() => {
     setColumns(cells);
   }, [cells])
+
+  // Sync selectedRows with selectedId prop
+  useEffect(() => {
+    if (selectedId !== null && selectedId !== undefined) {
+      setSelectedRows([selectedId]);
+      setLastSelectedRowId(selectedId);
+    } else {
+      setSelectedRows([]);
+      setLastSelectedRowId(null);
+    }
+  }, [selectedId]);
 
   // Sort sensors for drag-and-drop
   const sensors = useSensors(
@@ -471,7 +489,8 @@ const LoadedView = ({
 
                       return (
                         <Cell
-                          key={cellIndex}
+                          // key={cellIndex}
+                          key={`${rowKey}-${cell.key}-${cellIndex}`}
                           mode={mode}
                           selected={isSelected}
                           rowindex={rowIdx}

@@ -379,8 +379,8 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
         dispatch(actions.setIsCreating(true));
     }
 
-    const handleSave = (modifiedObj, force = false) => {
-        if (checkAndShowConflicts()) {
+    const handleSave = (modifiedObj, force = false, bypassConflictCheck = false) => {
+        if (!bypassConflictCheck && checkAndShowConflicts()) {
             return;
         }
 
@@ -458,12 +458,7 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
             return;
         }
         changesRef.current.active = activeChanges;
-        const changesCount = Object.keys(activeChanges).length;
-        if (changesCount === 1) {
-            executeSave();
-            return;
-        }
-        dispatch(actions.setPopupStatus({ confirmSave: true }));
+        handleSave(modelUpdatedObj, true, true);
     }
 
     const handleUpdate = (updatedObj) => {
@@ -573,7 +568,11 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
             onClose={handleFullScreenToggle}
         >
             <ModelCard id={modelName}>
-                <ModelCardHeader name={modelTitle}>
+                <ModelCardHeader 
+                    name={modelTitle}
+                    isMaximized={isMaximized}
+                    onMaximizeToggle={handleFullScreenToggle}
+                >
                     <MenuGroup
                         // column settings
                         columns={headCells}

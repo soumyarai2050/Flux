@@ -86,12 +86,11 @@ const HeaderField = (props) => {
      * Here we check if this header has an identifier,
      * and if so, we add the actual value in parentheses next to the title.
      * 
-     * Example: "Broker" becomes "Broker (ZERODHA)" if the broker field contains "ZERODHA"
+     * Example: "Broker" becomes "Broker [ZERODHA]" if the broker field contains "ZERODHA"
      * 
-     * @returns {string} - The display title with or without identifier value
+     * @returns {React.ReactNode} - The display title with or without identifier value
      */
     const getDisplayTitle = () => {
-        let displayTitle = title;
         // Check if this node has inherited array_obj_identifier from parent array , we have set this in complex props 
         if (props.data.array_obj_identifier) {
             const identifierValue = getIdentifierValue(
@@ -101,10 +100,14 @@ const HeaderField = (props) => {
                 props.data.storedDataForColor
             );
             if (identifierValue) {
-                displayTitle = `${title} [${identifierValue}]`;
+                return (
+                    <>
+                        {title} [<span style={{ fontStyle: 'italic' }}>{identifierValue}</span>]
+                    </>
+                );
             }
         }
-        return displayTitle;
+        return title;
     };
 
     let passToAddActiveContext = false;

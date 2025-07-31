@@ -746,25 +746,35 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
             # else not required for both above if cases - allowing only usual mongo collections as change stream is supported for them only
             output_str += f"            task_list.append(asyncio.create_task(watch_specific_collection_with_stream({message.proto.name}"
             has_update_agg_set = False
-            has_filter_agg_set = False
+            has_filter_agg_set_on_update = False
+            has_filter_agg_set_on_create = False
             for option_field_name, option_field_type in option_val.items():
                 if option_field_type == FastapiCallbackFileHandler.aggregation_type_update:
                     has_update_agg_set = True
                 elif option_field_type == FastapiCallbackFileHandler.aggregation_type_filter:
-                    has_filter_agg_set = True
-                elif option_field_type == FastapiCallbackFileHandler.aggregation_type_both:
-                    has_filter_agg_set = True
-                    has_update_agg_set = True
+                    if (option_field_name in [FastapiCallbackFileHandler.flux_json_root_update_field,
+                                              FastapiCallbackFileHandler.flux_json_root_update_all_field,
+                                              FastapiCallbackFileHandler.flux_json_root_patch_field,
+                                              FastapiCallbackFileHandler.flux_json_root_patch_all_field]):
+                        has_filter_agg_set_on_update = True
+                    elif option_field_name in [FastapiCallbackFileHandler.flux_json_root_create_field,
+                                               FastapiCallbackFileHandler.flux_json_root_create_all_field]:
+                        has_filter_agg_set_on_create = True
+
+                    if option_field_type == FastapiCallbackFileHandler.aggregation_type_both:
+                        has_update_agg_set = True
                 # else not required: if none of these using default values
 
+            message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
             if has_update_agg_set:
                 update_agg_set_message_list.append(message)
-                message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
                 output_str += f", filter_ws_updates_callable=self.{message_name_snake_cased}_update_ws_filter_callable"
-            elif has_filter_agg_set:
+            if has_filter_agg_set_on_create:
                 filer_agg_set_message_list.append(message)
-                message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
-                output_str += f", filter_agg_pipeline_callable=self.{message_name_snake_cased}_filter_agg_callable"
+                output_str += f", filter_agg_pipeline_callable_for_create_obj=self.{message_name_snake_cased}_filter_agg_callable"
+            if has_filter_agg_set_on_update:
+                filer_agg_set_message_list.append(message)
+                output_str += f", filter_agg_pipeline_callable_for_update_obj=self.{message_name_snake_cased}_filter_agg_callable"
             # else not required: if none of these is set then avoiding any param
             output_str += f")))\n"
 

@@ -338,7 +338,7 @@ async def _underlying_patch_n_put(msgspec_class_type: Type[MsgspecModel], proto_
         await gridfs_bucket_obj.upload_from_stream_with_id(
             file_id=_id,
             filename=str(_id),
-            source=orjson.dumps(updated_json_obj_dict),
+            source=orjson.dumps(updated_json_obj_dict, default=non_jsonable_types_handler),
         )
 
     else:
@@ -387,7 +387,7 @@ async def _underlying_patch_n_put_all(msgspec_class_type: Type[MsgspecModel], pr
             await gridfs_bucket_obj.upload_from_stream_with_id(
                 file_id=_id,
                 filename=str(_id),
-                source=orjson.dumps(updated_json_obj_dict),
+                source=orjson.dumps(updated_json_obj_dict, default=non_jsonable_types_handler),
             )
     else:
         collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.collection_obj
@@ -1253,7 +1253,8 @@ def generic_encoder(obj_to_encode: Any, enc_hook: Callable, exclude_none: bool =
 
 async def watch_specific_collection_with_stream(msgspec_class_type: Type[MsgspecModel],
                                                 filter_ws_updates_callable: Callable | None = None,
-                                                filter_agg_pipeline_callable: Callable | None = None):
+                                                filter_agg_pipeline_callable_for_create_obj: Callable | None = None,
+                                                filter_agg_pipeline_callable_for_update_obj: Callable | None = None):
     """Watches a specific collection for changes."""
 
     collection_cursor: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.collection_obj
@@ -1272,9 +1273,19 @@ async def watch_specific_collection_with_stream(msgspec_class_type: Type[Msgspec
                             continue
                         # else not required: if passes check allowing it for ws update
                     # else not required: if no filter_ws_updates_callable passed - no need for any handling
-                    if filter_agg_pipeline_callable is not None:
-                        filter_agg_pipeline = filter_agg_pipeline_callable(updated_or_created_obj)
-                        fetched_obj: Dict = await get_obj(msgspec_class_type, document_id, filter_agg_pipeline)
+                    if change['operationType'] == 'insert' and filter_agg_pipeline_callable_for_create_obj is not None:
+                        filter_agg_pipeline = filter_agg_pipeline_callable_for_create_obj(updated_or_created_obj)
+                        fetched_obj: Dict | None = await get_obj(msgspec_class_type, document_id, filter_agg_pipeline)
+
+                        # handling all datetime fields - converting to epoch int values - caller of this function will handle
+                        # these fields back if required
+                        msgspec_class_type.convert_ts_fields_from_datetime_to_epoch_int(fetched_obj)
+                        await publish_ws(msgspec_class_type, document_id, fetched_obj,
+                                         update_ws_with_id=True)
+                    elif change['operationType'] == 'update' and filter_agg_pipeline_callable_for_update_obj is not None:
+                        filter_agg_pipeline = filter_agg_pipeline_callable_for_create_obj(updated_or_created_obj)
+                        fetched_obj: Dict | None = await get_obj(msgspec_class_type, document_id, filter_agg_pipeline)
+
                         # handling all datetime fields - converting to epoch int values - caller of this function will handle
                         # these fields back if required
                         msgspec_class_type.convert_ts_fields_from_datetime_to_epoch_int(fetched_obj)

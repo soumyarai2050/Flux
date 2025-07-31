@@ -29,7 +29,7 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
 
     const { schema: modelSchema, fieldsMetadata, actions, selector, isAbbreviationSource = false } = modelDataSource;
     const modelRootFieldsMetadata = schemaCollections[modelRootName];
-    const { storedObj, updatedObj, objId, mode, isCreating, error, isLoading, allowUpdates,popupStatus } = useSelector(selector);
+    const { storedObj, updatedObj, objId, mode, isCreating, error, isLoading, allowUpdates, popupStatus } = useSelector(selector);
     const { storedObj: dataSourceStoredObj } = useSelector(dataSource?.selector ?? (() => ({ storedObj: null })), (prev, curr) => {
         return JSON.stringify(prev) === JSON.stringify(curr);
     });
@@ -128,7 +128,7 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
         checkAndShowConflicts,
         closeConflictPopup,
         getBaselineForComparison,
-    } = useConflictDetection(storedObj, updatedObj, mode, modelRootFieldsMetadata, allowUpdates,isCreating);
+    } = useConflictDetection(storedObj, updatedObj, mode, modelRootFieldsMetadata, allowUpdates, isCreating);
 
     useEffect(() => {
         const url = getServerUrl(modelSchema, dataSourceStoredObj, dataSource?.fieldsMetadata);
@@ -381,8 +381,8 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
         dispatch(actions.setIsCreating(true));
     }
 
-    const handleSave = (modifiedObj, force = false) => {
-        if (checkAndShowConflicts()) {
+    const handleSave = (modifiedObj, force = false, bypassConflictCheck = false) => {
+        if (!bypassConflictCheck && checkAndShowConflicts()) {
             return;
         }
 
@@ -460,12 +460,7 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
             return;
         }
         changesRef.current.active = activeChanges;
-        const changesCount = Object.keys(activeChanges).length;
-        if (changesCount === 1) {
-            executeSave();
-            return;
-        }
-        dispatch(actions.setPopupStatus({ confirmSave: true }));
+        handleSave(modelUpdatedObj, true, true);
     }
 
     const handleUpdate = (updatedObj) => {
@@ -575,7 +570,11 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
             onClose={handleFullScreenToggle}
         >
             <ModelCard id={modelName}>
-                <ModelCardHeader name={modelTitle}>
+                <ModelCardHeader 
+                    name={modelTitle}
+                    isMaximized={isMaximized}
+                    onMaximizeToggle={handleFullScreenToggle}
+                >
                     <MenuGroup
                         // column settings
                         columns={headCells}
