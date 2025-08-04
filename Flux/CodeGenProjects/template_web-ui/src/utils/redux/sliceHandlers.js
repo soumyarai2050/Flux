@@ -30,7 +30,7 @@ export function setStoredArrayHandler(state, action, config) {
   const { modelKeys, modelName, modelType, initialState, isAbbreviationSource } = config;
   const { storedArrayKey, storedObjKey, updatedObjKey, objIdKey } = modelKeys;
   state[storedArrayKey] = action.payload;
-  if (modelName === 'ui_layout') return;
+  // if (modelName === 'ui_layout') return;
   if ([MODEL_TYPES.ROOT, MODEL_TYPES.NON_ROOT].includes(modelType) && state[objIdKey] && state[objIdKey] !== NEW_ITEM_ID && !action.payload.find((o) => o[DB_ID] === state[objIdKey])) {
     state[objIdKey] = null;
   }

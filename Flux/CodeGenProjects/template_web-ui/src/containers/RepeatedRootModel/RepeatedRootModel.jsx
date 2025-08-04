@@ -302,7 +302,7 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
     }
 
     socketRef.current = useWebSocketWorker({
-        url: (modelSchema.is_large_db_object || modelSchema.is_time_series) ? url : viewUrl,
+        url: (modelSchema.is_large_db_object || modelSchema.is_time_series || modelLayoutOption.depending_proto_model_for_cpp_port) ? url : viewUrl,
         modelName,
         isDisabled: false,
         reconnectCounter,
@@ -312,7 +312,8 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
         params,
         crudOverrideDict: crudOverrideDictRef.current,
         uiLimit,
-        isAlertModel: modelLayoutOption.is_model_alert_type
+        isAlertModel: modelLayoutOption.is_model_alert_type,
+        isCppModel: modelLayoutOption.depending_proto_model_for_cpp_port
     })
 
     const handleModeToggle = () => {

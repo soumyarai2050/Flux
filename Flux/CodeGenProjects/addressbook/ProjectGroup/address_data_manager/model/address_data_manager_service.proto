@@ -46,7 +46,7 @@ message BarData {
     },
     QueryParams: {
       QueryParamName: "bar_type_list",
-      QueryParamDataType: "List[BarType] | None = None"
+      QueryParamDataType: "List[str] | None = None"
     },
     QueryParams: {
       QueryParamName: "start_time",
@@ -56,7 +56,6 @@ message BarData {
       QueryParamName: "end_time",
       QueryParamDataType: "pendulum.DateTime | None = None"
     },
-    QueryRouteType: PATCH
   };
   option (FluxMsgJsonQuery) = {
     QueryName: "get_aggregated_bar_data",
@@ -84,7 +83,6 @@ message BarData {
       QueryParamName: "symbol_list",
       QueryParamDataType: "List[str] | None = None"
     },
-    QueryRouteType: PATCH
   };
   option (FluxMsgJsonQuery) = {
     QueryName: "filter_one_min_bar_data",
@@ -104,7 +102,7 @@ message BarData {
       QueryParamName: "symbol_list",
       QueryParamDataType: "List[str] | None = None"
     },
-    QueryRouteType: PATCH
+
   };
   option (FluxMsgStringLength) = 128;
   required int32 id = 1;

@@ -31,12 +31,14 @@ onmessage = (e) => {
     });  // not used externally
     const groupedColumns = getGroupedTableColumns(columns, maxRowSize, groupedRows, [], mode, false);  // headCells
     let commonKeys;
+    let nullColumns;
     if (mode === MODES.EDIT) {
         commonKeys = [];
+        nullColumns = [];
     } else {
-        commonKeys = getCommonKeyCollections(activeRows, groupedColumns, !showHidden && !showAll, false, false, !showMore && !moreAll);
+        [commonKeys, nullColumns] = getCommonKeyCollections(activeRows, groupedColumns, !showHidden && !showAll, false, false, !showMore && !moreAll);
     }
-    const cells = getFilteredCells(groupedColumns, commonKeys, showHidden, showAll, showMore, moreAll);
+    const cells = getFilteredCells(groupedColumns, [...commonKeys, ...nullColumns], showHidden, showAll, showMore, moreAll);
     const sortedCells = sortColumns(cells, columnOrders, false, false, false, false);
     postMessage({ rows: filteredRows, groupedRows: sortedRows, activeRows, maxRowSize, headCells: groupedColumns, commonKeys, uniqueValues, sortedCells });
 }

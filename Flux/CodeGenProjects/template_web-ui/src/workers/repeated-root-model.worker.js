@@ -35,12 +35,15 @@ onmessage = (e) => {
         noCommonKeyOverride,
     }, false, true);  // not used externally
     const groupedColumns = getGroupedTableColumns(columns, maxRowSize, groupedRows, joinBy, updatedMode, false);  // headCells
+    let commonKeys;
+    let nullColumns;
     if (updatedMode === MODES.EDIT) {
-        var commonKeys = [];
+        commonKeys = [];
+        nullColumns = [];
     } else {
-        var commonKeys = getCommonKeyCollections(activeRows, groupedColumns, !showHidden && !showAll, false, true, !showMore && !moreAll);
+        [commonKeys, nullColumns] = getCommonKeyCollections(activeRows, groupedColumns, !showHidden && !showAll, false, true, !showMore && !moreAll);
     }
-    const cells = getFilteredCells(groupedColumns, commonKeys, showHidden, showAll, showMore, moreAll);
+    const cells = getFilteredCells(groupedColumns, [...commonKeys, ...nullColumns], showHidden, showAll, showMore, moreAll);
     const sortedCells = sortColumns(cells, columnOrders, joinBy && joinBy.length > 0, centerJoin, flip);
     postMessage({ rows, groupedRows: sortedRows, activeRows, maxRowSize, headCells: groupedColumns, commonKeys, uniqueValues, sortedCells });
 }

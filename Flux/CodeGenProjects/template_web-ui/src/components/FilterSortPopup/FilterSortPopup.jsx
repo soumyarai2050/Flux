@@ -436,7 +436,7 @@ const FilterSortPopup = ({
           <Divider />
 
           {/* Filter section */}
-          {filterEnable && (
+          {filterEnable && uniqueValues.length > 1 && (
             <div className={styles.section}>
               <div className={styles.searchContainer}>
                 <TextField

@@ -1800,7 +1800,7 @@ function processArrayItemsSimple(tree, schema, currentSchema, propname, callerPr
             const updatedxpath = `${xpath}[${i}]`;
             paths.push(updatedxpath);
 
-            if (!isNodeInSubtree(callerProps, xpath, updatedxpath)) continue;
+            if (currentSchema.abbreviated !== 'JSON' && !isNodeInSubtree(callerProps, xpath, updatedxpath)) continue;
 
             itemMetadata.push({
                 originalIndex: i,

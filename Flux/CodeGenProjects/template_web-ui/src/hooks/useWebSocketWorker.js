@@ -15,7 +15,8 @@ function useWebSocketWorker({
   uiLimit = null,
   isAlertModel = false,
   crudOverrideDict = null,
-  params = null
+  params = null,
+  isCppModel = false
 }) {
   // Get the current stored array from Redux (slice can be dynamic)
   const { storedArray } = useSelector(selector);
@@ -51,18 +52,18 @@ function useWebSocketWorker({
 
     const wsUrl = url.replace('http', 'ws');
     let apiUrl = `${wsUrl}/get-all-${modelName}-ws`;
-    if (uiLimit) {
+    if (uiLimit && !isCppModel) {
       apiUrl += `?limit_obj_count=${uiLimit}`
     }
     if (crudOverrideDict?.GET_ALL) {
       const { endpoint, paramDict } = crudOverrideDict.GET_ALL;
       if (!params && Object.keys(paramDict).length > 0) return;
       apiUrl = `${wsUrl}/ws-${endpoint}`;
-      if (uiLimit) {
+      if (uiLimit && !isCppModel) {
         apiUrl += `?limit_obj_count=${uiLimit}`
       }
       if (params) {
-        let paramsStr = uiLimit ? '&' : '?';
+        let paramsStr = uiLimit && !isCppModel ? '&' : '?';
         paramsStr += Object.keys(params).map((k) => `${k}=${params[k]}`).join('&');
         apiUrl += paramsStr;
       }

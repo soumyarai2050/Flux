@@ -86,12 +86,20 @@ const DataTree = ({
     // ref to track when full regeneration is needed
     const needsFullRegenerationRef = useRef(false);
     const isInitialMount = useRef(true);
+    const previousModeRef = useRef(mode); // Track previous mode to detect changes
 
     // Recalculates the default expansion level when treeLevel or xpath props change.
     useEffect(() => {
         levelRef.current = treeLevel ? treeLevel : xpath ? 3 : 2;
     }, [treeLevel, xpath]);
 
+    // Detect mode changes and flag for full regeneration
+    useEffect(() => {
+        if (previousModeRef.current !== mode) {
+            needsFullRegenerationRef.current = true;
+            previousModeRef.current = mode;
+        }
+    }, [mode]);
 
     // Initializes and terminates the data processing web worker.
     useEffect(() => {

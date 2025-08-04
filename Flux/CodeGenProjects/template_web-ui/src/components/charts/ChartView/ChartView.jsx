@@ -5,7 +5,7 @@ import {
     Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Divider, List, ListItem, ListItemButton, ListItemText
 } from '@mui/material';
 import { cloneDeep, get, isEqual } from 'lodash';
-import { Add, Close, Delete, Save, ContentCopy } from '@mui/icons-material';
+import { Add, Close, Delete, Save, ContentCopy, Error } from '@mui/icons-material';
 // project constants and common utility function imports
 import { DATA_TYPES, MODES, API_ROOT_URL, MODEL_TYPES, DB_ID } from '../../../constants';
 import { addxpath, clearxpath } from '../../../utils/core/dataAccess';
@@ -39,7 +39,6 @@ function ChartView({
     onRowSelect,
     onReload,
     onChartDataChange,
-    // onChartDelete,
     onModeToggle,
     mode,
     onChartSelect,
@@ -55,43 +54,317 @@ function ChartView({
     const theme = useTheme();
     const { schema: projectSchema, schemaCollections } = useSelector(state => state.schema);
 
-    const [storedChartObj, setStoredChartObj] = useState({});
-    const [updatedChartObj, setUpdatedChartObj] = useState({});
-    const [selectedIndex, setSelectedIndex] = useState(selectedChartName ? chartData.findIndex((o) => o.chart_name === selectedChartName) : null);
+    // Core chart state
+    const [storedChartObj, setStoredChartObj] = useState({});     // Original chart configuration from props
+    const [updatedChartObj, setUpdatedChartObj] = useState({});  // Chart config with xpath for editing
+    const [selectedIndex, setSelectedIndex] = useState(
+        selectedChartName ? chartData.findIndex((o) => o.chart_name === selectedChartName) : null
+    );
+
+    // UI state
     const [isChartOptionOpen, setIsChartOptionOpen] = useState(false);
     const [isConfirmPopupOpen, setIsConfirmPopupOpen] = useState(false);
-    // const [mode, setMode] = useState(MODES.READ);
-    const [data, setData] = useState({});
-    const [chartOption, setChartOption] = useState({});
-    const [tsData, setTsData] = useState({});
-    const [datasets, setDatasets] = useState([]);
-    const [rows, setRows] = useState(chartRows);
-    const [queryDict, setQueryDict] = useState({});
-    // TODO: check if updateCounters are irrelevent
+    const [isValidationErrorOpen, setIsValidationErrorOpen] = useState(false);
+    const [validationErrors, setValidationErrors] = useState([]);
+    const [isCreate, setIsCreate] = useState(false);
+    const [data, setData] = useState({});                        // Current editing data
+
+    // Chart rendering state
+    const [chartOption, setChartOption] = useState({});          // Final ECharts configuration
+    const [datasets, setDatasets] = useState([]);               // Chart datasets for rendering
+    const [rows, setRows] = useState(chartRows);                // Filtered chart data rows
+
+    // Time-series specific state
+    const [tsData, setTsData] = useState({});                    // Collected time-series data from WebSockets
+    const [queryDict, setQueryDict] = useState({});             // Maps series index to query configuration
+
+    // Update counters for controlling cascading effects
     const [chartUpdateCounter, setChartUpdateCounter] = useState(0);
-    const [tsUpdateCounter, setTsUpdateCounter] = useState(0);
     const [datasetUpdateCounter, setDatasetUpdateCounter] = useState(0);
     const [reloadCounter, setReloadCounter] = useState(0);
-    const [schema, setSchema] = useState(updateChartSchema(projectSchema, fieldsMetadata, modelType === MODEL_TYPES.ABBREVIATION_MERGE));
+
+    // Schema and filter state
+    const [schema, setSchema] = useState(
+        updateChartSchema(projectSchema, fieldsMetadata, modelType === MODEL_TYPES.ABBREVIATION_MERGE)
+    );
     const [selectedData, setSelectedData] = useState([]);
     const [selectedSeriesIdx, setSelectedSeriesIdx] = useState(null);
-    const [isCreate, setIsCreate] = useState(false);
+
+    // Pinned filters state
     const [pinnedFilters, setPinnedFilters] = useState([]);
     const [pinnedFiltersByChart, setPinnedFiltersByChart] = useState({});
     const [textToCopy, setTextToCopy] = useState('');
     const pinnedFilterUpdateRef = useRef(false);
-    const socketList = useRef([]);
-    const getAllWsDict = useRef({});
 
-    // 1. update chart schema to add flux properties to necessary fields
-    // 2. identify is chart configuration has time series field in y-axis (limitation) 
-    // 3. create datasets based on chart configuration (for both time-series and non time-series)
-    //    - default rows to be already present in dataset. set name of dataset as default
-    //    - if chart configuration has time series, time series data is fetched from query (oe queries) 
-    //      based on applied filter 
-    //    - if not time-series, apply filter on rows 
-    //    - add only the necessary field in filter dropdown for time-series
-    // 4. create expanded chart configuration object to be used by echart using stored chart configuration and datasets 
+    // =============================================
+    // WEBSOCKET WORKER MANAGEMENT SYSTEM
+    // =============================================
+
+    /**
+     * Refs for stable worker management across re-renders
+     * - workersRef: Map of fingerprint -> {worker, socket, queryName}
+     * - currentQueriesRef: Tracks current active query fingerprints for comparison
+     */
+    const workersRef = useRef(new Map());
+    const currentQueriesRef = useRef(new Map());
+
+    /**
+     * Creates a stable fingerprint for a WebSocket connection based on:
+     * - Root URL (can vary based on connection details)
+     * - Query name (identifies the data stream)
+     * - Meta filter parameters (affects data filtering)
+     * 
+     * This ensures each unique combination gets its own worker/socket
+     */
+
+    const createQueryFingerprint = useCallback((seriesIndex, query, metaFilterDict, rootUrl) => {
+        if (!query) return null;
+
+        // Build parameter string from meta filters
+        let paramStr = '';
+        for (const key in metaFilterDict) {
+            if (paramStr) {
+                paramStr += `&${key}=${metaFilterDict[key]}`;
+            } else {
+                paramStr = `${key}=${metaFilterDict[key]}`;
+            }
+        }
+
+        // Create unique fingerprint: URL + query + parameters
+        return `${rootUrl}/ws-query-${query.name}?${paramStr}`;
+    }, []);
+
+    /**
+     * Extracts worker information for a chart series, handling:
+     * - Collection mapping validation
+     * - Root URL determination (can be external service)
+     * - Query extraction from queryDict
+     * 
+     * Returns null if series doesn't support time-series data
+     */
+
+    const getSeriesWorkerInfo = useCallback((series, index) => {
+        const collection = getCollectionByName(
+            fieldsMetadata,
+            series.encode.y,
+            modelType === MODEL_TYPES.ABBREVIATION_MERGE
+        );
+
+        // Only process series that have time-series mapping
+        if (!collection.hasOwnProperty('mapping_src')) {
+            return null;
+        }
+
+        // Determine root URL - may be external service based on mapping model
+        let rootUrl = API_ROOT_URL;
+        const mappingModelName = collection.mapping_src?.split('.')[0];
+        if (mappingModelName) {
+            const mappingModelSchema = getModelSchema(mappingModelName, projectSchema);
+            if (mappingModelSchema?.connection_details) {
+                const { host, port, project_name } = mappingModelSchema.connection_details;
+                rootUrl = `http://${host}:${port}/${project_name}`;
+            }
+        }
+
+        const query = queryDict[index];
+        if (!query) {
+            return null;
+        }
+
+        return { collection, rootUrl, query };
+    }, [fieldsMetadata, modelType, projectSchema, queryDict]);
+
+    /**
+     * Generates all required worker fingerprints for current chart configuration
+     * Each series can generate multiple fingerprints based on meta filters
+     * 
+     * Returns Map of fingerprint -> {index, query, rootUrl, metaFilterDict}
+     */
+    const generateAllFingerprints = useCallback((metaFilters) => {
+        const fingerprints = new Map();
+
+        storedChartObj.series?.forEach((series, index) => {
+            const workerInfo = getSeriesWorkerInfo(series, index);
+            if (!workerInfo) return;
+
+            const { query, rootUrl } = workerInfo;
+
+            // Each meta filter creates a separate worker/connection
+            metaFilters.forEach(metaFilterDict => {
+                const fingerprint = createQueryFingerprint(index, query, metaFilterDict, rootUrl);
+                if (fingerprint) {
+                    fingerprints.set(fingerprint, { index, query, rootUrl, metaFilterDict });
+                }
+            });
+        });
+
+        return fingerprints;
+    }, [storedChartObj.series, getSeriesWorkerInfo, createQueryFingerprint]);
+
+    /**
+     * Creates a new WebSocket worker for a specific fingerprint
+     * Sets up the data flow: WebSocket -> Worker -> React State
+     */
+    const createWorker = useCallback((fingerprint, query) => {
+
+        // Create worker for data processing
+        const worker = new Worker(new URL('../../../workers/websocket-update.worker.js', import.meta.url));
+
+        // Create WebSocket connection (convert http URL to ws)
+        const wsUrl = fingerprint.replace('http', 'ws');
+        const socket = new WebSocket(wsUrl);
+
+        // Forward WebSocket messages to worker for processing
+        socket.onmessage = (event) => {
+            worker.postMessage({
+                messages: [event.data],
+                storedArray: [],
+                uiLimit: null,
+                isAlertModel: false
+            });
+        };
+
+        // Handle processed data from worker
+        worker.onmessage = (event) => {
+            const processedData = event.data;
+
+            // Only update state when in read mode and data is valid
+            if (mode === MODES.READ && processedData && Array.isArray(processedData)) {
+                setTsData(prevTsData => {
+                    const updatedTsData = { ...prevTsData };
+
+                    // Append new data to existing query data or create new entry
+                    if (updatedTsData[query.name]) {
+                        updatedTsData[query.name] = [...updatedTsData[query.name], ...processedData];
+                    } else {
+                        updatedTsData[query.name] = processedData;
+                    }
+
+                    return updatedTsData;
+                });
+            }
+        };
+
+        // Store worker reference for cleanup
+        workersRef.current.set(fingerprint, { socket, worker, queryName: query.name });
+    }, [mode]);
+
+    /**
+     * Cleans up a specific worker and its WebSocket connection
+     */
+    const cleanupWorker = useCallback((fingerprint) => {
+        const workerInfo = workersRef.current.get(fingerprint);
+        if (workerInfo) {
+            const { socket, worker } = workerInfo;
+
+            if (socket) socket.close();
+            if (worker) worker.terminate();
+            workersRef.current.delete(fingerprint);
+        }
+    }, []);
+
+    // =============================================
+    // MAIN WORKER MANAGEMENT EFFECT
+    // =============================================
+
+    /**
+     * This is the core effect that manages WebSocket workers for time-series data.
+     * It runs when chart configuration, queries, or filters change.
+     * 
+     * Flow:
+     * 1. Check if time-series is enabled
+     * 2. Generate required worker fingerprints
+     * 3. Compare with existing workers
+     * 4. Cleanup outdated workers
+     * 5. Create new workers as needed
+     */
+
+    useEffect(() => {
+        // Early exit: cleanup everything if not time-series chart
+        if (!storedChartObj.series || !storedChartObj.time_series) {
+            workersRef.current.forEach(({ socket, worker }) => {
+                if (socket) socket.close();
+                if (worker) worker.terminate();
+            });
+            workersRef.current.clear();
+            currentQueriesRef.current.clear();
+            setTsData({});
+            return;
+        }
+
+        // Get chart filters and generate meta filters for WebSocket queries
+        const filterDict = getChartFilterDict(storedChartObj.filters);
+        if (Object.keys(filterDict).length === 0) return;
+
+        const metaFilters = genMetaFilters(
+            rows,
+            fieldsMetadata,
+            filterDict,
+            Object.keys(filterDict)[0],
+            modelType === MODEL_TYPES.ABBREVIATION_MERGE
+        );
+
+        // Generate all required fingerprints for current configuration
+        const allFingerprints = generateAllFingerprints(metaFilters);
+
+        // Check if worker configuration has changed
+        const currentFingerprints = new Set(Array.from(workersRef.current.keys()));
+        const newFingerprints = new Set(Array.from(allFingerprints.keys()));
+
+        const fingerprintsChanged = currentFingerprints.size !== newFingerprints.size ||
+            Array.from(newFingerprints).some(fp => !currentFingerprints.has(fp));
+
+        // Early exit: no changes needed
+        if (!fingerprintsChanged) {
+            return;
+        }
+
+        // Cleanup workers that are no longer needed
+        workersRef.current.forEach(({ socket, worker }, fingerprint) => {
+            if (!newFingerprints.has(fingerprint)) {
+                cleanupWorker(fingerprint);
+            }
+        });
+
+        // Create workers for new fingerprints
+        allFingerprints.forEach(({ query }, fingerprint) => {
+            if (!workersRef.current.has(fingerprint)) {
+                createWorker(fingerprint, query);
+            }
+        });
+
+        // Update tracking reference
+        currentQueriesRef.current = new Map(Array.from(newFingerprints).map(fp => [fp, fp]));
+
+    }, [
+        storedChartObj.series,
+        storedChartObj.time_series,
+        queryDict,
+        projectSchema,
+        fieldsMetadata,
+        modelType,
+        rows,
+        mode,
+        generateAllFingerprints,
+        createWorker,
+        cleanupWorker
+    ]);
+
+    // Component unmount cleanup - ensure all workers are properly terminated
+    useEffect(() => {
+        return () => {
+            workersRef.current.forEach(({ socket, worker }) => {
+                if (socket) socket.close();
+                if (worker) worker.terminate();
+            });
+            workersRef.current.clear();
+            currentQueriesRef.current.clear();
+        };
+    }, []);
+
+    // =============================================
+    // EXISTING CHARTVIEW LOGIC
+    // =============================================
 
     useEffect(() => {
         const updatedIndex = selectedChartName ? chartData.findIndex((o) => o.chart_name === selectedChartName) : null;
@@ -206,80 +479,15 @@ function ChartView({
                 }
             })
             setQueryDict(updatedQueryDict);
-            // if (!storedChartObj.time_series) {
-            //     // if not time series, apply the filters on rows
-            //     if (storedChartObj.filters && storedChartObj.filters.length > 0) {
-            //         const updatedRows = applyFilter(rows, storedChartObj.filters, modelType === MODEL_TYPES.ABBREVIATION_MERGE, fieldsMetadata);
-            //         setRows(updatedRows);
-            //     } else {
-            //         setRows(chartRows);
-            //     }
-            // }
         }
     }, [chartUpdateCounter])
-
-    useEffect(() => {
-        if (storedChartObj.series && storedChartObj.time_series) {
-            const filterDict = getChartFilterDict(storedChartObj.filters);
-            if (Object.keys(filterDict).length > 0) {
-                const metaFilters = genMetaFilters(rows, fieldsMetadata, filterDict, Object.keys(filterDict)[0], modelType === MODEL_TYPES.ABBREVIATION_MERGE);
-                storedChartObj.series.forEach((series, index) => {
-                    const collection = getCollectionByName(fieldsMetadata, series.encode.y, modelType === MODEL_TYPES.ABBREVIATION_MERGE);
-                    if (collection.hasOwnProperty('mapping_src')) {
-                        let rootUrl = API_ROOT_URL;
-                        const mappingModelName = collection.mapping_src?.split('.')[0];
-                        if (mappingModelName) {
-                            const mappingModelSchema = getModelSchema(mappingModelName, projectSchema);
-                            if (mappingModelSchema?.connection_details) {
-                                const { host, port, project_name } = mappingModelSchema.connection_details;
-                                rootUrl = `http://${host}:${port}/${project_name}`;
-                            }
-                        }
-                        const query = queryDict[index];
-                        if (query) {
-                            metaFilters.forEach(metaFilterDict => {
-                                let paramStr;
-                                for (const key in metaFilterDict) {
-                                    if (paramStr) {
-                                        paramStr += `&${key}=${metaFilterDict[key]}`;
-                                    } else {
-                                        paramStr = `${key}=${metaFilterDict[key]}`;
-                                    }
-                                }
-                                const socket = new WebSocket(`${rootUrl.replace('http', 'ws')}/ws-query-${query.name}?${paramStr}`);
-                                socketList.current.push(socket);
-                                socket.onmessage = (event) => {
-                                    let updatedData = JSON.parse(event.data);
-                                    if (getAllWsDict.current[query.name]) {
-                                        getAllWsDict.current[query.name].push(...updatedData);
-                                    } else {
-                                        getAllWsDict.current[query.name] = updatedData;
-                                    }
-                                }
-                            })
-                        }
-                    }
-                })
-            }
-        }
-        return () => {
-            socketList.current.forEach(socket => {
-                if (socket) {
-                    socket.close();
-                }
-            })
-            socketList.current = [];
-            getAllWsDict.current = {};
-            setTsData({});
-        }
-    }, [chartUpdateCounter, reloadCounter, queryDict, rows])
 
     useEffect(() => {
         // create the datasets for chart configuration (time-series and non time-series both)
         const updatedDatasets = genChartDatasets(rows, tsData, storedChartObj, queryDict, fieldsMetadata, modelType === MODEL_TYPES.ABBREVIATION_MERGE);
         setDatasets(updatedDatasets);
         setDatasetUpdateCounter(prevCount => prevCount + 1);
-    }, [chartUpdateCounter, rows, tsUpdateCounter, queryDict])
+    }, [chartUpdateCounter, rows, tsData, queryDict])
 
     useEffect(() => {
         if (storedChartObj.series) {
@@ -288,85 +496,6 @@ function ChartView({
             setChartOption(updatedChartOption);
         }
     }, [datasetUpdateCounter, queryDict])
-
-    const flushGetAllWs = useCallback(() => {
-        /* apply get-all websocket changes */
-        if (Object.keys(getAllWsDict.current).length > 0 && mode === MODES.READ) {
-            const updatedWsDict = cloneDeep(getAllWsDict.current);
-            getAllWsDict.current = {}
-            const updatedTsData = mergeTsData(tsData, updatedWsDict, queryDict);
-            setTsData(updatedTsData);
-            setTsUpdateCounter(prevCount => prevCount + 1);
-        }
-    }, [tsData, queryDict, mode])
-
-    useEffect(() => {
-        const intervalId = setInterval(flushGetAllWs, 500);
-        return () => {
-            clearInterval(intervalId);
-        }
-    }, [tsData, queryDict, mode])
-
-    // useEffect(() => {
-    //     if (modelType === MODEL_TYPES.ABBREVIATION_MERGE && selectedData > 0) {
-    //         const idField = abbreviation.split(':')[0];
-    //         if (storedChartObj.time_series) {
-    //             console.log();
-    //             // const query = queryDict[selectedData.seriesIndex];
-    //             // if (query) {
-    //             //     const keys = query.params.map(param => {
-    //             //         const collection = fieldsMetadata.find(col => {
-    //             //             if (col.hasOwnProperty('mapping_underlying_meta_field')) {
-    //             //                 const [, ...mappedFieldSplit] = col.mapping_underlying_meta_field.split('.');
-    //             //                 const mappedField = mappedFieldSplit.join('.');
-    //             //                 if (mappedField === param) {
-    //             //                     return true;
-    //             //                 }
-    //             //             }
-    //             //             return false;
-    //             //         })
-    //             //         if (modelType === MODEL_TYPES.ABBREVIATION_MERGE) {
-    //             //             return collection.key;
-    //             //         } else {
-    //             //             return collection.tableTitle;
-    //             //         }
-    //             //     })
-    //             //     const filterCriteria = {};
-    //             //     query.params.forEach((param, index) => {
-    //             //         filterCriteria[keys[index]] = get(selectedData, param);
-    //             //     })
-    //             //     const row = rows.find(row => {
-    //             //         let found = true;
-    //             //         Object.keys(filterCriteria).forEach(field => {
-    //             //             if (row[field] !== filterCriteria[field]) {
-    //             //                 found = false;
-    //             //             }
-    //             //         })
-    //             //         if (found) return true;
-    //             //         return false;
-    //             //     })
-    //             //     if (row) {
-    //             //         if (row.hasOwnProperty(idField)) {
-    //             //             let id = row[idField];
-    //             //             if (typeof id === DATA_TYPES.STRING) {
-    //             //                 id = getIdFromAbbreviatedKey(abbreviation, id);
-    //             //             }
-    //             //             onRowSelect(id);
-    //             //             onChartPointSelect([id]);
-    //             //         }
-    //             //     }
-    //             // }
-    //         } else {
-    //             const recentItemId = selectedData[selectedData.length - 1];
-    //             // let id = selectedData[idField];
-    //             // if (typeof id === DATA_TYPES.STRING) {
-    //             //     id = getIdFromAbbreviatedKey(abbreviation, id);
-    //             // }
-    //             onRowSelect(recentItemId);
-    //             onChartPointSelect([id]);
-    //         }
-    //     }
-    // }, [selectedData, queryDict])
 
     const handleSelectDataChange = (e, dataId, seriesIdx) => {
         if (storedChartObj.time_series) return;
@@ -423,18 +552,84 @@ function ChartView({
         setDatasets([]);
         setTsData({});
         setQueryDict({});
-        setTsUpdateCounter(0);
         setDatasetUpdateCounter(0);
     }
 
+    const validateChartData = (chartData) => {
+        const errors = [];
+
+        // Check for required chart_name field
+        if (!chartData.chart_name || chartData.chart_name.trim() === '') {
+            errors.push('Chart name is required');
+        }
+
+        // Check series validation
+        if (chartData.series && chartData.series.length > 0) {
+            chartData.series.forEach((series, index) => {
+                // Check for required type field
+                if (!series.type || series.type.trim() === '') {
+                    errors.push(`Series ${index + 1}: Type is required`);
+                } else if (series.type === 'CHART_TYPE_UNSPECIFIED') {
+                    errors.push(`Series ${index + 1}: Please select a valid chart type`);
+                }
+
+                // Check for required encode field
+                if (!series.encode) {
+                    errors.push(`Series ${index + 1}: Encode is required`);
+                } else {
+                    // Check for required y field in encode
+                    if (!series.encode.y || series.encode.y.trim() === '') {
+                        errors.push(`Series ${index + 1}: Y axis field is required`);
+                    }
+
+                    // Check for required x field in encode (conditional)
+                    // x is required unless it's time-series and field on y-axis has projection
+                    if (!chartData.time_series) {
+                        // If not time-series, x is required
+                        if (!series.encode.x || series.encode.x.trim() === '') {
+                            errors.push(`Series ${index + 1}: X axis field is required when time-series is disabled`);
+                        }
+                    }
+                }
+            });
+        } else {
+            errors.push('At least one series is required');
+        }
+
+        // Check filters validation
+        if (chartData.filters && chartData.filters.length > 0) {
+            chartData.filters.forEach((filter, index) => {
+                // Check for required fld_name field
+                if (!filter.fld_name || filter.fld_name.trim() === '') {
+                    errors.push(`Filter ${index + 1}: Field name is required`);
+                }
+
+                // Check for required fld_value field
+                if (!filter.fld_value || (Array.isArray(filter.fld_value) && filter.fld_value.length === 0)) {
+                    errors.push(`Filter ${index + 1}: Field value is required`);
+                }
+            });
+        }
+
+        return errors;
+    }
+
     const handleSave = () => {
-        // setMode(MODES.READ);
+        const updatedObj = clearxpath(cloneDeep(data));
+
+        // Validate the chart data before saving
+        const errors = validateChartData(updatedObj);
+        if (errors.length > 0) {
+            setValidationErrors(errors);
+            setIsValidationErrorOpen(true);
+            return; // Don't save if validation fails
+        }
+
         onModeToggle();
-        const wasCreating = isCreate; // Check if we were in create mode
+        const wasCreating = isCreate;
         setIsCreate(false);
         setIsChartOptionOpen(false);
         setIsConfirmPopupOpen(false);
-        const updatedObj = clearxpath(cloneDeep(data));
         const idx = chartData.findIndex((o) => o.chart_name === updatedObj.chart_name);
         const updatedChartData = cloneDeep(chartData);
         if (idx !== -1) {
@@ -480,8 +675,12 @@ function ChartView({
         }
     }
 
+    const handleValidationErrorClose = () => {
+        setIsValidationErrorOpen(false);
+        setValidationErrors([]);
+    }
+
     const handleReload = () => {
-        // setMode(MODES.READ);
         onReload();
         setReloadCounter((prevCount) => prevCount + 1);
     }
@@ -493,20 +692,17 @@ function ChartView({
         setData(updatedObj);
         setStoredChartObj({});
         setIsCreate(true);
-        // setMode(MODES.EDIT);
         onModeToggle();
         setIsChartOptionOpen(true);
     }
 
     const handleUserChange = () => {
-
+        // Placeholder for user change handling
     }
 
     const handleUpdate = (updatedData) => {
         setData(updatedData);
 
-        // Only sync pinned filters if this update is NOT coming from a pinned filter change
-        // We can detect this by checking if we're in the middle of handling a pinned filter change
         const isFromPinnedFilterChange = pinnedFilterUpdateRef.current;
 
         if (!isFromPinnedFilterChange) {
@@ -516,16 +712,12 @@ function ChartView({
         const updatedSchema = cloneDeep(schema);
         const chartEncodeSchema = getModelSchema('chart_encode', updatedSchema);
         const filterSchema = getModelSchema('ui_filter', updatedSchema);
-        // get(updatedSchema, [SCHEMA_DEFINITIONS_XPATH, 'ui_filter']);
-        // const chartSchema = getModelSchema(CHART_SCHEMA_NAME, updatedSchema);
-        // get(updatedSchema, [SCHEMA_DEFINITIONS_XPATH, CHART_SCHEMA_NAME]);
+
         if (updatedData.time_series) {
             filterSchema.auto_complete = 'fld_name:MetaFldList';
-            // chartSchema.properties.partition_fld.hide = true;
             chartEncodeSchema.auto_complete = 'x:FldList,y:ProjFldList';
         } else {
             filterSchema.auto_complete = 'fld_name:FldList';
-            // chartSchema.properties.partition_fld.hide = false;
             chartEncodeSchema.auto_complete = 'x:FldList,y:FldList';
         }
         setSchema(updatedSchema);
@@ -542,13 +734,13 @@ function ChartView({
         e.stopPropagation();
         const updatedChartData = chartData.filter((o) => o.chart_name !== chartName);
         onChartDataChange(updatedChartData);
-        // Clear pinned filters for the deleted chart
+
         setPinnedFiltersByChart(prev => {
             const newObj = { ...prev };
             delete newObj[chartName];
             return newObj;
         });
-        // If the deleted chart was selected, also clear the visible pinned filters
+
         if (index === selectedIndex) {
             setPinnedFilters([]);
             setSelectedIndex();
@@ -580,13 +772,16 @@ function ChartView({
         onQuickFiltersChange(updatedQuickFilters);
     }
 
+    // =============================================
+    // PINNED FILTER MANAGEMENT (extracted to reduce duplication)
+    // =============================================
+
     const handleQuickFilterPin = (key, title, currentValue, nodeData) => {
         const uniqueId = nodeData.dataxpath || key;
         const currentChartName = data?.chart_name;
         const existingPin = pinnedFilters.find(pin => pin.uniqueId === uniqueId);
 
         if (!existingPin && currentChartName) {
-            // Get current value from chart data or use provided value
             const currentChartValue = getCurrentChartFieldValue(key, nodeData) || currentValue || getDefaultValueForField(nodeData);
 
             const newPin = {
@@ -594,32 +789,27 @@ function ChartView({
                 uniqueId,
                 title,
                 value: currentChartValue,
-                nodeData: nodeData // Store field metadata for rendering the correct input type
+                nodeData: nodeData
             };
 
-            // Update chart-specific storage
             setPinnedFiltersByChart(prev => ({
                 ...prev,
                 [currentChartName]: [...(prev[currentChartName] || []), newPin]
             }));
 
-            // Update current display
             setPinnedFilters(prev => [...prev, newPin]);
         }
     };
 
-    // Helper function to get current value from chart configuration data using xpath
-    const getCurrentChartFieldValue = (key, nodeData) => {
-        if (!data || !nodeData || !nodeData.dataxpath) return null;
+    /**
+     * Utility function to navigate object path using xpath notation
+     * Handles both object properties and array indices like 'series[0].encode.y'
+     */
+    const navigateObjectPath = useCallback((obj, pathParts) => {
+        let target = obj;
 
-        const dataxpath = nodeData.dataxpath;
-        const pathParts = dataxpath.split('.');
-        let target = data;
-
-        // Navigate through the path to get the current value
         for (const part of pathParts) {
             if (part.includes('[') && part.includes(']')) {
-                // Handle array notation like 'series[0]'
                 const arrayName = part.substring(0, part.indexOf('['));
                 const index = parseInt(part.substring(part.indexOf('[') + 1, part.indexOf(']')));
 
@@ -638,10 +828,17 @@ function ChartView({
         }
 
         return target;
-    };
+    }, []);
 
-    // Helper function to determine default value based on field type
-    const getDefaultValueForField = (nodeData) => {
+    const getCurrentChartFieldValue = useCallback((key, nodeData) => {
+        if (!data || !nodeData || !nodeData.dataxpath) return null;
+
+        const dataxpath = nodeData.dataxpath;
+        const pathParts = dataxpath.split('.');
+        return navigateObjectPath(data, pathParts);
+    }, [data, navigateObjectPath]);
+
+    const getDefaultValueForField = useCallback((nodeData) => {
         if (!nodeData) return false;
 
         switch (nodeData.type) {
@@ -656,61 +853,25 @@ function ChartView({
             default:
                 return null;
         }
-    };
+    }, []);
 
-    // Function to sync pinned filter values with current data values
     const syncPinnedFiltersWithData = useCallback((updatedData) => {
         setPinnedFilters(prev => {
             if (prev.length === 0) return prev;
 
             const updatedPins = prev.map(pin => {
-                // Get the current value from the updated data
-                const currentValue = getCurrentChartFieldValueFromData(pin.key, pin.nodeData, updatedData);
+                const currentValue = navigateObjectPath(updatedData, pin.nodeData.dataxpath?.split('.') || []);
 
-                // Only update if the value has actually changed AND it's not undefined
                 if (currentValue !== undefined && currentValue !== pin.value) {
                     return { ...pin, value: currentValue };
                 }
                 return pin;
             });
 
-            // Only set state if something actually changed to avoid unnecessary re-renders
             const hasChanges = updatedPins.some((pin, index) => pin.value !== prev[index].value);
             return hasChanges ? updatedPins : prev;
         });
-    }, []); // Empty dependency array since it only uses setPinnedFilters
-
-    // Helper function to get current value from specific data object (used for syncing)
-    const getCurrentChartFieldValueFromData = (key, nodeData, dataSource) => {
-        if (!dataSource || !nodeData || !nodeData.dataxpath) return null;
-
-        const dataxpath = nodeData.dataxpath;
-        const pathParts = dataxpath.split('.');
-        let target = dataSource;
-
-        // Navigate through the path to get the current value
-        for (const part of pathParts) {
-            if (part.includes('[') && part.includes(']')) {
-                // Handle array notation like 'series[0]'
-                const arrayName = part.substring(0, part.indexOf('['));
-                const index = parseInt(part.substring(part.indexOf('[') + 1, part.indexOf(']')));
-
-                if (target[arrayName] && Array.isArray(target[arrayName]) && target[arrayName][index] !== undefined) {
-                    target = target[arrayName][index];
-                } else {
-                    return null;
-                }
-            } else {
-                if (target[part] !== undefined) {
-                    target = target[part];
-                } else {
-                    return null;
-                }
-            }
-        }
-
-        return target;
-    };
+    }, [navigateObjectPath]);
 
     const handlePinnedFilterChange = (uniqueId, value) => {
         const currentChartName = data?.chart_name;
@@ -718,10 +879,8 @@ function ChartView({
             return;
         }
 
-        // Set flag to indicate we're updating from a pinned filter
         pinnedFilterUpdateRef.current = true;
 
-        // Update the pinned filter state for current display
         setPinnedFilters(prev => {
             const updated = prev.map(pin =>
                 pin.uniqueId === uniqueId ? { ...pin, value } : pin
@@ -729,7 +888,6 @@ function ChartView({
             return updated;
         });
 
-        // Update chart-specific storage
         setPinnedFiltersByChart(prev => {
             const updated = {
                 ...prev,
@@ -740,15 +898,11 @@ function ChartView({
             return updated;
         });
 
-        // Update the actual chart configuration data using xpath
         const updatedChartData = cloneDeep(data);
         const pinnedFilter = pinnedFilters.find(pin => pin.uniqueId === uniqueId);
 
         if (pinnedFilter && pinnedFilter.nodeData && pinnedFilter.nodeData.dataxpath) {
-            // Use the dataxpath from nodeData to update the correct location
             const dataxpath = pinnedFilter.nodeData.dataxpath;
-
-            // Split the path and navigate to set the value
             const pathParts = dataxpath.split('.');
             let target = updatedChartData;
 
@@ -756,7 +910,6 @@ function ChartView({
             for (let i = 0; i < pathParts.length - 1; i++) {
                 const part = pathParts[i];
                 if (part.includes('[') && part.includes(']')) {
-                    // Handle array notation like 'series[0]'
                     const arrayName = part.substring(0, part.indexOf('['));
                     const index = parseInt(part.substring(part.indexOf('[') + 1, part.indexOf(']')));
 
@@ -778,7 +931,6 @@ function ChartView({
             // Set the final value
             const finalKey = pathParts[pathParts.length - 1];
             if (finalKey.includes('[') && finalKey.includes(']')) {
-                // Handle array notation in final key
                 const arrayName = finalKey.substring(0, finalKey.indexOf('['));
                 const index = parseInt(finalKey.substring(finalKey.indexOf('[') + 1, finalKey.indexOf(']')));
 
@@ -838,13 +990,25 @@ function ChartView({
         setTextToCopy(chartName);
     };
 
-    const options = useMemo(() => getChartOption(clearxpath(cloneDeep(chartOption))), [chartOption]);
-    const chartQuickFilter = quickFilters.find((quickFilter) => quickFilter.chart_name === data?.chart_name);
+    // =============================================
+    // MEMOIZED VALUES FOR PERFORMANCE
+    // =============================================
 
-    let filterDict = {};
-    if (chartQuickFilter) {
-        filterDict = chartQuickFilter.filters ? JSON.parse(chartQuickFilter.filters) : {};
-    }
+    const options = useMemo(() => getChartOption(clearxpath(cloneDeep(chartOption))), [chartOption]);
+
+    const chartQuickFilter = useMemo(() =>
+        quickFilters.find((quickFilter) => quickFilter.chart_name === data?.chart_name),
+        [quickFilters, data?.chart_name]
+    );
+
+    const filterDict = useMemo(() => {
+        if (chartQuickFilter) {
+            return chartQuickFilter.filters ? JSON.parse(chartQuickFilter.filters) : {};
+        }
+        return {};
+    }, [chartQuickFilter]);
+
+
 
     return (
         <>
@@ -857,7 +1021,7 @@ function ChartView({
                     </Button>
                     <List>
                         {chartData.map((item, index) => {
-                            if (chartEnableOverride.includes(item.chart_name)) return;
+                            if (chartEnableOverride.includes(item.chart_name)) return null;
                             return (
                                 <ListItem
                                     className={styles.list_item}
@@ -1001,6 +1165,71 @@ function ChartView({
                     <DialogActions>
                         <Button color='error' variant='contained' onClick={handleConfirmClose} autoFocus>Discard</Button>
                         <Button color='success' variant='contained' onClick={handleSave} autoFocus>Save</Button>
+                    </DialogActions>
+                </Dialog>
+                <Dialog
+                    open={isValidationErrorOpen}
+                    onClose={handleValidationErrorClose}
+                    maxWidth="sm"
+                    fullWidth>
+                    <DialogTitle sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                        color: 'error.main',
+                        borderBottom: '1px solid',
+                        borderColor: 'divider'
+                    }}>
+                        <Error color="error" />
+                        Validation Error
+                    </DialogTitle>
+                    <DialogContent sx={{ pt: 2 }}>
+                        <DialogContentText sx={{ mb: 2, fontWeight: 500 }}>
+                            Please fix the following issues before saving:
+                        </DialogContentText>
+                        <Box component="ul" sx={{
+                            margin: 0,
+                            padding: 0,
+                            listStyle: 'none'
+                        }}>
+                            {validationErrors.map((error, index) => (
+                                <Box component="li" key={index} sx={{
+                                    display: 'flex',
+                                    alignItems: 'flex-start',
+                                    gap: 1,
+                                    mb: 1.5,
+                                    p: 1,
+                                    borderRadius: 1,
+                                    bgcolor: 'error.lighter',
+                                    border: '1px solid',
+                                    borderColor: 'error.light'
+                                }}>
+                                    <Error
+                                        color="error"
+                                        fontSize="small"
+                                        sx={{ mt: 0.25, flexShrink: 0 }}
+                                    />
+                                    <Box sx={{
+                                        color: 'error.dark',
+                                        fontSize: '0.875rem',
+                                        lineHeight: 1.4
+                                    }}>
+                                        {error}
+                                    </Box>
+                                </Box>
+                            ))}
+                        </Box>
+                    </DialogContent>
+                    <DialogActions sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+                        <Button
+                            color='primary'
+                            variant='contained'
+                            onClick={handleValidationErrorClose}
+                            autoFocus
+                            sx={{ minWidth: '100px' }}
+                        >
+                            OK
+                        </Button>
                     </DialogActions>
                 </Dialog>
             </FullScreenModal>

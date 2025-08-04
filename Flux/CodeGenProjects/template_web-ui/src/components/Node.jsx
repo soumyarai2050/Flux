@@ -111,7 +111,7 @@ const Node = (props) => {
 
     // Check if this field is currently pinned - use dataxpath or key as uniqueId
     const currentUniqueId = props.data.dataxpath || props.data.key;
-    isPinned = props.data.pinnedFilters && props.data.pinnedFilters.some(pin => pin.uniqueId === currentUniqueId);
+    isPinned = props.pinnedFilters && props.pinnedFilters.some(pin => pin.uniqueId === currentUniqueId);
 
     if (hasActiveFilter || isPinned) {
         FilterIcon = PushPin;

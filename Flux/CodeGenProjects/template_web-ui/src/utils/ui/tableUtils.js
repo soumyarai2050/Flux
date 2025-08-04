@@ -187,7 +187,7 @@ export function getTableRows(collections, mode, originalData, data, xpath, repea
 export function getCommonKeyCollections(rows, tableColumns, hide = true, collectionView = false, repeatedView = false, showLess = false) {
     const filteredColumns = tableColumns
         .filter((column) => {
-            if (column.noCommonKeyDeduced) return false;
+            // if (column.noCommonKeyDeduced) return false;
             if (hide && column.hide) return false;
             if (showLess && column.showLess) return false;
             if (column.joinKey || column.commonGroupKey) return false;
@@ -195,9 +195,11 @@ export function getCommonKeyCollections(rows, tableColumns, hide = true, collect
         })
         .map((column) => Object.assign({}, column));
 
-    if (!rows || rows.length === 0) return [];
-
     const commonKeyColumns = [];
+    const nullColumns = [];
+
+    if (!rows || rows.length === 0) return [commonKeyColumns, nullColumns];
+
     filteredColumns.forEach((column) => {
         const keyField = collectionView ? column.key : column.tableTitle;
         if (rows.length === 1) {
@@ -228,11 +230,18 @@ export function getCommonKeyCollections(rows, tableColumns, hide = true, collect
             }
             if (valueSet.size > 1) return;
 
-            column.value = valueSet.size === 1 ? [...valueSet][0] : null;
-            commonKeyColumns.push(column);
+            const value = valueSet.size === 1 ? [...valueSet][0] : null;
+            column.value = value;
+            if (value === null || value === undefined) {
+                nullColumns.push(column);
+            } else {
+                if (!column.noCommonKeyDeduced) {
+                    commonKeyColumns.push(column);
+                }
+            }
         }
     })
-    return commonKeyColumns;
+    return [commonKeyColumns, nullColumns];
 
     // if (rows.length > 1 || (rows.length === 1 && (collectionView || repeatedView))) {
     //     // exclude column with 'noCommonKey' as it cannot be added in common key

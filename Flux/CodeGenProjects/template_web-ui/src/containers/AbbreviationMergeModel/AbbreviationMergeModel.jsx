@@ -443,13 +443,14 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     }
 
     socketRef.current = useWebSocketWorker({
-        url: (modelSchema.is_large_db_object || modelSchema.is_time_series) ? url : viewUrl,
+        url: (modelSchema.is_large_db_object || modelSchema.is_time_series || modelLayoutOption.depending_proto_model_for_cpp_port) ? url : viewUrl,
         modelName,
         isDisabled: false,
         reconnectCounter,
         selector,
         onWorkerUpdate: handleModelDataSourceUpdate,
-        onReconnect: handleReconnect
+        onReconnect: handleReconnect,
+        isCppModel: modelLayoutOption.depending_proto_model_for_cpp_port
     })
 
     useDataSourcesWebsocketWorker({

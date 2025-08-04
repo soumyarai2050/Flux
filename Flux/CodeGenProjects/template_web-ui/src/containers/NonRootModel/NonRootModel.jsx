@@ -294,7 +294,7 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
     }
 
     socketRef.current = useWebSocketWorker({
-        url: (modelSchema.is_large_db_object || modelSchema.is_time_series) ? url : viewUrl,
+        url: (modelSchema.is_large_db_object || modelSchema.is_time_series || modelLayoutOption.depending_proto_model_for_cpp_port) ? url : viewUrl,
         modelName: modelRootName,
         isDisabled: false,
         reconnectCounter,
@@ -304,6 +304,7 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
         onReconnect: handleReconnect,
         params,
         crudOverrideDict: crudOverrideDictRef.current,
+        isCppModel: modelLayoutOption.depending_proto_model_for_cpp_port
     })
 
     const handleModeToggle = () => {

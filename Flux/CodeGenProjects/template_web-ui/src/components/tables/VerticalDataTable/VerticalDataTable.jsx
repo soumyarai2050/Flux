@@ -11,10 +11,10 @@ import {
   IconButton,
   Paper,
   Box,
-  Tooltip,
 } from '@mui/material';
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import ContentCopy from '@mui/icons-material/ContentCopy';
+import Check from '@mui/icons-material/Check';
 import styles from './VerticalDataTable.module.css';
 import { useTheme } from '@emotion/react';
 import ClipboardCopier from '../../ClipboardCopier/ClipboardCopier';
@@ -34,38 +34,44 @@ function VerticalDataTable({
 }) {
   // State for managing nested data popups
   const [nestedPopups, setNestedPopups] = useState([]);
-  // State for managing copy operations
-  const [copyText, setCopyText] = useState('');
-  const [showCopyFeedback, setShowCopyFeedback] = useState(false);
+  const [clipboardText, setClipboardText] = useState(null);
+  const [copiedKey, setCopiedKey] = useState(null);
   const containerRef = useRef(null);
   const theme = useTheme();
-  
-  const handleCopy = (text, label = 'Data') => {
-    setCopyText(text);
-    setShowCopyFeedback(true);
-    
-    // Hide feedback after 2 seconds
-    setTimeout(() => {
-      setShowCopyFeedback(false);
-    }, 2000);
-  };
 
   /**
-   * Formats a key-value pair for copying
-   *
-   * @param {string} key - The key
-   * @param {any} value - The value
-   * @returns {string} - The formatted key-value pair for copying
+   * Handles copying row data in the excel friendly format
+   * 
+   * @param {string} key - The field name/key
+   * @param {Array} values - Array of values for that field
    */
-  const formatKeyValueForCopy = (key, value) => {
-    if (value === null) return `${key}: null`;
-    if (value === undefined) return `${key}: undefined`;
-    
-    if (typeof value === 'object' || Array.isArray(value)) {
-      return `${key}: ${JSON.stringify(value, null, 2)}`;
-    }
-    
-    return `${key}: ${String(value)}`;
+  const handleCopy = (key, values) => {
+    // Convert values to strings and handle null/undefined
+    const convertedValues = values.map(value => {
+      if (value === null || value === undefined) {
+        return '--';
+      }
+
+      // Handle complex data types
+      if (typeof value === 'object' && !Array.isArray(value)) {
+        return `Object (${Object.keys(value).length} properties)`;
+      }
+
+      if (Array.isArray(value)) {
+        return `Array (${value.length} items)`;
+      }
+
+      return String(value);
+    });
+
+    const text = [key, ...convertedValues].join('\n');
+    setClipboardText(text);
+    setCopiedKey(key);
+    setTimeout(() => {
+      // to allow same row to be copied again even if there is no text change
+      setClipboardText(null);
+      setCopiedKey(null);
+    }, 2000);
   };
 
   /**
@@ -183,33 +189,45 @@ function VerticalDataTable({
    * @returns {Array<React.ReactNode>} - Array of rendered rows
    */
   const renderObjectRows = (obj) => {
-    return Object.keys(obj).map((key) => (
-      <TableRow key={key} hover>
-        <TableCell
-          component="th"
-          scope="row"
-          className={styles.headerCell}
-          aria-label={`Property: ${key}`}
-        >
-          {key}
-        </TableCell>
-        <TableCell className={styles.dataCell}>
-          {renderCell(obj[key], key)}
-        </TableCell>
-        <TableCell className={styles.copyCell}>
-          <Tooltip title="Copy row" placement="top">
-            <IconButton
-              onClick={() => handleCopy(formatKeyValueForCopy(key, obj[key]))}
-              size="small"
-              aria-label={`Copy ${key} row`}
-              className={styles.copyButton}
-            >
-              <ContentCopyIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        </TableCell>
-      </TableRow>
-    ));
+    return Object.keys(obj).map((key) => {
+      const value = obj[key];
+
+      return (
+        <TableRow key={key} hover>
+          <TableCell
+            component="th"
+            scope="row"
+            className={styles.headerCell}
+            aria-label={`Property: ${key}`}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span>{key}</span>
+              <IconButton
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCopy(key, [value]);
+                }}
+                title="Copy row data"
+                sx={{
+                  color: 'inherit',
+                  '&:hover': {
+                    backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                  }
+                }}
+              >
+                {copiedKey === key ? (
+                  <Check fontSize="small" sx={{ color: '#4caf50' }} />
+                ) : (
+                  <ContentCopy fontSize="small" />
+                )}
+              </IconButton>
+            </div>
+          </TableCell>
+          <TableCell className={styles.dataCell}>{renderCell(value, key)}</TableCell>
+        </TableRow>
+      );
+    });
   };
 
   /**
@@ -230,44 +248,55 @@ function VerticalDataTable({
               {arr.map((_, index) => (
                 <TableCell key={index} className={styles.tableHeaderCell}>{index}</TableCell>
               ))}
-              <TableCell className={styles.tableHeaderCell} sx={{ width: '50px' }}></TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {allKeys.map((key) => (
-              <TableRow key={key} hover>
-                <TableCell component="th" scope="row" className={styles.headerCell} aria-label={`Field: ${key}`}>
-                  {key}
-                </TableCell>
-                {arr.map((item, index) => (
-                  <TableCell key={index} className={styles.dataCell}>
-                    {(item && typeof item === 'object' && !Array.isArray(item) && key in item)
-                      ? renderCell(item[key], `${key}[${index}]`)
-                      : <span className={styles.nullValue}>--</span>}
+            {allKeys.map((key) => {
+              // Extract values for this key from all objects
+              const values = arr.map((item, index) => {
+                if (item && typeof item === 'object' && !Array.isArray(item) && key in item) {
+                  return item[key]; // Return raw value, let handleCopy handle conversion
+                }
+                return null; // Return null for missing values
+              });
+
+              return (
+                <TableRow key={key} hover>
+                  <TableCell component="th" scope="row" className={styles.headerCell} aria-label={`Field: ${key}`}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <span>{key}</span>
+                      <IconButton
+                        size="small"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCopy(key, values);
+                        }}
+                        title="Copy row data"
+                        sx={{
+                          color: 'inherit',
+                          '&:hover': {
+                            backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                          }
+                        }}
+                      >
+                        {copiedKey === key ? (
+                          <Check fontSize="small" sx={{ color: '#4caf50' }} />
+                        ) : (
+                          <ContentCopy fontSize="small" />
+                        )}
+                      </IconButton>
+                    </div>
                   </TableCell>
-                ))}
-                <TableCell className={styles.copyCell}>
-                  <Tooltip title="Copy row" placement="top">
-                    <IconButton
-                      onClick={() => {
-                        const rowData = arr.map((item, index) => {
-                          const value = (item && typeof item === 'object' && !Array.isArray(item) && key in item)
-                            ? item[key]
-                            : null;
-                          return `${index}: ${value !== null ? JSON.stringify(value) : 'null'}`;
-                        }).join(', ');
-                        handleCopy(`${key}: [${rowData}]`);
-                      }}
-                      size="small"
-                      aria-label={`Copy ${key} row`}
-                      className={styles.copyButton}
-                    >
-                      <ContentCopyIcon fontSize="small" />
-                    </IconButton>
-                  </Tooltip>
-                </TableCell>
-              </TableRow>
-            ))}
+                  {arr.map((item, index) => (
+                    <TableCell key={index} className={styles.dataCell}>
+                      {(item && typeof item === 'object' && !Array.isArray(item) && key in item)
+                        ? renderCell(item[key], `${key}[${index}]`)
+                        : <span className={styles.nullValue}>--</span>}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
       </TableContainer>
@@ -281,28 +310,39 @@ function VerticalDataTable({
    * @returns {Array<React.ReactNode>} - Array of rendered rows
    */
   const renderArrayRows = (arr) => {
-    return arr.map((item, index) => (
-      <TableRow key={index} hover>
-        <TableCell component="th" scope="row" className={styles.headerCell} aria-label={`Index: ${index}`}>
-          {`[${index}]`}
-        </TableCell>
-        <TableCell className={styles.dataCell}>
-          {renderCell(item, `[${index}]`)}
-        </TableCell>
-        <TableCell className={styles.copyCell}>
-          <Tooltip title="Copy row" placement="top">
-            <IconButton
-              onClick={() => handleCopy(formatKeyValueForCopy(`[${index}]`, item))}
-              size="small"
-              aria-label={`Copy [${index}] row`}
-              className={styles.copyButton}
-            >
-              <ContentCopyIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        </TableCell>
-      </TableRow>
-    ));
+    return arr.map((item, index) => {
+
+      return (
+        <TableRow key={index} hover>
+          <TableCell component="th" scope="row" className={styles.headerCell} aria-label={`Index: ${index}`}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span>{`[${index}]`}</span>
+              <IconButton
+                size="small"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCopy(`[${index}]`, [item]);
+                }}
+                title="Copy row data"
+                sx={{
+                  color: 'inherit',
+                  '&:hover': {
+                    backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                  }
+                }}
+              >
+                {copiedKey === `[${index}]` ? (
+                  <Check fontSize="small" sx={{ color: '#4caf50' }} />
+                ) : (
+                  <ContentCopy fontSize="small" />
+                )}
+              </IconButton>
+            </div>
+          </TableCell>
+          <TableCell className={styles.dataCell}>{renderCell(item, `[${index}]`)}</TableCell>
+        </TableRow>
+      );
+    });
   };
 
   /**
@@ -321,9 +361,8 @@ function VerticalDataTable({
         <Table stickyHeader aria-label="vertical json data table" className={styles.table}>
           <TableHead>
             <TableRow>
-              <TableCell className={styles.tableHeaderCell} sx={{ background: 'inherit' }}>Key</TableCell>
-              <TableCell className={styles.tableHeaderCell} sx={{ background: 'inherit' }}>Value</TableCell>
-              <TableCell className={styles.tableHeaderCell} sx={{ background: 'inherit', width: '50px' }}></TableCell>
+              <TableCell className={styles.tableHeaderCell}>Key</TableCell>
+              <TableCell className={styles.tableHeaderCell}>Value</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -382,13 +421,6 @@ function VerticalDataTable({
   // The table content to be rendered
   const tableContent = renderTableContent(data);
 
-  // Copy feedback component
-  const copyFeedback = showCopyFeedback && (
-    <div className={styles.copyFeedback}>
-      <span>✓ Copied to clipboard!</span>
-    </div>
-  );
-
   // If usePopover is true AND isOpen is true, render the popover
   if (usePopover) {
     const popoverPosition = anchorEl
@@ -434,16 +466,15 @@ function VerticalDataTable({
               className={styles.popoverContent}
               onClick={(e) => e.stopPropagation()} // Even more protection
             >
-              {copyFeedback}
               {tableContent}
             </Box>
           </Popover>
 
           {/* Render all nested popovers */}
           {nestedPopups.map((popup, index) => renderNestedPopover(popup, index))}
-          
-          {/* ClipboardCopier component */}
-          <ClipboardCopier text={copyText} />
+
+          {/* Clipboard copier for copy functionality */}
+          <ClipboardCopier text={clipboardText} />
         </>
       );
     }
@@ -453,15 +484,14 @@ function VerticalDataTable({
       <>
         {/* Render table directly */}
         <div className={styles.directContainer}>
-          {copyFeedback}
           {tableContent}
         </div>
 
         {/* Nested popups are always in popovers */}
         {nestedPopups.map((popup, index) => renderNestedPopover(popup, index))}
-        
-        {/* ClipboardCopier component */}
-        <ClipboardCopier text={copyText} />
+
+        {/* Clipboard copier for copy functionality */}
+        <ClipboardCopier text={clipboardText} />
       </>
     );
   } else {

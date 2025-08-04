@@ -99,6 +99,49 @@ const Cell = (props) => {
         }
     }, [currentValue])
 
+    // Handle autocomplete blur with dropdown detection
+    const handleAutocompleteBlur = useCallback(() => {
+        setTimeout(() => {
+            const autocompleteRoot = autocompleteRef.current?.closest('.MuiAutocomplete-root');
+            const activeElement = document.activeElement;
+
+            if (autocompleteRoot && !autocompleteRoot.contains(activeElement)) {
+                const isInDropdown = activeElement?.closest('.MuiAutocomplete-popper') ||
+                    activeElement?.closest('[role="listbox"]') ||
+                    activeElement?.closest('.MuiAutocomplete-listbox');
+
+                if (!isInDropdown) {
+                    setActive(false);
+                }
+            }
+        }, 100);
+    }, []);
+
+    // Global click handler to deactivate other autocomplete fields
+    useEffect(() => {
+        if (active && collection?.autocomplete) {
+            const handleGlobalClick = (event) => {
+                const currentAutocompleteRoot = autocompleteRef.current?.closest('.MuiAutocomplete-root');
+                const clickedElement = event.target;
+
+                // Check if click is in dropdown
+                const isInDropdown = clickedElement?.closest('.MuiAutocomplete-popper') ||
+                    clickedElement?.closest('[role="listbox"]') ||
+                    clickedElement?.closest('.MuiAutocomplete-listbox');
+
+                // If click is outside this autocomplete AND not in dropdown
+                if (currentAutocompleteRoot && !currentAutocompleteRoot.contains(clickedElement) && !isInDropdown) {
+                    setActive(false);
+                }
+            };
+
+            document.addEventListener('mousedown', handleGlobalClick);
+            return () => {
+                document.removeEventListener('mousedown', handleGlobalClick);
+            };
+        }
+    }, [active, collection?.autocomplete]);
+
     useEffect(() => {
         if (inputRef.current && active && cursorPos.current !== null) {
             if (inputRef.current.selectionStart !== cursorPos.current) {
@@ -349,8 +392,10 @@ const Cell = (props) => {
                     align='center'
                     size='small'
                     onKeyDown={onKeyDown}
-                    onBlur={onFocusOut}
-                    onClick={(e) => onRowSelect(e)}
+                    onClick={(e) => {
+                        onRowSelect(e);
+                        onFocusIn(e);
+                    }}
                     onDoubleClick={(e) => props.onDoubleClick(e, rowindex, xpath)}>
                     <Autocomplete
                         id={collection.key}
@@ -374,7 +419,10 @@ const Cell = (props) => {
                         filterOptions={(options, { inputValue }) =>
                             options.filter(option => String(option).toLowerCase().includes(inputValue.toLowerCase()))
                         }
-                        onBlur={onFocusOut}
+                        onBlur={handleAutocompleteBlur}
+                        onFocus={onFocusIn}
+                        onOpen={onFocusIn}
+                        onClose={handleAutocompleteBlur}
                         autoFocus
                         onChange={(e, v) => {
                             props.onAutocompleteOptionChange(e, v, dataxpath, xpath, dataSourceId, collection.source);
@@ -388,6 +436,8 @@ const Cell = (props) => {
                                     name={collection.key}
                                     error={validationError.current !== null}
                                     placeholder={placeholder}
+                                    onFocus={onFocusIn}
+                                    onBlur={handleAutocompleteBlur}
                                     onKeyDown={(e) => handleKeyDown(e, filteredOptions)}
                                     inputRef={autocompleteRef}
                                     InputProps={{
