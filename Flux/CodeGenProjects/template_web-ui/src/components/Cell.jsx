@@ -316,7 +316,7 @@ const Cell = (props) => {
     let textAlign = collection.textAlign ? collection.textAlign : 'center';
     let selectedClass = '';
     if (selected && !(collection.joinKey || collection.commonGroupKey)) {
-        selectedClass = classes.cell_selected;
+        selectedClass = props.mostRecent ? classes.cell_selected_recent : classes.cell_selected;
     }
 
     if (props.nullCell) {

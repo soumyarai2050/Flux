@@ -165,14 +165,19 @@ const LoadedView = ({
   filters,
   onFiltersChange,
   uniqueValues,
-  highlightDuration
+  highlightDuration,
+  selectedRows,
+  lastSelectedRowId,
+  onSelectionChange
 }) => {
   const [columns, setColumns] = useState(cells);
   const [columnWidths, setColumnWidths] = useState({});
-  const [selectedRows, setSelectedRows] = useState([]);
-  const [lastSelectedRowId, setLastSelectedRowId] = useState(null);
+  const [localSelectedRows, setLocalSelectedRows] = useState([]);
+  const [localLastSelectedRowId, setLocalLastSelectedRowId] = useState(null);
+  const [isMultiSelectActive, setIsMultiSelectActive] = useState(false);
   const columnRefs = useRef({});
   const tableWrapperRef = useRef(null);
+  const preventSyncRef = useRef(false);
 
   // Use the scroll indicators hook
   const {
@@ -185,25 +190,79 @@ const LoadedView = ({
     checkHorizontalScroll,
   } = useScrollIndicators([activeRows, cells]);
 
+  // Define getRowRange function for shift selection
+  const getRowRange = (startRowId, endRowId) => {
+    const allRowIds = activeRows.map(groupedRow => groupedRow[0]['data-id']);
+    const startIndex = allRowIds.indexOf(startRowId);
+    const endIndex = allRowIds.indexOf(endRowId);
+    if (startIndex === -1 || endIndex === -1) {
+      return [endRowId];
+    }
+    const minIndex = Math.min(startIndex, endIndex);
+    const maxIndex = Math.max(startIndex, endIndex);
+    return allRowIds.slice(minIndex, maxIndex + 1);
+  }
+
+  const [selectionAnchorId, setSelectionAnchorId] = useState(null);
+
+  // Handle multiselect changes - update local state and track multiselect mode
+  const handleSelectionChange = (newSelectedRows, mostRecentId = null) => {
+    // Prevent prop sync while we're updating selection internally
+    preventSyncRef.current = true;
+
+    setLocalSelectedRows(newSelectedRows);
+    // Update multiselect mode based on selection size
+    const newIsMultiSelectActive = newSelectedRows.length > 1;
+    setIsMultiSelectActive(newIsMultiSelectActive);
+
+    // Use provided mostRecentId or fallback to last in array
+    const finalMostRecentId = mostRecentId || (newSelectedRows.length > 0
+      ? newSelectedRows[newSelectedRows.length - 1]
+      : null);
+
+    // If switching back to single select, ensure proper state sync
+    if (!newIsMultiSelectActive && newSelectedRows.length === 1) {
+      setLocalLastSelectedRowId(finalMostRecentId);
+    } else if (newSelectedRows.length === 0) {
+      setLocalLastSelectedRowId(null);
+      setIsMultiSelectActive(false);
+    } else {
+      setLocalLastSelectedRowId(finalMostRecentId);
+    }
+
+    // Notify parent (this connects to chart!)
+    if (onSelectionChange) {
+      onSelectionChange(newSelectedRows, finalMostRecentId);
+    }
+
+    // Allow prop sync again after a brief delay
+    setTimeout(() => {
+      preventSyncRef.current = false;
+    }, 50);
+  };
+
   // Use the keyboard navigation hook
-  const { handleKeyDown } = useKeyboardNavigation({
+  const { handleKeyDown, handleRowClick } = useKeyboardNavigation({
     mode,
     activeRows,
     tableContainerRef,
     capabilities: {
       editModeScrolling: true,
       readModeSelection: true,
-      shiftSelection: false,  // AbbreviationMergeView doesn't support multi-selection
-      ctrlShiftSelection: false
+      shiftSelection: true,
+      ctrlShiftSelection: true
     },
     callbacks: {
-      onRowSelect: onRowSelect
+      onRowSelect: onRowSelect,
+      onSelectionChange: handleSelectionChange
     },
-    // Add state tracking for proper up/down navigation
-    selectedRows,
-    lastSelectedRowId,
-    setSelectedRows,
-    setLastSelectedRowId
+    selectedRows: localSelectedRows,
+    lastSelectedRowId: localLastSelectedRowId,
+    selectionAnchorId,
+    setSelectedRows: setLocalSelectedRows,
+    setLastSelectedRowId: setLocalLastSelectedRowId,
+    setSelectionAnchorId,
+    getRowRange
   });
 
   // const { containerRef, isScrollable, enableScrolling, disableScrolling } = useBoundaryScrollDetection();
@@ -212,16 +271,50 @@ const LoadedView = ({
     setColumns(cells);
   }, [cells])
 
-  // Sync selectedRows with selectedId prop
+  // Sync local state with parent props (bidirectional sync)
   useEffect(() => {
-    if (selectedId !== null && selectedId !== undefined) {
-      setSelectedRows([selectedId]);
-      setLastSelectedRowId(selectedId);
-    } else {
-      setSelectedRows([]);
-      setLastSelectedRowId(null);
+    if (preventSyncRef.current) {
+      return; // Skip sync if we're in the middle of internal selection changes
     }
-  }, [selectedId]);
+
+    // Sync from parent multiselect props to local state
+    if (selectedRows && selectedRows.length > 0) {
+      setLocalSelectedRows(selectedRows);
+      setIsMultiSelectActive(selectedRows.length > 1);
+      if (lastSelectedRowId) {
+        setLocalLastSelectedRowId(lastSelectedRowId);
+      }
+    } else if (selectedId !== null && selectedId !== undefined) {
+      // Fallback to single selection from selectedId prop
+      if (!isMultiSelectActive) {
+        setLocalSelectedRows([selectedId]);
+        setLocalLastSelectedRowId(selectedId);
+      }
+    } else if (!isMultiSelectActive) {
+      // Clear selection if no parent selection
+      setLocalSelectedRows([]);
+      setLocalLastSelectedRowId(null);
+    }
+  }, [selectedRows, lastSelectedRowId, selectedId, isMultiSelectActive]);
+
+  // Surgical fix: Only clear table selection when chart changes (not when other components change)
+  const prevSelectedRowsRef = useRef(selectedRows);
+  useEffect(() => {
+    // Only clear if we had selections before and now we don't (chart switch scenario)
+    const hadSelectionsBefore = prevSelectedRowsRef.current && prevSelectedRowsRef.current.length > 0;
+    const hasNoSelectionsNow = !selectedRows || selectedRows.length === 0;
+
+    if (hadSelectionsBefore && hasNoSelectionsNow) {
+      console.log('🔄 Chart switch detected - clearing only this table\'s local state');
+      setLocalSelectedRows([]);
+      setLocalLastSelectedRowId(null);
+      setIsMultiSelectActive(false);
+      setSelectionAnchorId(null);
+    }
+
+    // Update our reference for next comparison
+    prevSelectedRowsRef.current = selectedRows;
+  }, [selectedRows]);
 
   // Sort sensors for drag-and-drop
   const sensors = useSensors(
@@ -299,12 +392,6 @@ const LoadedView = ({
     handleFormUpdate(xpath, dataxpath, value, dataSourceId, validationRes, source)
 
   }
-
-  const handleRowSelect = (_, id) => {
-    if (mode === MODES.READ) {
-      onRowSelect(id);
-    }
-  };
 
   const handleRowDoubleClick = (e) => {
     if (mode === MODES.READ && !isReadOnly) {
@@ -412,8 +499,9 @@ const LoadedView = ({
                             );
                         });
                       }
-                      const isSelected = row?.['data-id'] === selectedId;
-                      const isButtonDisabled = !isSelected;
+                      const isSelected = row && localSelectedRows.includes(row['data-id']);
+                      const isMostRecent = row && localLastSelectedRowId === row['data-id'];
+                      const isButtonDisabled = row ? row['data-id'] !== selectedId : true;
                       const rowIdx = row ? row['data-id'] : cellIndex;
 
                       // Process cells of type 'progressBar'
@@ -512,7 +600,7 @@ const LoadedView = ({
                           truncateDateTime={false}
                           modelType={MODEL_TYPES.ABBREVIATION_MERGE}
                           onForceSave={onForceSave}
-                          onRowSelect={handleRowSelect}
+                          onRowSelect={(e) => row && handleRowClick(e, row['data-id'])}
                           dataSourceId={row?.['data-id'] || null}
                           nullCell={isNullCell}
                           dataSourceColors={dataSourceColors}
@@ -524,6 +612,7 @@ const LoadedView = ({
                           onDateTimeChange={() => { }}
                           stickyPosition={stickyPosition}
                           highlightDuration={highlightDuration}
+                          mostRecent={isMostRecent}
                         />
                       );
                     })}
@@ -639,7 +728,10 @@ const AbbreviationMergeView = ({
   filters,
   onFiltersChange,
   uniqueValues,
-  highlightDuration
+  highlightDuration,
+  selectedRows,
+  lastSelectedRowId,
+  onSelectionChange
 }) => {
   return (
     <>
@@ -688,6 +780,9 @@ const AbbreviationMergeView = ({
         onFiltersChange={onFiltersChange}
         uniqueValues={uniqueValues}
         highlightDuration={highlightDuration}
+        selectedRows={selectedRows}
+        lastSelectedRowId={lastSelectedRowId}
+        onSelectionChange={onSelectionChange}
       />
     </>
   );

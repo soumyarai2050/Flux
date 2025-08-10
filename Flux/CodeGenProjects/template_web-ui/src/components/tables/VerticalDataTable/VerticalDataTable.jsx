@@ -46,25 +46,30 @@ function VerticalDataTable({
    * @param {Array} values - Array of values for that field
    */
   const handleCopy = (key, values) => {
-    // Convert values to strings and handle null/undefined
-    const convertedValues = values.map(value => {
-      if (value === null || value === undefined) {
-        return '--';
-      }
+    let text;
+    if (key === 'copy-all') {
+      text = JSON.stringify(data ?? '');
+    } else {
+      // Convert values to strings and handle null/undefined
+      const convertedValues = values.map(value => {
+        if (value === null || value === undefined) {
+          return '--';
+        }
 
-      // Handle complex data types
-      if (typeof value === 'object' && !Array.isArray(value)) {
-        return `Object (${Object.keys(value).length} properties)`;
-      }
+        // Handle complex data types
+        if (typeof value === 'object' && !Array.isArray(value)) {
+          return `Object (${Object.keys(value).length} properties)`;
+        }
 
-      if (Array.isArray(value)) {
-        return `Array (${value.length} items)`;
-      }
+        if (Array.isArray(value)) {
+          return `Array (${value.length} items)`;
+        }
 
-      return String(value);
-    });
+        return String(value);
+      });
 
-    const text = [key, ...convertedValues].join('\n');
+      text = [key, ...convertedValues].join('\n');
+    }
     setClipboardText(text);
     setCopiedKey(key);
     setTimeout(() => {
@@ -244,7 +249,29 @@ function VerticalDataTable({
         <Table stickyHeader aria-label="array of objects table" className={styles.table}>
           <TableHead>
             <TableRow>
-              <TableCell className={styles.tableHeaderCell}>Field</TableCell>
+              <TableCell className={styles.tableHeaderCell}>
+                <span>Field</span>
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCopy('copy-all', null);
+                  }}
+                  title="Copy table"
+                  sx={{
+                    color: 'inherit',
+                    '&:hover': {
+                      backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                    }
+                  }}
+                >
+                  {copiedKey === 'copy-all' ? (
+                    <Check fontSize="small" sx={{ color: '#4caf50' }} />
+                  ) : (
+                    <ContentCopy fontSize="small" />
+                  )}
+                </IconButton>
+              </TableCell>
               {arr.map((_, index) => (
                 <TableCell key={index} className={styles.tableHeaderCell}>{index}</TableCell>
               ))}
@@ -299,6 +326,8 @@ function VerticalDataTable({
             })}
           </TableBody>
         </Table>
+        {/* Clipboard copier for copy functionality */}
+        <ClipboardCopier text={clipboardText} />
       </TableContainer>
     );
   };
@@ -361,7 +390,29 @@ function VerticalDataTable({
         <Table stickyHeader aria-label="vertical json data table" className={styles.table}>
           <TableHead>
             <TableRow>
-              <TableCell className={styles.tableHeaderCell}>Key</TableCell>
+              <TableCell className={styles.tableHeaderCell}>
+                <span>Key</span>
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCopy('copy-all', null);
+                  }}
+                  title="Copy table"
+                  sx={{
+                    color: 'inherit',
+                    '&:hover': {
+                      backgroundColor: 'rgba(255, 255, 255, 0.1)'
+                    }
+                  }}
+                >
+                  {copiedKey === 'copy-all' ? (
+                    <Check fontSize="small" sx={{ color: '#4caf50' }} />
+                  ) : (
+                    <ContentCopy fontSize="small" />
+                  )}
+                </IconButton>
+              </TableCell>
               <TableCell className={styles.tableHeaderCell}>Value</TableCell>
             </TableRow>
           </TableHead>
@@ -369,6 +420,8 @@ function VerticalDataTable({
             {Array.isArray(tableData) ? renderArrayRows(tableData) : renderObjectRows(tableData)}
           </TableBody>
         </Table>
+        {/* Clipboard copier for copy functionality */}
+        <ClipboardCopier text={clipboardText} />
       </TableContainer>
     );
   };
@@ -472,9 +525,6 @@ function VerticalDataTable({
 
           {/* Render all nested popovers */}
           {nestedPopups.map((popup, index) => renderNestedPopover(popup, index))}
-
-          {/* Clipboard copier for copy functionality */}
-          <ClipboardCopier text={clipboardText} />
         </>
       );
     }
@@ -489,9 +539,6 @@ function VerticalDataTable({
 
         {/* Nested popups are always in popovers */}
         {nestedPopups.map((popup, index) => renderNestedPopover(popup, index))}
-
-        {/* Clipboard copier for copy functionality */}
-        <ClipboardCopier text={clipboardText} />
       </>
     );
   } else {

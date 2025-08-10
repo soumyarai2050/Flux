@@ -3945,15 +3945,27 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
 
         return output_str
 
-    def _handle_http_query_str(self, message: protogen.Message, query_name: str, query_params_str: str,
-                               query_params_with_type_str: str, route_type: str | None = None,
-                               return_type_str: str | None = None, model_type: ModelType = ModelType.Beanie) -> str:
+    def _get_dt_query_params_name_list(self, query_params_with_type_str: str):
         # finding datetime params to get object created back
         query_params_with_type_str_split = query_params_with_type_str.split(", ")
         query_param_having_dt = []
         for query_params_with_type_str_ in query_params_with_type_str_split:
             if "DateTime" in query_params_with_type_str_:
                 query_param_having_dt.append(query_params_with_type_str_.split(":")[0])
+        return query_param_having_dt
+
+    def _add_datetime_params_handling_in_query(self, query_param_having_dt: List[str]):
+        output_str = ""
+        for param_having_dt in query_param_having_dt:
+            output_str += f'    if {param_having_dt} is not None:\n'
+            output_str += f'        {param_having_dt} = get_pendulum_dt_from_epoch({param_having_dt})\n'
+        return output_str
+
+    def _handle_http_query_str(self, message: protogen.Message, query_name: str, query_params_str: str,
+                               query_params_with_type_str: str, route_type: str | None = None,
+                               return_type_str: str | None = None, model_type: ModelType = ModelType.Beanie) -> str:
+        # finding datetime params to get object created back
+        query_param_having_dt = self._get_dt_query_params_name_list(query_params_with_type_str)
 
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         if return_type_str is None:
@@ -3987,9 +3999,9 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             # making Datetime type to str as it is not compatible in parsing with fastapi directly - will make
             # object back from str once receive value
             if "pendulum.DateTime" in query_params_with_type_str:
-                query_params_with_type_str = query_params_with_type_str.replace("pendulum.DateTime", "str")
+                query_params_with_type_str = query_params_with_type_str.replace("pendulum.DateTime", "int")
             if "DateTime" in query_params_with_type_str:
-                query_params_with_type_str = query_params_with_type_str.replace("DateTime", "str")
+                query_params_with_type_str = query_params_with_type_str.replace("DateTime", "int")
 
             if model_type in [ModelType.Dataclass, ModelType.Msgspec]:
                 output_str += f'@{self.api_router_app_name}.get("/query-{query_name}' + \
@@ -4004,9 +4016,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f'    Get Query of {message.proto.name} with aggregate - {query_name}\n'
             output_str += f'    """\n'
             if query_param_having_dt:
-                for param_having_dt in query_param_having_dt:
-                    output_str += f'    if {param_having_dt} is not None:\n'
-                    output_str += f'        {param_having_dt} = pendulum.parse({param_having_dt})\n'
+                output_str += self._add_datetime_params_handling_in_query(query_param_having_dt)
             if model_type == ModelType.Msgspec:
                 output_str += f"    return await underlying_{query_name}_query_http_bytes({query_params_str})"
             else:
@@ -4145,6 +4155,9 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
     def _handle_http_file_query_str(self, message: protogen.Message, query_name: str, query_params_str: str | None = None,
                                     query_params_with_type_str: str | None = None, return_type_str: str | None = None,
                                     model_type: ModelType = ModelType.Beanie) -> str:
+        # finding datetime params to get object created back
+        query_param_having_dt = self._get_dt_query_params_name_list(query_params_with_type_str)
+
         if return_type_str is None:
             return_type_str = message.proto.name
         output_str = f"@perf_benchmark\n"
@@ -4200,6 +4213,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str += f'    """\n'
         output_str += f'    File Upload Query of {message.proto.name} - {query_name}\n'
         output_str += f'    """\n'
+        if query_param_having_dt:
+            output_str += self._add_datetime_params_handling_in_query(query_param_having_dt)
         output_str += self._add_view_check_code_in_route()
         if model_type == ModelType.Msgspec:
             output_str += f"    return await underlying_{query_name}_query_http_bytes(upload_file"
@@ -4239,7 +4254,9 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                     param_type = param_type.replace("= None", "").replace("=None", "")
                 # else using exiting one as it is fine
 
-                param_to_type_str_list.append(f"{param_name}: {param_type} = Query()")
+                    param_to_type_str_list.append(f"{param_name}: {param_type} = Query(default=None)")
+                else:
+                    param_to_type_str_list.append(f"{param_name}: {param_type} = Query()")
             query_params_with_type_str = ", ".join(param_to_type_str_list)
 
             for param_name in params_name_list:
@@ -4341,8 +4358,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                     query_param_str += f"{meta_field_name}, "
                     query_param_with_type_str += f"{meta_field_name}: {meta_field_type}, "
             query_param_str += "start_date_time, end_date_time"
-            query_param_with_type_str += ("start_date_time: int | None = None, "
-                                          "end_date_time: int | None = None")
+            query_param_with_type_str += ("start_date_time: pendulum.DateTime | None = None, "
+                                          "end_date_time: pendulum.DateTime | None = None")
 
             # Http Filter Call
             output_str += self._handle_http_query_str(message, query_name, query_param_str, query_param_with_type_str,

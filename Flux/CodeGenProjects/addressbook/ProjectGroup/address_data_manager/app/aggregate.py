@@ -42,8 +42,8 @@ def get_dict_list_for_bar_meta_data_match(symbol: str, exch_id: str, bar_type: s
 
 def get_vwap_projection_from_bar_data_agg_pipeline(symbol: str, exch_id: str, bar_type: str,
                                                    symbol_type: str, ticker: str,
-                                                   start_date_time: int | None = None,
-                                                   end_date_time: int | None = None,
+                                                   start_date_time: DateTime | None = None,
+                                                   end_date_time: DateTime | None = None,
                                                    id_list: List[int] | None = None):
     # Code generated function
     agg_pipeline = [
@@ -130,8 +130,8 @@ def get_vwap_projection_from_bar_data_agg_pipeline(symbol: str, exch_id: str, ba
 
 def get_vwap_n_vwap_change_projection_from_bar_data_agg_pipeline(
         symbol: str, exch_id: str, bar_type: str, symbol_type: str, ticker: str,
-        start_date_time: int | None = None,
-        end_date_time: int | None = None, id_list: List[int] | None = None):
+        start_date_time: DateTime | None = None,
+        end_date_time: DateTime | None = None, id_list: List[int] | None = None):
     # Code generated function
     agg_pipeline = [
         {
@@ -218,8 +218,8 @@ def get_vwap_n_vwap_change_projection_from_bar_data_agg_pipeline(
 
 def get_vwap_change_projection_from_bar_data_agg_pipeline(
         symbol: str, exch_id: str, bar_type: str, symbol_type: str, ticker: str,
-        start_date_time: int | None = None,
-        end_date_time: int | None = None, id_list: List[int] | None = None):
+        start_date_time: DateTime | None = None,
+        end_date_time: DateTime | None = None, id_list: List[int] | None = None):
     # Code generated function
     agg_pipeline = [
         {
@@ -305,8 +305,8 @@ def get_vwap_change_projection_from_bar_data_agg_pipeline(
 
 def get_premium_projection_from_bar_data_agg_pipeline(
         symbol: str, exch_id: str, bar_type: str, symbol_type: str, ticker: str,
-        start_date_time: int | None = None,
-        end_date_time: int | None = None, id_list: List[int] | None = None):
+        start_date_time: DateTime | None = None,
+        end_date_time: DateTime | None = None, id_list: List[int] | None = None):
     # shift this function to aggregate.py file of project and remove this comment afterward
     agg_pipeline = [
         {
@@ -392,8 +392,8 @@ def get_premium_projection_from_bar_data_agg_pipeline(
 
 def get_premium_n_premium_change_projection_from_bar_data_agg_pipeline(
         symbol: str, exch_id: str, bar_type: str, symbol_type: str, ticker: str,
-        start_date_time: int | None = None,
-        end_date_time: int | None = None, id_list: List[int] | None = None):
+        start_date_time: DateTime | None = None,
+        end_date_time: DateTime | None = None, id_list: List[int] | None = None):
     # shift this function to aggregate.py file of project and remove this comment afterward
     agg_pipeline = [
         {
@@ -480,8 +480,8 @@ def get_premium_n_premium_change_projection_from_bar_data_agg_pipeline(
 
 def get_premium_change_projection_from_bar_data_agg_pipeline(
         symbol: str, exch_id: str, bar_type: str, symbol_type: str, ticker: str,
-        start_date_time: int | None = None,
-        end_date_time: int | None = None, id_list: List[int] | None = None):
+        start_date_time: DateTime | None = None,
+        end_date_time: DateTime | None = None, id_list: List[int] | None = None):
     # shift this function to aggregate.py file of project and remove this comment afterward
     agg_pipeline = [
         {

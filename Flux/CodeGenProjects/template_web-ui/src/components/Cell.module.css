@@ -210,6 +210,11 @@
     background-color: var(--dynamic-cell-selected) !important;
 }
 
+/* New stronger background for most recent selection */
+.cell_selected_recent {
+    background-color: var(--dynamic-cell-selected-recent, rgba(25, 118, 210, 0.30)) !important;
+}
+
 .positive {
     color: var(--green-success) !important;
     /* background-color: var(--green-400) !important; */

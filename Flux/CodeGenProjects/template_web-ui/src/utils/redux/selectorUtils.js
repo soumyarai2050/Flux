@@ -61,5 +61,8 @@ export function dataSourcesSelectorEquality(prev, next) {
     if (!shallowEqual(prev.objIdDict, next.objIdDict)) {
         return false;
     }
+    if (!shallowEqual(prev.modeDict, next.modeDict)) {
+        return false;
+    }
     return true;
 };

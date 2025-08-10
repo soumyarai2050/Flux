@@ -14,9 +14,9 @@
   justify-content: center;
   cursor: pointer;
   z-index: 100;
-  color: white;
+  color: var(--yellow-warning);
   box-shadow: 0 0 30px rgba(173, 135, 121, 0.8), 0 0 15px rgba(173, 135, 121, 1);
-  animation: glow 2s ease-in-out infinite alternate;
+  /* animation: glow 2s ease-in-out infinite alternate; */
   transition: all 0.3s ease;
   pointer-events: auto;
 }
@@ -47,9 +47,9 @@
   justify-content: center;
   cursor: pointer;
   z-index: 100;
-  color: white;
+  color: var(--yellow-warning);
   box-shadow: 0 0 30px rgba(173, 135, 121, 0.8), 0 0 15px rgba(173, 135, 121, 1);
-  animation: glow 2s ease-in-out infinite alternate;
+  /* animation: glow 2s ease-in-out infinite alternate; */
   transition: all 0.3s ease;
   pointer-events: auto;
 }

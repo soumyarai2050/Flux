@@ -15,7 +15,9 @@ onmessage = (e) => {
         centerJoin, flip, rowIds
     } = e.data;
     const rows = getRowsFromAbbreviation(items, itemsDataDict, itemProps, abbreviation, loadedProps);  // not used externally
-    const uniqueValues = getUniqueValues(rows, itemProps.filter((meta) => meta.filterEnable), true);
+    const filterFieldsMetadata = itemProps.filter((meta) => meta.filterEnable);
+    const filterAppliedFields = new Set(filters?.map((o) => o.column_name) ?? []);
+    const uniqueValues = getUniqueValues(rows, filterFieldsMetadata, true);
     const filteredRows = applyFilter(rows, filters);
     const rowIdsFilteredRows = applyRowIdsFilter(filteredRows, rowIds);
     const groupedRows = getGroupedTableRows(rowIdsFilteredRows, joinBy, joinSort);
@@ -42,9 +44,10 @@ onmessage = (e) => {
     } else {
         [commonKeys, nullColumns] = getCommonKeyCollections(activeRows, groupedColumns, !showHidden && !showAll, true, false, !showMore && !moreAll);
     }
-    const cells = getFilteredCells(groupedColumns, [...commonKeys, ...nullColumns], showHidden, showAll, showMore, moreAll, true);
+    const updatedCommonKeys = commonKeys.filter((o) => !filterAppliedFields.has(o.key));
+    const cells = getFilteredCells(groupedColumns, [...updatedCommonKeys, ...nullColumns], showHidden, showAll, showMore, moreAll, true);
     const sortedCells = sortColumns(cells, columnOrders, joinBy && joinBy.length > 0, centerJoin, flip, true);
-    postMessage({ rows: filteredRows, groupedRows: sortedRows, activeRows, maxRowSize, headCells: groupedColumns, commonKeys, uniqueValues, sortedCells, activeIds });
+    postMessage({ rows: filteredRows, groupedRows: sortedRows, activeRows, maxRowSize, headCells: groupedColumns, commonKeys: updatedCommonKeys, uniqueValues, sortedCells, activeIds });
 }
 
 export { };

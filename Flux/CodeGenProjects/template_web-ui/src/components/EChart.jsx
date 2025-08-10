@@ -1,9 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 import { init, getInstanceByDom } from 'echarts';
 import { useTheme } from '@emotion/react';
-import { cssVar } from '../theme';
+import { cloneDeep } from 'lodash';
 
-function EChart({ option, theme, loading, selectedData, selectedSeriesIdx, onSelectDataChange, activeDataId, isCollectionType }) {
+function EChart({ option, theme, loading, selectedData, selectedSeriesIdx, onSelectDataChange, activeDataId }) {
     const chartRef = useRef(null);
     const onSelectDataChangeRef = useRef();
     onSelectDataChangeRef.current = onSelectDataChange;
@@ -16,9 +16,7 @@ function EChart({ option, theme, loading, selectedData, selectedSeriesIdx, onSel
         let chart;
         if (chartRef.current !== null) {
             chart = init(chartRef.current, theme);
-            if (isCollectionType) {
-                chart.on('click', onChartClick);
-            }
+            chart.on('click', onChartClick);
         }
 
         function resizeChart() {
@@ -27,9 +25,7 @@ function EChart({ option, theme, loading, selectedData, selectedSeriesIdx, onSel
         window.addEventListener('resize', resizeChart);
 
         return () => {
-            if (isCollectionType) {
-                chart?.off('click', onChartClick);
-            }
+            chart?.off('click', onChartClick);
             chart?.dispose();
             window.removeEventListener('resize', resizeChart);
         }
@@ -40,8 +36,8 @@ function EChart({ option, theme, loading, selectedData, selectedSeriesIdx, onSel
         if (chartRef.current !== null) {
             const chart = getInstanceByDom(chartRef.current);
 
-            // Deep copy option to avoid mutating original
-            const modifiedOption = JSON.parse(JSON.stringify(option));
+            // Deep copy option to avoid mutating original while preserving functions (formatters, callbacks)
+            const modifiedOption = cloneDeep(option);
 
             const series = modifiedOption.series?.[selectedSeriesIdx];
             if (series) {

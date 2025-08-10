@@ -120,15 +120,15 @@ function getAxisMin(rows, field, index = 0) {
  */
 function updateChartTypeSpecificOptions(chartSeries, dataset) {
     if (chartSeries.type === 'line') {
-        // If the dataset has more than 10 data points, hide symbols for cleaner lines.
-        if (dataset.source.length > 10) {
+        // If the dataset has more than 100 data points, hide symbols for cleaner lines.
+        if (dataset.source.length > 100) {
             chartSeries.showSymbol = false;
         }
         // Set a default symbol size for line charts.
-        chartSeries.symbolSize = 10;
+        chartSeries.symbolSize = 5;
     } else if (chartSeries.type === 'scatter') {
         // Set a default symbol size for scatter charts.
-        chartSeries.symbolSize = 7;
+        chartSeries.symbolSize = 5;
     }
 }
 
@@ -318,19 +318,19 @@ export function updateChartDataObj(chartDataObj, collections, rows, datasets, is
 
                 // Add x-axis encode if not already present.
                 if (!xEndodes.find(encode => encode.encode === xEncode)) {
-                    xEndodes.push({ encode: xEncode, seriesCollections: chartSeriesCollections, isCollectionType: !chartDataObj.time_series });
+                    xEndodes.push({ encode: xEncode, seriesCollections: chartSeriesCollections, isCollectionType });
                 }
 
                 // Handle stacked series.
                 if (series.stack) {
                     // If a stack is already present, do not add a new encode for it.
                     if (!yEncodes.find((encode) => encode.stack)) {
-                        yEncodes.push({ encode: yEncode, seriesCollections: chartSeriesCollections, isCollectionType: !chartDataObj.time_series, max: yMax, min: yMin, forceMin, forceMax, stack: series.stack });
+                        yEncodes.push({ encode: yEncode, seriesCollections: chartSeriesCollections, isCollectionType, max: yMax, min: yMin, forceMin, forceMax, stack: series.stack });
                         prevYEncodeIndex += 1;
                     }
                 } else if (!yEncodes.find(encode => encode.encode === yEncode && !encode.stack)) {
                     // Add y-axis encode if not stacked and not already present.
-                    yEncodes.push({ encode: yEncode, seriesCollections: chartSeriesCollections, isCollectionType: !chartDataObj.time_series, max: yMax, min: yMin, forceMin, forceMax });
+                    yEncodes.push({ encode: yEncode, seriesCollections: chartSeriesCollections, isCollectionType, max: yMax, min: yMin, forceMin, forceMax });
                     prevYEncodeIndex += 1;
                 }
                 updatedSeries.yAxisIndex = prevYEncodeIndex - 1;
@@ -458,6 +458,8 @@ function updateChartAttributesInSchema(schema, currentSchema) {
                     attributes.orm_no_update = true;
                 } else if (['y_min', 'y_max'].includes(key)) {
                     attributes.hide = true;
+                } else if (key === 'fld_value') {
+                    attributes.placeholder = 'comma separated values';
                 }
             } else if ([DATA_TYPES.OBJECT, DATA_TYPES.ARRAY].includes(attributes.type)) {
                 // Recursively call for nested objects or arrays.
@@ -785,16 +787,43 @@ export function genMetaFilters(arr, collections, filterDict, filterFld, isCollec
     // Parse filter values from the filter dictionary.
     let values = filterDict[filterFld].split(",").map(val => val.trim()).filter(val => val !== "");
 
-    // Generate filter objects for each row that matches the filter values.
-    arr.forEach(row => {
-        if (values.includes(get(row, filterFld))) {
+    // For each filter value, create a meta filter
+    values.forEach(value => {
+        // Try to find a matching row in the data to get meta field mappings
+        const matchingRow = arr.find(row => get(row, filterFld) === value);
+
+        if (matchingRow) {
+            // If we found a matching row, use its data for meta fields
             const filter = {};
             for (const key in fldMappingDict) {
-                filter[fldMappingDict[key]] = get(row, key);
+                filter[fldMappingDict[key]] = get(matchingRow, key);
             }
+            filters.push(filter);
+        } else {
+            // If no matching row exists, create a filter with the value directly mapped
+            // This ensures we create WebSocket connections for all filter values
+            const filter = {};
+
+            // For time-series, we need to map the filter field to its underlying meta field
+            if (fldMappingDict[filterFld]) {
+                filter[fldMappingDict[filterFld]] = value;
+            } else {
+                // Fallback: use the field name directly as the meta field
+                filter[filterFld] = value;
+            }
+
+            // Add any other meta fields we can derive (like exch_id if it's consistent)
+            for (const key in fldMappingDict) {
+                if (key !== filterFld && arr.length > 0) {
+                    // Use the value from the first available row for other meta fields
+                    filter[fldMappingDict[key]] = get(arr[0], key);
+                }
+            }
+
             filters.push(filter);
         }
     });
+
     return filters;
 }
 
@@ -815,6 +844,20 @@ export function tooltipFormatter(value) {
     }
     return value;
 }
+// export function tooltipFormatter(value, fractionDigits = 2) {
+//     const n = Number(value);
+//     if (Number.isFinite(n)) {
+//         if (Number.isInteger(n)) {
+//             return n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+//         }
+//         // always show the same precision for floats
+//         return n.toLocaleString(undefined, {
+//             minimumFractionDigits: fractionDigits,
+//             maximumFractionDigits: fractionDigits
+//         });
+//     }
+//     return value;
+// }
 
 /**
  * Updates the schema for the `partition_fld` property based on whether the chart is a time-series chart.

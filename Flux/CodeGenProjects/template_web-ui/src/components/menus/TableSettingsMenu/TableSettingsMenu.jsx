@@ -230,7 +230,7 @@ const TableSettingsMenu = ({
             orientation="vertical"
             value={tabIndex}
             onChange={(e, newValue) => setTabIndex(newValue)}
-            sx={{ borderRight: 1, borderColor: 'divider', minWidth: 100 , backgroundColor: 'var(--brown-theme-medium)'}}
+            sx={{ borderRight: 1, borderColor: 'divider', minWidth: 100 , backgroundColor: 'var(--dynamic-bg-medium)'}}
           >
             <Tab label="Table Config" />
             <Tab label="Show/More" />

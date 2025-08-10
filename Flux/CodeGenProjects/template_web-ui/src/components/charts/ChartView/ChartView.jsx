@@ -48,7 +48,9 @@ function ChartView({
     children,
     quickFilters = [],
     onQuickFiltersChange,
-    selectedRowId
+    selectedRowId,
+    selectedRows = [],
+    lastSelectedRowId
 }) {
     // redux states
     const theme = useTheme();
@@ -233,11 +235,14 @@ function ChartView({
                 setTsData(prevTsData => {
                     const updatedTsData = { ...prevTsData };
 
+                    // Create a unique key that combines query name and fingerprint
+                    const uniqueKey = `${query.name}__${fingerprint}`;
+
                     // Append new data to existing query data or create new entry
-                    if (updatedTsData[query.name]) {
-                        updatedTsData[query.name] = [...updatedTsData[query.name], ...processedData];
+                    if (updatedTsData[uniqueKey]) {
+                        updatedTsData[uniqueKey] = [...updatedTsData[uniqueKey], ...processedData];
                     } else {
-                        updatedTsData[query.name] = processedData;
+                        updatedTsData[uniqueKey] = processedData;
                     }
 
                     return updatedTsData;
@@ -292,17 +297,35 @@ function ChartView({
             return;
         }
 
+        // Early exit: wait for queryDict to be populated for all time-series
+        const expectedQueryCount = storedChartObj.series.filter(series => {
+            if (!series.encode?.y) return false;
+            const collection = getCollectionByName(fieldsMetadata, series.encode.y, modelType === MODEL_TYPES.ABBREVIATION_MERGE);
+            return collection && collection.hasOwnProperty('mapping_src');
+        }).length;
+
+        const currentQueryCount = Object.keys(queryDict).length;
+
+        if (currentQueryCount < expectedQueryCount) {
+            return;
+        }
+
         // Get chart filters and generate meta filters for WebSocket queries
         const filterDict = getChartFilterDict(storedChartObj.filters);
         if (Object.keys(filterDict).length === 0) return;
 
-        const metaFilters = genMetaFilters(
-            rows,
-            fieldsMetadata,
-            filterDict,
-            Object.keys(filterDict)[0],
-            modelType === MODEL_TYPES.ABBREVIATION_MERGE
-        );
+        // Generate meta filters for all filter fields
+        let metaFilters = [];
+        Object.keys(filterDict).forEach(filterFld => {
+            const filtersForField = genMetaFilters(
+                rows,
+                fieldsMetadata,
+                filterDict,
+                filterFld,
+                modelType === MODEL_TYPES.ABBREVIATION_MERGE
+            );
+            metaFilters = metaFilters.concat(filtersForField);
+        });
 
         // Generate all required fingerprints for current configuration
         const allFingerprints = generateAllFingerprints(metaFilters);
@@ -317,6 +340,27 @@ function ChartView({
         // Early exit: no changes needed
         if (!fingerprintsChanged) {
             return;
+        }
+
+        // Identify fingerprints being removed
+        const removedFingerprints = Array.from(currentFingerprints).filter(fp => !newFingerprints.has(fp));
+        const addedFingerprints = Array.from(newFingerprints).filter(fp => !currentFingerprints.has(fp));
+
+
+        // Only clear tsData for fingerprints that are being removed
+        if (removedFingerprints.length > 0) {
+            setTsData(prevTsData => {
+                const updatedTsData = { ...prevTsData };
+                removedFingerprints.forEach(fingerprint => {
+                    // Find and remove all tsData keys that end with this fingerprint
+                    Object.keys(updatedTsData).forEach(key => {
+                        if (key.endsWith(`__${fingerprint}`)) {
+                            delete updatedTsData[key];
+                        }
+                    });
+                });
+                return updatedTsData;
+            });
         }
 
         // Cleanup workers that are no longer needed
@@ -339,6 +383,7 @@ function ChartView({
     }, [
         storedChartObj.series,
         storedChartObj.time_series,
+        storedChartObj.filters,
         queryDict,
         projectSchema,
         fieldsMetadata,
@@ -371,13 +416,40 @@ function ChartView({
         setSelectedIndex(updatedIndex);
     }, [selectedChartName, chartEnableOverride])
 
+    // Sync local selectedData state with props from parent
+    useEffect(() => {
+        if (selectedRows && selectedRows.length > 0) {
+            setSelectedData(prevData => {
+                if (!isEqual(prevData, selectedRows)) {
+                    return selectedRows;
+                }
+                return prevData;
+            });
+        } else {
+            setSelectedData(prevData => {
+                if (prevData.length > 0) {
+                    return [];
+                }
+                return prevData;
+            });
+        }
+    }, [selectedRows])
+
     useEffect(() => {
         // update the local row dataset on update from parent
         if (mode === MODES.READ) {
             let updatedRows;
             if (storedChartObj.filters?.length > 0) {
-                const updatedFilters = storedChartObj.filters
-                    .map((item) => ({ column_name: item.fld_name, filtered_values: item.fld_value }))
+
+                //Use getChartFilterDict for both time-series and non-time-series charts
+                const filterDict = getChartFilterDict(storedChartObj.filters);
+
+                // Convert to the format expected by applyFilter
+                const updatedFilters = Object.entries(filterDict).map(([fld_name, fld_value]) => ({
+                    column_name: fld_name,
+                    filtered_values: fld_value
+                }));
+
                 updatedRows = applyFilter(chartRows, updatedFilters);
             } else {
                 updatedRows = chartRows;
@@ -386,7 +458,7 @@ function ChartView({
         } else {  // mode is EDIT
             setIsChartOptionOpen(true);
         }
-    }, [chartRows, mode])
+    }, [chartRows, mode, storedChartObj.filters])
 
     useEffect(() => {
         // auto-select the chart obj if exists and not already selected
@@ -483,8 +555,22 @@ function ChartView({
     }, [chartUpdateCounter])
 
     useEffect(() => {
+        // Transform uniqueKey-based tsData back to query-name-based for chart rendering
+        // Aggregate data from multiple fingerprints that share the same query name
+        const queryBasedTsData = {};
+        Object.keys(tsData).forEach(uniqueKey => {
+            if (uniqueKey.includes('__')) {
+                const [queryName] = uniqueKey.split('__');
+                if (!queryBasedTsData[queryName]) {
+                    queryBasedTsData[queryName] = [];
+                }
+                queryBasedTsData[queryName] = queryBasedTsData[queryName].concat(tsData[uniqueKey]);
+            }
+        });
+
+
         // create the datasets for chart configuration (time-series and non time-series both)
-        const updatedDatasets = genChartDatasets(rows, tsData, storedChartObj, queryDict, fieldsMetadata, modelType === MODEL_TYPES.ABBREVIATION_MERGE);
+        const updatedDatasets = genChartDatasets(rows, queryBasedTsData, storedChartObj, queryDict, fieldsMetadata, modelType === MODEL_TYPES.ABBREVIATION_MERGE);
         setDatasets(updatedDatasets);
         setDatasetUpdateCounter(prevCount => prevCount + 1);
     }, [chartUpdateCounter, rows, tsData, queryDict])
@@ -512,13 +598,21 @@ function ChartView({
         }
         setSelectedData(updatedSelectedData);
         setSelectedSeriesIdx(seriesIdx);
-        if (updatedSelectedData.length > 0) {
-            const mostRecentItemId = updatedSelectedData[updatedSelectedData.length - 1];
+
+        // Determine most recent selection
+        const mostRecentItemId = updatedSelectedData.length > 0
+            ? updatedSelectedData[updatedSelectedData.length - 1]
+            : null;
+
+        // Call legacy onRowSelect for backward compatibility
+        if (mostRecentItemId) {
             onRowSelect(mostRecentItemId);
         } else {
             onRowSelect(null);
         }
-        onChartPointSelect(updatedSelectedData);
+
+        // Call new multiselect handler with both selected IDs and most recent
+        onChartPointSelect(updatedSelectedData, mostRecentItemId);
     }
 
     // on closing of modal, open a pop up to confirm/discard changes
@@ -792,12 +886,17 @@ function ChartView({
                 nodeData: nodeData
             };
 
+            const updatedFilters = [...pinnedFilters, newPin];
+
+            // Update local state
             setPinnedFiltersByChart(prev => ({
                 ...prev,
-                [currentChartName]: [...(prev[currentChartName] || []), newPin]
+                [currentChartName]: updatedFilters
             }));
+            setPinnedFilters(updatedFilters);
 
-            setPinnedFilters(prev => [...prev, newPin]);
+            // Save to quickFilters for persistence
+            savePinnedFiltersToQuickFilters(updatedFilters, currentChartName);
         }
     };
 
@@ -873,6 +972,9 @@ function ChartView({
         });
     }, [navigateObjectPath]);
 
+    //handlePinnedFilterChange : updates local state, chartData and calls the function savePinnedFiltersToQuickFilters(updatedFilters, currentChartName);
+    //this doesnt change the pin list , that function is handleQuickFilterPin 
+
     const handlePinnedFilterChange = (uniqueId, value) => {
         const currentChartName = data?.chart_name;
         if (!currentChartName) {
@@ -882,6 +984,10 @@ function ChartView({
         pinnedFilterUpdateRef.current = true;
 
         setPinnedFilters(prev => {
+            if (!Array.isArray(prev)) {
+                console.warn('⚠️ pinnedFilters is not an array:', prev);
+                return [];
+            }
             const updated = prev.map(pin =>
                 pin.uniqueId === uniqueId ? { ...pin, value } : pin
             );
@@ -964,25 +1070,38 @@ function ChartView({
             pinnedFilterUpdateRef.current = false;
         }
 
-        // Also update the main quick filters for backward compatibility
-        handleQuickFilterChange(uniqueId, value);
+        // Save updated pinned filters to quickFilters for persistence
+        if (Array.isArray(pinnedFilters)) {
+            const updatedFilters = pinnedFilters.map(pin =>
+                pin.uniqueId === uniqueId ? { ...pin, value } : pin
+            );
+            savePinnedFiltersToQuickFilters(updatedFilters, currentChartName);
+        }
     };
 
     const handleUnpinFilter = (uniqueId) => {
         const currentChartName = data?.chart_name;
         if (!currentChartName) return;
 
+        // Calculate the new filters after removal
+        if (!Array.isArray(pinnedFilters)) {
+            console.warn('⚠️ pinnedFilters is not an array in handleUnpinFilter:', pinnedFilters);
+            return;
+        }
+
+        const updatedFilters = pinnedFilters.filter(pin => pin.uniqueId !== uniqueId);
+
         // Update current display
-        setPinnedFilters(prev => {
-            const newFilters = prev.filter(pin => pin.uniqueId !== uniqueId);
-            return newFilters;
-        });
+        setPinnedFilters(updatedFilters);
 
         // Update chart-specific storage
         setPinnedFiltersByChart(prev => ({
             ...prev,
-            [currentChartName]: (prev[currentChartName] || []).filter(pin => pin.uniqueId !== uniqueId)
+            [currentChartName]: updatedFilters
         }));
+
+        // Save updated pinned filters to quickFilters for persistence
+        savePinnedFiltersToQuickFilters(updatedFilters, currentChartName);
     };
 
     const handleCopyChartName = (e, chartName) => {
@@ -996,10 +1115,83 @@ function ChartView({
 
     const options = useMemo(() => getChartOption(clearxpath(cloneDeep(chartOption))), [chartOption]);
 
-    const chartQuickFilter = useMemo(() =>
-        quickFilters.find((quickFilter) => quickFilter.chart_name === data?.chart_name),
-        [quickFilters, data?.chart_name]
-    );
+    const chartQuickFilter = useMemo(() => {
+        if (!Array.isArray(quickFilters)) {
+            console.warn('⚠️ quickFilters is not an array:', quickFilters);
+            return undefined;
+        }
+        return quickFilters.find((quickFilter) => quickFilter.chart_name === data?.chart_name);
+    }, [quickFilters, data?.chart_name]);
+
+    // Initialize pinned filters from quickFilters when component mounts or chart changes
+    useEffect(() => {
+
+
+        if (data?.chart_name && chartQuickFilter?.filters) {
+            try {
+                const deserializedFilters = JSON.parse(chartQuickFilter.filters);
+
+                // Ensure we're setting an array
+                if (Array.isArray(deserializedFilters)) {
+                    setPinnedFilters(deserializedFilters);
+                } else {
+                    setPinnedFilters([]);
+                }
+
+                // Update chart-specific storage to sync with the rest of the component
+                if (Array.isArray(deserializedFilters)) {
+                    setPinnedFiltersByChart(prev => ({
+                        ...prev,
+                        [data.chart_name]: deserializedFilters
+                    }));
+                }
+            } catch (error) {
+                console.warn('⚠️ Failed to parse quickFilters.filters:', error);
+                setPinnedFilters([]);
+            }
+        } else if (data?.chart_name) {
+            // No saved filters for this chart
+            setPinnedFilters([]);
+        }
+    }, [data?.chart_name, chartQuickFilter?.filters]);
+
+    // Helper function to save pinned filters to quickFilters
+    const savePinnedFiltersToQuickFilters = useCallback((updatedFilters, chartName) => {
+        if (!onQuickFiltersChange || !chartName) {
+            console.warn('⚠️ Cannot save pinned filters - missing onQuickFiltersChange or chartName');
+            return;
+        }
+
+        if (!Array.isArray(updatedFilters)) {
+            console.warn('⚠️ updatedFilters is not an array:', updatedFilters);
+            return;
+        }
+
+
+
+        // Create updated quickFilters array
+        const currentQuickFilters = Array.isArray(quickFilters) ? quickFilters : [];
+        const updatedQuickFilters = [...currentQuickFilters];
+        const existingIndex = updatedQuickFilters.findIndex(qf => qf.chart_name === chartName);
+
+        const filtersString = JSON.stringify(updatedFilters);
+
+        if (existingIndex >= 0) {
+            // Update existing entry
+            updatedQuickFilters[existingIndex] = {
+                ...updatedQuickFilters[existingIndex],
+                filters: filtersString
+            };
+        } else {
+            // Create new entry
+            updatedQuickFilters.push({
+                chart_name: chartName,
+                filters: filtersString
+            });
+        }
+
+        onQuickFiltersChange(updatedQuickFilters);
+    }, [quickFilters, onQuickFiltersChange]);
 
     const filterDict = useMemo(() => {
         if (chartQuickFilter) {
@@ -1106,9 +1298,8 @@ function ChartView({
                                     }}
                                     selectedSeriesIdx={selectedSeriesIdx ?? 0}
                                     selectedData={selectedData}
-                                    activeDataId={selectedRowId}
+                                    activeDataId={lastSelectedRowId || selectedRowId}
                                     onSelectDataChange={handleSelectDataChange}
-                                    isCollectionType={modelType === MODEL_TYPES.ABBREVIATION_MERGE}
                                 />
                             ) : (
                                 <Box className={styles.no_data_message}>

@@ -128,8 +128,9 @@ const HeaderField = (props) => {
         } else if (props.data.type === DATA_TYPES.OBJECT) {
             // Check if orm_no_update is set
             const hasOrmNoUpdate = props.data.ormNoUpdate; // This comes from fieldProps mapping
+            const isNewlyCreated = !!props.data['data-add']; // Newly created in updatedData only
 
-            if (!hasOrmNoUpdate) {
+            if (isNewlyCreated || !hasOrmNoUpdate) {
                 if (isArrayItem) {
                     // Array items can always be duplicated and removed (unless cascaded deletion)
                     passToAddActiveContext = true;

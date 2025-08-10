@@ -566,7 +566,8 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                     chartEnableOverride: modelLayoutData.chart_enable_override ?? [],
                     onChartPointSelect: setRowIds,
                     quickFilters: modelLayoutData.quick_filters ?? [],
-                    onQuickFiltersChange: handleQuickFiltersChange
+                    onQuickFiltersChange: handleQuickFiltersChange,
+                    selectedRowId: objId
                 };
                 wrapperMode = MODES.READ;
                 isReadOnly = true;

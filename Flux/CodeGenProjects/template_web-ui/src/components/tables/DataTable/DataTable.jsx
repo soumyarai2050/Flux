@@ -142,7 +142,7 @@ const DataTable = ({
   }
 
   // Use the keyboard navigation hook
-  const { handleKeyDown } = useKeyboardNavigation({
+  const { handleKeyDown, handleRowClick } = useKeyboardNavigation({
     mode,
     activeRows,
     tableContainerRef,
@@ -153,7 +153,8 @@ const DataTable = ({
       ctrlShiftSelection: true
     },
     callbacks: {
-      onRowSelect: onRowSelect
+      onRowSelect: onRowSelect,
+      onSelectionChange: setSelectedRows
     },
     // DataTable specific state
     selectedRows,
@@ -297,48 +298,9 @@ const DataTable = ({
   }
 
   const handleRowSelect = (e, rowId) => {
-    // row select only allowed in READ mode
-    if (mode !== MODES.READ) {
-      return;
-    }
-    let updatedSelectedRows;
-
-    if (e.shiftKey && e.ctrlKey && selectionAnchorId) {
-      // Ctrl+Shift+Click: Add range to existing selection (Excel behavior)
-      const range = getRowRange(selectionAnchorId, rowId);
-      updatedSelectedRows = [...new Set([...selectedRows, ...range])];
-    } else if (e.shiftKey && selectionAnchorId) {
-      // Shift+Click: Select range from anchor, replacing previous selection (Excel behavior)
-      updatedSelectedRows = getRowRange(selectionAnchorId, rowId);
-    } else if (e.ctrlKey) {
-      // Ctrl+Click: Toggle individual row selection
-      if (selectedRows.find(row => row === rowId)) {
-        // rowId already selected. unselect the row
-        updatedSelectedRows = selectedRows.filter(row => row !== rowId);
-      } else {
-        // new selected row. add it to selected array
-        updatedSelectedRows = [...selectedRows, rowId];
-      }
-      setSelectionAnchorId(rowId);
-    } else {
-      // Regular click: Select single row and set as anchor
-      updatedSelectedRows = [rowId];
-      setSelectionAnchorId(rowId);
-    }
-
-    setSelectedRows(updatedSelectedRows);
-    setLastSelectedRowId(rowId);
-
-    if (modelType === MODEL_TYPES.REPEATED_ROOT) {
-      if (updatedSelectedRows.length === 1) {
-        onRowSelect(rowId);
-      } else {
-        onRowSelect(null);
-      }
-    }
+    // Delegate to hook's unified click handler
+    handleRowClick(e, rowId);
   }
-
-
 
   const handleRowDoubleClick = (e) => {
     if (mode === MODES.READ && !isReadOnly) {
@@ -537,6 +499,7 @@ const DataTable = ({
                         modelType === MODEL_TYPES.ROOT
                           ? selectedRows.includes(row['data-id'])
                           : selectedRows.includes(row['data-id']) || selectedId === row['data-id']);
+                      const isMostRecent = row && lastSelectedRowId === row['data-id'];
                       const isNullCell = !row || (row && Object.keys(row).length === 0 && !cell.commonGroupKey);
 
                       let xpath = row?.['xpath_' + cell.key];
@@ -595,6 +558,7 @@ const DataTable = ({
                           key={cellKey}
                           mode={mode}
                           selected={isSelected}
+                          mostRecent={isMostRecent}
                           rowindex={rowIdx}
                           name={cell.key}
                           elaborateTitle={cell.tableTitle}

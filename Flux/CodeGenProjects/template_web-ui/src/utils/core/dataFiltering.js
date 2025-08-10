@@ -114,8 +114,23 @@ export function getFilterDict(filters) {
 }
 
 export function getChartFilterDict(filters) {
-    return filters.reduce((acc, item) => {
-        acc[item.fld_name] = item.fld_value;
+
+    const result = filters.reduce((acc, { fld_name, fld_value }) => {
+        const toList = (v) =>
+            Array.isArray(v)
+                ? v
+                : String(v ?? '')
+                    .split(',')
+                    .map((s) => s.trim())
+                    .filter(Boolean);
+
+        const merged = acc[fld_name]
+            ? Array.from(new Set([...toList(acc[fld_name]), ...toList(fld_value)]))
+            : toList(fld_value);
+
+        acc[fld_name] = merged.join(',');
         return acc;
     }, {});
+
+    return result;
 }

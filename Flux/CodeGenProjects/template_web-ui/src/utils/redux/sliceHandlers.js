@@ -52,6 +52,7 @@ export function setStoredArrayHandler(state, action, config) {
       }
     }
   } else {
+    if (modelName === 'ui_layout') return;
     if ([MODEL_TYPES.ABBREVIATION_MERGE, MODEL_TYPES.ROOT, MODEL_TYPES.NON_ROOT].includes(modelType) && !isAbbreviationSource) {
       if (action.payload.length > 0) {
         const obj = getObjectWithLeastId(action.payload);

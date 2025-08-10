@@ -291,12 +291,26 @@ const Layout = ({ projectName, theme, onThemeToggle, baseColor, onBaseColorChang
     const isLightMode = theme === Theme.LIGHT;
     const navbarBgColorVarName = currentSelectedPalette.dark;
     const navbarTextColorValue = cssVar('--dark-text-primary');
-    const cellSelectedColorVarName = isLightMode ? currentSelectedPalette.lighter : currentSelectedPalette.darkest;
+    const dynamicColorMediumVarName = currentSelectedPalette.medium; 
+
+    // Fix dark mode multi-select colors
+    let cellSelectedColorVarName, recentVarName;
+    if (isLightMode) {
+      // Light mode: use light background for selected, medium for recent
+      cellSelectedColorVarName = currentSelectedPalette.light;
+      recentVarName = currentSelectedPalette.medium;
+    } else {
+      // Dark mode: use medium background for selected, light for recent (better visibility)
+      cellSelectedColorVarName = currentSelectedPalette.light;
+      recentVarName = currentSelectedPalette.dark;
+    }
 
     const root = document.documentElement;
     root.style.setProperty('--dynamic-navbar-bg', `var(${navbarBgColorVarName})`);
     root.style.setProperty('--dynamic-navbar-text', navbarTextColorValue);
     root.style.setProperty('--dynamic-cell-selected', `var(${cellSelectedColorVarName})`);
+    root.style.setProperty('--dynamic-cell-selected-recent', `var(${recentVarName})`);
+    root.style.setProperty('--dynamic-bg-medium', `var(${dynamicColorMediumVarName})`);
   }, [selectedBaseColor, theme]);
 
   if (isLoading || !layout) return <div>Loading layout...</div>;

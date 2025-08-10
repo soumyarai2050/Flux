@@ -20,6 +20,7 @@ const SCROLL_DELAY = 50; // milliseconds
  * @param {function(string|number): void} [options.callbacks.onRowSelect] - Function to select a row by its ID.
  * @param {function(string|number, string|number): void} [options.callbacks.onRangeSelect] - Function for range selection.
  * @param {function(string|number, string|number): void} [options.callbacks.onExtendSelection] - Function for extending selection.
+ * @param {function(Array<string|number>): void} [options.callbacks.onSelectionChange] - Function called with the full selected IDs after a click selection change.
  * @param {Array<string|number>} [options.selectedRows=[]] - (DataTable specific) Array of currently selected row IDs.
  * @param {string|number|null} [options.lastSelectedRowId=null] - (DataTable specific) ID of the last selected row.
  * @param {string|number|null} [options.selectionAnchorId=null] - (DataTable specific) ID of the selection anchor row.
@@ -28,7 +29,7 @@ const SCROLL_DELAY = 50; // milliseconds
  * @param {function(string|number|null): void} [options.setSelectionAnchorId=null] - (DataTable specific) Setter for selection anchor ID state.
  * @param {function(string|number, string|number): Array<string|number>} [options.getRowRange=null] - (DataTable specific) Function to get a range of row IDs.
  * @param {string|null} [options.modelType=null] - (DataTable specific) The type of the model.
- * @returns {{handleKeyDown: function(KeyboardEvent): void}} An object containing the `handleKeyDown` function to be attached to a DOM element.
+ * @returns {{handleKeyDown: function(KeyboardEvent): void, handleRowClick: function(MouseEvent, string|number): { nextSelected: Array<string|number>, mostRecentId: string|number }|undefined}} An object containing handlers for keyboard and mouse selection.
  */
 const useKeyboardNavigation = ({
   mode,
@@ -55,7 +56,8 @@ const useKeyboardNavigation = ({
   const {
     onRowSelect,
     onRangeSelect,
-    onExtendSelection
+    onExtendSelection,
+    onSelectionChange
   } = callbacks;
 
   const handleKeyDown = useCallback((event) => {
@@ -86,6 +88,13 @@ const useKeyboardNavigation = ({
         const newSelectedRange = getRowRange(currentAnchorId, targetRowId);
         setSelectedRows(newSelectedRange);
         setLastSelectedRowId(targetRowId);
+        // Notify callbacks about the selection change
+        if (onSelectionChange) {
+          onSelectionChange(newSelectedRange, targetRowId);
+        }
+        if (onRowSelect) {
+          onRowSelect(targetRowId);
+        }
       }
     }
     // Shift+Arrow for extending selection (DataTable only)
@@ -97,6 +106,7 @@ const useKeyboardNavigation = ({
       const allRowIds = activeRows?.map(groupedRow => groupedRow[0]['data-id']) || [];
       if (allRowIds.length === 0) return;
 
+      // Initialize selection if no anchor or last selected exists
       if (!lastSelectedRowId || !selectionAnchorId) {
         const firstRowId = allRowIds[0];
         if (setSelectedRows && setLastSelectedRowId && setSelectionAnchorId) {
@@ -107,20 +117,44 @@ const useKeyboardNavigation = ({
         return;
       }
 
-      const currentIndex = allRowIds.indexOf(lastSelectedRowId);
-      if (currentIndex === -1) return;
+      // Find the current boundary of selection in the direction we're extending
+      const anchorIndex = allRowIds.indexOf(selectionAnchorId);
+      if (anchorIndex === -1) return;
 
-      let nextIndex = event.key === 'ArrowDown'
-        ? Math.min(currentIndex + 1, allRowIds.length - 1)
-        : Math.max(currentIndex - 1, 0);
+      // Determine the current selection boundary based on direction
+      let currentBoundaryIndex;
+      if (event.key === 'ArrowDown') {
+        // For downward extension, find the bottommost selected row
+        const selectedIndices = selectedRows.map(id => allRowIds.indexOf(id)).filter(idx => idx !== -1);
+        currentBoundaryIndex = selectedIndices.length > 0 ? Math.max(...selectedIndices) : anchorIndex;
+      } else {
+        // For upward extension, find the topmost selected row
+        const selectedIndices = selectedRows.map(id => allRowIds.indexOf(id)).filter(idx => idx !== -1);
+        currentBoundaryIndex = selectedIndices.length > 0 ? Math.min(...selectedIndices) : anchorIndex;
+      }
 
-      if (nextIndex === currentIndex) return;
+      // Calculate next boundary index
+      let nextBoundaryIndex = event.key === 'ArrowDown'
+        ? Math.min(currentBoundaryIndex + 1, allRowIds.length - 1)
+        : Math.max(currentBoundaryIndex - 1, 0);
 
-      const nextRowId = allRowIds[nextIndex];
+      // Don't proceed if we can't extend further
+      if (nextBoundaryIndex === currentBoundaryIndex) return;
+
+      const nextRowId = allRowIds[nextBoundaryIndex];
       if (getRowRange && setSelectedRows && setLastSelectedRowId) {
+        // Always calculate range from anchor to new boundary
         const newSelectedRange = getRowRange(selectionAnchorId, nextRowId);
         setSelectedRows(newSelectedRange);
         setLastSelectedRowId(nextRowId);
+        
+        // Notify callbacks about the selection change
+        if (onSelectionChange) {
+          onSelectionChange(newSelectedRange, nextRowId);
+        }
+        if (onRowSelect) {
+          onRowSelect(nextRowId);
+        }
       }
     }
     // Ctrl+Arrow navigation
@@ -176,11 +210,14 @@ const useKeyboardNavigation = ({
             setSelectedRows([targetRowId]);
             setLastSelectedRowId(targetRowId);
             setSelectionAnchorId(targetRowId);
-            if (modelType && onRowSelect) {
-              onRowSelect(targetRowId);
+            // Notify about selection change for visual updates
+            if (onSelectionChange) {
+              onSelectionChange([targetRowId], targetRowId);
             }
-          } else if (onRowSelect) {
-            // AbbreviationMergeView: single selection
+          }
+          
+          // Always notify parent about the selection for data binding
+          if (onRowSelect) {
             onRowSelect(targetRowId);
           }
 
@@ -249,6 +286,10 @@ const useKeyboardNavigation = ({
         setSelectedRows([nextRowId]);
         setLastSelectedRowId(nextRowId);
         setSelectionAnchorId(nextRowId);
+        // Notify about selection change for visual updates
+        if (onSelectionChange) {
+          onSelectionChange([nextRowId], nextRowId);
+        }
       }
       if (onRowSelect) {
         onRowSelect(nextRowId);
@@ -287,8 +328,61 @@ const useKeyboardNavigation = ({
     modelType
   ]);
 
+  // New: mouse click selection that supports Ctrl/Shift toggling and tracks most recent
+  const handleRowClick = useCallback((e, rowId) => {
+    if (mode !== MODES.READ) return;
+
+    const isCtrl = e?.ctrlKey || e?.metaKey;
+    const isShift = e?.shiftKey;
+
+    let nextSelected = [];
+
+    if (isShift && selectionAnchorId && getRowRange) {
+      const range = getRowRange(selectionAnchorId, rowId);
+      if (isCtrl) {
+        // Ctrl+Shift: extend selection by range
+        nextSelected = Array.from(new Set([...(selectedRows || []), ...range]));
+      } else {
+        // Shift only: replace with range
+        nextSelected = range;
+      }
+    } else if (isCtrl) {
+      // Ctrl: toggle single
+      const set = new Set(selectedRows || []);
+      if (set.has(rowId)) {
+        set.delete(rowId);
+      } else {
+        set.add(rowId);
+      }
+      nextSelected = Array.from(set);
+      if (setSelectionAnchorId) setSelectionAnchorId(rowId);
+    } else {
+      // Plain click: single select
+      nextSelected = [rowId];
+      if (setSelectionAnchorId) setSelectionAnchorId(rowId);
+    }
+
+    if (setSelectedRows) setSelectedRows(nextSelected);
+    if (setLastSelectedRowId) setLastSelectedRowId(rowId);
+    if (onSelectionChange) onSelectionChange(nextSelected, rowId);
+    if (onRowSelect) onRowSelect(rowId);
+
+    return { nextSelected, mostRecentId: rowId };
+  }, [
+    mode,
+    selectedRows,
+    selectionAnchorId,
+    setSelectedRows,
+    setLastSelectedRowId,
+    setSelectionAnchorId,
+    getRowRange,
+    onSelectionChange,
+    onRowSelect
+  ]);
+
   return {
-    handleKeyDown
+    handleKeyDown,
+    handleRowClick
   };
 };
 

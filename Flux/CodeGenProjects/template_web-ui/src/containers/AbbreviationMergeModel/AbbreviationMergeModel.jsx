@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { cloneDeep, get, isEqual, set, isObject } from 'lodash';
 import { saveAs } from 'file-saver';
@@ -89,6 +89,9 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     const [rowIds, setRowIds] = useState(null);
     const [dataSourcesParams, setDataSourcesParams] = useState(null);
     const [objIdToSourceIdDict, setObjIdToSourceIdDict] = useState({});
+    
+    // Multiselect state for chart-table synchronization (chart-specific)
+    const [chartMultiSelectState, setChartMultiSelectState] = useState({});
 
     const {
         modelLayoutOption,
@@ -136,6 +139,11 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         handleShowHiddenToggle,
         handleShowMoreToggle,
     } = useModelLayout(modelName, objId, MODEL_TYPES.ABBREVIATION_MERGE, setHeadCells, mode);
+
+    // Current chart's multiselect state (derived after modelLayoutData is available)
+    const currentChartName = modelLayoutData.selected_chart_name;
+    const multiSelectedRows = chartMultiSelectState[currentChartName]?.selectedRows || [];
+    const lastSelectedRowId = chartMultiSelectState[currentChartName]?.lastSelectedRowId || null;
 
     const dispatch = useDispatch();
     const [, startTransition] = useTransition();
@@ -517,6 +525,8 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     const handleReload = () => {
         handleDiscard();
         setSearchQuery('');
+        // Clear chart-specific multiselect state on reload
+        setChartMultiSelectState({});
         dispatch(actions.setIsCreating(false));
         dataSources.forEach(({ actions: dsActions }) => {
             dispatch(dsActions.setIsCreating(false));
@@ -541,6 +551,13 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
             const dsUpdatedObj = addxpath(cloneDeep(dsStoredObj));
             dispatch(dsActions.setUpdatedObj(dsUpdatedObj));
         })
+        
+        // Clear creating states like handleReload does
+        dispatch(actions.setIsCreating(false));
+        dataSources.forEach(({ actions: dsActions }) => {
+            dispatch(dsActions.setIsCreating(false));
+        });
+        
         if (mode !== MODES.READ) {
             handleModeToggle();
         }
@@ -790,6 +807,37 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         handleSelectedSourceIdChangeHandler(id);
     }
 
+    const handleMultiSelectChange = useCallback((selectedIds, mostRecentId) => {
+        if (Object.values(dataSourcesModeDict).includes(MODES.EDIT)) {
+            return;
+        }
+        
+        // Update chart-specific multiselect state
+        if (currentChartName) {
+            setChartMultiSelectState(prev => ({
+                ...prev,
+                [currentChartName]: {
+                    selectedRows: selectedIds || [],
+                    lastSelectedRowId: mostRecentId || null
+                }
+            }));
+        }
+        
+        // Data binding follows most recent selection
+        if (mostRecentId) {
+            dataSources.forEach(({ actions: dsActions }) => {
+                dispatch(dsActions.setObjId(mostRecentId));
+            });
+            handleSelectedSourceIdChangeHandler(mostRecentId);
+        } else if (!selectedIds || selectedIds.length === 0) {
+            // Clear selection if no items selected
+            dataSources.forEach(({ actions: dsActions }) => {
+                dispatch(dsActions.setObjId(null));
+            });
+            handleSelectedSourceIdChangeHandler(null);
+        }
+    }, [dataSources, dataSourcesModeDict, dispatch, currentChartName]);
+
     const cleanedRows = useMemo(() => {
         if ([LAYOUT_TYPES.CHART, LAYOUT_TYPES.PIVOT_TABLE].includes(layoutType)) {
             return removeRedundantFieldsFromRows(rows);
@@ -836,7 +884,9 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                     onChartSelect: handleSelectedChartNameChange,
                     selectedChartName: modelLayoutData.selected_chart_name ?? null,
                     chartEnableOverride: modelLayoutData.chart_enable_override ?? [],
-                    onChartPointSelect: setRowIds,
+                    onChartPointSelect: handleMultiSelectChange,
+                    selectedRows: multiSelectedRows,
+                    lastSelectedRowId: lastSelectedRowId,
                     quickFilters: modelLayoutData.quick_filters ?? [],
                     onQuickFiltersChange: handleQuickFiltersChange,
                     selectedRowId: dataSourcesObjIdDict[dataSources[0].name]
@@ -881,6 +931,9 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                     onButtonToggle={handleButtonToggle}
                     isReadOnly={isReadOnly}
                     onColumnOrdersChange={handleColumnOrdersChange}
+                    selectedRows={multiSelectedRows}
+                    lastSelectedRowId={lastSelectedRowId}
+                    onSelectionChange={handleMultiSelectChange}
                     stickyHeader={modelLayoutData.sticky_header ?? true}
                     frozenColumns={modelLayoutData.frozen_columns || []}
                     filters={modelLayoutOption.filters || []}

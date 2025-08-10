@@ -259,7 +259,7 @@ const FilterSortPopup = ({
     localSelectedFilters.includes(value)) && !allVisibleSelected;
 
   // Calculate if any filter is actually applied
-  const hasFilters = uniqueValues.length > 0;
+  const hasFilters = uniqueValues.length > 1;
   const isFiltered = selectedFilters.length !== 0 && selectedFilters.length < uniqueValues.length || textFilter;
   const hasLocalFilterOrSort = localSelectedFilters.length !== 0 && localSelectedFilters.length < uniqueValues.length || localTextFilter || localSortDirection;
 

@@ -44,7 +44,7 @@ MsgspecModel = TypeVar('MsgspecModel', bound=MsgspecBaseModel)
 id_not_found: Final[DefaultMsgspecWebResponse] = DefaultMsgspecWebResponse(msg="Id not Found")
 del_success: Final[DefaultMsgspecWebResponse] = DefaultMsgspecWebResponse(msg="Deletion Successful")
 code_gen_projects_path = PurePath(__file__).parent.parent.parent / "CodeGenProjects"
-
+timeseries_update_log_counter = 0
 
 def validate_ws_connection_managers_in_model_obj(model_class_type: Type[MsgspecModel]):
     if (not model_class_type.read_ws_path_ws_connection_manager) or \
@@ -199,8 +199,11 @@ async def _update_time_series(
     # TimeSeries has limitations when it comes to update:
     # https://www.mongodb.com/docs/manual/core/timeseries/timeseries-limitations/#updates
     # We have implemented alternative way to avoid limitations
-    logging.info("Warning: Update using aggregate pipeline is expensive in time_series - "
-                 "time-series have limitations for which we have implemented alternative but expensive way")
+    global timeseries_update_log_counter
+    if timeseries_update_log_counter < 100:
+        logging.info("MongoDB time-series collections have limitations on document updates. "
+                     "A delete-and-reinsert workaround is being used, which is more resource-intensive than a direct update.")
+        timeseries_update_log_counter += 1
 
     # first deleting all update objects
     delete_result = await collection_obj.delete_many({"_id": {'$in': id_list}})

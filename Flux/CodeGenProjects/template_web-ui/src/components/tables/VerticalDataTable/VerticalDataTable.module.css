@@ -39,14 +39,14 @@
   top: 0;
   z-index: 1;
   padding: 6px 8px !important;
-  background: var(--brown-theme-medium) !important;
+  background: var(--dynamic-bg-medium) !important;
   color: var(--table-header-text) !important;
 }
 
 .headerCell {
   font-weight: 600;
   vertical-align: top;
-  background: var(--brown-theme-medium);
+  background: var(--dynamic-bg-medium);
   color: var(--table-header-text) !important;
   word-break: break-word;
   position: sticky;

@@ -15,7 +15,9 @@ onmessage = (e) => {
         columnOrders, frozenColumns, columnNameOverride, highlightUpdateOverride, noCommonKeyOverride
     } = e.data;
     const rows = getTableRows(fieldsMetadata, mode, storedObj, addxpath(cloneDeep(updatedObj)), xpath);
-    const uniqueValues = getUniqueValues(rows, fieldsMetadata.filter((meta) => meta.filterEnable));
+    const filterFieldsMetadata = fieldsMetadata.filter((meta) => meta.filterEnable);
+    const filterAppliedFields = new Set(filters?.map((o) => o.column_name) ?? []);
+    const uniqueValues = getUniqueValues(rows, filterFieldsMetadata);
     const filteredRows = applyFilter(rows, filters);
     const groupedRows = getGroupedTableRows(filteredRows, [], null);
     const { sortedRows, activeRows } = getActiveRows(groupedRows, page, rowsPerPage, sortOrders, true);
@@ -38,9 +40,10 @@ onmessage = (e) => {
     } else {
         [commonKeys, nullColumns] = getCommonKeyCollections(activeRows, groupedColumns, !showHidden && !showAll, false, false, !showMore && !moreAll);
     }
-    const cells = getFilteredCells(groupedColumns, [...commonKeys, ...nullColumns], showHidden, showAll, showMore, moreAll);
+    const updatedCommonKeys = commonKeys.filter((o) => !filterAppliedFields.has(o.tableTitle));
+    const cells = getFilteredCells(groupedColumns, [...updatedCommonKeys, ...nullColumns], showHidden, showAll, showMore, moreAll);
     const sortedCells = sortColumns(cells, columnOrders, false, false, false, false);
-    postMessage({ rows: filteredRows, groupedRows: sortedRows, activeRows, maxRowSize, headCells: groupedColumns, commonKeys, uniqueValues, sortedCells });
+    postMessage({ rows: filteredRows, groupedRows: sortedRows, activeRows, maxRowSize, headCells: groupedColumns, commonKeys: updatedCommonKeys, uniqueValues, sortedCells });
 }
 
 export { };

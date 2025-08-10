@@ -16,8 +16,9 @@ const ClipboardCopier = ({ text }) => {
 
   useEffect(() => {
     if (text) {
+      // Note: disabled navigator API for copy
       // First try using the modern Clipboard API
-      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      if (false && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
         navigator.clipboard
           .writeText(text)
           .catch((err) => console.error('Failed to copy text using Clipboard API:', err));

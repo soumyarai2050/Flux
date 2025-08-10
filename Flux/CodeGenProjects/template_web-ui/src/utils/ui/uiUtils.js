@@ -603,7 +603,7 @@ export function updateFormValidation(formValidationRef, xpath, validation) {
  * @returns {Array<Object>} A new array containing only the rows whose IDs are in `rowIds`.
  */
 export function applyRowIdsFilter(rows, rowIds) {
-    if (rowIds && rowIds.length > 0) {
+    if (rowIds && rowIds.length > 0 && rows.length > 0) {
         const updatedRows = rows.filter((row) => rowIds.includes(row['data-id']));
         return updatedRows;
     }
