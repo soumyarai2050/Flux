@@ -168,7 +168,8 @@ const LoadedView = ({
   highlightDuration,
   selectedRows,
   lastSelectedRowId,
-  onSelectionChange
+  onSelectionChange,
+  dataSourcesModeDict
 }) => {
   const [columns, setColumns] = useState(cells);
   const [columnWidths, setColumnWidths] = useState({});
@@ -262,7 +263,8 @@ const LoadedView = ({
     setSelectedRows: setLocalSelectedRows,
     setLastSelectedRowId: setLocalLastSelectedRowId,
     setSelectionAnchorId,
-    getRowRange
+    getRowRange,
+    dataSourcesModeDict
   });
 
   // const { containerRef, isScrollable, enableScrolling, disableScrolling } = useBoundaryScrollDetection();
@@ -731,7 +733,8 @@ const AbbreviationMergeView = ({
   highlightDuration,
   selectedRows,
   lastSelectedRowId,
-  onSelectionChange
+  onSelectionChange,
+  dataSourcesModeDict
 }) => {
   return (
     <>
@@ -783,6 +786,7 @@ const AbbreviationMergeView = ({
         selectedRows={selectedRows}
         lastSelectedRowId={lastSelectedRowId}
         onSelectionChange={onSelectionChange}
+        dataSourcesModeDict={dataSourcesModeDict}
       />
     </>
   );

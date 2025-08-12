@@ -169,20 +169,25 @@ const FilterSortPopup = ({
         return stringValue.toLowerCase().includes(newSearchValue.toLowerCase());
       });
 
+      setLocalSelectedFilters([
+        ...newFilteredValues,
+        // ...localSelectedFilters.filter(item => nonFilteredValues.includes(item))
+      ]);
+
       // In Excel, when you type in search, it automatically selects all filtered items
       // but doesn't auto-check "Add current selection to filter"
-      if (!addCurrentSelectionToFilter) {
-        const nonFilteredValues = uniqueValues.filter(value => !newFilteredValues.includes(value));
-        setLocalSelectedFilters([
-          ...newFilteredValues,
-          // ...localSelectedFilters.filter(item => nonFilteredValues.includes(item))
-        ]);
-      } else {
-        // If "Add current selection" is checked, we merge the selections
-        const currentSelection = new Set(localSelectedFilters);
-        newFilteredValues.forEach(value => currentSelection.add(value));
-        setLocalSelectedFilters([...currentSelection]);
-      }
+      // if (!addCurrentSelectionToFilter) {
+      //   const nonFilteredValues = uniqueValues.filter(value => !newFilteredValues.includes(value));
+      //   setLocalSelectedFilters([
+      //     ...newFilteredValues,
+      //     // ...localSelectedFilters.filter(item => nonFilteredValues.includes(item))
+      //   ]);
+      // } else {
+      //   // If "Add current selection" is checked, we merge the selections
+      //   const currentSelection = new Set(localSelectedFilters);
+      //   newFilteredValues.forEach(value => currentSelection.add(value));
+      //   setLocalSelectedFilters([...currentSelection]);
+      // }
     } else {
       // When clearing search, restore original selection that was applied before search
       setLocalSelectedFilters(originalSelectedFilters);
@@ -215,7 +220,8 @@ const FilterSortPopup = ({
 
   // Handle Apply button click
   const handleApply = () => {
-    onApply && onApply(columnId, localSelectedFilters.length !== uniqueValues.length ? localSelectedFilters : null, localTextFilter,
+    const updatedSelectedFilters = originalSelectedFilters && addCurrentSelectionToFilter ? [...originalSelectedFilters, ...localSelectedFilters] : [...localSelectedFilters];
+    onApply && onApply(columnId, updatedSelectedFilters.length !== uniqueValues.length ? updatedSelectedFilters : null, localTextFilter,
       localTextFilterType, localSortDirection, localAbsoluteSort, multiSortRef.current);
     handleClose();
   };

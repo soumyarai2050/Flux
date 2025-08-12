@@ -29,6 +29,7 @@ const SCROLL_DELAY = 50; // milliseconds
  * @param {function(string|number|null): void} [options.setSelectionAnchorId=null] - (DataTable specific) Setter for selection anchor ID state.
  * @param {function(string|number, string|number): Array<string|number>} [options.getRowRange=null] - (DataTable specific) Function to get a range of row IDs.
  * @param {string|null} [options.modelType=null] - (DataTable specific) The type of the model.
+ * @param {object} [options.dataSourcesModeDict={}] - Dictionary of data source modes to check for edit mode blocking.
  * @returns {{handleKeyDown: function(KeyboardEvent): void, handleRowClick: function(MouseEvent, string|number): { nextSelected: Array<string|number>, mostRecentId: string|number }|undefined}} An object containing handlers for keyboard and mouse selection.
  */
 const useKeyboardNavigation = ({
@@ -44,7 +45,8 @@ const useKeyboardNavigation = ({
   setLastSelectedRowId = null,
   setSelectionAnchorId = null,
   getRowRange = null,
-  modelType = null
+  modelType = null,
+  dataSourcesModeDict = {}
 }) => {
   const {
     editModeScrolling = true,
@@ -66,6 +68,10 @@ const useKeyboardNavigation = ({
     // Ctrl+Shift+Up/Down for range selection (DataTable only)
     if (ctrlShiftSelection && isCtrlPressed && event.shiftKey && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
       if (mode !== MODES.READ) return;
+      // Block visual selection if any data source is in edit mode
+      if (Object.values(dataSourcesModeDict).includes(MODES.EDIT)) {
+        return;
+      }
       event.preventDefault();
       event.stopPropagation();
 
@@ -87,19 +93,23 @@ const useKeyboardNavigation = ({
       if (getRowRange && setSelectedRows && setLastSelectedRowId) {
         const newSelectedRange = getRowRange(currentAnchorId, targetRowId);
         setSelectedRows(newSelectedRange);
-        setLastSelectedRowId(targetRowId);
+        setLastSelectedRowId(currentAnchorId);
         // Notify callbacks about the selection change
         if (onSelectionChange) {
-          onSelectionChange(newSelectedRange, targetRowId);
+          onSelectionChange(newSelectedRange, currentAnchorId);
         }
         if (onRowSelect) {
-          onRowSelect(targetRowId);
+          onRowSelect(currentAnchorId);
         }
       }
     }
     // Shift+Arrow for extending selection (DataTable only)
     else if (shiftSelection && event.shiftKey && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
       if (mode !== MODES.READ) return;
+      // Block visual selection if any data source is in edit mode
+      if (Object.values(dataSourcesModeDict).includes(MODES.EDIT)) {
+        return;
+      }
       event.preventDefault();
       event.stopPropagation();
 
@@ -117,43 +127,61 @@ const useKeyboardNavigation = ({
         return;
       }
 
-      // Find the current boundary of selection in the direction we're extending
+      // Excel-like behavior: Keep anchor fixed, handle contraction then extension
       const anchorIndex = allRowIds.indexOf(selectionAnchorId);
       if (anchorIndex === -1) return;
 
-      // Determine the current selection boundary based on direction
-      let currentBoundaryIndex;
+      // Find current selection boundaries
+      const selectedIndices = selectedRows.map(id => allRowIds.indexOf(id)).filter(idx => idx !== -1);
+      if (selectedIndices.length === 0) return;
+
+      const minSelectedIndex = Math.min(...selectedIndices);
+      const maxSelectedIndex = Math.max(...selectedIndices);
+
+      let nextBoundaryIndex;
+
       if (event.key === 'ArrowDown') {
-        // For downward extension, find the bottommost selected row
-        const selectedIndices = selectedRows.map(id => allRowIds.indexOf(id)).filter(idx => idx !== -1);
-        currentBoundaryIndex = selectedIndices.length > 0 ? Math.max(...selectedIndices) : anchorIndex;
+        // Moving down: First contract upward selection, then extend downward
+        if (minSelectedIndex < anchorIndex) {
+          // Contract upward selection by moving min boundary toward anchor
+          nextBoundaryIndex = minSelectedIndex + 1;
+        } else {
+          // No upward selection to contract, extend downward from max boundary
+          nextBoundaryIndex = Math.min(maxSelectedIndex + 1, allRowIds.length - 1);
+        }
       } else {
-        // For upward extension, find the topmost selected row
-        const selectedIndices = selectedRows.map(id => allRowIds.indexOf(id)).filter(idx => idx !== -1);
-        currentBoundaryIndex = selectedIndices.length > 0 ? Math.min(...selectedIndices) : anchorIndex;
+        // Moving up: First contract downward selection, then extend upward
+        if (maxSelectedIndex > anchorIndex) {
+          // Contract downward selection by moving max boundary toward anchor
+          nextBoundaryIndex = maxSelectedIndex - 1;
+        } else {
+          // No downward selection to contract, extend upward from min boundary
+          nextBoundaryIndex = Math.max(minSelectedIndex - 1, 0);
+        }
       }
 
-      // Calculate next boundary index
-      let nextBoundaryIndex = event.key === 'ArrowDown'
-        ? Math.min(currentBoundaryIndex + 1, allRowIds.length - 1)
-        : Math.max(currentBoundaryIndex - 1, 0);
+      // Don't proceed if we can't move
+      const currentBoundaryIndex = event.key === 'ArrowDown' ?
+        (minSelectedIndex < anchorIndex ? minSelectedIndex : maxSelectedIndex) :
+        (maxSelectedIndex > anchorIndex ? maxSelectedIndex : minSelectedIndex);
 
-      // Don't proceed if we can't extend further
       if (nextBoundaryIndex === currentBoundaryIndex) return;
 
       const nextRowId = allRowIds[nextBoundaryIndex];
       if (getRowRange && setSelectedRows && setLastSelectedRowId) {
-        // Always calculate range from anchor to new boundary
+        // Always calculate range from FIXED anchor to new boundary
         const newSelectedRange = getRowRange(selectionAnchorId, nextRowId);
         setSelectedRows(newSelectedRange);
-        setLastSelectedRowId(nextRowId);
-        
+        // Keep lastSelectedRowId as the anchor for data binding (Excel behavior)
+        setLastSelectedRowId(selectionAnchorId);
+
         // Notify callbacks about the selection change
         if (onSelectionChange) {
-          onSelectionChange(newSelectedRange, nextRowId);
+          onSelectionChange(newSelectedRange, selectionAnchorId);
         }
         if (onRowSelect) {
-          onRowSelect(nextRowId);
+          // Data binding should use anchor row (Excel behavior)
+          onRowSelect(selectionAnchorId);
         }
       }
     }
@@ -187,6 +215,10 @@ const useKeyboardNavigation = ({
       else if (mode === MODES.READ && readModeSelection) {
         // Read mode: select top/bottom items
         if (!activeRows || activeRows.length === 0) return;
+        // Block visual selection if any data source is in edit mode
+        if (Object.values(dataSourcesModeDict).includes(MODES.EDIT)) {
+          return;
+        }
 
         let targetRowId = null;
 
@@ -215,7 +247,7 @@ const useKeyboardNavigation = ({
               onSelectionChange([targetRowId], targetRowId);
             }
           }
-          
+
           // Always notify parent about the selection for data binding
           if (onRowSelect) {
             onRowSelect(targetRowId);
@@ -262,6 +294,10 @@ const useKeyboardNavigation = ({
       (event.key === 'ArrowUp' || event.key === 'ArrowDown') &&
       !event.ctrlKey && !event.metaKey && !event.shiftKey
     ) {
+      // Block visual selection if any data source is in edit mode
+      if (Object.values(dataSourcesModeDict).includes(MODES.EDIT)) {
+        return;
+      }
       event.preventDefault();
       event.stopPropagation();
 
@@ -275,10 +311,13 @@ const useKeyboardNavigation = ({
 
       let nextIndex;
       if (event.key === 'ArrowDown') {
-        nextIndex = currentIndex < allRowIds.length - 1 ? currentIndex + 1 : 0;
+        nextIndex = currentIndex < allRowIds.length - 1 ? currentIndex + 1 : currentIndex;
       } else {
-        nextIndex = currentIndex > 0 ? currentIndex - 1 : allRowIds.length - 1;
+        nextIndex = currentIndex > 0 ? currentIndex - 1 : currentIndex;
       }
+
+      // Don't proceed if we're at the boundary and can't move further
+      if (nextIndex === currentIndex) return;
 
       const nextRowId = allRowIds[nextIndex];
 
@@ -325,12 +364,18 @@ const useKeyboardNavigation = ({
     setLastSelectedRowId,
     setSelectionAnchorId,
     getRowRange,
-    modelType
+    modelType,
+    dataSourcesModeDict
   ]);
 
   // New: mouse click selection that supports Ctrl/Shift toggling and tracks most recent
   const handleRowClick = useCallback((e, rowId) => {
     if (mode !== MODES.READ) return;
+
+    // Block visual selection if any data source is in edit mode
+    if (Object.values(dataSourcesModeDict).includes(MODES.EDIT)) {
+      return;
+    }
 
     const isCtrl = e?.ctrlKey || e?.metaKey;
     const isShift = e?.shiftKey;
@@ -343,19 +388,31 @@ const useKeyboardNavigation = ({
         // Ctrl+Shift: extend selection by range
         nextSelected = Array.from(new Set([...(selectedRows || []), ...range]));
       } else {
-        // Shift only: replace with range
+        // Shift only: replace with range, keep original anchor fixed
         nextSelected = range;
       }
+      // DON'T update anchor - keep original anchor for Excel-like behavior
+      // The anchor should remain the same for visual distinction (dark vs light)
     } else if (isCtrl) {
       // Ctrl: toggle single
       const set = new Set(selectedRows || []);
-      if (set.has(rowId)) {
+      const wasSelected = set.has(rowId);
+      
+      if (wasSelected) {
         set.delete(rowId);
+        // When unselecting, find the previous most recent from remaining selection
+        if (set.size > 0 && setSelectionAnchorId) {
+          // Use the last item in the remaining selection as new anchor (Excel-like)
+          const remainingRows = Array.from(set);
+          const newAnchor = remainingRows[remainingRows.length - 1];
+          setSelectionAnchorId(newAnchor);
+        }
       } else {
         set.add(rowId);
+        // When adding, the newly added row becomes the anchor
+        if (setSelectionAnchorId) setSelectionAnchorId(rowId);
       }
       nextSelected = Array.from(set);
-      if (setSelectionAnchorId) setSelectionAnchorId(rowId);
     } else {
       // Plain click: single select
       nextSelected = [rowId];
@@ -363,11 +420,34 @@ const useKeyboardNavigation = ({
     }
 
     if (setSelectedRows) setSelectedRows(nextSelected);
-    if (setLastSelectedRowId) setLastSelectedRowId(rowId);
-    if (onSelectionChange) onSelectionChange(nextSelected, rowId);
-    if (onRowSelect) onRowSelect(rowId);
 
-    return { nextSelected, mostRecentId: rowId };
+    // Determine correct data binding row based on operation type
+    let dataBindingRowId;
+    if (isShift && selectionAnchorId) {
+      // Shift+Click: use original anchor
+      dataBindingRowId = selectionAnchorId;
+    } else if (isCtrl) {
+      const wasSelected = (selectedRows || []).includes(rowId);
+      if (wasSelected && nextSelected.length > 0) {
+        // Ctrl+Click unselect: use new anchor (last remaining row)
+        dataBindingRowId = nextSelected[nextSelected.length - 1];
+      } else if (!wasSelected) {
+        // Ctrl+Click select: use clicked row (new anchor)
+        dataBindingRowId = rowId;
+      } else {
+        // Unselected everything
+        dataBindingRowId = null;
+      }
+    } else {
+      // Plain click: use clicked row
+      dataBindingRowId = rowId;
+    }
+    
+    if (setLastSelectedRowId) setLastSelectedRowId(dataBindingRowId);
+    if (onSelectionChange) onSelectionChange(nextSelected, dataBindingRowId);
+    if (onRowSelect && dataBindingRowId) onRowSelect(dataBindingRowId);
+
+    return { nextSelected, mostRecentId: dataBindingRowId };
   }, [
     mode,
     selectedRows,
@@ -377,7 +457,8 @@ const useKeyboardNavigation = ({
     setSelectionAnchorId,
     getRowRange,
     onSelectionChange,
-    onRowSelect
+    onRowSelect,
+    dataSourcesModeDict
   ]);
 
   return {

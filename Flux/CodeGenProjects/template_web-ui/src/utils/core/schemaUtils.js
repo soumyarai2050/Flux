@@ -556,8 +556,8 @@ export function generateObjectFromSchema(schema, currentSchema, additionalProps,
                     if (objToDup) {
                         object[propname] = [];
                     } else {
-                        let child = generateObjectFromSchema(schema, childSchema, null, xpath, null);
                         object[propname] = [];
+                        let child = generateObjectFromSchema(schema, childSchema, null, xpath, null);
                         object[propname].push(child);
                     }
                 }

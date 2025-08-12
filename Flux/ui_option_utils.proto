@@ -124,8 +124,8 @@ message ColumnOrder {
 }
 
 message SortOrder {
-  required string sort_by = 1;
-  required string sort_direction = 2;
+  optional string sort_by = 1;
+  optional string sort_direction = 2;
   optional bool is_absolute_sort = 3 [default = false];
 }
 

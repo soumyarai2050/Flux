@@ -4252,10 +4252,9 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             for param_name, param_type in list_type_params:
                 if "= None" in param_type or "=None" in param_type:
                     param_type = param_type.replace("= None", "").replace("=None", "")
-                # else using exiting one as it is fine
-
                     param_to_type_str_list.append(f"{param_name}: {param_type} = Query(default=None)")
                 else:
+                    # else using exiting one as it is fine
                     param_to_type_str_list.append(f"{param_name}: {param_type} = Query()")
             query_params_with_type_str = ", ".join(param_to_type_str_list)
 

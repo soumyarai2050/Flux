@@ -14,7 +14,6 @@ import {
     DialogContentText, TextField, Box, FormControlLabel, Switch
 } from '@mui/material';
 import { PlayArrow, Delete } from '@mui/icons-material';
-
 import ValueBasedToggleButton from './ValueBasedToggleButton';
 import { API_ROOT_URL, API_ROOT_VIEW_URL } from '../constants';
 import { AlertErrorMessage } from './Alert';
@@ -35,8 +34,8 @@ const RUN_BUTTON_TEXT = 'RUN';
 /**
  * @function ButtonQuery
  * @description A button component that triggers a query execution flow, with support for user-editable query parameters.
- * @param {object} props - The properties for the component.
- * @param {object} props.queryObj - The query object from the schema.
+ * @param {Object} props - The properties for the component.
+ * @param {Object} props.queryObj - The query object from the schema.
  * @param {string} [props.url] - The base URL for the query.
  * @param {string} [props.viewUrl] - The base URL for view queries.
  * @returns {React.ReactElement} The rendered ButtonQuery component.

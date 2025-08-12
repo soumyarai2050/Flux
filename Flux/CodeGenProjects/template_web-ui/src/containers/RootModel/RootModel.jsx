@@ -459,7 +459,7 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
             return;
         }
         changesRef.current.active = activeChanges;
-        handleSave(modelUpdatedObj, true, true);
+        handleSave(modelUpdatedObj, false, true);
     }
 
     const handleUpdate = (updatedObj) => {

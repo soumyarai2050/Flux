@@ -982,7 +982,7 @@ const Cell = (props) => {
                         </>
                     )}
                     {/* <JsonView open={open} onClose={onCloseTooltip} src={updatedData} /> */}
-                </TableCell >
+                </TableCell>
             )
         } else if (type === DATA_TYPES.STRING && !isValidJsonString(updatedData)) {
             let tooltipText = '';

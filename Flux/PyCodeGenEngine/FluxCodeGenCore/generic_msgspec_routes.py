@@ -46,6 +46,7 @@ del_success: Final[DefaultMsgspecWebResponse] = DefaultMsgspecWebResponse(msg="D
 code_gen_projects_path = PurePath(__file__).parent.parent.parent / "CodeGenProjects"
 timeseries_update_log_counter = 0
 
+
 def validate_ws_connection_managers_in_model_obj(model_class_type: Type[MsgspecModel]):
     if (not model_class_type.read_ws_path_ws_connection_manager) or \
             (not model_class_type.read_ws_path_with_id_ws_connection_manager):
@@ -1286,7 +1287,7 @@ async def watch_specific_collection_with_stream(msgspec_class_type: Type[Msgspec
                         await publish_ws(msgspec_class_type, document_id, fetched_obj,
                                          update_ws_with_id=True)
                     elif change['operationType'] == 'update' and filter_agg_pipeline_callable_for_update_obj is not None:
-                        filter_agg_pipeline = filter_agg_pipeline_callable_for_create_obj(updated_or_created_obj)
+                        filter_agg_pipeline = filter_agg_pipeline_callable_for_update_obj(updated_or_created_obj)
                         fetched_obj: Dict | None = await get_obj(msgspec_class_type, document_id, filter_agg_pipeline)
 
                         # handling all datetime fields - converting to epoch int values - caller of this function will handle

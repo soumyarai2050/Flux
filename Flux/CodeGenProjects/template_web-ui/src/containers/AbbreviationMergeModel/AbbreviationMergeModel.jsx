@@ -89,7 +89,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     const [rowIds, setRowIds] = useState(null);
     const [dataSourcesParams, setDataSourcesParams] = useState(null);
     const [objIdToSourceIdDict, setObjIdToSourceIdDict] = useState({});
-    
+
     // Multiselect state for chart-table synchronization (chart-specific)
     const [chartMultiSelectState, setChartMultiSelectState] = useState({});
 
@@ -301,22 +301,23 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     //     dispatch(actions.getAll());
     // }, [])
 
-    // useEffect(() => {
-    //     if (dataSourcesCrudOverrideDictRef.current) return;
-    //     dataSources.forEach(({ actions: dsActions, name, url, viewUrl }) => {
-    //         let args = { url: viewUrl };
-    //         const crudOverrideDict = dataSourcesCrudOverrideDictRef.current?.[name];
-    //         const params = dataSourcesParams?.[name];
-    //         if (crudOverrideDict?.GET_ALL) {
-    //             const { endpoint, paramDict } = crudOverrideDict.GET_ALL;
-    //             if (!params && Object.keys(paramDict).length > 0) {
-    //                 return;
-    //             }
-    //             args = { ...args, endpoint, params };
-    //         }
-    //         dispatch(dsActions.getAll({ ...args }));
-    //     })
-    // }, [dataSourcesParams])
+    useEffect(() => {
+        if (dataSourcesCrudOverrideDictRef.current) return;
+        if (bufferedFieldMetadata.hide) return;
+        dataSources.forEach(({ actions: dsActions, name, url, viewUrl }) => {
+            let args = { url: viewUrl };
+            const crudOverrideDict = dataSourcesCrudOverrideDictRef.current?.[name];
+            const params = dataSourcesParams?.[name];
+            if (crudOverrideDict?.GET_ALL) {
+                const { endpoint, paramDict } = crudOverrideDict.GET_ALL;
+                if (!params && Object.keys(paramDict).length > 0) {
+                    return;
+                }
+                args = { ...args, endpoint, params };
+            }
+            dispatch(dsActions.getAll({ ...args }));
+        })
+    }, [dataSourcesParams])
 
     useEffect(() => {
         workerRef.current = new Worker(new URL('../../workers/abbreviation-merge-model.worker.js', import.meta.url));
@@ -551,13 +552,14 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
             const dsUpdatedObj = addxpath(cloneDeep(dsStoredObj));
             dispatch(dsActions.setUpdatedObj(dsUpdatedObj));
         })
-        
+
         // Clear creating states like handleReload does
         dispatch(actions.setIsCreating(false));
         dataSources.forEach(({ actions: dsActions }) => {
             dispatch(dsActions.setIsCreating(false));
+            dispatch(dsActions.setMode(MODES.READ));
         });
-        
+
         if (mode !== MODES.READ) {
             handleModeToggle();
         }
@@ -742,7 +744,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
             return;
         }
 
-        handleSave(modelUpdatedObj, true, true);
+        handleSave(modelUpdatedObj, false, true);
     }
 
     const handleUpdate = (updatedObj, source) => {
@@ -811,7 +813,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         if (Object.values(dataSourcesModeDict).includes(MODES.EDIT)) {
             return;
         }
-        
+
         // Update chart-specific multiselect state
         if (currentChartName) {
             setChartMultiSelectState(prev => ({
@@ -822,7 +824,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                 }
             }));
         }
-        
+
         // Data binding follows most recent selection
         if (mostRecentId) {
             dataSources.forEach(({ actions: dsActions }) => {
@@ -941,6 +943,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                     uniqueValues={uniqueValues}
                     highlightDuration={modelLayoutData.highlight_duration ?? DEFAULT_HIGHLIGHT_DURATION}
                     baselineDictionary={baselineDictionaryRef.current}
+                    dataSourcesModeDict={dataSourcesModeDict}
                 />
             </Wrapper>
         )
@@ -953,7 +956,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
             onClose={handleFullScreenToggle}
         >
             <ModelCard id={modelName}>
-                <ModelCardHeader 
+                <ModelCardHeader
                     name={modelTitle}
                     isMaximized={isMaximized}
                     onMaximizeToggle={handleFullScreenToggle}

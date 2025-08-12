@@ -164,6 +164,12 @@ message SortCriteria {
   optional SortType level3_chore = 6 [default = ASCENDING];
 }
 
+message PositionBrief {
+  required string id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
+  required int64 available_size = 2;
+  optional int64 create_ts = 3 [(FluxFldValIsDateTime) = true, (FluxFldHelp) = "when was the position first created"];
+}
+
 // stores all position types from all sources for optimal selection, usage and clearance
 // one can design to make entry with the cheapest option first & clear the most expensive used position first
 message Position {
@@ -209,6 +215,7 @@ message Position {
   optional float accrual_usd = 19 [(FluxFldNumberFormat) = "%", (FluxFldHide) = "True"];
   optional float prev_mark_usd = 20 [(FluxFldNumberFormat) = "%", (FluxFldHide) = "True"];
   optional int64 create_ts = 21 [(FluxFldValIsDateTime) = true, (FluxFldHelp) = "when was the position first created. Note: merged/compressed position cases: the value will be any one of the create_ts of merged position"];
+  repeated PositionBrief underlying_position_briefs = 22 [(FluxFldAbbreviated) = "JSON", (FluxFldHelp) = "populated only in merged/compressed position cases"];
 }
 
 message SecPosition {

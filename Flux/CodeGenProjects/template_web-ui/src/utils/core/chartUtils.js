@@ -53,6 +53,7 @@ function getAxisMax(rows, field, index = 0) {
     if (!rows) {
         throw new Error('getAxisMax failed. rows list is null or undefined, rows: ' + rows);
     }
+    if (rows.length === 0) return 0;
     let max;
     rows.forEach(row => {
         if (row.hasOwnProperty(field)) {
@@ -88,6 +89,7 @@ function getAxisMin(rows, field, index = 0) {
     if (!rows) {
         throw new Error('getAxisMax failed. rows list is null or undefined, rows: ' + rows);
     }
+    if (rows.length === 0) return 0;
     let min;
     rows.forEach(row => {
         if (row.hasOwnProperty(field)) {
@@ -484,6 +486,26 @@ export function updateChartSchema(schema, collections, isCollectionType = false)
     // Create a deep clone to avoid modifying the original schema directly.
     schema = cloneDeep(schema);
 
+    // Determine the key to use for field identification based on collection type.
+    let fieldKey;
+    if (isCollectionType) {
+        fieldKey = 'key';
+    } else {
+        fieldKey = 'tableTitle';
+    }
+
+    // Populate autocomplete lists based on collections.
+    const fldList = collections.map(collection => collection[fieldKey]);
+    const strFldList = collections.filter(collection => collection.type === DATA_TYPES.STRING).map(collection => collection[fieldKey]);
+    const metaFldList = collections.filter(collection => collection.hasOwnProperty('mapping_underlying_meta_field')).map(collection => collection[fieldKey]);
+    const projectionFldList = collections.filter(col => col.hasOwnProperty('mapping_src')).map(col => col[fieldKey]);
+
+    // Assign the generated lists to the schema's autocomplete definitions.
+    schema.autocomplete['FldList'] = fldList;
+    schema.autocomplete['StrFldList'] = strFldList;
+    schema.autocomplete['MetaFldList'] = metaFldList;
+    schema.autocomplete['ProjFldList'] = projectionFldList;
+
     // Update chart_data schema properties.
     const chartDataSchema = get(schema, [SCHEMA_DEFINITIONS_XPATH, 'chart_data']);
     updateChartAttributesInSchema(schema, chartDataSchema);
@@ -497,52 +519,27 @@ export function updateChartSchema(schema, collections, isCollectionType = false)
 
     // Update ui_filter schema properties.
     const filterSchema = get(schema, [SCHEMA_DEFINITIONS_XPATH, 'ui_filter']);
-    filterSchema.auto_complete = 'fld_name:FldList';
-
-    let fldList;
-    let strFldList;
-    let metaFldList;
-    let projectionFldList;
-    let fieldKey;
-
-    // Determine the key to use for field identification based on collection type.
-    if (isCollectionType) {
-        fieldKey = 'key';
-    } else {
-        fieldKey = 'tableTitle';
-    }
-
-    // Populate autocomplete lists based on collections.
-    fldList = collections.map(collection => collection[fieldKey]);
-    strFldList = collections.filter(collection => collection.type === DATA_TYPES.STRING).map(collection => collection[fieldKey]);
-    metaFldList = collections.filter(collection => collection.hasOwnProperty('mapping_underlying_meta_field')).map(collection => collection[fieldKey]);
-    projectionFldList = collections.filter(col => col.hasOwnProperty('mapping_src')).map(col => col[fieldKey]);
-
-    // Assign the generated lists to the schema's autocomplete definitions.
-    schema.autocomplete['FldList'] = fldList;
-    schema.autocomplete['StrFldList'] = strFldList;
-    schema.autocomplete['MetaFldList'] = metaFldList;
-    schema.autocomplete['ProjFldList'] = projectionFldList;
+    filterSchema.auto_complete = 'fld_name:MetaFldList';
 
     return schema;
 }
 
-/**
- * Converts a dictionary of filters into an array of filter objects.
- * Each filter object will have `fld_name` and `fld_value` properties.
- * @param {Object} filterDict - A dictionary where keys are field names and values are filter values.
- * @returns {Array<Object>} An array of filter objects.
- */
-export function getFiltersFromDict(filterDict) {
-    const filters = [];
-    Object.keys(filterDict).forEach(key => {
-        filters.push({
-            fld_name: key,
-            fld_value: filterDict[key]
-        });
-    });
-    return filters;
-}
+// /**
+//  * Converts a dictionary of filters into an array of filter objects.
+//  * Each filter object will have `fld_name` and `fld_value` properties.
+//  * @param {Object} filterDict - A dictionary where keys are field names and values are filter values.
+//  * @returns {Array<Object>} An array of filter objects.
+//  */
+// export function getFiltersFromDict(filterDict) {
+//     const filters = [];
+//     Object.keys(filterDict).forEach(key => {
+//         filters.push({
+//             fld_name: key,
+//             fld_value: filterDict[key]
+//         });
+//     });
+//     return filters;
+// }
 
 /**
  * Generates a list of datasets for charting by grouping rows based on a partition field.
@@ -742,6 +739,113 @@ export function mergeTsData(tsData, updatedData, queryDict) {
 }
 
 /**
+ * Generic function to merge time-series data by dynamically detecting meta fields.
+ * This function automatically identifies meta fields from the first message and merges
+ * data based on those fields, making it reusable across different data structures.
+ * 
+ * @param {Object} existingTsData - The existing time-series data object.
+ * @param {Array} newData - Array of new data objects to merge.
+ * @param {string} uniqueKey - The unique key for this data stream.
+ * @returns {Object} The updated time-series data object.
+ */
+export function mergeTimeSeriesDataGeneric(existingTsData, newData, uniqueKey) {
+    if (!Array.isArray(newData) || newData.length === 0) {
+        return existingTsData;
+    }
+
+    // Initialize the entry if it doesn't exist
+    if (!existingTsData[uniqueKey]) {
+        existingTsData[uniqueKey] = [];
+    }
+
+    // Get the first message to detect meta fields dynamically
+    const firstMessage = newData[0];
+    
+    // Dynamically detect meta fields by excluding known data fields
+    const knownDataFields = ['projection_models', 'seriesIndex', 'DB_ID'];
+    const metaFields = Object.keys(firstMessage).filter(field => 
+        !knownDataFields.includes(field) && 
+        typeof firstMessage[field] === 'object' && 
+        firstMessage[field] !== null
+    );
+
+    // If no meta fields found, fall back to simple append
+    if (metaFields.length === 0) {
+        existingTsData[uniqueKey] = [...existingTsData[uniqueKey], ...newData];
+        return existingTsData;
+    }
+
+    // Merge data based on detected meta fields
+    newData.forEach(newDataItem => {
+        // Find existing data with matching meta information
+        const existingIndex = existingTsData[uniqueKey].findIndex(existing => {
+            return metaFields.every(metaField => {
+                const existingMeta = existing[metaField];
+                const newMeta = newDataItem[metaField];
+                
+                // Handle nested meta objects (like bar_meta_data)
+                if (existingMeta && newMeta && typeof existingMeta === 'object' && typeof newMeta === 'object') {
+                    return Object.keys(existingMeta).every(key => 
+                        existingMeta[key] === newMeta[key]
+                    );
+                }
+                
+                // Handle primitive meta values
+                return existingMeta === newMeta;
+            });
+        });
+
+        if (existingIndex >= 0) {
+            // Merge projection_models into existing data
+            if (existingTsData[uniqueKey][existingIndex].projection_models && 
+                newDataItem.projection_models) {
+                existingTsData[uniqueKey][existingIndex].projection_models = [
+                    ...existingTsData[uniqueKey][existingIndex].projection_models,
+                    ...newDataItem.projection_models
+                ];
+            }
+            
+            // Merge any other data arrays that might exist
+            Object.keys(newDataItem).forEach(key => {
+                if (Array.isArray(newDataItem[key]) && 
+                    key !== 'projection_models' && 
+                    existingTsData[uniqueKey][existingIndex][key]) {
+                    existingTsData[uniqueKey][existingIndex][key] = [
+                        ...existingTsData[uniqueKey][existingIndex][key],
+                        ...newDataItem[key]
+                    ];
+                }
+            });
+        } else {
+            // Add new data if no matching meta found
+            existingTsData[uniqueKey].push(newDataItem);
+        }
+    });
+
+    return existingTsData;
+}
+
+/**
+ * Utility function to get meta fields from a data object.
+ * This can be used independently to inspect the structure of incoming data.
+ * 
+ * @param {Object} dataObject - The data object to analyze.
+ * @returns {Array<string>} Array of meta field names.
+ */
+export function getMetaFields(dataObject) {
+    if (!dataObject || typeof dataObject !== 'object') {
+        return [];
+    }
+
+    const knownDataFields = ['projection_models', 'seriesIndex', 'DB_ID', 'data-id'];
+    return Object.keys(dataObject).filter(field => 
+        !knownDataFields.includes(field) && 
+        typeof dataObject[field] === 'object' && 
+        dataObject[field] !== null
+    );
+}
+
+/**
  * Generates meta filters based on a given array, collections, filter dictionary, and filter field.
  * This function maps filter values from the `filterDict` to corresponding meta fields
  * defined in the `collections` to create a list of filter objects.
@@ -867,14 +971,15 @@ export function tooltipFormatter(value) {
  * @returns {Object} The updated schema object.
  */
 export function updatePartitionFldSchema(schema, chartObj) {
-    const updatedSchema = cloneDeep(schema);
-    const chartSchema = get(updatedSchema, [SCHEMA_DEFINITIONS_XPATH, 'chart_data']);
-    if (chartObj.time_series) {
-        chartSchema.properties.partition_fld.hide = true;
-    } else {
-        chartSchema.properties.partition_fld.hide = false;
-    }
-    return updatedSchema;
+    // const updatedSchema = cloneDeep(schema);
+    // const chartSchema = get(updatedSchema, [SCHEMA_DEFINITIONS_XPATH, 'chart_data']);
+    // if (chartObj.time_series) {
+    //     chartSchema.properties.partition_fld.hide = true;
+    // } else {
+    //     chartSchema.properties.partition_fld.hide = false;
+    // }
+    // return updatedSchema;
+    return schema;
 }
 
 /**

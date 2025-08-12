@@ -158,7 +158,11 @@ const TreeRenderer = ({
                         xpathAttr
                     );
 
-
+                    //Add xpath properties to the generated object immediately
+                    // This ensures items from generateObjectFromSchema have xpath properties
+                    // and can be properly identified during later array operations
+                    newObjectInstance = addxpath(newObjectInstance, xpathAttr);
+                    
                     set(updatedObj, xpathAttr, newObjectInstance);
 
 

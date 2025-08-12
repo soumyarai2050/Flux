@@ -11,7 +11,7 @@ import { DATA_TYPES, MODES, API_ROOT_URL, MODEL_TYPES, DB_ID } from '../../../co
 import { addxpath, clearxpath } from '../../../utils/core/dataAccess';
 import { applyFilter, getChartFilterDict } from '../../../utils/core/dataFiltering';
 import {
-    genChartDatasets, genMetaFilters, getChartOption, mergeTsData, tooltipFormatter,
+    genChartDatasets, genMetaFilters, getChartOption, mergeTsData, mergeTimeSeriesDataGeneric, getMetaFields, tooltipFormatter,
     updateChartDataObj, updateChartSchema, updatePartitionFldSchema
 } from '../../../utils/core/chartUtils';
 import { generateObjectFromSchema, getModelSchema } from '../../../utils/core/schemaUtils';
@@ -237,15 +237,10 @@ function ChartView({
 
                     // Create a unique key that combines query name and fingerprint
                     const uniqueKey = `${query.name}__${fingerprint}`;
+                    // This function automatically detects meta fields and merges data intelligently
+                    const result = mergeTimeSeriesDataGeneric(updatedTsData, processedData, uniqueKey);
 
-                    // Append new data to existing query data or create new entry
-                    if (updatedTsData[uniqueKey]) {
-                        updatedTsData[uniqueKey] = [...updatedTsData[uniqueKey], ...processedData];
-                    } else {
-                        updatedTsData[uniqueKey] = processedData;
-                    }
-
-                    return updatedTsData;
+                    return result;
                 });
             }
         };
@@ -483,7 +478,8 @@ function ChartView({
             const selectedChartOption = chartData[selectedIndex];
             setStoredChartObj(selectedChartOption);
             setUpdatedChartObj(addxpath(cloneDeep(selectedChartOption)));
-            const updatedSchema = updatePartitionFldSchema(schema, selectedChartOption);
+            let updatedSchema = handleDynamicSchemaUpdate(selectedChartOption);
+            // updatedSchema = updatePartitionFldSchema(schema, selectedChartOption);
             setSchema(updatedSchema);
             onChartSelect(selectedChartOption.chart_name);
         } else {
@@ -567,7 +563,6 @@ function ChartView({
                 queryBasedTsData[queryName] = queryBasedTsData[queryName].concat(tsData[uniqueKey]);
             }
         });
-
 
         // create the datasets for chart configuration (time-series and non time-series both)
         const updatedDatasets = genChartDatasets(rows, queryBasedTsData, storedChartObj, queryDict, fieldsMetadata, modelType === MODEL_TYPES.ABBREVIATION_MERGE);
@@ -795,6 +790,14 @@ function ChartView({
     }
 
     const handleUpdate = (updatedData) => {
+        if (updatedData.time_series) {
+            updatedData.partition_fld = null;
+            updatedData.series?.forEach((series) => {
+                series.encode.x = null;
+            })
+        } else {
+            updatedData.filters = [];
+        }
         setData(updatedData);
 
         const isFromPinnedFilterChange = pinnedFilterUpdateRef.current;
@@ -803,18 +806,25 @@ function ChartView({
             syncPinnedFiltersWithData(updatedData);
         }
 
-        const updatedSchema = cloneDeep(schema);
-        const chartEncodeSchema = getModelSchema('chart_encode', updatedSchema);
-        const filterSchema = getModelSchema('ui_filter', updatedSchema);
-
-        if (updatedData.time_series) {
-            filterSchema.auto_complete = 'fld_name:MetaFldList';
-            chartEncodeSchema.auto_complete = 'x:FldList,y:ProjFldList';
-        } else {
-            filterSchema.auto_complete = 'fld_name:FldList';
-            chartEncodeSchema.auto_complete = 'x:FldList,y:FldList';
-        }
+        const updatedSchema = handleDynamicSchemaUpdate(updatedData);
         setSchema(updatedSchema);
+    }
+
+    const handleDynamicSchemaUpdate = (chartOptionObj) => {
+        const updatedSchema = cloneDeep(schema);
+        const chartDataSchema = getModelSchema('chart_data', updatedSchema);
+        const chartEncodeSchema = getModelSchema('chart_encode', updatedSchema);
+
+        if (chartOptionObj.time_series) {
+            chartDataSchema.properties.filters.server_populate = false;
+            chartEncodeSchema.auto_complete = 'x:FldList,y:ProjFldList';
+            chartEncodeSchema.required = ['y'];
+        } else {
+            chartDataSchema.properties.filters.server_populate = true;
+            chartEncodeSchema.auto_complete = 'x:FldList,y:FldList';
+            chartEncodeSchema.required = ['x', 'y'];
+        }
+        return updatedSchema;
     }
 
     const handleSelect = (index) => {
@@ -1199,8 +1209,6 @@ function ChartView({
         }
         return {};
     }, [chartQuickFilter]);
-
-
 
     return (
         <>

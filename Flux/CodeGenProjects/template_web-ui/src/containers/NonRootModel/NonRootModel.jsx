@@ -29,7 +29,7 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
 
     const { schema: modelSchema, fieldsMetadata, actions, selector, isAbbreviationSource = false } = modelDataSource;
     const modelRootFieldsMetadata = schemaCollections[modelRootName];
-    const { storedObj, updatedObj, objId, mode, isCreating, error, isLoading, allowUpdates, popupStatus } = useSelector(selector);
+    const { storedObj, updatedObj, objId, mode, allowUpdates, isCreating, error, isLoading, popupStatus } = useSelector(selector);
     const { storedObj: dataSourceStoredObj } = useSelector(dataSource?.selector ?? (() => ({ storedObj: null })), (prev, curr) => {
         return JSON.stringify(prev) === JSON.stringify(curr);
     });
@@ -128,7 +128,7 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
         checkAndShowConflicts,
         closeConflictPopup,
         getBaselineForComparison,
-    } = useConflictDetection(storedObj, updatedObj, mode, modelRootFieldsMetadata, allowUpdates, isCreating);
+    } = useConflictDetection(storedObj, updatedObj, mode, modelRootFieldsMetadata, isCreating, allowUpdates);
 
     useEffect(() => {
         const url = getServerUrl(modelSchema, dataSourceStoredObj, dataSource?.fieldsMetadata);
@@ -461,7 +461,7 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
             return;
         }
         changesRef.current.active = activeChanges;
-        handleSave(modelUpdatedObj, true, true);
+        handleSave(modelUpdatedObj, false, true);
     }
 
     const handleUpdate = (updatedObj) => {

@@ -29,7 +29,7 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
     const { schema: projectSchema } = useSelector((state) => state.schema);
 
     const { schema: modelSchema, fieldsMetadata, actions, selector } = modelDataSource;
-    const { storedArray, storedObj, updatedObj, objId, mode, error, isLoading, popupStatus } = useSelector(selector);
+    const { storedArray, storedObj, updatedObj, objId, mode, allowUpdates, error, isLoading, popupStatus } = useSelector(selector);
     const { storedObj: dataSourceStoredObj } = useSelector(dataSource?.selector ?? (() => ({ storedObj: null })), (prev, curr) => {
         return JSON.stringify(prev) === JSON.stringify(curr);
     });
@@ -130,7 +130,7 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
         checkAndShowConflicts,
         closeConflictPopup,
         getBaselineForComparison,
-    } = useConflictDetection(storedObj, updatedObj, mode, fieldsMetadata, false);
+    } = useConflictDetection(storedObj, updatedObj, mode, fieldsMetadata, false, allowUpdates);
 
     const effectiveStoredArray = storedArray.map((obj) => effectiveStoredData && effectiveStoredData[DB_ID] === obj[DB_ID] ? effectiveStoredData : obj)
 
@@ -476,7 +476,7 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
             return;
         }
         changesRef.current.active = activeChanges;
-        handleSave(modelUpdatedObj, true, true);
+        handleSave(modelUpdatedObj, false, true);
     }
 
     const handleUpdate = (updatedObj) => {
