@@ -16,14 +16,14 @@ import { removeRedundantFieldsFromRows } from '../../utils/core/dataTransformati
 import { cleanAllCache } from '../../cache/attributeCache';
 import { useWebSocketWorker, useDownload, useModelLayout, useConflictDetection } from '../../hooks';
 // custom components
-import { FullScreenModalOptional } from '../../components/Modal';
-import { ModelCard, ModelCardHeader, ModelCardContent } from '../../components/cards';
-import MenuGroup from '../../components/MenuGroup';
-import { ConfirmSavePopup, FormValidation } from '../../components/Popup';
-import CommonKeyWidget from '../../components/CommonKeyWidget';
-import { DataTable, PivotTable } from '../../components/tables';
-import { ChartView } from '../../components/charts';
-import ConflictPopup from '../../components/ConflictPopup';
+import { FullScreenModalOptional } from '../../components/ui/Modal';
+import { ModelCard, ModelCardHeader, ModelCardContent } from '../../components/utility/cards';
+import MenuGroup from '../../components/controls/MenuGroup';
+import { ConfirmSavePopup, FormValidation } from '../../components/utility/Popup';
+import CommonKeyWidget from '../../components/data-display/CommonKeyWidget';
+import { DataTable, PivotTable } from '../../components/data-display/tables';
+import { ChartView } from '../../components/data-display/charts';
+import ConflictPopup from '../../components/utility/ConflictPopup';
 
 function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
     const { schema: projectSchema } = useSelector((state) => state.schema);
@@ -113,6 +113,7 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
     const allowedLayoutTypesRef = useRef([LAYOUT_TYPES.TABLE, LAYOUT_TYPES.PIVOT_TABLE, LAYOUT_TYPES.CHART]);
     // refs to identify change
     const optionsRef = useRef(null);
+    const captionDictRef = useRef(null);
 
     // calculated fields
     const modelTitle = getWidgetTitle(modelLayoutOption, modelSchema, modelName, storedObj);
@@ -417,7 +418,8 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
             return;
         }
 
-        const activeChanges = compareJSONObjects(baselineForComparison, modelUpdatedObj, fieldsMetadata, false);
+        const [activeChanges, captionDict] = compareJSONObjects(baselineForComparison, modelUpdatedObj, fieldsMetadata, false) || [null, null];
+        captionDictRef.current = captionDict;
 
         if (!activeChanges || Object.keys(activeChanges).length === 0) {
             changesRef.current = {};
@@ -469,7 +471,8 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
             return;
         }
 
-        const activeChanges = compareJSONObjects(baselineForComparison, modelUpdatedObj, fieldsMetadata, false);
+        const [activeChanges, captionDict] = compareJSONObjects(baselineForComparison, modelUpdatedObj, fieldsMetadata, false) || [null, null];
+        captionDictRef.current = captionDict;
         if (!activeChanges || Object.keys(activeChanges).length === 0) {
             changesRef.current = {};
             dispatch(actions.setMode(MODES.READ));
@@ -503,7 +506,8 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                 return;
             }
 
-            const activeChanges = compareJSONObjects(baselineForComparison, modelUpdatedObj, fieldsMetadata);
+            const [activeChanges, captionDict] = compareJSONObjects(baselineForComparison, modelUpdatedObj, fieldsMetadata) || [null, null];
+            captionDictRef.current = captionDict;
             changesRef.current.active = activeChanges;
             executeSave();
         } else if (storedObj[DB_ID]) {
@@ -610,6 +614,7 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                     onFiltersChange={handleFiltersChange}
                     uniqueValues={uniqueValues}
                     highlightDuration={modelLayoutData.highlight_duration ?? DEFAULT_HIGHLIGHT_DURATION}
+                    maxRowSize = {maxRowSize ?? 1}
                 />
             </Wrapper>
         )
@@ -738,6 +743,7 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                 onClose={handleConfirmSavePopupClose}
                 onSave={executeSave}
                 src={changesRef.current.active}
+                captionDict={captionDictRef.current}
             />
             <FormValidation
                 title={modelTitle}

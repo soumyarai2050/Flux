@@ -31,7 +31,7 @@ class BasketCache(BasePlanCache, BasketBookServiceBasePlanCache, EmailBookServic
         EmailBookServiceBasePlanCache.__init__(self)
         self.unack_state_set: Set[str] = set()
         self.id_to_new_chore_dict: Dict[int, NewChore] = {}
-        self.non_cached_basket_chore_queue: Queue[BasketChore | BasketChoreOptional] = Queue()
+        self.non_cached_basket_chore_queue: Queue[BasketChore] = Queue()
         self.figi_to_sec_rec_dict: Dict[str, SecurityRecord] = {}
         self.chores: List[NewChore] | None = None  # remains None until first init - which may make it empty list if no chores in DB
         self.basket_id: int | None = None

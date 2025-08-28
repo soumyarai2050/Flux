@@ -139,7 +139,8 @@ message SystemControl {
     button_size: BUTTON_SIZE_MEDIUM,
     action: "flux_toggle",
     pressed_value_as_text: "true",
-    allow_force_update: true
+    confirmation_caption: "Triggering Kill Switch",
+    confirmation_style: "critical"
   }];
   required bool pause_all_plans = 3 [default = false, (FluxFldButton) = {
     unpressed_caption: "PAUSE ALL STRATS",
@@ -151,7 +152,8 @@ message SystemControl {
     action: "flux_toggle",
     pressed_value_as_text: "true",
     button_icon_name: "Pause",
-    allow_force_update: true,
+    confirmation_caption: "Triggering Pause All Plans",
+    confirmation_style: "warning",
     hide_caption: true
   }];
   required bool load_buffer_plans = 4 [default = false, (FluxFldButton) = {
@@ -163,7 +165,8 @@ message SystemControl {
     button_size: BUTTON_SIZE_MEDIUM,
     action: "flux_toggle",
     pressed_value_as_text: "true",
-    allow_force_update: true
+    confirmation_caption: "Triggering Load All Plans",
+    confirmation_style: "warning"
   }];
   required bool cxl_baskets = 5 [default = false, (FluxFldButton) = {
     unpressed_caption: "CXL BASKETS",
@@ -174,7 +177,8 @@ message SystemControl {
     button_size: BUTTON_SIZE_MEDIUM,
     action: "flux_toggle",
     pressed_value_as_text: "true",
-    allow_force_update: true
+    confirmation_caption: "Triggering Cxl Baskets",
+    confirmation_style: "error"
   }];
 }
 
@@ -484,7 +488,7 @@ message SampleModel{
 // Sample TimeSeries Model - used in tests to check basic api operations in time series
 message SampleTSModel{
   option (FluxMsgJsonRootTimeSeries) = {
-    MongoVersion: 7.0,
+    MongoVersion: 8.0,
     CreateOp: AggregateType_UNSPECIFIED,
     CreateAllOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
@@ -510,7 +514,7 @@ message SampleTSModel{
 // Sample TimeSeries Model - used in tests to check AggregateType_UpdateAggregate feature in time_series
 message SampleTSModel1{
   option (FluxMsgJsonRootTimeSeries) = {
-    MongoVersion: 7.0,
+    MongoVersion: 8.0,
     CreateOp: AggregateType_UpdateAggregate,
     CreateAllOp: AggregateType_UpdateAggregate,
     ReadOp: AggregateType_UNSPECIFIED,

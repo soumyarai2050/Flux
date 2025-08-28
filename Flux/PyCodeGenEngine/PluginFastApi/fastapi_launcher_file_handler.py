@@ -108,7 +108,7 @@ class FastapiLauncherFileHandler(BaseFastapiPlugin, ABC):
         output_str += f'    try:\n'
         output_str += f'        uvicorn.run(reload=reload_status, \n'
         output_str += f'                    host={host} if ((env_host := os.getenv("HOST")) is None or len(env_host) == 0) else env_host, \n'
-        output_str += f'                    port=parse_to_int(callback_instance.port), \n'
+        output_str += f'                    port={port} if callback_instance.port is None else parse_to_int(callback_instance.port), \n'
         output_str += '                    app=f"FastApi.{fastapi_file_name}'+f':{self.fastapi_app_name}", \n'
         output_str += f'                    log_level=20)\n'
         output_str += f'    except KeyboardInterrupt:\n'

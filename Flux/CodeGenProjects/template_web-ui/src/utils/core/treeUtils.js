@@ -1023,7 +1023,6 @@ function addSimpleNode(tree, schema, currentSchema, propname, callerProps, datax
         return;
     }
 
-
     if (primitiveDataTypes.includes(currentSchema)) {
         // For primitive arrays, currentSchema is the type string (e.g., "string")
         // propname is null. xpath is like "path.to.array[i]", dataxpath is also "path.to.array[i]"

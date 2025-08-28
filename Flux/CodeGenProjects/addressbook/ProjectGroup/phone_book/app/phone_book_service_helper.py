@@ -771,7 +771,7 @@ def get_premium(conv_px: float, eqt_px: float, cb_px: float) -> float:
     return premium
 
 
-def compute_max_single_leg_notional(static_data, brokers: List[Broker | BrokerOptional], cb_symbol: str,
+def compute_max_single_leg_notional(static_data, brokers: List[Broker | BrokerBaseModel], cb_symbol: str,
                                     eqt_symbol: str, side: Side, usd_fx: float, cb_close_px_: float | None,
                                     eqt_close_px_: float | None,
                                     orig_intra_day_bot: int | None = None,
@@ -1013,7 +1013,7 @@ def get_filtered_brokers_by_sec_id_list(brokers: List[Broker | BrokerBaseModel],
     return filtered_brokers
 
 
-def get_both_sym_side_key_from_pair_plan(pair_plan: PairPlan | PairPlanBaseModel | PairPlanOptional) -> str | None:
+def get_both_sym_side_key_from_pair_plan(pair_plan: PairPlan | PairPlanBaseModel) -> str | None:
     key: str | None = None
     if (pair_plan and pair_plan.pair_plan_params and pair_plan.pair_plan_params.plan_leg1 and
             pair_plan.pair_plan_params.plan_leg1.sec and pair_plan.pair_plan_params.plan_leg2 and

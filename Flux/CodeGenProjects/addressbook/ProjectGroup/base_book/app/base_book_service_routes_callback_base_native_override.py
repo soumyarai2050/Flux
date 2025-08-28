@@ -116,7 +116,7 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
                       self.log_simulator_file_name)
 
     @classmethod
-    def get_chore_ledger_log_key(cls, chore_ledger: ChoreLedger | ChoreLedgerBaseModel | ChoreLedgerOptional):
+    def get_chore_ledger_log_key(cls, chore_ledger: ChoreLedger | ChoreLedgerBaseModel):
         sec_id = chore_ledger.chore.security.sec_id
         side = chore_ledger.chore.side
         symbol_side_key = get_symbol_side_key([(sec_id, side)])
@@ -124,7 +124,7 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
         return f"{symbol_side_key}-{base_chore_ledger_key}"
 
     @classmethod
-    def get_deals_ledger_log_key(cls, deals_ledger: DealsLedger | DealsLedgerBaseModel | DealsLedgerOptional):
+    def get_deals_ledger_log_key(cls, deals_ledger: DealsLedger | DealsLedgerBaseModel):
         sec_id = deals_ledger.fill_symbol
         side = deals_ledger.fill_side
         symbol_side_key = get_symbol_side_key([(sec_id, side)])
@@ -132,7 +132,7 @@ class BaseBookServiceRoutesCallbackBaseNativeOverride(Service):
         return f"{symbol_side_key}-{base_fill_ledger_key}"
 
     @classmethod
-    def get_chore_snapshot_log_key(cls, chore_snapshot: ChoreSnapshot | ChoreSnapshotBaseModel | ChoreSnapshotOptional):
+    def get_chore_snapshot_log_key(cls, chore_snapshot: ChoreSnapshot | ChoreSnapshotBaseModel):
         sec_id = chore_snapshot.chore_brief.security.sec_id
         side = chore_snapshot.chore_brief.side
         symbol_side_key = get_symbol_side_key([(sec_id, side)])

@@ -689,54 +689,6 @@ export function genChartDatasets(rows = [], tsData, chartObj, queryDict, collect
     return datasets;
 }
 
-/**
- * Merges updated time-series data into existing time-series data.
- * This function iterates through updated data, finds corresponding time series
- * in the existing data based on query parameters, and appends or adds new data.
- * @param {Object} tsData - The existing time-series data object.
- * @param {Object} updatedData - The new time-series data to merge.
- * @param {Object} queryDict - Dictionary of queries, used to identify time series.
- * @returns {Object} The merged time-series data object.
- */
-export function mergeTsData(tsData, updatedData, queryDict) {
-    for (const queryName in updatedData) {
-        const dataList = updatedData[queryName];
-        let query;
-        // Find the corresponding query in queryDict.
-        Object.entries(queryDict).forEach(([index, queryProps]) => {
-            if (query) return; // Stop if query is already found.
-            if (queryProps.name === queryName) {
-                query = queryProps;
-            }
-        });
-
-        if (query) {
-            // Initialize tsData entry if it doesn't exist.
-            if (!tsData.hasOwnProperty(queryName)) {
-                tsData[queryName] = [];
-            }
-            dataList.forEach(data => {
-                // Find existing time series based on query parameters.
-                const timeSeries = tsData[queryName].find(ts => {
-                    let found = true;
-                    query.params.forEach(param => {
-                        if (get(ts, param) !== get(data, param)) {
-                            found = false;
-                        }
-                    });
-                    return found;
-                });
-                // Merge or add new time series data.
-                if (timeSeries) {
-                    timeSeries.projection_models.push(...data.projection_models);
-                } else {
-                    tsData[queryName].push(data);
-                }
-            });
-        }
-    }
-    return tsData;
-}
 
 /**
  * Generic function to merge time-series data by dynamically detecting meta fields.
@@ -760,12 +712,12 @@ export function mergeTimeSeriesDataGeneric(existingTsData, newData, uniqueKey) {
 
     // Get the first message to detect meta fields dynamically
     const firstMessage = newData[0];
-    
+
     // Dynamically detect meta fields by excluding known data fields
     const knownDataFields = ['projection_models', 'seriesIndex', 'DB_ID'];
-    const metaFields = Object.keys(firstMessage).filter(field => 
-        !knownDataFields.includes(field) && 
-        typeof firstMessage[field] === 'object' && 
+    const metaFields = Object.keys(firstMessage).filter(field =>
+        !knownDataFields.includes(field) &&
+        typeof firstMessage[field] === 'object' &&
         firstMessage[field] !== null
     );
 
@@ -782,14 +734,14 @@ export function mergeTimeSeriesDataGeneric(existingTsData, newData, uniqueKey) {
             return metaFields.every(metaField => {
                 const existingMeta = existing[metaField];
                 const newMeta = newDataItem[metaField];
-                
+
                 // Handle nested meta objects (like bar_meta_data)
                 if (existingMeta && newMeta && typeof existingMeta === 'object' && typeof newMeta === 'object') {
-                    return Object.keys(existingMeta).every(key => 
+                    return Object.keys(existingMeta).every(key =>
                         existingMeta[key] === newMeta[key]
                     );
                 }
-                
+
                 // Handle primitive meta values
                 return existingMeta === newMeta;
             });
@@ -797,18 +749,18 @@ export function mergeTimeSeriesDataGeneric(existingTsData, newData, uniqueKey) {
 
         if (existingIndex >= 0) {
             // Merge projection_models into existing data
-            if (existingTsData[uniqueKey][existingIndex].projection_models && 
+            if (existingTsData[uniqueKey][existingIndex].projection_models &&
                 newDataItem.projection_models) {
                 existingTsData[uniqueKey][existingIndex].projection_models = [
                     ...existingTsData[uniqueKey][existingIndex].projection_models,
                     ...newDataItem.projection_models
                 ];
             }
-            
+
             // Merge any other data arrays that might exist
             Object.keys(newDataItem).forEach(key => {
-                if (Array.isArray(newDataItem[key]) && 
-                    key !== 'projection_models' && 
+                if (Array.isArray(newDataItem[key]) &&
+                    key !== 'projection_models' &&
                     existingTsData[uniqueKey][existingIndex][key]) {
                     existingTsData[uniqueKey][existingIndex][key] = [
                         ...existingTsData[uniqueKey][existingIndex][key],
@@ -823,26 +775,6 @@ export function mergeTimeSeriesDataGeneric(existingTsData, newData, uniqueKey) {
     });
 
     return existingTsData;
-}
-
-/**
- * Utility function to get meta fields from a data object.
- * This can be used independently to inspect the structure of incoming data.
- * 
- * @param {Object} dataObject - The data object to analyze.
- * @returns {Array<string>} Array of meta field names.
- */
-export function getMetaFields(dataObject) {
-    if (!dataObject || typeof dataObject !== 'object') {
-        return [];
-    }
-
-    const knownDataFields = ['projection_models', 'seriesIndex', 'DB_ID', 'data-id'];
-    return Object.keys(dataObject).filter(field => 
-        !knownDataFields.includes(field) && 
-        typeof dataObject[field] === 'object' && 
-        dataObject[field] !== null
-    );
 }
 
 /**

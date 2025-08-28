@@ -123,7 +123,7 @@ def get_host_n_port_from_pair_plan(pair_plan_id: int, ignore_error: bool = False
 #                                                                                       exclude_none=True),
 #                                                               return_obj_copy=False)
 
-def get_new_chore_log_key(new_ord: NewChore | NewChoreBaseModel | NewChoreOptional):
+def get_new_chore_log_key(new_ord: NewChore | NewChoreBaseModel):
     sec_id = new_ord.security.sec_id
     side = new_ord.side
     symbol_side_key = get_symbol_side_key([(sec_id, side)])
@@ -131,7 +131,7 @@ def get_new_chore_log_key(new_ord: NewChore | NewChoreBaseModel | NewChoreOption
 
 
 def get_symbol_side_snapshot_log_key(
-        symbol_side_snapshot: SymbolSideSnapshot | SymbolSideSnapshotBaseModel | SymbolSideSnapshotOptional):
+        symbol_side_snapshot: SymbolSideSnapshot | SymbolSideSnapshotBaseModel):
     sec_id = symbol_side_snapshot.security.sec_id
     side = symbol_side_snapshot.side
     symbol_side_key = get_symbol_side_key([(sec_id, side)])
@@ -140,7 +140,7 @@ def get_symbol_side_snapshot_log_key(
     return f"{symbol_side_key}-{base_symbol_side_snapshot_key}"
 
 
-def get_plan_brief_log_key(plan_brief: PlanBrief | PlanBriefBaseModel | PlanBriefOptional):
+def get_plan_brief_log_key(plan_brief: PlanBrief | PlanBriefBaseModel):
     buy_sec_id = plan_brief.pair_buy_side_bartering_brief.security.sec_id
     buy_side = plan_brief.pair_buy_side_bartering_brief.side
     sell_sec_id = plan_brief.pair_sell_side_bartering_brief.security.sec_id

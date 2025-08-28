@@ -178,6 +178,8 @@ message UIButton{
   optional bool allow_force_update = 11 [default = false];  // if true, double click will trigger update without confirmation
   optional bool read_only = 12 [default = false];  // if true, button is hidden in edit mode
   optional bool hide_caption = 13 [default = false];
+  optional string confirmation_caption = 14;  // caption to be display when button pressed
+  optional string confirmation_style = 15;  // supported styles are [critical, error, warning, info, success, debug]
 }
 
 message UIProgressBar{

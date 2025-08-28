@@ -1,0 +1,82 @@
+.backdrop {
+    background-color: rgba(0, 0, 0, 0.5);
+}
+
+.dialog_title {
+    /* background-color: #0097a7; */
+    /* color: white; */
+    padding: 8px !important;
+}
+
+.dialog_body {
+    padding: 12px !important;
+    min-width: 300px;
+}
+
+.dialog_text {
+    font-weight: bold;
+    margin-bottom: 8px;
+}
+
+.field {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    margin-bottom: 5px;
+}
+
+.field_name {
+    padding: 5px 10px;
+    /* background-color: beige; */
+    margin-right: 10px;
+    border-radius: 5px;
+    box-shadow: 0px 0px 2px 0px #999;
+}
+
+.captionContainer {
+    margin-bottom: 10px;
+}
+
+.caption {
+    border-radius: 3px;
+    padding: 5px 10px;
+}
+
+.critical {
+    background-color: var(--red-critical) !important;
+    animation: blink 0.5s step-start infinite;
+}
+
+.error {
+    background-color: var(--red-error) !important;
+}
+
+.warning {
+    background-color: var(--yellow-warning) !important;
+}
+
+.info {
+    background-color: var(--blue-info) !important;
+}
+
+.debug {
+    background-color: var(--grey-debug) !important;
+}
+
+.success {
+    background-color: var(--green-success) !important;
+}
+
+@keyframes blink {
+    from {
+        opacity: 1
+    }
+
+    50% {
+        opacity: 0.8
+    }
+
+    to {
+        opacity: 1
+    }
+}

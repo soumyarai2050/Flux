@@ -10,8 +10,8 @@ import { HashLoader } from 'react-spinners';
 import { getSchema } from './features/schemaSlice';
 import { getTheme, BaseColor, Theme as ThemeModes, DEFAULT_BASE_COLOR } from './theme';
 import { PROJECT_NAME, THEME_MODE_STORAGE_KEY } from './constants';
-import ErrorBoundary from './components/ErrorBoundary';
-import Layout from './components/Layout';
+import ErrorBoundary from './components/layout/ErrorBoundary';
+import Layout from './components/layout/Layout';
 import { DraggableProvider } from './contexts/DraggableContext';
 // import { ScrollableProvider } from './contexts/ScrollableContext';
 

@@ -5,7 +5,7 @@ from typing import List, Tuple, Dict, Any
 # project imports
 from FluxPythonUtils.scripts.general_utility_functions import get_symbol_side_pattern
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import (
-    PairPlan, PairPlanBaseModel, PairPlanOptional, Side)
+    PairPlan, PairPlanBaseModel, Side)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.StreetBook.email_book_service_key_handler import (
     EmailBookServiceKeyHandler)
 
@@ -32,7 +32,7 @@ def get_symbol_side_key(symbol_side_tuple_list: List[Tuple[str, Side | str]]) ->
 pair_plan_id_key: Dict[int, str] = {}  # Used below - in future - consider moving in class static
 
 
-def get_pair_plan_log_key(pair_plan: PairPlan | PairPlanBaseModel | PairPlanOptional):
+def get_pair_plan_log_key(pair_plan: PairPlan | PairPlanBaseModel):
     if pair_plan_key := pair_plan_id_key.get(pair_plan.id):
         return pair_plan_key
     else:

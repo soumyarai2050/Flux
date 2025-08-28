@@ -1,6 +1,6 @@
 import React, { Suspense } from 'react';
 import PropTypes from 'prop-types';
-import Skeleton from '../components/Skeleton';
+import Skeleton from '../components/ui/Skeleton';
 import { ErrorBoundary } from 'react-error-boundary';
 
 /**

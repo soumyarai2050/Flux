@@ -127,7 +127,7 @@ class MsgspecModelPlugin(DataclassModelPlugin):
                     auto_gen_id = IdType.STR_ID
                     break
                 else:
-                    err_str = "id field must be of int type, any other implementation is not supported yet"
+                    err_str = "id field must be of int or string type, any other implementation is not supported yet"
                     logging.exception(err_str)
                     raise Exception(err_str)
         else:
@@ -216,15 +216,14 @@ class MsgspecModelPlugin(DataclassModelPlugin):
         message_name = message.proto.name
 
         output_str = ""
-        for suffix_ in ["BaseModel", "Optional"]:
-            output_str += f"class {message_name}{suffix_}(MsgspecBaseModel, kw_only=True):\n"
-            has_id_field = MsgspecModelPlugin.default_id_field_name in [field.proto.name for field in message.fields]
-            output_str += self._underlying_handle_none_default_fields(message, has_id_field)
+        output_str += f"class {message_name}BaseModel(MsgspecBaseModel, kw_only=True):\n"
+        has_id_field = MsgspecModelPlugin.default_id_field_name in [field.proto.name for field in message.fields]
+        output_str += self._underlying_handle_none_default_fields(message, has_id_field)
 
-            output_str += (
-                self._handle_post_init_in_basemodel_versions(message, auto_gen_id_type,
-                                                             alias_name_dict=kwargs.get("alias_name_dict", {})))
-            output_str += "\n\n"
+        output_str += (
+            self._handle_post_init_in_basemodel_versions(message, auto_gen_id_type,
+                                                         alias_name_dict=kwargs.get("alias_name_dict", {})))
+        output_str += "\n\n"
         return output_str
 
     def _handle_alias_setattr_output_in_model(self, alias_name_dict: Dict) -> str:

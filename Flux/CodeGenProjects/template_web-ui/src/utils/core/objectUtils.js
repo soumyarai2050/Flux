@@ -89,6 +89,7 @@ export function compareJSONObjects(obj1, obj2, fieldsMetadata, isCreate = false)
             excludeNullFromObject(diff);
         }
     }
+    let confirmationCaptionDict = null;
     if (fieldsMetadata) {
         let subFieldsMetadata = [];
         fieldsMetadata
@@ -98,6 +99,7 @@ export function compareJSONObjects(obj1, obj2, fieldsMetadata, isCreate = false)
             })
         const combinedFieldsMetadata = [...fieldsMetadata, ...subFieldsMetadata];
         const paths = getAllObjectPaths(diff);
+
         for (const path of paths) {
             // ignore DB_ID
             if (path === DB_ID) {
@@ -125,9 +127,20 @@ export function compareJSONObjects(obj1, obj2, fieldsMetadata, isCreate = false)
                 diff = null;
                 return;
             }  // else not required - field is modifiable from UI
+
+            if (metadata.type === 'button' && metadata.button.confirmation_caption) {
+                const { confirmation_caption, confirmation_style = 'info' } = metadata.button;
+                if (!confirmationCaptionDict) {
+                    confirmationCaptionDict = {};
+                }
+                confirmationCaptionDict[path] = {
+                    caption: confirmation_caption,
+                    style: confirmation_style
+                };
+            }
         }
     }
-    return diff;
+    return [diff, confirmationCaptionDict];
 }
 
 

@@ -97,8 +97,8 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_mod
 
 class FirstLastBarterCont(MsgspecBaseModel):
     id: int | None = msgspec.field(default=None)
-    first: LastBarterOptional | None = None
-    last: LastBarterOptional | None = None
+    first: LastBarterBaseModel | None = None
+    last: LastBarterBaseModel | None = None
 
     @classmethod
     def dec_hook(cls, type: Type, obj: Any):
@@ -864,8 +864,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         os.chmod(run_symbol_overview_file_path, stat.S_IRWXU)
         subprocess.Popen([f"{run_symbol_overview_file_path}"])
 
-    async def _compute_n_update_max_notionals(self, stored_plan_limits_obj: PlanLimits,
-                                              updated_plan_limits_obj: PlanLimits,
+    async def _compute_n_update_max_notionals(self, stored_plan_limits_obj: PlanLimits | PlanLimitsBaseModel,
+                                              updated_plan_limits_obj: PlanLimits | PlanLimitsBaseModel,
                                               stored_plan_status_obj: PlanStatus) -> bool:
         ret_val = False
         symbol: str = self.plan_leg_1.sec.sec_id
@@ -927,7 +927,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                 logging.info(warn_str_)
 
         balance_notional: float = computed_max_single_leg_notional - acquired_notional
-        updated_plan_status_obj = PlanStatusOptional(id=stored_plan_status_obj.id, balance_notional=balance_notional)
+        updated_plan_status_obj = PlanStatusBaseModel.from_kwargs(id=stored_plan_status_obj.id,
+                                                                    balance_notional=balance_notional)
         # collect pair_plan_tuple before marking it done (for today) - update plan status balance notional
         pair_plan_tuple = self.plan_cache.get_pair_plan()
         await StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_partial_update_plan_status_http(
@@ -1697,8 +1698,8 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
             case other_:
                 logging.error(f"create_admin_control_pre failed. unrecognized command_type: {other_}")
 
-    async def _update_plan_limits_pre(self, stored_plan_limits_obj: PlanLimits,
-                                       updated_plan_limits_obj: PlanLimits):
+    async def _update_plan_limits_pre(self, stored_plan_limits_obj: PlanLimits | PlanLimitsBaseModel,
+                                       updated_plan_limits_obj: PlanLimits | PlanLimitsBaseModel):
         stored_plan_status_obj: PlanStatus = await (
             StreetBookServiceRoutesCallbackBaseNativeOverride.underlying_read_plan_status_by_id_http(
                 stored_plan_limits_obj.id))
@@ -1735,8 +1736,12 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
 
         updated_obj_dict = compare_n_patch_dict(
             copy.deepcopy(stored_plan_limits_dict), updated_plan_limits_obj_json)
-        stored_plan_limits_obj = PlanLimitsOptional.from_dict(stored_plan_limits_dict)
-        updated_plan_limits_obj = PlanLimitsOptional.from_dict(updated_obj_dict)
+        # ignore warning - it's since basemodel(s) expects all their nested obj also as basemodel
+        # type - stored_plan_limits_dict and updated_plan_limits_obj_json here is from ChoreLedger not its BaseModel and this obj will have no issue
+        # when parsed to json before calling underlying http calls so not adding extra overhead of
+        # converting Security to BaseModel before using in PairSideBarteringBriefBaseModel
+        stored_plan_limits_obj: PlanLimitsBaseModel = PlanLimitsBaseModel.from_dict(stored_plan_limits_dict)
+        updated_plan_limits_obj: PlanLimitsBaseModel = PlanLimitsBaseModel.from_dict(updated_obj_dict)
         await self._update_plan_limits_pre(stored_plan_limits_obj, updated_plan_limits_obj)
         updated_plan_limits_obj_json = updated_plan_limits_obj.to_dict(exclude_none=True)
         updated_plan_limits_obj_json["eligible_brokers"] = original_eligible_brokers
@@ -3187,8 +3192,12 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                             indicative_consumable_participation_qty = 0
                             participation_period_chore_qty_sum = 0
 
+                        # ignore warning - it's since basemodel(s) expects all their nested obj also as basemodel
+                        # type - Security here is from ChoreLedger not its BaseModel and this obj will have no issue
+                        # when parsed to json before calling underlying http calls so not adding extra overhead of
+                        # converting Security to BaseModel before using in PairSideBarteringBriefBaseModel
                         updated_pair_side_brief_obj = \
-                            PairSideBarteringBriefOptional(
+                            PairSideBarteringBriefBaseModel(
                                 security=security, side=side,
                                 last_update_date_time=chore_snapshot.last_update_date_time,
                                 consumable_open_chores=consumable_open_chores,
@@ -3295,11 +3304,11 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
                             logging.error(err_str_)
 
                         if symbol == plan_brief_obj.pair_buy_side_bartering_brief.security.sec_id:
-                            updated_plan_brief = PlanBriefOptional(
+                            updated_plan_brief = PlanBriefBaseModel.from_kwargs(
                                 id=plan_brief_obj.id, pair_buy_side_bartering_brief=updated_pair_side_brief_obj,
                                 consumable_nett_filled_notional=consumable_nett_filled_notional)
                         elif symbol == plan_brief_obj.pair_sell_side_bartering_brief.security.sec_id:
-                            updated_plan_brief = PlanBriefOptional(
+                            updated_plan_brief = PlanBriefBaseModel.from_kwargs(
                                 id=plan_brief_obj.id, pair_sell_side_bartering_brief=updated_pair_side_brief_obj,
                                 consumable_nett_filled_notional=consumable_nett_filled_notional)
                         else:

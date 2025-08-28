@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { cloneDeep, get, isEqual, set, isObject } from 'lodash';
+import { cloneDeep, get, isEqual, set, isObject, debounce } from 'lodash';
 import { saveAs } from 'file-saver';
 // project imports
 import { DB_ID, DEFAULT_HIGHLIGHT_DURATION, LAYOUT_TYPES, MODEL_TYPES, MODES, NEW_ITEM_ID } from '../../constants';
@@ -19,15 +19,15 @@ import { dataSourcesSelectorEquality } from '../../utils/redux/selectorUtils';
 import { cleanAllCache } from '../../cache/attributeCache';
 import { useWebSocketWorker, useDataSourcesWebsocketWorker, useDownload, useModelLayout, useConflictDetection } from '../../hooks';
 // custom components
-import { FullScreenModalOptional } from '../../components/Modal';
-import { ModelCard, ModelCardHeader, ModelCardContent } from '../../components/cards';
-import MenuGroup from '../../components/MenuGroup';
-import { ConfirmSavePopup, FormValidation } from '../../components/Popup';
-import CommonKeyWidget from '../../components/CommonKeyWidget';
-import { PivotTable } from '../../components/tables';
-import { ChartView } from '../../components/charts';
-import AbbreviationMergeView from '../../components/AbbreviationMergeView';
-import ConflictPopup from '../../components/ConflictPopup';
+import { FullScreenModalOptional } from '../../components/ui/Modal';
+import { ModelCard, ModelCardHeader, ModelCardContent } from '../../components/utility/cards';
+import MenuGroup from '../../components/controls/MenuGroup';
+import { ConfirmSavePopup, FormValidation } from '../../components/utility/Popup';
+import CommonKeyWidget from '../../components/data-display/CommonKeyWidget';
+import { PivotTable } from '../../components/data-display/tables';
+import { ChartView } from '../../components/data-display/charts';
+import AbbreviationMergeView from '../../components/data-display/AbbreviationMergeView';
+import ConflictPopup from '../../components/utility/ConflictPopup';
 
 function getEffectiveStoredArrayDict(dataSourcesStoredArrayDict, effectiveStoredObjDict) {
 
@@ -72,7 +72,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         }, {})
     }, [dataSourcesStoredArrayDict, dataSourcesUpdatedObjDict])
 
-    const [searchQuery, setSearchQuery] = useState('');
+    const [searchQuery, setSearchQuery] = useState([]);
     const [rows, setRows] = useState([]);
     const [groupedRows, setGroupedRows] = useState([]);
     const [activeRows, setActiveRows] = useState([]);
@@ -163,6 +163,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     const allowedLayoutTypesRef = useRef([LAYOUT_TYPES.ABBREVIATION_MERGE, LAYOUT_TYPES.PIVOT_TABLE, LAYOUT_TYPES.CHART]);
     // refs to identify change
     const optionsRef = useRef(null);
+    const captionDictRef = useRef(null);
     const baselineDictionaryRef = useRef(null);
 
     // calculated fields
@@ -225,7 +226,8 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
             if (baselineSnapshot && !isEqual(baselineSnapshot, currentServerState)) {
                 // Prepare user-updated object and compare with baseline for conflicts.
                 const userUpdatedObj = modifiedObj || clearxpath(cloneDeep(dataSourcesUpdatedObjDict[sourceName]));
-                const userChanges = compareJSONObjects(baselineSnapshot, userUpdatedObj, dataSourcesMetadataDict[sourceName], isCreating);
+                const [userChanges, captionDict] = compareJSONObjects(baselineSnapshot, userUpdatedObj, dataSourcesMetadataDict[sourceName], isCreating) || [null, null];
+                captionDictRef.current = captionDict;
 
                 // Identify and store conflicts if user and server data differ.
                 if (userChanges && Object.keys(userChanges).length > 0) {
@@ -525,7 +527,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
 
     const handleReload = () => {
         handleDiscard();
-        setSearchQuery('');
+        setSearchQuery([]);
         // Clear chart-specific multiselect state on reload
         setChartMultiSelectState({});
         dispatch(actions.setIsCreating(false));
@@ -573,22 +575,26 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     }
 
     const handleLoad = () => {
-        const idx = modelAbbreviatedBufferItems.indexOf(searchQuery);
-        if (idx !== -1) {
-            const modifiedObj = cloneDeep(storedObj);
+        if (!searchQuery || searchQuery.length == 0) return;
+        const modifiedObj = cloneDeep(storedObj);
+        let mostRecentId;
+        searchQuery.forEach((item) => {
+            const idx = get(modifiedObj, bufferedFieldMetadata.key).indexOf(item);
+            if (idx === -1) {
+                console.error(`load failed for idx: ${idx}`);
+                return;
+            }
             get(modifiedObj, bufferedFieldMetadata.key).splice(idx, 1);
-            get(modifiedObj, loadedFieldMetadata.key).push(searchQuery);
-            dispatch(actions.setUpdatedObj(modifiedObj));
-            dispatch(actions.update({ url: modelDataSource.url, data: modifiedObj }));
-            const id = getIdFromAbbreviatedKey(abbreviationKey, searchQuery);
-            dataSources.forEach(({ actions: dsActions }) => {
-                dispatch(dsActions.setObjId(id));
-            })
-            handleSelectedSourceIdChangeHandler(id);
-            setSearchQuery('');
-        } else {
-            console.error(`load failed for idx: ${idx}`);
-        }
+            get(modifiedObj, loadedFieldMetadata.key).push(item);
+            mostRecentId = getIdFromAbbreviatedKey(abbreviationKey, item);
+        })
+        dispatch(actions.setUpdatedObj(modifiedObj));
+        dispatch(actions.update({ url: modelDataSource.url, data: modifiedObj }));
+        dataSources.forEach(({ actions: dsActions }) => {
+            dispatch(dsActions.setObjId(mostRecentId));
+        })
+        handleSelectedSourceIdChangeHandler(mostRecentId);
+        setSearchQuery([]);
     }
 
     const handleSelectedSourceIdChangeHandler = (updatedSelectedSourceId) => {
@@ -668,7 +674,8 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         }
         const baselineForComparison = baselineDictionaryRef.current?.[sourceRef.current] || dataSourcesStoredObjDict[sourceRef.current];
 
-        const activeChanges = compareJSONObjects(baselineForComparison, dataSourceUpdatedObj, fieldsMetadata, isCreating);
+        const [activeChanges, captionDict] = compareJSONObjects(baselineForComparison, dataSourceUpdatedObj, fieldsMetadata, isCreating) || [null, null];
+        captionDictRef.current = captionDict;
 
         if (!activeChanges || Object.keys(activeChanges).length === 0) {
             changesRef.current = {};
@@ -737,7 +744,8 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
             return;
         }
 
-        const activeChanges = compareJSONObjects(baselineForComparison, modelUpdatedObj, dataSourcesMetadataDict[sourceName], isCreating);
+        const [activeChanges, captionDict] = compareJSONObjects(baselineForComparison, modelUpdatedObj, dataSourcesMetadataDict[sourceName], isCreating) || [null, null];
+        captionDictRef.current = captionDict;
         if (!activeChanges || Object.keys(activeChanges).length === 0) {
             changesRef.current = {};
             dispatch(actions.setMode(MODES.READ));
@@ -787,7 +795,8 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         const fieldsMetadata = dataSourcesMetadataDict[source];
         set(dataSourceUpdatedObj, xpath, value);
         if (force) {
-            const activeChanges = compareJSONObjects(dataSourceStoredObj, dataSourceUpdatedObj, fieldsMetadata);
+            const [activeChanges, captionDict] = compareJSONObjects(dataSourceStoredObj, dataSourceUpdatedObj, fieldsMetadata) || [null, null];
+            captionDictRef.current = captionDict;
             changesRef.current.active = activeChanges;
             executeSave();
         } else if (dataSourceStoredObj[DB_ID]) {
@@ -799,14 +808,20 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         dispatch(actions.setError(null));
     }
 
+    const debouncedRowSelect = useRef(
+        debounce((id) => {
+            dataSources.forEach(({ actions: dsActions }) => {
+                dispatch(dsActions.setObjId(id));
+            })
+            handleSelectedSourceIdChangeHandler(id);
+        }, 1000)
+    ).current;
+
     const handleRowSelect = (id) => {
         if (Object.values(dataSourcesModeDict).includes(MODES.EDIT)) {
             return;
         }
-        dataSources.forEach(({ actions: dsActions }) => {
-            dispatch(dsActions.setObjId(id));
-        })
-        handleSelectedSourceIdChangeHandler(id);
+        debouncedRowSelect(id);
     }
 
     const handleMultiSelectChange = useCallback((selectedIds, mostRecentId) => {
@@ -944,6 +959,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                     highlightDuration={modelLayoutData.highlight_duration ?? DEFAULT_HIGHLIGHT_DURATION}
                     baselineDictionary={baselineDictionaryRef.current}
                     dataSourcesModeDict={dataSourcesModeDict}
+                    maxRowSize={maxRowSize}
                 />
             </Wrapper>
         )
@@ -1069,6 +1085,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                 onClose={handleConfirmSavePopupClose}
                 onSave={executeSave}
                 src={changesRef.current.active}
+                captionDict={captionDictRef.current}
             />
             <FormValidation
                 title={sourceRef.current}
