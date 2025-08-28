@@ -1,0 +1,44 @@
+.navbar {
+  padding: 12px 20px;
+  /* background: linear-gradient(90deg, #1a73e8, #4285f4); */
+  /* color: white; */
+  /* Will be set by CSS variable */
+  background-color: var(--dynamic-navbar-bg);
+  color: var(--dynamic-navbar-text);
+  display: flex;
+  align-items: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.hidden {
+  transform: translateY(-100%);
+  opacity: 0;
+}
+
+.navbarLogo {
+  margin-right: auto;
+  font-weight: bold;
+  font-size: 1.5rem;
+  letter-spacing: 0.5px;
+}
+
+/* Enhance first letter styling */
+.navbarLogo::first-letter {
+  background-color: rgba(255, 255, 255, 0.3);
+  padding: 0.2em 0.4em;
+  border-radius: 4px;
+  margin-right: 2px;
+}
+
+.mainContainer {
+  padding: 0;
+  overflow-x: hidden;
+}
+
+.navbar svg {
+  color: var(--dynamic-navbar-text);
+}
