@@ -1,0 +1,290 @@
+/* Main chat container */
+.chatContainer {
+  height: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--mui-palette-divider);
+}
+
+.chatContainerDark {
+  background-color: var(--mui-palette-grey-900, #121212);
+}
+
+.chatContainerLight {
+  background-color: var(--mui-palette-grey-50, #fafafa);
+}
+
+/* Header styles */
+.chatHeader {
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  border-bottom: 1px solid var(--mui-palette-divider);
+}
+
+.chatHeaderDark {
+  background-color: var(--mui-palette-grey-800, #1e1e1e);
+  border-bottom-color: var(--mui-palette-grey-700, #333);
+}
+
+.chatHeaderLight {
+  background-color: white;
+  border-bottom-color: var(--mui-palette-grey-300, #e0e0e0);
+}
+
+/* Collapsed state */
+.collapsedContainer {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 4px;
+  width: 50px;
+  height: 100%;
+  border-right: 1px solid var(--mui-palette-divider);
+}
+
+.collapsedContainer.dark {
+  background-color: var(--mui-palette-grey-900, #121212);
+}
+
+.collapsedContainer.light {
+  background-color: var(--mui-palette-grey-50, #fafafa);
+}
+
+/* Messages container */
+.messagesContainer {
+  flex: 1;
+  padding: 12px;
+  overflow-y: auto;
+  min-width: 300px;
+}
+
+/* Context wrapper */
+.contextWrapper {
+  margin-bottom: 4px;
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 4px 8px;
+  transition: all 0.2s ease;
+  border-left: 3px solid transparent;
+}
+
+.contextWrapperSelected {
+  border-left: 3px solid var(--mui-palette-secondary-main);
+  padding: 8px;
+}
+
+.contextWrapperSelectedDark {
+  background-color: rgba(25, 118, 210, 0.1);
+}
+
+.contextWrapperSelectedLight {
+  background-color: rgba(25, 118, 210, 0.05);
+}
+
+.contextWrapperHoverDark:hover:not(.contextWrapperSelected) {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.contextWrapperHoverLight:hover:not(.contextWrapperSelected) {
+  background-color: rgba(0, 0, 0, 0.03);
+}
+
+/* Message container */
+.messageContainer {
+  margin-bottom: 4px;
+  /* padding: 0 8px; */
+}
+
+.messageContainerUser {
+  /* padding-right: 40px; */
+}
+
+.messageContainerBot {
+  /* padding-left: 40px; */
+}
+
+/* Message wrapper for bubble and actions */
+.messageBubbleWrapper {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.messageContainerUser .messageBubbleWrapper {
+  flex-direction: row-reverse;
+  justify-content: flex-start;
+}
+
+.messageContainerBot .messageBubbleWrapper {
+  flex-direction: row;
+  justify-content: flex-start;
+}
+
+/* Message bubbles */
+.messageBubble {
+  position: relative;
+  max-width: 85%;
+  padding: 8px;
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+.userMessage {
+  background-color: var(--mui-palette-primary-main, #1976d2);
+  color: var(--mui-palette-primary-contrastText, white);
+  border-radius: 12px 12px 4px 12px;
+}
+
+.botMessage {
+  color: var(--mui-palette-text-primary);
+  border-radius: 12px 12px 12px 4px;
+}
+
+.botMessageDark {
+  background-color: var(--mui-palette-grey-700, #424242);
+}
+
+.botMessageLight {
+  background-color: var(--mui-palette-grey-100, #f5f5f5);
+}
+
+/* Message content */
+.messageContent {
+  display: flex;
+  align-items: flex-start;
+}
+
+.messageText {
+  flex: 1;
+  /* min-height: 24px; */
+  overflow: hidden;
+  max-height: 80px;
+  min-width: 0;
+}
+
+.messageTextEditing {
+  padding-right: 40px;
+}
+
+/* Action buttons */
+.actionButtons {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.messageContainer:hover .actionButtons {
+  opacity: 1;
+  visibility: visible;
+}
+
+.actionButtons .MuiIconButton-root {
+  padding: 2px;
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+}
+
+.editingButtons {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+  display: flex;
+  gap: 2px;
+}
+
+.editingButtons .MuiIconButton-root {
+  padding: 2px;
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+}
+
+/* Empty state */
+.emptyState {
+  padding: 24px;
+  text-align: center;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 300px;
+}
+
+/* Context divider */
+.contextDivider {
+  margin-bottom: 12px;
+  color: var(--mui-palette-text-secondary);
+}
+
+.contextDivider::before,
+.contextDivider::after {
+  border-color: var(--mui-palette-divider);
+}
+
+/* Dialog enhancements */
+.dialogTitle {
+  font-weight: 600;
+}
+
+.dialogContent {
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+
+/* Icon button enhancements for better visibility */
+.actionIcon {
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+}
+
+.actionIcon:hover {
+  opacity: 1;
+}
+
+.reasoningIcon {
+  color: var(--mui-palette-warning-main, #ff9800) !important;
+  opacity: 0.8 !important;
+}
+
+.reasoningIcon:hover {
+  opacity: 1 !important;
+  color: var(--mui-palette-warning-dark, #f57c00) !important;
+  transition: all 0.2s ease;
+}
+
+.editIcon {
+  opacity: 0.6;
+}
+
+.editIcon:hover:not(:disabled) {
+  opacity: 1;
+  color: var(--mui-palette-warning-main) !important;
+}
+
+.editIcon:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.expandIcon:hover {
+  color: var(--mui-palette-info-main) !important;
+}
+
+.copyIcon {
+  opacity: 0.6;
+}
+
+.copyIcon:hover {
+  opacity: 1;
+  color: var(--mui-palette-success-main) !important;
+}

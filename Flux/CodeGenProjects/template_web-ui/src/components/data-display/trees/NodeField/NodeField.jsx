@@ -474,11 +474,14 @@ const NodeField = (props) => {
         const inputProps = endAdornment ? {
             endAdornment: endAdornment
         } : {};
+        const isMultiline = props.data.text_area ?? false;
         return (
             <TextField
                 className={`${classes.text_field} ${nodeFieldRemove} ${colorClass}`}
                 id={props.data.key}
                 name={props.data.key}
+                multiline={isMultiline}
+                minRows={isMultiline ? 3 : 1}
                 size='small'
                 required={props.data.required}
                 error={validationError.current !== null}

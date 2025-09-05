@@ -5,12 +5,13 @@ import { saveAs } from 'file-saver';
 // project imports
 import { DB_ID, DEFAULT_HIGHLIGHT_DURATION, LAYOUT_TYPES, MODEL_TYPES, MODES } from '../../constants';
 import { clearxpath, addxpath } from '../../utils/core/dataAccess';
-import { generateObjectFromSchema } from '../../utils/core/schemaUtils';
+import { generateObjectFromSchema, getModelSchema } from '../../utils/core/schemaUtils';
 import { compareJSONObjects } from '../../utils/core/objectUtils';
 import { getServerUrl, isWebSocketActive } from '../../utils/network/networkUtils';
 import {
     getWidgetTitle, getCrudOverrideDict, getCSVFileName,
-    updateFormValidation
+    updateFormValidation,
+    snakeToCamel
 } from '../../utils/ui/uiUtils';
 import { removeRedundantFieldsFromRows } from '../../utils/core/dataTransformation';
 import { cleanAllCache } from '../../cache/attributeCache';
@@ -26,10 +27,16 @@ import { ChartView } from '../../components/data-display/charts';
 import ConflictPopup from '../../components/utility/ConflictPopup';
 
 function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
-    const { schema: projectSchema } = useSelector((state) => state.schema);
+    const { schema: projectSchema, schemaCollections } = useSelector((state) => state.schema);
 
-    const { schema: modelSchema, fieldsMetadata, actions, selector } = modelDataSource;
+    const { actions, selector } = modelDataSource;
     const { storedArray, storedObj, updatedObj, objId, mode, allowUpdates, error, isLoading, popupStatus } = useSelector(selector);
+    const { node } = useSelector(state => state[snakeToCamel(modelName)]);
+    const nodeModelName = useMemo(() => node?.modelName ?? null, [node]);
+    const nodeUrl = useMemo(() => node?.url ?? null, [node]);
+    const modelSchema = useMemo(() => node?.modelSchema ?? modelDataSource.schema, [node])
+    const fieldsMetadata = useMemo(() => node?.fieldsMetadata ?? modelDataSource.fieldsMetadata, [node]);
+    const derivedModelName = useMemo(() => nodeModelName ?? modelName, [nodeModelName]);
     const { storedObj: dataSourceStoredObj } = useSelector(dataSource?.selector ?? (() => ({ storedObj: null })), (prev, curr) => {
         return JSON.stringify(prev) === JSON.stringify(curr);
     });
@@ -48,6 +55,11 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
     const [reconnectCounter, setReconnectCounter] = useState(0);
     const [rowIds, setRowIds] = useState(null);
     const [params, setParams] = useState(null);
+
+    useEffect(() => {
+        setUrl(nodeUrl);
+        setViewUrl(nodeUrl);
+    }, [nodeUrl])
 
     const {
         modelLayoutOption,
@@ -119,7 +131,7 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
     const modelTitle = getWidgetTitle(modelLayoutOption, modelSchema, modelName, storedObj);
     const uiLimit = modelSchema.ui_get_all_limit ?? null;
 
-    const { downloadCSV, isDownloading, progress } = useDownload(modelName, fieldsMetadata, null);
+    const { downloadCSV, isDownloading, progress } = useDownload(derivedModelName, fieldsMetadata, null);
 
     // Conflict detection for handling websocket updates during editing
     const {
@@ -304,7 +316,7 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
 
     socketRef.current = useWebSocketWorker({
         url: (modelSchema.is_large_db_object || modelSchema.is_time_series || modelLayoutOption.depending_proto_model_for_cpp_port) ? url : viewUrl,
-        modelName,
+        modelName: derivedModelName,
         isDisabled: false,
         reconnectCounter,
         selector,
@@ -529,6 +541,22 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
         }
         return [];
     }, [rows, layoutType])
+
+    const handleSetNode = () => {
+        const nodes = [];
+        const nodeName = nodes[Math.floor(Math.random() * nodes.length)];
+        if (nodeName === nodeModelName) return;
+        dispatch(actions.setNode({
+            modelName: nodeName,
+            modelSchema: getModelSchema(nodeName, projectSchema),
+            fieldsMetadata: schemaCollections[nodeName],
+            url: url
+        }))
+        dispatch(actions.setStoredArray([]));
+        dispatch(actions.setStoredObj({}));
+        dispatch(actions.setUpdatedObj({}));
+        dispatch(actions.setObjId(null));
+    }
 
     // A helper function to decide which content to render based on layoutType
     const renderContent = () => {

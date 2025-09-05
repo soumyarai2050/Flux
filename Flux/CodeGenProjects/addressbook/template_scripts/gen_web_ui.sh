@@ -8,6 +8,7 @@ set -e
 if [ $# -lt 1 ] ; then
   cp -pr ../../../../template_web-ui ../.
   mv ../template_web-ui ../web-ui
+  rm -rf ../web-ui/src/docs
   cd ../web-ui
   cp -p ../../../template_scripts/helper_gen_script.sh .
   source helper_gen_script.sh

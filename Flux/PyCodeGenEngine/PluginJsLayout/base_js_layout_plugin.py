@@ -71,28 +71,24 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
             if project_grp_core_or_util_files:
                 core_or_util_files.extend(project_grp_core_or_util_files)
 
-        if core_or_util_files is not None:
-            for dependency_file in file.dependencies:
-                if dependency_file.proto.name in core_or_util_files:
-                    if is_multi_project:
-                        file_name = dependency_file.proto.name
-                        self.proto_file_name_to_message_list_dict[file_name.split(os.sep)[-1]] = (
-                            dependency_file.messages)
-                    for msg in dependency_file.messages:
-                        if msg not in message_list:
-                            if selective_msg_name_list:
-                                # selective_msg_name_list is passed when selective msg are going to be added for
-                                # this project
-                                if msg.proto.name in selective_msg_name_list:
-                                    message_list.append(msg)
-                                # else not required: ignoring if not present in selective_msg_name_list
-                            else:
-                                # normal case: putting all msg in list
-                                message_list.append(msg)
+        dependency_file_list = self._get_core_dependency_file_list(file)
 
-                # else not required: if dependency file name not in core_or_util_files
-                # config list, avoid messages from it
-        # else not required: core_or_util_files key is not in yaml dict config
+        for dependency_file in dependency_file_list:
+            if is_multi_project:
+                file_name = dependency_file.proto.name
+                self.proto_file_name_to_message_list_dict[file_name.split(os.sep)[-1]] = (
+                    dependency_file.messages)
+            for msg in dependency_file.messages:
+                if msg not in message_list:
+                    if selective_msg_name_list:
+                        # selective_msg_name_list is passed when selective msg are going to be added for
+                        # this project
+                        if msg.proto.name in selective_msg_name_list:
+                            message_list.append(msg)
+                        # else not required: ignoring if not present in selective_msg_name_list
+                    else:
+                        # normal case: putting all msg in list
+                        message_list.append(msg)
 
     def load_root_message_to_data_member(self, file_or_file_list: protogen.File | List[protogen.File]):
         message_list: List[protogen.Message]

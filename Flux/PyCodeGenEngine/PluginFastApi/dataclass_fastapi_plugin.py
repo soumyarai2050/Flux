@@ -331,13 +331,10 @@ class DataClassFastApiPlugin(FastapiCallbackFileHandler,
             if project_grp_core_or_util_files:
                 core_or_util_files.extend(project_grp_core_or_util_files)
 
-        if core_or_util_files is not None:
-            for dependency_file in file.dependencies:
-                if dependency_file.proto.name in core_or_util_files:
-                    self.load_root_and_non_root_messages_in_dicts(dependency_file.messages, avoid_non_roots=True)
-                # else not required: if dependency file name not in core_or_util_files
-                # config list, avoid messages from it
-        # else not required: core_or_util_files key is not in yaml dict config
+        dependency_file_list = self._get_core_dependency_file_list(file)
+
+        for dependency_file in dependency_file_list:
+            self.load_root_and_non_root_messages_in_dicts(dependency_file.messages, avoid_non_roots=True)
 
         self.set_req_data_members(file)
 

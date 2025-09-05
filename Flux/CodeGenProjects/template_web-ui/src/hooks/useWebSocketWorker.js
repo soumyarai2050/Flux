@@ -131,7 +131,7 @@ function useWebSocketWorker({
         setIsConnected(false);
       }
     };
-  }, [url, isDisabled, params, reconnectCounter]);
+  }, [url, isDisabled, params, reconnectCounter, modelName]);
 
   // Periodically send snapshot or accumulated messages to the worker
   useEffect(() => {

@@ -300,7 +300,20 @@ export const fieldProps = [
      * @property {string} usageName - The standardized name used in the UI code.
      */
     { propertyName: "visible_if", usageName: "visible_if" },
-
+    { propertyName: "text_area", usageName: "text_area" },
+    { propertyName: "chat_context", usageName: "chat_context" },
+    { propertyName: "chat_conversation", usageName: "chat_conversation" },
+    { propertyName: "user_message", usageName: "user_message" },
+    { propertyName: "bot_message", usageName: "bot_message" },
+    { propertyName: "bot_reasoning", usageName: "bot_reasoning" },
+    { propertyName: "default_array_create", usageName: "default_array_create" },
+    { propertyName: "graph", usageName: "graph" },
+    { propertyName: "node", usageName: "node" },
+    { propertyName: "edge", usageName: "edge" },
+    { propertyName: "node_name", usageName: "node_name" },
+    { propertyName: "node_type", usageName: "node_type" },
+    { propertyName: "node_access", usageName: "node_access" },
+    { propertyName: "node_url", usageName: "node_url" },
 ]
 
 

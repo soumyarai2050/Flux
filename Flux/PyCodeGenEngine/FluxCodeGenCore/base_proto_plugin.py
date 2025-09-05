@@ -214,6 +214,21 @@ class BaseProtoPlugin(ABC):
     flux_fld_zero_as_none: ClassVar[str] = "FluxFldZeroAsNone"
     flux_fld_visible_if: ClassVar[str] = "FluxFldVisibleIf"
     flux_fld_array_obj_identifier: ClassVar[str] = "FluxFldArrayObjIdentifier"
+    flux_fld_text_area: ClassVar[str] = "FluxFldTextArea"
+    flux_fld_graph: ClassVar[str] = "FluxFldGraph"
+    flux_fld_node: ClassVar[str] = "FluxFldNode"
+    flux_fld_edge: ClassVar[str] = "FluxFldEdge"
+    flux_fld_node_name: ClassVar[str] = "FluxFldNodeName"
+    flux_fld_node_type: ClassVar[str] = "FluxFldNodeType"
+    flux_fld_node_access: ClassVar[str] = "FluxFldNodeAccess"
+    flux_fld_node_url: ClassVar[str] = "FluxFldNodeUrl"
+    flux_fld_chat_context: ClassVar[str] = "FluxFldChatContext"
+    flux_fld_chat_conversation: ClassVar[str] = "FluxFldChatConversation"
+    flux_fld_user_message: ClassVar[str] = "FluxFldUserMessage"
+    flux_fld_bot_message: ClassVar[str] = "FluxFldBotMessage"
+    flux_fld_bot_reasoning: ClassVar[str] = "FluxFldBotReasoning"
+    flux_fld_default_array_create: ClassVar[str] = "FluxFldDefaultArrayCreate"
+    flux_fld_auto_complete_split_assign: ClassVar[str] = "FluxFldAutoCompleteSplitAssign"
     executor_option_is_websocket_model_field: ClassVar[str] = "IsWebSocketModel"
     executor_option_enable_notify_all_field: ClassVar[str] = "EnableNotifyAll"
     executor_option_is_top_lvl_model_field: ClassVar[str] = "IsTopLvlModel"
@@ -1101,6 +1116,17 @@ class BaseProtoPlugin(ABC):
         # removing none from dict
         override_default_crud_option_value_dict_list = remove_none_values(override_default_crud_option_value_dict_list)
         return override_default_crud_option_value_dict_list
+
+    def _get_core_dependency_file_list(self, project_service_file: protogen.File) -> List[protogen.File]:
+        core_dependency_file_list = []
+        if option_files:
+            for project_service_file_dependency in project_service_file.dependencies:
+                if project_service_file_dependency.proto.name not in option_files:
+                    core_dependency_file_list.append(project_service_file_dependency)
+                # else not required:
+        else:
+            core_dependency_file_list = project_service_file.dependencies
+        return core_dependency_file_list
 
     def _process(self, plugin: ExtendedProtogenPlugin) -> None:
         """

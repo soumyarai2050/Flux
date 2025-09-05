@@ -35,6 +35,14 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
 
+    def get_model_option_from_widget_ui_data_element(self, message: protogen.Message, option_name: str) -> str | None:
+        """Extract option value from widget_ui_data_element option"""
+        if self.is_option_enabled(message, self.flux_msg_widget_ui_data_element):
+            widget_ui_data_element_dict = self.get_complex_option_value_from_proto(
+                message, self.flux_msg_widget_ui_data_element)
+            return widget_ui_data_element_dict.get(option_name, None)
+        return None
+
     def handle_slice_content(self, message: protogen.Message) -> str:
         message_name = message.proto.name
         message_name_camel_cased = capitalized_to_camel_case(message_name)
@@ -72,9 +80,23 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             output_str += JsSliceFileGenPlugin.indentation_space*2 + "}\n"
             output_str += JsSliceFileGenPlugin.indentation_space + "},\n"
             output_str += "};\n"
+        elif self.get_model_option_from_widget_ui_data_element(message, "is_graph_model"):
+            output_str += "const injectedReducers = {\n"
+            output_str += JsSliceFileGenPlugin.indentation_space + "setContextId(state, action) {\n"
+            output_str += JsSliceFileGenPlugin.indentation_space * 2 + "state.contextId = action.payload;\n"
+            output_str += JsSliceFileGenPlugin.indentation_space + "},\n"
+            output_str += "};\n"
+        elif self.get_model_option_from_widget_ui_data_element(message, "is_graph_node_model"):
+            output_str += "const injectedReducers = {\n"
+            output_str += JsSliceFileGenPlugin.indentation_space + "setNode(state, action) {\n"
+            output_str += JsSliceFileGenPlugin.indentation_space * 2 + "state.node = action.payload;\n"
+            output_str += JsSliceFileGenPlugin.indentation_space + "},\n"
+            output_str += "};\n"
+
         output_str += "\n"
         output_str += "const { reducer, actions } = createGenericSlice({\n"
         output_str += JsSliceFileGenPlugin.indentation_space + f"modelName: '{message_name_snake_cased}',\n"
+        
         if message in self.repeated_msg_list:
             output_str += JsSliceFileGenPlugin.indentation_space + f"modelType: MODEL_TYPES.REPEATED_ROOT,\n"
         elif message in self.abbreviated_merge_layout_msg_list:
@@ -98,6 +120,16 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             output_str += JsSliceFileGenPlugin.indentation_space + "injectedReducers\n"
         elif message in self.alert_type_message_list:
             output_str += JsSliceFileGenPlugin.indentation_space + f"isAlertModel: true\n"
+        elif self.get_model_option_from_widget_ui_data_element(message, "is_graph_model"):
+            output_str += JsSliceFileGenPlugin.indentation_space + "extraState: {\n"
+            output_str += JsSliceFileGenPlugin.indentation_space*2 + f"contextId: null\n"
+            output_str += JsSliceFileGenPlugin.indentation_space + "},\n"
+            output_str += JsSliceFileGenPlugin.indentation_space + "injectedReducers\n"
+        elif self.get_model_option_from_widget_ui_data_element(message, "is_graph_node_model"):
+            output_str += JsSliceFileGenPlugin.indentation_space + "extraState: {\n"
+            output_str += JsSliceFileGenPlugin.indentation_space * 2 + f"node: null\n"
+            output_str += JsSliceFileGenPlugin.indentation_space + "},\n"
+            output_str += JsSliceFileGenPlugin.indentation_space + "injectedReducers\n"
         output_str += "});\n\n"
         output_str += "export default reducer;\n"
         output_str += "export { actions };\n"

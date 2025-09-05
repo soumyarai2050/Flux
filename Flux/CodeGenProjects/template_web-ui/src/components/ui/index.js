@@ -7,5 +7,6 @@ export { default as LinkText } from './LinkText';
 export { default as MenuItem } from './MenuItem';
 export { default as Modal } from './Modal';
 export { default as Skeleton } from './Skeleton';
+export { default as Slider } from './Slider';
 export { default as ValueBasedProgressBar } from './ValueBasedProgressBar';
 export { default as ValueBasedToggleButton } from './ValueBasedToggleButton';

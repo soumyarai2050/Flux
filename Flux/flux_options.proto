@@ -336,6 +336,21 @@ extend google.protobuf.FieldOptions
   optional bool FluxFldZeroAsNone = 55279;  // Use this to treat 0 value as None for UI aggregation
   optional string FluxFldVisibleIf = 55280;  // Use this to conditionally render field on UI
   optional string FluxFldArrayObjIdentifier = 55281;  // Use to display identifier on array object on UI
+  optional bool FluxFldTextArea = 55282;  // Use this to display field as text area instead of single line input
+  optional bool FluxFldGraph = 55283; // Use this to mark field as graph data for visualization
+  optional bool FluxFldNode = 55284; // Use this to mark field as graph node data
+  optional bool FluxFldEdge = 55285; // Use this to mark field as graph edge data
+  optional bool FluxFldChatContext = 55286; // Use this to mark field as chat context data
+  optional bool FluxFldChatConversation = 55287; // Use this to mark field as chat conversation data
+  optional bool FluxFldUserMessage = 55288; // Use this to mark field as user message in chat
+  optional bool FluxFldBotMessage = 55289; // Use this to mark field as bot response message in chat
+  optional bool FluxFldBotReasoning = 55290; // Use this to mark field as bot reasoning/explanation in chat
+  optional bool FluxFldDefaultArrayCreate = 55291; // Use this to auto-create array elements by default
+  optional bool FluxFldNodeName = 55292; // Use this to mark field as graph node name/label
+  optional bool FluxFldNodeType = 55293; // Use this to mark field as graph node type identifier
+  optional bool FluxFldNodeAccess = 55294; // Use this to mark field as graph node access permission flag
+  optional bool FluxFldNodeUrl = 55295; // Use this to mark field as graph node URL/endpoint
+  optional string FluxFldAutoCompleteSplitAssign = 55296; // Use this to split input text into multiple fields with autocomplete support. Format: "{delimiter}field1:index1{delimiter}field2:index2|ListName"
 
   //Complexity Option - 56
   optional string FluxFldCmplxHigh = 56151;

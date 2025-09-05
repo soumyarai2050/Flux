@@ -55,7 +55,7 @@ export function getWidgetOptionById(widgetOptions, id, isIdBound = false) {
  * @returns {string} The determined title for the widget.
  */
 export function getWidgetTitle(widgetOption, widgetSchema, widgetName, data) {
-    if (widgetSchema.widget_ui_data_element.hasOwnProperty('dynamic_widget_title_fld')) {
+    if (widgetSchema.widget_ui_data_element?.hasOwnProperty('dynamic_widget_title_fld')) {
         const dynamicWidgetTitleField = widgetSchema.widget_ui_data_element.dynamic_widget_title_fld;
         const name = dynamicWidgetTitleField.split('.')[0];
         if (name === widgetName) {

@@ -80,13 +80,10 @@ class JsonSampleGenPlugin(BaseProtoPlugin):
             if project_grp_core_or_util_files:
                 core_or_util_files.extend(project_grp_core_or_util_files)
 
-        if core_or_util_files is not None:
-            for dependency_file in file.dependencies:
-                if dependency_file.proto.name in core_or_util_files:
-                    message_list.extend(dependency_file.messages)
-                # else not required: if dependency file name not in core_or_util_files
-                # config list, avoid messages from it
-        # else not required: core_or_util_files key is not in yaml dict config
+        dependency_file_list = self._get_core_dependency_file_list(file)
+
+        for dependency_file in dependency_file_list:
+            message_list.extend(dependency_file.messages)
 
         self.message_list.extend(message_list)
         for message in set(message_list):

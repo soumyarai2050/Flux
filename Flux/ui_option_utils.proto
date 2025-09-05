@@ -112,6 +112,8 @@ message WidgetUIDataElement {
   optional int32 server_running_status_lvl = 26;
   optional bool ws_connection_by_get_all = 27;  // for abbreviation widget
   repeated PivotData pivot_data = 28;
+  optional bool is_graph_model = 29;
+  optional bool is_graph_node_model = 30;
 }
 
 message WidgetUIOption {

@@ -8,7 +8,8 @@ import {
   PivotTableChartSharp,
   TableChartSharp,
   PushPin,
-  PushPinOutlined
+  PushPinOutlined,
+  Hub
 } from '@mui/icons-material';
 import Icon from '../../../ui/Icon';
 import MenuItem from '../../../ui/MenuItem';
@@ -44,6 +45,7 @@ const LayoutSwitchMenu = ({
     [LAYOUT_TYPES.PIVOT_TABLE]: PivotTableChartSharp,
     [LAYOUT_TYPES.ABBREVIATION_MERGE]: FormatListNumberedSharp,
     [LAYOUT_TYPES.CHART]: BarChart,
+    [LAYOUT_TYPES.GRAPH]: Hub,
   }), []);
 
   const layoutNameMap = useMemo(() => ({
@@ -51,7 +53,8 @@ const LayoutSwitchMenu = ({
     [LAYOUT_TYPES.TREE]: 'tree',
     [LAYOUT_TYPES.PIVOT_TABLE]: 'pivot',
     [LAYOUT_TYPES.ABBREVIATION_MERGE]: 'list',
-    [LAYOUT_TYPES.CHART]: 'chart'
+    [LAYOUT_TYPES.CHART]: 'chart',
+    [LAYOUT_TYPES.GRAPH]: 'graph'
   }), [])
 
   const menuName = 'layout-switch';

@@ -124,6 +124,14 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
 
         return output_str
 
+    def get_model_type_from_widget_ui_data(self, message: protogen.Message) -> str | None:
+        """Extract model_type from widget_ui_data_element option"""
+        if self.is_option_enabled(message, self.flux_msg_widget_ui_data_element):
+            widget_ui_data_dict = self.get_complex_option_value_from_proto(
+                message, self.flux_msg_widget_ui_data_element)
+            return widget_ui_data_dict.get("model_type")
+        return None
+
     def output_file_generate_handler(self, file: protogen.File | List[protogen.File]):
         # Loading root messages to data member
         self.load_root_message_to_data_member(file)
@@ -136,6 +144,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         for message in self.layout_msg_list:
             message_name = message.proto.name
             output_dict_key = f"{message_name}.jsx"
+            
             # Abbreviated Case
             if message in self.abbreviated_merge_layout_msg_list:
                 self.root_message = message

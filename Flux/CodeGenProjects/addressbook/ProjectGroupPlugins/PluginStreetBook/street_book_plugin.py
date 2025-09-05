@@ -323,8 +323,7 @@ class StreetBookPlugin(BaseProtoPlugin):
         if log_executor_key_seq_list is not None:
             output_str += "\t@staticmethod\n"
             output_str += f"\tdef get_log_key_from_{message_name_snake_cased}(" \
-                          f"{message_name_snake_cased}: {message_name} | {message_name}BaseModel | " \
-                          f"{message_name}Optional) -> str | None:\n"
+                          f"{message_name_snake_cased}: {message_name} | {message_name}BaseModel) -> str | None:\n"
             output_str += self._get_key_method_content(message_name_snake_cased, log_executor_key_seq_list, "key")
             output_str += "\t\t# else not required - returning None (default value of key)\n"
             output_str += "\t\treturn key\n\n"

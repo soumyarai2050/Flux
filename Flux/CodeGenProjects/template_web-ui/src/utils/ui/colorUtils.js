@@ -155,3 +155,24 @@ export function getColorTypeFromValue(collection, value, separator = '-') {
     }
     return color;
 }
+
+export const getJoinColor = (joinType, isConfirmed = true) => {
+    const colors = {
+        inner: '#3B82F6',
+        left: '#EF4444',
+        outer: '#EF4444',
+        full: '#10B981',
+        right: '#F59E0B',
+        default: '#9CA3AF'
+    };
+
+    const joinKey = joinType?.toLowerCase() || 'default';
+    const color = colors[joinKey] || colors.default;
+
+    if (isConfirmed) {
+        return color;
+    } else {
+        // Add 80 (hex for 128) for ~50% opacity for unconfirmed suggestions
+        return `${color}80`;
+    }
+};

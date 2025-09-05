@@ -105,24 +105,6 @@ class CachedORMModelPlugin(BaseORMModelPlugin):
             raise Exception(err_str)
         return output_str, is_msg_root, auto_gen_id_type
 
-    def _handle_class_docstring(self, message: protogen.Message) -> str:
-        output_str = ""
-        if leading_comments := message.location.leading_comments:
-            output_str += '    """\n'
-            if '"' in str(leading_comments):
-                err_str = 'Leading comments can not contain "" (double quotes) to avoid error in generated output,' \
-                          f' found in comment: {leading_comments}'
-                logging.exception(err_str)
-                raise Exception(err_str)
-            # else not required: If double quotes not found then avoiding
-            comments = ", ".join(leading_comments.split("\n"))
-            comments_multiline = [comments[0 + i:100 + i] for i in range(0, len(comments), 100)]
-            for comments_line in comments_multiline:
-                output_str += f"        {comments_line}\n"
-            output_str += '    """\n'
-        # else not required: empty string will be sent
-        return output_str
-
     def handle_message_output(self, message: protogen.Message) -> str:
         output_str, is_msg_root, auto_gen_id_type = self._handle_ORM_class_declaration(message)
 

@@ -1,0 +1,53 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.sliderWrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.slider {
+  flex: 1;
+  min-width: 80px;
+}
+
+.slider.disabled {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.valueDisplay {
+  min-width: 32px;
+  text-align: right;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+/* Vertical orientation adjustments */
+.container:has(.slider[data-orientation="vertical"]) {
+  flex-direction: row;
+  align-items: center;
+  height: 120px;
+}
+
+.container:has(.slider[data-orientation="vertical"]) .sliderWrapper {
+  flex-direction: column;
+  height: 100%;
+}
+
+.container:has(.slider[data-orientation="vertical"]) .slider {
+  flex: 1;
+  min-height: 80px;
+  min-width: unset;
+}
+
+.container:has(.slider[data-orientation="vertical"]) .valueDisplay {
+  min-width: unset;
+  text-align: center;
+}

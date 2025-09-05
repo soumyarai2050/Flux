@@ -349,7 +349,7 @@ export function createCollections(schema, currentSchema, callerProps, collection
                 collections.push(collection);
                 return;
             }
-
+            collection.$ref = v.items.$ref;
             let ref = v.items.$ref.split('/');
             let record = ref.length === 2 ? schema[ref[1]] : schema[ref[1]][ref[2]];
             record = cloneDeep(record);
@@ -544,22 +544,26 @@ export function generateObjectFromSchema(schema, currentSchema, additionalProps,
                     object[propname] = [];
                 }
             } else {
-                let ref = metadata.items.$ref.split('/');
-                let childSchema = ref.length === 2 ? schema[ref[1]] : schema[ref[1]][ref[2]];
-                childSchema = cloneDeep(childSchema);
+                if (metadata.hasOwnProperty('default_array_create') && metadata.default_array_create) {
+                    let ref = metadata.items.$ref.split('/');
+                    let childSchema = ref.length === 2 ? schema[ref[1]] : schema[ref[1]][ref[2]];
+                    childSchema = cloneDeep(childSchema);
 
-                if (currentSchema.hasOwnProperty('auto_complete') || metadata.hasOwnProperty('auto_complete')) {
-                    childSchema.auto_complete = metadata.auto_complete ? metadata.auto_complete : currentSchema.auto_complete;
-                }
-
-                if (!childSchema.server_populate && !metadata.server_populate) {
-                    if (objToDup) {
-                        object[propname] = [];
-                    } else {
-                        object[propname] = [];
-                        let child = generateObjectFromSchema(schema, childSchema, null, xpath, null);
-                        object[propname].push(child);
+                    if (currentSchema.hasOwnProperty('auto_complete') || metadata.hasOwnProperty('auto_complete')) {
+                        childSchema.auto_complete = metadata.auto_complete ? metadata.auto_complete : currentSchema.auto_complete;
                     }
+
+                    if (!childSchema.server_populate && !metadata.server_populate) {
+                        if (objToDup) {
+                            object[propname] = [];
+                        } else {
+                            object[propname] = [];
+                            let child = generateObjectFromSchema(schema, childSchema, null, xpath, null);
+                            object[propname].push(child);
+                        }
+                    }
+                } else {
+                    object[propname] = [];
                 }
             }
         } else if (metadata.type === DATA_TYPES.OBJECT) {

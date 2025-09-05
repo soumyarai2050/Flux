@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useTransition } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { cloneDeep, get, isEqual, set } from 'lodash';
 import { saveAs } from 'file-saver';
@@ -23,6 +23,9 @@ import CommonKeyWidget from '../../components/data-display/CommonKeyWidget';
 import { DataTable } from '../../components/data-display/tables';
 import { DataTree } from '../../components/data-display/trees';
 import ConflictPopup from '../../components/utility/ConflictPopup';
+import DataJoinGraph from '../../components/data-display/graphs/DataJoinGraph/DataJoinGraph';
+import ChatView from '../../components/data-display/ChatView';
+import { Box } from '@mui/material';
 
 function RootModel({ modelName, modelDataSource, dataSource }) {
     const { schema: projectSchema } = useSelector((state) => state.schema);
@@ -108,10 +111,16 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
     const changesRef = useRef({});
     const formValidationRef = useRef({});
     const crudOverrideDictRef = useRef(getCrudOverrideDict(modelSchema));
-    const allowedLayoutTypesRef = useRef([LAYOUT_TYPES.TABLE, LAYOUT_TYPES.TREE]);
+    const allowedLayoutTypesRef = useRef([
+        LAYOUT_TYPES.TABLE,
+        LAYOUT_TYPES.TREE,
+        ...(modelSchema?.widget_ui_data_element.is_graph_model ? [LAYOUT_TYPES.GRAPH] : [])
+    ]);
     // refs to identify change
     const optionsRef = useRef(null);
     const captionDictRef = useRef(null);
+
+    const hasChatContext = useMemo(() => fieldsMetadata.find((o) => o?.chat_context === true), []);
 
     // calculated fields
     const modelTitle = getWidgetTitle(modelLayoutOption, modelSchema, modelName, storedObj);
@@ -315,6 +324,7 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
         }
 
         dispatch(actions.setMode(updatedMode));
+        if (layoutType === LAYOUT_TYPES.GRAPH) return;
         const layoutTypeKey = updatedMode === MODES.READ ? 'view_layout' : 'edit_layout';
         if (modelLayoutData[layoutTypeKey] && modelLayoutData[layoutTypeKey] !== layoutType) {
             handleLayoutTypeChange(modelLayoutData[layoutTypeKey], updatedMode);
@@ -561,6 +571,20 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
                         isDisabled={isLoading || isProcessingUserActions}
                     />
                 );
+            case LAYOUT_TYPES.GRAPH:
+                return (
+                    <Box sx={{ display: 'flex', height: '100%' }}>
+                        {hasChatContext && (
+                            <Box sx={{ maxWidth: '30%' }}>
+                                <ChatView
+                                    modelName={modelName}
+                                    modelDataSource={modelDataSource}
+                                />
+                            </Box>
+                        )}
+                        <DataJoinGraph modelDataSource={modelDataSource} modelName={modelName} />
+                    </Box>
+                );
             default:
                 return null;
         }
@@ -573,7 +597,7 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
             onClose={handleFullScreenToggle}
         >
             <ModelCard id={modelName}>
-                <ModelCardHeader 
+                <ModelCardHeader
                     name={modelTitle}
                     isMaximized={isMaximized}
                     onMaximizeToggle={handleFullScreenToggle}

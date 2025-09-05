@@ -82,7 +82,22 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         BaseProtoPlugin.flux_fld_diff_threshold,
         BaseProtoPlugin.flux_fld_zero_as_none,
         BaseProtoPlugin.flux_fld_visible_if,
-        BaseProtoPlugin.flux_fld_array_obj_identifier
+        BaseProtoPlugin.flux_fld_array_obj_identifier,
+        BaseProtoPlugin.flux_fld_text_area,
+        BaseProtoPlugin.flux_fld_graph,
+        BaseProtoPlugin.flux_fld_node,
+        BaseProtoPlugin.flux_fld_edge,
+        BaseProtoPlugin.flux_fld_node_name,
+        BaseProtoPlugin.flux_fld_node_type,
+        BaseProtoPlugin.flux_fld_node_access,
+        BaseProtoPlugin.flux_fld_node_url,
+        BaseProtoPlugin.flux_fld_chat_context,
+        BaseProtoPlugin.flux_fld_chat_conversation,
+        BaseProtoPlugin.flux_fld_user_message,
+        BaseProtoPlugin.flux_fld_bot_message,
+        BaseProtoPlugin.flux_fld_bot_reasoning,
+        BaseProtoPlugin.flux_fld_default_array_create,
+        BaseProtoPlugin.flux_fld_auto_complete_split_assign
     ]
     flx_fld_simple_repeated_attribute_options: List[str] = [
         BaseProtoPlugin.flux_fld_mapping_underlying_meta_field,
@@ -200,27 +215,13 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
             logging.exception(err_str)
             raise Exception(err_str)
 
-        core_or_util_files: List[str] = root_flux_core_config_yaml_dict.get("core_or_util_files")
-
-        if "ProjectGroup" in project_dir:
-            project_group_flux_core_config_yaml_path = PurePath(project_dir).parent.parent / "flux_core.yaml"
-            project_group_flux_core_config_yaml_dict = (
-                YAMLConfigurationManager.load_yaml_configurations(str(project_group_flux_core_config_yaml_path)))
-            project_grp_core_or_util_files = project_group_flux_core_config_yaml_dict.get("core_or_util_files")
-            if project_grp_core_or_util_files:
-                core_or_util_files.extend(project_grp_core_or_util_files)
-
-        if core_or_util_files is not None:
-            for dependency_file in dependencies:
-                if dependency_file.proto.name in core_or_util_files:
-                    if excepted_msg_name_list:
-                        for msg in dependency_file.messages:
-                            if msg.proto.name in excepted_msg_name_list:
-                                message_list.append(msg)
-                    else:
-                        message_list.extend(dependency_file.messages)
-                # else not required: if dependency file name not in core_or_util_files
-                # config list, avoid messages from it
+        for dependency_file in dependencies:
+            if excepted_msg_name_list:
+                for msg in dependency_file.messages:
+                    if msg.proto.name in excepted_msg_name_list:
+                        message_list.append(msg)
+            else:
+                message_list.extend(dependency_file.messages)
         # else not required: core_or_util_files key is not in yaml dict config
 
         for message in set(message_list):
@@ -1148,19 +1149,19 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                             included_msgs.append(message_)
 
                     self._proto_project_name_to_msg_list_dict[f.proto.package] = included_msgs
-                    self.__load_json_layout_and_non_layout_messages_in_dicts(included_msgs, f.dependencies,
+                    self.__load_json_layout_and_non_layout_messages_in_dicts(included_msgs, self._get_core_dependency_file_list(f),
                                                                              msg_list)
                 else:       # else all msg in file are included
                     message_list: List[protogen.Message] = f.messages
                     self._proto_project_name_to_msg_list_dict[f.proto.package] = message_list
-                    self.__load_json_layout_and_non_layout_messages_in_dicts(message_list, f.dependencies)
+                    self.__load_json_layout_and_non_layout_messages_in_dicts(message_list, self._get_core_dependency_file_list(f))
             file = file_list[0]  # since first file will be this project's proto file
             self.__main_file_message_name_list = [p.proto.name for p in file.messages]
             self._current_project_name = file.proto.package
             self._current_project_model_file = file
         else:
             file: protogen.File = file_or_file_list
-            self.__load_json_layout_and_non_layout_messages_in_dicts(file.messages, file.dependencies)
+            self.__load_json_layout_and_non_layout_messages_in_dicts(file.messages, self._get_core_dependency_file_list(file))
         # Performing Recursion to messages (including nested type) to get json layout, non-layout and enums and
         # adding to their respective data-member
         if self.__response_field_case_style.lower() == "snake":
