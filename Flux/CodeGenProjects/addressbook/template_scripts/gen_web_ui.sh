@@ -26,6 +26,7 @@ else
   cd - # back to script folder
   cd ..
   rsync -a -v temp_web-ui/ web-ui/
+  rm -rf web-ui/src/docs
   rm -rf temp_web-ui
   cd -  # back to script folder
 fi

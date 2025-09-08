@@ -11,24 +11,24 @@ import {
     Tooltip,
     Chip
 } from '@mui/material';
-import CloseIcon from '@mui/icons-material/Close';
 import {
     ReactFlow,
     Controls,
     Background,
+    useNodesState,
+    useEdgesState,
     Handle,
     Position,
-    applyNodeChanges,
-    applyEdgeChanges
 } from '@xyflow/react';
 import DataJoinPopup from '../DataJoinPopup/DataJoinPopup';
 import CustomEdge from '../Edges/CustomEdge';
 import NodeSelector from '../NodeSelector';
+import useClickIntent from '../../../../hooks/useClickIntent';
 import { fetchNodeData, getCachedNodeData, fetchAnalysedData } from '../../../../services/GraphNodeService';
 import { sliceMap } from '../../../../models/sliceMap';
 import { DB_ID, MODES } from '../../../../constants';
 import { generateObjectFromSchema, getModelSchema, snakeToCamel } from '../../../../utils';
-import { getJoinColor, createColorMapFromString, getNodeTypeColor } from '../../../../utils/ui/colorUtils';
+import { getJoinColor } from '../../../../utils/ui/colorUtils';
 import { API_ROOT_URL } from '../../../../config';
 import '@xyflow/react/dist/style.css';
 import styles from './DataJoinGraph.module.css';
@@ -90,37 +90,29 @@ const edgeTypes = {
     custom: CustomEdge,
 };
 
-// Helper function to calculate nodes
-const calculateNodes = (params) => {
+// Helper function to calculate nodes and edges
+const calculateNodesAndEdges = (params) => {
     const {
         activeContext,
         graphAttributes,
         selectedNodes,
+        selectedAnalyzeButton,
         visibleNodes,
         nodesWithChildren,
-        nodeTypeColorMap,
-        existingNodes = []
+        nodeTypeColorMap
     } = params;
 
-    if (!activeContext) return [];
-
-    // Create a map of existing positions
-    const existingPositions = {};
-    existingNodes.forEach(node => {
-        existingPositions[node.id] = node.position;
-    });
+    if (!activeContext) {
+        return { computedNodes: [], computedEdges: [] };
+    }
 
     const contextNodes = get(activeContext, graphAttributes.nodesPath) || [];
+    const contextEdges = get(activeContext, graphAttributes.edgesPath) || [];
 
     const allNodes = contextNodes.map((node, index) => {
+        const x = (index % 3) * 300 + 100;
+        const y = Math.floor(index / 3) * 250 + 100;
         const nodeName = get(node, graphAttributes.nodeNameField);
-
-        // Use existing position if available, otherwise calculate new position
-        const position = existingPositions[nodeName] || {
-            x: (index % 3) * 300 + 100,
-            y: Math.floor(index / 3) * 250 + 100
-        };
-
         const hasChildren = nodesWithChildren.has(nodeName);
 
         // Check if children are actually visible (effective expansion)
@@ -138,7 +130,7 @@ const calculateNodes = (params) => {
         return {
             id: nodeName,
             type: 'tableNode',
-            position,
+            position: { x, y },
             data: {
                 label: nodeName,
                 isSelected: selectedNodes.includes(nodeName),
@@ -150,42 +142,13 @@ const calculateNodes = (params) => {
         };
     });
 
-    // Filter based on visible nodes
-    return allNodes.filter(node => visibleNodes.has(node.id));
-};
-
-// Helper function to calculate edges
-const calculateEdges = (params) => {
-    const {
-        activeContext,
-        graphAttributes,
-        selectedAnalyzeButton,
-        visibleNodes,
-        joinTypeColorMapping,
-        theme
-    } = params;
-
-    if (!activeContext) return [];
-
-    const contextNodes = get(activeContext, graphAttributes.nodesPath) || [];
-    const contextEdges = get(activeContext, graphAttributes.edgesPath) || [];
-
     const allEdges = contextEdges.map((edge, index) => {
         const edgePairs = get(edge, graphAttributes.edgePairsField) || [];
-
-        // Check if any pairs are AI suggestions that haven't been confirmed
-        const hasUnconfirmedAiSuggestions = edgePairs.some(p =>
-            get(p, graphAttributes.edgeAiSuggestedField) === true &&
-            get(p, graphAttributes.edgeConfirmedField) === false
-        );
-
-        // For rendering: AI suggestions (ai_suggested=true, user_confirmed=false) should appear in light color
-        const isConfirmed = !hasUnconfirmedAiSuggestions;
-
+        const isConfirmed = edgePairs.every(p => get(p, graphAttributes.edgeConfirmedField)) ?? true;
         const edgeType = get(edge, graphAttributes.edgeTypeField);
         const baseNode = get(edge, graphAttributes.edgeBaseField);
         const targetNode = get(edge, graphAttributes.edgeTargetField);
-        const color = getJoinColor(edgeType, joinTypeColorMapping, theme, isConfirmed);
+        const color = getJoinColor(edgeType, isConfirmed);
         const edgeId = `edge-${baseNode}-${targetNode}-${index}`;
 
         // Find the source and target node objects
@@ -215,9 +178,12 @@ const calculateEdges = (params) => {
     });
 
     // Filter based on visible nodes
-    return allEdges.filter(edge =>
+    const filteredNodes = allNodes.filter(node => visibleNodes.has(node.id));
+    const filteredEdges = allEdges.filter(edge =>
         visibleNodes.has(edge.source) && visibleNodes.has(edge.target)
     );
+
+    return { computedNodes: filteredNodes, computedEdges: filteredEdges };
 };
 
 // Initial state factory
@@ -227,8 +193,8 @@ const createInitialState = () => ({
     nodeDataCache: {},
     visibleNodes: new Set(),
     expandedNodes: new Set(),
-    nodes: [],
-    edges: [],
+    computedNodes: [],
+    computedEdges: [],
     modalOpen: false,
     modalNodes: { source: null, target: null }
 });
@@ -245,10 +211,8 @@ const ACTION_TYPES = {
     SET_VISIBLE_NODES: 'SET_VISIBLE_NODES',
     OPEN_MODAL: 'OPEN_MODAL',
     CLOSE_MODAL: 'CLOSE_MODAL',
-    UPDATE_GRAPH: 'UPDATE_GRAPH',
-    CLEAR_SELECTION: 'CLEAR_SELECTION',
-    NODES_CHANGE: 'NODES_CHANGE',
-    EDGES_CHANGE: 'EDGES_CHANGE'
+    UPDATE_NODES_AND_EDGES: 'UPDATE_NODES_AND_EDGES',
+    CLEAR_SELECTION: 'CLEAR_SELECTION'
 };
 
 // Main reducer function
@@ -260,33 +224,30 @@ const graphReducer = (state, action) => {
 
         case ACTION_TYPES.INITIALIZE: {
             const { rootNodeIds, ...params } = action.payload;
-
-            const nodes = calculateNodes({
-                ...params,
-                selectedNodes: [],
+            const newState = {
+                ...state,
                 visibleNodes: rootNodeIds,
-                existingNodes: []
-            });
-
-            const edges = calculateEdges({
+                expandedNodes: new Set()
+            };
+            
+            const { computedNodes, computedEdges } = calculateNodesAndEdges({
                 ...params,
-                selectedAnalyzeButton: null,
-                visibleNodes: rootNodeIds
+                selectedNodes: newState.selectedNodes,
+                selectedAnalyzeButton: newState.selectedAnalyzeButton,
+                visibleNodes: newState.visibleNodes
             });
 
             return {
-                ...state,
-                visibleNodes: rootNodeIds,
-                expandedNodes: new Set(),
-                nodes,
-                edges
+                ...newState,
+                computedNodes,
+                computedEdges
             };
         }
 
         case ACTION_TYPES.SELECT_NODE: {
             const { nodeId, isCtrlPressed, ...params } = action.payload;
             const isSelected = state.selectedNodes.includes(nodeId);
-
+            
             let newSelectedNodes;
             if (isCtrlPressed) {
                 newSelectedNodes = isSelected
@@ -296,15 +257,9 @@ const graphReducer = (state, action) => {
                 newSelectedNodes = [nodeId];
             }
 
-            const nodes = calculateNodes({
+            const { computedNodes, computedEdges } = calculateNodesAndEdges({
                 ...params,
                 selectedNodes: newSelectedNodes,
-                visibleNodes: state.visibleNodes,
-                existingNodes: state.nodes
-            });
-
-            const edges = calculateEdges({
-                ...params,
                 selectedAnalyzeButton: null,
                 visibleNodes: state.visibleNodes
             });
@@ -313,16 +268,17 @@ const graphReducer = (state, action) => {
                 ...state,
                 selectedNodes: newSelectedNodes,
                 selectedAnalyzeButton: null,
-                nodes,
-                edges
+                computedNodes,
+                computedEdges
             };
         }
 
         case ACTION_TYPES.SELECT_ANALYZE_BUTTON: {
             const { edgeId, ...params } = action.payload;
-
-            const edges = calculateEdges({
+            
+            const { computedNodes, computedEdges } = calculateNodesAndEdges({
                 ...params,
+                selectedNodes: state.selectedNodes,
                 selectedAnalyzeButton: edgeId,
                 visibleNodes: state.visibleNodes
             });
@@ -330,7 +286,8 @@ const graphReducer = (state, action) => {
             return {
                 ...state,
                 selectedAnalyzeButton: edgeId,
-                edges
+                computedNodes,
+                computedEdges
             };
         }
 
@@ -339,15 +296,9 @@ const graphReducer = (state, action) => {
             const newVisibleNodes = new Set([...state.visibleNodes, ...children]);
             const newExpandedNodes = new Set([...state.expandedNodes, nodeId]);
 
-            const nodes = calculateNodes({
+            const { computedNodes, computedEdges } = calculateNodesAndEdges({
                 ...params,
                 selectedNodes: state.selectedNodes,
-                visibleNodes: newVisibleNodes,
-                existingNodes: state.nodes
-            });
-
-            const edges = calculateEdges({
-                ...params,
                 selectedAnalyzeButton: state.selectedAnalyzeButton,
                 visibleNodes: newVisibleNodes
             });
@@ -356,17 +307,17 @@ const graphReducer = (state, action) => {
                 ...state,
                 visibleNodes: newVisibleNodes,
                 expandedNodes: newExpandedNodes,
-                nodes,
-                edges
+                computedNodes,
+                computedEdges
             };
         }
 
         case ACTION_TYPES.COLLAPSE_NODE: {
             const { nodeId, descendants, ...params } = action.payload;
-
+            
             const newVisibleNodes = new Set(state.visibleNodes);
             const newExpandedNodes = new Set(state.expandedNodes);
-
+            
             descendants.forEach(descendant => {
                 newVisibleNodes.delete(descendant);
                 newExpandedNodes.delete(descendant);
@@ -377,15 +328,9 @@ const graphReducer = (state, action) => {
                 selectedId => selectedId === nodeId || !descendants.has(selectedId)
             );
 
-            const nodes = calculateNodes({
+            const { computedNodes, computedEdges } = calculateNodesAndEdges({
                 ...params,
                 selectedNodes: newSelectedNodes,
-                visibleNodes: newVisibleNodes,
-                existingNodes: state.nodes
-            });
-
-            const edges = calculateEdges({
-                ...params,
                 selectedAnalyzeButton: state.selectedAnalyzeButton,
                 visibleNodes: newVisibleNodes
             });
@@ -395,8 +340,8 @@ const graphReducer = (state, action) => {
                 selectedNodes: newSelectedNodes,
                 visibleNodes: newVisibleNodes,
                 expandedNodes: newExpandedNodes,
-                nodes,
-                edges
+                computedNodes,
+                computedEdges
             };
         }
 
@@ -411,15 +356,9 @@ const graphReducer = (state, action) => {
         case ACTION_TYPES.SET_VISIBLE_NODES: {
             const { visibleNodes, ...params } = action.payload;
 
-            const nodes = calculateNodes({
+            const { computedNodes, computedEdges } = calculateNodesAndEdges({
                 ...params,
                 selectedNodes: state.selectedNodes,
-                visibleNodes,
-                existingNodes: state.nodes
-            });
-
-            const edges = calculateEdges({
-                ...params,
                 selectedAnalyzeButton: state.selectedAnalyzeButton,
                 visibleNodes
             });
@@ -427,8 +366,8 @@ const graphReducer = (state, action) => {
             return {
                 ...state,
                 visibleNodes,
-                nodes,
-                edges
+                computedNodes,
+                computedEdges
             };
         }
 
@@ -449,41 +388,29 @@ const graphReducer = (state, action) => {
             };
         }
 
-        case ACTION_TYPES.UPDATE_GRAPH: {
+        case ACTION_TYPES.UPDATE_NODES_AND_EDGES: {
             const { ...params } = action.payload;
-
-            const nodes = calculateNodes({
+            
+            const { computedNodes, computedEdges } = calculateNodesAndEdges({
                 ...params,
                 selectedNodes: state.selectedNodes,
-                visibleNodes: state.visibleNodes,
-                existingNodes: state.nodes
-            });
-
-            const edges = calculateEdges({
-                ...params,
                 selectedAnalyzeButton: state.selectedAnalyzeButton,
                 visibleNodes: state.visibleNodes
             });
 
             return {
                 ...state,
-                nodes,
-                edges
+                computedNodes,
+                computedEdges
             };
         }
 
         case ACTION_TYPES.CLEAR_SELECTION: {
             const { ...params } = action.payload;
-
-            const nodes = calculateNodes({
+            
+            const { computedNodes, computedEdges } = calculateNodesAndEdges({
                 ...params,
                 selectedNodes: [],
-                visibleNodes: state.visibleNodes,
-                existingNodes: state.nodes
-            });
-
-            const edges = calculateEdges({
-                ...params,
                 selectedAnalyzeButton: null,
                 visibleNodes: state.visibleNodes
             });
@@ -492,24 +419,8 @@ const graphReducer = (state, action) => {
                 ...state,
                 selectedNodes: [],
                 selectedAnalyzeButton: null,
-                nodes,
-                edges
-            };
-        }
-
-        case ACTION_TYPES.NODES_CHANGE: {
-            const { changes } = action.payload;
-            return {
-                ...state,
-                nodes: applyNodeChanges(changes, state.nodes)
-            };
-        }
-
-        case ACTION_TYPES.EDGES_CHANGE: {
-            const { changes } = action.payload;
-            return {
-                ...state,
-                edges: applyEdgeChanges(changes, state.edges)
+                computedNodes,
+                computedEdges
             };
         }
 
@@ -535,6 +446,10 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
     // Initialize reducer
     const [state, dispatch] = useReducer(graphReducer, createInitialState());
 
+    // Initialize ReactFlow hooks
+    const [nodes, setNodes, onNodesChange] = useNodesState([]);
+    const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+
     // Graph attributes mapping
     const graphAttributes = useMemo(() => {
         const contextMeta = fieldsMetadata.find((o) => o.graph);
@@ -548,12 +463,6 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
 
         const nodesPath = nodesMeta?.key;
         const edgesPath = edgesMeta?.key;
-
-        const nodeMetaQuerySchemaName = nodesMeta?.node_meta_query;
-        const nodeMetaQueryName = 'query-' + nodeMetaQuerySchemaName;
-
-        const edgeMetaQuerySchemaName = edgesMeta?.edge_meta_query;
-        const edgeMetaQueryName = 'query-' + edgeMetaQuerySchemaName;
 
         const nodeNameMeta = fieldsMetadata.find((o) => o.node_name);
         const nodeTypeMeta = fieldsMetadata.find((o) => o.node_type);
@@ -575,18 +484,12 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
             nodeUrlField,
             nodeTypeField,
             nodeAccessField,
-            nodeMetaQueryName,
-            nodeMetaParamName: 'entity_name',
-            edgeMetaQueryName,
-            edgeMetaParamName: 'join_configuration',
             nodeSelectedFieldsField: 'field_selections',
             edgeBaseField: 'base_entity_selection.entity_name',
             edgeTargetField: 'join_entity_selection.entity_name',
             edgeTypeField: 'join_type',
             edgePairsField: 'join_pairs',
-            edgeConfirmedField: 'user_confirmed',
-            edgeAiSuggestedField: 'ai_suggested',
-            edgeFilterOperator: 'filter_operator'
+            edgeConfirmedField: 'user_confirmed'
         };
     }, [fieldsMetadata]);
 
@@ -636,11 +539,6 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
         return colorMap;
     }, [fieldsMetadata, graphAttributes.nodeTypeField]);
 
-    const joinTypeColorMapping = useMemo(() => {
-        const joinTypeMeta = fieldsMetadata.find(f => f.key === graphAttributes.edgeTypeField);
-        return joinTypeMeta?.color || '';
-    }, [fieldsMetadata, graphAttributes.edgeTypeField]);
-
     // Helper function to get all descendants of a node recursively
     const getNodeDescendants = useCallback((nodeId, nodesWithChildrenMap) => {
         const descendants = new Set();
@@ -655,6 +553,21 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
         return descendants;
     }, []);
 
+    // Update ReactFlow nodes and edges when computed values change
+    useEffect(() => {
+        setNodes((prevNodes) => {
+            const existingPositions = {};
+            prevNodes.forEach((node) => {
+                existingPositions[node.id] = node.position;
+            });
+            return state.computedNodes.map((node) => ({
+                ...node,
+                position: existingPositions[node.id] || node.position
+            }));
+        });
+        setEdges(state.computedEdges);
+    }, [state.computedNodes, state.computedEdges, setNodes, setEdges]);
+
     // Reset state when context changes
     useEffect(() => {
         dispatch({ type: ACTION_TYPES.RESET_STATE });
@@ -667,40 +580,47 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
             return;
         }
 
-        const payload = {
-            activeContext,
-            graphAttributes,
-            nodesWithChildren,
-            nodeTypeColorMap,
-            joinTypeColorMapping,
-            theme
-        };
-
         if (mode === MODES.READ) {
             if (!isInitializedRef.current) {
                 dispatch({
-                    type: ACTION_TYPES.INITIALIZE, payload: {
-                        ...payload,
+                    type: ACTION_TYPES.INITIALIZE,
+                    payload: {
                         rootNodeIds,
+                        activeContext,
+                        graphAttributes,
+                        nodesWithChildren,
+                        nodeTypeColorMap
                     }
                 });
                 isInitializedRef.current = true;
             } else {
                 // In READ mode, always update when context changes
-                dispatch({ type: ACTION_TYPES.UPDATE_GRAPH, payload });
+                dispatch({
+                    type: ACTION_TYPES.UPDATE_NODES_AND_EDGES,
+                    payload: {
+                        activeContext,
+                        graphAttributes,
+                        nodesWithChildren,
+                        nodeTypeColorMap
+                    }
+                });
             }
         } else if (mode === MODES.EDIT) {
             if (!isInitializedRef.current) {
                 dispatch({
-                    type: ACTION_TYPES.INITIALIZE, payload: {
-                        ...payload,
+                    type: ACTION_TYPES.INITIALIZE,
+                    payload: {
                         rootNodeIds,
+                        activeContext,
+                        graphAttributes,
+                        nodesWithChildren,
+                        nodeTypeColorMap
                     }
                 });
                 isInitializedRef.current = true;
             }
         }
-    }, [mode, activeContext, contextId, rootNodeIds, graphAttributes, nodesWithChildren, nodeTypeColorMap, joinTypeColorMapping, theme]);
+    }, [mode, activeContext, contextId, rootNodeIds, graphAttributes, nodesWithChildren, nodeTypeColorMap]);
 
     // Prepare and open modal
     const prepareAndOpenModal = useCallback(async (nodeName1, nodeName2) => {
@@ -719,7 +639,7 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
         try {
             if (!sourceNodeData) {
                 console.log(`Cache miss for ${nodeName1}. Fetching...`);
-                sourceNodeData = await fetchNodeData(graphAttributes.nodeMetaQueryName, graphAttributes.nodeMetaParamName, sourceNode);
+                sourceNodeData = await fetchNodeData(sourceNode);
                 dispatch({
                     type: ACTION_TYPES.CACHE_NODE_DATA,
                     payload: { nodeId: nodeName1, data: sourceNodeData }
@@ -728,7 +648,7 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
 
             if (!targetNodeData) {
                 console.log(`Cache miss for ${nodeName2}. Fetching...`);
-                targetNodeData = await fetchNodeData(graphAttributes.nodeMetaQueryName, graphAttributes.nodeMetaParamName, targetNode);
+                targetNodeData = await fetchNodeData(targetNode);
                 dispatch({
                     type: ACTION_TYPES.CACHE_NODE_DATA,
                     payload: { nodeId: nodeName2, data: targetNodeData }
@@ -739,8 +659,8 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
             return;
         }
 
-        const sourceNodeWithColumns = { ...sourceNode, columns: sourceNodeData?.nodeColumns || [] };
-        const targetNodeWithColumns = { ...targetNode, columns: targetNodeData?.nodeColumns || [] };
+        const sourceNodeWithColumns = { ...sourceNode, columns: sourceNodeData?.columns || [] };
+        const targetNodeWithColumns = { ...targetNode, columns: targetNodeData?.columns || [] };
 
         dispatch({
             type: ACTION_TYPES.OPEN_MODAL,
@@ -758,9 +678,7 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
                     activeContext,
                     graphAttributes,
                     nodesWithChildren,
-                    nodeTypeColorMap,
-                    joinTypeColorMapping,
-                    theme
+                    nodeTypeColorMap
                 }
             });
 
@@ -777,7 +695,7 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
             let targetNodeData = state.nodeDataCache[targetName] || getCachedNodeData(targetName);
 
             if (!sourceNodeData) {
-                sourceNodeData = await fetchNodeData(graphAttributes.nodeMetaQueryName, graphAttributes.nodeMetaParamName, sourceNode);
+                sourceNodeData = await fetchNodeData(sourceNode);
                 dispatch({
                     type: ACTION_TYPES.CACHE_NODE_DATA,
                     payload: { nodeId: sourceName, data: sourceNodeData }
@@ -785,7 +703,7 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
             }
 
             if (!targetNodeData) {
-                targetNodeData = await fetchNodeData(graphAttributes.nodeMetaQueryName, graphAttributes.nodeMetaParamName, targetNode);
+                targetNodeData = await fetchNodeData(targetNode);
                 dispatch({
                     type: ACTION_TYPES.CACHE_NODE_DATA,
                     payload: { nodeId: targetName, data: targetNodeData }
@@ -816,13 +734,13 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
             console.error('Analysis error:', error);
             console.error(`Analysis failed: ${error.message}`);
         }
-    }, [activeContext, graphAttributes, nodesWithChildren, nodeTypeColorMap, joinTypeColorMapping, theme, state.nodeDataCache]);
+    }, [activeContext, graphAttributes, nodesWithChildren, nodeTypeColorMap, state.nodeDataCache]);
 
     // Handle node selection
     const handleNodeSelection = useCallback(async (e, node) => {
         const isCtrlPressed = e.ctrlKey || e.metaKey;
         const isSelected = state.selectedNodes.includes(node.id);
-
+        
         let newSelection;
         if (isCtrlPressed) {
             newSelection = isSelected
@@ -840,9 +758,7 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
                 activeContext,
                 graphAttributes,
                 nodesWithChildren,
-                nodeTypeColorMap,
-                joinTypeColorMapping,
-                theme
+                nodeTypeColorMap
             }
         });
 
@@ -850,7 +766,14 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
         const nodeName = newSelection[0];
         const modelNodeName = `${modelName}_node`;
         const nodeActions = sliceMap[modelNodeName]?.actions;
-        if (newSelection.length !== 1) {
+        if (newSelection.length === 1) {
+            reduxDispatch(nodeActions.setNode({
+                modelName: nodeName,
+                modelSchema: getModelSchema(nodeName, projectSchema),
+                fieldsMetadata: schemaCollections[nodeName],
+                url: API_ROOT_URL
+            }));
+        } else {
             reduxDispatch(nodeActions.setNode(null));
         }
 
@@ -864,44 +787,22 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
         const hasChildren = nodesWithChildren.has(node.id);
         const isExpanded = !hasChildren || (hasChildren && state.expandedNodes.has(node.id));
 
-        if (selectedNode) {  //  && isExpanded
+        if (selectedNode && isExpanded) {
             const nodeName = get(selectedNode, graphAttributes.nodeNameField);
             if (!state.nodeDataCache[nodeName] && !getCachedNodeData(nodeName)) {
                 try {
-                    const nodeData = await fetchNodeData(graphAttributes.nodeMetaQueryName, graphAttributes.nodeMetaParamName, selectedNode);
+                    const nodeData = await fetchNodeData(selectedNode);
                     dispatch({
                         type: ACTION_TYPES.CACHE_NODE_DATA,
                         payload: { nodeId: nodeName, data: nodeData }
                     });
-                    if (newSelection.length === 1) {
-                        const { nodeSchema, nodeProjectSchema, nodeData: nodeSampleData, nodeUrl, nodeFieldsMetadata } = nodeData;
-                        reduxDispatch(nodeActions.setNode({
-                            modelName: nodeName,
-                            modelSchema: nodeSchema,
-                            projectSchema: nodeProjectSchema,
-                            fieldsMetadata: nodeFieldsMetadata,
-                            url: nodeUrl
-                        }));
-                    }
                 } catch (error) {
                     console.error(`Failed to fetch data for node: ${nodeName}`, error);
                 }
-            } else {
-                if (newSelection.length === 1) {
-                    const nodeData = state.nodeDataCache[nodeName];
-                    const { nodeSchema, nodeProjectSchema, nodeData: nodeSampleData, nodeUrl, nodeFieldsMetadata } = nodeData;
-                    reduxDispatch(nodeActions.setNode({
-                        modelName: nodeName,
-                        modelSchema: nodeSchema,
-                        projectSchema: nodeProjectSchema,
-                        fieldsMetadata: nodeFieldsMetadata,
-                        url: nodeUrl
-                    }));
-                }
             }
         }
-    }, [activeContext, state.selectedNodes, state.expandedNodes, state.nodeDataCache, nodesWithChildren,
-        graphAttributes, nodeTypeColorMap, joinTypeColorMapping, theme, mode, modelName, projectSchema, schemaCollections,
+    }, [activeContext, state.selectedNodes, state.expandedNodes, state.nodeDataCache, nodesWithChildren, 
+        graphAttributes, nodeTypeColorMap, mode, modelName, projectSchema, schemaCollections, 
         reduxDispatch, prepareAndOpenModal]);
 
     // Handle node double click (expand/collapse)
@@ -911,32 +812,38 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
         const childrenIds = nodesWithChildren.get(node.id) || [];
         const isExpanded = state.expandedNodes.has(node.id);
 
-        const payload = {
-            activeContext,
-            graphAttributes,
-            nodesWithChildren,
-            nodeTypeColorMap,
-            joinTypeColorMapping,
-            theme
-        };
-
         if (childrenIds.size > 0) {
             if (isExpanded) {
                 const descendants = getNodeDescendants(node.id, nodesWithChildren);
                 dispatch({
                     type: ACTION_TYPES.COLLAPSE_NODE,
-                    payload: { ...payload, nodeId: node.id, descendants }
+                    payload: {
+                        nodeId: node.id,
+                        descendants,
+                        activeContext,
+                        graphAttributes,
+                        nodesWithChildren,
+                        nodeTypeColorMap
+                    }
                 });
             } else {
                 dispatch({
                     type: ACTION_TYPES.EXPAND_NODE,
-                    payload: { ...payload, nodeId: node.id, children: childrenIds }
+                    payload: {
+                        nodeId: node.id,
+                        children: childrenIds,
+                        activeContext,
+                        graphAttributes,
+                        nodesWithChildren,
+                        nodeTypeColorMap
+                    }
                 });
             }
         }
-    }, [activeContext, state.expandedNodes, nodesWithChildren, getNodeDescendants,
-        graphAttributes, nodeTypeColorMap, joinTypeColorMapping, theme]);
+    }, [activeContext, state.expandedNodes, nodesWithChildren, getNodeDescendants, 
+        graphAttributes, nodeTypeColorMap]);
 
+    const clickHandler = useClickIntent(handleNodeSelection, handleNodeDoubleClick);
 
     // Get existing edges between two nodes
     const getNodePairEdges = useCallback((sourceNodeName, targetNodeName) => {
@@ -952,66 +859,27 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
 
     // Handle save from DataJoinPopup
     const handleModalSave = useCallback((saveData) => {
+        const { sourceNode, targetNode, updatedJoins: updatedEdges } = saveData;
+
         if (!activeContext || !reduxDispatch) return;
 
-        const sourceName = get(state.modalNodes.source, graphAttributes.nodeNameField);
-        const targetName = get(state.modalNodes.target, graphAttributes.nodeNameField);
-
-        if (!sourceName || !targetName) {
+        if (updatedEdges === null) {
+            console.log('No join changes needed - maintaining current state');
             return;
         }
 
+        const sourceName = get(sourceNode, graphAttributes.nodeNameField);
+        const targetName = get(targetNode, graphAttributes.nodeNameField);
+
         const contextEdges = get(activeContext, graphAttributes.edgesPath) || [];
-        let newCompleteEdgesArray;
+        const otherEdges = contextEdges.filter(edge => {
+            const baseNode = get(edge, graphAttributes.edgeBaseField);
+            const targetNodeField = get(edge, graphAttributes.edgeTargetField);
+            return !((baseNode === sourceName && targetNodeField === targetName) ||
+                (baseNode === targetName && targetNodeField === sourceName));
+        });
 
-        // saveData is the updatedJoinObject from the popup
-        const updatedJoin = saveData;
-
-        // CASE 1: DELETE - when no join pairs are left
-        if (updatedJoin.join_pairs.length === 0) {
-
-            // Find if a connection already exists
-            const existingEdgeIndex = contextEdges.findIndex(edge => {
-                const baseNode = get(edge, graphAttributes.edgeBaseField);
-                const targetNodeField = get(edge, graphAttributes.edgeTargetField);
-                return ((baseNode === sourceName && targetNodeField === targetName) ||
-                    (baseNode === targetName && targetNodeField === sourceName));
-            });
-
-            //  If no connection existed, do nothing.
-            if (existingEdgeIndex === -1) {
-                newCompleteEdgesArray = contextEdges; // Array remains unchanged
-            } else {
-                // If connection existed, delete it using splice.
-                // TO ask: mutation ? 
-
-                const clonedEdges = cloneDeep(contextEdges);
-                clonedEdges.splice(existingEdgeIndex, 1); // Deletes 1 element at the found index
-
-                newCompleteEdgesArray = clonedEdges;
-            }
-
-        } else { // CASE 2: ADD/UPDATE
-            //Find if a connection already exists 
-            const existingEdgeIndex = contextEdges.findIndex(edge => {
-                const baseNode = get(edge, graphAttributes.edgeBaseField);
-                const targetNodeField = get(edge, graphAttributes.edgeTargetField);
-                return ((baseNode === sourceName && targetNodeField === targetName) ||
-                    (baseNode === targetName && targetNodeField === sourceName));
-            })
-
-            const clonedEdges = cloneDeep(contextEdges);
-            if (existingEdgeIndex !== -1) {
-                //join exists 
-                clonedEdges.splice(existingEdgeIndex, 1, updatedJoin);
-
-            }
-            else {
-                //new one 
-                clonedEdges.push(updatedJoin)
-            }
-            newCompleteEdgesArray = clonedEdges;
-        }
+        const newCompleteEdgesArray = [...otherEdges, ...updatedEdges];
 
         const updatedContext = cloneDeep(activeContext);
         set(updatedContext, graphAttributes.edgesPath, newCompleteEdgesArray);
@@ -1023,20 +891,18 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
             contexts.splice(contextIndex, 1, updatedContext);
         }
         reduxDispatch(actions.setUpdatedObj(updatedData));
-
-        // Update graph with new context
+        
+        // Update computed nodes and edges with new context
         dispatch({
-            type: ACTION_TYPES.UPDATE_GRAPH,
+            type: ACTION_TYPES.UPDATE_NODES_AND_EDGES,
             payload: {
                 activeContext: updatedContext,
                 graphAttributes,
                 nodesWithChildren,
-                nodeTypeColorMap,
-                joinTypeColorMapping,
-                theme
+                nodeTypeColorMap
             }
         });
-    }, [activeContext, reduxDispatch, updatedObj, graphAttributes, actions, nodesWithChildren, nodeTypeColorMap, joinTypeColorMapping, theme, state.modalNodes]);
+    }, [activeContext, reduxDispatch, updatedObj, graphAttributes, actions, nodesWithChildren, nodeTypeColorMap]);
 
     // Handle edge click
     const handleEdgeClick = useCallback(async (event, edge) => {
@@ -1105,13 +971,13 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
         });
         set(updatedContext, graphAttributes.edgesPath, filteredEdges);
         reduxDispatch(actions.setUpdatedObj(updatedData));
-
+        
         // Update visible nodes and recompute
         const filteredVisibleNodes = new Set(
             [...state.visibleNodes].filter(nodeId => nodesSet.has(nodeId))
         );
         newNodes.forEach(nodeId => filteredVisibleNodes.add(nodeId));
-
+        
         dispatch({
             type: ACTION_TYPES.SET_VISIBLE_NODES,
             payload: {
@@ -1119,34 +985,12 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
                 activeContext: updatedContext,
                 graphAttributes,
                 nodesWithChildren,
-                nodeTypeColorMap,
-                joinTypeColorMapping,
-                theme
+                nodeTypeColorMap
             }
         });
     };
 
-    // Handle ReactFlow node changes (dragging, etc.)
-    const handleNodesChange = useCallback((changes) => {
-        dispatch({
-            type: ACTION_TYPES.NODES_CHANGE,
-            payload: { changes }
-        });
-    }, []);
-
-    // Handle ReactFlow edge changes
-    const handleEdgesChange = useCallback((changes) => {
-        dispatch({
-            type: ACTION_TYPES.EDGES_CHANGE,
-            payload: { changes }
-        });
-    }, []);
-
     const availableNodes = useMemo(() => projectSchema.autocomplete['EntityNType_List'] || [], [projectSchema]);
-
-    const joinColorMapForLegend = useMemo(() => {
-        return createColorMapFromString(joinTypeColorMapping);
-    }, [joinTypeColorMapping]);
 
     return (
         <>
@@ -1174,12 +1018,12 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
 
                     <Box className={styles.flowContainer} sx={{ height: '100vh' }}>
                         <ReactFlow
-                            nodes={state.nodes}
-                            edges={state.edges}
-                            onNodesChange={handleNodesChange}
-                            onEdgesChange={handleEdgesChange}
-                            onNodeClick={handleNodeSelection}
-                            onNodeDoubleClick={handleNodeDoubleClick}
+                            nodes={nodes}
+                            edges={edges}
+                            onNodesChange={onNodesChange}
+                            onEdgesChange={onEdgesChange}
+                            onNodeClick={clickHandler}
+                            onNodeDoubleClick={clickHandler}
                             onEdgeClick={handleEdgeClick}
                             nodeTypes={nodeTypes}
                             edgeTypes={edgeTypes}
@@ -1218,8 +1062,12 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
                             <Button variant="outlined"
                                 size="small"
                                 sx={{
-                                    color: "#808080 !important"
-
+                                    color: "#0000",
+                                    borderColor: "#3B82F6",
+                                    borderRadius: "6px",
+                                    padding: "2px 10px",
+                                    fontSize: "12px",
+                                    textTransform: "none"
                                 }}
                                 disabled={state.selectedNodes.length !== 2 || mode === MODES.READ}
                                 onClick={() => {
@@ -1241,33 +1089,37 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
                                                     activeContext,
                                                     graphAttributes,
                                                     nodesWithChildren,
-                                                    nodeTypeColorMap,
-                                                    joinTypeColorMapping,
-                                                    theme
+                                                    nodeTypeColorMap
                                                 }
                                             });
                                         }}
                                         disabled={state.selectedNodes.length === 0}
                                     >
-                                        <CloseIcon fontSize="small" />
+                                        <Typography variant="button">X</Typography>
                                     </IconButton>
                                 </span>
                             </Tooltip>
                         </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1, flexWrap: 'wrap' }}>
-                            {Object.entries(joinColorMapForLegend).map(([joinType, schemaColor]) => {
-                                if (joinType === 'JOIN_TYPE_UNSPECIFIED') return null;
-                                const color = getNodeTypeColor(schemaColor, theme)?.main;
-                                if (!color) return null;
-                                return (
-                                    <React.Fragment key={joinType}>
-                                        <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'capitalize' }}>
-                                            {joinType.replace('_', ' ').toLowerCase()}:
-                                        </Typography>
-                                        <Box sx={{ width: 20, height: 2, bgcolor: color }} />
-                                    </React.Fragment>
-                                );
-                            })}
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1 }}>
+                            <Typography variant="caption" color="text.secondary">
+                                Inner:
+                            </Typography>
+                            <Box sx={{ width: 20, height: 2, bgcolor: '#3B82F6' }} />
+
+                            <Typography variant="caption" color="text.secondary">
+                                Left/Outer:
+                            </Typography>
+                            <Box sx={{ width: 20, height: 2, bgcolor: '#EF4444' }} />
+
+                            <Typography variant="caption" color="text.secondary">
+                                Full:
+                            </Typography>
+                            <Box sx={{ width: 20, height: 2, bgcolor: '#10B981' }} />
+
+                            <Typography variant="caption" color="text.secondary">
+                                Right:
+                            </Typography>
+                            <Box sx={{ width: 20, height: 2, bgcolor: '#F59E0B' }} />
                             <Typography variant="caption">
                                 AI suggestions are displayed in light color •• Unknown Joins are in Grey
                             </Typography>
@@ -1296,33 +1148,21 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
             )}
 
             {/* DataJoinPopup Modal */}
-            {state.modalOpen && state.modalNodes.source && state.modalNodes.target && (() => {
-                const existingJoins = getNodePairEdges(
-                    get(state.modalNodes.source, graphAttributes.nodeNameField),
-                    get(state.modalNodes.target, graphAttributes.nodeNameField)
-                );
-
-                const existingJoin = existingJoins.length > 0 ? existingJoins[0] : null;
-                const joinTypeOptions = fieldsMetadata?.find(field => field.key === graphAttributes.edgeTypeField)?.autocomplete_list || [];
-                const filterOperators = fieldsMetadata?.find(field => field.key === graphAttributes.edgeFilterOperator)?.autocomplete_list;
-
-                return (
-                    <DataJoinPopup
-                        open={state.modalOpen}
-                        onClose={() => dispatch({ type: ACTION_TYPES.CLOSE_MODAL })}
-                        sourceNode={state.modalNodes.source}
-                        targetNode={state.modalNodes.target}
-                        existingJoin={existingJoin}
-                        onSave={handleModalSave}
-                        graphAttributes={graphAttributes}
-                        metadata={{
-                            joinTypeOptions,
-                            filterOperators,
-                            joinTypeColorMapping
-                        }}
-                    />
-                );
-            })()}
+            {state.modalOpen && state.modalNodes.source && state.modalNodes.target && (
+                <DataJoinPopup
+                    open={state.modalOpen}
+                    onClose={() => dispatch({ type: ACTION_TYPES.CLOSE_MODAL })}
+                    sourceNode={state.modalNodes.source}
+                    targetNode={state.modalNodes.target}
+                    existingJoins={getNodePairEdges(
+                        get(state.modalNodes.source, graphAttributes.nodeNameField),
+                        get(state.modalNodes.target, graphAttributes.nodeNameField)
+                    )}
+                    onSave={handleModalSave}
+                    graphAttributes={graphAttributes}
+                    fieldsMetadata={fieldsMetadata}
+                />
+            )}
         </>
     );
 };

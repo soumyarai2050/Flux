@@ -222,6 +222,8 @@ class BaseProtoPlugin(ABC):
     flux_fld_node_type: ClassVar[str] = "FluxFldNodeType"
     flux_fld_node_access: ClassVar[str] = "FluxFldNodeAccess"
     flux_fld_node_url: ClassVar[str] = "FluxFldNodeUrl"
+    flux_fld_node_meta_query: ClassVar[str] = "FluxFldNodeMetaQuery"
+    flux_fld_edge_meta_query: ClassVar[str] = "FluxFldEdgeMetaQuery"
     flux_fld_chat_context: ClassVar[str] = "FluxFldChatContext"
     flux_fld_chat_conversation: ClassVar[str] = "FluxFldChatConversation"
     flux_fld_user_message: ClassVar[str] = "FluxFldUserMessage"

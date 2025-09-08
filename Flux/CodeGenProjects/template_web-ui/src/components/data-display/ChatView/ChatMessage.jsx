@@ -5,14 +5,12 @@ import {
     IconButton,
     Tooltip,
     TextField,
-    useTheme
+    useTheme,
+    Button
 } from '@mui/material';
 import {
     Psychology,
     Edit,
-    Check,
-    Close,
-    MoreHoriz,
     ContentCopy
 } from '@mui/icons-material';
 import MarkdownRenderer from './MarkdownRenderer';
@@ -34,8 +32,7 @@ function ChatMessage({
     editText,
     onEditChange,
     onSave,
-    onCancel,
-    mode
+    onCancel
 }) {
     const theme = useTheme();
     const isDarkMode = theme.palette.mode === 'dark';
@@ -68,9 +65,13 @@ function ChatMessage({
                 <Paper
                     elevation={0}
                     className={messageClasses}
-                    sx={{ color: textColor }}
+                    sx={{ color: textColor, width: isEditing ? '100%' : 'max-content' }}
                 >
-                    <Box className={`${styles.messageText} ${isEditing ? styles.messageTextEditing : ''}`}>
+                    <Box
+                        className={isEditing ? styles.messageTextEditing : styles.messageText}
+                        onDoubleClick={() => onViewFull(content, field)}
+                        style={{ cursor: 'pointer' }}
+                    >
                         {isEditing ? (
                             <TextField
                                 variant="standard"
@@ -82,9 +83,11 @@ function ChatMessage({
                                 InputProps={{ disableUnderline: true }}
                                 inputProps={{
                                     style: {
+                                        minHeight: '60px',
+                                        overflow: 'auto',
                                         color: textColor,
                                         lineHeight: 1.4,
-                                        fontSize: theme.typography.body2.fontSize,
+                                        fontSize: '0.75rem',
                                         fontFamily: theme.typography.fontFamily,
                                     }
                                 }}
@@ -99,20 +102,22 @@ function ChatMessage({
 
                     {isEditing && (
                         <Box className={styles.editingButtons}>
-                            <IconButton
+                            <Button
                                 size="small"
                                 onClick={onSave}
-                                sx={{ color: 'success.main' }}
+                                color='success'
+                                variant='contained'
                             >
-                                <Check fontSize="small" />
-                            </IconButton>
-                            <IconButton
+                                Save
+                            </Button>
+                            <Button
                                 size="small"
                                 onClick={onCancel}
-                                sx={{ color: 'error.main' }}
+                                color='error'
+                                variant='contained'
                             >
-                                <Close fontSize="small" />
-                            </IconButton>
+                                Cancel
+                            </Button>
                         </Box>
                     )}
                 </Paper>
@@ -141,25 +146,13 @@ function ChatMessage({
                                 <ContentCopy fontSize="small" />
                             </IconButton>
                         </Tooltip>
-                        {isTruncated && (
-                            <Tooltip title="View full message">
-                                <IconButton
-                                    size="small"
-                                    onClick={() => onViewFull(content)}
-                                    className={`${styles.actionIcon} ${styles.expandIcon}`}
-                                    sx={{ color: 'text.secondary' }}
-                                >
-                                    <MoreHoriz fontSize="small" />
-                                </IconButton>
-                            </Tooltip>
-                        )}
                         <Tooltip title="Edit message">
                             <IconButton
                                 size="small"
                                 onClick={() => onEdit(field)}
                                 className={`${styles.actionIcon} ${styles.editIcon}`}
                                 sx={{ color: 'text.secondary' }}
-                                disabled={mode !== 'edit' || !isActive}
+                                disabled={!isActive}
                             >
                                 <Edit fontSize="small" />
                             </IconButton>

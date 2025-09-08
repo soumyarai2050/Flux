@@ -1,4 +1,7 @@
+import axios from "axios";
 import { NODE_DATA_SCHEMAS } from "./MockData";
+import { API_ROOT_URL } from "../config";
+import { createCollections, getModelSchema, getServerUrl } from "../utils";
 
 
 
@@ -89,14 +92,14 @@ export async function fetchAnalysedData(sourceNode, targetNode, joinInfo = null)
         if (!sourceNodeData) {
             sourceNodeData = await fetchNodeData(sourceNode);
         }
-        
+
         if (!targetNodeData) {
             targetNodeData = await fetchNodeData(targetNode);
         }
 
         // Generate and return analysed data
         const analysedResult = generateAnalysedData(sourceNodeData, targetNodeData, joinInfo);
-        
+
         return {
             ...analysedResult,
             status: 'success'
@@ -127,7 +130,7 @@ class NodeDataCache {
     isCacheValid(cacheKey) {
         const cached = this.cache.get(cacheKey);
         if (!cached) return false;
-        
+
         const now = Date.now();
         return (now - cached.timestamp) < this.CACHE_TTL;
     }
@@ -172,7 +175,7 @@ class NodeDataCache {
      */
     setLoadingPromise(cacheKey, promise) {
         this.loadingPromises.set(cacheKey, promise);
-        
+
         // Clean up when promise resolves
         promise.finally(() => {
             this.loadingPromises.delete(cacheKey);
@@ -180,7 +183,7 @@ class NodeDataCache {
             // Ignore errors in cleanup
         });
     }
-    
+
     /**
      * Force refresh cache for a specific key
      * @param {string} cacheKey - The cache key to refresh
@@ -251,9 +254,9 @@ async function mockFetchNodeData(nodeBaseUrl, nodeName) {
  * @param {Object} node - Node object from DataLab response
  * @returns {Promise<Object>} Promise resolving to node data with caching
  */
-export async function fetchNodeData(node) {
-    const { entity_base_url, name } = node;
-    
+export async function fetchNodeData(queryName, queryParamName, node) {
+    const { name } = node;
+
     if (!name) {
         throw new Error(`Node "${name}" is missing node_base_url`);
     }
@@ -277,14 +280,32 @@ export async function fetchNodeData(node) {
     }
 
     // Make new request
-    const fetchPromise = mockFetchNodeData(entity_base_url, name);
-    
+    // const fetchPromise = mockFetchNodeData(entity_base_url, name);
+    const url = `${API_ROOT_URL}/${queryName}`
+    const fetchPromise = axios.patch(url, { [queryParamName]: name });
+
     // Store loading promise to prevent duplicates
     nodeCache.setLoadingPromise(cacheKey, fetchPromise);
 
     try {
-        const data = await fetchPromise;
-        
+        const res = await fetchPromise;
+        const { schema: nodeProjectSchema, data: nodeData } = res.data;
+        const nodeSchema = getModelSchema(name, nodeProjectSchema);
+        const nodeFieldsMetadata = createCollections(nodeProjectSchema, nodeSchema, {});
+        const nodeColumns = nodeFieldsMetadata.map((o) => {
+            const updatedColumn = Object.assign({}, o);
+            updatedColumn.name = updatedColumn.tableTitle;
+            return updatedColumn;
+        });
+        const nodeUrl = getServerUrl(nodeSchema);
+        const data = {
+            nodeProjectSchema,
+            nodeSchema,
+            nodeData,
+            nodeFieldsMetadata,
+            nodeColumns,
+            nodeUrl
+        };
         // Cache the result
         nodeCache.setCached(cacheKey, data);
         return data;

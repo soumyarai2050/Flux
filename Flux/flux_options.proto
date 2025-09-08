@@ -351,6 +351,8 @@ extend google.protobuf.FieldOptions
   optional bool FluxFldNodeAccess = 55294; // Use this to mark field as graph node access permission flag
   optional bool FluxFldNodeUrl = 55295; // Use this to mark field as graph node URL/endpoint
   optional string FluxFldAutoCompleteSplitAssign = 55296; // Use this to split input text into multiple fields with autocomplete support. Format: "{delimiter}field1:index1{delimiter}field2:index2|ListName"
+  optional string FluxFldNodeMetaQuery = 55297;
+  optional string FluxFldEdgeMetaQuery = 55298;
 
   //Complexity Option - 56
   optional string FluxFldCmplxHigh = 56151;

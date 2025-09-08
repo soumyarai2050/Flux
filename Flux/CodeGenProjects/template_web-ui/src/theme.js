@@ -334,6 +334,12 @@ export const getTheme = (themeMode = Theme.LIGHT, baseColorName = DEFAULT_BASE_C
                 success: {
                     main: cssVar('--green-success'),
                 },
+                debug: {
+                    main: cssVar('--grey-debug'),
+                },
+                critical: {
+                    main: cssVar('--red-critical'),
+                },
                 white: {
                     main: 'white'
                 },
@@ -393,6 +399,12 @@ export const getTheme = (themeMode = Theme.LIGHT, baseColorName = DEFAULT_BASE_C
             },
             success: {
                 main: cssVar('--green-success'),
+            },
+            debug: {
+                main: cssVar('--grey-debug'),
+            },
+            critical: {
+                main: cssVar('--red-critical'),
             },
             white: {
                 main: 'white'

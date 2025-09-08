@@ -1,12 +1,16 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import {
     Box,
     Typography,
     Checkbox,
     FormControlLabel,
-    Chip
+    Chip,
+    TextField,
+    InputAdornment,
+    IconButton
 } from '@mui/material';
+import { Search, Clear } from '@mui/icons-material';
 
 const ColumnList = ({
     title,
@@ -23,11 +27,57 @@ const ColumnList = ({
     isDarkMode,
     selectedSourceColumn
 }) => {
+    const [filterText, setFilterText] = useState('');
+
+    const filteredColumns = useMemo(() => {
+        if (!filterText.trim()) {
+            return columns;
+        }
+        return columns.filter(column =>
+            column.name.toLowerCase().includes(filterText.toLowerCase())
+        );
+    }, [columns, filterText]);
+
+    const handleClearFilter = () => {
+        setFilterText('');
+    };
+
     return (
         <Box flex={1}>
             <Typography variant="subtitle2" gutterBottom color="primary">
                 {title}
             </Typography>
+
+            <TextField
+                size="small"
+                placeholder="Filter columns..."
+                value={filterText}
+                onChange={(e) => setFilterText(e.target.value)}
+                InputProps={{
+                    startAdornment: (
+                        <InputAdornment position="start">
+                            <Search style={{ fontSize: '18px' }} />
+                        </InputAdornment>
+                    ),
+                    endAdornment: filterText && (
+                        <InputAdornment position="end">
+                            <IconButton
+                                size="small"
+                                onClick={handleClearFilter}
+                                style={{ padding: '4px' }}
+                            >
+                                <Clear style={{ fontSize: '16px' }} />
+                            </IconButton>
+                        </InputAdornment>
+                    )
+                }}
+                style={{
+                    marginBottom: '12px',
+                    backgroundColor: isDarkMode ? theme.palette.grey[800] : theme.palette.background.paper
+                }}
+                fullWidth
+            />
+
             {selectedColumn && isSource && (
                 <Typography variant="caption" style={{
                     color: theme.palette.primary.main,
@@ -66,9 +116,11 @@ const ColumnList = ({
                 padding: '8px',
                 backgroundColor: isDarkMode ? theme.palette.grey[800] : theme.palette.grey[50]
             }}>
-                {columns.map((column, idx) => {
-                    const isSelected = selectedColumns.includes(column.name);
-                    const isConnected = confirmedConnections.some(conn => 
+                {filteredColumns.map((column, idx) => {
+                    const isSelected = selectedColumns.some(col => col.field_name === column.name);
+                    const selectedColumnObj = selectedColumns.find(col => col.field_name === column.name);
+                    const hasFilters = selectedColumnObj?.field_filters?.length > 0;
+                    const isConnected = confirmedConnections.some(conn =>
                         isSource ? conn.sourceColumn === column.name : conn.targetColumn === column.name
                     );
                     const hasAiSuggestion = aiSuggestions.some(suggestion =>
@@ -103,7 +155,7 @@ const ColumnList = ({
                                         <Typography variant="body2" style={{
                                             fontWeight: isSelected || isConnected ? 600 : 400
                                         }}>
-                                            {column.name} {column.primary && '='}
+                                            {column.name}
                                             {isConnected && (
                                                 <Chip
                                                     label="Connected"
@@ -112,6 +164,19 @@ const ColumnList = ({
                                                         backgroundColor: '#4CAF50',
                                                         color: 'white',
                                                         marginLeft: '8px',
+                                                        height: '16px',
+                                                        fontSize: '9px'
+                                                    }}
+                                                />
+                                            )}
+                                            {hasFilters && (
+                                                <Chip
+                                                    label="Filtered"
+                                                    size="small"
+                                                    style={{
+                                                        backgroundColor: '#2196F3',
+                                                        color: 'white',
+                                                        marginLeft: '4px',
                                                         height: '16px',
                                                         fontSize: '9px'
                                                     }}
@@ -127,6 +192,19 @@ const ColumnList = ({
                         </Box>
                     );
                 })}
+
+                {filteredColumns.length === 0 && filterText.trim() && (
+                    <Box style={{
+                        padding: '20px',
+                        textAlign: 'center',
+                        color: theme.palette.text.secondary,
+                        fontStyle: 'italic'
+                    }}>
+                        <Typography variant="body2">
+                            No columns match "{filterText}"
+                        </Typography>
+                    </Box>
+                )}
             </Box>
         </Box>
     );
@@ -140,7 +218,10 @@ ColumnList.propTypes = {
         type: PropTypes.string.isRequired,
         primary: PropTypes.bool
     })).isRequired,
-    selectedColumns: PropTypes.arrayOf(PropTypes.string).isRequired,
+    selectedColumns: PropTypes.arrayOf(PropTypes.shape({
+        field_name: PropTypes.string.isRequired,
+        field_filters: PropTypes.array
+    })).isRequired,
     confirmedConnections: PropTypes.arrayOf(PropTypes.object).isRequired,
     aiSuggestions: PropTypes.arrayOf(PropTypes.object).isRequired,
     rejectedSuggestionIds: PropTypes.instanceOf(Set).isRequired,

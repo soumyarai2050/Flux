@@ -91,6 +91,8 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         BaseProtoPlugin.flux_fld_node_type,
         BaseProtoPlugin.flux_fld_node_access,
         BaseProtoPlugin.flux_fld_node_url,
+        BaseProtoPlugin.flux_fld_node_meta_query,
+        BaseProtoPlugin.flux_fld_edge_meta_query,
         BaseProtoPlugin.flux_fld_chat_context,
         BaseProtoPlugin.flux_fld_chat_conversation,
         BaseProtoPlugin.flux_fld_user_message,

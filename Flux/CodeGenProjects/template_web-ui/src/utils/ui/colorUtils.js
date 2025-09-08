@@ -156,23 +156,58 @@ export function getColorTypeFromValue(collection, value, separator = '-') {
     return color;
 }
 
-export const getJoinColor = (joinType, isConfirmed = true) => {
-    const colors = {
-        inner: '#3B82F6',
-        left: '#EF4444',
-        outer: '#EF4444',
-        full: '#10B981',
-        right: '#F59E0B',
-        default: '#9CA3AF'
-    };
+/**
+ * Parses a schema color string (e.g., "KEY1=VALUE1,KEY2=VALUE2") into a map.
+ * @param {string} colorString - The color mapping string from the schema.
+ * @returns {Object} A map of key-value pairs (e.g., { KEY1: 'VALUE1' }).
+ */
+export const createColorMapFromString = (colorString) => {
+    if (!colorString || typeof colorString !== 'string') {
+        return {};
+    }
+    const colorMap = {};
+    colorString.split(',').forEach((pair) => {
+        const [key, value] = pair.split('=');
+        if (key && value) {
+            colorMap[key.trim().toUpperCase()] = value.trim().toUpperCase();
+        }
+    });
+    return colorMap;
+};
 
-    const joinKey = joinType?.toLowerCase() || 'default';
-    const color = colors[joinKey] || colors.default;
+export const getJoinColor = (joinType, colorMappingString, theme, isConfirmed = true) => {
+    const colorMap = createColorMapFromString(colorMappingString);
+
+    const joinKey = joinType?.toUpperCase();
+    const schemaColorType = colorMap[joinKey]; // Will be undefined if not found
+
+    const themeColor = getNodeTypeColor(schemaColorType, theme); // getNodeTypeColor handles undefined
+
+    const color = themeColor.main || theme.palette.grey[500];
 
     if (isConfirmed) {
         return color;
     } else {
-        // Add 80 (hex for 128) for ~50% opacity for unconfirmed suggestions
-        return `${color}80`;
+        // Add opacity for unconfirmed suggestions
+        return `${color}30`;
     }
+};
+
+/**
+ * Maps schema color types to MUI theme color properties
+ * @param {string} schemaColorType - The color type from schema (DEBUG, INFO, ERROR, SUCCESS, etc.)
+ * @param {Object} theme - MUI theme object
+ * @returns {Object} Color object with main, light, dark properties
+ */
+export const getNodeTypeColor = (schemaColorType, theme) => {
+    const colorMapping = {
+        DEBUG: theme.palette.debug,
+        INFO: theme.palette.info,
+        ERROR: theme.palette.error,
+        SUCCESS: theme.palette.success,
+        WARNING: theme.palette.warning,
+        CRITICAL: theme.palette.critical
+    };
+
+    return colorMapping[schemaColorType?.toUpperCase()] || theme.palette.grey;
 };

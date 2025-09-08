@@ -391,7 +391,7 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
         dispatch(actions.setIsCreating(true));
     }
 
-    const handleSave = (modifiedObj, force = false, bypassConflictCheck = false) => {
+    const handleSave = (modifiedObj, force = false, bypassConflictCheck = false, forceConfirmSave = false) => {
         if (!bypassConflictCheck && checkAndShowConflicts()) {
             return;
         }
@@ -420,8 +420,8 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
         }
         changesRef.current.active = activeChanges;
         const changesCount = Object.keys(activeChanges).length;
-        if (force) {
-            if (changesCount === 1) {
+        if (force || forceConfirmSave) {
+            if (forceConfirmSave || changesCount === 1) {
                 executeSave();
                 return;
             }
@@ -579,6 +579,8 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
                                 <ChatView
                                     modelName={modelName}
                                     modelDataSource={modelDataSource}
+                                    onModeToggle={handleModeToggle}
+                                    onSave={handleSave}
                                 />
                             </Box>
                         )}

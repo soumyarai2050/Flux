@@ -125,7 +125,9 @@
 
 /* Message bubbles */
 .messageBubble {
-  position: relative;
+  /* position: relative; */
+  display: flex;
+  flex-direction: column;
   max-width: 85%;
   padding: 8px;
   border-radius: 12px;
@@ -166,7 +168,9 @@
 }
 
 .messageTextEditing {
-  padding-right: 40px;
+  flex: 1;
+  min-width: 0;
+  overflow: visible;
 }
 
 /* Action buttons */
@@ -194,11 +198,13 @@
 }
 
 .editingButtons {
-  position: absolute;
+  /* position: absolute;
   top: 50%;
   right: 4px;
-  transform: translateY(-50%);
+  transform: translateY(-50%); */
   display: flex;
+  justify-content: end;
+  flex-direction: row-reverse;
   gap: 2px;
 }
 

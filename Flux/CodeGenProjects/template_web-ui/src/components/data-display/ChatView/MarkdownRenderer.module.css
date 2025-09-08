@@ -1,0 +1,518 @@
+/* MarkdownRenderer.module.css */
+
+/* Container */
+.markdownContainer {
+    width: 100%;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+/* Paragraph Styles */
+.paragraph {
+    word-break: break-word;
+    line-height: 1.6;
+    margin: 0;
+}
+
+.paragraphLarge {
+    margin-bottom: 16px;
+    font-size: 0.8rem;
+}
+
+.paragraphSmall {
+    margin-bottom: 8px;
+    font-size: 0.7rem;
+}
+
+.paragraph:last-child {
+    margin-bottom: 0;
+}
+
+/* Heading Styles */
+.heading {
+    font-weight: 600;
+    line-height: 1.3;
+    margin-top: 0;
+}
+
+.heading:first-child {
+    margin-top: 0;
+}
+
+/* H1 Styles */
+.h1 {
+    font-weight: 700;
+}
+
+.h1Large {
+    font-size: 1.6rem;
+    margin: 24px 0 16px 0;
+}
+
+.h1Small {
+    font-size: 1.2rem;
+    margin: 16px 0 8px 0;
+}
+
+/* H2 Styles */
+.h2Large {
+    font-size: 1.2rem;
+    margin: 20px 0 12px 0;
+}
+
+.h2Small {
+    font-size: 1rem;
+    margin: 12px 0 6px 0;
+}
+
+/* H3 Styles */
+.h3Large {
+    font-size: 1rem;
+    margin: 16px 0 8px 0;
+}
+
+.h3Small {
+    font-size: 0.9rem;
+    margin: 8px 0 4px 0;
+}
+
+/* H4 Styles */
+.h4Large {
+    font-size: 0.9rem;
+    margin: 12px 0 6px 0;
+}
+
+.h4Small {
+    font-size: 0.8rem;
+    margin: 6px 0 3px 0;
+}
+
+/* H5 Styles */
+.h5Large {
+    font-size: 0.8rem;
+    margin: 10px 0 5px 0;
+}
+
+.h5Small {
+    font-size: 0.7rem;
+    margin: 5px 0 2px 0;
+}
+
+/* H6 Styles */
+.h6Large {
+    font-size: 0.7rem;
+    margin: 8px 0 4px 0;
+}
+
+.h6Small {
+    font-size: 0.6rem;
+    margin: 4px 0 2px 0;
+}
+
+/* Text Formatting */
+.strong {
+    font-weight: 700;
+}
+
+.emphasis {
+    font-style: italic;
+}
+
+.strikethrough {
+    text-decoration: line-through;
+    opacity: 0.6;
+}
+
+/* Inline Code */
+.inlineCode {
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 0.7em;
+    font-weight: 500;
+    white-space: nowrap;
+    vertical-align: baseline;
+}
+
+.inlineCodeLight {
+    background-color: rgba(0, 0, 0, 0.06);
+    color: #e01e5a;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.inlineCodeDark {
+    background-color: rgba(255, 255, 255, 0.08);
+    color: #ff79c6;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Code Blocks */
+.codeBlock {
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    border-radius: 8px;
+    font-size: 0.7rem;
+    display: block;
+    overflow: auto;
+    white-space: pre;
+    max-width: 100%;
+    line-height: 1.6;
+    position: relative;
+}
+
+.codeBlockLight {
+    background-color: #f6f8fa;
+    color: #24292e;
+    border: 1px solid #e1e4e8;
+}
+
+.codeBlockDark {
+    background-color: #161b22;
+    color: #f8f8f2;
+    border: 1px solid #30363d;
+}
+
+.codeBlockLarge {
+    padding: 16px;
+    margin: 16px 0;
+}
+
+.codeBlockSmall {
+    padding: 12px;
+    margin: 12px 0;
+}
+
+.codeBlockContent {
+    font-family: inherit;
+    font-size: inherit;
+    background: transparent;
+    color: inherit;
+    border: none;
+    padding: 0;
+    margin: 0;
+}
+
+/* Language label for code blocks */
+.codeBlock[data-language]::before {
+    content: attr(data-language);
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    opacity: 0.7;
+}
+
+.codeBlockLight[data-language]::before {
+    background-color: #e1e4e8;
+    color: #586069;
+}
+
+.codeBlockDark[data-language]::before {
+    background-color: #30363d;
+    color: #8b949e;
+}
+
+.codeBlock[data-language] {
+    padding-top: 40px;
+}
+
+/* Lists */
+.list {
+    margin: 0;
+    padding: 0;
+}
+
+.listLarge {
+    margin: 12px 0;
+    padding-left: 32px;
+}
+
+.listSmall {
+    margin: 8px 0;
+    padding-left: 24px;
+}
+
+.unorderedList {
+    list-style-type: disc;
+}
+
+.orderedList {
+    list-style-type: decimal;
+}
+
+.listItem {
+    line-height: 1.6;
+    display: list-item;
+}
+
+.listItemLarge {
+    margin: 6px 0;
+    font-size: 0.8rem;
+}
+
+.listItemSmall {
+    margin: 4px 0;
+    font-size: 0.7rem;
+}
+
+/* Nested lists */
+.list .list {
+    margin-top: 4px;
+    margin-bottom: 4px;
+}
+
+/* Blockquote */
+.blockquote {
+    border-left-width: 4px;
+    border-left-style: solid;
+    font-style: italic;
+    border-radius: 0 4px 4px 0;
+    padding: 12px 16px;
+    margin: 0;
+}
+
+.blockquoteLight {
+    border-left-color: #d0d7de;
+    color: #656d76;
+    background-color: rgba(0, 0, 0, 0.02);
+}
+
+.blockquoteDark {
+    border-left-color: #3d444d;
+    color: #8b949e;
+    background-color: rgba(255, 255, 255, 0.02);
+}
+
+.blockquoteLarge {
+    margin: 16px 0;
+    padding-left: 24px;
+}
+
+.blockquoteSmall {
+    margin: 12px 0;
+    padding-left: 16px;
+}
+
+/* Links */
+.link {
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: border-color 0.2s ease, opacity 0.2s ease;
+}
+
+.link:hover {
+    border-bottom-color: currentColor;
+    opacity: 0.8;
+}
+
+.linkLight {
+    color: #0969da;
+}
+
+.linkDark {
+    color: #58a6ff;
+}
+
+/* Images */
+.image {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    display: block;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+}
+
+.imageLarge {
+    margin: 16px 0;
+}
+
+.imageSmall {
+    margin: 12px 0;
+}
+
+/* Divider */
+.divider {
+    border: none;
+    height: 2px;
+    background: linear-gradient(to right, transparent, currentColor 20%, currentColor 80%, transparent);
+    opacity: 0.2;
+}
+
+.dividerLight {
+    color: #d0d7de;
+}
+
+.dividerDark {
+    color: #3d444d;
+}
+
+.dividerLarge {
+    margin: 24px 0;
+}
+
+.dividerSmall {
+    margin: 16px 0;
+}
+
+/* Tables */
+.tableWrapper {
+    overflow-x: auto;
+    border-radius: 8px;
+}
+
+.tableWrapperLarge {
+    margin: 16px 0;
+}
+
+.tableWrapperSmall {
+    margin: 8px 0;
+}
+
+.table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.7rem;
+}
+
+.tableLight {
+    border: 1px solid #d0d7de;
+    background-color: #ffffff;
+}
+
+.tableDark {
+    border: 1px solid #3d444d;
+    background-color: #0d1117;
+}
+
+.tableHead {
+    font-weight: 600;
+}
+
+.tableBody {
+    font-weight: 400;
+}
+
+.tableRow {
+    transition: background-color 0.2s ease;
+}
+
+.tableLight .tableBody .tableRow:hover {
+    background-color: rgba(0, 0, 0, 0.02);
+}
+
+.tableDark .tableBody .tableRow:hover {
+    background-color: rgba(255, 255, 255, 0.02);
+}
+
+.tableHeaderCell,
+.tableCell {
+    padding: 8px 12px;
+    text-align: left;
+    vertical-align: middle;
+}
+
+.tableHeaderCell {
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.tableHeaderCellLight {
+    background-color: #f6f8fa;
+    border-bottom: 2px solid #d0d7de;
+    color: #24292e;
+}
+
+.tableHeaderCellDark {
+    background-color: #161b22;
+    border-bottom: 2px solid #3d444d;
+    color: #f0f6fc;
+}
+
+.tableCellLight {
+    border-bottom: 1px solid #e1e4e8;
+    color: #24292e;
+}
+
+.tableCellDark {
+    border-bottom: 1px solid #30363d;
+    color: #c9d1d9;
+}
+
+.tableBody .tableRow:last-child .tableCell {
+    border-bottom: none;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .h1Large {
+        font-size: 1.4rem;
+    }
+    
+    .h2Large {
+        font-size: 1.1rem;
+    }
+    
+    .h3Large {
+        font-size: 0.9rem;
+    }
+    
+    .codeBlock {
+        font-size: 0.64rem;
+    }
+    
+    .table {
+        font-size: 0.64rem;
+    }
+    
+    .tableHeaderCell,
+    .tableCell {
+        padding: 6px 8px;
+    }
+}
+
+/* Dark mode specific adjustments */
+.darkMode {
+    color: #c9d1d9;
+}
+
+.lightMode {
+    color: #24292e;
+}
+
+/* Scrollbar styling for code blocks */
+.codeBlock::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
+}
+
+.codeBlockLight::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.codeBlockLight::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.codeBlockLight::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+.codeBlockDark::-webkit-scrollbar-track {
+    background: #1e1e1e;
+    border-radius: 4px;
+}
+
+.codeBlockDark::-webkit-scrollbar-thumb {
+    background: #4a4a4a;
+    border-radius: 4px;
+}
+
+.codeBlockDark::-webkit-scrollbar-thumb:hover {
+    background: #606060;
+}

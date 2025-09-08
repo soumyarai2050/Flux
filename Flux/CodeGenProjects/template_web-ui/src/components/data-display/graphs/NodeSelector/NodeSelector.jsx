@@ -163,7 +163,7 @@ const NodeSelector = ({
                             InputProps={{
                                 ...params.InputProps,
                                 startAdornment: selectedOptions.length > 0 ? (
-                                    <Typography variant="body2" sx={{ mr: 1, color: 'text.primary' }}>
+                                    <Typography variant="body2" sx={{ ml: 1, mr: 1, color: 'text.primary' }}>
                                         {displayValue}
                                     </Typography>
                                 ) : params.InputProps.startAdornment

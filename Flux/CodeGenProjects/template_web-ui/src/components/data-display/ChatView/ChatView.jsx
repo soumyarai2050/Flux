@@ -26,7 +26,7 @@ import MarkdownRenderer from './MarkdownRenderer';
 import ClipboardCopier from '../../utility/ClipboardCopier';
 import ChatMessage from './ChatMessage';
 import { DB_ID, MODES } from '../../../constants';
-import { generateObjectFromSchema, getModelSchema, snakeToCamel } from '../../../utils';
+import { clearxpath, generateObjectFromSchema, getModelSchema, snakeToCamel } from '../../../utils';
 import styles from './ChatView.module.css';
 
 /**
@@ -67,7 +67,12 @@ function LoadingState() {
     );
 }
 
-function ChatView({ modelName, modelDataSource }) {
+function ChatView({
+    modelName,
+    modelDataSource,
+    onModeToggle,
+    onSave
+}) {
     const { schema: projectSchema } = useSelector(state => state.schema);
     const { actions, selector, fieldsMetadata } = modelDataSource;
     const { updatedObj, mode, loading, error } = useSelector(selector);
@@ -82,6 +87,8 @@ function ChatView({ modelName, modelDataSource }) {
 
     const [viewMessageDialogOpen, setViewMessageDialogOpen] = useState(false);
     const [viewMessageDialogContent, setViewMessageDialogContent] = useState('');
+    const [viewMessageDialogField, setViewMessageDialogField] = useState(null);
+    const [modalEditText, setModalEditText] = useState('');
 
     const [editingField, setEditingField] = useState(null);
     const [editText, setEditText] = useState('');
@@ -196,7 +203,8 @@ function ChatView({ modelName, modelDataSource }) {
     const handleCancelEdit = useCallback(() => {
         setEditingField(null);
         setEditText('');
-    }, []);
+        onModeToggle();
+    }, [onModeToggle]);
 
     // Keyboard navigation handler
     const handleKeyDown = useCallback((event) => {
@@ -267,14 +275,25 @@ function ChatView({ modelName, modelDataSource }) {
         setViewReasoningDialogOpen(false);
     }, []);
 
-    const handleOpenViewMessageDialog = useCallback((content) => {
+    const handleOpenViewMessageDialog = useCallback((content, field = null) => {
         setViewMessageDialogContent(content);
+        setViewMessageDialogField(field);
+        setModalEditText(content || '');
         setViewMessageDialogOpen(true);
     }, []);
 
     const handleCloseViewMessageDialog = useCallback(() => {
         setViewMessageDialogOpen(false);
+        setViewMessageDialogField(null);
     }, []);
+
+    const handleModalTextChange = useCallback((newText) => {
+        setModalEditText(newText);
+        // Update the main edit text if this is for the currently editing field
+        if (viewMessageDialogField === editingField) {
+            setEditText(newText);
+        }
+    }, [viewMessageDialogField, editingField]);
 
     const handleCopyMessage = useCallback((content) => {
         if (!content) return;
@@ -285,26 +304,30 @@ function ChatView({ modelName, modelDataSource }) {
     }, []);
 
     const handleStartEdit = useCallback((field) => {
-        if (mode === MODES.READ) return;
+        if (mode === MODES.READ) {
+            onModeToggle();
+        };
         setEditingField(field);
         const conversation = get(activeChatContext, chatAttributes.conversationRelPath || '');
         setEditText(conversation?.[field] || '');
-    }, [mode, activeChatContext]);
+    }, [mode, activeChatContext, onModeToggle]);
 
     const handleSaveEdit = useCallback(() => {
         if (editingField && activeChatContext) {
             const updatedData = cloneDeep(updatedObj);
-            if (chatContexts && Array.isArray(chatContexts)) {
-                const context = chatContexts.find((o) => o[DB_ID] === contextIdRef.current);
+            const udpatedContexts = get(updatedData, chatAttributes.contextPath);
+            if (udpatedContexts && Array.isArray(udpatedContexts)) {
+                const context = udpatedContexts.find((o) => o[DB_ID] === contextIdRef.current);
                 if (context) {
                     const conversation = get(context, chatAttributes.conversationRelPath || '');
                     conversation[editingField] = editText;
                     dispatch(actions.setUpdatedObj(updatedData));
+                    onSave(clearxpath(cloneDeep(updatedData)), undefined, undefined, true);
                 }
             }
         }
         handleCancelEdit();
-    }, [editingField, activeChatContext, updatedObj, editText, dispatch, actions, handleCancelEdit]);
+    }, [editingField, activeChatContext, updatedObj, editText, dispatch, actions, handleCancelEdit, onSave]);
 
     const handleSend = useCallback(() => {
         const updatedData = cloneDeep(updatedObj);
@@ -313,15 +336,16 @@ function ChatView({ modelName, modelDataSource }) {
         set(newObj, chatAttributes.userMessageRelPath, inputMessage);
         get(updatedData, chatAttributes.contextPath).push(newObj);
         dispatch(actions.setUpdatedObj(updatedData));
+        onSave(clearxpath(cloneDeep(updatedData)), undefined, undefined, true);
         setInputMessage('');
-    }, [updatedObj, chatAttributes, projectSchema, inputMessage]);
+    }, [updatedObj, chatAttributes, projectSchema, inputMessage, onSave]);
 
     // Render message function - moved before VirtualListItem
-    const renderMessage = useCallback((type, content, contextIdentifier, field) => {
+    const renderMessage = useCallback((type, content, contextIdentifier, field, mode) => {
         const context = chatContexts.find((o) => o[DB_ID] === contextIdentifier);
         const reasoning = get(context, chatAttributes.botReasoningRelPath);
         const isActive = contextIdentifier === contextId;
-        const isEditing = isActive && editingField === field;
+        const isEditing = mode === MODES.EDIT && isActive && editingField === field;
 
         return (
             <ChatMessage
@@ -476,15 +500,15 @@ function ChatView({ modelName, modelDataSource }) {
                                 aria-selected={isSelected}
                                 aria-label={`Chat context ${currentContextId}${isSelected ? ' (selected)' : ''}`}
                             >
-                                {userMessage && renderMessage('user', userMessage, currentContextId, 'user_chat')}
-                                {botMessage && renderMessage('bot', botMessage, currentContextId, 'llm_chat')}
+                                {userMessage && renderMessage('user', userMessage, currentContextId, 'user_chat', mode)}
+                                {botMessage && renderMessage('bot', botMessage, currentContextId, 'llm_chat', mode)}
                             </Box>
                         );
                     })
                 }
             </Box>
 
-            <Box className={styles.inputContainer}>
+            <Box className={styles.inputContainer} style={{ position: 'relative' }}>
                 <TextField
                     fullWidth
                     multiline
@@ -498,7 +522,8 @@ function ChatView({ modelName, modelDataSource }) {
                             handleSend();
                         }
                     }}
-                    disabled={mode === MODES.READ}
+                    disabled={mode === MODES.READ || editingField}
+                    autoFocus={mode === MODES.EDIT}
                     InputProps={{
                         endAdornment: (
                             <InputAdornment position="end">
@@ -514,24 +539,58 @@ function ChatView({ modelName, modelDataSource }) {
                         ),
                     }}
                     size="small"
+                    sx={{ 
+                        '& .MuiInputBase-input': { fontSize: '0.75rem' },
+                        '& .MuiInputBase-root': { fontSize: '0.75rem' }
+                    }}
                 />
+                {(mode === MODES.READ || editingField) && (
+                    <div
+                        style={{
+                            position: "absolute",
+                            inset: 0, // shorthand for top:0,right:0,bottom:0,left:0
+                            cursor: "text",
+                        }}
+                        onClick={() => {
+                            if (mode === MODES.READ) {
+                                onModeToggle();
+                            }
+                        }}
+                    />
+                )}
             </Box>
 
             <Dialog open={viewReasoningDialogOpen} onClose={handleCloseReasoningDialog} fullWidth maxWidth="md">
                 <DialogContent>
                     <MarkdownRenderer
                         content={viewReasoningDialogContent}
-                        variant="body1"
+                        variant="body2"
                     />
                 </DialogContent>
             </Dialog>
 
             <Dialog open={viewMessageDialogOpen} onClose={handleCloseViewMessageDialog} fullWidth maxWidth="md">
                 <DialogContent>
-                    <MarkdownRenderer
-                        content={viewMessageDialogContent}
-                        variant="body1"
-                    />
+                    {mode === MODES.READ ? (
+                        <MarkdownRenderer
+                            content={viewMessageDialogContent}
+                            variant="body2"
+                        />
+                    ) : (
+                        <TextField
+                            fullWidth
+                            multiline
+                            minRows={10}
+                            value={modalEditText}
+                            onChange={(e) => handleModalTextChange(e.target.value)}
+                            variant="outlined"
+                            placeholder="Enter your message..."
+                            sx={{ 
+                                '& .MuiInputBase-input': { fontSize: '0.75rem' },
+                                '& .MuiInputBase-root': { fontSize: '0.75rem' }
+                            }}
+                        />
+                    )}
                 </DialogContent>
             </Dialog>
         </Box>
