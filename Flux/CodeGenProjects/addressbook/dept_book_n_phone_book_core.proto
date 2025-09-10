@@ -33,6 +33,7 @@ message ContactLimits {
     CreateOp: AggregateType_UNSPECIFIED,
     CreateAllOp: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found this cmt can be removed
     ReadOp: AggregateType_UNSPECIFIED,
+    ReadAllOp: AggregateType_UNSPECIFIED,
     UpdateOp: AggregateType_UNSPECIFIED,
     PatchOp: AggregateType_UNSPECIFIED,
     PatchAllOp: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found this cmt can be removed
@@ -80,6 +81,7 @@ message ShadowBrokers{
     CreateOp: AggregateType_UNSPECIFIED,
     CreateAllOp: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found this cmt can be removed
     ReadOp: AggregateType_UNSPECIFIED,
+    ReadAllOp: AggregateType_UNSPECIFIED,
     UpdateOp: AggregateType_UNSPECIFIED,
     UpdateAllOp: AggregateType_UNSPECIFIED,
     DeleteOp: AggregateType_UNSPECIFIED,
@@ -112,6 +114,7 @@ message FxSymbolOverview{
     CreateOp: AggregateType_UNSPECIFIED,
     CreateAllOp: AggregateType_UNSPECIFIED, // currently set for tests, once real use-case is found can be removed
     ReadOp: AggregateType_UNSPECIFIED,
+    ReadAllOp: AggregateType_UNSPECIFIED,
     UpdateOp: AggregateType_UNSPECIFIED,
     UpdateAllOp: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found can be removed
     PatchOp: AggregateType_UNSPECIFIED,

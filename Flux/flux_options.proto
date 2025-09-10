@@ -54,21 +54,22 @@ message MessageJsonRoot{
   optional AggregateType CreateOp = 1;
   optional AggregateType CreateAllOp = 2;
   optional AggregateType ReadOp = 3;
-  optional AggregateType UpdateOp = 4;
-  optional AggregateType UpdateAllOp = 5;
-  optional AggregateType PatchOp = 6;
-  optional AggregateType PatchAllOp = 7;
-  optional AggregateType DeleteOp = 8;
-  optional AggregateType DeleteAllOp = 9;
-  optional AggregateType DeleteByIdListOp = 10;
-  optional AggregateType ReadByIDWebSocketOp = 11;
-  optional bool SetReentrantLock = 12 [default=true];
-  optional bool PassStoredObjToUpdatePrePostCallback = 13 [default=false];
-  optional bool PassStoredObjToUpdateAllPrePostCallback = 14 [default=false];
-  optional bool PassStoredObjToPartialUpdatePostCallback = 15 [default=false];
-  optional bool PassStoredObjToPartialUpdateAllPostCallback = 16 [default=false];
-  optional bool IncludeDataframeClients = 17 [default=false];
-  optional bool EnableLargeDBObject = 18 [default=false];  // enables mega db obj support - ex: mongo requires special handling if object being persisted is >16 mb
+  optional AggregateType ReadAllOp = 4;
+  optional AggregateType UpdateOp = 5;
+  optional AggregateType UpdateAllOp = 6;
+  optional AggregateType PatchOp = 7;
+  optional AggregateType PatchAllOp = 8;
+  optional AggregateType DeleteOp = 9;
+  optional AggregateType DeleteAllOp = 10;
+  optional AggregateType DeleteByIdListOp = 11;
+  optional AggregateType ReadByIDWebSocketOp = 12;
+  optional bool SetReentrantLock = 13 [default=true];
+  optional bool PassStoredObjToUpdatePrePostCallback = 14 [default=false];
+  optional bool PassStoredObjToUpdateAllPrePostCallback = 15 [default=false];
+  optional bool PassStoredObjToPartialUpdatePostCallback = 16 [default=false];
+  optional bool PassStoredObjToPartialUpdateAllPostCallback = 17 [default=false];
+  optional bool IncludeDataframeClients = 18 [default=false];
+  optional bool EnableLargeDBObject = 19 [default=false];  // enables mega db obj support - ex: mongo requires special handling if object being persisted is >16 mb
 }
 
 enum TimeSeriesGranularityType{
@@ -82,22 +83,23 @@ message MessageJsonRootTimeSeries{
   optional AggregateType CreateOp = 2;
   optional AggregateType CreateAllOp = 3;
   optional AggregateType ReadOp = 4;
-  optional AggregateType ReadByIDWebSocketOp = 5;
-  optional AggregateType DeleteAllOp = 6;
-  optional AggregateType UpdateOp = 7;
-  optional AggregateType UpdateAllOp = 8;
-  optional AggregateType PatchOp = 9;
-  optional AggregateType PatchAllOp = 10;
-  optional AggregateType DeleteOp = 11;
-  optional AggregateType DeleteByIdListOp = 12;
+  optional AggregateType ReadAllOp = 5;
+  optional AggregateType ReadByIDWebSocketOp = 6;
+  optional AggregateType DeleteAllOp = 7;
+  optional AggregateType UpdateOp = 8;
+  optional AggregateType UpdateAllOp = 9;
+  optional AggregateType PatchOp = 10;
+  optional AggregateType PatchAllOp = 11;
+  optional AggregateType DeleteOp = 12;
+  optional AggregateType DeleteByIdListOp = 13;
 
-  optional TimeSeriesGranularityType Granularity = 13 [default=Sec];
-  optional int64 ExpireAfterSeconds = 14;
-  optional string SecondaryField = 15;  // not supported yet
-  optional bool SetReentrantLock = 16 [default=true];
-  optional bool PassStoredObjToUpdatePrePostCallback = 17 [default=false];
-  optional bool PassStoredObjToUpdateAllPrePostCallback = 18 [default=false];
-  optional bool IncludeDataframeClients = 19 [default=false];
+  optional TimeSeriesGranularityType Granularity = 14 [default=Sec];
+  optional int64 ExpireAfterSeconds = 15;
+  optional string SecondaryField = 16;  // not supported yet
+  optional bool SetReentrantLock = 17 [default=true];
+  optional bool PassStoredObjToUpdatePrePostCallback = 18 [default=false];
+  optional bool PassStoredObjToUpdateAllPrePostCallback = 19 [default=false];
+  optional bool IncludeDataframeClients = 20 [default=false];
 }
 
 message FileUploadOptions{

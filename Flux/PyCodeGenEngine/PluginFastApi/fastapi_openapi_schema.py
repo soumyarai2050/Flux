@@ -202,8 +202,10 @@ class FastapiOpenapiSchema(BaseFastapiPlugin, ABC):
                                                                        FastapiOpenapiSchema.flux_msg_json_root_time_series)
 
         if option_val_dict.get(FastapiOpenapiSchema.flux_json_root_read_field) is not None:
-            # get and get-all request response
+            # get request response
             output_str += self._handle_get_response(message_name_snake_cased)
+
+        if option_val_dict.get(FastapiOpenapiSchema.flux_json_root_read_all_field) is not None:
             output_str += self._handle_get_all_response(message_name_snake_cased)
 
         if option_val_dict.get(FastapiOpenapiSchema.flux_json_root_create_field) is not None:
@@ -895,13 +897,13 @@ class FastapiOpenapiSchema(BaseFastapiPlugin, ABC):
             for crud_option_field_name, crud_operation_method in crud_field_name_to_method_call_dict.items():
                 if crud_option_field_name in option_val_dict:
                     output_str += crud_operation_method(message)
-
-                    if crud_option_field_name == FastapiOpenapiSchema.flux_json_root_read_field:
-                        # adding get all handling also
-                        output_str += ",\n"
-                        output_str += self.handle_GET_all_req_body(message)
-
                     output_str += ",\n"
+
+            if (aggregation_type := option_val_dict.get(
+                    FastapiOpenapiSchema.flux_json_root_read_all_field)) is not None:
+                # adding get all handling also
+                output_str += self.handle_GET_all_req_body(message)
+                output_str += ",\n"
 
             for field in message.fields:
                 if self.is_bool_option_enabled(field, FastapiOpenapiSchema.flux_fld_index):

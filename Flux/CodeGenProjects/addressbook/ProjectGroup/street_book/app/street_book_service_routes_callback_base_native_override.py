@@ -1744,8 +1744,10 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         updated_plan_limits_obj: PlanLimits = PlanLimits.from_dict(updated_obj_dict)
         await self._update_plan_limits_pre(stored_plan_limits_obj, updated_plan_limits_obj)
         updated_plan_limits_obj_json = updated_plan_limits_obj.to_dict(exclude_none=True)
+        # setting original_eligible_brokers back to updated_plan_limits_obj_json's eligible_brokers,
+        # so that large list of eligible_brokers is not passed to generic db layer for compare_n_patch
+        # and db operations
         updated_plan_limits_obj_json["eligible_brokers"] = original_eligible_brokers
-
         if stored_plan_limits_obj.plan_limits_update_seq_num is None:
             stored_plan_limits_obj.plan_limits_update_seq_num = 0
         updated_plan_limits_obj_json[

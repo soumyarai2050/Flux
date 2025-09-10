@@ -43,7 +43,6 @@ const TreeRenderer = ({
     handleCollapseAll,
     handlePageChange,
     setPaginatedNodes,
-    expandNodeAndAllChildren,
     onUpdate,
     setItemVisualStates,
     setCounter,
@@ -54,17 +53,15 @@ const TreeRenderer = ({
     animatingNodes,
     // Original toggle function for default expansion
     originalHandleNodeToggle,
-    // Glow props
-    newlyAddedOrDuplicatedXPath,
-    setNewlyAddedOrDuplicatedXPath,
 }) => {
     if (element.id === "root") return null;
 
 
     const nodeXPath = element.metadata?.xpath;
-    // Glow for the node itself or any descendant of the newly added/duplicated node
-    // const shouldGlow = newlyAddedOrDuplicatedXPath && nodeXPath && nodeXPath.startsWith(newlyAddedOrDuplicatedXPath);
-    const shouldGlow = newlyAddedOrDuplicatedXPath && newlyAddedOrDuplicatedXPath === nodeXPath;
+    // Get visual state for this node
+    const nodeVisualState = itemVisualStates[nodeXPath];
+    // Apply glow to newly added or duplicated items
+    const shouldGlow = nodeVisualState === 'added' || nodeVisualState === 'duplicated';
     const nodeProps = getNodeProps();
 
     // Apply glow class to the li element (tree branch wrapper) for newly added/duplicated items
@@ -171,10 +168,8 @@ const TreeRenderer = ({
                         setItemVisualStates(prev => ({ ...prev, [xpathAttr]: 'added' }));
                     }
 
-                    // Set the glow effect for the newly created object
-                    setNewlyAddedOrDuplicatedXPath(xpathAttr);
-
-                    expandNodeAndAllChildren(xpathAttr, newObjectInstance, itemSchemaForObject, projectSchema);
+                    // The expansion will be handled automatically by the data-add flag detection
+                    // No need to call expandNodeAndAllChildren here as the data-add mechanism will handle it
                     onUpdate(updatedObj, 'add');
 
                     // Mark that full regeneration is needed for structural changes
@@ -247,11 +242,8 @@ const TreeRenderer = ({
                 const schemaXpathForNewItem = `${xpathAttr}[${nextIndex}]`;
                 setItemVisualStates(prev => ({ ...prev, [schemaXpathForNewItem]: 'added' }));
 
-                // Set the glow effect for the newly created array item
-                setNewlyAddedOrDuplicatedXPath(schemaXpathForNewItem);
-
+                // Expansion will be handled automatically by the data-add flag detection
                 handleNodeToggle(xpathAttr, true);
-                expandNodeAndAllChildren(schemaXpathForNewItem, newArrayItem, arrayItemSchema, projectSchema);
 
                 const newItemPageIndex = Math.floor(nextIndex / ITEMS_PER_PAGE);
                 setPaginatedNodes(prev => ({ ...prev, [xpathAttr]: { page: newItemPageIndex } }));
@@ -324,12 +316,9 @@ const TreeRenderer = ({
             const schemaXpathForDuplicatedItem = parentOriginalXpath + '[' + nextIndex + ']';
             setItemVisualStates(prev => ({ ...prev, [schemaXpathForDuplicatedItem]: 'duplicated' }));
 
-            // Set the glow effect for the newly duplicated item
-            setNewlyAddedOrDuplicatedXPath(schemaXpathForDuplicatedItem);
-
+            // Expansion will be handled automatically by the data-add flag detection
             parentObject.push(duplicatedObject);
             handleNodeToggle(parentOriginalXpath, true); // Expand parent
-            expandNodeAndAllChildren(schemaXpathForDuplicatedItem, duplicatedObject, currentItemSchema, projectSchema);
             const totalItems = parentObject.length;
             const newItemPageIndex = Math.floor((totalItems - 1) / ITEMS_PER_PAGE);
             setPaginatedNodes(prev => ({ ...prev, [parentDataXpath]: { page: newItemPageIndex } }));
@@ -590,7 +579,6 @@ const TreeRenderer = ({
                     visualState={visualState}
                     pinnedFilters={pinnedFilters}
                     enableQuickFilterPin={enableQuickFilterPin}
-                    triggerGlowForXPath={newlyAddedOrDuplicatedXPath}
                 />
             </li>
         );
@@ -625,7 +613,6 @@ TreeRenderer.propTypes = {
     handleCollapseAll: PropTypes.func.isRequired,
     handlePageChange: PropTypes.func.isRequired,
     setPaginatedNodes: PropTypes.func.isRequired,
-    expandNodeAndAllChildren: PropTypes.func.isRequired,
     onUpdate: PropTypes.func.isRequired,
     setItemVisualStates: PropTypes.func.isRequired,
     setCounter: PropTypes.func.isRequired,
@@ -635,9 +622,6 @@ TreeRenderer.propTypes = {
     getNodeAnimationProps: PropTypes.func,
     animatingNodes: PropTypes.instanceOf(Set),
     originalHandleNodeToggle: PropTypes.func,
-    // Glow props
-    newlyAddedOrDuplicatedXPath: PropTypes.string,
-    setNewlyAddedOrDuplicatedXPath: PropTypes.func.isRequired,
 };
 
 export default TreeRenderer; 

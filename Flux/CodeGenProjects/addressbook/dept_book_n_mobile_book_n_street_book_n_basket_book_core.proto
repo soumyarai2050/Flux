@@ -13,6 +13,7 @@ message SymbolOverview {
     CreateOp: AggregateType_UNSPECIFIED,
     CreateAllOp: AggregateType_UNSPECIFIED, // currently set for tests, once real use-case is found can be removed
     ReadOp: AggregateType_UNSPECIFIED,
+    ReadAllOp: AggregateType_UNSPECIFIED,
     UpdateOp: AggregateType_UNSPECIFIED,
     UpdateAllOp: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found can be removed
     PatchOp: AggregateType_UNSPECIFIED,
@@ -70,11 +71,13 @@ message SymbolOverview {
 message TopOfBook {
   option (FluxMsgCppJsonRoot) = {
     ReadOp: AggregateType_UNSPECIFIED,
+    ReadAllOp: AggregateType_UNSPECIFIED,
   };
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     CreateAllOp: AggregateType_UNSPECIFIED, // currently set for tests, once real use-case is found can be removed
     ReadOp: AggregateType_UNSPECIFIED,
+    ReadAllOp: AggregateType_UNSPECIFIED,
     UpdateOp: AggregateType_UNSPECIFIED,
     UpdateAllOp: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found can be removed
     PatchOp: AggregateType_UNSPECIFIED,
@@ -129,6 +132,7 @@ message MarketDepth {
   option (FluxMsgCppJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
+    ReadAllOp: AggregateType_UNSPECIFIED,
     UpdateOp: AggregateType_UNSPECIFIED,
     PatchOp: AggregateType_UNSPECIFIED,
     DeleteOp: AggregateType_UNSPECIFIED,
@@ -138,6 +142,7 @@ message MarketDepth {
     CreateOp: AggregateType_UNSPECIFIED,
     CreateAllOp: AggregateType_UNSPECIFIED, // currently set for tests, once real use-case is found can be removed
     ReadOp: AggregateType_UNSPECIFIED,
+    ReadAllOp: AggregateType_UNSPECIFIED,
     UpdateOp: AggregateType_UNSPECIFIED,
     UpdateAllOp: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found can be removed
     PatchOp: AggregateType_UNSPECIFIED,
@@ -198,6 +203,7 @@ message LastBarter {
   option (FluxMsgCppJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
+    ReadAllOp: AggregateType_UNSPECIFIED,
     DeleteOp: AggregateType_UNSPECIFIED,
     DeleteAllOp: AggregateType_UNSPECIFIED,
   };
@@ -206,6 +212,7 @@ message LastBarter {
     CreateOp: AggregateType_UNSPECIFIED,
     CreateAllOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
+    ReadAllOp: AggregateType_UNSPECIFIED,
     DeleteAllOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED,
     Granularity: Sec,
@@ -248,6 +255,7 @@ message RawLastBarterHistory {
     CreateOp: AggregateType_UNSPECIFIED,
     CreateAllOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
+    ReadAllOp: AggregateType_UNSPECIFIED,
     DeleteAllOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED,
     Granularity: Sec,

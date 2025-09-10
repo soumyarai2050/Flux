@@ -12,6 +12,7 @@ message AdminControl {
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
+    ReadAllOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
   option (FluxMsgStringLength) = 128;

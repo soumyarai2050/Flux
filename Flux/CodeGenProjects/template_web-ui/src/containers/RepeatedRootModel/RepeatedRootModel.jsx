@@ -314,10 +314,13 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
         setReconnectCounter((prev) => prev + 1);
     }
 
+
+    const isWebSocketDisabled = projectSchema?.data_lab_node?.widget_ui_data_element?.is_graph_node_model ?? false;
+
     socketRef.current = useWebSocketWorker({
         url: (modelSchema.is_large_db_object || modelSchema.is_time_series || modelLayoutOption.depending_proto_model_for_cpp_port) ? url : viewUrl,
         modelName: derivedModelName,
-        isDisabled: false,
+        isDisabled: isWebSocketDisabled,
         reconnectCounter,
         selector,
         onWorkerUpdate: handleModelDataSourceUpdate,
@@ -642,7 +645,7 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                     onFiltersChange={handleFiltersChange}
                     uniqueValues={uniqueValues}
                     highlightDuration={modelLayoutData.highlight_duration ?? DEFAULT_HIGHLIGHT_DURATION}
-                    maxRowSize = {maxRowSize ?? 1}
+                    maxRowSize={maxRowSize ?? 1}
                 />
             </Wrapper>
         )
@@ -655,7 +658,7 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
             onClose={handleFullScreenToggle}
         >
             <ModelCard id={modelName}>
-                <ModelCardHeader 
+                <ModelCardHeader
                     name={modelTitle}
                     isMaximized={isMaximized}
                     onMaximizeToggle={handleFullScreenToggle}
@@ -757,7 +760,7 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                     isDisabled={isLoading || isProcessingUserActions}
                     error={error}
                     onClear={handleErrorClear}
-                    isDisconnected={!isWebSocketActive(socketRef.current)}
+                    isDisconnected={!isWebSocketActive(socketRef.current) && !isWebSocketDisabled}
                     onReconnect={handleReconnect}
                     isDownloading={isDownloading}
                     progress={progress}

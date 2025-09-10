@@ -381,7 +381,7 @@ def get_total_plan_alert_count_n_highest_severity(plan_id: int):
 
 
 def sort_alerts_based_on_severity_n_last_update_analyzer_time(
-        plan_id_or_model_obj: int | MsgspecBaseModel | None = None, limit: int | None = None):
+        plan_id_or_model_obj: int | MsgspecBaseModel | None = None, limit: int | None = None, **kwargs):
     """
     - $addFields: Adds a new field severityPriority based on the priority mapping defined using $switch.
     - $switch: Evaluates each case expression and returns the value associated with the first case expression that

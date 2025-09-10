@@ -25,6 +25,7 @@ message PlanAlert {
     CreateOp: AggregateType_UNSPECIFIED,
     CreateAllOp: AggregateType_UNSPECIFIED
     ReadOp: AggregateType_FilterAggregate,
+    ReadAllOp: AggregateType_FilterAggregate,
     UpdateOp: AggregateType_UNSPECIFIED,
     UpdateAllOp: AggregateType_UNSPECIFIED,
     PatchOp: AggregateType_UNSPECIFIED,
@@ -138,6 +139,7 @@ message ContactAlert {
     CreateOp: AggregateType_UNSPECIFIED,
     CreateAllOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_FilterAggregate,
+    ReadAllOp: AggregateType_FilterAggregate,
     UpdateOp: AggregateType_UNSPECIFIED,
     UpdateAllOp: AggregateType_UNSPECIFIED,
     PatchOp: AggregateType_UNSPECIFIED,
@@ -226,6 +228,7 @@ message ExecutorEventLedger {
     CreateOp: AggregateType_UNSPECIFIED,
     CreateAllOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
+    ReadAllOp: AggregateType_UNSPECIFIED,
     DeleteAllOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED,
     Granularity: Sec,

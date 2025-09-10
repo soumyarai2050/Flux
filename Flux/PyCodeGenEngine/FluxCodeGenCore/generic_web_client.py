@@ -41,26 +41,42 @@ else:
         raise Exception(err_str)
 
 @log_n_except
-def generic_http_get_all_client(url: str, model_type: Type[MsgspecModel], limit_obj_count: int | None = None):
-    params = None
+def generic_http_get_all_client(url: str, model_type: Type[MsgspecModel], limit_obj_count: int | None = None,
+                                **kwargs):
+    if kwargs:
+        params = kwargs
+    else:
+        params = {}
     if limit_obj_count:
-        params = {"limit_obj_count": limit_obj_count}
+        params["limit_obj_count"] = limit_obj_count
     response: requests.Response = requests.get(url, timeout=120, params=params)     # TIMEOUT for get-all set to 60 sec
     return http_response_as_class_type(url, response, 200, model_type, HTTPRequestType.GET)
 
 
 @log_n_except
-def generic_http_get_all_df_client(url: str, limit_obj_count: int | None = None):
-    params = None
+def generic_http_get_all_df_client(url: str, limit_obj_count: int | None = None, **kwargs):
+    if kwargs is not None:
+        params = kwargs
+    else:
+        params = {}
     if limit_obj_count:
-        params = {"limit_obj_count": limit_obj_count}
+        params["limit_obj_count"] = limit_obj_count
     response: requests.Response = requests.get(url, timeout=120, params=params)     # TIMEOUT for get-all set to 60 sec
     return http_response_as_df(url, response, 200, HTTPRequestType.GET)
 
 
+def _get_params_from_kwargs(return_copy_obj: bool | None = True, **kwargs):
+    if kwargs:
+        params = kwargs
+    else:
+        params = {}
+    if return_copy_obj:
+        params["return_obj_copy"] = return_copy_obj
+    return params
+
 @log_n_except
 def generic_http_post_client(url: str, model_obj: MsgspecModel, model_type: Type[MsgspecModel],
-                             return_copy_obj: bool | None = True):
+                             return_copy_obj: bool | None = True, **kwargs):
     # When used for routes
     if model_obj is not None:
         # create don't need to delete any field: model default should handle that,
@@ -70,7 +86,10 @@ def generic_http_post_client(url: str, model_obj: MsgspecModel, model_type: Type
     # When used for queries like get last date query, as there is no model obj in case of query
     else:
         json_data = None
-    response: requests.Response = requests.post(url, json=json_data, params={"return_obj_copy": return_copy_obj})
+
+    params = _get_params_from_kwargs(return_copy_obj, **kwargs)
+
+    response: requests.Response = requests.post(url, json=json_data, params=params)
     return http_response_as_class_type(url, response, 201, model_type, HTTPRequestType.POST)
 
 
@@ -89,7 +108,7 @@ def generic_http_file_query_client(url: str, file_path: str | PurePath, query_pa
 
 @log_n_except
 def generic_http_post_all_client(url: str, model_obj_list: List[MsgspecModel], model_type: Type[MsgspecModel],
-                                 return_copy_obj: bool | None = True):
+                                 return_copy_obj: bool | None = True, **kwargs):
     # When used for routes
     if model_obj_list is not None:
         json_data = generic_encoder(model_obj_list, model_type.enc_hook, by_alias=True, exclude_none=True)
@@ -97,13 +116,16 @@ def generic_http_post_all_client(url: str, model_obj_list: List[MsgspecModel], m
     # When used for queries like get last date query, as there is no model obj in case of query
     else:
         json_data = None
-    response: requests.Response = requests.post(url, json=json_data, params={"return_obj_copy": return_copy_obj})
+
+    params = _get_params_from_kwargs(return_copy_obj, **kwargs)
+
+    response: requests.Response = requests.post(url, json=json_data, params=params)
     return http_response_as_class_type(url, response, 201, model_type, HTTPRequestType.POST)
 
 
 @log_n_except
 def generic_http_post_all_df_in_model_list_out_client(url: str, df: pl.DataFrame, model_type: Type[MsgspecModel],
-                                                      return_copy_obj: bool | None = True):
+                                                      return_copy_obj: bool | None = True, **kwargs):
     # When used for routes
     if df is not None:
         json_data = df.to_dicts()
@@ -112,14 +134,17 @@ def generic_http_post_all_df_in_model_list_out_client(url: str, df: pl.DataFrame
     # When used for queries like get last date query, as there is no model obj in case of query
     else:
         json_data = None
-    response: requests.Response = requests.post(url, json=json_data, params={"return_obj_copy": return_copy_obj})
+
+    params = _get_params_from_kwargs(return_copy_obj, **kwargs)
+
+    response: requests.Response = requests.post(url, json=json_data, params=params)
     return http_response_as_class_type(url, response, 201, model_type, HTTPRequestType.POST)
 
 
 @log_n_except
 def generic_http_post_all_model_list_in_df_out_client(url: str, model_obj_list: List[MsgspecModel],
                                                       model_type: Type[MsgspecModel],
-                                                      return_copy_obj: bool | None = True):
+                                                      return_copy_obj: bool | None = True, **kwargs):
     # When used for routes
     if model_obj_list is not None:
         json_data = generic_encoder(model_obj_list, model_type.enc_hook, by_alias=True, exclude_none=True)
@@ -127,14 +152,17 @@ def generic_http_post_all_model_list_in_df_out_client(url: str, model_obj_list: 
     # When used for queries like get last date query, as there is no model obj in case of query
     else:
         json_data = None
-    response: requests.Response = requests.post(url, json=json_data, params={"return_obj_copy": return_copy_obj})
+
+    params = _get_params_from_kwargs(return_copy_obj, **kwargs)
+
+    response: requests.Response = requests.post(url, json=json_data, params=params)
     return http_response_as_df(url, response, 201, HTTPRequestType.POST)
 
 
 @log_n_except
 def generic_http_post_all_df_in_df_out_client(url: str, df: pl.DataFrame,
                                               model_type: Type[MsgspecModel],
-                                              return_copy_obj: bool | None = True):
+                                              return_copy_obj: bool | None = True, **kwargs):
     # When used for routes
     if df is not None:
         json_data = df.to_dicts()
@@ -143,12 +171,15 @@ def generic_http_post_all_df_in_df_out_client(url: str, df: pl.DataFrame,
     # When used for queries like get last date query, as there is no model obj in case of query
     else:
         json_data = None
-    response: requests.Response = requests.post(url, json=json_data, params={"return_obj_copy": return_copy_obj})
+
+    params = _get_params_from_kwargs(return_copy_obj, **kwargs)
+
+    response: requests.Response = requests.post(url, json=json_data, params=params)
     return http_response_as_df(url, response, 201, HTTPRequestType.POST)
 
 
 @log_n_except
-def generic_http_get_client(url: str, query_param: Any, model_type: Type[MsgspecModel]):
+def generic_http_get_client(url: str, query_param: Any, model_type: Type[MsgspecModel], **kwargs):
     # When used for routes
     if query_param is not None:
         if url.endswith("/"):
@@ -157,39 +188,45 @@ def generic_http_get_client(url: str, query_param: Any, model_type: Type[Msgspec
             url = f"{url}/{query_param}"
 
     # else not required: When used for queries, like get last date query, there is no query_param in case of query
-    response: requests.Response = requests.get(url)
+    response: requests.Response = requests.get(url, params=kwargs)
     return http_response_as_class_type(url, response, 200, model_type, HTTPRequestType.GET)
 
 
 @log_n_except
 def generic_http_put_client(url: str, model_obj: MsgspecModel, model_type: Type[MsgspecModel],
-                            return_copy_obj: bool | None = True):
+                            return_copy_obj: bool | None = True, **kwargs):
     if model_obj is not None:
         # When used for routes
         json_data = generic_encoder(model_obj, model_type.enc_hook, by_alias=True)
     else:
         # When used for queries like get last date query, as there is no model obj in case of query
         json_data = None
-    response: requests.Response = requests.put(url, json=json_data, params={"return_obj_copy": return_copy_obj})
+
+    params = _get_params_from_kwargs(return_copy_obj, **kwargs)
+
+    response: requests.Response = requests.put(url, json=json_data, params=params)
     return http_response_as_class_type(url, response, 200, model_type, HTTPRequestType.PUT)
 
 
 @log_n_except
 def generic_http_put_all_client(url: str, model_obj_list: List[MsgspecModel], model_type: Type[MsgspecModel],
-                                return_copy_obj: bool | None = True):
+                                return_copy_obj: bool | None = True, **kwargs):
     if model_obj_list is not None:
         # When used for routes
         json_data = generic_encoder(model_obj_list, model_type.enc_hook, by_alias=True)
     else:
         # When used for queries like get last date query, as there is no model obj in case of query
         json_data = None
-    response: requests.Response = requests.put(url, json=json_data, params={"return_obj_copy": return_copy_obj})
+
+    params = _get_params_from_kwargs(return_copy_obj, **kwargs)
+
+    response: requests.Response = requests.put(url, json=json_data, params=params)
     return http_response_as_class_type(url, response, 200, model_type, HTTPRequestType.PUT)
 
 
 @log_n_except
 def generic_http_put_all_df_in_model_list_out_client(url: str, df: pl.DataFrame, model_type: Type[MsgspecModel],
-                                                     return_copy_obj: bool | None = True):
+                                                     return_copy_obj: bool | None = True, **kwargs):
     if df is not None:
         # When used for routes
         json_data = df.to_dicts()
@@ -198,28 +235,34 @@ def generic_http_put_all_df_in_model_list_out_client(url: str, df: pl.DataFrame,
     else:
         # When used for queries like get last date query, as there is no model obj in case of query
         json_data = None
-    response: requests.Response = requests.put(url, json=json_data, params={"return_obj_copy": return_copy_obj})
+
+    params = _get_params_from_kwargs(return_copy_obj, **kwargs)
+
+    response: requests.Response = requests.put(url, json=json_data, params=params)
     return http_response_as_class_type(url, response, 200, model_type, HTTPRequestType.PUT)
 
 
 @log_n_except
 def generic_http_put_all_model_list_in_df_out_client(url: str, model_obj_list: List[MsgspecModel],
                                                      model_type: Type[MsgspecModel],
-                                                     return_copy_obj: bool | None = True):
+                                                     return_copy_obj: bool | None = True, **kwargs):
     if model_obj_list is not None:
         # When used for routes
         json_data = generic_encoder(model_obj_list, model_type.enc_hook, by_alias=True)
     else:
         # When used for queries like get last date query, as there is no model obj in case of query
         json_data = None
-    response: requests.Response = requests.put(url, json=json_data, params={"return_obj_copy": return_copy_obj})
+
+    params = _get_params_from_kwargs(return_copy_obj, **kwargs)
+
+    response: requests.Response = requests.put(url, json=json_data, params=params)
     return http_response_as_df(url, response, 200, HTTPRequestType.PUT)
 
 
 @log_n_except
 def generic_http_put_all_df_in_df_out_client(url: str, df: pl.DataFrame,
                                              model_type: Type[MsgspecModel],
-                                             return_copy_obj: bool | None = True):
+                                             return_copy_obj: bool | None = True, **kwargs):
     if df is not None:
         # When used for routes
         json_data = df.to_dicts()
@@ -228,48 +271,59 @@ def generic_http_put_all_df_in_df_out_client(url: str, df: pl.DataFrame,
     else:
         # When used for queries like get last date query, as there is no model obj in case of query
         json_data = None
-    response: requests.Response = requests.put(url, json=json_data, params={"return_obj_copy": return_copy_obj})
+
+    params = _get_params_from_kwargs(return_copy_obj, **kwargs)
+
+    response: requests.Response = requests.put(url, json=json_data, params=params)
     return http_response_as_df(url, response, 200, HTTPRequestType.PUT)
 
 
 @log_n_except
 def generic_http_patch_client(url: str, model_obj_json: Dict, model_type: Type[MsgspecModel],
-                              return_copy_obj: bool | None = True):
+                              return_copy_obj: bool | None = True, **kwargs):
     model_obj_json = generic_encoder(model_obj_json, model_type.enc_hook, by_alias=True)
+
+    params = _get_params_from_kwargs(return_copy_obj, **kwargs)
+
     response: requests.Response = requests.patch(url, json=model_obj_json,
-                                                 params={"return_obj_copy": return_copy_obj})
+                                                 params=params)
     return http_response_as_class_type(url, response, 200, model_type, HTTPRequestType.PATCH)
 
 
 @log_n_except
 def generic_http_patch_all_client(url: str, model_obj_json_list: List[Dict], model_type: Type[MsgspecModel],
-                                  return_copy_obj: bool | None = True):
+                                  return_copy_obj: bool | None = True, **kwargs):
     model_obj_json_list = generic_encoder(model_obj_json_list, model_type.enc_hook, by_alias=True)
-    response: requests.Response = requests.patch(url, json=model_obj_json_list,
-                                                 params={"return_obj_copy": return_copy_obj})
+
+    params = _get_params_from_kwargs(return_copy_obj, **kwargs)
+
+    response: requests.Response = requests.patch(url, json=model_obj_json_list, params=params)
     return http_response_as_class_type(url, response, 200, model_type, HTTPRequestType.PATCH)
 
 
 @log_n_except
 def generic_http_patch_all_json_list_in_df_out_client(url: str, json_list: List[Dict],
-                                                      return_copy_obj: bool | None = True):
-    response: requests.Response = requests.patch(url, json=json_list,
-                                                 params={"return_obj_copy": return_copy_obj})
+                                                      return_copy_obj: bool | None = True, **kwargs):
+    params = _get_params_from_kwargs(return_copy_obj, **kwargs)
+
+    response: requests.Response = requests.patch(url, json=json_list, params=params)
     return http_response_as_df(url, response, 200, HTTPRequestType.PATCH)
 
 
 @log_n_except
 def generic_http_patch_all_df_in_df_out_client(url: str, df: pl.DataFrame, model_type: Type[MsgspecModel],
-                                               return_copy_obj: bool | None = True):
+                                               return_copy_obj: bool | None = True, **kwargs):
     json_data = df.to_dicts()
     json_data = generic_encoder(json_data, model_type.enc_hook, by_alias=True)
-    response: requests.Response = requests.patch(url, json=json_data,
-                                                 params={"return_obj_copy": return_copy_obj})
+
+    params = _get_params_from_kwargs(return_copy_obj, **kwargs)
+
+    response: requests.Response = requests.patch(url, json=json_data, params=params)
     return http_response_as_df(url, response, 200, HTTPRequestType.PATCH)
 
 
 @log_n_except
-def generic_http_delete_client(url: str, query_param: Any, return_copy_obj: bool | None = True):
+def generic_http_delete_client(url: str, query_param: Any, return_copy_obj: bool | None = True, **kwargs):
     # When used for routes
     if query_param is not None:
         if url.endswith("/"):
@@ -277,24 +331,31 @@ def generic_http_delete_client(url: str, query_param: Any, return_copy_obj: bool
         else:
             url = f"{url}/{query_param}"
     # else not required: When used for queries like get last date query, as there is no query_param in case of query
-    response: requests.Response = requests.delete(url, params={"return_obj_copy": return_copy_obj})
+
+    params = _get_params_from_kwargs(return_copy_obj, **kwargs)
+
+    response: requests.Response = requests.delete(url, params=params)
     expected_status_code = 200
     return http_response_as_json(url, response, expected_status_code, HTTPRequestType.DELETE)
 
 
 @log_n_except
 def generic_http_delete_by_id_list_client(url: str, delete_id_list: List[Any], model_type: Type[MsgspecModel],
-                                          return_copy_obj: bool | None = True):
+                                          return_copy_obj: bool | None = True, **kwargs):
     delete_id_list_json = generic_encoder(delete_id_list, model_type.enc_hook, by_alias=True)
-    response: requests.Response = requests.delete(url, json=delete_id_list_json,
-                                                  params={"return_obj_copy": return_copy_obj})
+
+    params = _get_params_from_kwargs(return_copy_obj, **kwargs)
+
+    response: requests.Response = requests.delete(url, json=delete_id_list_json, params=params)
     expected_status_code = 200
     return http_response_as_json(url, response, expected_status_code, HTTPRequestType.DELETE)
 
 
 @log_n_except
-def generic_http_delete_all_client(url: str, return_copy_obj: bool | None = True):
-    response: requests.Response = requests.delete(url, params={"return_obj_copy": return_copy_obj})
+def generic_http_delete_all_client(url: str, return_copy_obj: bool | None = True, **kwargs):
+    params = _get_params_from_kwargs(return_copy_obj, **kwargs)
+
+    response: requests.Response = requests.delete(url, params=params)
     expected_status_code = 200
     return http_response_as_json(url, response, expected_status_code, HTTPRequestType.DELETE)
 
@@ -382,13 +443,14 @@ async def generic_ws_get_client(url: str, query_param: Any, model_type: Type[Msg
                     continue
 
 @log_n_except
-def generic_http_index_client(url: str, query_params: List[Any], model_type: Type[MsgspecModel]):
+def generic_http_index_client(url: str, query_params: List[Any], model_type: Type[MsgspecModel], **kwargs):
     query_params = "/".join(query_params)
     if url.endswith("/"):
         url = f"{url}{query_params}"
     else:
         url = f"{url}/{query_params}"
-    response: requests.Response = requests.get(url)
+
+    response: requests.Response = requests.get(url, params=kwargs)
     return http_response_as_class_type(url, response, 200, model_type, HTTPRequestType.GET)
 
 

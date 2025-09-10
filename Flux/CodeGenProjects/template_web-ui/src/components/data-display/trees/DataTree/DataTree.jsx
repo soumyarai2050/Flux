@@ -50,7 +50,7 @@ const DataTree = ({
     const [originalTree, setOriginalTree] = useState([]);
     const [paginatedNodes, setPaginatedNodes] = useState({});
     const [itemVisualStates, setItemVisualStates] = useState({});
-    const [newlyAddedOrDuplicatedXPath, setNewlyAddedOrDuplicatedXPath] = useState(null); // Track the single node that should glow
+    //using visual states instead
     const [isWorkerProcessing, setIsWorkerProcessing] = useState(false);
     const [counter, setCounter] = useState(0);
     const workerRef = useRef(null);
@@ -70,8 +70,8 @@ const DataTree = ({
         expandNodeAndAllChildren,
         updateExpandedStateForTreeData,
         initializeExpansionForTree,
-        autoExpandNewlyCreatedObjects,
-    } = useTreeExpansion(projectSchema, updatedData, storedData, newlyAddedOrDuplicatedXPath);
+        autoExpandDataAddFlaggedObjects,
+    } = useTreeExpansion(projectSchema, updatedData, storedData);
 
     // Use our custom hook for animation management
     const {
@@ -422,7 +422,6 @@ const DataTree = ({
                 handlePageChange={handlePageChange}
                 setPaginatedNodes={setPaginatedNodes}
                 needsFullRegenerationRef={needsFullRegenerationRef}
-                expandNodeAndAllChildren={expandNodeAndAllChildren}
                 onUpdate={onUpdate}
                 setItemVisualStates={setItemVisualStates}
                 setCounter={setCounter}
@@ -431,8 +430,6 @@ const DataTree = ({
                 getNodeAnimationProps={getNodeAnimationProps}
                 animatingNodes={animatingNodes}
                 originalHandleNodeToggle={handleNodeToggle}
-                newlyAddedOrDuplicatedXPath={newlyAddedOrDuplicatedXPath}
-                setNewlyAddedOrDuplicatedXPath={setNewlyAddedOrDuplicatedXPath}
             />
         );
     };
@@ -445,36 +442,43 @@ const DataTree = ({
         initializeExpansionForTree(originalTree);
     }, [originalTree, initializeExpansionForTree]);
 
-    // Use our custom hook function for auto-expansion
-    // Automatically expands nodes that represent newly created objects.
+    // Auto-expand newly created objects (unified approach using data-add flags)
     useEffect(() => {
-        autoExpandNewlyCreatedObjects(originalTree);
-    }, [originalTree, autoExpandNewlyCreatedObjects]);
+        autoExpandDataAddFlaggedObjects(originalTree);
+    }, [originalTree, autoExpandDataAddFlaggedObjects]);
 
-    // Auto-clear glow effect with timer
+    // Auto-clear glow effect with single timer for latest created object
     useEffect(() => {
-        // If a node is marked for glowing...
-        if (newlyAddedOrDuplicatedXPath) {
-            // Set a timer to turn off the glow after 3 seconds
-            const glowClearTimer = setTimeout(() => {
-                setNewlyAddedOrDuplicatedXPath(null); // Resetting state removes the glow on re-render
-            }, 3000); // 3-second glow duration
+        const latestAddedXPath = Object.keys(itemVisualStates).find(
+            xpath => itemVisualStates[xpath] === 'added' || itemVisualStates[xpath] === 'duplicated'
+        );
+        
+        if (latestAddedXPath) {
+            const timer = setTimeout(() => {
+                setItemVisualStates(prev => {
+                    const next = { ...prev };
+                    delete next[latestAddedXPath];
+                    return next;
+                });
+            }, 3000); // 3-second glow duration for latest item only
 
-            // Cleanup function to clear the timer if the component unmounts or the state changes again
-            return () => {
-                clearTimeout(glowClearTimer);
-            };
+            return () => clearTimeout(timer);
         }
-    }, [newlyAddedOrDuplicatedXPath]); // This effect runs only when the glow target changes
+    }, [itemVisualStates]);
 
-    // Auto-scroll to newly added node - moved to DataTree to avoid Framer Motion conflicts
+    // Auto-scroll to newly added nodes using visual states
     useEffect(() => {
-        if (newlyAddedOrDuplicatedXPath) {
-            // Function to find the best element to scroll to
+        const addedXPaths = Object.keys(itemVisualStates).filter(
+            xpath => itemVisualStates[xpath] === 'added' || itemVisualStates[xpath] === 'duplicated'
+        );
+
+        if (addedXPaths.length > 0) {
+            // Scroll to the first newly added item
+            const targetXPath = addedXPaths[0];
+            
             const findScrollTarget = () => {
                 // First try to find the animated-tree-node
-                const animatedNode = document.querySelector(`[data-xpath="${newlyAddedOrDuplicatedXPath}"]`);
-
+                const animatedNode = document.querySelector(`[data-xpath="${targetXPath}"]`);
                 if (animatedNode) {
                     // Check if it's fully rendered (not mid-animation)
                     const computedStyle = window.getComputedStyle(animatedNode);
@@ -514,7 +518,7 @@ const DataTree = ({
 
             return () => clearTimeout(scrollTimer);
         }
-    }, [newlyAddedOrDuplicatedXPath]);
+    }, [itemVisualStates]);
 
     if (!treeData || treeData.length === 0) return null;
 

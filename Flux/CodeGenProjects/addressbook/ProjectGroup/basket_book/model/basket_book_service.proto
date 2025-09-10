@@ -15,13 +15,14 @@ message BasketChore{
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
+    ReadAllOp: AggregateType_UNSPECIFIED,
     UpdateOp: AggregateType_UNSPECIFIED,
     UpdateAllOp: AggregateType_UNSPECIFIED,
     PatchOp: AggregateType_UNSPECIFIED,
     PatchAllOp: AggregateType_UNSPECIFIED,
     DeleteOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED,
-    PassStoredObjToPartialUpdatePostCallback: True
+    PassStoredObjToPartialUpdatePostCallback: true
   };
   option (FluxMsgWidgetUIDataElement) = {
     x: 4,

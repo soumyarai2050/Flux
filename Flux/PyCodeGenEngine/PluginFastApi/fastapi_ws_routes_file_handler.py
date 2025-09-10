@@ -70,7 +70,7 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
 
         field_params = ", ".join([f"{field.proto.name}: {self.proto_to_py_datatype(field)}" for field in index_fields])
         output_str = f"async def underlying_get_{message_name_snake_cased}_from_index_fields_ws(websocket: WebSocket," \
-                     f" {field_params}, filter_agg_pipeline: Any = None):\n"
+                     f" {field_params}, filter_agg_pipeline: Any = None, **query_params):\n"
         output_str += f'    """ Index route of {message.proto.name} """\n'
         output_str += f"    await callback_class.index_of_{message_name_snake_cased}_ws_pre()\n"
         filter_configs_var_name = self._get_filter_configs_var_name(message, None)
@@ -104,8 +104,10 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                       f"{field_params}):\n"
         field_params = ", ".join([f"{field.proto.name}" for field in index_fields])
         output_str += self._get_view_check_code_for_ws(message)
+        output_str += f"    query_params = dict(websocket.query_params)\n"
         output_str += \
-            f"    await underlying_get_{message_name_snake_cased}_from_index_fields_ws(websocket, {field_params})\n\n\n"
+            (f"    await underlying_get_{message_name_snake_cased}_from_index_fields_ws(websocket, {field_params}, "
+             f"**query_params)\n\n\n")
         return output_str
 
     def handle_underlying_GET_ws_gen(self, **kwargs):
@@ -114,13 +116,14 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         message_name = message.proto.name
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         if id_field_type is not None:
-            output_str = f"async def underlying_read_{message_name_snake_cased}_by_id_ws(websocket: WebSocket, " \
-                         f"{message_name_snake_cased}_id: {id_field_type}, " \
-                         f"filter_agg_pipeline: Any = None, need_initial_snapshot: bool | None = True) -> None:\n"
+            output_str = (f"async def underlying_read_{message_name_snake_cased}_by_id_ws(websocket: WebSocket, "
+                          f"{message_name_snake_cased}_id: {id_field_type}, "
+                          f"filter_agg_pipeline: Any = None, need_initial_snapshot: bool | None = True, "
+                          f"**query_params) -> None:\n")
         else:
             output_str = f"async def underlying_read_{message_name_snake_cased}_by_id_ws(websocket: WebSocket, " \
                          f"{message_name_snake_cased}_id: {FastapiWsRoutesFileHandler.default_id_type_var_name}, " \
-                         f"filter_agg_pipeline: Any = None) -> None:\n"
+                         f"filter_agg_pipeline: Any = None, **query_params) -> None:\n"
         output_str += f'    """\n'
         output_str += f'    Read by id using websocket route for {message.proto.name}\n'
         output_str += f'    """\n'
@@ -167,15 +170,15 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                       '{' + f'{message_name_snake_cased}_id' + '}")\n'
         if id_field_type is not None:
             output_str += (f"async def read_{message_name_snake_cased}_by_id_ws(websocket: WebSocket, "
-                           f"{message_name_snake_cased}_id: {id_field_type}, "
-                           f"need_initial_snapshot: bool | None = True) -> None:\n")
+                           f"{message_name_snake_cased}_id: {id_field_type}) -> None:\n")
         else:
             output_str += (f"async def read_{message_name_snake_cased}_by_id_ws(websocket: WebSocket, "
-                           f"{message_name_snake_cased}_id: {FastapiWsRoutesFileHandler.default_id_type_var_name},"
-                           f"need_initial_snapshot: bool | None = True) -> None:\n")
+                           f"{message_name_snake_cased}_id: {FastapiWsRoutesFileHandler.default_id_type_var_name}) -> None:\n")
         output_str += self._get_view_check_code_for_ws(message)
+        output_str += f"    query_params = dict(websocket.query_params)\n"
+        output_str += f"    need_initial_snapshot = True if str(query_params.pop('need_initial_snapshot', True)).lower() == 'true' else False\n"
         output_str += f"    await underlying_read_{message_name_snake_cased}_by_id_ws(websocket, " \
-                      f"{message_name_snake_cased}_id, need_initial_snapshot=need_initial_snapshot)\n"
+                      f"{message_name_snake_cased}_id, need_initial_snapshot=need_initial_snapshot, **query_params)\n"
         return output_str
 
     def handle_underlying_GET_ALL_ws_gen(self, message: protogen.Message, aggregation_type: str,
@@ -185,7 +188,7 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
         output_str = (f"async def underlying_read_{message_name_snake_cased}_ws(websocket: WebSocket, "
                       f"filter_agg_pipeline: Any = None, need_initial_snapshot: bool | None = True, "
-                      f"limit_obj_count: int | None = None) -> None:\n")
+                      f"limit_obj_count: int | None = None, **query_params) -> None:\n")
         output_str += f'    """ Get All {message_name} using websocket """\n'
 
         output_str += f"    await callback_class.read_all_ws_{message_name_snake_cased}_pre()\n"
@@ -256,8 +259,12 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str = self.handle_underlying_GET_ALL_ws_gen(message, aggregation_type, shared_lock_list)
         output_str += f"\n"
         output_str += (f'@{self.api_router_app_name}.websocket("/get-all-{message_name_snake_cased}-ws")\n')
-        output_str += (f"async def read_{message_name_snake_cased}_ws(websocket: WebSocket, "
-                       f"need_initial_snapshot: bool | None = True, limit_obj_count: int | None = None) -> None:\n")
+        output_str += (f"async def read_{message_name_snake_cased}_ws(websocket: WebSocket) -> None:\n")
+        output_str += f"    query_params = dict(websocket.query_params)\n"
+        output_str += f"    limit_obj_count = query_params.pop('limit_obj_count', None)\n"
+        output_str += f"    if limit_obj_count is not None:\n"
+        output_str += f"        limit_obj_count = parse_to_int(limit_obj_count)\n"
+        output_str += f"    need_initial_snapshot = True if str(query_params.pop('need_initial_snapshot', True)).lower() == 'true' else False\n"
         additional_agg_option_val_dict = \
             self.get_complex_option_value_from_proto(message,
                                                      FastapiWsRoutesFileHandler.flux_msg_main_crud_operations_agg)
@@ -268,12 +275,12 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += "        limit_filter_agg = {'agg': get_limited_objs(limit_obj_count)}\n"
             output_str += self._get_view_check_code_for_ws(message)
             output_str += (f"    await underlying_read_{message_name_snake_cased}_ws(websocket, "
-                           f"limit_filter_agg, need_initial_snapshot)\n\n\n")
+                           f"limit_filter_agg, need_initial_snapshot, **query_params)\n\n\n")
         else:
             output_str += self._get_view_check_code_for_ws(message)
             output_str += (f"    await underlying_read_{message_name_snake_cased}_ws(websocket, "
                            f"need_initial_snapshot=need_initial_snapshot, "
-                           f"limit_obj_count=limit_obj_count)\n\n\n")
+                           f"limit_obj_count=limit_obj_count, **query_params)\n\n\n")
         return output_str
 
     def handle_field_web_socket_gen(self, message: protogen.Message, field: protogen.Field):
@@ -349,7 +356,7 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         shared_mutex_list = self._get_list_of_shared_lock_for_message(message)
 
         if (aggregation_type := option_val_dict.get(
-                FastapiWsRoutesFileHandler.flux_json_root_read_field)) is not None:
+                FastapiWsRoutesFileHandler.flux_json_root_read_all_field)) is not None:
             output_str += \
                 self.handle_GET_ALL_ws_gen(message, aggregation_type.strip(), shared_mutex_list)
         # else not required: avoiding find_all route for this message if read_ws_field of json_root option is not set

@@ -62,6 +62,7 @@ message ChoreLimits {
     CreateOp: AggregateType_UNSPECIFIED,
     CreateAllOp: AggregateType_UNSPECIFIED, // currently set for tests, once real use-case is found can be removed
     ReadOp: AggregateType_UNSPECIFIED,
+    ReadAllOp: AggregateType_UNSPECIFIED,
     UpdateOp: AggregateType_UNSPECIFIED,
     UpdateAllOp: AggregateType_UNSPECIFIED,  // currently set for tests, once real use-case is found can be removed
     PatchOp: AggregateType_UNSPECIFIED,
@@ -105,6 +106,7 @@ message SystemControl {
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
+    ReadAllOp: AggregateType_UNSPECIFIED,
     UpdateOp: AggregateType_UNSPECIFIED,
     PatchOp: AggregateType_UNSPECIFIED,
     PatchAllOp: AggregateType_UNSPECIFIED,
@@ -187,6 +189,7 @@ message ContactStatus {
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
+    ReadAllOp: AggregateType_UNSPECIFIED,
     UpdateOp: AggregateType_UNSPECIFIED,
     PatchOp: AggregateType_UNSPECIFIED,
     PatchAllOp: AggregateType_UNSPECIFIED,
@@ -242,6 +245,7 @@ message PairPlan {
     option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
+    ReadAllOp: AggregateType_UNSPECIFIED,
     UpdateOp: AggregateType_UNSPECIFIED,
     PatchOp: AggregateType_UNSPECIFIED,
     PatchAllOp: AggregateType_UNSPECIFIED,
@@ -357,6 +361,7 @@ message PlanCollection {
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
+    ReadAllOp: AggregateType_UNSPECIFIED,
     UpdateOp: AggregateType_UNSPECIFIED,
     DeleteOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
@@ -413,6 +418,7 @@ message SampleModel{
     CreateOp: AggregateType_UpdateAggregate,
     CreateAllOp: AggregateType_UpdateAggregate,
     ReadOp: AggregateType_UNSPECIFIED,
+    ReadAllOp: AggregateType_UNSPECIFIED,
     UpdateOp: AggregateType_UpdateAggregate,
     UpdateAllOp: AggregateType_UpdateAggregate,
     PatchOp: AggregateType_UpdateAggregate,
@@ -492,6 +498,7 @@ message SampleTSModel{
     CreateOp: AggregateType_UNSPECIFIED,
     CreateAllOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
+    ReadAllOp: AggregateType_UNSPECIFIED,
     UpdateOp: AggregateType_UNSPECIFIED,
     UpdateAllOp: AggregateType_UNSPECIFIED,
     PatchOp: AggregateType_UNSPECIFIED,
@@ -518,6 +525,7 @@ message SampleTSModel1{
     CreateOp: AggregateType_UpdateAggregate,
     CreateAllOp: AggregateType_UpdateAggregate,
     ReadOp: AggregateType_UNSPECIFIED,
+    ReadAllOp: AggregateType_UNSPECIFIED,
     UpdateOp: AggregateType_UpdateAggregate,
     UpdateAllOp: AggregateType_UpdateAggregate,
     PatchOp: AggregateType_UpdateAggregate,
@@ -569,6 +577,7 @@ message CommandRequest{
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
+    ReadAllOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
   option (FluxMsgStringLength) = 128;
@@ -585,6 +594,7 @@ message CommandResponse{
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
+    ReadAllOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
   option (FluxMsgStringLength) = 128;
@@ -656,6 +666,7 @@ message Window{
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
+    ReadAllOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
     UpdateOp: AggregateType_UNSPECIFIED
     PatchOp: AggregateType_UNSPECIFIED
@@ -670,6 +681,7 @@ message Door{
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
+    ReadAllOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
     UpdateOp: AggregateType_UNSPECIFIED
     PatchOp: AggregateType_UNSPECIFIED
@@ -684,6 +696,7 @@ message House{
   option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
+    ReadAllOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
     UpdateOp: AggregateType_UNSPECIFIED
     PatchOp: AggregateType_UNSPECIFIED

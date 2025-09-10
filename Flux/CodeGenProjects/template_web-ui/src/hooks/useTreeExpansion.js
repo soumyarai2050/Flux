@@ -6,7 +6,7 @@ import { DATA_TYPES } from '../constants';
  * Custom hook for managing tree expansion state and operations
  * This separates all expansion logic from the main DataTree component
  */
-const useTreeExpansion = (projectSchema, updatedData, storedData, newlyAddedOrDuplicatedXPath = null) => {
+const useTreeExpansion = (projectSchema, updatedData, storedData) => {
     // State for tracking which nodes are expanded
     const [expandedNodeXPaths, setExpandedNodeXPaths] = useState({ "root": true });
 
@@ -311,14 +311,14 @@ const useTreeExpansion = (projectSchema, updatedData, storedData, newlyAddedOrDu
     }, []);
 
     /**
-     * Auto-expand newly created objects based on the specific newly added/duplicated XPath
-     * Only expands the most recently created node, not all previously created nodes
+     * Auto-expand newly created objects based on data-add flags in the tree structure
+     * This handles objects created outside the DataTree component (e.g., from forms)
      */
-    const autoExpandNewlyCreatedObjects = useCallback((originalTree) => {
-        if (originalTree && originalTree.length > 0 && newlyAddedOrDuplicatedXPath) {
-            const expandNewlyCreatedObjects = (node) => {
-                // Only expand if this specific node matches the newly added/duplicated XPath
-                if (node.xpath === newlyAddedOrDuplicatedXPath) {
+    const autoExpandDataAddFlaggedObjects = useCallback((originalTree) => {
+        if (originalTree && originalTree.length > 0) {
+            const expandDataAddObjects = (node) => {
+                // Check if this node has a data-add flag, indicating it's newly created
+                if (node['data-add'] === true) {
                     const nodeData = get(updatedData, node.xpath);
                     if (nodeData) {
                         let objectSchema = null;
@@ -353,16 +353,16 @@ const useTreeExpansion = (projectSchema, updatedData, storedData, newlyAddedOrDu
 
                 if (node.children && Array.isArray(node.children)) {
                     node.children.forEach(child => {
-                        expandNewlyCreatedObjects(child);
+                        expandDataAddObjects(child);
                     });
                 }
             };
 
             originalTree.forEach(node => {
-                expandNewlyCreatedObjects(node);
+                expandDataAddObjects(node);
             });
         }
-    }, [updatedData, storedData, projectSchema, expandNodeAndAllChildren, newlyAddedOrDuplicatedXPath]);
+    }, [updatedData, projectSchema, expandNodeAndAllChildren]);
 
     /**
      * Reset expansion state for a new tree instance
@@ -390,7 +390,7 @@ const useTreeExpansion = (projectSchema, updatedData, storedData, newlyAddedOrDu
         expandNodeAndAllChildren,
         updateExpandedStateForTreeData,
         initializeExpansionForTree,
-        autoExpandNewlyCreatedObjects,
+        autoExpandDataAddFlaggedObjects,
         resetExpansionState,
 
         // Refs

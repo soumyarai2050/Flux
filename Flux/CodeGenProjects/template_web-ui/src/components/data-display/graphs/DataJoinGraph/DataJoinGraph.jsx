@@ -773,9 +773,9 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
 
             const sourceName = get(sourceNode, graphAttributes.nodeNameField);
             const targetName = get(targetNode, graphAttributes.nodeNameField);
-            let sourceNodeData = state.nodeDataCache[sourceName] || getCachedNodeData(sourceName);
-            let targetNodeData = state.nodeDataCache[targetName] || getCachedNodeData(targetName);
 
+            // Fetch source node data
+            let sourceNodeData = state.nodeDataCache[sourceName] || getCachedNodeData(sourceName);
             if (!sourceNodeData) {
                 sourceNodeData = await fetchNodeData(graphAttributes.nodeMetaQueryName, graphAttributes.nodeMetaParamName, sourceNode);
                 dispatch({
@@ -784,39 +784,34 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
                 });
             }
 
-            if (!targetNodeData) {
-                targetNodeData = await fetchNodeData(graphAttributes.nodeMetaQueryName, graphAttributes.nodeMetaParamName, targetNode);
-                dispatch({
-                    type: ACTION_TYPES.CACHE_NODE_DATA,
-                    payload: { nodeId: targetName, data: targetNodeData }
-                });
-            }
+            // Fetch target node data (commented out for now)
+            // let targetNodeData = state.nodeDataCache[targetName] || getCachedNodeData(targetName);
+            // if (!targetNodeData) {
+            //     targetNodeData = await fetchNodeData(graphAttributes.nodeMetaQueryName, graphAttributes.nodeMetaParamName, targetNode);
+            //     dispatch({
+            //         type: ACTION_TYPES.CACHE_NODE_DATA,
+            //         payload: { nodeId: targetName, data: targetNodeData }
+            //     });
+            // }
 
-            const result = await fetchAnalysedData(sourceNode, targetNode, edgeInfo);
-
-            let alertMessage = `Analysis Results:\n`;
-            alertMessage += `Source: ${result.source_node}\n`;
-            alertMessage += `Target: ${result.target_node}\n`;
-            alertMessage += `Records: ${result.record_count}\n\n`;
-
-            if (result.analysed_columns && result.analysed_columns.length > 0) {
-                alertMessage += `Columns: ${result.analysed_columns.map(col => col.name).join(', ')}\n\n`;
-            }
-
-            if (result.analysed_data && result.analysed_data.length > 0) {
-                alertMessage += `Sample Data:\n`;
-                result.analysed_data.forEach((record, index) => {
-                    alertMessage += `Row ${index + 1}: ${JSON.stringify(record)}\n`;
-                });
-            }
-
-            alert(alertMessage);
+            // Dispatch source node data to Redux 
+            const modelNodeName = `${modelName}_node`;
+            const nodeActions = sliceMap[modelNodeName]?.actions;
+            const { nodeSchema, nodeProjectSchema, nodeData: nodeSampleData, nodeUrl, nodeFieldsMetadata } = sourceNodeData;
+            reduxDispatch(nodeActions.setNode({
+                modelName: sourceName,
+                modelSchema: nodeSchema,
+                projectSchema: nodeProjectSchema,
+                fieldsMetadata: nodeFieldsMetadata,
+                url: nodeUrl
+            }));
+            reduxDispatch(nodeActions.setStoredArray(nodeSampleData || []));
 
         } catch (error) {
             console.error('Analysis error:', error);
             console.error(`Analysis failed: ${error.message}`);
         }
-    }, [activeContext, graphAttributes, nodesWithChildren, nodeTypeColorMap, joinTypeColorMapping, theme, state.nodeDataCache]);
+    }, [activeContext, graphAttributes, nodesWithChildren, nodeTypeColorMap, joinTypeColorMapping, theme, state.nodeDataCache, reduxDispatch]);
 
     // Handle node selection
     const handleNodeSelection = useCallback(async (e, node) => {
@@ -882,6 +877,7 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
                             fieldsMetadata: nodeFieldsMetadata,
                             url: nodeUrl
                         }));
+                        reduxDispatch(nodeActions.setStoredArray(nodeSampleData || []));
                     }
                 } catch (error) {
                     console.error(`Failed to fetch data for node: ${nodeName}`, error);
@@ -897,6 +893,7 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
                         fieldsMetadata: nodeFieldsMetadata,
                         url: nodeUrl
                     }));
+                    reduxDispatch(nodeActions.setStoredArray(nodeSampleData || []));
                 }
             }
         }
@@ -1024,13 +1021,23 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
         }
         reduxDispatch(actions.setUpdatedObj(updatedData));
 
-        // Update graph with new context
+        const newNodesWithChildren = new Map();
+        const currentEdges = get(updatedContext, graphAttributes.edgesPath) || []
+        currentEdges.forEach(edge => {
+            const baseNode = get(edge, graphAttributes.edgeBaseField)
+            const targetNode = get(edge, graphAttributes.edgeTargetField);
+            if (!newNodesWithChildren.has(baseNode)) {
+                newNodesWithChildren.set(baseNode, new Set());
+            }
+            newNodesWithChildren.get(baseNode).add(targetNode);
+        });
+
         dispatch({
             type: ACTION_TYPES.UPDATE_GRAPH,
             payload: {
                 activeContext: updatedContext,
                 graphAttributes,
-                nodesWithChildren,
+                nodesWithChildren: newNodesWithChildren,
                 nodeTypeColorMap,
                 joinTypeColorMapping,
                 theme

@@ -425,8 +425,9 @@ class FastapiCallbackFileHandler(BaseFastapiPlugin, ABC):
                     self.handle_read_by_id_WEBSOCKET_callback_methods_gen
             }
 
-            output_str += self.handle_get_all_message_http_callback_methods(message)
-            output_str += self.handle_get_all_message_ws_callback_methods(message)
+            if FastapiCallbackFileHandler.flux_json_root_read_all_field in option_value_dict:
+                output_str += self.handle_get_all_message_http_callback_methods(message)
+                output_str += self.handle_get_all_message_ws_callback_methods(message)
 
             id_field_type = self._get_msg_id_field_type(message)
 

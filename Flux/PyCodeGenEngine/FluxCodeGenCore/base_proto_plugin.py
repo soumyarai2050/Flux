@@ -87,6 +87,7 @@ class BaseProtoPlugin(ABC):
     flux_json_root_create_field: ClassVar[str] = "CreateOp"
     flux_json_root_create_all_field: ClassVar[str] = "CreateAllOp"
     flux_json_root_read_field: ClassVar[str] = "ReadOp"
+    flux_json_root_read_all_field: ClassVar[str] = "ReadAllOp"
     flux_json_root_update_field: ClassVar[str] = "UpdateOp"
     flux_json_root_update_all_field: ClassVar[str] = "UpdateAllOp"
     flux_json_root_patch_field: ClassVar[str] = "PatchOp"

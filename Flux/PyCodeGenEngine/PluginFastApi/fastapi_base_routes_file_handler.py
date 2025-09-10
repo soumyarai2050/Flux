@@ -128,14 +128,14 @@ class FastapiBaseRoutesFileHandler(BaseFastapiPlugin, ABC):
             if put_param:
                 if param_name is not None:
                     if override_default_get_all_limit and put_limit:
-                        return_str += f"({param_name}, limit_obj_count)"
+                        return_str += f"({param_name}, limit_obj_count, **query_params)"
                     else:
-                        return_str += f"({param_name})"
+                        return_str += f"({param_name}, **query_params)"
                 else:
                     if override_default_get_all_limit and put_limit:
-                        return_str += f"(None, limit_obj_count)"
+                        return_str += f"(None, limit_obj_count, **query_params)"
                     else:
-                        return_str += f"(None)"
+                        return_str += f"(None, **query_params)"
 
             return return_str
         elif self.is_option_enabled(message, BaseFastapiPlugin.flux_msg_main_crud_operations_agg):
@@ -148,14 +148,14 @@ class FastapiBaseRoutesFileHandler(BaseFastapiPlugin, ABC):
             if put_param:
                 if param_name is not None:
                     if override_default_get_all_limit and put_limit:
-                        return_str += f"({param_name}, limit_obj_count)"
+                        return_str += f"({param_name}, limit_obj_count, **query_params)"
                     else:
-                        return_str += f"({param_name})"
+                        return_str += f"({param_name}, **query_params)"
                 else:
                     if override_default_get_all_limit and put_limit:
-                        return_str += f"(None, limit_obj_count)"
+                        return_str += f"(None, limit_obj_count, **query_params)"
                     else:
-                        return_str += f"(None)"
+                        return_str += f"(None, **query_params)"
             return return_str
         else:
             return ""
@@ -217,13 +217,13 @@ class FastapiBaseRoutesFileHandler(BaseFastapiPlugin, ABC):
                     agg_params = parse_string_to_original_types(agg_params)
 
                 additional_agg_str += f", {agg_params}"
-            additional_agg_str += ")"
+            additional_agg_str += ", **kwargs)"
 
         # else not required: by-passing if option not used
 
         if filter_list:
             var_name = self._get_filter_configs_var_name(message, put_param=False)
-            return_str = f"{var_name} = lambda model_obj : " + "{'redact': " + f"{filter_list}"
+            return_str = f"{var_name} = lambda model_obj, *kwargs : " + "{'redact': " + f"{filter_list}"
             if additional_agg_str:
                 return_str += f", 'agg': {additional_agg_str}"
             return_str += "}\n"
@@ -231,9 +231,9 @@ class FastapiBaseRoutesFileHandler(BaseFastapiPlugin, ABC):
         elif additional_agg_str:
             var_name = self._get_filter_configs_var_name(message, put_param=False)
             if override_default_get_all_limit:
-                return_str = f"{var_name} = lambda model_obj, limit = None: " + "{'agg': " + f"{additional_agg_str}" + "}\n"
+                return_str = f"{var_name} = lambda model_obj, limit = None, **kwargs: " + "{'agg': " + f"{additional_agg_str}" + "}\n"
             else:
-                return_str = f"{var_name} = lambda model_obj : " + "{'agg': " + f"{additional_agg_str}" + "}\n"
+                return_str = f"{var_name} = lambda model_obj, **kwargs : " + "{'agg': " + f"{additional_agg_str}" + "}\n"
             return return_str
         else:
             return ""
@@ -274,7 +274,8 @@ class FastapiBaseRoutesFileHandler(BaseFastapiPlugin, ABC):
         output_str += f"from {perf_benchmark_decorators_path} import perf_benchmark\n"
         output_str += f"from FluxPythonUtils.scripts.async_rlock import AsyncRLock\n"
         aggregate_file_path = self.import_path_from_os_path("PROJECT_DIR", "app.aggregate")
-        output_str += f'from {aggregate_file_path} import *'
+        output_str += f'from {aggregate_file_path} import *\n'
+        output_str += f'from FluxPythonUtils.scripts.general_utility_functions import parse_to_int'
 
         output_str += f"\n\n"
         output_str += 'config_path = PurePath(__file__).parent.parent.parent / "data" / "config.yaml"\n'

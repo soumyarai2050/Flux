@@ -59,8 +59,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str = (f"async def _underlying_create_{message_name_snake_cased}_http("
                       f"{message_name_snake_cased}_msgspec_obj: msgspec.Struct, "
                       f"filter_agg_pipeline: Any = None, generic_callable: "
-                      f"Callable[Any, Any] | None = None, return_obj_copy: bool | None = True"
-                      f"):\n")
+                      f"Callable[..., Any] | None = None, return_obj_copy: bool | None = True"
+                      f", **query_params):\n")
         mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
 
         output_str += mutex_handling_str
@@ -157,8 +157,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += (f"async def underlying_create_{message_name_snake_cased}_http("
                            f"{message_name_snake_cased}_msgspec_obj: msgspec.Struct, "
                            f"filter_agg_pipeline: Any = None, generic_callable: "
-                           f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True"
-                           f"):\n")
+                           f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True, "
+                           f"**query_params):\n")
             output_str += f'    """\n'
             output_str += (f'    Create route for {message.proto.name} which takes msgspec_obj param and returns '
                            f' msgspec_obj\n')
@@ -168,7 +168,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f'        generic_callable = generic_post_http\n'
             output_str += (f"    return_obj = await _underlying_create_{message_name_snake_cased}_http("
                            f"{message_name_snake_cased}_msgspec_obj, filter_agg_pipeline, generic_callable, "
-                           f"return_obj_copy)\n")
+                           f"return_obj_copy, **query_params)\n")
             output_str += f"    return return_obj\n\n\n"
 
             # version that takes json_dict and returns json_dict
@@ -176,8 +176,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += (f"async def underlying_create_{message_name_snake_cased}_http_json_dict("
                            f"{message_name_snake_cased}_json_dict: Dict[str, Any], "
                            f"filter_agg_pipeline: Any = None, generic_callable: "
-                           f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True"
-                           f"):\n")
+                           f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True, "
+                           f"**query_params):\n")
             output_str += f'    """\n'
             output_str += (f'    Create route for {message.proto.name} which takes json_dict param and returns '
                            f' json_dict\n')
@@ -189,7 +189,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                            f"{message_name_snake_cased}_json_dict)\n")
             output_str += (f"    return_obj = await _underlying_create_{message_name_snake_cased}_http("
                            f"{message_name_snake_cased}_msgspec_obj, filter_agg_pipeline, generic_callable, "
-                           f"return_obj_copy)\n")
+                           f"return_obj_copy, **query_params)\n")
             output_str += f"    if return_obj_copy:\n"
             output_str += f"        return_obj_dict = msgspec.to_builtins(return_obj, builtin_types=[DateTime])\n"
             output_str += f"        return return_obj_dict\n"
@@ -201,8 +201,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += (f"async def underlying_create_{message_name_snake_cased}_http_bytes("
                            f"{message_name_snake_cased}_bytes: "
                            f"bytes, filter_agg_pipeline: Any = None, generic_callable: "
-                           f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True"
-                           f"):\n")
+                           f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True, "
+                           f"**query_params):\n")
             output_str += f'    """\n'
             output_str += (f'    Create route for {message.proto.name} which takes json_str param and returns '
                            f' json_dict\n')
@@ -215,7 +215,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                            f"dec_hook={message.proto.name}.dec_hook)\n")
             output_str += (f"    return_obj = await _underlying_create_{message_name_snake_cased}_http("
                            f"{message_name_snake_cased}_msgspec_obj, filter_agg_pipeline, generic_callable, "
-                           f"return_obj_copy)\n")
+                           f"return_obj_copy, **query_params)\n")
             output_str += f"    if return_obj_copy:\n"
             output_str += f"        return_obj_bytes = msgspec.json.encode(return_obj, enc_hook={message.proto.name}.enc_hook)\n"
             output_str += f"        return CustomFastapiResponse(content=return_obj_bytes, status_code=201)\n"
@@ -229,8 +229,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                 output_str += (f"async def underlying_create_{message_name_snake_cased}_http("
                                f"{message_name_snake_cased}_json_dict: "
                                f"Dict, filter_agg_pipeline: Any = None, generic_callable: "
-                               f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True"
-                               f"):\n")
+                               f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True, "
+                               f"**query_params):\n")
             else:
                 output_str = f"@perf_benchmark\n"
                 output_str += (
@@ -385,13 +385,15 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f'@{self.api_router_app_name}.post("/create-{message_name_snake_cased}' + \
                           f'", status_code=201)\n'
             output_str += (f"async def create_{message_name_snake_cased}_http({message_name_snake_cased}_json_req: "
-                           f"Request, return_obj_copy: bool | None = True):\n")
+                           f"Request):\n")
             output_str += self._add_view_check_code_in_route()
             output_str += f"    try:\n"
             output_str += f"        data_body = await {message_name_snake_cased}_json_req.body()\n"
+            output_str += f"        query_params = dict(request.query_params)\n"
+            output_str += f"        return_obj_copy = True if str(query_params.pop('return_obj_copy', True)).lower() == 'true' else False\n"
             output_str += f"        json_body = orjson.loads(data_body)\n"
             output_str += (f"        return await underlying_create_{message_name_snake_cased}_http("
-                           f"json_body, return_obj_copy=return_obj_copy)\n")
+                           f"json_body, return_obj_copy=return_obj_copy, **query_params)\n")
             output_str += f"    except Exception as e:\n"
             output_str += (f"        logging.exception(f'create_{message_name_snake_cased}_http failed in client call "
                            "with exception: {e}')\n")
@@ -400,12 +402,14 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f'@{self.api_router_app_name}.post("/create-{message_name_snake_cased}' + \
                           f'", status_code=201)\n'
             output_str += (f"async def create_{message_name_snake_cased}_http("
-                           f"{message_name_snake_cased}_json_req: Request, return_obj_copy: bool | None = True):\n")
+                           f"{message_name_snake_cased}_json_req: Request):\n")
             output_str += self._add_view_check_code_in_route()
             output_str += f"    try:\n"
             output_str += f"        data_body = await {message_name_snake_cased}_json_req.body()\n"
+            output_str += f"        query_params = dict({message_name_snake_cased}_json_req.query_params)\n"
+            output_str += f"        return_obj_copy = True if str(query_params.pop('return_obj_copy', True)).lower() == 'true' else False\n"
             output_str += (f"        return await underlying_create_{message_name_snake_cased}_http_bytes("
-                           f"data_body, return_obj_copy=return_obj_copy)\n")
+                           f"data_body, return_obj_copy=return_obj_copy, **query_params)\n")
             output_str += f"    except Exception as e:\n"
             output_str += (f"        logging.exception(f'create_{message_name_snake_cased}_http failed in client call "
                            "with exception: {e}')\n")
@@ -432,8 +436,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str = (f"async def _underlying_create_all_{message_name_snake_cased}_http("
                       f"{message_name_snake_cased}_msgspec_obj_list: List[msgspec.Struct], "
                       f"filter_agg_pipeline: Any = None, generic_callable: "
-                      f"Callable[Any, Any] | None = None, return_obj_copy: bool | None = True"
-                      f"):\n")
+                      f"Callable[..., Any] | None = None, return_obj_copy: bool | None = True, "
+                      f"**query_params):\n")
         mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
 
         output_str += mutex_handling_str
@@ -538,7 +542,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += (f"async def underlying_create_all_{message_name_snake_cased}_http("
                            f"{message_name_snake_cased}_msgspec_obj_list: List[msgspec.Struct], "
                            f"filter_agg_pipeline: Any = None, generic_callable: "
-                           f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True):\n")
+                           f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True, "
+                           f"**query_params):\n")
             output_str += f'    """\n'
             output_str += f'    Create All route for {message.proto.name}\n'
             output_str += f'    """\n'
@@ -547,14 +552,15 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f'        generic_callable = generic_post_all_http\n'
             output_str += (f"    return_val = await _underlying_create_all_{message_name_snake_cased}_http("
                            f"{message_name_snake_cased}_msgspec_obj_list, "
-                           f"filter_agg_pipeline, generic_callable, return_obj_copy)\n")
+                           f"filter_agg_pipeline, generic_callable, return_obj_copy, **query_params)\n")
             output_str += "    return return_val\n\n\n"
 
             output_str += f"@perf_benchmark\n"
             output_str += (f"async def underlying_create_all_{message_name_snake_cased}_http_json_dict("
                            f"{message_name_snake_cased}_json_dict_list: List[Dict[str, Any]], "
                            f"filter_agg_pipeline: Any = None, generic_callable: "
-                           f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True):\n")
+                           f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True, "
+                           f"**query_params):\n")
             output_str += f'    """\n'
             output_str += f'    Create All route for {message.proto.name}\n'
             output_str += f'    """\n'
@@ -565,7 +571,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                            f"from_dict_list({message_name_snake_cased}_json_dict_list)\n")
             output_str += (f"    return_val = await _underlying_create_all_{message_name_snake_cased}_http("
                            f"{message_name_snake_cased}_msgspec_obj_list, "
-                           f"filter_agg_pipeline, generic_callable, return_obj_copy)\n")
+                           f"filter_agg_pipeline, generic_callable, return_obj_copy, **query_params)\n")
             output_str += f"    if return_obj_copy:\n"
             output_str += f"        return_obj_dict = msgspec.to_builtins(return_val, builtin_types=[DateTime])\n"
             output_str += f"        return return_obj_dict\n"
@@ -576,7 +582,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += (f"async def underlying_create_all_{message_name_snake_cased}_http_bytes("
                            f"{message_name_snake_cased}_bytes: "
                            f"bytes, filter_agg_pipeline: Any = None, generic_callable: "
-                           f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True):\n")
+                           f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True, "
+                           f"**query_params):\n")
             output_str += f'    """\n'
             output_str += f'    Create All route for {message.proto.name}\n'
             output_str += f'    """\n'
@@ -588,7 +595,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                            f"dec_hook={message.proto.name}.dec_hook)\n")
             output_str += (f"    return_val = await _underlying_create_all_{message_name_snake_cased}_http("
                            f"{message_name_snake_cased}_msgspec_obj_list, "
-                           f"filter_agg_pipeline, generic_callable, return_obj_copy)\n")
+                           f"filter_agg_pipeline, generic_callable, return_obj_copy, **query_params)\n")
             output_str += f"    if return_obj_copy:\n"
             output_str += f"        return_obj_bytes = msgspec.json.encode(return_val, enc_hook={message.proto.name}.enc_hook)\n"
             output_str += f"        return CustomFastapiResponse(content=return_obj_bytes, status_code=201)\n"
@@ -761,13 +768,15 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f'@{self.api_router_app_name}.post("/create-all-{message_name_snake_cased}' + \
                           f'", status_code=201)\n'
             output_str += (f"async def create_all_{message_name_snake_cased}_http({message_name_snake_cased}_req: "
-                           f"Request, return_obj_copy: bool | None = True):\n")
+                           f"Request):\n")
             output_str += self._add_view_check_code_in_route()
             output_str += f"    try:\n"
             output_str += f"        data_body = await {message_name_snake_cased}_req.body()\n"
+            output_str += f"        query_params = dict({message_name_snake_cased}_req.query_params)\n"
+            output_str += f"        return_obj_copy = True if str(query_params.pop('return_obj_copy', True)).lower() == 'true' else False\n"
             output_str += f"        json_body = orjson.loads(data_body)\n"
             output_str += f"        return await underlying_create_all_{message_name_snake_cased}_http(" \
-                          f"json_body, return_obj_copy=return_obj_copy)\n"
+                          f"json_body, return_obj_copy=return_obj_copy, **query_params)\n"
             output_str += f"    except Exception as e:\n"
             output_str += (f"        logging.exception(f'create_all_{message_name_snake_cased}_http failed in "
                            "client call with exception: {e}')\n")
@@ -776,12 +785,14 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f'@{self.api_router_app_name}.post("/create-all-{message_name_snake_cased}' + \
                           f'", status_code=201)\n'
             output_str += (f"async def create_all_{message_name_snake_cased}_http({message_name_snake_cased}_req: "
-                           f"Request, return_obj_copy: bool | None = True):\n")
+                           f"Request):\n")
             output_str += self._add_view_check_code_in_route()
             output_str += f"    try:\n"
             output_str += f"        data_body = await {message_name_snake_cased}_req.body()\n"
+            output_str += f"        query_params = dict({message_name_snake_cased}_req.query_params)\n"
+            output_str += f"        return_obj_copy = True if str(query_params.pop('return_obj_copy', True)).lower() == 'true' else False\n"
             output_str += f"        return await underlying_create_all_{message_name_snake_cased}_http_bytes(" \
-                          f"data_body, return_obj_copy=return_obj_copy)\n"
+                          f"data_body, return_obj_copy=return_obj_copy, **query_params)\n"
             output_str += f"    except Exception as e:\n"
             output_str += (f"        logging.exception(f'create_all_{message_name_snake_cased}_http failed in "
                            "client call with exception: {e}')\n")
@@ -808,8 +819,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str = (
             f"async def _underlying_update_{message_name_snake_cased}_http({message_name_snake_cased}_"
             f"update_msgspec_obj: msgspec.Struct, filter_agg_pipeline: Any = None, generic_callable: "
-            f"Callable[Any, Any] | None = None, return_obj_copy: bool | None = True"
-            f"):\n")
+            f"Callable[..., Any] | None = None, return_obj_copy: bool | None = True, "
+            f"**query_params):\n")
         mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
 
         output_str += mutex_handling_str
@@ -947,8 +958,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += (
                 f"async def underlying_update_{message_name_snake_cased}_http({message_name_snake_cased}_"
                 f"update_msgspec_obj: msgspec.Struct, filter_agg_pipeline: Any = None, generic_callable: "
-                f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True"
-                f"):\n")
+                f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True, "
+                f"**query_params):\n")
             output_str += f'    """\n'
             output_str += f'    Update route for {message.proto.name}\n'
             output_str += f'    """\n'
@@ -957,15 +968,15 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f'        generic_callable = generic_put_http\n'
             output_str += (
                 f"    return_val = await _underlying_update_{message_name_snake_cased}_http({message_name_snake_cased}_"
-                f"update_msgspec_obj, filter_agg_pipeline, generic_callable, return_obj_copy)\n")
+                f"update_msgspec_obj, filter_agg_pipeline, generic_callable, return_obj_copy, **query_params)\n")
             output_str += "    return return_val\n\n\n"
 
             output_str += f"@perf_benchmark\n"
             output_str += (
                 f"async def underlying_update_{message_name_snake_cased}_http_json_dict({message_name_snake_cased}_"
                 f"update_json_dict: Dict[str, Any], filter_agg_pipeline: Any = None, generic_callable: "
-                f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True"
-                f"):\n")
+                f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True, "
+                f"**query_params):\n")
             output_str += f'    """\n'
             output_str += f'    Update route for {message.proto.name}\n'
             output_str += f'    """\n'
@@ -976,7 +987,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                            f"{message_name_snake_cased}_update_json_dict)\n")
             output_str += (
                 f"    return_val = await _underlying_update_{message_name_snake_cased}_http({message_name_snake_cased}_"
-                f"update_msgspec_obj, filter_agg_pipeline, generic_callable, return_obj_copy)\n")
+                f"update_msgspec_obj, filter_agg_pipeline, generic_callable, return_obj_copy, **query_params)\n")
             output_str += f"    if return_obj_copy:\n"
             output_str += f"        return_obj_dict = msgspec.to_builtins(return_val, builtin_types=[DateTime])\n"
             output_str += f"        return return_obj_dict\n"
@@ -987,8 +998,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += (
                 f"async def underlying_update_{message_name_snake_cased}_http_bytes({message_name_snake_cased}_"
                 f"update_bytes: bytes, filter_agg_pipeline: Any = None, generic_callable: "
-                f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True"
-                f"):\n")
+                f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True, "
+                f"**query_params):\n")
             output_str += f'    """\n'
             output_str += f'    Update route for {message.proto.name}\n'
             output_str += f'    """\n'
@@ -1000,7 +1011,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                            f"dec_hook={message.proto.name}.dec_hook)\n")
             output_str += (
                 f"    return_val = await _underlying_update_{message_name_snake_cased}_http({message_name_snake_cased}_"
-                f"update_msgspec_obj, filter_agg_pipeline, generic_callable, return_obj_copy)\n")
+                f"update_msgspec_obj, filter_agg_pipeline, generic_callable, return_obj_copy, **query_params)\n")
             output_str += f"    if return_obj_copy:\n"
             output_str += f"        return_obj_bytes = msgspec.json.encode(return_val, enc_hook={message.proto.name}.enc_hook)\n"
             output_str += f"        return CustomFastapiResponse(content=return_obj_bytes, status_code=200)\n"
@@ -1169,13 +1180,15 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f'@{self.api_router_app_name}.put("/put-{message_name_snake_cased}' + \
                           f'", status_code=200)\n'
             output_str += f"async def update_{message_name_snake_cased}_http({message_name_snake_cased}_update_req: " \
-                          f"Request, return_obj_copy: bool | None = True):\n"
+                          f"Request):\n"
             output_str += self._add_view_check_code_in_route()
             output_str += f"    try:\n"
             output_str += f"        data_body = await {message_name_snake_cased}_update_req.body()\n"
+            output_str += f"        query_params = dict({message_name_snake_cased}_update_req.query_params)\n"
+            output_str += f"        return_obj_copy = True if str(query_params.pop('return_obj_copy', True)).lower() == 'true' else False\n"
             output_str += f"        json_body = orjson.loads(data_body)\n"
             output_str += f"        return await underlying_update_{message_name_snake_cased}_http(" \
-                          f"json_body, return_obj_copy=return_obj_copy)\n"
+                          f"json_body, return_obj_copy=return_obj_copy, **query_params)\n"
             output_str += f"    except Exception as e:\n"
             output_str += (f"        logging.exception(f'update_{message_name_snake_cased}_http failed in "
                            "client call with exception: {e}')\n")
@@ -1184,12 +1197,14 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f'@{self.api_router_app_name}.put("/put-{message_name_snake_cased}' + \
                           f'", status_code=200)\n'
             output_str += f"async def update_{message_name_snake_cased}_http({message_name_snake_cased}_update_req: " \
-                          f"Request, return_obj_copy: bool | None = True):\n"
+                          f"Request):\n"
             output_str += self._add_view_check_code_in_route()
             output_str += f"    try:\n"
             output_str += f"        data_body = await {message_name_snake_cased}_update_req.body()\n"
+            output_str += f"        query_params = dict({message_name_snake_cased}_update_req.query_params)\n"
+            output_str += f"        return_obj_copy = True if str(query_params.pop('return_obj_copy', True)).lower() == 'true' else False\n"
             output_str += f"        return await underlying_update_{message_name_snake_cased}_http_bytes(" \
-                          f"data_body, return_obj_copy=return_obj_copy)\n"
+                          f"data_body, return_obj_copy=return_obj_copy, **query_params)\n"
             output_str += f"    except Exception as e:\n"
             output_str += (f"        logging.exception(f'update_{message_name_snake_cased}_http failed in "
                            "client call with exception: {e}')\n")
@@ -1215,7 +1230,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         output_str = (f"async def _underlying_update_all_{message_name_snake_cased}_http({message_name_snake_cased}_"
                       f"update_msgspec_obj_list: List[msgspec.Struct], filter_agg_pipeline: Any = None, "
-                      f"generic_callable: Callable[Any, Any] | None = None, return_obj_copy: bool | None = True):\n")
+                      f"generic_callable: Callable[..., Any] | None = None, return_obj_copy: bool | None = True, "
+                      f"**update_req_body):\n")
         mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
         output_str += mutex_handling_str
 
@@ -1378,7 +1394,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += (
                 f"async def underlying_update_all_{message_name_snake_cased}_http({message_name_snake_cased}_"
                 f"update_msgspec_obj_list: List[msgspec.Struct], filter_agg_pipeline: Any = None, generic_callable: "
-                f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True):\n")
+                f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True, **query_params):\n")
             output_str += f'    """\n'
             output_str += f'    Update All route for {message.proto.name}\n'
             output_str += f'    """\n'
@@ -1388,14 +1404,14 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += (
                 f"    return_val = await _underlying_update_all_{message_name_snake_cased}_http("
                 f"{message_name_snake_cased}_update_msgspec_obj_list, filter_agg_pipeline, "
-                f"generic_callable, return_obj_copy)\n")
+                f"generic_callable, return_obj_copy, **query_params)\n")
             output_str += "    return return_val\n\n\n"
 
             output_str += f"@perf_benchmark\n"
             output_str += (
                 f"async def underlying_update_all_{message_name_snake_cased}_http_json_dict({message_name_snake_cased}_"
-                f"update_json_dict: Dict[str, Any], filter_agg_pipeline: Any = None, generic_callable: "
-                f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True):\n")
+                f"update_json_dict: List[Dict[str, Any]], filter_agg_pipeline: Any = None, generic_callable: "
+                f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True, **query_params):\n")
             output_str += f'    """\n'
             output_str += f'    Update All route for {message.proto.name}\n'
             output_str += f'    """\n'
@@ -1407,7 +1423,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += (
                 f"    return_val = await _underlying_update_all_{message_name_snake_cased}_http("
                 f"{message_name_snake_cased}_update_msgspec_obj_list, filter_agg_pipeline, generic_callable, "
-                f"return_obj_copy)\n")
+                f"return_obj_copy, **query_params)\n")
             output_str += f"    if return_obj_copy:\n"
             output_str += f"        return_obj_dict = msgspec.to_builtins(return_val, builtin_types=[DateTime])\n"
             output_str += f"        return return_obj_dict\n"
@@ -1418,7 +1434,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += (
                 f"async def underlying_update_all_{message_name_snake_cased}_http_bytes({message_name_snake_cased}_"
                 f"update_bytes: bytes, filter_agg_pipeline: Any = None, generic_callable: "
-                f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True):\n")
+                f"Callable[[...], Any] | None = None, return_obj_copy: bool | None = True, **query_params):\n")
             output_str += f'    """\n'
             output_str += f'    Update All route for {message.proto.name}\n'
             output_str += f'    """\n'
@@ -1431,7 +1447,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += (
                 f"    return_val = await _underlying_update_all_{message_name_snake_cased}_http("
                 f"{message_name_snake_cased}_update_msgspec_obj_list, filter_agg_pipeline, generic_callable, "
-                f"return_obj_copy)\n")
+                f"return_obj_copy, **query_params)\n")
             output_str += f"    if return_obj_copy:\n"
             output_str += f"        return_obj_bytes = msgspec.json.encode(return_val, enc_hook={message.proto.name}.enc_hook)\n"
             output_str += f"        return CustomFastapiResponse(content=return_obj_bytes, status_code=200)\n"
@@ -1608,13 +1624,15 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f'@{self.api_router_app_name}.put("/put-all-{message_name_snake_cased}' + \
                           f'", status_code=200)\n'
             output_str += (f"async def update_all_{message_name_snake_cased}_http({message_name_snake_cased}_update_req: "
-                           f"Request, return_obj_copy: bool | None = True):\n")
+                           f"Request):\n")
             output_str += self._add_view_check_code_in_route()
             output_str += f"    try:\n"
             output_str += f"        data_body = await {message_name_snake_cased}_update_req.body()\n"
+            output_str += f"        query_params = dict({message_name_snake_cased}_update_req.query_params)\n"
+            output_str += f"        return_obj_copy = True if str(query_params.pop('return_obj_copy', True)).lower() == 'true' else False\n"
             output_str += f"        json_body = orjson.loads(data_body)\n"
             output_str += f"        return await underlying_update_all_{message_name_snake_cased}_http(" \
-                          f"json_body, return_obj_copy=return_obj_copy)\n"
+                          f"json_body, return_obj_copy=return_obj_copy, **query_params)\n"
             output_str += f"    except Exception as e:\n"
             output_str += (f"        logging.exception(f'update_all_{message_name_snake_cased}_http failed in "
                            "client call with exception: {e}')\n")
@@ -1623,12 +1641,14 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f'@{self.api_router_app_name}.put("/put-all-{message_name_snake_cased}' + \
                           f'", status_code=200)\n'
             output_str += (f"async def update_all_{message_name_snake_cased}_http({message_name_snake_cased}_update_req: "
-                           f"Request, return_obj_copy: bool | None = True):\n")
+                           f"Request):\n")
             output_str += self._add_view_check_code_in_route()
             output_str += f"    try:\n"
             output_str += f"        data_body = await {message_name_snake_cased}_update_req.body()\n"
+            output_str += f"        query_params = dict({message_name_snake_cased}_update_req.query_params)\n"
+            output_str += f"        return_obj_copy = True if str(query_params.pop('return_obj_copy', True)).lower() == 'true' else False\n"
             output_str += f"        return await underlying_update_all_{message_name_snake_cased}_http_bytes(" \
-                          f"data_body, return_obj_copy=return_obj_copy)\n"
+                          f"data_body, return_obj_copy=return_obj_copy, **query_params)\n"
             output_str += f"    except Exception as e:\n"
             output_str += (f"        logging.exception(f'update_all_{message_name_snake_cased}_http failed in "
                            "client call with exception: {e}')\n")
@@ -1655,7 +1675,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         output_str = (f"async def _underlying_partial_update_{message_name_snake_cased}_http("
                       f"{message_name_snake_cased}_update_json_dict: Dict[str, None], filter_agg_pipeline: Any = None, "
-                      f"generic_callable: Callable[Any, Any] | None = None, return_obj_copy: bool | None = True):\n")
+                      f"generic_callable: Callable[..., Any] | None = None, return_obj_copy: bool | None = True, "
+                      f"**query_params):\n")
         # else not required: avoiding if method desc not provided
         mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
 
@@ -1790,7 +1811,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += (f"async def underlying_partial_update_{message_name_snake_cased}_http("
                            f"{message_name_snake_cased}_update_json_dict: Dict[str, Any], "
                            f"filter_agg_pipeline: Any = None, generic_callable: Callable[[...], Any] | None = None, "
-                           f"return_obj_copy: bool | None = True):\n")
+                           f"return_obj_copy: bool | None = True, **query_params):\n")
             output_str += f'    """\n'
             output_str += f'    Partial Update route for {message.proto.name}\n'
             output_str += f'    """\n'
@@ -1799,7 +1820,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f'        generic_callable = generic_patch_http\n'
             output_str += (f"    return_val = await _underlying_partial_update_{message_name_snake_cased}_http("
                            f"{message_name_snake_cased}_update_json_dict, filter_agg_pipeline, "
-                           f"generic_callable, return_obj_copy)\n")
+                           f"generic_callable, return_obj_copy, **query_params)\n")
             output_str += f"    if return_val:\n"
             output_str += f"        return_val = {message.proto.name}.from_dict(return_val)\n"
             output_str += f"    return return_val\n\n\n"
@@ -1808,7 +1829,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += (f"async def underlying_partial_update_{message_name_snake_cased}_http_json_dict("
                            f"{message_name_snake_cased}_update_json_dict: Dict[str, Any], "
                            f"filter_agg_pipeline: Any = None, generic_callable: Callable[[...], Any] | None = None, "
-                           f"return_obj_copy: bool | None = True):\n")
+                           f"return_obj_copy: bool | None = True, **query_params):\n")
             output_str += f'    """\n'
             output_str += f'    Partial Update route for {message.proto.name}\n'
             output_str += f'    """\n'
@@ -1817,13 +1838,14 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f'        generic_callable = generic_patch_http\n'
             output_str += (f"    return_val = await _underlying_partial_update_{message_name_snake_cased}_http("
                            f"{message_name_snake_cased}_update_json_dict, filter_agg_pipeline, "
-                           f"generic_callable, return_obj_copy)\n")
+                           f"generic_callable, return_obj_copy, **query_params)\n")
             output_str += f"    return return_val\n\n\n"
 
             output_str += f"@perf_benchmark\n"
             output_str += (f"async def underlying_partial_update_{message_name_snake_cased}_http_bytes("
                            f"{message_name_snake_cased}_update_bytes: bytes, filter_agg_pipeline: Any = None, "
-                           f"generic_callable: Callable[[...], Any] | None = None, return_obj_copy: bool | None = True):\n")
+                           f"generic_callable: Callable[[...], Any] | None = None, "
+                           f"return_obj_copy: bool | None = True, **query_params):\n")
             output_str += f'    """\n'
             output_str += f'    Partial Update route for {message.proto.name}\n'
             output_str += f'    """\n'
@@ -1834,7 +1856,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                            f"{message_name_snake_cased}_update_bytes)\n")
             output_str += (f"    return_val = await _underlying_partial_update_{message_name_snake_cased}_http("
                            f"{message_name_snake_cased}_update_json_dict, filter_agg_pipeline, "
-                           f"generic_callable, return_obj_copy)\n")
+                           f"generic_callable, return_obj_copy, **query_params)\n")
             output_str += f"    if return_obj_copy:\n"
             output_str += f"        return_obj_bytes = msgspec.json.encode(return_val, enc_hook={message.proto.name}.enc_hook)\n"
             output_str += f"        return CustomFastapiResponse(content=return_obj_bytes, status_code=200)\n"
@@ -2019,12 +2041,14 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f'@{self.api_router_app_name}.patch("/patch-{message_name_snake_cased}' + \
                           f'", status_code=200)\n'
             output_str += f"async def partial_update_{message_name_snake_cased}_http({message_name_snake_cased}_update_req_body: " \
-                          f"Request, return_obj_copy: bool | None = True):\n"
+                          f"Request):\n"
             output_str += self._add_view_check_code_in_route()
             output_str += f"    try:\n"
             output_str += f"        data_body = await {message_name_snake_cased}_update_req_body.body()\n"
+            output_str += f"        query_params = dict({message_name_snake_cased}_update_req_body.query_params)\n"
+            output_str += f"        return_obj_copy = True if str(query_params.pop('return_obj_copy', True)).lower() == 'true' else False\n"
             output_str += (f'        return await underlying_partial_update_{message_name_snake_cased}_http_bytes('
-                           f'data_body, return_obj_copy=return_obj_copy)\n')
+                           f'data_body, return_obj_copy=return_obj_copy, **query_params)\n')
             output_str += f"    except Exception as e:\n"
             output_str += (f"        logging.exception(f'partial_update_{message_name_snake_cased}_http failed in "
                            "client call with exception: {e}')\n")
@@ -2034,18 +2058,20 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                 output_str += f'@{self.api_router_app_name}.patch("/patch-{message_name_snake_cased}' + \
                               f'", status_code=200)\n'
                 output_str += f"async def partial_update_{message_name_snake_cased}_http({message_name_snake_cased}_update_req_body: " \
-                              f"Request, return_obj_copy: bool | None = True):\n"
+                              f"Request):\n"
             else:
                 output_str += f'@{self.api_router_app_name}.patch("/patch-{message_name_snake_cased}' + \
                               f'", response_model={message.proto.name} | bool, status_code=200)\n'
                 output_str += f"async def partial_update_{message_name_snake_cased}_http({message_name_snake_cased}_update_req_body: " \
-                              f"Request, return_obj_copy: bool | None = True) -> {message.proto.name} | bool:\n"
+                              f"Request) -> {message.proto.name} | bool:\n"
             output_str += self._add_view_check_code_in_route()
             output_str += f"    try:\n"
             output_str += f"        data_body = await {message_name_snake_cased}_update_req_body.body()\n"
+            output_str += f"        query_params = dict(request.query_params)\n"
+            output_str += f"        return_obj_copy = True if str(query_params.pop('return_obj_copy', True)).lower() == 'true' else False\n"
             output_str += f"        json_body = orjson.loads(data_body)\n"
             output_str += (f'        return await underlying_partial_update_{message_name_snake_cased}_http(json_body, '
-                           f'return_obj_copy=return_obj_copy)\n')
+                           f'return_obj_copy=return_obj_copy, **query_params)\n')
             output_str += f"    except Exception as e:\n"
             output_str += (f"        logging.exception(f'partial_update_{message_name_snake_cased}_http failed in "
                            "client call with exception: {e}')\n")
@@ -2345,8 +2371,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str = (f"async def _underlying_partial_update_all_{message_name_snake_cased}_http("
                       f"{message_name_snake_cased}_update_json_dict_list: List[Dict[str, Any]], "
                       f"filter_agg_pipeline: Any = None, "
-                      f"generic_callable: Callable[Any, Any] | None = None, "
-                      f"return_obj_copy: bool | None = True):\n")
+                      f"generic_callable: Callable[..., Any] | None = None, "
+                      f"return_obj_copy: bool | None = True, **query_params):\n")
         mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
         output_str += mutex_handling_str
         output_str += " " * indent_count + f"    obj_id_list = []\n"
@@ -2488,7 +2514,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                            f"{message_name_snake_cased}_update_json_dict_list: List[Dict[str, Any]], "
                            f"filter_agg_pipeline: Any = None, "
                            f"generic_callable: Callable[[...], Any] | None = None, "
-                           f"return_obj_copy: bool | None = True):\n")
+                           f"return_obj_copy: bool | None = True, **query_params):\n")
             output_str += f'    """\n'
             output_str += f'    Partial Update route for {message.proto.name}\n'
             output_str += f'    """\n'
@@ -2497,7 +2523,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f'        generic_callable = generic_patch_all_http\n'
             output_str += (f"    return_val = await _underlying_partial_update_all_{message_name_snake_cased}_http("
                            f"{message_name_snake_cased}_update_json_dict_list, filter_agg_pipeline, "
-                           f"generic_callable, return_obj_copy)\n")
+                           f"generic_callable, return_obj_copy, **query_params)\n")
             output_str += "    if return_obj_copy:\n"
             output_str += f"        return_val = {message.proto.name}.from_dict_list(return_val)\n"
             output_str += "    return return_val\n\n\n"
@@ -2506,7 +2532,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += (f"async def underlying_partial_update_all_{message_name_snake_cased}_http_json_dict("
                            f"{message_name_snake_cased}_update_json_dict_list: List[Dict[str, Any]], "
                            f"filter_agg_pipeline: Any = None, generic_callable: Callable[[...], Any] | None = None, "
-                           f"return_obj_copy: bool | None = True):\n")
+                           f"return_obj_copy: bool | None = True, **query_params):\n")
             output_str += f'    """\n'
             output_str += f'    Partial Update route for {message.proto.name}\n'
             output_str += f'    """\n'
@@ -2515,7 +2541,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f'        generic_callable = generic_patch_all_http\n'
             output_str += (f"    return_val = await _underlying_partial_update_all_{message_name_snake_cased}_http("
                            f"{message_name_snake_cased}_update_json_dict_list, filter_agg_pipeline, "
-                           f"generic_callable, return_obj_copy)\n")
+                           f"generic_callable, return_obj_copy, **query_params)\n")
             output_str += "    return return_val\n\n\n"
 
             output_str += f"@perf_benchmark\n"
@@ -2523,7 +2549,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                            f"{message_name_snake_cased}_update_req_bytes: bytes, "
                            f"filter_agg_pipeline: Any = None, "
                            f"generic_callable: Callable[[...], Any] | None = None, "
-                           f"return_obj_copy: bool | None = True):\n")
+                           f"return_obj_copy: bool | None = True, **query_params):\n")
             output_str += f'    """\n'
             output_str += f'    Partial Update route for {message.proto.name}\n'
             output_str += f'    """\n'
@@ -2534,7 +2560,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                            f"{message_name_snake_cased}_update_req_bytes)\n")
             output_str += (f"    return_val = await _underlying_partial_update_all_{message_name_snake_cased}_http("
                            f"{message_name_snake_cased}_update_json_dict_list, filter_agg_pipeline, "
-                           f"generic_callable, return_obj_copy)\n")
+                           f"generic_callable, return_obj_copy, **query_params)\n")
             output_str += f"    if return_obj_copy:\n"
             output_str += f"        return_obj_bytes = msgspec.json.encode(return_val, enc_hook={message.proto.name}.enc_hook)\n"
             output_str += f"        return CustomFastapiResponse(content=return_obj_bytes, status_code=200)\n"
@@ -2733,12 +2759,14 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f'@{self.api_router_app_name}.patch("/patch-all-{message_name_snake_cased}' + \
                           f'", status_code=200)\n'
             output_str += (f"async def partial_update_all_{message_name_snake_cased}_http({message_name_snake_cased}_"
-                           f"update_req_body: Request, return_obj_copy: bool | None = True):\n")
+                           f"update_req_body: Request):\n")
             output_str += self._add_view_check_code_in_route()
             output_str += f"    try:\n"
             output_str += f"        data_body = await {message_name_snake_cased}_update_req_body.body()\n"
+            output_str += f"        query_params = dict({message_name_snake_cased}_update_req_body.query_params)\n"
+            output_str += f"        return_obj_copy = True if str(query_params.pop('return_obj_copy', True)).lower() == 'true' else False\n"
             output_str += (f'        return await underlying_partial_update_all_{message_name_snake_cased}_http_bytes('
-                           f'data_body, return_obj_copy=return_obj_copy)\n')
+                           f'data_body, return_obj_copy=return_obj_copy, **query_params)\n')
             output_str += f"    except Exception as e:\n"
             output_str += (f"        logging.exception(f'partial_update_all_{message_name_snake_cased}_http failed in "
                            "client call with exception: {e}')\n")
@@ -2748,16 +2776,17 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                 output_str += f'@{self.api_router_app_name}.patch("/patch-all-{message_name_snake_cased}' + \
                               f'", status_code=200)\n'
                 output_str += (f"async def partial_update_all_{message_name_snake_cased}_http({message_name_snake_cased}_"
-                               f"update_req_body: Request, return_obj_copy: bool | None = True):\n")
+                               f"update_req_body: Request):\n")
             else:
                 output_str += f'@{self.api_router_app_name}.patch("/patch-all-{message_name_snake_cased}' + \
                               f'", response_model=List[{message.proto.name}] | bool, status_code=200)\n'
                 output_str += (f"async def partial_update_all_{message_name_snake_cased}_http({message_name_snake_cased}_"
-                               f"update_req_body: Request, return_obj_copy: bool | None = True"
-                               f") -> List[{message.proto.name}] | bool:\n")
+                               f"update_req_body: Request) -> List[{message.proto.name}] | bool:\n")
             output_str += self._add_view_check_code_in_route()
             output_str += f"    try:\n"
             output_str += f"        data_body = await {message_name_snake_cased}_update_req_body.body()\n"
+            output_str += f"        query_params = dict(update_req_body.query_params)\n"
+            output_str += f"        return_obj_copy = True if str(query_params.pop('return_obj_copy', True)).lower() == 'true' else False\n"
             output_str += f"        json_body = orjson.loads(data_body)\n"
             output_str += (f'        return await underlying_partial_update_all_{message_name_snake_cased}_http(json_body, '
                            f'return_obj_copy=return_obj_copy)\n')
@@ -2775,12 +2804,12 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += (f"async def _underlying_delete_{message_name_snake_cased}_http("
                            f"{message_name_snake_cased}_id: {id_field_type}, "
                            f"generic_callable: Callable[[...], Any] | None = None, "
-                           f"return_obj_copy: bool | None = True):\n")
+                           f"return_obj_copy: bool | None = True, **query_params):\n")
         else:
             output_str += (f"async def _underlying_delete_{message_name_snake_cased}_http("
                            f"{message_name_snake_cased}_id: {FastapiHttpRoutesFileHandler.default_id_type_var_name}, "
                            f"generic_callable: Callable[[...], Any] | None = None, "
-                           f"return_obj_copy: bool | None = True):\n")
+                           f"return_obj_copy: bool | None = True, **query_params):\n")
         mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
 
         output_str += mutex_handling_str
@@ -2828,13 +2857,13 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                 output_str += (f"async def underlying_delete_{message_name_snake_cased}_http("
                                f"{message_name_snake_cased}_id: {id_field_type}, "
                                f"generic_callable: Callable[[...], Any] | None = None, "
-                               f"return_obj_copy: bool | None = True):\n")
+                               f"return_obj_copy: bool | None = True, **query_params):\n")
             else:
                 output_str += (f"async def underlying_delete_{message_name_snake_cased}_http("
                                f"{message_name_snake_cased}_id: "
                                f"{FastapiHttpRoutesFileHandler.default_id_type_var_name}, "
                                f"generic_callable: Callable[[...], Any] | None = None, "
-                               f"return_obj_copy: bool | None = True):\n")
+                               f"return_obj_copy: bool | None = True, **query_params):\n")
             output_str += f'    """\n'
             output_str += f'    Delete route for {message.proto.name}\n'
             output_str += f'    """\n'
@@ -2842,7 +2871,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f'    if generic_callable is None:\n'
             output_str += f'        generic_callable = generic_delete_http\n'
             output_str += (f"    return_val = await _underlying_delete_{message_name_snake_cased}_http("
-                           f"{message_name_snake_cased}_id, generic_callable, return_obj_copy)\n")
+                           f"{message_name_snake_cased}_id, generic_callable, return_obj_copy, **query_params)\n")
             output_str += "    return return_val\n\n\n"
 
             output_str += f"@perf_benchmark\n"
@@ -2850,13 +2879,13 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                 output_str += (f"async def underlying_delete_{message_name_snake_cased}_http_bytes("
                                f"{message_name_snake_cased}_id: {id_field_type}, "
                                f"generic_callable: Callable[[...], Any] | None = None, "
-                               f"return_obj_copy: bool | None = True):\n")
+                               f"return_obj_copy: bool | None = True, **query_params):\n")
             else:
                 output_str += (f"async def underlying_delete_{message_name_snake_cased}_http_bytes("
                                f"{message_name_snake_cased}_id: "
                                f"{FastapiHttpRoutesFileHandler.default_id_type_var_name}, "
                                f"generic_callable: Callable[[...], Any] | None = None, "
-                               f"return_obj_copy: bool | None = True):\n")
+                               f"return_obj_copy: bool | None = True, **query_params):\n")
             output_str += f'    """\n'
             output_str += f'    Delete route for {message.proto.name}\n'
             output_str += f'    """\n'
@@ -2864,7 +2893,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f'    if generic_callable is None:\n'
             output_str += f'        generic_callable = generic_delete_http\n'
             output_str += (f"    return_val = await _underlying_delete_{message_name_snake_cased}_http("
-                           f"{message_name_snake_cased}_id, generic_callable, return_obj_copy)\n")
+                           f"{message_name_snake_cased}_id, generic_callable, return_obj_copy, **query_params)\n")
             output_str += f"    return_obj_bytes = msgspec.json.encode(return_val, enc_hook={message.proto.name}.enc_hook)\n"
             output_str += "    return CustomFastapiResponse(content=return_obj_bytes, status_code=200)\n"
         else:
@@ -2949,28 +2978,29 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             if id_field_type is not None:
                 output_str += (f"async def delete_{message_name_snake_cased}_http("
                                f"{message_name_snake_cased}_id: {id_field_type}, "
-                               f"return_obj_copy: bool | None = True):\n")
+                               f"request: Request):\n")
             else:
                 output_str += (f"async def delete_{message_name_snake_cased}_http("
                                f"{message_name_snake_cased}_id: {FastapiHttpRoutesFileHandler.default_id_type_var_name}, "
-                               f"return_obj_copy: bool | None = True):\n")
+                               f"request: Request):\n")
         else:
             output_str += f'@{self.api_router_app_name}.delete("/delete-{message_name_snake_cased}/' + \
                           '{' + f'{message_name_snake_cased}_id' + '}' + \
                           f'", response_model=DefaultPydanticWebResponse | bool, status_code=200)\n'
             if id_field_type is not None:
                 output_str += (f"async def delete_{message_name_snake_cased}_http("
-                               f"{message_name_snake_cased}_id: {id_field_type}, "
-                               f"return_obj_copy: bool | None = True) -> DefaultPydanticWebResponse | bool:\n")
+                               f"{message_name_snake_cased}_id: {id_field_type}) -> DefaultPydanticWebResponse | bool:\n")
             else:
                 output_str += (f"async def delete_{message_name_snake_cased}_http("
-                               f"{message_name_snake_cased}_id: {FastapiHttpRoutesFileHandler.default_id_type_var_name}, "
-                               f"return_obj_copy: bool | None = True) -> DefaultPydanticWebResponse | bool:\n")
+                               f"{message_name_snake_cased}_id: {FastapiHttpRoutesFileHandler.default_id_type_var_name}"
+                               f") -> DefaultPydanticWebResponse | bool:\n")
         output_str += self._add_view_check_code_in_route()
         output_str += f"    try:\n"
+        output_str += f"        query_params = dict(request.query_params)\n"
+        output_str += f"        return_obj_copy = True if str(query_params.pop('return_obj_copy', True)).lower() == 'true' else False\n"
         if model_type == ModelType.Msgspec:
             output_str += f"        return await underlying_delete_{message_name_snake_cased}_http_bytes(" \
-                          f"{message_name_snake_cased}_id, return_obj_copy=return_obj_copy)\n"
+                          f"{message_name_snake_cased}_id, return_obj_copy=return_obj_copy, **query_params)\n"
         else:
             output_str += f"        return await underlying_delete_{message_name_snake_cased}_http(" \
                           f"{message_name_snake_cased}_id, return_obj_copy=return_obj_copy)\n"
@@ -2984,8 +3014,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                                          shared_lock_list) -> str:
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         output_str = (f"async def _underlying_delete_all_{message_name_snake_cased}_http("
-                      f"generic_callable: Callable[Any, Any] | None = None, "
-                      f"return_obj_copy: bool | None = True):\n")
+                      f"generic_callable: Callable[..., Any] | None = None, "
+                      f"return_obj_copy: bool | None = True, **query_params):\n")
         mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
 
         output_str += mutex_handling_str
@@ -3022,7 +3052,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f"@perf_benchmark\n"
             output_str += (f"async def underlying_delete_all_{message_name_snake_cased}_http("
                            f"generic_callable: Callable[[...], Any] | None = None, "
-                           f"return_obj_copy: bool | None = True):\n")
+                           f"return_obj_copy: bool | None = True, **query_params):\n")
             output_str += f'    """\n'
             output_str += f'    Delete All route for {message.proto.name}\n'
             output_str += f'    """\n'
@@ -3030,13 +3060,13 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f'    if generic_callable is None:\n'
             output_str += f'        generic_callable = generic_delete_all_http\n'
             output_str += (f"    return_val = await _underlying_delete_all_{message_name_snake_cased}_http("
-                           f"generic_callable, return_obj_copy)\n")
+                           f"generic_callable, return_obj_copy, **query_params)\n")
             output_str += f"    return return_val\n\n\n"
 
             output_str += f"@perf_benchmark\n"
             output_str += (f"async def underlying_delete_all_{message_name_snake_cased}_http_bytes("
                            f"generic_callable: Callable[[...], Any] | None = None, "
-                           f"return_obj_copy: bool | None = True):\n")
+                           f"return_obj_copy: bool | None = True, **query_params):\n")
             output_str += f'    """\n'
             output_str += f'    Delete All route for {message.proto.name}\n'
             output_str += f'    """\n'
@@ -3044,7 +3074,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f'    if generic_callable is None:\n'
             output_str += f'        generic_callable = generic_delete_all_http\n'
             output_str += (f"    return_val = await _underlying_delete_all_{message_name_snake_cased}_http("
-                           f"generic_callable, return_obj_copy)\n")
+                           f"generic_callable, return_obj_copy, **query_params)\n")
             output_str += f"    return_obj_bytes = msgspec.json.encode(return_val, enc_hook={message.proto.name}.enc_hook)\n"
             output_str += f"    return CustomFastapiResponse(content=return_obj_bytes, status_code=200)\n"
 
@@ -3100,21 +3130,22 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         if model_type in [ModelType.Dataclass, ModelType.Msgspec]:
             output_str += (f'@{self.api_router_app_name}.delete("/delete-all-{message_name_snake_cased}/", '
                            f'status_code=200)\n')
-            output_str += (f"async def delete_{message_name_snake_cased}_all_http(return_obj_copy: bool | None = True"
-                           f"):\n")
+            output_str += (f"async def delete_{message_name_snake_cased}_all_http(request: Request):\n")
         else:
             output_str += (f'@{self.api_router_app_name}.delete("/delete-all-{message_name_snake_cased}/", '
                            f'response_model=DefaultPydanticWebResponse | bool, status_code=200)\n')
-            output_str += (f"async def delete_{message_name_snake_cased}_all_http(return_obj_copy: bool | None = True"
+            output_str += (f"async def delete_{message_name_snake_cased}_all_http(request: Request"
                            f") -> DefaultPydanticWebResponse | bool:\n")
         output_str += self._add_view_check_code_in_route()
         output_str += f"    try:\n"
+        output_str += f"        query_params = dict(request.query_params)\n"
+        output_str += f"        return_obj_copy = True if str(query_params.pop('return_obj_copy', True)).lower() == 'true' else False\n"
         if model_type == ModelType.Msgspec:
             output_str += (f"        return await underlying_delete_all_{message_name_snake_cased}_http_bytes("
-                           f"return_obj_copy=return_obj_copy)\n")
+                           f"return_obj_copy=return_obj_copy, **query_params)\n")
         else:
             output_str += (f"        return await underlying_delete_all_{message_name_snake_cased}_http("
-                           f"return_obj_copy=return_obj_copy)\n")
+                           f"return_obj_copy=return_obj_copy, **query_params)\n")
         output_str += f"    except Exception as e:\n"
         output_str += (f"        logging.exception(f'delete_{message_name_snake_cased}_all_http failed in "
                        "client call with exception: {e}')\n")
@@ -3129,7 +3160,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += (f"async def _underlying_delete_by_id_list_{message_name_snake_cased}_http("
                            f"{message_name_snake_cased}_id_list: List[{id_field_type}], "
                            f"generic_callable: Callable[[...], Any] | None = None, "
-                           f"return_obj_copy: bool | None = True):\n")
+                           f"return_obj_copy: bool | None = True, **query_params):\n")
         else:
             output_str += (f"async def _underlying_delete_by_id_list_{message_name_snake_cased}_http("
                            f"{message_name_snake_cased}_id_list: List["
@@ -3184,13 +3215,13 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                 output_str += (f"async def underlying_delete_by_id_list_{message_name_snake_cased}_http("
                                f"{message_name_snake_cased}_id_list: List[{id_field_type}], "
                                f"generic_callable: Callable[[...], Any] | None = None, "
-                               f"return_obj_copy: bool | None = True):\n")
+                               f"return_obj_copy: bool | None = True, **query_params):\n")
             else:
                 output_str += (f"async def underlying_delete_by_id_list_{message_name_snake_cased}_http("
                                f"{message_name_snake_cased}_id_list: List["
                                f"{FastapiHttpRoutesFileHandler.default_id_type_var_name}], "
                                f"generic_callable: Callable[[...], Any] | None = None, "
-                               f"return_obj_copy: bool | None = True):\n")
+                               f"return_obj_copy: bool | None = True, **query_params):\n")
             output_str += f'    """\n'
             output_str += f'    Delete by id list route for {message.proto.name}\n'
             output_str += f'    """\n'
@@ -3198,7 +3229,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f'    if generic_callable is None:\n'
             output_str += f'        generic_callable = generic_delete_by_id_list_http\n'
             output_str += (f"    return_val = await _underlying_delete_by_id_list_{message_name_snake_cased}_http("
-                           f"{message_name_snake_cased}_id_list, generic_callable, return_obj_copy)\n")
+                           f"{message_name_snake_cased}_id_list, generic_callable, return_obj_copy, **query_params)\n")
             output_str += "    return return_val\n\n\n"
 
             output_str += f"@perf_benchmark\n"
@@ -3206,12 +3237,12 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                 output_str += (f"async def underlying_delete_by_id_list_{message_name_snake_cased}_http_bytes("
                                f"{message_name_snake_cased}_id_list_bytes: bytes, "
                                f"generic_callable: Callable[[...], Any] | None = None, "
-                               f"return_obj_copy: bool | None = True):\n")
+                               f"return_obj_copy: bool | None = True, **query_params):\n")
             else:
                 output_str += (f"async def underlying_delete_by_id_list_{message_name_snake_cased}_http_bytes("
                                f"{message_name_snake_cased}_id_list_bytes: bytes, "
                                f"generic_callable: Callable[[...], Any] | None = None, "
-                               f"return_obj_copy: bool | None = True):\n")
+                               f"return_obj_copy: bool | None = True, **query_params):\n")
             output_str += f'    """\n'
             output_str += f'    Delete by id list route for {message.proto.name}\n'
             output_str += f'    """\n'
@@ -3221,7 +3252,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += (f'    {message_name_snake_cased}_id_list = orjson.loads('
                            f'{message_name_snake_cased}_id_list_bytes)\n')
             output_str += (f"    return_val = await _underlying_delete_by_id_list_{message_name_snake_cased}_http("
-                           f"{message_name_snake_cased}_id_list, generic_callable, return_obj_copy)\n")
+                           f"{message_name_snake_cased}_id_list, generic_callable, return_obj_copy, **query_params)\n")
             output_str += f"    return_obj_bytes = msgspec.json.encode(return_val, enc_hook={message.proto.name}.enc_hook)\n"
             output_str += "    return CustomFastapiResponse(content=return_obj_bytes, status_code=200)\n"
         else:
@@ -3305,12 +3336,10 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                            f'status_code=200)\n')
             if id_field_type is not None:
                 output_str += (f"async def delete_by_id_list_{message_name_snake_cased}_http("
-                               f"{message_name_snake_cased}_id_list_req_body: Request, "
-                               f"return_obj_copy: bool | None = True):\n")
+                               f"{message_name_snake_cased}_id_list_req_body: Request):\n")
             else:
                 output_str += (f"async def delete_by_id_list_{message_name_snake_cased}_http("
-                               f"{message_name_snake_cased}_id_list_req_body: Request, "
-                               f"return_obj_copy: bool | None = True):\n")
+                               f"{message_name_snake_cased}_id_list_req_body: Request):\n")
         else:
             output_str += f'@{self.api_router_app_name}.delete("/delete-by-id-list-{message_name_snake_cased}/' + \
                           '{' + f'{message_name_snake_cased}_id_list' + '}' + \
@@ -3318,19 +3347,21 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             if id_field_type is not None:
                 output_str += (f"async def delete_by_id_list_{message_name_snake_cased}_http("
                                f"{message_name_snake_cased}_id_list: List[{id_field_type}], "
-                               f"return_obj_copy: bool | None = True) -> DefaultPydanticWebResponse | bool:\n")
+                               f") -> DefaultPydanticWebResponse | bool:\n")
             else:
                 output_str += (f"async def delete_by_id_list_{message_name_snake_cased}_http("
                                f"{message_name_snake_cased}_id_list: List["
                                f"{FastapiHttpRoutesFileHandler.default_id_type_var_name}], "
-                               f"return_obj_copy: bool | None = True) -> DefaultPydanticWebResponse | bool:\n")
+                               f") -> DefaultPydanticWebResponse | bool:\n")
         output_str += self._add_view_check_code_in_route()
         output_str += f"    try:\n"
+        output_str += f"        query_params = dict({message_name_snake_cased}_id_list_req_body.query_params)\n"
+        output_str += f"        return_obj_copy = True if str(query_params.pop('return_obj_copy', True)).lower() == 'true' else False\n"
         if model_type == ModelType.Msgspec:
             output_str += (f"        {message_name_snake_cased}_id_list_bytes = "
                            f"await {message_name_snake_cased}_id_list_req_body.body()\n")
             output_str += f"        return await underlying_delete_by_id_list_{message_name_snake_cased}_http_bytes(" \
-                          f"{message_name_snake_cased}_id_list_bytes, return_obj_copy=return_obj_copy)\n"
+                          f"{message_name_snake_cased}_id_list_bytes, return_obj_copy=return_obj_copy, **query_params)\n"
         else:
             output_str += f"        return await underlying_delete_by_id_list_{message_name_snake_cased}_http(" \
                           f"{message_name_snake_cased}_id_list, return_obj_copy=return_obj_copy)\n"
@@ -3359,7 +3390,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str = "@perf_benchmark\n"
         output_str += f"async def underlying_get_{message_name_snake_cased}_from_index_fields_http({field_params}, " \
                       f"filter_agg_pipeline: Any = None, generic_callable: " \
-                      f"Callable[[...], Any] | None = None) -> List[{message.proto.name}]:\n"
+                      f"Callable[[...], Any] | None = None, **query_params) -> List[{message.proto.name}]:\n"
         output_str += f'    """ Index route of {message.proto.name} """\n'
         output_str += f'    if generic_callable is None:\n'
         output_str += f'        generic_callable = generic_read_http\n'
@@ -3404,15 +3435,18 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         if model_type == ModelType.Msgspec:
             output_str += f'@{self.api_router_app_name}.get("/get-{message_name_snake_cased}-from-index-fields/' + \
                           f'{field_query}' + f'", status_code=200)\n'
-            output_str += f"async def get_{message_name_snake_cased}_from_index_fields_http({field_params}):\n"
+            output_str += (f"async def get_{message_name_snake_cased}_from_index_fields_http(request: Request, "
+                           f"{field_params}):\n")
         else:
             output_str += f'@{self.api_router_app_name}.get("/get-{message_name_snake_cased}-from-index-fields/' + \
                           f'{field_query}' + f'", response_model=List[{message.proto.name}], status_code=200)\n'
             output_str += f"async def get_{message_name_snake_cased}_from_index_fields_http({field_params}) " \
                           f"-> List[{message.proto.name}]:\n"
         field_params = ", ".join([f"{field.proto.name}" for field in index_fields])
+        output_str += f"    query_params = dict(request.query_params)\n"
         output_str += \
-            f"    return await underlying_get_{message_name_snake_cased}_from_index_fields_http({field_params})\n\n\n"
+            (f"    return await underlying_get_{message_name_snake_cased}_from_index_fields_http({field_params}, "
+             f"**query_params)\n\n\n")
         return output_str
 
     def _handle_msgspec_common_underlying_get_gen(self, message: protogen.Message, aggregation_type, msg_has_links,
@@ -3421,12 +3455,12 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         if id_field_type is not None:
             output_str = f"async def _underlying_read_{message_name_snake_cased}_by_id_http(" \
                           f"{message_name_snake_cased}_id: {id_field_type}, filter_agg_pipeline: Any = None, " \
-                          f"generic_callable: Callable[Any, Any] | None = None):\n"
+                          f"generic_callable: Callable[..., Any] | None = None, **query_params):\n"
         else:
             output_str = f"async def _underlying_read_{message_name_snake_cased}_by_id_http(" \
                           f"{message_name_snake_cased}_id: {FastapiHttpRoutesFileHandler.default_id_type_var_name}, " \
                           f"filter_agg_pipeline: Any = None, generic_callable: " \
-                          f"Callable[[...], Any] | None = None):\n"
+                          f"Callable[[...], Any] | None = None, **query_params):\n"
         mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
 
         output_str += mutex_handling_str
@@ -3478,31 +3512,31 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             if id_field_type is not None:
                 output_str += f"async def underlying_read_{message_name_snake_cased}_by_id_http(" \
                               f"{message_name_snake_cased}_id: {id_field_type}, filter_agg_pipeline: Any = None, " \
-                              f"generic_callable: Callable[[...], Any] | None = None):\n"
+                              f"generic_callable: Callable[[...], Any] | None = None, **query_params):\n"
             else:
                 output_str += f"async def underlying_read_{message_name_snake_cased}_by_id_http(" \
                               f"{message_name_snake_cased}_id: {FastapiHttpRoutesFileHandler.default_id_type_var_name}, " \
                               f"filter_agg_pipeline: Any = None, generic_callable: " \
-                              f"Callable[[...], Any] | None = None):\n"
+                              f"Callable[[...], Any] | None = None, **query_params):\n"
             output_str += f'    """\n'
             output_str += f'    Read by id route for {message.proto.name}\n'
             output_str += f'    """\n'
             output_str += f'    if generic_callable is None:\n'
             output_str += f'        generic_callable = generic_read_by_id_http\n'
             output_str += f"    return_val = await _underlying_read_{message_name_snake_cased}_by_id_http(" \
-                          f"{message_name_snake_cased}_id, filter_agg_pipeline, generic_callable)\n"
+                          f"{message_name_snake_cased}_id, filter_agg_pipeline, generic_callable, **query_params)\n"
             output_str += f"    return return_val\n\n\n"
 
             output_str += f"@perf_benchmark\n"
             if id_field_type is not None:
                 output_str += f"async def underlying_read_{message_name_snake_cased}_by_id_http_json_dict(" \
                               f"{message_name_snake_cased}_id: {id_field_type}, filter_agg_pipeline: Any = None, " \
-                              f"generic_callable: Callable[[...], Any] | None = None):\n"
+                              f"generic_callable: Callable[[...], Any] | None = None, **query_params):\n"
             else:
                 output_str += f"async def underlying_read_{message_name_snake_cased}_by_id_http_json_dict(" \
                               f"{message_name_snake_cased}_id: {FastapiHttpRoutesFileHandler.default_id_type_var_name}, " \
                               f"filter_agg_pipeline: Any = None, generic_callable: " \
-                              f"Callable[[...], Any] | None = None):\n"
+                              f"Callable[[...], Any] | None = None, **query_params):\n"
             output_str += f'    """\n'
             output_str += f'    Read by id route for {message.proto.name}\n'
             output_str += f'    """\n'
@@ -3510,26 +3544,26 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f'        generic_callable = generic_read_by_id_http\n'
             output_str += f"    return_val = await _underlying_read_{message_name_snake_cased}_by_id_http(" \
                           f"{message_name_snake_cased}_id, filter_agg_pipeline, generic_callable)\n"
-            output_str += f"    return_val = msgspec.to_builtins(return_val, builtin_types=[DateTime])\n"
+            output_str += f"    return_val = msgspec.to_builtins(return_val, builtin_types=[DateTime], **query_params)\n"
             output_str += f"    return return_val\n\n\n"
 
             output_str += f"@perf_benchmark\n"
             if id_field_type is not None:
                 output_str += f"async def underlying_read_{message_name_snake_cased}_by_id_http_bytes(" \
                               f"{message_name_snake_cased}_id: {id_field_type}, filter_agg_pipeline: Any = None, " \
-                              f"generic_callable: Callable[[...], Any] | None = None):\n"
+                              f"generic_callable: Callable[[...], Any] | None = None, **query_params):\n"
             else:
                 output_str += f"async def underlying_read_{message_name_snake_cased}_by_id_http_bytes(" \
                               f"{message_name_snake_cased}_id: {FastapiHttpRoutesFileHandler.default_id_type_var_name}, " \
                               f"filter_agg_pipeline: Any = None, generic_callable: " \
-                              f"Callable[[...], Any] | None = None):\n"
+                              f"Callable[[...], Any] | None = None, **query_params):\n"
             output_str += f'    """\n'
             output_str += f'    Read by id route for {message.proto.name}\n'
             output_str += f'    """\n'
             output_str += f'    if generic_callable is None:\n'
             output_str += f'        generic_callable = generic_read_by_id_http\n'
             output_str += f"    return_val = await _underlying_read_{message_name_snake_cased}_by_id_http(" \
-                          f"{message_name_snake_cased}_id, filter_agg_pipeline, generic_callable)\n"
+                          f"{message_name_snake_cased}_id, filter_agg_pipeline, generic_callable, **query_params)\n"
             output_str += f"    return_obj_bytes = msgspec.json.encode(return_val, enc_hook={message.proto.name}.enc_hook)\n"
             output_str += f"    return CustomFastapiResponse(content=return_obj_bytes, status_code=200)\n\n"
         else:
@@ -3537,12 +3571,12 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             if id_field_type is not None:
                 output_str += f"async def underlying_read_{message_name_snake_cased}_by_id_http(" \
                               f"{message_name_snake_cased}_id: {id_field_type}, filter_agg_pipeline: Any = None, " \
-                              f"generic_callable: Callable[[...], Any] | None = None)"
+                              f"generic_callable: Callable[[...], Any] | None = None, **query_params)"
             else:
                 output_str += f"async def underlying_read_{message_name_snake_cased}_by_id_http(" \
                               f"{message_name_snake_cased}_id: {FastapiHttpRoutesFileHandler.default_id_type_var_name}, " \
                               f"filter_agg_pipeline: Any = None, generic_callable: " \
-                              f"Callable[[...], Any] | None = None)"
+                              f"Callable[[...], Any] | None = None, **query_params)"
             if model_type == ModelType.Dataclass:
                 output_str += ":\n"
             else:
@@ -3606,21 +3640,24 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                           f'", response_model={message.proto.name}, status_code=200)\n'
         if id_field_type is not None:
             output_str += f"async def read_{message_name_snake_cased}_by_id_http({message_name_snake_cased}_id: " \
-                          f"{id_field_type})"
+                          f"{id_field_type}, request: Request)"
         else:
             output_str += f"async def read_{message_name_snake_cased}_by_id_http({message_name_snake_cased}_id: " \
-                          f"{FastapiHttpRoutesFileHandler.default_id_type_var_name})"
+                          f"{FastapiHttpRoutesFileHandler.default_id_type_var_name}, request: Request)"
         if model_type == ModelType.Dataclass or model_type == ModelType.Msgspec:
             output_str += ":\n"
         else:
             output_str += f" -> {message.proto.name}:\n"
         output_str += f"    try:\n"
         if model_type == ModelType.Msgspec:
+            output_str += f"        query_params = dict(request.query_params)\n"
             output_str += \
-                f"        return await underlying_read_{message_name_snake_cased}_by_id_http_bytes({message_name_snake_cased}_id)\n"
+                (f"        return await underlying_read_{message_name_snake_cased}_by_id_http_bytes("
+                 f"{message_name_snake_cased}_id, **query_params)\n")
         else:
             output_str += \
-                f"        return await underlying_read_{message_name_snake_cased}_by_id_http({message_name_snake_cased}_id)\n"
+                (f"        return await underlying_read_{message_name_snake_cased}_by_id_http("
+                 f"{message_name_snake_cased}_id, **query_params)\n")
         output_str += f"    except Exception as e:\n"
         output_str += (f"        logging.exception(f'read_{message_name_snake_cased}_by_id_http failed in "
                        "client call with exception: {e}')\n")
@@ -3633,8 +3670,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         output_str = (f"async def _underlying_read_{message_name_snake_cased}_http("
                       f"filter_agg_pipeline: Any = None, generic_callable: "
-                      f"Callable[Any, Any] | None = None, projection_model=None, "
-                      f"projection_filter: Dict | None = None, limit_obj_count: int | None = None):\n")
+                      f"Callable[..., Any] | None = None, projection_model=None, "
+                      f"projection_filter: Dict | None = None, limit_obj_count: int | None = None, **query_params):\n")
         mutex_handling_str, indent_count = self._handle_underlying_mutex_str(message, shared_lock_list)
 
         return_obj_str = "json_list"
@@ -3698,8 +3735,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += (f"async def underlying_read_{message_name_snake_cased}_http("
                            f"filter_agg_pipeline: Any = None, generic_callable: "
                            f"Callable[[...], Any] | None = None, projection_model=None, "
-                           f"projection_filter: Dict | None = None, limit_obj_count: int | None = None"
-                           f"):\n")
+                           f"projection_filter: Dict | None = None, limit_obj_count: int | None = None, "
+                           f"**query_params):\n")
             output_str += f'    """\n'
             output_str += f'    Get All route for {message.proto.name}\n'
             output_str += f'    """\n'
@@ -3707,15 +3744,15 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f'        generic_callable = generic_read_http\n'
             output_str += (f"    return_val = await _underlying_read_{message_name_snake_cased}_http("
                           f"filter_agg_pipeline, generic_callable, projection_model, projection_filter, "
-                          f"limit_obj_count)\n")
+                          f"limit_obj_count, **query_params)\n")
             output_str += f"    return return_val\n\n\n"
 
             output_str += f"@perf_benchmark\n"
             output_str += (f"async def underlying_read_{message_name_snake_cased}_http_json_dict("
                            f"filter_agg_pipeline: Any = None, generic_callable: "
                            f"Callable[[...], Any] | None = None, projection_model=None, "
-                           f"projection_filter: Dict | None = None, limit_obj_count: int | None = None"
-                           f"):\n")
+                           f"projection_filter: Dict | None = None, limit_obj_count: int | None = None, "
+                           f"**query_params):\n")
             output_str += f'    """\n'
             output_str += f'    Get All route for {message.proto.name}\n'
             output_str += f'    """\n'
@@ -3723,7 +3760,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f'        generic_callable = generic_read_http\n'
             output_str += (f"    return_val = await _underlying_read_{message_name_snake_cased}_http("
                           f"filter_agg_pipeline, generic_callable, projection_model, projection_filter, "
-                          f"limit_obj_count)\n")
+                          f"limit_obj_count, **query_params)\n")
             output_str += f"    return_obj_dict = msgspec.to_builtins(return_val, builtin_types=[DateTime])\n"
             output_str += f"    return return_obj_dict\n\n\n"
 
@@ -3731,8 +3768,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += (f"async def underlying_read_{message_name_snake_cased}_http_bytes("
                            f"filter_agg_pipeline: Any = None, generic_callable: "
                            f"Callable[[...], Any] | None = None, projection_model=None, "
-                           f"projection_filter: Dict | None = None, limit_obj_count: int | None = None"
-                           f"):\n")
+                           f"projection_filter: Dict | None = None, limit_obj_count: int | None = None, "
+                           f"**query_params):\n")
             output_str += f'    """\n'
             output_str += f'    Get All route for {message.proto.name}\n'
             output_str += f'    """\n'
@@ -3740,7 +3777,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f'        generic_callable = generic_read_http\n'
             output_str += (f"    return_val = await _underlying_read_{message_name_snake_cased}_http("
                            f"filter_agg_pipeline, generic_callable, projection_model, projection_filter, "
-                           f"limit_obj_count)\n")
+                           f"limit_obj_count, **query_params)\n")
             output_str += f"    return_obj_bytes = msgspec.json.encode(return_val, enc_hook={message.proto.name}.enc_hook)\n"
             output_str += f"    return CustomFastapiResponse(content=return_obj_bytes, status_code=200)\n\n"
         else:
@@ -3748,8 +3785,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += (f"async def underlying_read_{message_name_snake_cased}_http("
                            f"filter_agg_pipeline: Any = None, generic_callable: "
                            f"Callable[[...], Any] | None = None, projection_model=None, "
-                           f"projection_filter: Dict | None = None, limit_obj_count: int | None = None"
-                           f")")
+                           f"projection_filter: Dict | None = None, limit_obj_count: int | None = None, "
+                           f"**query_params)")
             if model_type == ModelType.Dataclass:
                 output_str += ":\n"
                 return_obj_str = "json_list"
@@ -3808,8 +3845,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         if model_type in [ModelType.Dataclass, ModelType.Msgspec]:
             output_str += (f'@{self.api_router_app_name}.get("/get-all-{message_name_snake_cased}'
                            f'", status_code=200)\n')
-            output_str += (f"async def read_{message_name_snake_cased}_http(limit_obj_count: int | None = None"
-                           f"):\n")
+            output_str += (f"async def read_{message_name_snake_cased}_http(request: Request):\n")
         else:
             output_str += (f'@{self.api_router_app_name}.get("/get-all-{message_name_snake_cased}'
                            f'", response_model=List[{message.proto.name}], status_code=200)\n')
@@ -3820,6 +3856,11 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                                      FastapiHttpRoutesFileHandler.flux_msg_main_crud_operations_agg)
 
         output_str += f"    try:\n"
+        output_str += f"        # Process arbitrary query parameters (kwargs)\n"
+        output_str += f"        query_params = dict(request.query_params)\n"
+        output_str += f"        limit_obj_count = query_params.pop('limit_obj_count', None)\n"
+        output_str += f"        if limit_obj_count is not None:\n"
+        output_str += f"            limit_obj_count = parse_to_int(limit_obj_count)\n"
         override_default_get_all_limit = additional_agg_option_val_dict.get("override_get_all_limit_handling")
         if not override_default_get_all_limit:
             output_str += f"        limit_filter_agg: Dict[str, Any] | None = None\n"
@@ -3827,16 +3868,17 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += "            limit_filter_agg = {'agg': get_limited_objs(limit_obj_count)}\n"
             if model_type == ModelType.Msgspec:
                 output_str += (f"        return await underlying_read_{message_name_snake_cased}_http_bytes("
-                               f"limit_filter_agg)\n")
+                               f"limit_filter_agg, **query_params)\n")
             else:
-                output_str += f"        return await underlying_read_{message_name_snake_cased}_http(limit_filter_agg)\n"
+                output_str += (f"        return await underlying_read_{message_name_snake_cased}_http(limit_filter_agg, "
+                               f"**query_params)\n")
         else:
             if model_type == ModelType.Msgspec:
                 output_str += (f"        return await underlying_read_{message_name_snake_cased}_http_bytes("
-                               f"limit_obj_count=limit_obj_count)\n")
+                               f"limit_obj_count=limit_obj_count, **query_params)\n")
             else:
                 output_str += (f"        return await underlying_read_{message_name_snake_cased}_http("
-                               f"limit_obj_count=limit_obj_count)\n")
+                               f"limit_obj_count=limit_obj_count, **query_params)\n")
         output_str += f"    except Exception as e:\n"
         output_str += (f"        logging.exception(f'read_{message_name_snake_cased}_http failed in "
                        "client call with exception: {e}')\n")
@@ -3916,7 +3958,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
 
         shared_mutex_list = self._get_list_of_shared_lock_for_message(message)
 
-        if (aggregation_type := option_val_dict.get(FastapiHttpRoutesFileHandler.flux_json_root_read_field)) is not None:
+        if (aggregation_type := option_val_dict.get(FastapiHttpRoutesFileHandler.flux_json_root_read_all_field)) is not None:
             output_str += self.handle_GET_ALL_gen(message, aggregation_type.strip(),
                                                   shared_mutex_list, model_type)
         # else not required: avoiding find_all route for this message if read_field of json_root option is not set
