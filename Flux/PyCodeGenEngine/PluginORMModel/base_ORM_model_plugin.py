@@ -565,7 +565,7 @@ class BaseORMModelPlugin(BaseProtoPlugin):
 
     def list_model_content(self, file: protogen.File) -> str:
         output_str = ""
-        for message in self.root_message_list:
+        for message in self.root_message_list+self.query_message_list:
             if message in file.messages:
                 output_str += f'class {message.proto.name}BaseModelList(RootModel, ListModelBase):\n'
                 output_str += f'    root: List[{message.proto.name}BaseModel]\n\n\n'
@@ -604,11 +604,20 @@ class BaseORMModelPlugin(BaseProtoPlugin):
         # adding class to be used by query to get max_id of any model
         output_str += self._handle_max_id_model()
 
+        # adding class to be used by filtered count query in any model
+        output_str += self._handle_filtered_doc_count_model()
+
         return output_str
 
     @abstractmethod
     def _handle_max_id_model(self) -> str:
-        raise NotImplementedError("Must handle MaxId model use for getting max_id set for any model in query")
+        raise NotImplementedError("Must handle MaxId model generation - used for getting max_id "
+                                  "set for any model in query")
+
+    @abstractmethod
+    def _handle_filtered_doc_count_model(self) -> str:
+        raise NotImplementedError("Must handle FilteredDocCount model generation - used for getting filtered counts "
+                                  "for any model in query")
 
     def _import_current_models(self) -> List[str]:
         import_statements: List[str] = []

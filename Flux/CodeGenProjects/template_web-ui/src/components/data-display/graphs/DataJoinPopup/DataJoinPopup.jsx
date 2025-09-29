@@ -53,7 +53,8 @@ const connectionLogic = {
             sourceColumn,
             targetColumn,
             joinType: state.joinType,
-            status: 'new'
+            status: 'new',
+            tolerance: Math.floor(Math.random() * 100)
         };
 
         return [...state.connections, newConnection];
@@ -84,7 +85,8 @@ const aiSuggestionLogic = {
             targetColumn: suggestion.targetColumn,
             joinType: suggestion.joinType,
             status: suggestion.originalDbId ? 'modified' : 'new',
-            wasAiSuggestion: true
+            wasAiSuggestion: true,
+            tolerance: suggestion.tolerance
         };
 
         const updatedConnections = [...state.connections, newConnection];
@@ -177,6 +179,7 @@ const createInitialState = ({ sourceNode, targetNode, existingJoin, graphAttribu
         edgePairsBaseField: 'base_field',
         edgePairsJoinField: 'join_field',
         edgeAiSuggestedField: 'ai_suggested',
+        edgeToleranceField: 'tolerance',
         ...graphAttributes
     };
 
@@ -214,13 +217,15 @@ const createInitialState = ({ sourceNode, targetNode, existingJoin, graphAttribu
                     const wasAiSuggestion = pair[attrs.edgeAiSuggestedField] === true;
                     confirmedConnections.push({
                         ...connectionBase,
-                        wasAiSuggestion
+                        wasAiSuggestion,
+                        tolerance: pair[attrs.edgeToleranceField] ?? Math.floor(Math.random() * 100)
                     });
                 } else if (pair[attrs.edgeAiSuggestedField] === true && pair[attrs.edgeConfirmedField] === false) {
                     aiSuggestions.push({
                         ...connectionBase,
                         id: `ai_${pairIndex}`,
-                        isAiSuggestion: true
+                        isAiSuggestion: true,
+                        tolerance: pair[attrs.edgeToleranceField] ?? Math.floor(Math.random() * 100)
                     });
                 }
             }
@@ -912,6 +917,16 @@ const DataJoinPopup = ({
                 sourceHandle: `${state.sourceNodeName}-${conn.sourceColumn}-source`,
                 targetHandle: `${state.targetNodeName}-${conn.targetColumn}-target`,
                 type: 'default',
+                label: `T: ${conn.tolerance}`,
+                labelShowBg: false,
+                labelStyle: {
+                    fill: confirmedEdgeColor,  
+                    fontWeight: 200,
+                    fontSize: '10px',
+                    transform: 'translateY(-15px)',
+                    textAnchor: 'middle',
+                    dominantBaseline: 'middle'
+                },
                 style: {
                     stroke: confirmedEdgeColor,
                     strokeWidth: 2
@@ -936,6 +951,16 @@ const DataJoinPopup = ({
                     sourceHandle: `${state.sourceNodeName}-${suggestion.sourceColumn}-source`,
                     targetHandle: `${state.targetNodeName}-${suggestion.targetColumn}-target`,
                     type: 'default',
+                    label: `T: ${suggestion.tolerance}`,
+                    labelShowBg: false,
+                    labelStyle: {
+                        fill: suggestedEdgeColor,
+                        fontWeight: 600,
+                        fontSize: '12px',
+                        transform: 'translateY(-15px)',
+                        textAnchor: 'middle',
+                        dominantBaseline: 'middle'
+                    },
                     style: {
                         stroke: suggestedEdgeColor,
                         strokeWidth: 2
@@ -983,7 +1008,6 @@ const DataJoinPopup = ({
             newFieldSelections.forEach(field => {
                 newFieldsMap.set(field.field_name, field);
             });
-           
 
             // Start with existing fields that are still selected, preserve their order and metadata
             const updatedFields = originalFieldSelections
@@ -1308,7 +1332,7 @@ const DataJoinPopup = ({
                             Select columns with checkboxes • Click columns in top cards to create connections
                         </Typography>
                         {hasPendingAiSuggestions && (
-                            <Typography variant="body2" color="warning.main" sx={{ ml:5, mt: 1 }}>
+                            <Typography variant="body2" color="warning.main" sx={{ ml: 5, mt: 1 }}>
                                 Please accept or reject all AI suggestions before saving manual connections.
                             </Typography>
                         )}

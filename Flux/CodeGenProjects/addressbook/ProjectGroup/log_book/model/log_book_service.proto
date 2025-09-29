@@ -40,7 +40,7 @@ message PlanAlert {
     y: 32,
     w: 8,
     h: 8,
-    is_repeated: True,
+    is_repeated: true,
     widget_ui_data: {
       view_layout: UI_TABLE
     },
@@ -48,6 +48,7 @@ message PlanAlert {
     is_read_only: true,
     is_model_alert_type: true
   };
+  option (FluxMsgGetFilterCountQuery) = true;
   option (FluxMsgOverrideDefaultCrud) = {
     ui_crud_type: GET_ALL,
     query_name: "filtered_plan_alert_by_plan_id",
@@ -56,6 +57,15 @@ message PlanAlert {
       query_param_name: "plan_id",
       query_param_value_src: "PairPlan.id"
     }
+  };
+  option (FluxMsgJsonQuery) = {
+    QueryName: "get_filtered_plan_alert_count"
+    QueryParams: {
+        QueryParamName: "filter_kwargs",
+        QueryParamDataType: "List[Dict[str, Any]]"
+    },
+    ProjectionModelName: "FilteredDocCount"
+    QueryType: WS
   };
   option (FluxMsgButtonQuery) = {
     query_data: {
@@ -105,6 +115,18 @@ message PlanAlert {
         QueryParamName: "limit_obj_count",
         QueryParamDataType: "int | None = None"
       }
+      QueryParams: {
+        QueryParamName: "filters",
+        QueryParamDataType: "List[Dict[str, Any]] | None = None"
+      }
+      QueryParams: {
+        QueryParamName: "sort_chore",
+        QueryParamDataType: "List[Dict[str, Any]] | None = None"
+      }
+      QueryParams: {
+        QueryParamName: "pagination",
+        QueryParamDataType: "Dict[str, Any] | None = None"
+      }
       QueryType: BOTH
   };
   option (FluxMsgStringLength) = 128;
@@ -115,7 +137,7 @@ message PlanAlert {
     override_get_all_limit_handling: true
   };
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
-  required int32 plan_id = 2 [(FluxFldServerPopulate) = true, (FluxFldHide) = "True", (FluxFldIndex) = true, (FluxFldOrmNoUpdate) = true];
+  required int32 plan_id = 2 [(FluxFldQueryParamBind) = "plan_id", (FluxFldServerPopulate) = true, (FluxFldHide) = "True", (FluxFldIndex) = true, (FluxFldOrmNoUpdate) = true];
   optional bool dismiss = 3 [default=false, (FluxFldIndex) = true, (FluxFldUIUpdateOnly) = true, (FluxFldSequenceNumber) = 1, (FluxFldNoCommonKey) = true, (FluxFldButton) = {
     unpressed_caption: "dismiss",
     pressed_caption: "undo",
@@ -152,13 +174,14 @@ message ContactAlert {
     y: 32,
     w: 8,
     h: 8,
-    is_repeated: True,
+    is_repeated: true,
     widget_ui_data: {
       view_layout: UI_TABLE
     },
     is_read_only: true,
     is_model_alert_type: true
   };
+  option (FluxMsgGetFilterCountQuery) = true;
   option (FluxMsgJsonQuery) = {
       QueryName: "create_or_update_contact_alert"
       QueryParams: {
@@ -173,6 +196,15 @@ message ContactAlert {
         QueryParamName: "alert_details",
         QueryParamDataType: "str | None = None"
       }
+  };
+  option (FluxMsgJsonQuery) = {
+    QueryName: "get_filtered_contact_alert_count"
+    QueryParams: {
+        QueryParamName: "filter_kwargs",
+        QueryParamDataType: "List[Dict[str, Any]]"
+    },
+    ProjectionModelName: "FilteredDocCount"
+    QueryType: WS
   };
   option (FluxMsgButtonQuery) = {
     query_data: {
@@ -474,6 +506,7 @@ message HandlePlanPauseFromSymbolSideLog{
   };
   optional bool is_id_present = 1;  // no use case - kept as at least 1 field must be present in message
 }
+
 
 // used to avoid unused import warning by using any random msg or enum from imported file causing warning
 message ImportWarningAvoidDummyMessage {

@@ -28,6 +28,7 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
     repeated_root_type: str = 'repeated_root'
     non_root_type: str = 'non_root'
     abbreviated_merge_type: str = 'abbreviation_merge'
+    chart_type: str = 'chart'
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)

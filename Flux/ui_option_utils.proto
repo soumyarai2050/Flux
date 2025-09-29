@@ -33,6 +33,14 @@ enum HoverTextType{
     HoverTextType_VALUE_AND_PERCENTAGE = 4;
 }
 
+enum UIModelType{
+  ROOT = 0;
+  NON_ROOT = 1;
+  REPEATED_ROOT = 2;
+  ABBREVIATION_MERGE = 3;
+  CHART = 4;
+}
+
 enum UILayoutType{
   UI_ABBREVIATED_FILTER = 0;
   UI_TABLE = 1;
@@ -114,6 +122,7 @@ message WidgetUIDataElement {
   repeated PivotData pivot_data = 28;
   optional bool is_graph_model = 29;
   optional bool is_graph_node_model = 30;
+  optional UIModelType model_type = 31;
 }
 
 message WidgetUIOption {

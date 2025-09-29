@@ -28,7 +28,7 @@ from FluxPythonUtils.scripts.general_utility_functions import (
     compare_n_patch_list, non_jsonable_types_handler)
 from Flux.PyCodeGenEngine.FluxCodeGenCore.generic_route_utils import get_aggregate_pipeline, generic_perf_benchmark
 from FluxPythonUtils.scripts.model_base_utils import MsgspecBaseModel, remove_none_values
-from Flux.PyCodeGenEngine.FluxCodeGenCore.base_aggregate import get_non_stored_ids
+from Flux.PyCodeGenEngine.FluxCodeGenCore.base_aggregate import *
 
 """
 1. FilterAggregate [only filters the returned value]
@@ -68,8 +68,10 @@ async def broadcast_all_from_active_ws_data_set(active_ws_data_set: List[WSData]
         projection_agg_pipeline_callable = ws_data.projection_agg_pipeline_callable
 
         if projection_agg_pipeline_callable is not None:
-            projection_agg_params["id_list"] = db_obj_id_list
-            filter_agg_pipeline = projection_agg_pipeline_callable(**projection_agg_params)
+            filter_agg_pipeline: Dict[str, List] = projection_agg_pipeline_callable(**projection_agg_params)
+
+            # inserting match by obj_list as top match filter
+            filter_agg_pipeline["aggregate"].insert(0, get_match_layer_for_obj_id_list(db_obj_id_list))
 
             db_obj_dict_list = await get_obj_list(msgspec_class_type, db_obj_id_list,
                                                   filter_agg_pipeline=filter_agg_pipeline,
@@ -101,8 +103,10 @@ async def broadcast_from_active_ws_data_set(active_ws_data_set: List[WSData], ms
         projection_agg_pipeline_callable = ws_data.projection_agg_pipeline_callable
 
         if projection_agg_pipeline_callable is not None:
-            projection_agg_params["id_list"] = [db_obj_id]
             filter_agg_pipeline = projection_agg_pipeline_callable(**projection_agg_params)
+
+            # inserting match by obj_list as top match filter
+            filter_agg_pipeline["aggregate"].insert(0, get_match_layer_for_obj_id_list([db_obj_id]))
 
             db_obj_dict = await get_obj(msgspec_class_type, db_obj_id,
                                         filter_agg_pipeline=filter_agg_pipeline,
@@ -251,7 +255,7 @@ async def execute_update_agg_pipeline(msgspec_class_type: Type[MsgspecModel],
 async def generic_post_http(msgspec_class_type: Type[MsgspecModel],
                             proto_package_name: str, create_obj: MsgspecModel,
                             filter_agg_pipeline: Any = None,
-                            update_agg_pipeline: Any = None, has_links: bool = False) -> Dict[str, Any] | bool:
+                            update_agg_pipeline: Any = None, has_links: bool = False, **kwargs) -> Dict[str, Any] | bool:
     obj_json = create_obj.to_dict()
     obj_id = create_obj.id
     if obj_id is not None:
@@ -286,7 +290,7 @@ async def generic_post_http(msgspec_class_type: Type[MsgspecModel],
 async def generic_post_all_http(msgspec_class_type: Type[MsgspecModel], proto_package_name: str,
                                 create_obj_list: List[MsgspecModel],
                                 filter_agg_pipeline: Any = None, update_agg_pipeline: Any = None,
-                                has_links: bool = False) -> List[Dict[str, Any]] | bool:
+                                has_links: bool = False, **kwargs) -> List[Dict[str, Any]] | bool:
     obj_id_list = []
     for create_obj in create_obj_list:
         obj_id = create_obj.id
@@ -437,7 +441,7 @@ async def _underlying_patch_n_put_all(msgspec_class_type: Type[MsgspecModel], pr
 @generic_perf_benchmark
 async def generic_put_http(model_class_type: Type[MsgspecModel], proto_package_name: str,
                            update_msgspec_obj: MsgspecModel, filter_agg_pipeline: Any = None,
-                           update_agg_pipeline: Any = None, has_links: bool = False) -> Dict[str, Any] | bool:
+                           update_agg_pipeline: Any = None, has_links: bool = False, **kwargs) -> Dict[str, Any] | bool:
 
     # stored_update_id_val = stored_json_obj.get("updated_id")
     # new_updated_id_val = obj_json.get("updated_id")
@@ -477,7 +481,7 @@ async def generic_put_http(model_class_type: Type[MsgspecModel], proto_package_n
 async def generic_put_all_http(msgspec_class_type: Type[MsgspecModel], proto_package_name: str,
                                update_obj_list: List[MsgspecModel], filter_agg_pipeline: Any = None,
                                update_agg_pipeline: Any = None,
-                               has_links: bool = False) -> Tuple[List[Dict[str, Any]], List[int]]:
+                               has_links: bool = False, **kwargs) -> Tuple[List[Dict[str, Any]], List[int]]:
     updated_obj_id_list = [update_obj.id for update_obj in update_obj_list]
     obj_json_list = msgspec.to_builtins(update_obj_list, builtin_types=[DateTime])
     return await _underlying_patch_n_put_all(msgspec_class_type, proto_package_name,
@@ -577,7 +581,7 @@ async def generic_put_all_http(msgspec_class_type: Type[MsgspecModel], proto_pac
 async def generic_patch_http(msgspec_class_type: Type[MsgspecModel], proto_package_name: str,
                              stored_obj_dict: Dict[str, Any], partial_update_dict: Dict[str, Any],
                              filter_agg_pipeline: Any = None, update_agg_pipeline: Any = None,
-                             has_links: bool = False) -> Dict[str, Any] | bool:
+                             has_links: bool = False, **kwargs) -> Dict[str, Any] | bool:
 
     # since patch not call's default_factory of update_id
     partial_update_dict["update_id"] = msgspec_class_type.next_update_id()
@@ -682,7 +686,7 @@ async def generic_patch_all_http(msgspec_class_type: Type[MsgspecModel], proto_p
                                  stored_obj_dict_list: List[Dict[str, Any]],
                                  partial_update_dict_list: List[Dict[str, Any]],
                                  updated_obj_id_list: List[Any], filter_agg_pipeline: Any = None,
-                                 update_agg_pipeline: Any = None, has_links: bool = False) -> List[Dict[str, Any]]:
+                                 update_agg_pipeline: Any = None, has_links: bool = False, **kwargs) -> List[Dict[str, Any]]:
     if (stored_len := len(stored_obj_dict_list)) != (update_len := len(partial_update_dict_list)):
         err_str = ("Unexpected: len of stored_obj_dict_list must be equal to len of partial_update_dict_list, "
                    f"len(stored_obj_dict_list)={stored_len}, len(partial_update_dict_list)={update_len};;; "
@@ -711,7 +715,7 @@ async def handle_reset_int_id(collection_obj: motor.motor_asyncio.AsyncIOMotorCo
 @generic_perf_benchmark
 async def generic_delete_http(msgspec_class_type: Type[MsgspecModel], proto_package_name: str,
                               model_dummy_model, db_obj_id: int | str | Any,
-                              update_agg_pipeline: Any = None, has_links: bool = False) -> DefaultMsgspecWebResponse | bool:
+                              update_agg_pipeline: Any = None, has_links: bool = False, **kwargs) -> DefaultMsgspecWebResponse | bool:
     id_is_int_type = isinstance(db_obj_id, int)
     if msgspec_class_type.enable_large_db_object:
         gridfs_bucket_obj: motor.motor_asyncio.AsyncIOMotorGridFSBucket = msgspec_class_type.gridfs_bucket_obj
@@ -748,7 +752,7 @@ async def generic_delete_http(msgspec_class_type: Type[MsgspecModel], proto_pack
 @http_except_n_log_error(status_code=500)
 @generic_perf_benchmark
 async def generic_delete_all_http(msgspec_class_type: Type[MsgspecModel], proto_package_name: str,
-                                  msgspec_dummy_model: Type[MsgspecModel]) -> DefaultMsgspecWebResponse | bool:
+                                  msgspec_dummy_model: Type[MsgspecModel], **kwargs) -> DefaultMsgspecWebResponse | bool:
     id_is_int_type = (msgspec_class_type.__annotations__.get("_id") == int)
 
     if msgspec_class_type.enable_large_db_object:
@@ -805,7 +809,7 @@ async def generic_delete_all_http(msgspec_class_type: Type[MsgspecModel], proto_
 async def generic_delete_by_id_list_http(
         msgspec_class_type: Type[MsgspecModel], proto_package_name: str,
         model_dummy_model, db_obj_id_list: List[int | str | Any], update_agg_pipeline: Any = None,
-        has_links: bool = False) -> DefaultMsgspecWebResponse | bool:
+        has_links: bool = False, **kwargs) -> DefaultMsgspecWebResponse | bool:
     id_is_int_type = isinstance(db_obj_id_list[0], int)  # checking only first obj type assuming all will have same
     if msgspec_class_type.enable_large_db_object:
         gridfs_bucket_obj: motor.motor_asyncio.AsyncIOMotorGridFSBucket = msgspec_class_type.gridfs_bucket_obj
@@ -876,11 +880,18 @@ async def generic_delete_by_id_list_http(
 @generic_perf_benchmark
 async def generic_read_http(msgspec_class_type: Type[MsgspecModel], proto_package_name: str,
                             filter_agg_pipeline: Any = None, has_links: bool = False,
-                            read_ids_list: List[Any] | None = None, projection_model=None):
+                            read_ids_list: List[Any] | None = None, projection_model=None, **kwargs):
     json_obj_list: List[msgspec_class_type]
+
+    filter_sort_pagination_agg_pipeline = create_cascading_multi_filter_pipeline(msgspec_class_type, **kwargs)
+
+    if filter_agg_pipeline is not None:
+        filter_sort_pagination_agg_pipeline += filter_agg_pipeline.get("agg", [])
+    filter_sort_pagination_agg_pipeline = {"agg": filter_sort_pagination_agg_pipeline}
+
     json_obj_list = \
         await get_obj_list(msgspec_class_type, read_ids_list,
-                           filter_agg_pipeline=filter_agg_pipeline, has_links=has_links)
+                           filter_agg_pipeline=filter_sort_pagination_agg_pipeline, has_links=has_links)
     if read_ids_list and len(json_obj_list) != len(set(read_ids_list)):
         existing_ids = set()
         for json_obj in json_obj_list:
@@ -897,19 +908,25 @@ async def generic_read_http(msgspec_class_type: Type[MsgspecModel], proto_packag
     return json_obj_list
 
 
+async def _get_obj_list_n_dump_to_bytes(msgspec_class_type: Type[MsgspecModel],
+                                        filter_agg_pipeline: Dict[str, Any], has_links: bool):
+    json_obj_list = \
+        await get_obj_list(msgspec_class_type, filter_agg_pipeline=filter_agg_pipeline, has_links=has_links)
+    for obj_json in json_obj_list:
+        # handling all datetime fields - converting to epoch int values - caller of this function will handle
+        # these fields back if required
+        msgspec_class_type.convert_ts_fields_from_datetime_to_epoch_int(obj_json)
+    json_obj_list_str = json.dumps(json_obj_list, default=non_jsonable_types_handler)
+    return json_obj_list_str
+
+
 async def _generic_read_ws(msgspec_class_type: Type[MsgspecModel], ws: WebSocket,
                            filter_agg_pipeline, need_initial_snapshot: bool,
                            is_new_ws: bool, has_links: bool):
     need_disconnect = False
     try:
         if need_initial_snapshot is None or need_initial_snapshot:
-            json_obj_list = \
-                await get_obj_list(msgspec_class_type, filter_agg_pipeline=filter_agg_pipeline, has_links=has_links)
-            for obj_json in json_obj_list:
-                # handling all datetime fields - converting to epoch int values - caller of this function will handle
-                # these fields back if required
-                msgspec_class_type.convert_ts_fields_from_datetime_to_epoch_int(obj_json)
-            json_obj_list_str = json.dumps(json_obj_list, default=non_jsonable_types_handler)
+            json_obj_list_str = await _get_obj_list_n_dump_to_bytes(msgspec_class_type, filter_agg_pipeline, has_links)
             await msgspec_class_type.read_ws_path_ws_connection_manager. \
                 send_json_to_websocket(json_obj_list_str, ws)
         # else not required: no initial snapshot is provided on this connection
@@ -935,7 +952,7 @@ async def _generic_read_ws(msgspec_class_type: Type[MsgspecModel], ws: WebSocket
         raise HTTPException(status_code=404, detail=str(e))
     except RuntimeError as e:
         need_disconnect = True
-        logging.info(f"RuntimeError: web socket raised runtime error within while loop in ws {ws.client}: {e}")
+        logging.exception(f"RuntimeError: web socket raised runtime error within while loop in ws {ws.client}: {e}")
         raise HTTPException(status_code=404, detail=str(e))
     except HTTPException as http_e:
         need_disconnect = True
@@ -951,13 +968,56 @@ async def _generic_read_ws(msgspec_class_type: Type[MsgspecModel], ws: WebSocket
             logging.debug(f"Disconnected to websocket: {ws.client}")
 
 
+def get_filter_sort_pagination_pipeline_with_passed_agg(msgspec_class_type: Type[MsgspecModel], **kwargs):
+    passed_filter_agg_pipeline: Dict | None = kwargs.get("filter_agg_pipeline")
+
+    filters = kwargs.get("filters")
+    sort_order = kwargs.get("sort_order")
+    pagination = kwargs.get("pagination")
+
+    filter_sort_pagination_agg_pipeline = create_cascading_multi_filter_pipeline(msgspec_class_type, filters,
+                                                                                 sort_order, pagination)
+
+    if passed_filter_agg_pipeline is not None:
+        filter_sort_pagination_agg_pipeline.extend(passed_filter_agg_pipeline.get("agg"))
+
+    return filter_sort_pagination_agg_pipeline
+
+
+async def ws_get_all_filter_callable(obj_json_str: str, obj_id_or_list: int | List[int], **kwargs):
+    if isinstance(obj_id_or_list, int):
+        obj_id_or_list = [obj_id_or_list]
+
+    agg_pipeline = []
+
+    agg_pipeline.append(get_match_layer_for_obj_id_list(obj_id_or_list))
+    msgspec_class_type = kwargs.get("class_type")
+    agg_pipeline.extend(get_filter_sort_pagination_pipeline_with_passed_agg(msgspec_class_type, **kwargs))
+
+    agg_pipeline = {"agg": agg_pipeline}
+    json_obj_list_str = await _get_obj_list_n_dump_to_bytes(msgspec_class_type, agg_pipeline, has_links=False)
+    return json_obj_list_str
+
+
 @http_except_n_log_error(status_code=500)
 async def generic_read_ws(ws: WebSocket, project_name: str, msgspec_class_type: Type[MsgspecModel],
-                          filter_agg_pipeline: Any = None, has_links: bool = False, need_initial_snapshot: bool = True):
-    is_new_ws: bool = await msgspec_class_type.read_ws_path_ws_connection_manager.connect(ws)
+                          filter_agg_pipeline: Any = None, has_links: bool = False,
+                          need_initial_snapshot: bool = True, **filter_kwargs):
+
+    # required in ws_get_all_filter_callable to create aggregate pipeline for match by filter, sort and pagination
+    filter_kwargs["class_type"] = msgspec_class_type
+    filter_kwargs["filter_agg_pipeline"] = filter_agg_pipeline
+
+    is_new_ws: bool = await msgspec_class_type.read_ws_path_ws_connection_manager.connect(ws,
+                                                                                          ws_get_all_filter_callable,
+                                                                                          filter_kwargs)
     logging.debug(f"websocket client requested to connect: {ws.client}")
 
-    await _generic_read_ws(msgspec_class_type, ws, filter_agg_pipeline, need_initial_snapshot, is_new_ws, has_links)
+    filter_sort_pagination_agg_pipeline_with_passed_agg = get_filter_sort_pagination_pipeline_with_passed_agg(
+        msgspec_class_type, **filter_kwargs)
+    agg_pipeline = {"agg": filter_sort_pagination_agg_pipeline_with_passed_agg}
+
+    await _generic_read_ws(msgspec_class_type, ws, agg_pipeline, need_initial_snapshot, is_new_ws, has_links)
 
 
 @http_except_n_log_error(status_code=500)
@@ -1044,7 +1104,7 @@ async def generic_projection_query_ws(ws: WebSocket, project_name: str, msgspec_
 @http_except_n_log_error(status_code=500)
 @generic_perf_benchmark
 async def generic_read_by_id_http(msgspec_class_type: Type[MsgspecModel], proto_package_name: str,
-                                  db_obj_id: Any, filter_agg_pipeline: Any = None, has_links: bool = False):
+                                  db_obj_id: Any, filter_agg_pipeline: Any = None, has_links: bool = False, **kwargs):
     fetched_json_obj: Dict = await get_obj(msgspec_class_type, db_obj_id,
                                            filter_agg_pipeline, has_links)
     if not fetched_json_obj:
@@ -1174,7 +1234,7 @@ async def get_obj_list(msgspec_class_type: Type[MsgspecModel], find_ids: List[An
 @http_except_n_log_error(status_code=500)
 @generic_perf_benchmark
 async def projection_read_http(msgspec_class_type: Type[MsgspecModel], proto_package_name: str,
-                               filter_agg_pipeline: Any, has_links: bool = False, projection_model = None):
+                               filter_agg_pipeline: Any, has_links: bool = False, projection_model = None, **kwargs):
     if not projection_model:
         logging.error(f"projection_read_http called for: {msgspec_class_type=} with no projection_model;;;"
                       f"{filter_agg_pipeline=}")

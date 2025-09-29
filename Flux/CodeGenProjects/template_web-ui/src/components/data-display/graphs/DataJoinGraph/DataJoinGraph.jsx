@@ -24,7 +24,7 @@ import {
 import DataJoinPopup from '../DataJoinPopup/DataJoinPopup';
 import CustomEdge from '../Edges/CustomEdge';
 import NodeSelector from '../NodeSelector';
-import { fetchNodeData, getCachedNodeData, fetchAnalysedData } from '../../../../services/GraphNodeService';
+import { fetchModelSchema, fetchJoinAnalysisData } from '../../../../utils/core/serviceUtils';
 import { sliceMap } from '../../../../models/sliceMap';
 import { DB_ID, MODES } from '../../../../constants';
 import { generateObjectFromSchema, getModelSchema, snakeToCamel } from '../../../../utils';
@@ -526,6 +526,7 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
     const { selector, actions, fieldsMetadata } = modelDataSource;
     const { updatedObj, mode } = useSelector(selector);
     const { contextId } = useSelector(state => state[snakeToCamel(modelName)]);
+    const nodeActions = useMemo(() => sliceMap[`${modelName}_node`]?.actions, []);
     const reduxDispatch = useDispatch();
 
     const theme = useTheme();
@@ -564,7 +565,6 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
         const nodeTypeField = nodeTypeMeta?.key;
         const nodeAccessField = nodeAccessMeta?.key;
         const nodeUrlField = nodeUrlMeta?.key;
-
         return {
             contextParentPath,
             contextSchemaName,
@@ -586,7 +586,9 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
             edgePairsField: 'join_pairs',
             edgeConfirmedField: 'user_confirmed',
             edgeAiSuggestedField: 'ai_suggested',
-            edgeFilterOperator: 'filter_operator'
+            edgeFilterOperator: 'filter_operator',
+            nodeBaseURL : 'entity_base_url',
+            dropDownNode : 'entity'
         };
     }, [fieldsMetadata]);
 
@@ -658,6 +660,8 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
     // Reset state when context changes
     useEffect(() => {
         dispatch({ type: ACTION_TYPES.RESET_STATE });
+        reduxDispatch(nodeActions.setNode(null));
+        reduxDispatch(nodeActions.setStoredArray([]));
         isInitializedRef.current = false;
     }, [contextId]);
 
@@ -713,39 +717,74 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
             return;
         }
 
-        let sourceNodeData = state.nodeDataCache[nodeName1] || getCachedNodeData(nodeName1);
-        let targetNodeData = state.nodeDataCache[nodeName2] || getCachedNodeData(nodeName2);
+        // Check internal component cache for schema data
+        let sourceSchemaData = state.nodeDataCache[nodeName1];
+        let targetSchemaData = state.nodeDataCache[nodeName2];
 
         try {
-            if (!sourceNodeData) {
-                console.log(`Cache miss for ${nodeName1}. Fetching...`);
-                sourceNodeData = await fetchNodeData(graphAttributes.nodeMetaQueryName, graphAttributes.nodeMetaParamName, sourceNode);
-                dispatch({
-                    type: ACTION_TYPES.CACHE_NODE_DATA,
-                    payload: { nodeId: nodeName1, data: sourceNodeData }
+            // Prepare promises for any missing schema data
+            const schemaPromises = [];
+
+            if (!sourceSchemaData) {
+                console.log(`Schema cache miss for ${nodeName1}. Fetching schema...`);
+                const sourceNodeBaseUrl = sourceNode[graphAttributes.nodeBaseURL];
+                schemaPromises.push(
+                    fetchModelSchema(nodeName1, sourceNodeBaseUrl).then(data => ({
+                        nodeId: nodeName1,
+                        data: { ...data, nodeColumns: data.fieldsMetadata.map(field => ({ name: field.tableTitle, ...field })) }
+                    }))
+                );
+            }
+
+            if (!targetSchemaData) {
+                console.log(`Schema cache miss for ${nodeName2}. Fetching schema...`);
+                const targetNodeBaseUrl = targetNode[graphAttributes.nodeBaseURL];
+                schemaPromises.push(
+                    fetchModelSchema(nodeName2, targetNodeBaseUrl).then(data => ({
+                        nodeId: nodeName2,
+                        data: { ...data, nodeColumns: data.fieldsMetadata.map(field => ({ name: field.tableTitle, ...field })) }
+                    }))
+                );
+            }
+
+            // Fetch schemas in parallel if needed
+            if (schemaPromises.length > 0) {
+                const schemaResults = await Promise.all(schemaPromises);
+
+                // Cache the newly fetched schemas
+                schemaResults.forEach(result => {
+                    dispatch({
+                        type: ACTION_TYPES.CACHE_NODE_DATA,
+                        payload: { nodeId: result.nodeId, data: result.data }
+                    });
+
+                    if (result.nodeId === nodeName1) {
+                        sourceSchemaData = result.data;
+                    } else if (result.nodeId === nodeName2) {
+                        targetSchemaData = result.data;
+                    }
                 });
             }
 
-            if (!targetNodeData) {
-                console.log(`Cache miss for ${nodeName2}. Fetching...`);
-                targetNodeData = await fetchNodeData(graphAttributes.nodeMetaQueryName, graphAttributes.nodeMetaParamName, targetNode);
-                dispatch({
-                    type: ACTION_TYPES.CACHE_NODE_DATA,
-                    payload: { nodeId: nodeName2, data: targetNodeData }
-                });
-            }
+            // Construct nodes with column information from schema metadata
+            const sourceNodeWithColumns = {
+                ...sourceNode,
+                columns: sourceSchemaData?.nodeColumns || []
+            };
+            const targetNodeWithColumns = {
+                ...targetNode,
+                columns: targetSchemaData?.nodeColumns || []
+            };
+
+            dispatch({
+                type: ACTION_TYPES.OPEN_MODAL,
+                payload: { source: sourceNodeWithColumns, target: targetNodeWithColumns }
+            });
+
         } catch (error) {
-            console.error('Failed to fetch node data for modal:', error);
+            console.error('Failed to fetch schema data for modal:', error);
             return;
         }
-
-        const sourceNodeWithColumns = { ...sourceNode, columns: sourceNodeData?.nodeColumns || [] };
-        const targetNodeWithColumns = { ...targetNode, columns: targetNodeData?.nodeColumns || [] };
-
-        dispatch({
-            type: ACTION_TYPES.OPEN_MODAL,
-            payload: { source: sourceNodeWithColumns, target: targetNodeWithColumns }
-        });
     }, [activeContext, graphAttributes.nodesPath, state.nodeDataCache]);
 
     // Handle analysis from edge
@@ -764,7 +803,7 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
                 }
             });
 
-            const { sourceNode, targetNode, edgeInfo } = edgeData;
+            const { sourceNode, targetNode } = edgeData;
 
             if (!sourceNode || !targetNode) {
                 console.error('Missing node information for analysis');
@@ -774,44 +813,31 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
             const sourceName = get(sourceNode, graphAttributes.nodeNameField);
             const targetName = get(targetNode, graphAttributes.nodeNameField);
 
-            // Fetch source node data
-            let sourceNodeData = state.nodeDataCache[sourceName] || getCachedNodeData(sourceName);
-            if (!sourceNodeData) {
-                sourceNodeData = await fetchNodeData(graphAttributes.nodeMetaQueryName, graphAttributes.nodeMetaParamName, sourceNode);
-                dispatch({
-                    type: ACTION_TYPES.CACHE_NODE_DATA,
-                    payload: { nodeId: sourceName, data: sourceNodeData }
-                });
-            }
+            // Construct query name for join analysis
+            const queryName = graphAttributes.edgeMetaQueryName;
 
-            // Fetch target node data (commented out for now)
-            // let targetNodeData = state.nodeDataCache[targetName] || getCachedNodeData(targetName);
-            // if (!targetNodeData) {
-            //     targetNodeData = await fetchNodeData(graphAttributes.nodeMetaQueryName, graphAttributes.nodeMetaParamName, targetNode);
-            //     dispatch({
-            //         type: ACTION_TYPES.CACHE_NODE_DATA,
-            //         payload: { nodeId: targetName, data: targetNodeData }
-            //     });
-            // }
+            // Fetch join analysis data from dedicated endpoint
+            const analysisResult = await fetchJoinAnalysisData(queryName);
 
-            // Dispatch source node data to Redux 
-            const modelNodeName = `${modelName}_node`;
-            const nodeActions = sliceMap[modelNodeName]?.actions;
-            const { nodeSchema, nodeProjectSchema, nodeData: nodeSampleData, nodeUrl, nodeFieldsMetadata } = sourceNodeData;
+            const { projectSchema, modelSchema, modelName, data, fieldsMetadata } = analysisResult;
+
+
+            // Dispatch joined schema and data to Redux
             reduxDispatch(nodeActions.setNode({
-                modelName: sourceName,
-                modelSchema: nodeSchema,
-                projectSchema: nodeProjectSchema,
-                fieldsMetadata: nodeFieldsMetadata,
-                url: nodeUrl
+                modelName: modelName,
+                modelSchema: modelSchema,
+                projectSchema: projectSchema,
+                fieldsMetadata: fieldsMetadata, 
+                url: null
             }));
-            reduxDispatch(nodeActions.setStoredArray(nodeSampleData || []));
+            reduxDispatch(nodeActions.setStoredArray(data || []));
+            reduxDispatch(nodeActions.setIsAnalysis(true));
 
         } catch (error) {
             console.error('Analysis error:', error);
             console.error(`Analysis failed: ${error.message}`);
         }
-    }, [activeContext, graphAttributes, nodesWithChildren, nodeTypeColorMap, joinTypeColorMapping, theme, state.nodeDataCache, reduxDispatch]);
+    }, [activeContext, graphAttributes, nodesWithChildren, nodeTypeColorMap, joinTypeColorMapping, theme, reduxDispatch]);
 
     // Handle node selection
     const handleNodeSelection = useCallback(async (e, node) => {
@@ -842,9 +868,6 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
         });
 
         // Handle model node display
-        const nodeName = newSelection[0];
-        const modelNodeName = `${modelName}_node`;
-        const nodeActions = sliceMap[modelNodeName]?.actions;
         if (newSelection.length !== 1) {
             reduxDispatch(nodeActions.setNode(null));
         }
@@ -853,47 +876,33 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
             prepareAndOpenModal(newSelection[0], newSelection[1]);
         }
 
-        // Fetch node data if needed
-        const contextNodes = get(activeContext, graphAttributes.nodesPath) || [];
-        const selectedNode = contextNodes.find(n => get(n, graphAttributes.nodeNameField) === node.id);
-        const hasChildren = nodesWithChildren.has(node.id);
-        const isExpanded = !hasChildren || (hasChildren && state.expandedNodes.has(node.id));
+        // Fetch schema-only data if needed
+        if (newSelection.length === 1) {
+            const nodeName = newSelection[0];
 
-        if (selectedNode) {  //  && isExpanded
-            const nodeName = get(selectedNode, graphAttributes.nodeNameField);
-            if (!state.nodeDataCache[nodeName] && !getCachedNodeData(nodeName)) {
+            // Find the selected node object to get its entity_base_url
+            const contextNodes = get(activeContext, graphAttributes.nodesPath) || [];
+            const selectedNode = contextNodes.find(n => get(n, graphAttributes.nodeNameField) === nodeName);
+
+            if (selectedNode) {
                 try {
-                    const nodeData = await fetchNodeData(graphAttributes.nodeMetaQueryName, graphAttributes.nodeMetaParamName, selectedNode);
-                    dispatch({
-                        type: ACTION_TYPES.CACHE_NODE_DATA,
-                        payload: { nodeId: nodeName, data: nodeData }
-                    });
-                    if (newSelection.length === 1) {
-                        const { nodeSchema, nodeProjectSchema, nodeData: nodeSampleData, nodeUrl, nodeFieldsMetadata } = nodeData;
-                        reduxDispatch(nodeActions.setNode({
-                            modelName: nodeName,
-                            modelSchema: nodeSchema,
-                            projectSchema: nodeProjectSchema,
-                            fieldsMetadata: nodeFieldsMetadata,
-                            url: nodeUrl
-                        }));
-                        reduxDispatch(nodeActions.setStoredArray(nodeSampleData || []));
-                    }
-                } catch (error) {
-                    console.error(`Failed to fetch data for node: ${nodeName}`, error);
-                }
-            } else {
-                if (newSelection.length === 1) {
-                    const nodeData = state.nodeDataCache[nodeName];
-                    const { nodeSchema, nodeProjectSchema, nodeData: nodeSampleData, nodeUrl, nodeFieldsMetadata } = nodeData;
+
+                    const baseUrl = selectedNode[graphAttributes.nodeBaseURL];
+                    const schemaData = await fetchModelSchema(nodeName, baseUrl);
+                    const { projectSchema, modelSchema, fieldsMetadata } = schemaData;
+
                     reduxDispatch(nodeActions.setNode({
                         modelName: nodeName,
-                        modelSchema: nodeSchema,
-                        projectSchema: nodeProjectSchema,
-                        fieldsMetadata: nodeFieldsMetadata,
-                        url: nodeUrl
+                        modelSchema: modelSchema,
+                        projectSchema: projectSchema,
+                        fieldsMetadata: fieldsMetadata,
+                        url: baseUrl
                     }));
-                    reduxDispatch(nodeActions.setStoredArray(nodeSampleData || []));
+                    reduxDispatch(nodeActions.setStoredArray([]));
+                    reduxDispatch(nodeActions.setIsAnalysis(false));
+
+                } catch (error) {
+                    console.error(`Failed to fetch schema for node: ${nodeName}`, error);
                 }
             }
         }
@@ -1085,7 +1094,7 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
             }
 
             const parentPath = trimLastPath(activeContext['xpath__id']);
-            const nodeSchema = getModelSchema('entity', projectSchema);
+            const nodeSchema = getModelSchema(graphAttributes.dropDownNode, projectSchema);
             const newObject = generateObjectFromSchema(projectSchema, nodeSchema, undefined, parentPath);
 
             const optionName = get(option, graphAttributes.nodeNameField) || option.displayName;

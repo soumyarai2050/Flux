@@ -474,7 +474,7 @@ class MsgspecModelPlugin(DataclassModelPlugin):
 
     def list_model_content(self, file: protogen.File) -> str:
         output_str = ""
-        for message in self.root_message_list:
+        for message in self.root_message_list+self.query_message_list:
             if message in file.messages:
                 output_str += f'class {message.proto.name}BaseModelList(ListModelMsgspec):\n'
                 output_str += f'    root: List[{message.proto.name}BaseModel]\n\n'
@@ -485,6 +485,11 @@ class MsgspecModelPlugin(DataclassModelPlugin):
     def _handle_max_id_model(self) -> str:
         output_str = f"class MaxId(MsgspecBaseModel):\n"
         output_str += f"    max_id_val: int\n\n"
+        return output_str
+
+    def _handle_filtered_doc_count_model(self) -> str:
+        output_str = f"class FilteredDocCount(MsgspecBaseModel):\n"
+        output_str += f"    filtered_count: int\n\n"
         return output_str
 
     def handle_imports(self) -> str:

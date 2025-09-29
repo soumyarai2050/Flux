@@ -37,6 +37,8 @@ function getDefaultViewLayout(layoutData, modelType) {
     return layoutData.view_layout ?? (
         modelType === MODEL_TYPES.ABBREVIATION_MERGE
             ? LAYOUT_TYPES.ABBREVIATION_MERGE
+            : modelType === MODEL_TYPES.CHART
+            ? LAYOUT_TYPES.TABLE
             : LAYOUT_TYPES.TABLE
     );
 }

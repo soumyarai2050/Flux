@@ -47,6 +47,9 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         message_name = message.proto.name
         message_name_camel_cased = capitalized_to_camel_case(message_name)
         message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
+        # Check for explicit model_type in widget_ui_data_element
+        explicit_model_type = self.get_model_option_from_widget_ui_data_element(message, "model_type")
+
         output_str = "import { MODEL_TYPES } from '../constants.js';\n"
         output_str += "import createGenericSlice from '../utils/redux/sliceFactory.js';\n"
         if message_name == "UILayout":
@@ -91,13 +94,21 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             output_str += JsSliceFileGenPlugin.indentation_space + "setNode(state, action) {\n"
             output_str += JsSliceFileGenPlugin.indentation_space * 2 + "state.node = action.payload;\n"
             output_str += JsSliceFileGenPlugin.indentation_space + "},\n"
+            output_str += JsSliceFileGenPlugin.indentation_space + "setSelectedDataPoints(state, action) {\n"
+            output_str += JsSliceFileGenPlugin.indentation_space * 2 + "state.selectedDataPoints = action.payload;\n"
+            output_str += JsSliceFileGenPlugin.indentation_space + "},\n"
+            output_str += JsSliceFileGenPlugin.indentation_space + "setLastSelectedDataPoint(state, action) {\n"
+            output_str += JsSliceFileGenPlugin.indentation_space * 2 + "state.lastSelectedDataPoint = action.payload;\n"
+            output_str += JsSliceFileGenPlugin.indentation_space + "},\n"
             output_str += "};\n"
 
         output_str += "\n"
         output_str += "const { reducer, actions } = createGenericSlice({\n"
         output_str += JsSliceFileGenPlugin.indentation_space + f"modelName: '{message_name_snake_cased}',\n"
-        
-        if message in self.repeated_msg_list:
+
+        if explicit_model_type == "CHART":
+            output_str += JsSliceFileGenPlugin.indentation_space + f"modelType: MODEL_TYPES.CHART,\n"
+        elif message in self.repeated_msg_list:
             output_str += JsSliceFileGenPlugin.indentation_space + f"modelType: MODEL_TYPES.REPEATED_ROOT,\n"
         elif message in self.abbreviated_merge_layout_msg_list:
             output_str += JsSliceFileGenPlugin.indentation_space + f"modelType: MODEL_TYPES.ABBREVIATION_MERGE,\n"
@@ -127,7 +138,9 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             output_str += JsSliceFileGenPlugin.indentation_space + "injectedReducers\n"
         elif self.get_model_option_from_widget_ui_data_element(message, "is_graph_node_model"):
             output_str += JsSliceFileGenPlugin.indentation_space + "extraState: {\n"
-            output_str += JsSliceFileGenPlugin.indentation_space * 2 + f"node: null\n"
+            output_str += JsSliceFileGenPlugin.indentation_space * 2 + "node: null,\n"
+            output_str += JsSliceFileGenPlugin.indentation_space * 2 + "selectedDataPoints: [],\n"
+            output_str += JsSliceFileGenPlugin.indentation_space * 2 + "lastSelectedDataPoint: null\n"
             output_str += JsSliceFileGenPlugin.indentation_space + "},\n"
             output_str += JsSliceFileGenPlugin.indentation_space + "injectedReducers\n"
         output_str += "});\n\n"

@@ -1,0 +1,93 @@
+.resizer {
+    position: relative;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.2s ease;
+    z-index: 10;
+}
+
+.resizer:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+.resizer.dragging {
+    background-color: rgba(0, 0, 0, 0.1);
+}
+
+.horizontal {
+    height: 8px;
+    cursor: ns-resize;
+    width: 100%;
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.vertical {
+    width: 8px;
+    cursor: ew-resize;
+    height: 100%;
+    border-left: 1px solid rgba(0, 0, 0, 0.1);
+    border-right: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.6;
+    transition: opacity 0.2s ease;
+}
+
+.resizer:hover .handle {
+    opacity: 1;
+}
+
+.resizer.dragging .handle {
+    opacity: 1;
+}
+
+.dots {
+    display: flex;
+    gap: 2px;
+}
+
+.dot {
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background-color: currentColor;
+}
+
+.line {
+    width: 20px;
+    height: 2px;
+    background-color: currentColor;
+    border-radius: 1px;
+}
+
+/* Disable text selection during drag */
+.resizer.dragging {
+    user-select: none;
+}
+
+/* Hover effects */
+.horizontal:hover {
+    border-color: rgba(0, 0, 0, 0.2);
+}
+
+.vertical:hover {
+    border-color: rgba(0, 0, 0, 0.2);
+}
+
+/* Active state */
+.resizer.dragging.horizontal {
+    border-color: rgba(0, 0, 0, 0.3);
+    background-color: rgba(0, 0, 0, 0.08);
+}
+
+.resizer.dragging.vertical {
+    border-color: rgba(0, 0, 0, 0.3);
+    background-color: rgba(0, 0, 0, 0.08);
+}

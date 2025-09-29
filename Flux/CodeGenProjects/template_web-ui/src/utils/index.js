@@ -9,6 +9,7 @@ export * from './core/dataSorting';
 export * from './core/dataTransformation';
 export * from './core/errorUtils';
 export * from './core/objectUtils';
+export * from './core/parameterBindingUtils';
 export * from './core/schemaConstants';
 export * from './core/schemaUtils';
 export * from './core/sortUtils';

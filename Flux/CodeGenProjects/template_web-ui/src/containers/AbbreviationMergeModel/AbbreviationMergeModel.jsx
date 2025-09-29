@@ -14,6 +14,7 @@ import {
     getWidgetTitle, getDataSourcesCrudOverrideDict, getCSVFileName, getAbbreviatedCollections,
     getDataSourceObj, updateFormValidation
 } from '../../utils/ui/uiUtils';
+import { createAutoBoundParams } from '../../utils/core/parameterBindingUtils';
 import { removeRedundantFieldsFromRows } from '../../utils/core/dataTransformation';
 import { dataSourcesSelectorEquality } from '../../utils/redux/selectorUtils';
 import { cleanAllCache } from '../../cache/attributeCache';
@@ -182,6 +183,15 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     const modelAbbreviatedItems = useMemo(() => get(storedObj, loadedFieldMetadata.key) || [], [storedObj]);
     const modelAbbreviatedBufferItems = useMemo(() => get(storedObj, bufferedFieldMetadata.key) || [], [storedObj]);
     const modelTitle = getWidgetTitle(modelLayoutOption, modelSchema, modelName, storedObj);
+
+    // Auto-bound parameters for query parameter binding - uses selected row from combined abbreviation view
+    const autoBoundParams = useMemo(() => {
+        // For AbbreviationMergeModel, use the selected row data from the first data source
+        const currentData = dataSourcesUpdatedObjDict[dataSources[0]?.name];
+        if (!currentData || !modelItemFieldsMetadata) return {};
+
+        return createAutoBoundParams(modelItemFieldsMetadata, currentData);
+    }, [modelItemFieldsMetadata, dataSourcesUpdatedObjDict]);
 
     const { downloadCSV, isDownloading, progress } = useDownload(modelName, modelItemFieldsMetadata, null, MODEL_TYPES.ABBREVIATION_MERGE);
 
@@ -1030,6 +1040,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                         modelSchema={modelSchema}
                         url={url}
                         viewUrl={viewUrl}
+                        autoBoundParams={autoBoundParams}
                         // misc
                         enableOverride={modelLayoutData.enable_override || []}
                         disableOverride={modelLayoutData.disable_override || []}

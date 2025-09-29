@@ -12,6 +12,7 @@ import threading
 import inspect
 import ast
 
+import msgspec
 # 3rd party modules
 import pendulum
 import setproctitle
@@ -120,6 +121,7 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
     underlying_create_all_plan_alert_http: Callable[..., Any] | None = None
     underlying_update_all_plan_alert_http: Callable[..., Any] | None = None
     underlying_read_plan_alert_http: Callable[..., Any] | None = None
+    underlying_read_plan_alert_http_json_dict: Callable[..., Any] | None = None
     underlying_filtered_plan_alert_by_plan_id_query_http: Callable[..., Any] | None = None
     underlying_delete_plan_alert_http: Callable[..., Any] | None = None
     underlying_delete_by_id_list_plan_alert_http: Callable[..., Any] | None = None
@@ -191,7 +193,8 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             underlying_update_all_plan_alert_http,
             underlying_filtered_plan_alert_by_plan_id_query_http, underlying_delete_plan_alert_http,
             underlying_handle_plan_alerts_with_symbol_side_query_http,
-            underlying_handle_plan_alerts_with_plan_id_query_http)
+            underlying_handle_plan_alerts_with_plan_id_query_http,
+            underlying_read_plan_alert_http_json_dict)
         LogBookServiceRoutesCallbackBaseNativeOverride.underlying_read_contact_alert_http = (
             underlying_read_contact_alert_http)
         LogBookServiceRoutesCallbackBaseNativeOverride.underlying_create_all_contact_alert_http = (
@@ -204,6 +207,8 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             underlying_update_all_plan_alert_http)
         LogBookServiceRoutesCallbackBaseNativeOverride.underlying_read_plan_alert_http = (
             underlying_read_plan_alert_http)
+        LogBookServiceRoutesCallbackBaseNativeOverride.underlying_read_plan_alert_http_json_dict = (
+            underlying_read_plan_alert_http_json_dict)
         LogBookServiceRoutesCallbackBaseNativeOverride.underlying_filtered_plan_alert_by_plan_id_query_http = (
             underlying_filtered_plan_alert_by_plan_id_query_http)
         LogBookServiceRoutesCallbackBaseNativeOverride.underlying_delete_plan_alert_http = (
@@ -1259,22 +1264,39 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         return updated_plan_alerts
 
     async def filtered_plan_alert_by_plan_id_query_pre(
-            self, plan_alert_class_type: Type[PlanAlert], plan_id: int, limit_obj_count: int | None = None):
-        agg_pipeline = {"agg": sort_alerts_based_on_severity_n_last_update_analyzer_time(plan_id, limit_obj_count)}
+            self, plan_alert_class_type: Type[PlanAlert], plan_id: int, limit_obj_count: int | None = None,
+            filters: List[Dict[str, Any]] | None = None, sort_chore: List[Dict[str, Any]] | None = None,
+            pagination: Dict[str, Any] | None = None):
+
+        filter_sort_pagination_agg = create_cascading_multi_filter_pipeline(PlanAlert, filters, sort_chore, pagination)
+
+        sort_alerts_based_on_severity_n_last_update_analyzer_time_agg = sort_alerts_based_on_severity_n_last_update_analyzer_time(plan_id, limit_obj_count)
+
+        agg_pipeline = {"agg": filter_sort_pagination_agg + sort_alerts_based_on_severity_n_last_update_analyzer_time_agg}
         filtered_plan_alerts = \
             await LogBookServiceRoutesCallbackBaseNativeOverride.underlying_read_plan_alert_http(agg_pipeline)
         return filtered_plan_alerts
 
     async def filtered_plan_alert_by_plan_id_query_ws_pre(self, *args):
-        if len(args) != 2:
+        if len(args) != 5:
             err_str_ = ("filtered_plan_alert_by_plan_id_query_ws_pre failed: received inappropriate *args to be "
-                        f"used in agg pipeline to sort plan_alert based on severity and date_time - "
-                        f"received {args=}")
+                        f"used in agg pipeline to sort plan_alert based on severity and date_time with other args: "
+                        f"filters, sort_chore and pagination - received {args=}")
             logging.error(err_str_)
             raise HTTPException(detail=err_str_, status_code=404)
 
-        filter_agg_pipeline = sort_alerts_based_on_severity_n_last_update_analyzer_time(args[0], args[-1])
-        return filtered_plan_alert_by_plan_id_query_callable, filter_agg_pipeline
+        filter_sort_pagination_agg = create_cascading_multi_filter_pipeline(PlanAlert, args[2], args[3], args[4])
+
+        sort_alerts_based_on_severity_n_last_update_analyzer_time_agg_pipeline = (
+            sort_alerts_based_on_severity_n_last_update_analyzer_time(args[0], args[1]))
+
+        final_agg_pipeline = (filter_sort_pagination_agg +
+                              sort_alerts_based_on_severity_n_last_update_analyzer_time_agg_pipeline)
+
+        return filtered_plan_alert_by_plan_id_query_callable, final_agg_pipeline
+
+    async def read_all_ws_plan_alert_pre(self):
+        pass
 
     async def contact_alert_fail_logger_query_pre(
             self, contact_alert_fail_logger_class_type: Type[ContactAlertFailLogger], payload: Dict[str, Any]):
@@ -1761,6 +1783,54 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             logging.critical(err_)
             return []
 
+    async def get_filtered_contact_alert_count_query_pre(
+            self, filtered_doc_count_class_type: Type[FilteredDocCount], filter_kwargs: Dict):
+        agg_pipeline = get_cascading_multi_filter_count_pipeline(ContactAlert, filter_kwargs)
+
+        filtered_doc_count_list: List[FilteredDocCount] | None = \
+            await LogBookServiceRoutesCallbackBaseNativeOverride.underlying_read_contact_alert_http(
+                agg_pipeline, projection_read_http, FilteredDocCount)
+        if filtered_doc_count_list is None:
+            return []
+        return filtered_doc_count_list
+
+    def get_cascading_multi_filter_count_contact_alert_pipeline(self, filter_kwargs):
+        agg_pipeline = get_cascading_multi_filter_count_pipeline(ContactAlert, filter_kwargs)
+        return agg_pipeline
+
+    async def get_filtered_contact_alert_count_query_ws_pre(self, *args):
+        return self.get_filtered_contact_alert_count_query_ws_callable, self.get_cascading_multi_filter_count_contact_alert_pipeline
+
+    async def get_filtered_contact_alert_count_query_ws_callable(
+            self, obj_json_str: str, obj_id_or_list: int | List[int], **kwargs):
+        # no additional filter required
+        return obj_json_str
+
+    async def get_filtered_plan_alert_count_query_pre(self, plan_alert_class_type: Type[PlanAlert], filter_kwargs: List[Dict[str, Any]]):
+        agg_pipeline = get_cascading_multi_filter_count_pipeline(PlanAlert, filter_kwargs)
+
+        filtered_doc_count_list: List[FilteredDocCount] | None = \
+            await LogBookServiceRoutesCallbackBaseNativeOverride.underlying_read_plan_alert_http(
+                agg_pipeline, projection_read_http, FilteredDocCount)
+        if filtered_doc_count_list is None:
+            return []
+
+        # a = await projection_read_http(PlanAlert, )
+
+        return filtered_doc_count_list
+
+    def get_cascading_multi_filter_count_plan_alert_pipeline(self, filter_kwargs):
+        agg_pipeline = get_cascading_multi_filter_count_pipeline(PlanAlert, filter_kwargs)
+        return agg_pipeline
+
+    async def get_filtered_plan_alert_count_query_ws_pre(self, *args):
+        return self.get_filtered_plan_alert_count_query_ws_callable, self.get_cascading_multi_filter_count_plan_alert_pipeline
+
+    async def get_filtered_plan_alert_count_query_ws_callable(
+            self, obj_json_str: str, obj_id_or_list: int | List[int], **kwargs):
+        # no additional filter required
+        return obj_json_str
+
 def _handle_plan_alert_ids_list_update_for_start_id_in_filter_callable(
         plan_alert_obj_json: Dict, plan_id: int, plan_id_to_start_alert_obj_list_dict: Dict, res_json_list: List):
     if plan_alert_obj_json.get('plan_id') == plan_id:
@@ -1799,26 +1869,32 @@ async def filtered_plan_alert_by_plan_id_query_callable(plan_alert_obj_json_str:
         logging.error(err_str_)
         raise HTTPException(detail=err_str_, status_code=404)
 
-    plan_alert_obj_json_data = json.loads(plan_alert_obj_json_str)
+    filters = kwargs.get('filters')
+    sort_chore = kwargs.get('sort_chore')
+    projection = kwargs.get('projection')
+    filter_sort_pagination_agg_pipeline = create_cascading_multi_filter_pipeline(PlanAlert, filters, sort_chore, projection)
 
-    if isinstance(plan_alert_obj_json_data, list):
-        res_json_list = []
-        for plan_alert_obj_json in plan_alert_obj_json_data:
-            _handle_plan_alert_ids_list_update_for_start_id_in_filter_callable(
-                plan_alert_obj_json, plan_id,
-                LogBookServiceRoutesCallbackBaseNativeOverride.plan_id_to_start_alert_obj_list_dict, res_json_list)
-        if res_json_list:
-            return json.dumps(res_json_list)
-    elif isinstance(plan_alert_obj_json_data, dict):
-        res_json_list = []
+    # adding match for plan id to filter first
+    filter_sort_pagination_agg_pipeline.insert(0, {"$match": {"plan_id": plan_id}})
+    is_single_obj = False
+    if isinstance(obj_id_or_list, int):
+        is_single_obj = True
+        obj_id_or_list = [obj_id_or_list]
+    filter_sort_pagination_agg_pipeline.insert(0, get_match_layer_for_obj_id_list(obj_id_or_list))
+
+    agg_pipeline = {"agg": filter_sort_pagination_agg_pipeline}
+    filtered_plan_alert_obj_dict_list: List[Dict] = await LogBookServiceRoutesCallbackBaseNativeOverride.underlying_read_plan_alert_http_json_dict(agg_pipeline)
+
+    res_json_list = []
+    for plan_alert_obj_json in filtered_plan_alert_obj_dict_list:
         _handle_plan_alert_ids_list_update_for_start_id_in_filter_callable(
-            plan_alert_obj_json_data, plan_id,
+            plan_alert_obj_json, plan_id,
             LogBookServiceRoutesCallbackBaseNativeOverride.plan_id_to_start_alert_obj_list_dict, res_json_list)
-        if res_json_list:
-            return json.dumps(res_json_list[0])
-    else:
-        logging.error("Unsupported DataType found in filtered_plan_alert_by_plan_id_query_callable: "
-                      f"{plan_alert_obj_json_str=}")
+    if res_json_list:
+        if is_single_obj:
+            return orjson.dumps(res_json_list[0], default=non_jsonable_types_handler).decode("utf-8")
+        else:
+            return orjson.dumps(res_json_list, default=non_jsonable_types_handler).decode("utf-8")
 
     return None
 

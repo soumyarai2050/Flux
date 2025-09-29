@@ -424,14 +424,15 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
             output_str = " " * 4 + f"def {query_name}_query_client(self, {params_str}) -> " \
                                     f"List[{container_model_name}]:\n"
             params_dict_str = \
-                ', '.join([f'"{query_param}": {query_param}' for query_param in query_params])
+                ', '.join([f'"{query_param}": orjson.dumps({query_param})' for query_param in query_params])
             if route_type is None or route_type == FastapiHttpClientFileHandler.flux_json_query_route_get_type_field_val:
+                for query_param in query_params:
+                    output_str += " " * 4 + (f"    {query_param} = generic_encoder({query_param}, "
+                                             f"{message_name}.enc_hook, "
+                                             "exclude_none=True)   # removes none values from dict\n")
                 output_str += " " * 4 + "    query_params_dict = {" + f"{params_dict_str}" + "}\n"
-                output_str += " " * 4 + ("    query_params_data = generic_encoder(query_params_dict, "
-                                         f"{message_name}.enc_hook, "
-                                         "exclude_none=True)   # removes none values from dict\n")
                 output_str += " " * 4 + f"    return generic_http_get_query_client(self.query_{query_name}_url, " \
-                                        f"query_params_data, {container_model_name})\n\n"
+                                        f"query_params_dict, {container_model_name})\n\n"
             else:
                 if route_type in [FastapiHttpClientFileHandler.flux_json_query_route_post_all_type_field_val,
                                   FastapiHttpClientFileHandler.flux_json_query_route_patch_all_type_field_val]:
@@ -460,14 +461,14 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
                 output_str += " " * 4 + f"def {query_name}_query_df_client(self, {params_str}) -> " \
                                        f"pl.DataFrame:\n"
                 params_dict_str = \
-                    ', '.join([f'"{aggregate_param}": {aggregate_param}' for aggregate_param in query_params])
+                    ', '.join([f'"{aggregate_param}": orjson.dumps({aggregate_param})' for aggregate_param in query_params])
                 if route_type is None or route_type == FastapiHttpClientFileHandler.flux_json_query_route_get_type_field_val:
-                    output_str += " " * 4 + "    query_params_dict = {" + f"{params_dict_str}" + "}\n"
-                    output_str += " " * 4 + ("    query_params_data = generic_encoder(query_params_dict, "
+                    output_str += " " * 4 + (f"    {params_dict_str} = generic_encoder({params_dict_str}, "
                                              f"{message_name}.enc_hook, "
                                              "exclude_none=True)   # removes none values from dict\n")
+                    output_str += " " * 4 + "    query_params_dict = {" + f"{params_dict_str}" + "}\n"
                     output_str += " " * 4 + f"    return generic_http_get_query_df_client(self.query_{query_name}_url, " \
-                                            f"query_params_data)\n\n"
+                                            f"query_params_dict)\n\n"
                 else:
                     output_str += " " * 4 + "    query_params_dict = {" + f"{params_dict_str}" + "}\n"
                     output_str += " " * 4 + ("    query_params_data = generic_encoder(query_params_dict, "
@@ -546,6 +547,7 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
             query_route_type = str(query_route_type_value) if query_route_type_value is not None else \
                 FastapiHttpClientFileHandler.flux_json_query_route_get_type_field_val
             include_dataframe_clients = aggregate_value.get(FastapiHttpClientFileHandler.flux_json_root_include_dataframe_clients_field)
+            query_projection_model_name = aggregate_value.get(FastapiHttpClientFileHandler.query_projection_model_key)
 
             query_params_name_list = []
             if query_params:
@@ -554,18 +556,25 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
 
             params_str = ", ".join([f"{aggregate_param}: {aggregate_params_type}"
                                     for aggregate_param, aggregate_params_type in query_params])
-            message_name = message.proto.name
+            if query_projection_model_name is None:
+                message_name = message.proto.name
+                is_projection_query = False
+            else:
+                message_name = query_projection_model_name
+                is_projection_query = True
 
             if query_type is None or query_type == "http" or query_type == "both":
                 if query_route_type in [FastapiHttpClientFileHandler.flux_json_query_route_post_all_type_field_val,
                                         FastapiHttpClientFileHandler.flux_json_query_route_patch_all_type_field_val]:
                     output_str += self._handle_client_http_query_output(message_name, query_name, query_params_name_list,
                                                                         params_str, query_route_type,
+                                                                        is_projection_query,
                                                                         include_dataframe_clients)
                 else:
                     output_str += self._handle_client_http_query_output(message_name, query_name,
                                                                         query_params_name_list,
                                                                         params_str, query_route_type,
+                                                                        is_projection_query,
                                                                         include_dataframe_clients)
             elif query_type == "http_file":
                 output_str += self._handle_client_http_file_query_output(message_name, query_name, query_params_name_list, params_str)

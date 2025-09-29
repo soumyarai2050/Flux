@@ -1,0 +1,71 @@
+/* --- Gallery View Styles --- */
+
+.galleryContainer {
+    padding: 24px;
+}
+
+.autoGridContainer {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+    gap: 24px;
+}
+
+.chartCard {
+    --chart-color: #9e9e9e;
+    --chart-color-glow: rgba(158, 158, 158, 0.4);
+
+    height: 100%;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.2s ease-in-out;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.chartCard:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 4px 20px 0 var(--chart-color-glow);
+}
+
+.cardIcon {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 0;
+    font-size: 6rem;
+    pointer-events: none;
+    opacity: 0.15;
+    color: var(--chart-color);
+}
+
+.cardContent {
+    position: relative;
+    z-index: 1;
+}
+
+.noChartsPaper {
+    padding: 32px;
+    text-align: center;
+}
+
+/* --- Detailed View Styles --- */
+
+.detailedViewContainer {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.detailedViewHeader {
+    padding: 1px;
+    border-bottom: 1px solid;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.detailedViewChartArea {
+    flex: 1;
+    padding: 16px;
+    min-height: 400px;
+}

@@ -297,9 +297,9 @@ function checkItemAgainstFilter(itemData, filter, schema, itemSchemaRef) {
 
             // Check if this property's path is what the filter is targeting
             if (propSchema.filter_enable && filter.column_name.endsWith(currentPath)) {
-                
+
                 const matchResult = checkMatch(propValue, filter.filtered_values);
-               
+
                 if (matchResult) {
                     return true;
                 }
@@ -1232,7 +1232,19 @@ function addNodeProperties(node, attributes, currentSchema, schema, data, caller
 
                 if (node.options) {
                     if (node.hasOwnProperty('dynamic_autocomplete')) {
-                        const dynamicValuePath = node.autocomplete.substring(node.autocomplete.indexOf('.') + 1);
+                        let dynamicValuePath;
+                        
+                        if (node.xpath.includes('[') && node.xpath.includes(']')) {
+                            // Array context - use relative path approach
+                            const currentNodePath = node.xpath;
+                            const lastDotIndex = currentNodePath.lastIndexOf('.');
+                            const entityBasePath = currentNodePath.substring(0, lastDotIndex);
+                            dynamicValuePath = entityBasePath + '.' + node.autocomplete;
+                        } else {
+                            // Object context
+                            dynamicValuePath = node.autocomplete.substring(node.autocomplete.indexOf('.') + 1);
+                        }
+                        
                         const dynamicValue = get(data, dynamicValuePath);
                         if (dynamicValue && schema.autocomplete.hasOwnProperty(dynamicValue)) {
                             node.options = schema.autocomplete[schema.autocomplete[dynamicValue]];
@@ -1876,16 +1888,16 @@ function processArrayItemsSimple(tree, schema, currentSchema, propname, callerPr
                 // If the filter path doesn't start with this array's path, it's for a
                 // different branch. We must keep the item.
                 if (!filterPath.startsWith(genericArrayPath)) {
-                   
+
                     return true;
                 }
 
-                
+
 
                 // CHECK 2: The filter IS relevant. Does this item itself contain the matching field?
                 // This is where the filtering of the `sec_positions` array will happen.
                 const directMatch = checkItemAgainstFilter(itemData, filter, schema, currentSchema.items?.$ref);
-               
+
                 if (directMatch) {
                     return true; // Keep the item (e.g., the CB_Sec_7 object).
                 }
@@ -1921,7 +1933,7 @@ function processArrayItemsSimple(tree, schema, currentSchema, propname, callerPr
                         return true;
                     }
                 }
-                
+
                 // If we reach here, the filter was relevant, but this item didn't match,
                 // and none of its children could possibly contain the match. Discard it.
                 // (This is what will correctly discard the EQT_Sec_7 object).

@@ -43,6 +43,7 @@ class BaseFastapiPlugin(BaseProtoPlugin):
     query_route_type_key: ClassVar[str] = "query_route_type"
     button_query_data_key: ClassVar[str] = "query_data"
     button_query_file_upload_options_key: ClassVar[str] = "file_upload_options"
+    query_projection_model_key: ClassVar[str] = "projection_model_name"
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
@@ -182,6 +183,8 @@ class BaseFastapiPlugin(BaseProtoPlugin):
                 option_dict.get(BaseFastapiPlugin.flux_json_query_type_field)
             agg_value_dict[BaseFastapiPlugin.query_route_type_key] = \
                 option_dict.get(BaseFastapiPlugin.flux_json_query_route_type_field)
+            agg_value_dict[BaseFastapiPlugin.query_projection_model_key] = (
+                option_dict.get(BaseFastapiPlugin.flux_json_query_projection_model_name_field))
             agg_value_dict[BaseFastapiPlugin.query_params_key] = []
             if (query_params := option_dict.get(
                     BaseFastapiPlugin.flux_json_query_params_field)) is not None:

@@ -62,10 +62,15 @@ const DataTable = ({
   highlightDuration,
   maxRowSize,
   copyHeaders = true,
+  selectedRows: externalSelectedRows,
+  lastSelectedRowId: externalLastSelectedRowId,
+  onSelectionChange: externalOnSelectionChange,
 }) => {
+
   const { schema: projectSchema } = useSelector((state) => state.schema);
-  const [selectedRows, setSelectedRows] = useState([]);
-  const [lastSelectedRowId, setLastSelectedRowId] = useState(null);
+  // Local state for immediate UI feedback
+  const [localSelectedRows, setLocalSelectedRows] = useState([]);
+  const [localLastSelectedRowId, setLocalLastSelectedRowId] = useState(null);
   // const [contextMenuAnchorEl, setContextMenuAnchorEl] = useState(null);
   const [selectionAnchorId, setSelectionAnchorId] = useState(null);
   const [dataTree, setDataTree] = useState({});
@@ -82,6 +87,43 @@ const DataTable = ({
   useEffect(() => {
     setColumns(cells);
   }, [cells])
+
+  // Ref to prevent infinite sync loops during internal updates
+  const preventSyncRef = useRef(false);
+
+  // Sync local state with external props when they change (from parent/chart)
+  useEffect(() => {
+    if (preventSyncRef.current) {
+      return; // Skip sync if we're in the middle of internal selection changes
+    }
+
+    if (externalSelectedRows !== undefined) {
+      setLocalSelectedRows(externalSelectedRows);
+    }
+    if (externalLastSelectedRowId !== undefined) {
+      setLocalLastSelectedRowId(externalLastSelectedRowId);
+    }
+  }, [externalSelectedRows, externalLastSelectedRowId]);
+
+  // Internal selection handler that provides immediate UI feedback
+  const handleSelectionChange = (newSelectedRows, mostRecentId = null) => {
+    // Prevent prop sync while we're updating selection internally
+    preventSyncRef.current = true;
+
+    // Update local state first for immediate UI feedback
+    setLocalSelectedRows(newSelectedRows);
+    setLocalLastSelectedRowId(mostRecentId || (newSelectedRows.length > 0 ? newSelectedRows[newSelectedRows.length - 1] : null));
+
+    // Notify parent component asynchronously
+    if (externalOnSelectionChange) {
+      externalOnSelectionChange(newSelectedRows, mostRecentId);
+    }
+
+    // Allow prop sync again after a brief delay
+    setTimeout(() => {
+      preventSyncRef.current = false;
+    }, 50);
+  };
 
   // Sort sensors for drag-and-drop
   const sensors = useSensors(
@@ -216,15 +258,15 @@ const DataTable = ({
     },
     callbacks: {
       onRowSelect: onRowSelect,
-      onSelectionChange: setSelectedRows,
+      onSelectionChange: handleSelectionChange,
       onCopySelection: handleCopySelection,
     },
-    // DataTable specific state
-    selectedRows,
-    lastSelectedRowId,
+    // DataTable specific state - using local state for immediate UI feedback
+    selectedRows: localSelectedRows,
+    lastSelectedRowId: localLastSelectedRowId,
     selectionAnchorId,
-    setSelectedRows,
-    setLastSelectedRowId,
+    setSelectedRows: setLocalSelectedRows,
+    setLastSelectedRowId: setLocalLastSelectedRowId,
     setSelectionAnchorId,
     getRowRange,
     modelType,
@@ -259,7 +301,7 @@ const DataTable = ({
   const handleFormUpdate = (xpath, dataxpath, value, dataSourceId, validationRes = null) => {
     let updatedObj;
     if (modelType === MODEL_TYPES.REPEATED_ROOT) {
-      const objId = selectedRows[0] ?? selectedId;
+      const objId = localSelectedRows[0] ?? selectedId;
       updatedObj = cloneDeep(updatedData.find((o) => o[DB_ID] === objId));
     } else {
       updatedObj = cloneDeep(updatedData);
@@ -310,7 +352,7 @@ const DataTable = ({
   const handleCellDoubleClick = (e, rowId, xpath) => {
     if (mode === MODES.EDIT) {
       setIsModalOpen(true);
-      setSelectedRows([rowId]);
+      handleSelectionChange([rowId], rowId);
 
       if (modelType === MODEL_TYPES.REPEATED_ROOT) {
         const updatedTreeObj = updatedData.find((o) => o['data-id'] === rowId);
@@ -369,7 +411,7 @@ const DataTable = ({
 
   const handleRowDoubleClick = (e) => {
     if (mode === MODES.READ && !isReadOnly) {
-      if (selectedRows.length !== 1) {
+      if (localSelectedRows.length !== 1) {
         return;
       } // else - single selected row
       if (!e.target.closest('button')) {
@@ -562,9 +604,9 @@ const DataTable = ({
                       const row = groupedRow[cell.sourceIndex];
                       const isSelected = row && (
                         modelType === MODEL_TYPES.ROOT
-                          ? selectedRows.includes(row['data-id'])
-                          : selectedRows.includes(row['data-id']) || selectedId === row['data-id']);
-                      const isMostRecent = row && lastSelectedRowId === row['data-id'];
+                          ? localSelectedRows.includes(row['data-id'])
+                          : localSelectedRows.includes(row['data-id']) || selectedId === row['data-id']);
+                      const isMostRecent = row && localLastSelectedRowId === row['data-id'];
                       const isNullCell = !row || (row && Object.keys(row).length === 0 && !cell.commonGroupKey);
 
                       let xpath = row?.['xpath_' + cell.key];
@@ -612,8 +654,8 @@ const DataTable = ({
                           }
                         }
                       }
-
-                      const isButtonDisabled = modelType === MODEL_TYPES.REPEATED_ROOT && (!isSelected || (isSelected && xpath?.startsWith('[')));
+                      const isButtonUpdateDisabled = cell.serverPopulate || cell.ormNoUpdate;
+                      const isButtonDisabled = isButtonUpdateDisabled || (modelType === MODEL_TYPES.REPEATED_ROOT && (!isSelected || (isSelected && xpath?.startsWith('['))));
                       const rowIdx = modelType === MODEL_TYPES.REPEATED_ROOT ? row?.['data-id'] : row?.['data-id'] || cell.tableTitle;
                       const cellKey = `${rowIdx}_${cell.tableTitle}`;
                       const stickyPosition = getStickyPosition(cell.tableTitle);
@@ -713,7 +755,7 @@ const DataTable = ({
               projectSchema={projectSchema}
               modelName={modelName}
               updatedData={modelType === MODEL_TYPES.REPEATED_ROOT ? dataTree : updatedData}
-              storedData={modelType === MODEL_TYPES.REPEATED_ROOT ? (storedData.find((o) => o[DB_ID] === selectedRows[0]) || {}) : storedData}
+              storedData={modelType === MODEL_TYPES.REPEATED_ROOT ? (storedData.find((o) => o[DB_ID] === localSelectedRows[0]) || {}) : storedData}
               subtree={modelType === MODEL_TYPES.REPEATED_ROOT ? null : dataTree}
               mode={mode}
               xpath={modelRootPath}

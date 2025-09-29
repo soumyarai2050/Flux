@@ -4,12 +4,6 @@
     /* overflow: auto; */
 }
 
-.list_container {
-    display: flex;
-    flex-direction: column;
-    min-width: 150px;
-    overflow: auto;
-}
 
 .pivot_container {
     flex: 1;
@@ -23,6 +17,5 @@
 }
 
 .pivot_table {
-    height: 80%;
     overflow: auto;
 }

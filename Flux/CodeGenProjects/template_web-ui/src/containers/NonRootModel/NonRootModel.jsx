@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useTransition } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { cloneDeep, get, isEqual, set } from 'lodash';
 import { saveAs } from 'file-saver';
@@ -12,6 +12,7 @@ import {
     getWidgetTitle, getCrudOverrideDict, getCSVFileName,
     updateFormValidation
 } from '../../utils/ui/uiUtils';
+import { createAutoBoundParams } from '../../utils/core/parameterBindingUtils';
 import { cleanAllCache } from '../../cache/attributeCache';
 import { useWebSocketWorker, useDownload, useModelLayout, useConflictDetection } from '../../hooks';
 // custom components
@@ -116,6 +117,14 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
 
     // calculated fields
     const modelTitle = getWidgetTitle(modelLayoutOption, modelSchema, modelName, storedObj);
+
+    // Auto-bound parameters for query parameter binding
+    const autoBoundParams = useMemo(() => {
+        const currentData = updatedObj;
+        if (!currentData || !fieldsMetadata) return {};
+
+        return createAutoBoundParams(fieldsMetadata, currentData);
+    }, [fieldsMetadata, updatedObj]);
 
     const { downloadCSV, isDownloading, progress } = useDownload(modelName, modelRootFieldsMetadata, modelName);
 
@@ -637,6 +646,7 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
                         modelSchema={modelSchema}
                         url={url}
                         viewUrl={viewUrl}
+                        autoBoundParams={autoBoundParams}
                         // misc
                         enableOverride={modelLayoutData.enable_override || []}
                         disableOverride={modelLayoutData.disable_override || []}

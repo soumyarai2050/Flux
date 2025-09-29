@@ -636,37 +636,40 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
                       f"override examples with available messages"
             logging.exception(err_str)
 
-        output_str = self._handle_import_n_pre_exec_code_str(required_root_msg)
+        output_str = ""
+        if required_root_msg:
 
-        callback_class_name_camel_cased = convert_to_capitalized_camel_case(self.routes_callback_class_name)
-        callback_override_class_name_camel_cased = \
-            convert_to_capitalized_camel_case(self.beanie_native_override_routes_callback_class_name)
-        # example 0 of 5
-        output_str += self._handle_callback_example_0(callback_class_name_camel_cased,
-                                                      callback_override_class_name_camel_cased)
+            output_str = self._handle_import_n_pre_exec_code_str(required_root_msg)
 
-        first_msg_name = required_root_msg[0].proto.name
-        first_msg_name_snake_cased = convert_camel_case_to_specific_case(first_msg_name)
-        # example 1 of 5
-        if len(required_root_msg) >= 1:
-            output_str += self._handle_callback_example_1(first_msg_name, first_msg_name_snake_cased,
-                                                          self.json_sample_loaded_json, required_root_msg)
-        # example 2 of 5
-        if len(required_root_msg) >= 2:
-            output_str += self._handle_callback_example_2(first_msg_name, first_msg_name_snake_cased,
-                                                          self.json_sample_loaded_json, required_root_msg)
+            callback_class_name_camel_cased = convert_to_capitalized_camel_case(self.routes_callback_class_name)
+            callback_override_class_name_camel_cased = \
+                convert_to_capitalized_camel_case(self.beanie_native_override_routes_callback_class_name)
+            # example 0 of 5
+            output_str += self._handle_callback_example_0(callback_class_name_camel_cased,
+                                                          callback_override_class_name_camel_cased)
 
-        # example 3 of 5
-        if len(required_root_msg) >= 3:
-            output_str += self._handle_callback_example_3(first_msg_name, first_msg_name_snake_cased,
-                                                          self.json_sample_loaded_json, required_root_msg)
+            first_msg_name = required_root_msg[0].proto.name
+            first_msg_name_snake_cased = convert_camel_case_to_specific_case(first_msg_name)
+            # example 1 of 5
+            if len(required_root_msg) >= 1:
+                output_str += self._handle_callback_example_1(first_msg_name, first_msg_name_snake_cased,
+                                                              self.json_sample_loaded_json, required_root_msg)
+            # example 2 of 5
+            if len(required_root_msg) >= 2:
+                output_str += self._handle_callback_example_2(first_msg_name, first_msg_name_snake_cased,
+                                                              self.json_sample_loaded_json, required_root_msg)
 
-        if len(required_root_msg) >= 4:
-            # example 4 of 5
-            output_str += self._handle_callback_example_4(first_msg_name, first_msg_name_snake_cased, required_root_msg)
-            # example 5 of 5
-            output_str += self._handle_callback_example_5(first_msg_name, first_msg_name_snake_cased, required_root_msg)
+            # example 3 of 5
+            if len(required_root_msg) >= 3:
+                output_str += self._handle_callback_example_3(first_msg_name, first_msg_name_snake_cased,
+                                                              self.json_sample_loaded_json, required_root_msg)
 
-        output_str += self._handle_callback_query_example()
+            if len(required_root_msg) >= 4:
+                # example 4 of 5
+                output_str += self._handle_callback_example_4(first_msg_name, first_msg_name_snake_cased, required_root_msg)
+                # example 5 of 5
+                output_str += self._handle_callback_example_5(first_msg_name, first_msg_name_snake_cased, required_root_msg)
+
+            output_str += self._handle_callback_query_example()
 
         return output_str

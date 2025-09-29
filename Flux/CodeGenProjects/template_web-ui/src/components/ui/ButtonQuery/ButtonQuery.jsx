@@ -21,6 +21,7 @@ import { getColorTypeFromValue } from '../../../utils/ui/colorUtils';
 import { getSizeFromValue, getShapeFromValue } from '../../../utils/ui/uiUtils';
 import { getErrorDetails } from '../../../utils/core/errorUtils';
 import { getAxiosMethod } from '../../../utils/network/networkUtils';
+import { getEditableParams, mergeQueryParams } from '../../../utils/core/parameterBindingUtils';
 import classes from './ButtonQuery.module.css';
 import { computeFileChecksum } from '../../../utils/file/fileUtils';
 
@@ -38,9 +39,10 @@ const RUN_BUTTON_TEXT = 'RUN';
  * @param {Object} props.queryObj - The query object from the schema.
  * @param {string} [props.url] - The base URL for the query.
  * @param {string} [props.viewUrl] - The base URL for view queries.
+ * @param {Object} [props.autoBoundParams={}] - Auto-bound query parameters from field values with FluxFldQueryParamBind.
  * @returns {React.ReactElement} The rendered ButtonQuery component.
  */
-const ButtonQuery = ({ queryObj, url, viewUrl }) => {
+const ButtonQuery = ({ queryObj, url, viewUrl, autoBoundParams = {} }) => {
     const [value, setButtonValue] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
     const [alert, setAlert] = useState(null);
@@ -90,16 +92,25 @@ const ButtonQuery = ({ queryObj, url, viewUrl }) => {
             QueryParams: queryParamsArray = []
         } = query_data;
 
-        // Process array into a more usable key-value object for type-lookups
-        const queryParams = queryParamsArray.reduce((acc, param) => {
+        // Filter out auto-bound parameters from user-editable parameters
+        const editableParams = getEditableParams(queryParamsArray, autoBoundParams);
+
+        // Keep all parameters for reference (used in coercion and final execution)
+        const allParams = queryParamsArray.reduce((acc, param) => {
             acc[param.QueryParamName] = { type: param.QueryParamDataType || 'str' };
             return acc;
         }, {});
 
         const finalQueryRouteType = queryType === 'HTTP_FILE' ? 'POST' : queryRouteType;
         const queryName = `query-${query_data.QueryName}`;
-        return { queryName, queryType, queryRouteType: finalQueryRouteType, queryParams };
-    }, [queryObj]);
+        return {
+            queryName,
+            queryType,
+            queryRouteType: finalQueryRouteType,
+            queryParams: editableParams,  // Only user-editable parameters
+            allParams  // All parameters for type coercion
+        };
+    }, [queryObj, autoBoundParams]);
 
     const fileUploadOptions = useMemo(() => {
         const { file_upload_options } = queryObj;
@@ -191,12 +202,15 @@ const ButtonQuery = ({ queryObj, url, viewUrl }) => {
         setButtonValue(true);
         try {
             const { queryName, queryType, queryRouteType } = queryOptions;
-            const coercedParams = coerceParams(queryParamsState);
+            const coercedUserParams = coerceParams(queryParamsState);
+
+            // Merge auto-bound parameters with user-provided parameters
+            const finalParams = mergeQueryParams(autoBoundParams, coercedUserParams);
 
             if (queryType === 'HTTP_FILE') {
-                await handleHttpFileQuery(queryName, 'POST', coercedParams);
+                await handleHttpFileQuery(queryName, 'POST', finalParams);
             } else if (queryType === 'HTTP') {
-                await handleHttpQuery(queryName, queryRouteType, coercedParams);
+                await handleHttpQuery(queryName, queryRouteType, finalParams);
             } else {
                 throw new Error(`QueryType: ${queryType} is not supported`);
             }
@@ -390,6 +404,7 @@ ButtonQuery.propTypes = {
     queryObj: PropTypes.object.isRequired,
     url: PropTypes.string,
     viewUrl: PropTypes.string,
+    autoBoundParams: PropTypes.object,
 };
 
 export default ButtonQuery;

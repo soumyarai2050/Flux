@@ -10,24 +10,25 @@ function usage {
     }
 
 if [ "$1" != "" ] && [ "$2" != "" ] ; then
-	PY_CODE_GEN_ENGINE_DIR=$PWD
-	SAMPLE_PLUGIN_DIR="PluginTemp"
-	PLUGIN_FILE_NAME="$2.py"
-  mkdir "$1"
-	cd "$1" || (echo "cd $1 failed"; exit 1)
-	cp -pr "$PY_CODE_GEN_ENGINE_DIR"/$SAMPLE_PLUGIN_DIR/. .
-	mv "template_plugin.py" "$PLUGIN_FILE_NAME"
-	PLUGIN_CLASS_NAME=$(gsed -r 's/(^|_)(\w)/\U\2/g' <<< "$2")
-  gsed -i -e "s/TemplatePlugin/$PLUGIN_CLASS_NAME/g" "$PLUGIN_FILE_NAME"
-  gsed -i -e "s/temp_plugin/$2/g" "$PLUGIN_FILE_NAME"
-  cd - || (echo "cd - failed from dir $PWD"; exit 1)
-	echo "Created Plugin $2 in /$1"
-	cd ../"CodeGenProjects/template_scripts" || (echo "cd ../CodeGenProjects/template_scripts from $PWD failed"; exit 1)
-	cp "gen_template_plugin.py" "gen_$2.py"
-  gsed -i -e "s/template_plugin/$2/g" "gen_$2.py"
-  gsed -i -e "s/temp_plugin_dir/$1/g" "gen_$2.py"
-  echo "Created plugin output generator template for $2 in $PWD"
-	cd "$PY_CODE_GEN_ENGINE_DIR" || (echo "cd $PY_CODE_GEN_ENGINE_DIR failed"; exit 1)
+    SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+    PY_CODE_GEN_ENGINE_DIR=$SCRIPT_DIR
+    SAMPLE_PLUGIN_DIR="PluginTemp"
+    PLUGIN_FILE_NAME="$2.py"
+    mkdir -p "$PY_CODE_GEN_ENGINE_DIR/$1"
+    cd "$PY_CODE_GEN_ENGINE_DIR/$1" || (echo "cd $PY_CODE_GEN_ENGINE_DIR/$1 failed"; exit 1)
+    cp -pr "$PY_CODE_GEN_ENGINE_DIR"/$SAMPLE_PLUGIN_DIR/. .
+    mv "template_plugin.py" "$PLUGIN_FILE_NAME"
+    PLUGIN_CLASS_NAME=$(sed -r 's/(^|_)(\w)/\U\2/g' <<< "$2")
+    sed -i -e "s/TemplatePlugin/$PLUGIN_CLASS_NAME/g" "$PLUGIN_FILE_NAME"
+    sed -i -e "s/temp_plugin/$2/g" "$PLUGIN_FILE_NAME"
+    chmod +x "$PLUGIN_FILE_NAME"
+    echo "Created Plugin $2 in $PY_CODE_GEN_ENGINE_DIR/$1"
+    TEMPLATE_SCRIPTS_DIR=$(dirname "$PY_CODE_GEN_ENGINE_DIR")/CodeGenProjects/template_scripts
+    cd "$TEMPLATE_SCRIPTS_DIR" || (echo "cd $TEMPLATE_SCRIPTS_DIR from $PWD failed"; exit 1)
+    cp "gen_template_plugin.py" "gen_$2.py"
+    sed -i -e "s/template_plugin/$2/g" "gen_$2.py"
+    sed -i -e "s/temp_plugin_dir/$1/g" "gen_$2.py"
+    echo "Created plugin output generator template for $2 in $PWD"
 else
     usage
 fi

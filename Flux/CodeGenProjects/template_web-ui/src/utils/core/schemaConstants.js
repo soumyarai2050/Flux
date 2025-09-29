@@ -316,6 +316,7 @@ export const fieldProps = [
     { propertyName: "node_url", usageName: "node_url" },
     { propertyName: "node_meta_query", usageName: "node_meta_query" },
     { propertyName: "edge_meta_query", usageName: "edge_meta_query" },
+    { propertyName: "query_param_bind", usageName: "query_param_bind" },
 ]
 
 

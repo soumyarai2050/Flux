@@ -32,6 +32,7 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
     repeated_root_model: str = 'RepeatedRootModel'
     non_root_model: str = 'NonRootModel'
     abbreviated_merge_model: str = 'AbbreviationMergeModel'
+    chart_model: str = 'ChartModel'
 
     def __init__(self, base_dir_path: str):
         super().__init__(base_dir_path)
@@ -47,6 +48,8 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 model_type_str = JsxFileGenPlugin.non_root_model
             case JsxFileGenPlugin.abbreviated_merge_type:
                 model_type_str = JsxFileGenPlugin.abbreviated_merge_model
+            case JsxFileGenPlugin.chart_type:
+                model_type_str = JsxFileGenPlugin.chart_model
             case other:
                 raise RuntimeError(f"Unknown model type: {other}")
         return model_type_str
@@ -144,9 +147,14 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         for message in self.layout_msg_list:
             message_name = message.proto.name
             output_dict_key = f"{message_name}.jsx"
-            
+
+            # Check for explicit model_type in widget_ui_data_element
+            explicit_model_type = self.get_model_type_from_widget_ui_data(message)
+
+            if explicit_model_type == "CHART":
+                output_str = self.handle_jsx_file_output(message, JsxFileGenPlugin.chart_type)
             # Abbreviated Case
-            if message in self.abbreviated_merge_layout_msg_list:
+            elif message in self.abbreviated_merge_layout_msg_list:
                 self.root_message = message
                 for field in message.fields:
                     # It's assumed that abbreviated layout type will also have  some field having flux_fld_abbreviated

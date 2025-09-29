@@ -196,14 +196,14 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str += (f"        await generic_read_ws(websocket, "
                        f"{FastapiWsRoutesFileHandler.proto_package_var_name}, "
                        f"{message_name}, filter_agg_pipeline, has_links={msg_has_links}, "
-                       f"need_initial_snapshot=need_initial_snapshot)\n")
+                       f"need_initial_snapshot=need_initial_snapshot, **query_params)\n")
         output_str += "    else:\n"
         match aggregation_type:
             case FastapiWsRoutesFileHandler.aggregation_type_filter:
                 output_str += \
                     (f"        await generic_read_ws(websocket, {FastapiWsRoutesFileHandler.proto_package_var_name}, "
                      f"{message_name}, {self._get_filter_configs_var_name(message, None, put_limit=True)}, "
-                     f"has_links={msg_has_links}, need_initial_snapshot=need_initial_snapshot)\n")
+                     f"has_links={msg_has_links}, need_initial_snapshot=need_initial_snapshot, **query_params)\n")
             case FastapiWsRoutesFileHandler.aggregation_type_update | FastapiWsRoutesFileHandler.aggregation_type_both:
                 err_str = "Update Aggregation type is not supported in real all websocket operations, " \
                           f"but aggregation type {aggregation_type} received in message {message.proto.name}"
@@ -216,7 +216,7 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                 output_str += \
                     (f"        await generic_read_ws(websocket, {FastapiWsRoutesFileHandler.proto_package_var_name}, "
                      f"{message_name}, limit_filter_agg, has_links={msg_has_links}, "
-                     f"need_initial_snapshot=need_initial_snapshot)\n")
+                     f"need_initial_snapshot=need_initial_snapshot, **query_params)\n")
         output_str += f"    await callback_class.read_all_ws_{message_name_snake_cased}_post()\n\n"
         return output_str
 
@@ -261,10 +261,10 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str += (f'@{self.api_router_app_name}.websocket("/get-all-{message_name_snake_cased}-ws")\n')
         output_str += (f"async def read_{message_name_snake_cased}_ws(websocket: WebSocket) -> None:\n")
         output_str += f"    query_params = dict(websocket.query_params)\n"
+        output_str += f"    for query_param_name, query_param_val in query_params.items():\n"
+        output_str += f"        query_params[query_param_name] = orjson.loads(query_param_val)\n"
         output_str += f"    limit_obj_count = query_params.pop('limit_obj_count', None)\n"
-        output_str += f"    if limit_obj_count is not None:\n"
-        output_str += f"        limit_obj_count = parse_to_int(limit_obj_count)\n"
-        output_str += f"    need_initial_snapshot = True if str(query_params.pop('need_initial_snapshot', True)).lower() == 'true' else False\n"
+        output_str += f"    need_initial_snapshot = query_params.pop('need_initial_snapshot', True)\n"
         additional_agg_option_val_dict = \
             self.get_complex_option_value_from_proto(message,
                                                      FastapiWsRoutesFileHandler.flux_msg_main_crud_operations_agg)
@@ -385,8 +385,8 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
 
         return output_str
 
-    def _handle_ws_query_str(self, message: protogen.Message, query_name: str, query_params_str: str,
-                             query_params_with_type_str: str, query_args_dict_str: str) -> str:
+    def _handle_ws_query_str(self, message: protogen.Message, query_name: str, param_name_to_param_type_dict: Dict[str, str],
+                             query_params_str: str, query_params_with_type_str: str, query_args_dict_str: str) -> str:
         output_str = f"@perf_benchmark\n"
         output_str += (f"async def underlying_{query_name}_query_ws(websocket: WebSocket, "
                        f"{query_params_with_type_str}, need_initial_snapshot: bool | None = True):\n")
@@ -402,18 +402,37 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str += f"    await callback_class.{query_name}_query_ws_post()\n"
         output_str += f"\n\n"
         output_str += f'@{self.api_router_app_name}.websocket("/ws-query-{query_name}")\n'
-        output_str += (f"async def {query_name}_query_ws(websocket: WebSocket, {query_params_with_type_str}, "
-                       f"need_initial_snapshot: bool | None = True):\n")
+        output_str += (f"async def {query_name}_query_ws(websocket: WebSocket):\n")
         output_str += f'    """\n'
         output_str += f'    WS Query of {message.proto.name} with aggregate - {query_name}\n'
         output_str += f'    """\n'
         output_str += self._get_view_check_code_for_ws(message)
+        output_str += self._add_query_params_handling(param_name_to_param_type_dict)
         output_str += (f"    await underlying_{query_name}_query_ws(websocket, {query_params_str}, "
                        f"need_initial_snapshot)")
         output_str += "\n\n\n"
         return output_str
 
-    def _handle_projection_ws_query_str(self, message: protogen.Message, query_name: str, query_params_str: str,
+    def _add_query_params_handling(self, param_name_to_param_type_dict: Dict[str, str]):
+        output_str = f"    query_params = dict(websocket.query_params)\n"
+        output_str += f"    for query_param_name, query_param_val in query_params.items():\n"
+        output_str += f"        query_params[query_param_name] = orjson.loads(query_param_val)\n"
+        output_str += f"    need_initial_snapshot: bool | None = query_params.pop('need_initial_snapshot', None)\n"
+        for param_name, param_type in param_name_to_param_type_dict.items():
+            if "None" in param_type:
+                output_str += f"    {param_name} = query_params.pop('{param_name}', None)\n"
+            else:
+                output_str += f"    try:\n"
+                output_str += f"        {param_name} = query_params.pop('{param_name}')\n"
+                output_str += f"    except KeyError as e:\n"
+                output_str += (f"        raise HTTPException("
+                               f"detail=f\"Couldn't find key {param_name} in query params passed by user {{e}}\", "
+                               f"status_code=400)\n")
+        return output_str
+
+    def _handle_projection_ws_query_str(self, message: protogen.Message, query_name: str,
+                                        param_name_to_param_type_dict: Dict[str, str],
+                                        query_params_str: str,
                                         query_params_with_type_str: str, query_args_dict_str: str,
                                         projection_model_name: str | None = None,
                                         model_type: ModelType | None = None) -> str:
@@ -449,18 +468,19 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str += f"    await callback_class.{query_name}_query_ws_post()\n"
         output_str += f"\n\n"
         output_str += f'@{self.api_router_app_name}.websocket("/ws-query-{query_name}")\n'
-        output_str += (f"async def {query_name}_query_ws(websocket: WebSocket, {query_params_with_type_str}, "
-                       f"need_initial_snapshot: bool | None = True):\n")
+        output_str += (f"async def {query_name}_query_ws(websocket: WebSocket):\n")
         output_str += f'    """\n'
         output_str += f'    WS Query of {message.proto.name} with aggregate - {query_name}\n'
         output_str += f'    """\n'
         output_str += self._get_view_check_code_for_ws(message)
+        output_str += self._add_query_params_handling(param_name_to_param_type_dict)
+
         output_str += (f"    await underlying_{query_name}_query_ws(websocket, {query_params_str}, "
                        f"need_initial_snapshot)")
         output_str += "\n\n\n"
         return output_str
 
-    def _handle_ws_query_methods(self, message: protogen.Message) -> str:
+    def _handle_ws_query_methods(self, message: protogen.Message, model_type: ModelType) -> str:
         output_str = ""
         aggregate_value_list = self.message_to_query_option_list_dict[message]
 
@@ -471,29 +491,32 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             query_type = str(query_type_value).lower() if query_type_value is not None else None
             query_route_value = aggregate_value[FastapiWsRoutesFileHandler.query_route_type_key]
             query_route_type = query_route_value if query_route_value is not None else None
+            query_projection_name = aggregate_value.get(FastapiWsRoutesFileHandler.query_projection_model_key)
 
             query_params_str = ""
             query_params_with_type_str = ""
             query_args_dict_str = ""
+            query_params_name_list = []
+            param_name_to_param_type_dict: Dict[str, str] = {}
             if query_params:
                 param_to_type_str_list = []
-                list_type_params = []
-                query_params_name_list = []
                 for param, param_type in query_params:
                     query_params_name_list.append(param)
-                    if "List" not in param_type:
-                        param_to_type_str_list.append(f"{param}: {param_type}")
-                    else:
-                        list_type_params.append((param, param_type))
-                for param, param_type in list_type_params:
-                    param_to_type_str_list.append(f"{param}: {param_type} = Query()")
+                    param_to_type_str_list.append(f"{param}: {param_type}")
+                    param_name_to_param_type_dict[param] = param_type
                 query_params_with_type_str = ", ".join(param_to_type_str_list)
                 query_params_str = ", ".join(query_params_name_list)
                 query_args_str = ', '.join([f'"{param}": {param}' for param in query_params_name_list])
                 query_args_dict_str = "{" + f"{query_args_str}" + "}"
             if query_type == "ws" or query_type == "both":
-                output_str += self._handle_ws_query_str(message, query_name, query_params_str,
-                                                        query_params_with_type_str, query_args_dict_str)
+                if query_projection_name:
+                    output_str += self._handle_projection_ws_query_str(message, query_name, param_name_to_param_type_dict,
+                                                                       query_params_str,
+                                                                       query_params_with_type_str, query_args_dict_str,
+                                                                       query_projection_name, model_type)
+                else:
+                    output_str += self._handle_ws_query_str(message, query_name, param_name_to_param_type_dict, query_params_str,
+                                                            query_params_with_type_str, query_args_dict_str)
 
         return output_str
 
@@ -540,6 +563,7 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
 
             query_param_str = ""
             query_param_with_type_str = ""
+            param_name_to_param_type_dict: Dict[str, str] = {}
             for meta_field_name, meta_field_info in meta_data_field_name_to_field_tuple_dict.items():
                 if isinstance(meta_field_info, dict):
                     for nested_meta_field_name, nested_meta_field_info in meta_field_info.items():
@@ -547,10 +571,12 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                         query_param_str += f"{nested_meta_field_name}, "
                         query_param_with_type_str += (f"{nested_meta_field_name}: "
                                                       f"{nested_meta_field_type}, ")
+                        param_name_to_param_type_dict[nested_meta_field_name] = nested_meta_field_type
                 else:
                     meta_field_type, _ = meta_field_info
                     query_param_str += f"{meta_field_name}, "
                     query_param_with_type_str += f"{meta_field_name}: {meta_field_type}, "
+                    param_name_to_param_type_dict[meta_field_name] = meta_field_type
             query_param_str += "start_date_time, end_date_time"
             if model_type == ModelType.Msgspec:
                 query_param_with_type_str += ("start_date_time: Any | None = None, "
@@ -558,6 +584,8 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             else:
                 query_param_with_type_str += ("start_date_time: DateTime | None = None, "
                                               "end_date_time: DateTime | None = None")
+            param_name_to_param_type_dict["start_date_time"] = "DateTime | None = None"
+            param_name_to_param_type_dict["end_date_time"] = "DateTime | None = None"
 
             query_param_dict_str = "{"
             for meta_field_name, meta_field_info in meta_data_field_name_to_field_tuple_dict.items():
@@ -570,7 +598,8 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             query_param_dict_str += '"start_date_time": start_date_time, "end_date_time": end_date_time}'
 
             # WS method
-            output_str += self._handle_projection_ws_query_str(message, query_name, query_param_str,
+            output_str += self._handle_projection_ws_query_str(message, query_name, param_name_to_param_type_dict,
+                                                               query_param_str,
                                                                query_param_with_type_str, query_param_dict_str,
                                                                container_model_name, model_type)
         return output_str
@@ -585,7 +614,7 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
 
         for message in self.root_message_list + self.non_root_message_list:
             if FastapiWsRoutesFileHandler.is_option_enabled(message, FastapiWsRoutesFileHandler.flux_msg_json_query):
-                output_str += self._handle_ws_query_methods(message)
+                output_str += self._handle_ws_query_methods(message, model_type)
 
         for message in self.root_message_list:
             if FastapiWsRoutesFileHandler.is_option_enabled(message,

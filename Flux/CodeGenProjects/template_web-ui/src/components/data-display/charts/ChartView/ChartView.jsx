@@ -5,7 +5,7 @@ import {
     Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Divider, List, ListItem, ListItemButton, ListItemText
 } from '@mui/material';
 import { cloneDeep, get, isEqual } from 'lodash';
-import { Add, Close, Delete, Save, ContentCopy, Error } from '@mui/icons-material';
+import { Add, Close, Delete, Save, Error } from '@mui/icons-material';
 // project constants and common utility function imports
 import { DATA_TYPES, MODES, API_ROOT_URL, MODEL_TYPES, DB_ID } from '../../../../constants';
 import { addxpath, clearxpath } from '../../../../utils/core/dataAccess';
@@ -20,21 +20,19 @@ import { getCollectionByName } from '../../../../utils/core/dataUtils';
 // custom component imports
 import Icon from '../../../ui/Icon';
 import FullScreenModal from '../../../ui/Modal';
+import Resizer from '../../../ui/Resizer/Resizer';
 import EChart from '../EChart';
+import ListPanel from '../../../ui/ListPanel/ListPanel';
 import styles from './ChartView.module.css';
 import { useTheme } from '@emotion/react';
 import DataTree from '../../trees/DataTree';
 import { ModelCard, ModelCardContent, ModelCardHeader } from '../../../utility/cards';
 import QuickFilterPin from '../../../controls/QuickFilterPin';
-import ClipboardCopier from '../../../utility/ClipboardCopier';
+import ContentCopier from '../../../ui/ContentCopier';
+// custom hooks
+import useTimeSeriesData from '../../../../hooks/useTimeSeriesData';
 
 const CHART_SCHEMA_NAME = 'chart_data';
-
-// 🪟 Sliding Window Configuration - Controls memory management for time-series data
-// Set to number (e.g., 10) for sliding window with that many points
-// Set to null for unlimited data growth (no sliding window)
-
-const SLIDING_WINDOW_SIZE = null;
 
 function ChartView({
     chartData,
@@ -82,9 +80,18 @@ function ChartView({
     const [datasets, setDatasets] = useState([]);               // Chart datasets for rendering
     const [rows, setRows] = useState(chartRows);                // Filtered chart data rows
 
-    // Time-series specific state
-    const [tsData, setTsData] = useState({});                    // Collected time-series data from WebSockets
-    const [queryDict, setQueryDict] = useState({});             // Maps series index to query configuration
+    // Time-series data from custom hook
+    const { tsData, queryDict } = useTimeSeriesData({
+        chartConfig: storedChartObj,
+        chartRows: chartRows,
+        fieldsMetadata,
+        projectSchema,
+        schemaCollections,
+        modelType,
+        isEnabled: mode === MODES.READ,
+        mode,
+        slidingWindowSize: 20
+    });
 
     // Update counters for controlling cascading effects
     const [chartUpdateCounter, setChartUpdateCounter] = useState(0);
@@ -101,440 +108,12 @@ function ChartView({
     // Pinned filters state
     const [pinnedFilters, setPinnedFilters] = useState([]);
     const [pinnedFiltersByChart, setPinnedFiltersByChart] = useState({});
-    const [textToCopy, setTextToCopy] = useState('');
     const pinnedFilterUpdateRef = useRef(false);
 
-    // =============================================
-    // SPECIALIZED CHART DATA WORKER SYSTEM
-    // =============================================
+    // Resizer state for adjustable heights
+    const [chartHeight, setChartHeight] = useState(500);
+    const containerRef = useRef(null);
 
-    /**
-     * Single specialized worker for all chart data management
-     * Handles all WebSocket connections, data merging, and state management
-     * Provides O(1) performance with Map-based data structures
-     */
-    const chartDataWorkerRef = useRef(null);
-    const webSocketWorkersRef = useRef(new Map()); // fingerprint -> WebSocket worker
-    const registeredStreamsRef = useRef(new Set()); // Track registered streams
-
-    /**
-     * Initialize the specialized chart data worker
-     * This worker handles all time-series data processing and state management
-     */
-    const initializeChartDataWorker = useCallback(() => {
-        if (chartDataWorkerRef.current) {
-            return chartDataWorkerRef.current;
-        }
-
-        const worker = new Worker(new URL('../../../../workers/chart-data.worker.js', import.meta.url));
-
-        // Handle messages from the specialized worker
-        worker.onmessage = (event) => {
-            const { type, data } = event.data;
-
-            switch (type) {
-                case 'AGGREGATED_DATA':
-                    // Full replacement for aggregated data
-                    if (mode === MODES.READ && data) {
-                        setTsData(prevData => {
-                            return data;
-                        });
-                    }
-                    break;
-
-                case 'INCREMENTAL_UPDATE':
-                    // Merge incremental updates with existing data
-                    if (mode === MODES.READ && data) {
-                        setTsData(prevData => {
-
-                            // Merge new data with existing data
-                            const mergedData = { ...prevData, ...data };
-
-                            return mergedData;
-                        });
-                    }
-                    break;
-
-                case 'STREAM_REGISTERED':
-                    break;
-                case 'STREAM_UNREGISTERED':
-                    break;
-
-                case 'ERROR':
-                    break;
-
-                case 'MEMORY_REPORT':
-                    break;
-
-                default:
-                //for debugging point of view
-            }
-        };
-
-        worker.onerror = (error) => {
-            console.error('Chart Data Worker Error:', error);
-        };
-
-        chartDataWorkerRef.current = worker;
-        return worker;
-    }, [mode]);
-
-    /**
-     * Creates a stable fingerprint for a WebSocket connection
-     */
-    const createQueryFingerprint = useCallback((query, metaFilterDict, rootUrl) => {
-        if (!query) return null;
-
-        // Build parameter string from meta filters
-        let paramStr = '';
-        for (const key in metaFilterDict) {
-            if (paramStr) {
-                paramStr += `&${key}=${metaFilterDict[key]}`;
-            } else {
-                paramStr = `${key}=${metaFilterDict[key]}`;
-            }
-        }
-
-        // Create unique fingerprint: URL + query + parameters
-        return `${rootUrl}/ws-query-${query.name}?${paramStr}`;
-    }, []);
-
-    /**
-     * Extracts worker information for a chart series, handling:
-     * - Collection mapping validation
-     * - Root URL determination (can be external service)
-     * - Query extraction from queryDict
-     * 
-     * Returns null if series doesn't support time-series data
-     */
-
-    const getSeriesWorkerInfo = useCallback((series, index) => {
-        const collection = getCollectionByName(
-            fieldsMetadata,
-            series.encode.y,
-            modelType === MODEL_TYPES.ABBREVIATION_MERGE
-        );
-
-        // Only process series that have time-series mapping
-        if (!collection.hasOwnProperty('mapping_src')) {
-            return null;
-        }
-
-        // Determine root URL - may be external service based on mapping model
-        let rootUrl = API_ROOT_URL;
-        const mappingModelName = collection.mapping_src?.split('.')[0];
-        if (mappingModelName) {
-            const mappingModelSchema = getModelSchema(mappingModelName, projectSchema);
-            if (mappingModelSchema?.connection_details) {
-                const { host, port, project_name } = mappingModelSchema.connection_details;
-                rootUrl = `http://${host}:${port}/${project_name}`;
-            }
-        }
-
-        const query = queryDict[index];
-        if (!query) {
-            return null;
-        }
-
-        return { collection, rootUrl, query };
-    }, [fieldsMetadata, modelType, projectSchema, queryDict]);
-
-    /**
-     * Create a WebSocket worker for a specific stream
-     * This connects to the WebSocket and forwards data to the specialized chart data worker
-     */
-    const createWebSocketWorker = useCallback((fingerprint, query) => {
-
-        // Create WebSocket connection
-        const wsUrl = fingerprint.replace('http', 'ws');
-        const socket = new WebSocket(wsUrl);
-
-        // Create WebSocket processing worker
-        const worker = new Worker(new URL('../../../../workers/websocket-update.worker.js', import.meta.url));
-
-        // Forward WebSocket messages to processing worker
-        socket.onmessage = (event) => {
-            worker.postMessage({
-                messages: [event.data],
-                storedArray: [],
-                uiLimit: null,
-                isAlertModel: false
-            });
-        };
-
-        // Forward processed data to specialized chart data worker
-        worker.onmessage = (event) => {
-            const processedData = event.data;
-
-            if (chartDataWorkerRef.current && Array.isArray(processedData) && processedData.length > 0) {
-                chartDataWorkerRef.current.postMessage({
-                    type: 'UPDATE_DATA',
-                    fingerprint,
-                    data: processedData
-                });
-            }
-        };
-
-        // socket.onopen = () => {
-        //     console.log(`✅ [ChartView] WebSocket connected: ${fingerprint}`);
-        // };
-
-        socket.onerror = (error) => {
-            console.error(`❌ [ChartView] WebSocket error for ${fingerprint}:`, error);
-        };
-
-        // socket.onclose = (event) => {
-        //     console.log(`🗑️ [ChartView] WebSocket closed for ${fingerprint}:`, event.code, event.reason);
-        // };
-
-        worker.onerror = (error) => {
-            console.error(`❌ [ChartView] WebSocket worker error for ${fingerprint}:`, error);
-        };
-
-        return { socket, worker };
-    }, []);
-
-    /**
-     * Generates all required stream configurations for current chart configuration
-     */
-    const generateStreamConfigurations = useCallback((metaFilters) => {
-        const configurations = new Map();
-
-        storedChartObj.series?.forEach((series, index) => {
-            const workerInfo = getSeriesWorkerInfo(series, index);
-            if (!workerInfo) return;
-
-            const { query, rootUrl } = workerInfo;
-
-            // Each meta filter creates a separate stream configuration
-            metaFilters.forEach(metaFilterDict => {
-                const fingerprint = createQueryFingerprint(query, metaFilterDict, rootUrl);
-                if (fingerprint) {
-                    configurations.set(fingerprint, {
-                        index,
-                        query,
-                        rootUrl,
-                        metaFilterDict,
-                        queryName: query.name
-                    });
-                }
-            });
-        });
-
-        return configurations;
-    }, [storedChartObj.series, getSeriesWorkerInfo, createQueryFingerprint]);
-
-    /**
-     * Register a new stream with the specialized chart data worker
-     */
-    const registerStream = useCallback((fingerprint, config) => {
-        const chartWorker = initializeChartDataWorker();
-
-        chartWorker.postMessage({
-            type: 'REGISTER_STREAM',
-            fingerprint,
-            config: {
-                queryName: config.queryName,
-                rootUrl: config.rootUrl,
-                metaFilterDict: config.metaFilterDict,
-                slidingWindowSize: SLIDING_WINDOW_SIZE // Pass from parent
-            }
-        });
-
-        registeredStreamsRef.current.add(fingerprint);
-    }, [initializeChartDataWorker]);
-
-    /**
-     * Unregister a stream from the specialized chart data worker
-     */
-    const unregisterStream = useCallback((fingerprint) => {
-        if (chartDataWorkerRef.current) {
-            chartDataWorkerRef.current.postMessage({
-                type: 'UNREGISTER_STREAM',
-                fingerprint
-            });
-        }
-
-        registeredStreamsRef.current.delete(fingerprint);
-
-        // Cleanup WebSocket worker
-        const wsWorker = webSocketWorkersRef.current.get(fingerprint);
-        if (wsWorker) {
-            const { socket, worker } = wsWorker;
-            if (socket) socket.close();
-            if (worker) worker.terminate();
-            webSocketWorkersRef.current.delete(fingerprint);
-        }
-    }, []);
-
-    /**
-     * Request aggregated data from the specialized chart data worker
-     */
-    const requestAggregatedData = useCallback(() => {
-        if (chartDataWorkerRef.current) {
-            chartDataWorkerRef.current.postMessage({
-                type: 'GET_AGGREGATED_DATA'
-            });
-        }
-    }, []);
-
-    /**
-     * Update sliding window configuration for the worker
-     * This allows runtime configuration changes without worker restart
-     */
-    const updateSlidingWindowConfig = useCallback((newSize) => {
-        if (chartDataWorkerRef.current) {
-            console.log(`🔧 [ChartView] Updating sliding window size: ${SLIDING_WINDOW_SIZE} -> ${newSize}`);
-            chartDataWorkerRef.current.postMessage({
-                type: 'UPDATE_GLOBAL_SLIDING_WINDOW',
-                data: { windowSize: newSize }
-            });
-        }
-    }, []);
-
-    // =============================================
-    // SPECIALIZED CHART DATA WORKER MANAGEMENT
-    // =============================================
-
-    /**
-     * Main effect for managing the specialized chart data worker and streams.
-     * This replaces the old multiple-worker system with a single, efficient worker.
-     * 
-     * New Flow:
-     * 1. Initialize specialized chart data worker
-     * 2. Generate stream configurations for all required data
-     * 3. Register/unregister streams as needed
-     * 4. Let the specialized worker handle all data processing
-     */
-
-    useEffect(() => {
-        // Early exit: cleanup everything if not time-series chart
-        if (!storedChartObj.series || !storedChartObj.time_series) {
-            // Cleanup all WebSocket workers
-            webSocketWorkersRef.current.forEach(({ socket, worker }) => {
-                if (socket) socket.close();
-                if (worker) worker.terminate();
-            });
-            webSocketWorkersRef.current.clear();
-            registeredStreamsRef.current.clear();
-
-            // Clear all data in specialized worker
-            if (chartDataWorkerRef.current) {
-                chartDataWorkerRef.current.postMessage({ type: 'CLEAR_ALL_DATA' });
-            }
-
-            setTsData({});
-            setDatasets([]);
-            return;
-        }
-
-        // Early exit: wait for queryDict to be populated for all time-series
-        const expectedQueryCount = storedChartObj.series.filter(series => {
-            if (!series.encode?.y) return false;
-            const collection = getCollectionByName(fieldsMetadata, series.encode.y, modelType === MODEL_TYPES.ABBREVIATION_MERGE);
-            return collection && collection.hasOwnProperty('mapping_src');
-        }).length;
-
-        const currentQueryCount = Object.keys(queryDict).length;
-
-        if (currentQueryCount < expectedQueryCount) {
-            return;
-        }
-
-        // Get chart filters and generate meta filters
-        const filterDict = getChartFilterDict(storedChartObj.filters);
-        if (Object.keys(filterDict).length === 0) return;
-
-        // Generate meta filters for all filter fields
-        let metaFilters = [];
-        Object.keys(filterDict).forEach(filterFld => {
-            const filtersForField = genMetaFilters(
-                rows,
-                fieldsMetadata,
-                filterDict,
-                filterFld,
-                modelType === MODEL_TYPES.ABBREVIATION_MERGE
-            );
-            metaFilters = metaFilters.concat(filtersForField);
-        });
-
-        // Generate stream configurations
-        const streamConfigurations = generateStreamConfigurations(metaFilters);
-
-        // Initialize the specialized worker
-        initializeChartDataWorker();
-
-        // Determine which streams need to be added/removed
-        const currentStreams = new Set(registeredStreamsRef.current);
-        const newStreams = new Set(streamConfigurations.keys());
-
-        const streamsChanged = currentStreams.size !== newStreams.size ||
-            Array.from(newStreams).some(fp => !currentStreams.has(fp));
-
-        // Early exit: no changes needed
-        if (!streamsChanged) {
-            return;
-        }
-
-        // Identify streams being removed and added
-        const removedStreams = Array.from(currentStreams).filter(fp => !newStreams.has(fp));
-        const addedStreams = Array.from(newStreams).filter(fp => !currentStreams.has(fp));
-
-        // Unregister removed streams
-        removedStreams.forEach(fingerprint => {
-            unregisterStream(fingerprint);
-        });
-
-        // Register and create WebSocket workers for new streams
-        addedStreams.forEach(fingerprint => {
-            const config = streamConfigurations.get(fingerprint);
-            if (config) {
-
-                // Register stream with specialized worker
-                registerStream(fingerprint, config);
-
-                // Create WebSocket worker for this stream
-                const wsWorker = createWebSocketWorker(fingerprint, config.query);
-                webSocketWorkersRef.current.set(fingerprint, wsWorker);
-            }
-        });
-
-    }, [
-        storedChartObj.series,
-        storedChartObj.time_series,
-        storedChartObj.filters,
-        queryDict,
-        projectSchema,
-        fieldsMetadata,
-        modelType,
-        rows,
-        mode,
-        generateStreamConfigurations,
-        initializeChartDataWorker,
-        registerStream,
-        unregisterStream,
-        createWebSocketWorker
-    ]);
-
-    // Component unmount cleanup - ensure all workers are properly terminated
-    useEffect(() => {
-        return () => {
-            // Cleanup all WebSocket workers
-            webSocketWorkersRef.current.forEach(({ socket, worker }) => {
-                if (socket) socket.close();
-                if (worker) worker.terminate();
-            });
-            webSocketWorkersRef.current.clear();
-
-            // Cleanup specialized chart data worker
-            if (chartDataWorkerRef.current) {
-                chartDataWorkerRef.current.terminate();
-                chartDataWorkerRef.current = null;
-            }
-
-            registeredStreamsRef.current.clear();
-        };
-    }, []);
 
     // =============================================
     // EXISTING CHARTVIEW LOGIC
@@ -547,22 +126,18 @@ function ChartView({
 
     // Sync local selectedData state with props from parent
     useEffect(() => {
-        if (selectedRows && selectedRows.length > 0) {
-            setSelectedData(prevData => {
-                if (!isEqual(prevData, selectedRows)) {
-                    return selectedRows;
-                }
-                return prevData;
-            });
-        } else {
-            setSelectedData(prevData => {
-                if (prevData.length > 0) {
-                    return [];
-                }
-                return prevData;
-            });
-        }
-    }, [selectedRows])
+        const newSelectedIds = selectedRows ? selectedRows.map(row => row['data-id'] || row['_id']) : [];
+        setSelectedData(prevData => {
+            // Create a sorted version of both arrays for a consistent comparison
+            const sortedPrevData = [...prevData].sort();
+            const sortedNewData = [...newSelectedIds].sort();
+
+            if (!isEqual(sortedPrevData, sortedNewData)) {
+                return newSelectedIds;
+            }
+            return prevData;
+        });
+    }, [selectedRows]);
 
     useEffect(() => {
         // update the local row dataset on update from parent
@@ -642,47 +217,6 @@ function ChartView({
         }
     }, [updatedChartObj, pinnedFiltersByChart])
 
-    useEffect(() => {
-        // identify if the chart configuration obj selected has a time series or not
-        // for time series, selected y axis field should have mapping_src attribute set on it
-        // and time_series should be checked
-        if (storedChartObj.series) {
-            let updatedQueryDict = {};
-            storedChartObj.series.forEach((series, index) => {
-                if (series.encode && series.encode.y) {
-                    const collection = getCollectionByName(fieldsMetadata, series.encode.y, modelType === MODEL_TYPES.ABBREVIATION_MERGE);
-                    if (storedChartObj.time_series && collection && collection.hasOwnProperty('mapping_src')) {
-                        const [seriesWidgetName, ...mappingSrcField] = collection.mapping_src.split('.');
-                        const srcField = mappingSrcField.join('.');
-                        const seriesCollections = schemaCollections[seriesWidgetName];
-                        if (seriesCollections) {
-                            const mappedCollection = seriesCollections.find(col => col.tableTitle === srcField);
-                            // fetch query details for time series
-                            let name;
-                            let params = [];
-                            if (mappedCollection && mappedCollection.projections) {
-                                mappedCollection.projections.forEach(projection => {
-                                    // if query is found, dont proceed
-                                    if (name) return;
-                                    const [fieldName, queryName] = projection.split(':');
-                                    if (fieldName === srcField) {
-                                        name = queryName;
-                                    }
-                                });
-                            }
-                            seriesCollections.forEach(col => {
-                                if (col.val_meta_field && col.required && ![DATA_TYPES.OBJECT, DATA_TYPES.ARRAY].includes(col.type)) {
-                                    params.push(col.tableTitle);
-                                }
-                            })
-                            updatedQueryDict[index] = { name, params };
-                        }
-                    }
-                }
-            })
-            setQueryDict(updatedQueryDict);
-        }
-    }, [chartUpdateCounter])
 
     useEffect(() => {
         // Transform unique-key tsData back to query-based structure for chart rendering
@@ -775,14 +309,7 @@ function ChartView({
     const handleChartReset = () => {
         setRows(chartRows);
         setDatasets([]);
-        setTsData({});
-        setQueryDict({});
         setDatasetUpdateCounter(0);
-
-        // Clear all data in specialized chart data worker
-        if (chartDataWorkerRef.current) {
-            chartDataWorkerRef.current.postMessage({ type: 'CLEAR_ALL_DATA' });
-        }
     }
 
     const validateChartData = (chartData) => {
@@ -1255,10 +782,6 @@ function ChartView({
         savePinnedFiltersToQuickFilters(updatedFilters, currentChartName);
     };
 
-    const handleCopyChartName = (e, chartName) => {
-        e.stopPropagation();
-        setTextToCopy(chartName);
-    };
 
     // =============================================
     // MEMOIZED VALUES FOR PERFORMANCE
@@ -1351,43 +874,47 @@ function ChartView({
         return {};
     }, [chartQuickFilter]);
 
+    // Resizer handlers
+    const handleChartResize = useCallback((newHeight) => {
+        setChartHeight(newHeight);
+    }, []);
+
+    // Initialize chart height based on container
+    useEffect(() => {
+        if (containerRef.current) {
+            const containerHeight = containerRef.current.clientHeight;
+            const initialChartHeight = Math.max(300, containerHeight * 0.9);
+            setChartHeight(initialChartHeight);
+        }
+    }, []);
+
     return (
         <>
-            <ClipboardCopier text={textToCopy} />
             <Box className={styles.container}>
-                <Box className={styles.list_container}>
-                    <Button color='warning' variant='contained' onClick={handleChartCreate}>
-                        <Add fontSize='small' />
-                        Add new chart
-                    </Button>
-                    <List>
-                        {chartData.map((item, index) => {
-                            if (chartEnableOverride.includes(item.chart_name)) return null;
-                            return (
-                                <ListItem
-                                    className={styles.list_item}
-                                    key={index}
-                                    selected={selectedIndex === index}
-                                    disablePadding
-                                    onClick={() => handleSelect(index)}
-                                    sx={{ color: item.time_series ? 'var(--blue-info)' : undefined }}
-                                    onDoubleClick={() => handleDoubleClick(index)}>
-                                    <ListItemButton>
-                                        <ListItemText>{item.chart_name}</ListItemText>
-                                    </ListItemButton>
-                                    <Icon title='Copy chart name' onClick={(e) => handleCopyChartName(e, item.chart_name)}>
-                                        <ContentCopy fontSize='small' />
-                                    </Icon>
-                                    <Icon title='Delete' onClick={(e) => handleChartDelete(e, item.chart_name, index)}>
-                                        <Delete fontSize='small' />
-                                    </Icon>
-                                </ListItem>
-                            )
-                        })}
-                    </List>
-                </Box>
+                <ListPanel
+                    items={chartData}
+                    selectedIndex={selectedIndex}
+                    onSelect={handleSelect}
+                    onCreate={handleChartCreate}
+                    onDelete={handleChartDelete}
+                    itemNameKey="chart_name"
+                    addButtonText="Add new chart"
+                    enableOverride={chartEnableOverride}
+                    collapse={true}
+                    mode={mode}
+                    onDoubleClick={handleDoubleClick}
+                    additionalActions={(item, index, mode, selectedIndex) => (
+
+                        <>
+                            <ContentCopier text={item.chart_name} />
+                            <Icon title='Delete' onClick={(e) => handleChartDelete(e, item.chart_name, index)}>
+                                <Delete fontSize='small' />
+                            </Icon>
+                        </>
+                    )}
+                />
                 <Divider orientation='vertical' flexItem />
-                <Box className={styles.chart_container}>
+                <Box ref={containerRef} className={styles.chart_container}>
                     {/* Pinned Filters Section */}
                     {pinnedFilters.length > 0 && (
                         <Box className={styles.pinned_filters_container}>
@@ -1405,63 +932,87 @@ function ChartView({
                             ))}
                         </Box>
                     )}
-                    <Box className={styles.chart}>
-                        {storedChartObj.chart_name ? (
-                            rows.length > 0 ? (
-                                <EChart
-                                    loading={false}
-                                    theme={theme.palette.mode}
-                                    option={{
-                                        legend: {},
-                                        tooltip: {
-                                            trigger: 'axis',
-                                            axisPointer: {
-                                                type: 'cross'
+
+                    {/* Resizable Chart Section */}
+                    <Box className={styles.resizable_content}>
+                        <Box
+                            className={styles.chart}
+                            style={{ height: chartHeight }}
+                        >
+                            {storedChartObj.chart_name ? (
+                                rows.length > 0 ? (
+                                    <EChart
+                                        loading={false}
+                                        theme={theme.palette.mode}
+                                        option={{
+                                            legend: {},
+                                            tooltip: {
+                                                trigger: 'axis',
+                                                axisPointer: {
+                                                    type: 'cross'
+                                                },
+                                                valueFormatter: (value) => tooltipFormatter(value)
                                             },
-                                            valueFormatter: (value) => tooltipFormatter(value)
-                                        },
-                                        dataZoom: [
-                                            {
-                                                type: 'inside',
-                                                filterMode: 'filter',
-                                                xAxisIndex: [0, 1]
-                                            },
-                                            {
-                                                type: 'inside',
-                                                filterMode: 'empty',
-                                                yAxisIndex: [0, 1]
-                                            },
-                                            {
-                                                type: 'slider',
-                                                filterMode: 'filter',
-                                                xAxisIndex: [0, 1]
-                                            },
-                                            {
-                                                type: 'slider',
-                                                filterMode: 'empty',
-                                                yAxisIndex: [0, 1]
-                                            }
-                                        ],
-                                        dataset: datasets,
-                                        ...options
-                                    }}
-                                    selectedSeriesIdx={selectedSeriesIdx ?? 0}
-                                    selectedData={selectedData}
-                                    activeDataId={lastSelectedRowId || selectedRowId}
-                                    onSelectDataChange={handleSelectDataChange}
-                                />
+                                            dataZoom: [
+                                                {
+                                                    type: 'inside',
+                                                    filterMode: 'filter',
+                                                    xAxisIndex: [0, 1]
+                                                },
+                                                {
+                                                    type: 'inside',
+                                                    filterMode: 'empty',
+                                                    yAxisIndex: [0, 1]
+                                                },
+                                                {
+                                                    type: 'slider',
+                                                    filterMode: 'filter',
+                                                    xAxisIndex: [0, 1]
+                                                },
+                                                {
+                                                    type: 'slider',
+                                                    filterMode: 'empty',
+                                                    yAxisIndex: [0, 1]
+                                                }
+                                            ],
+                                            dataset: datasets,
+                                            ...options
+                                        }}
+                                        selectedSeriesIdx={selectedSeriesIdx ?? 0}
+                                        selectedData={selectedData}
+                                        activeDataId={lastSelectedRowId || selectedRowId}
+                                        onSelectDataChange={handleSelectDataChange}
+                                    />
+                                ) : (
+                                    <Box className={styles.no_data_message}>
+                                        No Data Available
+                                    </Box>
+                                )
                             ) : (
                                 <Box className={styles.no_data_message}>
-                                    No Data Available
+                                    No Chart Selected
                                 </Box>
-                            )
-                        ) : (
-                            <Box className={styles.no_data_message}>
-                                No Chart Selected
+                            )}
+                        </Box>
+
+                        {/* Resizer Component */}
+                        {children && (
+                            <Resizer
+                                direction="horizontal"
+                                onResize={handleChartResize}
+                                minSize={100}
+                                maxSize={containerRef.current ? containerRef.current.clientHeight - 200 : 800}
+                                className={styles.chart_resizer}
+                            />
+                        )}
+
+                        {/* Children (AbbreviationMergeView) Section */}
+                        {children && (
+                            <Box className={styles.children_container}>
+                                {children}
                             </Box>
                         )}
                     </Box>
-                    {children}
                 </Box>
             </Box>
             <FullScreenModal

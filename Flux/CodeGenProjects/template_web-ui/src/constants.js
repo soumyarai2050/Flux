@@ -187,7 +187,8 @@ export const MODEL_TYPES = Object.freeze({
   ABBREVIATION_MERGE: 'abbreviation_merge',
   ROOT: 'root',
   REPEATED_ROOT: 'repeated_root',
-  NON_ROOT: 'non_root'
+  NON_ROOT: 'non_root',
+  CHART: 'chart'
 });
 
 export const WEBSOCKET_CLOSE_CODES = {

@@ -127,6 +127,23 @@ class FastapiOpenapiSchema(BaseFastapiPlugin, ABC):
         # else not required: avoiding duplicate response
         return output_str
 
+    def _handle_filtered_doc_count_response(self) -> str:
+        output_str = ""
+        output_str += f"filtered_doc_count_list_response = " + "{\n"
+        output_str += '    "200": {\n'
+        output_str += '        "description": "queried-all",\n'
+        output_str += '        "content": {\n'
+        output_str += '            "application/json": {\n'
+        output_str += '                "schema": {\n'
+        output_str += '                    "type": "array",\n'
+        output_str += f'                    "items": filtered_doc_count_schema\n'
+        output_str += '                }\n'
+        output_str += '            }\n'
+        output_str += '        }\n'
+        output_str += '    }\n'
+        output_str += '}\n\n'
+        return output_str
+
     def _handle_create_all_response(self, message_name_snake_cased: str) -> str:
         cache_response_type_list = self.cache_schema_message_name_to_res_type_list_dict.get(message_name_snake_cased)
         output_str = ""
@@ -183,6 +200,20 @@ class FastapiOpenapiSchema(BaseFastapiPlugin, ABC):
             self.cache_schema_message_name_to_res_type_list_dict[message_name_snake_cased] = []
             self.message_schema_cache_list.append(message)
         # else not required: avoiding duplicate schema
+        return output_str
+
+    def _handle_filtered_doc_count_schema(self):
+        output_str = ""
+        output_str += "filtered_doc_count_schema = " + "{\n"
+        output_str += '    "type": "integer",\n'
+        output_str += '    "properties": {\n'
+        output_str += '        "filtered_count": {\n'
+        output_str += '            "description": "return count",\n'
+        output_str += '            "required": True,\n'
+        output_str += '            "type": "integer",\n'
+        output_str += '        }\n'
+        output_str += '    }\n'
+        output_str += '}\n\n'
         return output_str
 
     def _get_root_msg_openapi_schemas_str(
@@ -579,6 +610,70 @@ class FastapiOpenapiSchema(BaseFastapiPlugin, ABC):
         output_str += '                            "type": "integer"\n'
         output_str += '                        },\n'
         output_str += '                        "description": "int value to limit response list length"\n'
+        output_str += '                    },\n'
+        output_str += '                    {\n'
+        output_str += '                        "name": "filters",\n'
+        output_str += '                        "in": "query",\n'
+        output_str += '                        "required": False,\n'
+        output_str += '                        "schema": {\n'
+        output_str += '                            "type": "array",\n'
+        output_str += '                            "items": {\n'
+        output_str += '                                "type": "object"\n'
+        output_str += '                            },\n'
+        output_str += '                        },\n'
+        output_str += ('                        "description": "Filter order - List of objects of column_name, filtered_values, '
+                       'text_filter and text_filter_type"\n')
+        output_str += '                    },\n'
+        output_str += '                    {\n'
+        output_str += '                        "name": "sort_order",\n'
+        output_str += '                        "in": "query",\n'
+        output_str += '                        "required": False,\n'
+        output_str += '                        "schema": {\n'
+        output_str += '                            "type": "array",\n'
+        output_str += '                            "items": {\n'
+        output_str += '                                "type": "object"\n'
+        output_str += '                            },\n'
+        output_str += '                        },\n'
+        output_str += ('                        "description": "sort order - List of objects of '
+                       'sort_by, sort_direction, is_absolute_sort "\n')
+        output_str += '                    },\n'
+        output_str += '                    {\n'
+        output_str += '                        "name": "pagination",\n'
+        output_str += '                        "in": "query",\n'
+        output_str += '                        "required": False,\n'
+        output_str += '                        "schema": {\n'
+        output_str += '                            "type": "array",\n'
+        output_str += '                            "items": {\n'
+        output_str += '                                "type": "object"\n'
+        output_str += '                            },\n'
+        output_str += '                        },\n'
+        output_str += '                        "description": "pagination - object with page_number and page_size"\n'
+        output_str += '                    }\n'
+        output_str += f'                ]\n'
+        output_str += '            }\n'
+        output_str += '        }'
+        return output_str
+
+    def handle_filter_count_req_body(self, message: protogen.Message) -> str:
+        message_name = message.proto.name
+        message_name_snake_cased = convert_camel_case_to_specific_case(message_name)
+        output_str = f'        "/{self.proto_file_package}/query-get_{message_name_snake_cased}_filtered_count": '+'{\n'
+        output_str += '            "get": {\n'
+        output_str += f'                "summary": "GET Filter Count api for {message_name}",\n'
+        output_str += f'                "responses": filtered_doc_count_list_response,\n'
+        output_str += f'                "parameters": [\n'
+        output_str += '                    {\n'
+        output_str += '                        "name": "filters",\n'
+        output_str += '                        "in": "query",\n'
+        output_str += '                        "required": False,\n'
+        output_str += '                        "schema": {\n'
+        output_str += '                            "type": "array",\n'
+        output_str += '                            "items": {\n'
+        output_str += '                                "type": "object"\n'
+        output_str += '                            },\n'
+        output_str += '                        },\n'
+        output_str += ('                        "description": "Filter order - List of objects of column_name, filtered_values, '
+                       'text_filter and text_filter_type"\n')
         output_str += '                    }\n'
         output_str += f'                ]\n'
         output_str += '            }\n'
@@ -832,6 +927,10 @@ class FastapiOpenapiSchema(BaseFastapiPlugin, ABC):
 
     def handle_openapi_schema_gen(self, file: protogen.File) -> str:
         output_str = ""
+
+        output_str += self._handle_filtered_doc_count_schema()
+        output_str += self._handle_filtered_doc_count_response()
+
         for message in self.root_message_list:
             output_str += self._get_root_msg_openapi_schemas_str(message)
         for message in self.message_to_query_option_list_dict:
@@ -911,6 +1010,10 @@ class FastapiOpenapiSchema(BaseFastapiPlugin, ABC):
                     output_str += ",\n"
                     break
                 # else not required: Avoiding field if index option is not enabled
+
+            if self.is_bool_option_enabled(message, FastapiOpenapiSchema.flux_msg_get_filter_count_query):
+                output_str += self.handle_filter_count_req_body(message=message)
+                output_str += ",\n"
 
         # query req_body and response
         for message in self.message_to_query_option_list_dict:

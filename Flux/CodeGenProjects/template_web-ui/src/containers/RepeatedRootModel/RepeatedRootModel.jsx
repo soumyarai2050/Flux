@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { cloneDeep, get, isEqual, set } from 'lodash';
 import { saveAs } from 'file-saver';
@@ -13,6 +13,7 @@ import {
     updateFormValidation,
     snakeToCamel
 } from '../../utils/ui/uiUtils';
+import { createAutoBoundParams } from '../../utils/core/parameterBindingUtils';
 import { removeRedundantFieldsFromRows } from '../../utils/core/dataTransformation';
 import { cleanAllCache } from '../../cache/attributeCache';
 import { useWebSocketWorker, useDownload, useModelLayout, useConflictDetection } from '../../hooks';
@@ -24,6 +25,7 @@ import { ConfirmSavePopup, FormValidation } from '../../components/utility/Popup
 import CommonKeyWidget from '../../components/data-display/CommonKeyWidget';
 import { DataTable, PivotTable } from '../../components/data-display/tables';
 import { ChartView } from '../../components/data-display/charts';
+import { sliceMap } from '../../models/sliceMap';
 import ConflictPopup from '../../components/utility/ConflictPopup';
 
 function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
@@ -31,7 +33,7 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
 
     const { actions, selector } = modelDataSource;
     const { storedArray, storedObj, updatedObj, objId, mode, allowUpdates, error, isLoading, popupStatus } = useSelector(selector);
-    const { node } = useSelector(state => state[snakeToCamel(modelName)]);
+    const { node, selectedDataPoints, lastSelectedDataPoint, isAnalysis } = useSelector(state => state[snakeToCamel(modelName)] ?? {});
     const nodeModelName = useMemo(() => node?.modelName ?? null, [node]);
     const nodeUrl = useMemo(() => node?.url ?? null, [node]);
     const modelSchema = useMemo(() => node?.modelSchema ?? modelDataSource.schema, [node])
@@ -108,6 +110,29 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
         handleShowMoreToggle,
     } = useModelLayout(modelName, objId, MODEL_TYPES.REPEATED_ROOT, setHeadCells, mode);
 
+    // Local state multiselect pattern for non-ChartTileNode models
+    // Node models use Redux-based selectedDataPoints/lastSelectedDataPoint
+    const isChartModel = nodeModelName !== null && nodeModelName !== undefined;
+    const [chartMultiSelectState, setChartMultiSelectState] = useState({});
+
+    // Current multiselect state key (for local state pattern)
+    // Apply chart-specific multiselect only when chart name exists
+    const currentStateKey = layoutType === LAYOUT_TYPES.CHART && modelLayoutData.selected_chart_name
+        ? modelLayoutData.selected_chart_name
+        : modelName;
+    const localMultiSelectedRows = chartMultiSelectState[currentStateKey]?.selectedRows || [];
+    const localLastSelectedRowId = chartMultiSelectState[currentStateKey]?.lastSelectedRowId || null;
+
+    // Final multiselect state - use Redux for ChartTileNode, local state for others
+    // Different formats needed for ChartView (objects) vs DataTable (IDs)
+    const finalSelectedRowObjects = isChartModel
+        ? selectedDataPoints || []
+        : (localMultiSelectedRows || []).map(id => storedArray.find(row => row._id === id)).filter(Boolean);
+    const finalSelectedRowIds = isChartModel
+        ? (selectedDataPoints || []).map(point => point._id)
+        : localMultiSelectedRows;
+    const finalLastSelectedRowId = isChartModel ? lastSelectedDataPoint?._id : localLastSelectedRowId;
+
     const dispatch = useDispatch();
     const [, startTransition] = useTransition();
 
@@ -130,6 +155,19 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
     // calculated fields
     const modelTitle = getWidgetTitle(modelLayoutOption, modelSchema, modelName, storedObj);
     const uiLimit = modelSchema.ui_get_all_limit ?? null;
+
+    // Auto-bound parameters for query parameter binding - uses selected row data
+    const autoBoundParams = useMemo(() => {
+        const isEmpty = obj => obj && obj.constructor === Object && Object.keys(obj).length === 0;
+
+        // Selected row data
+        const currentData = !isEmpty(updatedObj)
+            ? updatedObj
+            : storedArray?.[0];
+        if (!currentData || !fieldsMetadata) return {};
+
+        return createAutoBoundParams(fieldsMetadata, currentData);
+    }, [fieldsMetadata, updatedObj, storedArray]);
 
     const { downloadCSV, isDownloading, progress } = useDownload(derivedModelName, fieldsMetadata, null);
 
@@ -314,8 +352,7 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
         setReconnectCounter((prev) => prev + 1);
     }
 
-
-    const isWebSocketDisabled = projectSchema?.data_lab_node?.widget_ui_data_element?.is_graph_node_model ?? false;
+    const isWebSocketDisabled = isAnalysis ?? false;
 
     socketRef.current = useWebSocketWorker({
         url: (modelSchema.is_large_db_object || modelSchema.is_time_series || modelLayoutOption.depending_proto_model_for_cpp_port) ? url : viewUrl,
@@ -349,6 +386,10 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
 
     const handleReload = () => {
         handleDiscard();
+        // Clear local chart multiselect state on reload for non-ChartNode models
+        if (!isChartModel) {
+            setChartMultiSelectState({});
+        }
         dispatch(actions.setIsCreating(false));
         handleReconnect();
     }
@@ -538,28 +579,73 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
         dispatch(actions.setObjId(id));
     }
 
+    const nodeActions = useMemo(() => sliceMap[modelName]?.actions, []);
+
+    const handleTableSelectionChange = (newSelectedIds, mostRecentId) => {
+        const safeSelectedIds = Array.isArray(newSelectedIds) ? newSelectedIds : (newSelectedIds ? [newSelectedIds] : []);
+
+        if (isChartModel) {
+            // Redux pattern for ChartTileNode models
+            const newSelectedDataPoints = safeSelectedIds.map(id => {
+                return storedArray.find(row => row['_id'] === id);
+            }).filter(Boolean);
+
+            const newLastSelectedDataPoint = mostRecentId
+                ? storedArray.find(row => row['_id'] === mostRecentId)
+                : null;
+
+            if (nodeActions && typeof nodeActions.setSelectedDataPoints === 'function') {
+                dispatch(nodeActions.setSelectedDataPoints(newSelectedDataPoints));
+            }
+
+            if (nodeActions && typeof nodeActions.setLastSelectedDataPoint === 'function') {
+                dispatch(nodeActions.setLastSelectedDataPoint(newLastSelectedDataPoint));
+            }
+        } else {
+            // Local state pattern for other RepeatedRoot models
+            if (currentStateKey) {
+                setChartMultiSelectState(prev => ({
+                    ...prev,
+                    [currentStateKey]: {
+                        selectedRows: safeSelectedIds,
+                        lastSelectedRowId: mostRecentId || null
+                    }
+                }));
+            }
+        }
+    }
+
+    const handleChartMultiSelectChange = useCallback((selectedIds, mostRecentId) => {
+        if (isChartModel) {
+            // Redux pattern for ChartTileNode models - delegate to existing handler
+            handleTableSelectionChange(selectedIds, mostRecentId);
+        } else {
+            // Local state pattern for other RepeatedRoot models
+            if (currentStateKey) {
+                setChartMultiSelectState(prev => ({
+                    ...prev,
+                    [currentStateKey]: {
+                        selectedRows: selectedIds || [],
+                        lastSelectedRowId: mostRecentId || null
+                    }
+                }));
+            }
+
+            // Update row selection for data binding (similar to AbbreviatedMergeModel)
+            if (mostRecentId) {
+                dispatch(actions.setObjId(mostRecentId));
+            } else if (!selectedIds || selectedIds.length === 0) {
+                dispatch(actions.setObjId(null));
+            }
+        }
+    }, [isChartModel, currentStateKey, dispatch, actions, handleTableSelectionChange]);
+
     const cleanedRows = useMemo(() => {
         if ([LAYOUT_TYPES.CHART, LAYOUT_TYPES.PIVOT_TABLE].includes(layoutType)) {
             return removeRedundantFieldsFromRows(rows);
         }
         return [];
     }, [rows, layoutType])
-
-    const handleSetNode = () => {
-        const nodes = [];
-        const nodeName = nodes[Math.floor(Math.random() * nodes.length)];
-        if (nodeName === nodeModelName) return;
-        dispatch(actions.setNode({
-            modelName: nodeName,
-            modelSchema: getModelSchema(nodeName, projectSchema),
-            fieldsMetadata: schemaCollections[nodeName],
-            url: url
-        }))
-        dispatch(actions.setStoredArray([]));
-        dispatch(actions.setStoredObj({}));
-        dispatch(actions.setUpdatedObj({}));
-        dispatch(actions.setObjId(null));
-    }
 
     // A helper function to decide which content to render based on layoutType
     const renderContent = () => {
@@ -599,10 +685,12 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                     onChartSelect: handleSelectedChartNameChange,
                     selectedChartName: modelLayoutData.selected_chart_name ?? null,
                     chartEnableOverride: modelLayoutData.chart_enable_override ?? [],
-                    onChartPointSelect: setRowIds,
+                    onChartPointSelect: handleChartMultiSelectChange,
                     quickFilters: modelLayoutData.quick_filters ?? [],
                     onQuickFiltersChange: handleQuickFiltersChange,
-                    selectedRowId: objId
+                    selectedRowId: objId,
+                    selectedRows: finalSelectedRowObjects,
+                    lastSelectedRowId: finalLastSelectedRowId,
                 };
                 wrapperMode = MODES.READ;
                 isReadOnly = true;
@@ -646,6 +734,9 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                     uniqueValues={uniqueValues}
                     highlightDuration={modelLayoutData.highlight_duration ?? DEFAULT_HIGHLIGHT_DURATION}
                     maxRowSize={maxRowSize ?? 1}
+                    selectedRows={finalSelectedRowIds}
+                    lastSelectedRowId={finalLastSelectedRowId}
+                    onSelectionChange={handleTableSelectionChange}
                 />
             </Wrapper>
         )
@@ -719,6 +810,7 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                         modelSchema={modelSchema}
                         url={url}
                         viewUrl={viewUrl}
+                        autoBoundParams={autoBoundParams}
                         // misc
                         enableOverride={modelLayoutData.enable_override || []}
                         disableOverride={modelLayoutData.disable_override || []}

@@ -215,6 +215,14 @@ class FastapiWSClientFileHandler(BaseFastapiPlugin, ABC):
             query_params = aggregate_value[FastapiWSClientFileHandler.query_params_key]
             query_type = str(aggregate_value[FastapiWSClientFileHandler.query_type_key]).lower() \
                 if aggregate_value[FastapiWSClientFileHandler.query_type_key] is not None else None
+            query_projection_model_name = aggregate_value.get(FastapiWSClientFileHandler.query_projection_model_key)
+
+            if query_projection_model_name is None:
+                basemodel_type = f"{message.proto.name}BaseModel"
+                basemodel_list_type = f"{message.proto.name}BaseModelList"
+            else:
+                basemodel_type = query_projection_model_name
+                basemodel_list_type = f"{query_projection_model_name}List"
 
             # query_param_name_n_param_type_list = []
             query_params_name_list = []
@@ -235,7 +243,7 @@ class FastapiWSClientFileHandler(BaseFastapiPlugin, ABC):
                 output_str += ("\t\tquery_kwargs = jsonable_encoder(query_kwargs, exclude_none=True)   "
                                "# removes none values from dict\n")
                 output_str += (f'\t\tws_reader_obj = WSReader(self.ws_query_{query_name}_url, '
-                               f'{message.proto.name}BaseModel, {message.proto.name}BaseModelList, '
+                               f'{basemodel_type}, {basemodel_list_type}, '
                                f'self.handle_query_{query_name}_ws, query_kwargs, notify=notify)\n')
                 output_str += f"\t\treturn ws_reader_obj\n\n"
         return output_str

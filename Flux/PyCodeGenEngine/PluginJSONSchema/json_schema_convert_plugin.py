@@ -99,7 +99,8 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         BaseProtoPlugin.flux_fld_bot_message,
         BaseProtoPlugin.flux_fld_bot_reasoning,
         BaseProtoPlugin.flux_fld_default_array_create,
-        BaseProtoPlugin.flux_fld_auto_complete_split_assign
+        BaseProtoPlugin.flux_fld_auto_complete_split_assign,
+        BaseProtoPlugin.flux_fld_query_param_bind
     ]
     flx_fld_simple_repeated_attribute_options: List[str] = [
         BaseProtoPlugin.flux_fld_mapping_underlying_meta_field,

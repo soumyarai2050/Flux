@@ -12,6 +12,7 @@ import {
     getWidgetTitle, getCrudOverrideDict, getCSVFileName,
     updateFormValidation
 } from '../../utils/ui/uiUtils';
+import { createAutoBoundParams } from '../../utils/core/parameterBindingUtils';
 import { cleanAllCache } from '../../cache/attributeCache';
 import { useWebSocketWorker, useDownload, useModelLayout, useConflictDetection } from '../../hooks';
 // custom components
@@ -124,6 +125,14 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
 
     // calculated fields
     const modelTitle = getWidgetTitle(modelLayoutOption, modelSchema, modelName, storedObj);
+
+    // Auto-bound parameters for query parameter binding
+    const autoBoundParams = useMemo(() => {
+        const currentData = updatedObj;
+        if (!currentData || !fieldsMetadata) return {};
+
+        return createAutoBoundParams(fieldsMetadata, currentData);
+    }, [fieldsMetadata, updatedObj]);
 
     const { downloadCSV, isDownloading, progress } = useDownload(modelName, fieldsMetadata, null);
 
@@ -661,6 +670,7 @@ function RootModel({ modelName, modelDataSource, dataSource }) {
                         modelSchema={modelSchema}
                         url={url}
                         viewUrl={viewUrl}
+                        autoBoundParams={autoBoundParams}
                         // misc
                         enableOverride={modelLayoutData.enable_override || []}
                         disableOverride={modelLayoutData.disable_override || []}

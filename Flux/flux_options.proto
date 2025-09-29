@@ -140,7 +140,8 @@ message MessageJsonQuery{
   repeated QueryParamData QueryParams = 3;  // list of params required for aggregation
   optional QueryTypeEnum QueryType = 5 [default=HTTP];
   optional QueryRouteTypeEnum QueryRouteType = 6 [default=GET];
-  optional bool IncludeDataframeClients = 7[default=false];
+  optional bool IncludeDataframeClients = 7 [default=false];
+  optional string ProjectionModelName = 8;
 }
 
 
@@ -217,6 +218,7 @@ extend google.protobuf.MessageOptions
   optional string FluxMsgRsp = 53152;
   optional string FluxMsgNotify = 53153;
   optional ExecutorUtilOptions FluxMsgExecutorOptions = 53154;
+  optional bool FluxMsgGetFilterCountQuery = 53155;
 
   //DAO Options - 54
   optional string FluxMsgDaoAccessType = 54151;
@@ -355,6 +357,7 @@ extend google.protobuf.FieldOptions
   optional string FluxFldAutoCompleteSplitAssign = 55296; // Use this to split input text into multiple fields with autocomplete support. Format: "{delimiter}field1:index1{delimiter}field2:index2|ListName"
   optional string FluxFldNodeMetaQuery = 55297;
   optional string FluxFldEdgeMetaQuery = 55298;
+  optional string FluxFldQueryParamBind = 55299; // Bind this field's value to a query parameter when triggering FluxMsgButtonQuery
 
   //Complexity Option - 56
   optional string FluxFldCmplxHigh = 56151;

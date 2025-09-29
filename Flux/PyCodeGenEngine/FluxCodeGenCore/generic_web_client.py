@@ -2,6 +2,7 @@
 import os
 
 import msgspec
+import orjson
 import requests
 from typing import Any, Callable, List, Dict, TypeVar, Type
 from pathlib import PurePath
@@ -49,6 +50,10 @@ def generic_http_get_all_client(url: str, model_type: Type[MsgspecModel], limit_
         params = {}
     if limit_obj_count:
         params["limit_obj_count"] = limit_obj_count
+
+    for param_name, param_value in params.items():
+        params[param_name] = orjson.dumps(param_value)
+
     response: requests.Response = requests.get(url, timeout=120, params=params)     # TIMEOUT for get-all set to 60 sec
     return http_response_as_class_type(url, response, 200, model_type, HTTPRequestType.GET)
 

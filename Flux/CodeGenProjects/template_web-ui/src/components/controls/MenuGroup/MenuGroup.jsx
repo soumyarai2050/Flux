@@ -96,6 +96,7 @@ import ButtonQuery from '../../ui/ButtonQuery';
  * @param {Array<string>} props.noCommonKeyOverride - No common key override list.
  * @param {function} props.onNoCommonKeyOverrideChange - Callback for no common key override change.
  * @param {function} props.onDiscard - Callback for discard action.
+ * @param {Object} [props.autoBoundParams={}] - Auto-bound query parameters from field values with FluxFldQueryParamBind.
  * @returns {React.ReactElement} The rendered MenuGroup component.
  */
 const MenuGroup = ({
@@ -175,7 +176,8 @@ const MenuGroup = ({
     highlightDuration,
     onHighlightDurationChange,
     noCommonKeyOverride,
-    onNoCommonKeyOverrideChange
+    onNoCommonKeyOverrideChange,
+    autoBoundParams = {}
 }) => {
     const [anchorEl, setAnchorEl] = useState(null);
 
@@ -560,6 +562,7 @@ const MenuGroup = ({
                         url={url}
                         viewUrl={viewUrl}
                         queryObj={obj}
+                        autoBoundParams={autoBoundParams}
                     />
                 ))}
             </div>
@@ -657,6 +660,7 @@ MenuGroup.propTypes = {
     onHighlightDurationChange: PropTypes.func,
     noCommonKeyOverride: PropTypes.array,
     onNoCommonKeyOverrideChange: PropTypes.func,
+    autoBoundParams: PropTypes.object,
 };
 
 export default MenuGroup;

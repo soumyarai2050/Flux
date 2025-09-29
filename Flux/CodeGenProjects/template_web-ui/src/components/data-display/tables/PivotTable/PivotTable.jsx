@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import PivotTableUI from 'react-pivottable/PivotTableUI';
 import TableRenderers from 'react-pivottable/TableRenderers';
@@ -7,6 +7,8 @@ import createPlotlyRenderer from 'react-pivottable/PlotlyRenderers';
 import { Box, Button, Divider, List, ListItem, ListItemButton, ListItemText } from '@mui/material';
 import { Add, Close, Delete, Done, Save } from '@mui/icons-material';
 import Icon from '../../../ui/Icon';
+import ListPanel from '../../../ui/ListPanel/ListPanel';
+import ContentCopier from '../../../ui/ContentCopier';
 import 'react-pivottable/pivottable.css';
 import styles from './PivotTable.module.css';
 import { updatePivotSchema } from '../../../../utils/core/chartUtils';
@@ -17,6 +19,7 @@ import DataTree from '../../trees/DataTree';
 import { ModelCard, ModelCardContent, ModelCardHeader } from '../../../utility/cards';
 import FullScreenModal from '../../../ui/Modal';
 import { cloneDeep } from 'lodash';
+import Resizer from '../../../ui/Resizer/Resizer';
 
 const PlotlyRenderers = createPlotlyRenderer(Plot);
 
@@ -34,8 +37,9 @@ function PivotTable({
     onPivotCellSelect,
     children
 }) {
+    const containerRef = useRef(null);
     const { schema: projectSchema } = useSelector(state => state.schema);
-
+    const [tableHeight, setTableHeight] = useState(300);
     const [schema, setSchema] = useState(updatePivotSchema(projectSchema));
     const [selectedIndex, setSelectedIndex] = useState(selectedPivotName ? pivotData.findIndex((o) => o.pivot_name === selectedPivotName) : null);
     const [storedPivotObj, setStoredPivotObj] = useState({});
@@ -84,6 +88,10 @@ function PivotTable({
             prev.classList.remove(styles.selected);
         }
     }, [selectedIndex])
+
+    const handleTableResize = (newHeight) => {
+        setTableHeight(newHeight);
+    };
 
     const handlePivotTableChange = (updatedPivotProps) => {
         if (mode === MODES.READ) {
@@ -147,10 +155,9 @@ function PivotTable({
     }
 
     const handlePivotDelete = (pivotName, index) => {
-        const updatedPivotData = pivotData.filter((o) => o.pivot_data !== pivotName);
-        if (onPivotDataChange) {
-            onPivotDataChange(updatedPivotData);
-        }
+        const updatedPivotData = pivotData.filter((o) => o.pivot_name !== pivotName);
+        onPivotDataChange(updatedPivotData);
+
         if (index === selectedIndex) {
             setSelectedIndex(null);
         }
@@ -178,88 +185,100 @@ function PivotTable({
     };
 
     return (
-        <Box className={styles.container}>
-            <Box className={styles.list_container}>
-                <Button color='warning' variant='contained' onClick={handlePivotCreate}>
-                    <Add fontSize='small' />
-                    Add new pivot
-                </Button>
-                <List>
-                    {pivotData.map((item, index) => {
-                        if (pivotEnableOverride.includes(item.pivot_name)) return;
-                        return (
-                            <ListItem className={styles.list_item} key={index} selected={selectedIndex === index} disablePadding onClick={() => handleSelect(index)}>
-                                <ListItemButton>
-                                    <ListItemText>{item.pivot_name}</ListItemText>
-                                </ListItemButton>
-                                {mode === MODES.EDIT && index === selectedIndex && (
-                                    <>
-                                        <Icon title='Apply' onClick={handleSave}>
-                                            <Done color='success' fontSize='small' />
-
-                                        </Icon>
-                                        <Icon title='Discard' onClick={handleDiscard}>
-                                            <Close color='error' fontSize='small' />
-                                        </Icon>
-                                    </>
-                                )}
-                                <Icon title='Delete' onClick={() => handlePivotDelete(item.pivot_name, index)}>
-                                    <Delete fontSize='small' />
-                                </Icon>
-                            </ListItem>
-                        )
-                    })}
-                </List>
-            </Box>
-            <Divider orientation='vertical' flexItem />
-            <Box className={styles.pivot_container}>
-                {updatedPivotObj && Object.keys(updatedPivotObj).length > 0 && (
-                    <>
-                        <Box className={styles.pivot_table}>
-                            <PivotTableUI
-                                {...updatedPivotObj}
-                                data={data}
-                                aggregatorName={updatedPivotObj.aggregator_name}
-                                rendererName={updatedPivotObj.renderer_name}
-                                valueFilter={updatedPivotObj.value_filter ? JSON.parse(updatedPivotObj.value_filter) : {}}
-                                onChange={handlePivotTableChange}
-                                renderers={Object.assign({}, TableRenderers, PlotlyRenderers)}
-                                unusedOrientationCutoff={Infinity}
-                                tableOptions={{
-                                    clickCallback: clickCallback
-                                }}
+        <>
+            <Box className={styles.container} ref={containerRef}>
+                <ListPanel
+                    items={pivotData}
+                    selectedIndex={selectedIndex}
+                    onSelect={handleSelect}
+                    onCreate={handlePivotCreate}
+                    onDelete={(e, pivotName, index) => handlePivotDelete(pivotName, index)}
+                    itemNameKey="pivot_name"
+                    addButtonText="Add new pivot"
+                    enableOverride={pivotEnableOverride}
+                    collapse={true}
+                    mode={mode}
+                    additionalActions={(item, index, mode, selectedIndex) => (
+                        <>
+                            <ContentCopier text={item.pivot_name} />
+                            {mode === MODES.EDIT && index === selectedIndex && (
+                                <>
+                                    <Icon title='Apply' onClick={handleSave}>
+                                        <Done color='success' fontSize='small' />
+                                    </Icon>
+                                    <Icon title='Discard' onClick={handleDiscard}>
+                                        <Close color='error' fontSize='small' />
+                                    </Icon>
+                                </>
+                            )}
+                            <Icon title='Delete' onClick={() => handlePivotDelete(item.pivot_name, index)}>
+                                <Delete fontSize='small' />
+                            </Icon>
+                        </>
+                    )}
+                />
+                <Divider orientation='vertical' flexItem />
+                <Box className={styles.pivot_container}>
+                    {updatedPivotObj && Object.keys(updatedPivotObj).length > 0 && (
+                        <>
+                            <Box className={styles.pivot_table} style={{ height: `${tableHeight}px` }}>
+                                <PivotTableUI
+                                    {...updatedPivotObj}
+                                    data={data}
+                                    aggregatorName={updatedPivotObj.aggregator_name}
+                                    rendererName={updatedPivotObj.renderer_name}
+                                    valueFilter={updatedPivotObj.value_filter ? JSON.parse(updatedPivotObj.value_filter) : {}}
+                                    onChange={handlePivotTableChange}
+                                    renderers={Object.assign({}, TableRenderers, PlotlyRenderers)}
+                                    unusedOrientationCutoff={Infinity}
+                                    tableOptions={{
+                                        clickCallback: clickCallback
+                                    }}
+                                />
+                            </Box>
+                            {isCellActive && (
+                                <>
+                                    <Resizer
+                                        direction="horizontal"
+                                        onResize={handleTableResize}
+                                        minSize={100}
+                                        maxSize={containerRef.current ? containerRef.current.clientHeight - 100 : 600}
+                                    />
+                                    <Box style={{ flex: 1, overflow: 'auto' }}>
+                                        {children}
+                                    </Box>
+                                </>
+                            )}
+                        </>
+                    )}
+                </Box>
+                <FullScreenModal
+                    id={'pivot-option-modal'}
+                    open={isPivotOptionOpen}
+                    onClose={handlePivotOptionClose}
+                >
+                    <ModelCard>
+                        <ModelCardHeader name={PIVOT_SCHEMA_NAME} >
+                            <Icon name='save' title='save' onClick={handleSave}><Save fontSize='small' color='white' /></Icon>
+                            <Icon name='close' title='close' onClick={handlePivotOptionClose}><Close fontSize='small' color='white' /></Icon>
+                        </ModelCardHeader>
+                        <ModelCardContent>
+                            <DataTree
+                                projectSchema={schema}
+                                modelName={PIVOT_SCHEMA_NAME}
+                                updatedData={updatedPivotObj}
+                                storedData={storedPivotObj}
+                                subtree={null}
+                                mode={mode}
+                                xpath={null}
+                                onUpdate={handleUpdate}
+                                onUserChange={handleUserChange}
                             />
-                        </Box>
-                        {isCellActive && children}
-                    </>
-                )}
+                        </ModelCardContent>
+                    </ModelCard>
+                </FullScreenModal>
             </Box>
-            <FullScreenModal
-                id={'pivot-option-modal'}
-                open={isPivotOptionOpen}
-                onClose={handlePivotOptionClose}
-            >
-                <ModelCard>
-                    <ModelCardHeader name={PIVOT_SCHEMA_NAME} >
-                        <Icon name='save' title='save' onClick={handleSave}><Save fontSize='small' color='white' /></Icon>
-                        <Icon name='close' title='close' onClick={handlePivotOptionClose}><Close fontSize='small' color='white' /></Icon>
-                    </ModelCardHeader>
-                    <ModelCardContent>
-                        <DataTree
-                            projectSchema={schema}
-                            modelName={PIVOT_SCHEMA_NAME}
-                            updatedData={updatedPivotObj}
-                            storedData={storedPivotObj}
-                            subtree={null}
-                            mode={mode}
-                            xpath={null}
-                            onUpdate={handleUpdate}
-                            onUserChange={handleUserChange}
-                        />
-                    </ModelCardContent>
-                </ModelCard>
-            </FullScreenModal>
-        </Box>
+        </>
     )
 }
 
