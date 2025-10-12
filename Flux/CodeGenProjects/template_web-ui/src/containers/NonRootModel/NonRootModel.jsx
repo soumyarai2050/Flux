@@ -1,20 +1,21 @@
 import React, { useEffect, useMemo, useRef, useState, useTransition } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useDispatch, useSelector, shallowEqual } from 'react-redux';
 import { cloneDeep, get, isEqual, set } from 'lodash';
 import { saveAs } from 'file-saver';
 // project imports
 import { DB_ID, DEFAULT_HIGHLIGHT_DURATION, LAYOUT_TYPES, MODEL_TYPES, MODES } from '../../constants';
 import { clearxpath, addxpath } from '../../utils/core/dataAccess';
-import { generateObjectFromSchema } from '../../utils/core/schemaUtils';
+import { generateObjectFromSchema, getModelSchema } from '../../utils/core/schemaUtils';
 import { compareJSONObjects } from '../../utils/core/objectUtils';
 import { getServerUrl, isWebSocketActive } from '../../utils/network/networkUtils';
 import {
-    getWidgetTitle, getCrudOverrideDict, getCSVFileName,
+    getWidgetTitle, getCrudOverrideDict, getDefaultFilterParamDict, getCSVFileName,
     updateFormValidation
 } from '../../utils/ui/uiUtils';
 import { createAutoBoundParams } from '../../utils/core/parameterBindingUtils';
 import { cleanAllCache } from '../../cache/attributeCache';
-import { useWebSocketWorker, useDownload, useModelLayout, useConflictDetection } from '../../hooks';
+import { useWebSocketWorker, useDownload, useModelLayout, useConflictDetection, useCountQuery } from '../../hooks';
+import { massageDataForBackend, shouldUsePagination, buildDefaultFilters, extractCrudParams } from '../../utils/core/paginationUtils';
 // custom components
 import { FullScreenModalOptional } from '../../components/ui/Modal';
 import { ModelCard, ModelCardHeader, ModelCardContent } from '../../components/utility/cards';
@@ -25,15 +26,38 @@ import { DataTable } from '../../components/data-display/tables';
 import { DataTree } from '../../components/data-display/trees';
 import ConflictPopup from '../../components/utility/ConflictPopup';
 
-function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName }) {
+function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRootName }) {
     const { schema: projectSchema, schemaCollections } = useSelector((state) => state.schema);
-
     const { schema: modelSchema, fieldsMetadata, actions, selector, isAbbreviationSource = false } = modelDataSource;
     const modelRootFieldsMetadata = schemaCollections[modelRootName];
+    const modelRootSchema = useMemo(() => getModelSchema(modelRootName, projectSchema), [modelRootName, projectSchema]);
     const { storedObj, updatedObj, objId, mode, allowUpdates, isCreating, error, isLoading, popupStatus } = useSelector(selector);
-    const { storedObj: dataSourceStoredObj } = useSelector(dataSource?.selector ?? (() => ({ storedObj: null })), (prev, curr) => {
-        return JSON.stringify(prev) === JSON.stringify(curr);
-    });
+    // Extract allowedOperations from the PARENT ROOT model's json_root, not the non-root model's
+    const allowedOperations = useMemo(() => modelRootSchema?.json_root || null, [modelRootSchema]);
+
+    // Extract the three data sources from dictionary
+    const urlOverrideDataSource = modelDependencyMap?.urlOverride ?? null;
+    const crudOverrideDataSource = modelDependencyMap?.crudOverride ?? null;
+    const defaultFilterDataSource = modelDependencyMap?.defaultFilter ?? null;
+
+    // Create stable selector functions
+    const urlOverrideSelector = useMemo(
+        () => urlOverrideDataSource?.selector ?? (() => ({ storedObj: null })),
+        [urlOverrideDataSource]
+    );
+    const crudOverrideSelector = useMemo(
+        () => crudOverrideDataSource?.selector ?? (() => ({ storedObj: null })),
+        [crudOverrideDataSource]
+    );
+    const defaultFilterSelector = useMemo(
+        () => defaultFilterDataSource?.selector ?? (() => ({ storedObj: null })),
+        [defaultFilterDataSource]
+    );
+
+    // Subscribe to each data source's Redux store using shallow equality
+    const { storedObj: urlOverrideDataSourceStoredObj } = useSelector(urlOverrideSelector, shallowEqual);
+    const { storedObj: crudOverrideDataSourceStoredObj } = useSelector(crudOverrideSelector, shallowEqual);
+    const { storedObj: defaultFilterDataSourceStoredObj } = useSelector(defaultFilterSelector, shallowEqual);
 
     const [rows, setRows] = useState([]);
     const [groupedRows, setGroupedRows] = useState([]);
@@ -43,11 +67,8 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
     const [commonKeys, setCommonKeys] = useState([]);
     const [sortedCells, setSortedCells] = useState([]);
     const [uniqueValues, setUniqueValues] = useState({});
-    const [url, setUrl] = useState(modelDataSource.url);
-    const [viewUrl, setViewUrl] = useState(modelDataSource.viewUrl);
     const [isProcessingUserActions, setIsProcessingUserActions] = useState(false);
     const [reconnectCounter, setReconnectCounter] = useState(0);
-    const [params, setParams] = useState(null);
 
     const {
         modelLayoutOption,
@@ -96,6 +117,93 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
         handleShowMoreToggle,
     } = useModelLayout(modelName, objId, MODEL_TYPES.NON_ROOT, setHeadCells, mode);
 
+    const crudOverrideDictRef = useRef(getCrudOverrideDict(modelSchema));
+    const defaultFilterParamDictRef = useRef(getDefaultFilterParamDict(modelSchema));
+    const hasReadByIdWsProperty = allowedOperations?.ReadByIDWebSocketOp === true;
+
+    // Determine if server-side pagination is enabled from schema
+    const serverSidePaginationEnabled = modelSchema.server_side_pagination === true && modelSchema.is_large_db_object !== true;
+
+    // Extract ui_limit from schema unconditionally for NonRootModel (client-side pagination enforced)
+    // NonRootModel always uses client-side pagination regardless of server-side settings
+    const uiLimit = modelSchema.ui_get_all_limit ?? null;
+
+    // Build default filters (server-side) for use in multiple places
+    const defaultFilters = useMemo(() => {
+        return buildDefaultFilters(defaultFilterDataSourceStoredObj, defaultFilterParamDictRef.current);
+    }, [defaultFilterDataSourceStoredObj]);
+
+    // Check if all required default filter values are ready
+    const areDefaultFiltersReady = useMemo(() => {
+        if (!defaultFilterParamDictRef.current || Object.keys(defaultFilterParamDictRef.current).length === 0) {
+            return true; // No default filters required
+        }
+        // Check if all required default filters have valid values
+        const filterMap = new Map(defaultFilters.map(f => [f.column_name, f.filtered_values]));
+        return Object.keys(defaultFilterParamDictRef.current).every(key => {
+            const filterValues = filterMap.get(key);
+            return filterValues !== undefined && filterValues !== null &&
+                   (!Array.isArray(filterValues) || filterValues.length > 0);
+        });
+    }, [defaultFilters]);
+
+    // Construct URLs using urlOverrideDataSource (must be before useCountQuery)
+    const url = useMemo(() =>
+        getServerUrl(modelSchema, urlOverrideDataSourceStoredObj, urlOverrideDataSource?.fieldsMetadata),
+        [modelSchema, urlOverrideDataSourceStoredObj, urlOverrideDataSource?.fieldsMetadata]
+    );
+
+    const viewUrl = useMemo(() =>
+        getServerUrl(modelSchema, urlOverrideDataSourceStoredObj, urlOverrideDataSource?.fieldsMetadata, undefined, true),
+        [modelSchema, urlOverrideDataSourceStoredObj, urlOverrideDataSource?.fieldsMetadata]
+    );
+
+    // Extract params for CRUD override using crudOverrideDataSource (must be before useEffects)
+    const params = useMemo(() =>
+        extractCrudParams(crudOverrideDataSourceStoredObj, crudOverrideDictRef.current),
+        [crudOverrideDataSourceStoredObj]
+    );
+
+    // Process data for backend consumption
+    // Use modelLayoutData with JSON.stringify to handle reference stability
+    const processedData = useMemo(() => {
+        const rowsPerPage = modelLayoutData.rows_per_page || 25;
+        const filters = modelLayoutOption.filters || [];
+        const sortOrders = modelLayoutData.sort_orders || [];
+
+        // Merge UI filters with default filters
+        const mergedFilters = [...filters, ...defaultFilters];
+
+        const result = massageDataForBackend(mergedFilters, sortOrders, page, rowsPerPage);
+
+        return result;
+    }, [
+        JSON.stringify(modelLayoutOption.filters),
+        JSON.stringify(modelLayoutData.sort_orders),
+        page,
+        modelLayoutData.rows_per_page,
+        defaultFilters
+    ]);
+
+    // Unified count query - automatically uses HTTP or WebSocket based on allowedOperations
+    const {
+        count,
+        isLoading: isCountLoading,
+        isSynced
+    } = useCountQuery(
+        url,
+        modelRootName,
+        processedData.filters,
+        serverSidePaginationEnabled && areDefaultFiltersReady,
+        hasReadByIdWsProperty
+    );
+
+    // Derive waiting state - true if no count yet OR if count doesn't match current filters OR if loading
+    const isWaitingForCount = serverSidePaginationEnabled && (count === null || isCountLoading || !isSynced);
+
+    // Keeping it false to enforce client side pagination
+    const usePagination = false;
+
     const dispatch = useDispatch();
     const [, startTransition] = useTransition();
 
@@ -109,7 +217,6 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
     const pendingUpdateRef = useRef(null);
     const changesRef = useRef({});
     const formValidationRef = useRef({});
-    const crudOverrideDictRef = useRef(getCrudOverrideDict(modelSchema));
     const allowedLayoutTypesRef = useRef([LAYOUT_TYPES.TABLE, LAYOUT_TYPES.TREE]);
     // refs to identify change
     const optionsRef = useRef(null);
@@ -140,51 +247,70 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
         getBaselineForComparison,
     } = useConflictDetection(storedObj, updatedObj, mode, modelRootFieldsMetadata, isCreating, allowUpdates);
 
+    // Initial GET_ALL request - only for models without WebSocket support
     useEffect(() => {
-        const url = getServerUrl(modelSchema, dataSourceStoredObj, dataSource?.fieldsMetadata);
-        setUrl(url);
-        const viewUrl = getServerUrl(modelSchema, dataSourceStoredObj, dataSource?.fieldsMetadata, undefined, true);
-        setViewUrl(viewUrl);
-        let updatedParams = null;
-        if (dataSourceStoredObj && Object.keys(dataSourceStoredObj).length > 0 && crudOverrideDictRef.current?.GET_ALL) {
-            const { paramDict } = crudOverrideDictRef.current.GET_ALL;
-            if (Object.keys(paramDict).length > 0) {
-                Object.keys(paramDict).forEach((k) => {
-                    const paramSrc = paramDict[k];
-                    const paramValue = get(dataSourceStoredObj, paramSrc);
-                    if (paramValue !== null && paramValue !== undefined) {
-                        if (!updatedParams) {
-                            updatedParams = {};
-                        }
-                        updatedParams[k] = paramValue;
-                    }
-                })
-            }
+        // If ReadByIDWebSocketOp exists, skip HTTP GET_ALL (WebSocket will handle it)
+        if (hasReadByIdWsProperty) {
+            return;
         }
-        setParams((prev) => {
-            if (JSON.stringify(prev) === JSON.stringify(updatedParams)) {
-                return prev;
-            }
-            return updatedParams;
-        })
-    }, [dataSourceStoredObj]);
 
-    // useEffect(() => {
-    //     if (viewUrl && !isAbbreviationSource) {
-    //         let args = { url: viewUrl };
-    //         if (crudOverrideDictRef.current?.GET_ALL) {
-    //             const { endpoint, paramDict } = crudOverrideDictRef.current.GET_ALL;
-    //             if (!params && Object.keys(paramDict).length > 0) {
-    //                 return;
-    //             }
-    //             args = { ...args, endpoint, params };
-    //         }
-    //         dispatch(actions.getAll({ ...args }));
-    //     }
-    // }, [viewUrl, params])
+        // Wait for count query to complete if server-side pagination is enabled
+        if (isWaitingForCount) {
+            return;
+        }
+
+        // Wait for default filters to be ready
+        if (!areDefaultFiltersReady) {
+            return;
+        }
+
+        if (viewUrl && !isAbbreviationSource) {
+            let args = { url: viewUrl };
+
+            // Add uiLimit to args (not queryParams) - it will be handled by sliceFactory
+            if (uiLimit) {
+                args.uiLimit = uiLimit;
+            }
+
+            // Build query params similar to WebSocket implementation
+            // JSON-stringify filters, sortOrders, and pagination to match WebSocket format
+            const queryParams = {};
+
+            // Add filters if they exist (JSON-stringified)
+            if (processedData.filters && processedData.filters.length > 0) {
+                queryParams.filters = JSON.stringify(processedData.filters);
+            }
+
+            // Add sort orders if they exist (JSON-stringified)
+            if (processedData.sortOrders && processedData.sortOrders.length > 0) {
+                queryParams.sort_order = JSON.stringify(processedData.sortOrders);
+            }
+
+            // Only add pagination if server-side pagination is enabled and needed (JSON-stringified)
+            if (serverSidePaginationEnabled && usePagination) {
+                queryParams.pagination = JSON.stringify(processedData.pagination);
+            }
+
+            // Handle CRUD override - merge custom endpoint and params
+            if (crudOverrideDictRef.current?.GET_ALL) {
+                const { endpoint, paramDict } = crudOverrideDictRef.current.GET_ALL;
+                if (!params && Object.keys(paramDict).length > 0) {
+                    return;
+                }
+                // Merge CRUD params with query params (CRUD params are not JSON-stringified)
+                args = { ...args, endpoint, params: { ...params, ...queryParams } };
+            } else {
+                // Standard endpoint - just pass query params
+                args = { ...args, params: queryParams };
+            }
+
+            dispatch(actions.getAll(args));
+        }
+    }, [viewUrl, JSON.stringify(params), hasReadByIdWsProperty, processedData.filters, processedData.sortOrders, processedData.pagination, 
+        serverSidePaginationEnabled, usePagination, isWaitingForCount, defaultFilters, uiLimit])
 
     useEffect(() => {
-        workerRef.current = new Worker(new URL("../../workers/non-root-model.worker.js", import.meta.url));
+        workerRef.current = new Worker(new URL("../../workers/non-root-model.worker.js", import.meta.url), { type: 'module' });
 
         workerRef.current.onmessage = (event) => {
             const { rows, groupedRows, activeRows, maxRowSize, headCells, commonKeys, uniqueValues, sortedCells } = event.data;
@@ -257,7 +383,8 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
                 highlightUpdateOverride: modelLayoutData.highlight_update_override || [],
                 columnOrders: modelLayoutData.column_orders || [],
                 noCommonKeyOverride: modelLayoutData.no_common_key_override || [],
-                xpath: modelName
+                xpath: modelName,
+                serverSidePaginationEnabled : false  // Pass this false as in case of Non-RootModel we want to enforce client side pagination control in both cases 
             }
 
             const updatedOptionsRef = {
@@ -303,10 +430,18 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
         setReconnectCounter((prev) => prev + 1);
     }
 
+    // Determine if WebSocket should be disabled
+    const isWebSocketDisabled = !hasReadByIdWsProperty;
+    // Wait for count query to complete before establishing WebSocket connection
+    // This prevents double connection (once without pagination, once with pagination)
+    // isWaitingForCount handles both: (1) initial load and (2) filter changes
+    // Also wait for default filters to be ready
+    const isWebSocketDelayed = isWebSocketDisabled || isWaitingForCount || !areDefaultFiltersReady;
+
     socketRef.current = useWebSocketWorker({
         url: (modelSchema.is_large_db_object || modelSchema.is_time_series || modelLayoutOption.depending_proto_model_for_cpp_port) ? url : viewUrl,
         modelName: modelRootName,
-        isDisabled: false,
+        isDisabled: isWebSocketDelayed,
         reconnectCounter,
         isAbbreviationSource,
         selector,
@@ -314,7 +449,14 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
         onReconnect: handleReconnect,
         params,
         crudOverrideDict: crudOverrideDictRef.current,
-        isCppModel: modelLayoutOption.depending_proto_model_for_cpp_port
+        defaultFilterParamDict: defaultFilterParamDictRef.current,
+        isCppModel: modelLayoutOption.depending_proto_model_for_cpp_port,
+        // Parameters for unified endpoint with dynamic parameter inclusion
+        // Filters now include merged default filter params
+        filters: processedData.filters,
+        sortOrders: processedData.sortOrders,
+        pagination: (serverSidePaginationEnabled && usePagination) ? processedData.pagination : null,
+        uiLimit: uiLimit  // Client-side limit (always enabled for NonRootModel)
     })
 
     const handleModeToggle = () => {
@@ -529,6 +671,7 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
                             onSortOrdersChange={handleSortOrdersChange}
                             page={page}
                             rowsPerPage={modelLayoutData.rows_per_page || 25}
+                            totalCount={rows.length} //Non Root models we dont depend on total count from query for total rows
                             dataSourceColors={modelLayoutData.data_source_colors || []}
                             selectedId={objId}
                             onPageChange={handlePageChange}
@@ -584,7 +727,7 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
             onClose={handleFullScreenToggle}
         >
             <ModelCard id={modelName}>
-                <ModelCardHeader 
+                <ModelCardHeader
                     name={modelTitle}
                     isMaximized={isMaximized}
                     onMaximizeToggle={handleFullScreenToggle}
@@ -631,6 +774,7 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
                         onDownload={handleDownload}
                         // edit save
                         onModeToggle={handleModeToggle}
+                        isReadOnly={modelLayoutOption.is_read_only ?? false}
                         onSave={handleSave}
                         // layout switch
                         layout={layoutType}
@@ -682,7 +826,7 @@ function NonRootModel({ modelName, modelDataSource, dataSource, modelRootName })
                     isDisabled={isLoading || isProcessingUserActions}
                     error={error}
                     onClear={handleErrorClear}
-                    isDisconnected={!isCreating && !isWebSocketActive(socketRef.current, isAbbreviationSource ? modelRootName : null)}
+                    isDisconnected={!isCreating && !isWebSocketActive(socketRef.current, isAbbreviationSource ? modelRootName : null) && !isWebSocketDisabled}
                     onReconnect={handleReconnect}
                     isDownloading={isDownloading}
                     progress={progress}

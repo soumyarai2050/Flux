@@ -22,6 +22,7 @@ message PlanView{
     PassStoredObjToPartialUpdatePostCallback: True,
     PassStoredObjToPartialUpdateAllPostCallback: True
   };
+  option (FluxMsgGetFilterCountQuery) = true;
   required int32 id = 1 [(FluxFldDefaultValuePlaceholderString) = "NEW_ITEM_ID", (FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional int32 plan_alert_count = 2;
   optional Severity plan_alert_aggregated_severity = 3 [default=Severity_UNSPECIFIED, (FluxFldColor) = "Severity_CRITICAL=CRITICAL,Severity_ERROR=ERROR,Severity_WARNING=WARNING,Severity_INFO=INFO, Severity_DEBUG=DEBUG, Severity_UNSPECIFIED=UNSPECIFIED"];

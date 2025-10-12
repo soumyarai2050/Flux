@@ -377,6 +377,17 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                        f"status_code=400)\n")
         return output_str
 
+    def handle_query_http_params_json_parsing(self, indent_count=0) -> str:
+        output_str = " "*(indent_count*4) + f"    query_params = dict(request.query_params)\n"
+        output_str += " "*(indent_count*4) + f"    for query_param_name, query_param_val in query_params.items():\n"
+        output_str += " "*(indent_count*4) + f"        try:\n"
+        output_str += " "*(indent_count*4) + f"            # Attempt to parse the value as JSON\n"
+        output_str += " "*(indent_count*4) + f"            query_params[query_param_name] = orjson.loads(query_param_val)\n"
+        output_str += " "*(indent_count*4) + f"        except orjson.JSONDecodeError:\n"
+        output_str += " "*(indent_count*4) + f"            # If it fails, it's not a JSON string, so store the original string value\n"
+        output_str += " "*(indent_count*4) + f"            query_params[query_param_name] = query_param_val\n"
+        return output_str
+
     def handle_POST_gen(self, **kwargs) -> str:
         message, _, _, model_type = self._unpack_kwargs_without_id_field_type(**kwargs)
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
@@ -390,9 +401,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += self._add_view_check_code_in_route()
             output_str += f"    try:\n"
             output_str += f"        data_body = await {message_name_snake_cased}_json_req.body()\n"
-            output_str += f"        query_params = dict(request.query_params)\n"
-            output_str += f"        for query_param_name, query_param_val in query_params.items():\n"
-            output_str += f"            query_params[query_param_name] = orjson.loads(query_param_val)\n"
+            output_str += self.handle_query_http_params_json_parsing(indent_count=1)
             output_str += f"        return_obj_copy = query_params.pop('return_obj_copy', True)\n"
             output_str += f"        json_body = orjson.loads(data_body)\n"
             output_str += (f"        return await underlying_create_{message_name_snake_cased}_http("
@@ -2073,9 +2082,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += self._add_view_check_code_in_route()
             output_str += f"    try:\n"
             output_str += f"        data_body = await {message_name_snake_cased}_update_req_body.body()\n"
-            output_str += f"        query_params = dict(request.query_params)\n"
-            output_str += f"        for query_param_name, query_param_val in query_params.items():\n"
-            output_str += f"            query_params[query_param_name] = orjson.loads(query_param_val)\n"
+            output_str += self.handle_query_http_params_json_parsing(indent_count=1)
             output_str += f"        return_obj_copy = query_params.pop('return_obj_copy', True)\n"
             output_str += f"        json_body = orjson.loads(data_body)\n"
             output_str += (f'        return await underlying_partial_update_{message_name_snake_cased}_http(json_body, '
@@ -3004,9 +3011,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                                f") -> DefaultPydanticWebResponse | bool:\n")
         output_str += self._add_view_check_code_in_route()
         output_str += f"    try:\n"
-        output_str += f"        query_params = dict(request.query_params)\n"
-        output_str += f"        for query_param_name, query_param_val in query_params.items():\n"
-        output_str += f"            query_params[query_param_name] = orjson.loads(query_param_val)\n"
+        output_str += self.handle_query_http_params_json_parsing(indent_count=1)
         output_str += f"        return_obj_copy = query_params.pop('return_obj_copy', True)\n"
         if model_type == ModelType.Msgspec:
             output_str += f"        return await underlying_delete_{message_name_snake_cased}_http_bytes(" \
@@ -3148,9 +3153,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                            f") -> DefaultPydanticWebResponse | bool:\n")
         output_str += self._add_view_check_code_in_route()
         output_str += f"    try:\n"
-        output_str += f"        query_params = dict(request.query_params)\n"
-        output_str += f"        for query_param_name, query_param_val in query_params.items():\n"
-        output_str += f"            query_params[query_param_name] = orjson.loads(query_param_val)\n"
+        output_str += self.handle_query_http_params_json_parsing(indent_count=1)
         output_str += f"        return_obj_copy = query_params.pop('return_obj_copy', True)\n"
         if model_type == ModelType.Msgspec:
             output_str += (f"        return await underlying_delete_all_{message_name_snake_cased}_http_bytes("
@@ -3455,9 +3458,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f"async def get_{message_name_snake_cased}_from_index_fields_http({field_params}) " \
                           f"-> List[{message.proto.name}]:\n"
         field_params = ", ".join([f"{field.proto.name}" for field in index_fields])
-        output_str += f"    query_params = dict(request.query_params)\n"
-        output_str += f"    for query_param_name, query_param_val in query_params.items():\n"
-        output_str += f"        query_params[query_param_name] = orjson.loads(query_param_val)\n"
+        output_str += self.handle_query_http_params_json_parsing()
         output_str += \
             (f"    return await underlying_get_{message_name_snake_cased}_from_index_fields_http({field_params}, "
              f"**query_params)\n\n\n")
@@ -3664,9 +3665,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f" -> {message.proto.name}:\n"
         output_str += f"    try:\n"
         if model_type == ModelType.Msgspec:
-            output_str += f"        query_params = dict(request.query_params)\n"
-            output_str += f"        for query_param_name, query_param_val in query_params.items():\n"
-            output_str += f"            query_params[query_param_name] = orjson.loads(query_param_val)\n"
+            output_str += self.handle_query_http_params_json_parsing(indent_count=1)
             output_str += \
                 (f"        return await underlying_read_{message_name_snake_cased}_by_id_http_bytes("
                  f"{message_name_snake_cased}_id, **query_params)\n")
@@ -3873,9 +3872,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
 
         output_str += f"    try:\n"
         output_str += f"        # Process arbitrary query parameters (kwargs)\n"
-        output_str += f"        query_params = dict(request.query_params)\n"
-        output_str += f"        for query_param_name, query_param_val in query_params.items():\n"
-        output_str += f"            query_params[query_param_name] = orjson.loads(query_param_val)\n"
+        output_str += self.handle_query_http_params_json_parsing(indent_count=1)
         output_str += f"        limit_obj_count = query_params.pop('limit_obj_count', None)\n"
         override_default_get_all_limit = additional_agg_option_val_dict.get("override_get_all_limit_handling")
         if not override_default_get_all_limit:
@@ -4080,9 +4077,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             if query_param_having_dt:
                 output_str += self._add_datetime_params_handling_in_query(query_param_having_dt)
             if model_type == ModelType.Msgspec:
-                output_str += f"    query_params: Dict[str, Any] = dict(request.query_params)\n"
-                output_str += f"    for query_param_name, query_param_val in query_params.items():\n"
-                output_str += f"        query_params[query_param_name] = orjson.loads(query_param_val)\n"
+                output_str += self.handle_query_http_params_json_parsing()
                 for param_name, param_type in param_name_to_param_type_dict.items():
                     if "None" in param_type:
                         output_str += f"    {param_name} = query_params.pop('{param_name}', None)\n"
@@ -4389,7 +4384,7 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         model_type: ModelType = kwargs.get("model_type")
         message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
         if model_type in [model_type.Dataclass, model_type.Msgspec]:
-            output_str = f'@{self.api_router_app_name}.get("/query-get_{message_name_snake_cased}_filtered_count' + \
+            output_str = f'@{self.api_router_app_name}.get("/query-{message_name_snake_cased}_filtered_count' + \
                          f'", status_code=200)\n'
             output_str += f"async def get_{message_name_snake_cased}_filtered_count_http(request: Request):\n"
         else:
@@ -4406,6 +4401,8 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str += f'    agg_pipeline = get_cascading_multi_filter_count_pipeline({message.proto.name}, filters)\n'
         output_str += (f'    filtered_doc_count = await projection_read_http({message.proto.name}, '
                        f'{self.proto_package_var_name}, agg_pipeline, False, FilteredDocCount)\n')
+        output_str += f'    if filtered_doc_count is None:\n'
+        output_str += f'        filtered_doc_count = FilteredDocCount.from_kwargs(filtered_count=0)\n'
         if model_type == model_type.Dataclass:
             output_str += f"    return orjson.dumps(filtered_doc_count)\n"
         elif model_type == model_type.Msgspec:

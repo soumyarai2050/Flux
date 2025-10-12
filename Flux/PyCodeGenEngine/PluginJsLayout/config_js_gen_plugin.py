@@ -89,6 +89,34 @@ class JsConstantsGenPlugin(BaseJSLayoutPlugin):
             logging.error(err_str)
             raise Exception(err_str)
 
+        # Load ui_config.yaml to get edge_publish_url and chart_publish_url
+        project_dir = os.getenv("PROJECT_DIR")
+        if project_dir is None or not project_dir:
+            err_str = f"env var 'PROJECT_DIR' received as {project_dir}"
+            logging.exception(err_str)
+            raise Exception(err_str)
+
+        ui_config_file_path = PurePath(project_dir) / "data" / "ui_config.yaml"
+        edge_publish_url = None
+        chart_publish_url = None
+
+        if os.path.exists(ui_config_file_path):
+            ui_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(ui_config_file_path))
+            edge_publish_url = ui_config_yaml_dict.get("edge_publish_url")
+            chart_publish_url = ui_config_yaml_dict.get("chart_publish_url")
+
+        # Generate edge_publish_url content
+        if edge_publish_url is None or edge_publish_url == "null":
+            edge_publish_url_content = "export const EDGE_PUBLISH_URL = null;"
+        else:
+            edge_publish_url_content = f"export const EDGE_PUBLISH_URL = '{edge_publish_url}';"
+
+        # Generate chart_publish_url content
+        if chart_publish_url is None or chart_publish_url == "null":
+            chart_publish_url_content = "export const CHART_PUBLISH_URL = null;"
+        else:
+            chart_publish_url_content = f"export const CHART_PUBLISH_URL = '{chart_publish_url}';"
+
         return {
             output_file_name: {
                 "enable_proxy": f"const ENABLE_PROXY = {proxy_server.lower()};",
@@ -96,7 +124,9 @@ class JsConstantsGenPlugin(BaseJSLayoutPlugin):
                 "proxy_server_root": f"const PROXY_SERVER_ROOT = 'http://{ui_proxy_host}:{ui_proxy_port}/ui_proxy';",
                 "api_root": f"const API_ROOT = `http://{self.host}:{beanie_port}/"+"${PROJECT_NAME}`;",
                 "api_view_root": f"const API_VIEW_ROOT = `http://{self.host}:{view_port}/" + "${PROJECT_NAME}`;",
-                "api_public_url": f"export const API_PUBLIC_URL = 'http://{self.host}:{ui_port}';"
+                "api_public_url": f"export const API_PUBLIC_URL = 'http://{self.host}:{ui_port}';",
+                "edge_publish_url": edge_publish_url_content,
+                "chart_publish_url": chart_publish_url_content
             }
         }
 

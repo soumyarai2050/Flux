@@ -50,7 +50,7 @@ export function useConflictDetection(storedObj, updatedObj, mode, fieldsMetadata
             modelUpdatedObj,
             fieldsMetadata,
             isCreating
-        );
+        )[0];
 
         if (!userModifiedFields || Object.keys(userModifiedFields).length === 0) {
             return [];

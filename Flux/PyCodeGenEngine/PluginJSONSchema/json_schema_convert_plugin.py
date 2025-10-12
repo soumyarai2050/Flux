@@ -117,7 +117,8 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
     ]
     flx_msg_simple_non_repeated_attribute_options: List[str] = [
         BaseProtoPlugin.flux_msg_server_populate,
-        BaseProtoPlugin.flux_msg_ui_get_all_limit
+        BaseProtoPlugin.flux_msg_ui_get_all_limit,
+        BaseProtoPlugin.flux_msg_server_side_pagination
     ]
     flx_msg_simple_repeated_attribute_options: List[str] = [
         # put this category's options here
@@ -127,7 +128,8 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
     ]
     flx_msg_complex_repeated_attribute_options: List[str] = [
         BaseProtoPlugin.flux_msg_button_query,
-        BaseProtoPlugin.flux_msg_override_default_crud
+        BaseProtoPlugin.flux_msg_override_default_crud,
+        BaseProtoPlugin.flux_msg_default_filter_param
     ]
     # @LOW todo: query_param_field_src should have same query_src_model_name as src model
 
@@ -184,7 +186,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
             elif field.kind.name.lower() == "message":
                 if self.is_option_enabled(field.message, JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element):
                     widget_ui_data_option_value_dict = (
-                        self.handle_n_get_ui_widget_data_option_values_having_msg_name(message,
+                        self.handle_n_get_ui_widget_data_option_values_having_msg_name(field.message,
                                                                                        self.all_message_dict))
                     widget_ui_data_list = widget_ui_data_option_value_dict.get("widget_ui_data")
                     # since there will always be single widget_ui_data
@@ -560,9 +562,13 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                                 self.flx_msg_complex_repeated_attribute_options +
                                 self.flx_file_complex_repeated_attribute_options):
                     if option == JsonSchemaConvertPlugin.flux_msg_override_default_crud:
-                        # special handling required to case_etyle field values present in this option
+                        # special handling required to case_style field values present in this option
                         option_value_dict: List[Dict] = (
                             self.handle_n_get_override_default_crud_option_value_having_msg_name(field_or_message_obj, self.all_message_dict))
+                    elif option == JsonSchemaConvertPlugin.flux_msg_default_filter_param:
+                        # special handling required to case_style field values present in this option
+                        option_value_dict: List[Dict] = (
+                            self.handle_n_get_default_filter_param_value_having_msg_name(field_or_message_obj, self.all_message_dict))
                     else:
                         option_value_dict: List[Dict] = \
                             self.get_complex_option_value_from_proto(field_or_message_obj, option, is_option_repeated=True)
@@ -780,12 +786,34 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
 
         json_msg_str += self.__handle_msg_leading_comment_as_attribute(message, indent_space_count)
         # Handling json root attribute
+
+        is_time_series = False
         if (self.is_option_enabled(message, JsonSchemaConvertPlugin.flux_msg_json_root) or
-                self.is_option_enabled(message, JsonSchemaConvertPlugin.flux_msg_json_root_time_series)):
+                (is_time_series:=self.is_option_enabled(message, JsonSchemaConvertPlugin.flux_msg_json_root_time_series))):
+
+            if not is_time_series:
+                root_crud_ops = JsonSchemaConvertPlugin.get_complex_option_value_from_proto(message,
+                                                                                           JsonSchemaConvertPlugin.flux_msg_json_root)
+            else:
+                root_crud_ops = JsonSchemaConvertPlugin.get_complex_option_value_from_proto(message,
+                                                                                           JsonSchemaConvertPlugin.flux_msg_json_root_time_series)
             json_root_prefix_stripped = \
                 JsonSchemaConvertPlugin.flux_msg_json_root.lstrip(JsonSchemaConvertPlugin.msg_options_standard_prefix)
             json_root_prefix_stripped_case_styled = self.__case_style_convert_method(json_root_prefix_stripped)
-            json_msg_str += " " * indent_space_count + f'"{json_root_prefix_stripped_case_styled}": true,\n'
+            json_msg_str += " " * indent_space_count + f'"{json_root_prefix_stripped_case_styled}": ' + "{\n"
+
+            root_crud_ops_name_list: List[str] = []
+            for root_crud_ops_name in root_crud_ops:
+                if root_crud_ops_name.endswith("Op"):
+                    root_crud_ops_name_list.append(root_crud_ops_name)
+
+            for root_crud_op_name in root_crud_ops_name_list:
+                json_msg_str += " " * (indent_space_count+2) + f'"{root_crud_op_name}": true'
+                if root_crud_op_name == root_crud_ops_name_list[-1]:
+                    json_msg_str += "\n"
+                else:
+                    json_msg_str += ",\n"
+            json_msg_str += " " * indent_space_count + "},\n"
         json_msg_str += self.__underlying_json_output_handler(message, indent_space_count)
         return json_msg_str
 

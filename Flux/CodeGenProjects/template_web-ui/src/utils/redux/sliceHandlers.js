@@ -344,3 +344,172 @@ export function handlePartialUpdate(builder, thunk, config) {
     state.isLoading = false;
   });
 }
+
+/**
+ * Registers pending, fulfilled, and rejected cases for a createAll thunk.
+ *
+ * @param {Object} builder - Redux Toolkit builder.
+ * @param {Object} thunk - The async thunk for "createAll".
+ * @param {Object} config - Configuration object.
+ */
+export function handleCreateAll(builder, thunk, config) {
+  const { modelKeys, initialState } = config;
+  const { storedArrayKey } = modelKeys;
+  builder.addCase(thunk.pending, (state) => {
+    state.isLoading = true;
+    state.error = null;
+  });
+  builder.addCase(thunk.fulfilled, (state, action) => {
+    if (Array.isArray(action.payload)) {
+      // Append newly created items to the stored array
+      state[storedArrayKey] = [...state[storedArrayKey], ...action.payload];
+    }
+    state.isLoading = false;
+  });
+  builder.addCase(thunk.rejected, (state, action) => {
+    const { code, message, detail, status } = action.payload || {};
+    state.error = { code, message, detail, status };
+    state.isLoading = false;
+  });
+}
+
+/**
+ * Registers pending, fulfilled, and rejected cases for an updateAll thunk.
+ *
+ * @param {Object} builder - Redux Toolkit builder.
+ * @param {Object} thunk - The async thunk for "updateAll".
+ * @param {Object} config - Configuration object.
+ */
+export function handleUpdateAll(builder, thunk, config) {
+  const { modelKeys, initialState } = config;
+  const { storedArrayKey, storedObjKey, updatedObjKey, objIdKey } = modelKeys;
+  builder.addCase(thunk.pending, (state) => {
+    state.isLoading = true;
+    state.error = null;
+  });
+  builder.addCase(thunk.fulfilled, (state, action) => {
+    if (Array.isArray(action.payload)) {
+      // Create a map of updated items by ID for efficient lookup
+      const updatedMap = new Map(action.payload.map((item) => [item[DB_ID], item]));
+      // Update the stored array by replacing items with matching IDs
+      state[storedArrayKey] = state[storedArrayKey].map((o) =>
+        updatedMap.has(o[DB_ID]) ? updatedMap.get(o[DB_ID]) : o
+      );
+      // If the currently selected object was updated, refresh it
+      if (state[objIdKey] && updatedMap.has(state[objIdKey])) {
+        const updatedObj = updatedMap.get(state[objIdKey]);
+        state[storedObjKey] = updatedObj;
+        state[updatedObjKey] = addxpath(fastClone(updatedObj));
+      }
+    }
+    state.isLoading = false;
+  });
+  builder.addCase(thunk.rejected, (state, action) => {
+    const { code, message, detail, status } = action.payload || {};
+    state.error = { code, message, detail, status };
+    state.isLoading = false;
+  });
+}
+
+/**
+ * Registers pending, fulfilled, and rejected cases for a patchAll thunk.
+ *
+ * @param {Object} builder - Redux Toolkit builder.
+ * @param {Object} thunk - The async thunk for "patchAll".
+ * @param {Object} config - Configuration object.
+ */
+export function handlePatchAll(builder, thunk, config) {
+  const { modelKeys, initialState } = config;
+  const { storedArrayKey, storedObjKey, updatedObjKey, objIdKey } = modelKeys;
+  builder.addCase(thunk.pending, (state) => {
+    state.isLoading = true;
+    state.error = null;
+  });
+  builder.addCase(thunk.fulfilled, (state, action) => {
+    if (Array.isArray(action.payload)) {
+      // Create a map of patched items by ID for efficient lookup
+      const patchedMap = new Map(action.payload.map((item) => [item[DB_ID], item]));
+      // Update the stored array by replacing items with matching IDs
+      state[storedArrayKey] = state[storedArrayKey].map((o) =>
+        patchedMap.has(o[DB_ID]) ? patchedMap.get(o[DB_ID]) : o
+      );
+      // If the currently selected object was patched, refresh it
+      if (state[objIdKey] && patchedMap.has(state[objIdKey])) {
+        const patchedObj = patchedMap.get(state[objIdKey]);
+        state[storedObjKey] = patchedObj;
+        state[updatedObjKey] = addxpath(fastClone(patchedObj));
+      }
+    }
+    state.isLoading = false;
+  });
+  builder.addCase(thunk.rejected, (state, action) => {
+    const { code, message, detail, status } = action.payload || {};
+    state.error = { code, message, detail, status };
+    state.isLoading = false;
+  });
+}
+
+/**
+ * Registers pending, fulfilled, and rejected cases for a delete thunk.
+ *
+ * @param {Object} builder - Redux Toolkit builder.
+ * @param {Object} thunk - The async thunk for "delete".
+ * @param {Object} config - Configuration object.
+ */
+export function handleDelete(builder, thunk, config) {
+  const { modelKeys, initialState } = config;
+  const { storedArrayKey, storedObjKey, updatedObjKey, objIdKey } = modelKeys;
+  builder.addCase(thunk.pending, (state) => {
+    state.isLoading = true;
+    state.error = null;
+  });
+  builder.addCase(thunk.fulfilled, (state, action) => {
+    // action.meta.arg contains the original payload (with id)
+    const deletedId = action.meta?.arg?.id;
+    if (deletedId !== undefined) {
+      // Remove the deleted item from the stored array
+      state[storedArrayKey] = state[storedArrayKey].filter((o) => o[DB_ID] !== deletedId);
+      // If the deleted item was selected, reset the selection
+      if (state[objIdKey] === deletedId) {
+        state[objIdKey] = initialState[objIdKey];
+        state[storedObjKey] = initialState[storedObjKey];
+        state[updatedObjKey] = initialState[updatedObjKey];
+      }
+    }
+    state.isLoading = false;
+  });
+  builder.addCase(thunk.rejected, (state, action) => {
+    const { code, message, detail, status } = action.payload || {};
+    state.error = { code, message, detail, status };
+    state.isLoading = false;
+  });
+}
+
+/**
+ * Registers pending, fulfilled, and rejected cases for a deleteAll thunk.
+ *
+ * @param {Object} builder - Redux Toolkit builder.
+ * @param {Object} thunk - The async thunk for "deleteAll".
+ * @param {Object} config - Configuration object.
+ */
+export function handleDeleteAll(builder, thunk, config) {
+  const { modelKeys, initialState } = config;
+  const { storedArrayKey, storedObjKey, updatedObjKey, objIdKey } = modelKeys;
+  builder.addCase(thunk.pending, (state) => {
+    state.isLoading = true;
+    state.error = null;
+  });
+  builder.addCase(thunk.fulfilled, (state, action) => {
+    // Clear all items from the stored array
+    state[storedArrayKey] = initialState[storedArrayKey];
+    state[storedObjKey] = initialState[storedObjKey];
+    state[updatedObjKey] = initialState[updatedObjKey];
+    state[objIdKey] = initialState[objIdKey];
+    state.isLoading = false;
+  });
+  builder.addCase(thunk.rejected, (state, action) => {
+    const { code, message, detail, status } = action.payload || {};
+    state.error = { code, message, detail, status };
+    state.isLoading = false;
+  });
+}

@@ -12,7 +12,7 @@ import { sortColumns, getSortOrdersWithAbs, getUniqueValues } from '../utils/ui/
 onmessage = (e) => {
     const { storedObj, updatedObj, fieldsMetadata, filters, mode, page, rowsPerPage, sortOrders,
         enableOverride, disableOverride, showLess, showHidden, showAll, showMore, moreAll, xpath,
-        columnOrders, frozenColumns, columnNameOverride, highlightUpdateOverride, noCommonKeyOverride
+        columnOrders, frozenColumns, columnNameOverride, highlightUpdateOverride, noCommonKeyOverride,serverSidePaginationEnabled
     } = e.data;
     const rows = getTableRows(fieldsMetadata, mode, storedObj, addxpath(cloneDeep(updatedObj)), xpath);
     const filterFieldsMetadata = fieldsMetadata.filter((meta) => meta.filterEnable);
@@ -20,7 +20,12 @@ onmessage = (e) => {
     const uniqueValues = getUniqueValues(rows, filterFieldsMetadata);
     const filteredRows = applyFilter(rows, filters);
     const groupedRows = getGroupedTableRows(filteredRows, [], null);
-    const { sortedRows, activeRows } = getActiveRows(groupedRows, page, rowsPerPage, sortOrders, true);
+
+    // If server-side pagination is enabled, skip client-side pagination slice
+    // The storedObj already contains only the data for the current page
+    const { sortedRows, activeRows } = serverSidePaginationEnabled
+        ? getActiveRows(groupedRows, 0, rowsPerPage, sortOrders, true)
+        : getActiveRows(groupedRows, page, rowsPerPage, sortOrders, true);
     const maxRowSize = getMaxRowSize(activeRows);
     const columns = getTableColumns(fieldsMetadata, mode, {
         enableOverride,

@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 from pathlib import PurePath
 from typing import Dict, Tuple
 import re
@@ -16,16 +17,24 @@ class UpdateWebUIConfiguration:
         self.proxy_project_dir: PurePath = self.root_dir / "ws_mux_demux_proxy"
         self.project_name: str = str(self.project_dir).split("/")[-1]
         self.project_config_file_path: PurePath = self.project_dir / "data" / "config.yaml"
+        self.project_ui_config_file_path: PurePath = self.project_dir / "data" / "ui_config.yaml"
         self.proxy_config_file_path: PurePath = self.proxy_project_dir / "data" / "config.yaml"
         self.web_ui_path: PurePath = self.project_dir / "web-ui"
         self.project_config_path: PurePath = self.web_ui_path / "src" / "config.js"
         self.project_package_json_path: PurePath = self.web_ui_path / "package.json"
+        self.project_vite_config_path: PurePath = self.web_ui_path / "vite.config.js"
         self.project_schema_path: PurePath = self.web_ui_path / "public" / "schema.json"
 
         self.project_config_yaml_dict: Dict = (YAMLConfigurationManager.load_yaml_configurations
                                                (str(self.project_config_file_path)))
         self.proxy_config_yaml_dict: Dict = (YAMLConfigurationManager.load_yaml_configurations
                                              (str(self.proxy_config_file_path)))
+
+        # Load ui_config.yaml if it exists
+        self.ui_config_yaml_dict: Dict = {}
+        if os.path.exists(self.project_ui_config_file_path):
+            self.ui_config_yaml_dict = (YAMLConfigurationManager.load_yaml_configurations
+                                       (str(self.project_ui_config_file_path)))
 
         self.server_host: str = self.project_config_yaml_dict.get("server_host")
         self.proxy_server_host: str = self.proxy_config_yaml_dict.get("server_host")
@@ -42,9 +51,13 @@ class UpdateWebUIConfiguration:
             self.use_view_clients) else self.main_server_beanie_port
         self.ui_port: str = self.project_config_yaml_dict.get("ui_port")
 
+        # Get edge_publish_url and chart_publish_url from ui_config.yaml
+        self.edge_publish_url = self.ui_config_yaml_dict.get("edge_publish_url")
+        self.chart_publish_url = self.ui_config_yaml_dict.get("chart_publish_url")
+
         self._update_config_js()
         self._update_schema_json()
-        self._update_package_json()
+        self._update_vite_config()
 
     def _update_config_js(self):
         with open(self.project_config_path, 'r') as f:
@@ -68,6 +81,24 @@ class UpdateWebUIConfiguration:
         content = re.sub(
             r'export const API_PUBLIC_URL = [^;]+;',
             f'export const API_PUBLIC_URL = \'http://{self.server_host}:{self.ui_port}\';', content)
+
+        # Update edge_publish_url
+        if self.edge_publish_url is None or self.edge_publish_url == "null":
+            edge_publish_url_value = "null"
+        else:
+            edge_publish_url_value = f"'{self.edge_publish_url}'"
+        content = re.sub(
+            r'export const EDGE_PUBLISH_URL = [^;]+;',
+            f'export const EDGE_PUBLISH_URL = {edge_publish_url_value};', content)
+
+        # Update chart_publish_url
+        if self.chart_publish_url is None or self.chart_publish_url == "null":
+            chart_publish_url_value = "null"
+        else:
+            chart_publish_url_value = f"'{self.chart_publish_url}'"
+        content = re.sub(
+            r'export const CHART_PUBLISH_URL = [^;]+;',
+            f'export const CHART_PUBLISH_URL = {chart_publish_url_value};', content)
 
         with open(self.project_config_path, 'w') as f:
             f.write(content)
@@ -109,18 +140,18 @@ class UpdateWebUIConfiguration:
         view_port: int = int(config_yaml_dict.get("view_port")) if use_view_clients else beanie_port
         return host, beanie_port, view_port
 
-    def _update_package_json(self):
-        with open(str(self.project_package_json_path), 'r') as file:
-            package_json = json.load(file)
+    def _update_vite_config(self):
+        with open(str(self.project_vite_config_path), 'r') as f:
+            content = f.read()
 
-        # Update UI_PORT in package.json
-        package_json['scripts']['start'] = f'cross-env PORT={self.ui_port} react-scripts start'
+        # Update UI_PORT in vite.config.js
+        content = re.sub(r'port: \d+,',
+                         f'port: {self.ui_port},', content)
 
-        # Write the updated package.json back to the file
-        with open(str(self.project_package_json_path), 'w', encoding='utf-8') as file:
-            json.dump(package_json, file, indent=2)
+        with open(str(self.project_vite_config_path), 'w') as f:
+            f.write(content)
 
-        print(f'"package.json" updated with port {self.ui_port}')
+        print(f'"vite.config.js" updated with port {self.ui_port}')
 
 
 if __name__ == "__main__":

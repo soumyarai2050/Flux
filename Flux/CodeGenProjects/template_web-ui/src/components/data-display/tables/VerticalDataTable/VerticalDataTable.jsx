@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import {
   Popover,
@@ -11,18 +11,218 @@ import {
   IconButton,
   Paper,
   Box,
+  TablePagination,
 } from '@mui/material';
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
 import ContentCopy from '@mui/icons-material/ContentCopy';
 import Check from '@mui/icons-material/Check';
 import styles from './VerticalDataTable.module.css';
-import { useTheme } from '@emotion/react';
 import ClipboardCopier from '../../../utility/ClipboardCopier';
+import ValueBasedToggleButton from '../../../ui/ValueBasedToggleButton';
+import { getColorTypeFromValue } from '../../../../utils/ui/colorUtils';
+import { getSizeFromValue, getShapeFromValue } from '../../../../utils/ui/uiUtils';
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+const COPY_TIMEOUT_MS = 2000;
+const DEFAULT_PAGINATION_KEY = 'main';
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
 
 /**
- * VerticalDataTable - A component that displays JSON data in a vertical table format.
- * 
+ * Flattens a nested object into dot-notation keys.
+ * @param {Object} obj - The object to flatten
+ * @param {string} prefix - Current prefix for nested keys
+ * @returns {Object} Flattened object with dot-notation keys
+ * @example flattenObject({ user: { name: "Alice" } }) => { "user.name": "Alice" }
+ */
+const flattenObject = (obj, prefix = '') => {
+  const flattened = {};
+  for (const key in obj) {
+    if (obj.hasOwnProperty(key)) {
+      const value = obj[key];
+      const newKey = prefix ? `${prefix}.${key}` : key;
+      if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+        Object.assign(flattened, flattenObject(value, newKey));
+      } else {
+        flattened[newKey] = value;
+      }
+    }
+  }
+  return flattened;
+};
+
+/**
+ * Checks if a value should be treated as expandable.
+ * @param {*} value - The value to check
+ * @param {boolean} flattenObjects - Whether objects should be flattened
+ * @returns {boolean} True if value is expandable
+ */
+const isComplexType = (value, flattenObjects) => {
+  if (flattenObjects) return Array.isArray(value);
+  return (value !== null && typeof value === 'object') || Array.isArray(value);
+};
+
+/**
+ * Checks if an array contains objects.
+ * @param {Array} arr - The array to check
+ * @returns {boolean} True if array contains at least one object
+ */
+const isArrayOfObjects = (arr) => {
+  return Array.isArray(arr) && arr.length > 0 && arr.some(item =>
+    item !== null && typeof item === 'object' && !Array.isArray(item)
+  );
+};
+
+/**
+ * Extracts all unique keys from an array of objects.
+ * @param {Array} arr - Array of objects
+ * @returns {string[]} Array of unique keys
+ */
+const getAllKeysFromArrayOfObjects = (arr) => {
+  const keys = new Set();
+  arr.forEach(obj => {
+    if (obj !== null && typeof obj === 'object' && !Array.isArray(obj)) {
+      Object.keys(obj).forEach(key => keys.add(key));
+    }
+  });
+  return Array.from(keys);
+};
+
+/**
+ * Calculates paginated array slice.
+ * @param {Array} arr - Array to paginate
+ * @param {Object} paginationState - Current pagination state
+ * @param {string} paginationKey - Key for this pagination instance
+ * @param {number} itemsPerPage - Items per page
+ * @param {boolean} enablePagination - Whether pagination is enabled
+ * @returns {Object} Pagination data and sliced array
+ */
+const getPaginatedData = (arr, paginationState, paginationKey, itemsPerPage, enablePagination) => {
+  const currentPage = paginationState[paginationKey] || 0;
+  const startIdx = currentPage * itemsPerPage;
+  const endIdx = startIdx + itemsPerPage;
+  const paginatedArr = enablePagination ? arr.slice(startIdx, endIdx) : arr;
+  return { paginatedArr, currentPage, startIdx, endIdx };
+};
+
+// ============================================================================
+// Sub-Components
+// ============================================================================
+
+/**
+ * Copy button with visual feedback.
+ */
+const CopyButton = ({ copyKey, isCopied, onCopy, title = "Copy row data" }) => (
+  <IconButton
+    size="small"
+    onClick={(e) => {
+      e.stopPropagation();
+      onCopy(copyKey);
+    }}
+    title={title}
+    className={styles.iconButton}
+  >
+    {isCopied ? (
+      <Check fontSize="small" className={styles.checkIcon} />
+    ) : (
+      <ContentCopy fontSize="small" />
+    )}
+  </IconButton>
+);
+
+CopyButton.propTypes = {
+  copyKey: PropTypes.string.isRequired,
+  isCopied: PropTypes.bool.isRequired,
+  onCopy: PropTypes.func.isRequired,
+  title: PropTypes.string
+};
+
+/**
+ * Reusable table wrapper with common structure.
+ */
+const TableWrapper = ({
+  children,
+  maxHeight,
+  ariaLabel,
+  clipboardText,
+  showPagination,
+  paginationProps
+}) => (
+  <TableContainer component={Paper} className={styles.tableContainer} style={{ maxHeight }}>
+    <Table stickyHeader aria-label={ariaLabel} className={styles.table}>
+      {children}
+    </Table>
+    <ClipboardCopier text={clipboardText} />
+    {showPagination && <TablePagination {...paginationProps} />}
+  </TableContainer>
+);
+
+TableWrapper.propTypes = {
+  children: PropTypes.node.isRequired,
+  maxHeight: PropTypes.string,
+  ariaLabel: PropTypes.string.isRequired,
+  clipboardText: PropTypes.string,
+  showPagination: PropTypes.bool.isRequired,
+  paginationProps: PropTypes.object
+};
+
+// ============================================================================
+// Main Component
+// ============================================================================
+
+/**
+ * VerticalDataTable - Displays JSON data in a vertical table format with expandable nested data.
+ *
+ * Key Features:
+ * - Displays objects with keys as rows and values as columns
+ * - Supports nested data exploration via expandable popups
+ * - Optional object flattening into dot-notation (e.g., user.name)
+ * - Copy functionality for individual rows or entire table
+ * - Pagination support for arrays with independent state per popup
+ * - Can render standalone or within a popover
+ * - Supports button fields with metadata-driven rendering
+ *
  * @component
+ * @example
+ * // Standalone usage
+ * <VerticalDataTable
+ *   data={{ name: "John", age: 30 }}
+ *   isOpen={true}
+ * />
+ *
+ * @example
+ * // Popover usage
+ * <VerticalDataTable
+ *   data={userData}
+ *   isOpen={isOpen}
+ *   onClose={() => setIsOpen(false)}
+ *   usePopover={true}
+ *   anchorEl={buttonRef.current}
+ * />
+ *
+ * @example
+ * // With button fields
+ * <VerticalDataTable
+ *   data={{ status: "active", value: 42 }}
+ *   isOpen={true}
+ *   fieldsMetadata={[
+ *     {
+ *       key: "status",
+ *       type: "button",
+ *       button: {
+ *         pressed_value_as_text: "active",
+ *         unpressed_caption: "Inactive",
+ *         pressed_caption: "Active",
+ *         value_color_map: { active: "success", inactive: "error" }
+ *       }
+ *     }
+ *   ]}
+ * />
  */
 function VerticalDataTable({
   data,
@@ -31,140 +231,227 @@ function VerticalDataTable({
   maxHeight = '80vh',
   anchorEl = null,
   usePopover = false,
+  flattenObjects = true,
+  itemsPerPage = 10,
+  enablePagination = true,
+  fieldsMetadata = [],
 }) {
-  // State for managing nested data popups
+  // ============================================================================
+  // State Management
+  // ============================================================================
+
   const [nestedPopups, setNestedPopups] = useState([]);
   const [clipboardText, setClipboardText] = useState(null);
   const [copiedKey, setCopiedKey] = useState(null);
-  const containerRef = useRef(null);
-  const theme = useTheme();
+  const [paginationState, setPaginationState] = useState({ main: 0 });
+
+  // ============================================================================
+  // Helper Functions
+  // ============================================================================
 
   /**
-   * Handles copying row data in the excel friendly format
-   * 
-   * @param {string} key - The field name/key
-   * @param {Array} values - Array of values for that field
+   * Finds field metadata by key from fieldsMetadata array.
+   * Strips array indices [n] and uses base key for lookup.
    */
-  const handleCopy = (key, values) => {
-    let text;
-    if (key === 'copy-all') {
-      text = JSON.stringify(data ?? '');
-    } else {
-      // Convert values to strings and handle null/undefined
-      const convertedValues = values.map(value => {
-        if (value === null || value === undefined) {
-          return '--';
-        }
+  const getFieldMetadata = useCallback((key) => {
+    if (!fieldsMetadata || fieldsMetadata.length === 0) return null;
 
-        // Handle complex data types
-        if (typeof value === 'object' && !Array.isArray(value)) {
-          return `Object (${Object.keys(value).length} properties)`;
-        }
+    // Strip array index suffix like [0], [1], etc.
+    // Also handle nested paths by taking the last segment after dot
+    let baseKey = key.replace(/\[\d+\]$/, ''); // Remove [n] suffix
 
-        if (Array.isArray(value)) {
-          return `Array (${value.length} items)`;
-        }
-
-        return String(value);
-      });
-
-      text = [key, ...convertedValues].join('\n');
+    // For flattened objects with dot notation (e.g., "parent.child"), use the last part
+    if (baseKey.includes('.')) {
+      const parts = baseKey.split('.');
+      baseKey = parts[parts.length - 1];
     }
+
+    return fieldsMetadata.find(field =>
+      field.key === baseKey ||
+      field.xpath === baseKey ||
+      field.key === key ||
+      field.xpath === key
+    );
+  }, [fieldsMetadata]);
+
+  // ============================================================================
+  // Event Handlers
+  // ============================================================================
+
+  /**
+   * Handles pagination page change.
+   */
+  const handlePageChange = useCallback((paginationKey) => (event, newPage) => {
+    setPaginationState(prev => ({
+      ...prev,
+      [paginationKey]: newPage
+    }));
+  }, []);
+
+  /**
+   * Converts value to string for clipboard.
+   */
+  const valueToString = useCallback((value) => {
+    if (value === null || value === undefined) return '--';
+    if (typeof value === 'object' && !Array.isArray(value)) {
+      return `Object (${Object.keys(value).length} properties)`;
+    }
+    if (Array.isArray(value)) return `Array (${value.length} items)`;
+    return String(value);
+  }, []);
+
+  /**
+   * Handles copying data to clipboard with visual feedback.
+   */
+  const handleCopy = useCallback((key, values) => {
+    const text = key === 'copy-all'
+      ? JSON.stringify(data ?? '')
+      : [key, ...values.map(valueToString)].join('\n');
+
     setClipboardText(text);
     setCopiedKey(key);
+
     setTimeout(() => {
-      // to allow same row to be copied again even if there is no text change
       setClipboardText(null);
       setCopiedKey(null);
-    }, 2000);
-  };
+    }, COPY_TIMEOUT_MS);
+  }, [data, valueToString]);
 
   /**
-   * Handles the opening of a nested popup for complex data types
-   *
-   * @param {Object|Array} nestedData - The nested data to display
-   * @param {string} nestedKey - The key associated with the nested data
-   * @param {HTMLElement} anchorElement - The element to anchor the popover to
-   * @param {Event} event - The click event
+   * Opens a nested popup for complex data types.
    */
-  const handleNestedOpen = (nestedData, nestedKey, anchorElement, event) => {
-    // Stop propagation to prevent immediate closing
-    if (event) {
-      event.stopPropagation();
-    }
+  const handleNestedOpen = useCallback((nestedData, nestedKey, anchorElement, event) => {
+    if (event) event.stopPropagation();
+
+    const popupId = `popup-${nestedPopups.length}`;
 
     setNestedPopups([...nestedPopups, {
       data: nestedData,
       key: nestedKey,
-      anchorEl: anchorElement
+      anchorEl: anchorElement,
+      paginationKey: popupId
     }]);
-  };
+
+    setPaginationState(prev => ({ ...prev, [popupId]: 0 }));
+  }, [nestedPopups]);
 
   /**
-   * Closes a nested popup at a specific index
-   *
-   * @param {number} index - The index of the nested popup to close
+   * Closes a nested popup and cleans up its state.
    */
-  const handleNestedClose = (index) => {
+  const handleNestedClose = useCallback((index) => {
+    const closedPopup = nestedPopups[index];
+
     setNestedPopups(nestedPopups.filter((_, i) => i !== index));
-  };
+
+    if (closedPopup?.paginationKey) {
+      setPaginationState(prev => {
+        const newState = { ...prev };
+        delete newState[closedPopup.paginationKey];
+        return newState;
+      });
+    }
+  }, [nestedPopups]);
 
   /**
-   * Checks if a value is a complex type (object or array) that should be expandable
-   *
-   * @param {any} value - The value to check
-   * @returns {boolean} - Whether the value is complex and expandable
+   * Handles popover close with event safety.
    */
-  const isComplexType = (value) => {
-    return (value !== null && typeof value === 'object') || Array.isArray(value);
-  };
+  const handlePopoverClose = useCallback((event) => {
+    if (event) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    if (isOpen) onClose();
+  }, [isOpen, onClose]);
+
+  // ============================================================================
+  // Rendering Functions
+  // ============================================================================
 
   /**
-   * Determines if an array contains objects that should be displayed in columnar format
-   *
-   * @param {Array} arr - The array to check
-   * @returns {boolean} - Whether the array contains objects
+   * Gets display text for complex types.
    */
-  const isArrayOfObjects = (arr) => {
-    return Array.isArray(arr) && arr.length > 0 && arr.some(item => item !== null && typeof item === 'object' && !Array.isArray(item));
-  };
+  const getComplexTypeDisplay = useCallback((value) => {
+    return Array.isArray(value)
+      ? `Array (${value.length} items)`
+      : `Object (${Object.keys(value).length} properties)`;
+  }, []);
 
   /**
-   * Extracts all unique keys from an array of objects
-   *
-   * @param {Array} arr - Array of objects
-   * @returns {Array} - Array of unique keys
+   * Renders a button field using ValueBasedToggleButton.
    */
-  const getAllKeysFromArrayOfObjects = (arr) => {
-    const keys = new Set();
-    arr.forEach(obj => {
-      if (obj !== null && typeof obj === 'object' && !Array.isArray(obj)) {
-        Object.keys(obj).forEach(key => keys.add(key));
-      }
-    });
-    return Array.from(keys);
-  };
+  const renderButtonField = useCallback((value, key, collection) => {
+    // If value not set, show null placeholder
+    if (value === undefined || value === null) {
+      return <span className={styles.nullValue}>--</span>;
+    }
+
+    const buttonConfig = collection.button;
+    if (!buttonConfig) {
+      return <span className={styles.primitiveValue}>{String(value)}</span>;
+    }
+
+    // Parse disabled captions if present
+    const disabledValueCaptionDict = {};
+    if (buttonConfig.disabled_captions) {
+      buttonConfig.disabled_captions.split(',').forEach(valueCaptionPair => {
+        const [val, caption] = valueCaptionPair.split('=');
+        disabledValueCaptionDict[val] = caption;
+      });
+    }
+
+    const isDisabledValue = disabledValueCaptionDict.hasOwnProperty(String(value));
+    const disabledCaption = isDisabledValue ? disabledValueCaptionDict[String(value)] : '';
+    const checked = String(value) === buttonConfig.pressed_value_as_text;
+    const color = getColorTypeFromValue(collection, String(value));
+    const size = getSizeFromValue(buttonConfig.button_size);
+    const shape = getShapeFromValue(buttonConfig.button_type);
+
+    let caption = String(value);
+    if (isDisabledValue) {
+      caption = disabledCaption;
+    } else if (checked && buttonConfig.pressed_caption) {
+      caption = buttonConfig.pressed_caption;
+    } else if (!checked && buttonConfig.unpressed_caption) {
+      caption = buttonConfig.unpressed_caption;
+    }
+
+    return (
+      <ValueBasedToggleButton
+        size={size}
+        shape={shape}
+        color={color}
+        value={value}
+        caption={caption}
+        xpath={null}
+        disabled={isDisabledValue}
+        action={buttonConfig.action}
+        allowForceUpdate={buttonConfig.allow_force_update}
+        dataSourceId={null}
+        source={null}
+        onClick={null}
+        iconName={buttonConfig.button_icon_name}
+        hideCaption={buttonConfig.hide_caption}
+      />
+    );
+  }, []);
 
   /**
-   * Renders a cell based on the data type of the value
-   *
-   * @param {any} value - The value to render
-   * @param {string} key - The key associated with the value
-   * @returns {React.ReactNode} - The rendered cell content
+   * Renders a cell based on value type.
    */
-  const renderCell = (value, key) => {
+  const renderCell = useCallback((value, key) => {
     if (value === null) return <span className={styles.nullValue}>null</span>;
     if (value === undefined) return <span className={styles.undefinedValue}>undefined</span>;
 
-    if (isComplexType(value)) {
-      // For objects and arrays, show expand button
-      const displayTitle = Array.isArray(value)
-        ? `Array (${value.length} items)`
-        : `Object (${Object.keys(value).length} properties)`;
+    // Check if field has button metadata (identified by presence of button attribute)
+    const fieldMeta = getFieldMetadata(key);
+    if (fieldMeta && fieldMeta.button) {
+      return renderButtonField(value, key, fieldMeta);
+    }
 
+    if (isComplexType(value, flattenObjects)) {
       return (
         <div className={styles.complexValueContainer}>
-          <span className={styles.typeIndicator}>{displayTitle}</span>
+          <span className={styles.typeIndicator}>{getComplexTypeDisplay(value)}</span>
           <IconButton
             onClick={(event) => handleNestedOpen(value, key, event.currentTarget, event)}
             size="small"
@@ -175,412 +462,354 @@ function VerticalDataTable({
           </IconButton>
         </div>
       );
-    } else if (typeof value === 'boolean') {
-      // For booleans, show true/false with styling
-      return <span className={`${styles.booleanValue} ${value ? styles.trueValue : styles.falseValue}`}>{String(value)}</span>;
-    } else if (typeof value === 'string') {
-      // For strings, wrap in quotes to distinguish from other types
-      return <span className={styles.stringValue}>{value}</span>;
-    } else {
-      // For numbers and other primitives
-      return <span className={styles.primitiveValue}>{String(value)}</span>;
     }
-  };
+
+    if (typeof value === 'boolean') {
+      return <span className={`${styles.booleanValue} ${value ? styles.trueValue : styles.falseValue}`}>{String(value)}</span>;
+    }
+
+    if (typeof value === 'string') {
+      return <span className={styles.stringValue}>{value}</span>;
+    }
+
+    return <span className={styles.primitiveValue}>{String(value)}</span>;
+  }, [flattenObjects, getComplexTypeDisplay, handleNestedOpen, getFieldMetadata, renderButtonField]);
 
   /**
-   * Renders table rows for a JSON object
-   *
-   * @param {Object} obj - The object to render as rows
-   * @returns {Array<React.ReactNode>} - Array of rendered rows
+   * Renders table rows for an object.
    */
-  const renderObjectRows = (obj) => {
-    return Object.keys(obj).map((key) => {
-      const value = obj[key];
+  const renderObjectRows = useCallback((obj) => {
+    const dataToRender = flattenObjects ? flattenObject(obj) : obj;
 
-      return (
-        <TableRow key={key} hover>
-          <TableCell
-            component="th"
-            scope="row"
-            className={styles.headerCell}
-            aria-label={`Property: ${key}`}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <span>{key}</span>
-              <IconButton
-                size="small"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleCopy(key, [value]);
-                }}
-                title="Copy row data"
-                sx={{
-                  color: 'inherit',
-                  '&:hover': {
-                    backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                  }
-                }}
-              >
-                {copiedKey === key ? (
-                  <Check fontSize="small" sx={{ color: '#4caf50' }} />
-                ) : (
-                  <ContentCopy fontSize="small" />
-                )}
-              </IconButton>
-            </div>
-          </TableCell>
-          <TableCell className={styles.dataCell}>{renderCell(value, key)}</TableCell>
-        </TableRow>
-      );
-    });
-  };
+    return Object.entries(dataToRender).map(([key, value]) => (
+      <TableRow key={key} hover>
+        <TableCell component="th" scope="row" className={styles.headerCell} aria-label={`Property: ${key}`}>
+          <div className={styles.flexContainer}>
+            <span>{key}</span>
+            <CopyButton copyKey={key} isCopied={copiedKey === key} onCopy={(k) => handleCopy(k, [value])} />
+          </div>
+        </TableCell>
+        <TableCell className={styles.dataCell}>{renderCell(value, key)}</TableCell>
+      </TableRow>
+    ));
+  }, [flattenObjects, copiedKey, handleCopy, renderCell]);
 
   /**
-   * Renders table for an array of objects
-   *
-   * @param {Array} arr - The array of objects to render
-   * @returns {React.ReactNode} - The rendered table
+   * Renders table for array of objects.
    */
-  const renderArrayOfObjectsTable = (arr) => {
-    const allKeys = getAllKeysFromArrayOfObjects(arr);
+  const renderArrayOfObjectsTable = useCallback((arr, paginationKey = DEFAULT_PAGINATION_KEY) => {
+    const { paginatedArr, currentPage, startIdx } = getPaginatedData(
+      arr, paginationState, paginationKey, itemsPerPage, enablePagination
+    );
+
+    const processedArr = flattenObjects
+      ? paginatedArr.map(item => (item && typeof item === 'object' && !Array.isArray(item) ? flattenObject(item) : item))
+      : paginatedArr;
+
+    const allKeys = getAllKeysFromArrayOfObjects(processedArr);
 
     return (
-      <TableContainer component={Paper} className={styles.tableContainer} style={{ maxHeight }}>
-        <Table stickyHeader aria-label="array of objects table" className={styles.table}>
-          <TableHead>
-            <TableRow>
-              <TableCell className={styles.tableHeaderCell}>
-                <span>Field</span>
-                <IconButton
-                  size="small"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleCopy('copy-all', null);
-                  }}
-                  title="Copy table"
-                  sx={{
-                    color: 'inherit',
-                    '&:hover': {
-                      backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                    }
-                  }}
-                >
-                  {copiedKey === 'copy-all' ? (
-                    <Check fontSize="small" sx={{ color: '#4caf50' }} />
-                  ) : (
-                    <ContentCopy fontSize="small" />
-                  )}
-                </IconButton>
-              </TableCell>
-              {arr.map((_, index) => (
-                <TableCell key={index} className={styles.tableHeaderCell}>{index}</TableCell>
-              ))}
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {allKeys.map((key) => {
-              // Extract values for this key from all objects
-              const values = arr.map((item, index) => {
-                if (item && typeof item === 'object' && !Array.isArray(item) && key in item) {
-                  return item[key]; // Return raw value, let handleCopy handle conversion
-                }
-                return null; // Return null for missing values
-              });
+      <TableWrapper
+        maxHeight={maxHeight}
+        ariaLabel="array of objects table"
+        clipboardText={clipboardText}
+        showPagination={enablePagination && arr.length > itemsPerPage}
+        paginationProps={{
+          component: "div",
+          count: arr.length,
+          page: currentPage,
+          onPageChange: handlePageChange(paginationKey),
+          rowsPerPage: itemsPerPage,
+          rowsPerPageOptions: [itemsPerPage],
+          labelDisplayedRows: ({ from, to, count }) => `${from}-${to} of ${count} items`
+        }}
+      >
+        <TableHead>
+          <TableRow>
+            <TableCell className={styles.tableHeaderCell}>
+              <span>Field</span>
+              <CopyButton
+                copyKey="copy-all"
+                isCopied={copiedKey === 'copy-all'}
+                onCopy={() => handleCopy('copy-all', null)}
+                title="Copy table"
+              />
+            </TableCell>
+            {processedArr.map((_, index) => (
+              <TableCell key={index} className={styles.tableHeaderCell}>{startIdx + index}</TableCell>
+            ))}
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {allKeys.map((key) => {
+            const values = processedArr.map((item) => {
+              if (item && typeof item === 'object' && !Array.isArray(item) && key in item) {
+                return item[key];
+              }
+              return null;
+            });
 
-              return (
-                <TableRow key={key} hover>
-                  <TableCell component="th" scope="row" className={styles.headerCell} aria-label={`Field: ${key}`}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <span>{key}</span>
-                      <IconButton
-                        size="small"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleCopy(key, values);
-                        }}
-                        title="Copy row data"
-                        sx={{
-                          color: 'inherit',
-                          '&:hover': {
-                            backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                          }
-                        }}
-                      >
-                        {copiedKey === key ? (
-                          <Check fontSize="small" sx={{ color: '#4caf50' }} />
-                        ) : (
-                          <ContentCopy fontSize="small" />
-                        )}
-                      </IconButton>
-                    </div>
+            return (
+              <TableRow key={key} hover>
+                <TableCell component="th" scope="row" className={styles.headerCell} aria-label={`Field: ${key}`}>
+                  <div className={styles.flexContainer}>
+                    <span>{key}</span>
+                    <CopyButton
+                      copyKey={key}
+                      isCopied={copiedKey === key}
+                      onCopy={(k) => handleCopy(k, values)}
+                    />
+                  </div>
+                </TableCell>
+                {processedArr.map((item, index) => (
+                  <TableCell key={index} className={styles.dataCell}>
+                    {(item && typeof item === 'object' && !Array.isArray(item) && key in item)
+                      ? renderCell(item[key], `${key}[${index}]`)
+                      : <span className={styles.nullValue}>--</span>}
                   </TableCell>
-                  {arr.map((item, index) => (
-                    <TableCell key={index} className={styles.dataCell}>
-                      {(item && typeof item === 'object' && !Array.isArray(item) && key in item)
-                        ? renderCell(item[key], `${key}[${index}]`)
-                        : <span className={styles.nullValue}>--</span>}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-        {/* Clipboard copier for copy functionality */}
-        <ClipboardCopier text={clipboardText} />
-      </TableContainer>
+                ))}
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </TableWrapper>
     );
-  };
+  }, [paginationState, flattenObjects, itemsPerPage, enablePagination, maxHeight, clipboardText, copiedKey, handleCopy, handlePageChange, renderCell]);
 
   /**
-   * Renders table rows for a JSON array (for arrays not containing objects)
-   *
-   * @param {Array} arr - The array to render as rows
-   * @returns {Array<React.ReactNode>} - Array of rendered rows
+   * Renders table rows for simple arrays.
    */
-  const renderArrayRows = (arr) => {
-    return arr.map((item, index) => {
+  const renderArrayRows = useCallback((arr, paginationKey = DEFAULT_PAGINATION_KEY) => {
+    const { paginatedArr, startIdx } = getPaginatedData(
+      arr, paginationState, paginationKey, itemsPerPage, enablePagination
+    );
 
+    return paginatedArr.map((item, index) => {
+      const actualIndex = startIdx + index;
       return (
-        <TableRow key={index} hover>
-          <TableCell component="th" scope="row" className={styles.headerCell} aria-label={`Index: ${index}`}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <span>{`[${index}]`}</span>
-              <IconButton
-                size="small"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleCopy(`[${index}]`, [item]);
-                }}
-                title="Copy row data"
-                sx={{
-                  color: 'inherit',
-                  '&:hover': {
-                    backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                  }
-                }}
-              >
-                {copiedKey === `[${index}]` ? (
-                  <Check fontSize="small" sx={{ color: '#4caf50' }} />
-                ) : (
-                  <ContentCopy fontSize="small" />
-                )}
-              </IconButton>
+        <TableRow key={actualIndex} hover>
+          <TableCell component="th" scope="row" className={styles.headerCell} aria-label={`Index: ${actualIndex}`}>
+            <div className={styles.flexContainer}>
+              <span>{`[${actualIndex}]`}</span>
+              <CopyButton
+                copyKey={`[${actualIndex}]`}
+                isCopied={copiedKey === `[${actualIndex}]`}
+                onCopy={(k) => handleCopy(k, [item])}
+              />
             </div>
           </TableCell>
-          <TableCell className={styles.dataCell}>{renderCell(item, `[${index}]`)}</TableCell>
+          <TableCell className={styles.dataCell}>{renderCell(item, `[${actualIndex}]`)}</TableCell>
         </TableRow>
       );
     });
-  };
+  }, [paginationState, itemsPerPage, enablePagination, copiedKey, handleCopy, renderCell]);
 
   /**
-   * Renders the content of the table based on the data type
+   * Renders table content based on data type.
    */
-  const renderTableContent = (tableData) => {
+  const renderTableContent = useCallback((tableData, paginationKey = DEFAULT_PAGINATION_KEY) => {
     if (!tableData) return null;
 
-    // Special handling for arrays of objects
+    // Array of objects - special columnar layout
     if (isArrayOfObjects(tableData)) {
-      return renderArrayOfObjectsTable(tableData);
+      return renderArrayOfObjectsTable(tableData, paginationKey);
     }
 
-    return (
-      <TableContainer component={Paper} className={styles.tableContainer} style={{ maxHeight }}>
-        <Table stickyHeader aria-label="vertical json data table" className={styles.table}>
+    // Simple array - indexed rows
+    if (Array.isArray(tableData)) {
+      const { currentPage } = getPaginatedData(
+        tableData, paginationState, paginationKey, itemsPerPage, enablePagination
+      );
+
+      return (
+        <TableWrapper
+          maxHeight={maxHeight}
+          ariaLabel="vertical json data table"
+          clipboardText={clipboardText}
+          showPagination={enablePagination && tableData.length > itemsPerPage}
+          paginationProps={{
+            component: "div",
+            count: tableData.length,
+            page: currentPage,
+            onPageChange: handlePageChange(paginationKey),
+            rowsPerPage: itemsPerPage,
+            rowsPerPageOptions: [itemsPerPage],
+            labelDisplayedRows: ({ from, to, count }) => `${from}-${to} of ${count} items`
+          }}
+        >
           <TableHead>
             <TableRow>
               <TableCell className={styles.tableHeaderCell}>
                 <span>Key</span>
-                <IconButton
-                  size="small"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleCopy('copy-all', null);
-                  }}
+                <CopyButton
+                  copyKey="copy-all"
+                  isCopied={copiedKey === 'copy-all'}
+                  onCopy={() => handleCopy('copy-all', null)}
                   title="Copy table"
-                  sx={{
-                    color: 'inherit',
-                    '&:hover': {
-                      backgroundColor: 'rgba(255, 255, 255, 0.1)'
-                    }
-                  }}
-                >
-                  {copiedKey === 'copy-all' ? (
-                    <Check fontSize="small" sx={{ color: '#4caf50' }} />
-                  ) : (
-                    <ContentCopy fontSize="small" />
-                  )}
-                </IconButton>
+                />
               </TableCell>
               <TableCell className={styles.tableHeaderCell}>Value</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {Array.isArray(tableData) ? renderArrayRows(tableData) : renderObjectRows(tableData)}
+            {renderArrayRows(tableData, paginationKey)}
           </TableBody>
-        </Table>
-        {/* Clipboard copier for copy functionality */}
-        <ClipboardCopier text={clipboardText} />
-      </TableContainer>
-    );
-  };
-
-  /**
-   * Safely handle popover close
-   */
-  const handlePopoverClose = (event) => {
-    if (event) {
-      event.preventDefault();
-      event.stopPropagation();
+        </TableWrapper>
+      );
     }
-    if (isOpen) onClose();
-  };
+
+    // Object - key-value pairs
+    return (
+      <TableWrapper
+        maxHeight={maxHeight}
+        ariaLabel="vertical json data table"
+        clipboardText={clipboardText}
+        showPagination={false}
+      >
+        <TableHead>
+          <TableRow>
+            <TableCell className={styles.tableHeaderCell}>
+              <span>Key</span>
+              <CopyButton
+                copyKey="copy-all"
+                isCopied={copiedKey === 'copy-all'}
+                onCopy={() => handleCopy('copy-all', null)}
+                title="Copy table"
+              />
+            </TableCell>
+            <TableCell className={styles.tableHeaderCell}>Value</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {renderObjectRows(tableData)}
+        </TableBody>
+      </TableWrapper>
+    );
+  }, [paginationState, itemsPerPage, enablePagination, maxHeight, clipboardText, copiedKey, handleCopy, handlePageChange, renderArrayOfObjectsTable, renderArrayRows, renderObjectRows]);
 
   /**
-   * Renders a nested data popover
+   * Renders a nested data popover.
    */
-  const renderNestedPopover = (popup, index) => {
-    return (
-      <Popover
-        key={`popup-${index}`}
-        open={Boolean(popup.anchorEl)}
-        anchorEl={popup.anchorEl}
-        onClose={(event) => {
-          event.stopPropagation();
-          handleNestedClose(index);
-        }}
-        anchorOrigin={{
-          vertical: 'center',
-          horizontal: 'right',
-        }}
-        transformOrigin={{
-          vertical: 'center',
-          horizontal: 'left',
-        }}
-        className={styles.popover}
-        slotProps={{
-          paper: {
-            className: styles.popoverPaper,
-          }
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {renderTableContent(popup.data)}
-      </Popover>
-    );
-  };
+  const renderNestedPopover = useCallback((popup, index) => (
+    <Popover
+      key={`popup-${index}`}
+      open={Boolean(popup.anchorEl)}
+      anchorEl={popup.anchorEl}
+      onClose={(event) => {
+        event.stopPropagation();
+        handleNestedClose(index);
+      }}
+      anchorOrigin={{ vertical: 'center', horizontal: 'right' }}
+      transformOrigin={{ vertical: 'center', horizontal: 'left' }}
+      className={styles.popover}
+      slotProps={{ paper: { className: styles.popoverPaper } }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {renderTableContent(popup.data, popup.paginationKey)}
+    </Popover>
+  ), [handleNestedClose, renderTableContent]);
 
-  // The table content to be rendered
-  const tableContent = renderTableContent(data);
+  // ============================================================================
+  // Memoized Content
+  // ============================================================================
 
-  // If usePopover is true AND isOpen is true, render the popover
+  const tableContent = useMemo(() => renderTableContent(data), [data, renderTableContent]);
+
+  // ============================================================================
+  // Render Logic
+  // ============================================================================
+
+  if (!isOpen) return null;
+
+  // Popover mode
   if (usePopover) {
     const popoverPosition = anchorEl
       ? {
         anchorEl: anchorEl,
-        anchorOrigin: {
-          vertical: 'bottom',
-          horizontal: 'left',
-        },
-        transformOrigin: {
-          vertical: 'top',
-          horizontal: 'left',
-        },
+        anchorOrigin: { vertical: 'bottom', horizontal: 'left' },
+        transformOrigin: { vertical: 'top', horizontal: 'left' },
       }
       : {
-        // If no anchorEl provided, center on screen
         anchorReference: "anchorPosition",
         anchorPosition: { top: window.innerHeight / 2, left: window.innerWidth / 2 },
-        transformOrigin: {
-          vertical: 'center',
-          horizontal: 'center',
-        },
+        transformOrigin: { vertical: 'center', horizontal: 'center' },
       };
 
-    // Only render the popover if isOpen is true
-    if (usePopover) {
-      return (
-        <>
-          <Popover
-            open={isOpen} // We only render when it's open, so this is always true
-            onClose={handlePopoverClose}
-            {...popoverPosition}
-            className={styles.popover}
-            slotProps={{
-              paper: {
-                className: styles.mainPopoverPaper,
-                onClick: (e) => e.stopPropagation() // Prevent clicks inside from bubbling
-              }
-            }}
-            onClick={(e) => e.stopPropagation()} // Extra protection against click bubbling
-          >
-            <Box
-              className={styles.popoverContent}
-              onClick={(e) => e.stopPropagation()} // Even more protection
-            >
-              {tableContent}
-            </Box>
-          </Popover>
-
-          {/* Render all nested popovers */}
-          {nestedPopups.map((popup, index) => renderNestedPopover(popup, index))}
-        </>
-      );
-    }
-  } else if (isOpen) {
-    // Default rendering - direct table with no popover
     return (
       <>
-        {/* Render table directly */}
-        <div className={styles.directContainer}>
-          {tableContent}
-        </div>
-
-        {/* Nested popups are always in popovers */}
+        <Popover
+          open={isOpen}
+          onClose={handlePopoverClose}
+          {...popoverPosition}
+          className={styles.popover}
+          slotProps={{
+            paper: {
+              className: styles.mainPopoverPaper,
+              onClick: (e) => e.stopPropagation()
+            }
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <Box className={styles.popoverContent} onClick={(e) => e.stopPropagation()}>
+            {tableContent}
+          </Box>
+        </Popover>
         {nestedPopups.map((popup, index) => renderNestedPopover(popup, index))}
       </>
     );
-  } else {
-    // Don't render anything when closed
-    return null;
   }
-};
+
+  // Direct rendering mode
+  return (
+    <>
+      <div className={styles.directContainer}>{tableContent}</div>
+      {nestedPopups.map((popup, index) => renderNestedPopover(popup, index))}
+    </>
+  );
+}
+
+// ============================================================================
+// PropTypes
+// ============================================================================
 
 VerticalDataTable.propTypes = {
-  /**
-   * JSON data to display in the table
-   */
+  /** JSON data to display (object or array) */
   data: PropTypes.oneOfType([
     PropTypes.object,
     PropTypes.array
   ]).isRequired,
 
-  /**
-   * Controls whether the popup is open (only used when usePopover=true)
-   */
+  /** Controls component visibility */
   isOpen: PropTypes.bool,
 
-  /**
-   * Callback function for when the popup is closed (only used when usePopover=true)
-   */
+  /** Callback when popover closes */
   onClose: PropTypes.func,
 
-  /**
-   * Maximum height for the table container
-   */
+  /** Maximum height for table container */
   maxHeight: PropTypes.string,
 
-  /**
-   * Element to anchor the popover to (only used when usePopover=true)
-   * If not provided, popover will be centered on screen
-   */
+  /** Anchor element for popover positioning */
   anchorEl: PropTypes.object,
 
-  /**
-   * Whether to display in a popover instead of directly
-   */
+  /** Display as popover instead of inline */
   usePopover: PropTypes.bool,
+
+  /** Flatten nested objects to dot-notation (e.g., user.name) */
+  flattenObjects: PropTypes.bool,
+
+  /** Number of items per page for arrays */
+  itemsPerPage: PropTypes.number,
+
+  /** Enable pagination for arrays */
+  enablePagination: PropTypes.bool,
+
+  /** Array of field metadata objects for special rendering (buttons, etc.) */
+  fieldsMetadata: PropTypes.arrayOf(PropTypes.shape({
+    key: PropTypes.string,
+    xpath: PropTypes.string,
+    type: PropTypes.string,
+    button: PropTypes.object,
+  })),
 };
 
 export default VerticalDataTable;

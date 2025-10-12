@@ -1087,7 +1087,7 @@ const useKeyboardNavigation = ({
     wasDraggedRef.current = false;
     // For drag start, preserve the real event modifiers
     handleRowClick(e, rowId);
-    tableWrapperRef?.current?.focus();
+    tableWrapperRef?.current?.focus({ preventScroll: true });
   }, [dragSelection, mode, handleRowClick, tableWrapperRef]);
 
   const handleRowMouseEnter = useCallback((e, rowId) => {

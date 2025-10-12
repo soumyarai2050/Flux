@@ -1,5 +1,6 @@
 import React from 'react';
 import { BaseEdge, EdgeLabelRenderer, getBezierPath } from '@xyflow/react';
+import { TroubleshootOutlined, SendOutlined } from '@mui/icons-material';
 import styles from './CustomEdge.module.css';
 
 const CustomEdge = ({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style = {}, data, markerEnd }) => {
@@ -25,10 +26,19 @@ const CustomEdge = ({ sourceX, sourceY, targetX, targetY, sourcePosition, target
                     }}
                     className="nodrag nopan"
                 >
-                    <div
-                        className={`${styles.analyzeButton} ${data?.isSelected ? styles.selected : ''}`}
-                    >
-                        Analyze
+                    <div className={styles.iconContainer}>
+                        <div
+                            className={`${styles.edgeButton} ${data?.isSelected ? styles.selected : ''}`}
+                            title="Analyze"
+                        >
+                            <TroubleshootOutlined sx={{ fontSize: 18 }} />
+                        </div>
+                        <div
+                            className={`${styles.edgeButton}`}
+                            title="Publish"
+                        >
+                            <SendOutlined sx={{ fontSize: 18 }} />
+                        </div>
                     </div>
                 </div>
             </EdgeLabelRenderer>

@@ -25,12 +25,14 @@ import DataJoinPopup from '../DataJoinPopup/DataJoinPopup';
 import CustomEdge from '../Edges/CustomEdge';
 import NodeSelector from '../NodeSelector';
 import { fetchModelSchema, fetchJoinAnalysisData } from '../../../../utils/core/serviceUtils';
-import { sliceMap } from '../../../../models/sliceMap';
+import { sliceMapWithFallback as sliceMap } from '../../../../models/sliceMap';
 import { DB_ID, MODES } from '../../../../constants';
 import { generateObjectFromSchema, getModelSchema, snakeToCamel } from '../../../../utils';
-import { getJoinColor, createColorMapFromString, getNodeTypeColor } from '../../../../utils/ui/colorUtils';
-import { API_ROOT_URL } from '../../../../config';
+import { getJoinColor, createColorMapFromString, getResolvedColor } from '../../../../utils/ui/colorUtils';
+import { getContrastColor } from '../../../../utils/ui/uiUtils';
+import { API_ROOT_URL, EDGE_PUBLISH_URL } from '../../../../config';
 import '@xyflow/react/dist/style.css';
+import { clearxpath } from '../../../../utils';
 import styles from './DataJoinGraph.module.css';
 
 /**
@@ -42,6 +44,10 @@ const TableNode = ({ data }) => {
 
     const shouldHighlight = (hasChildren) && !isExpanded;
     const isExpandedRoot = (hasChildren) && isExpanded;
+
+    // Resolve color using the centralized utility instead of direct prop injection
+    const resolvedColor = getResolvedColor(nodeTypeColor, theme);
+    const textColor = getContrastColor(resolvedColor);
 
     return (
         <Box
@@ -66,7 +72,14 @@ const TableNode = ({ data }) => {
         >
             <Handle type="source" position={Position.Right} />
             <Handle type="target" position={Position.Left} />
-            <Chip size='small' label={label} color={nodeTypeColor} />
+            <Chip
+                size='small'
+                label={label}
+                sx={{
+                    backgroundColor: resolvedColor || theme.palette.grey[500],
+                    color : textColor
+                }}
+            />
         </Box>
     );
 };
@@ -525,7 +538,7 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
     const { schema: projectSchema, schemaCollections } = useSelector(state => state.schema);
     const { selector, actions, fieldsMetadata } = modelDataSource;
     const { updatedObj, mode } = useSelector(selector);
-    const { contextId } = useSelector(state => state[snakeToCamel(modelName)]);
+    const { contextId } = useSelector(state => state[modelName]);
     const nodeActions = useMemo(() => sliceMap[`${modelName}_node`]?.actions, []);
     const reduxDispatch = useDispatch();
 
@@ -587,8 +600,8 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
             edgeConfirmedField: 'user_confirmed',
             edgeAiSuggestedField: 'ai_suggested',
             edgeFilterOperator: 'filter_operator',
-            nodeBaseURL : 'entity_base_url',
-            dropDownNode : 'entity'
+            nodeBaseURL: 'entity_base_url',
+            dropDownNode: 'entity'
         };
     }, [fieldsMetadata]);
 
@@ -827,7 +840,7 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
                 modelName: modelName,
                 modelSchema: modelSchema,
                 projectSchema: projectSchema,
-                fieldsMetadata: fieldsMetadata, 
+                fieldsMetadata: fieldsMetadata,
                 url: null
             }));
             reduxDispatch(nodeActions.setStoredArray(data || []));
@@ -838,6 +851,39 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
             console.error(`Analysis failed: ${error.message}`);
         }
     }, [activeContext, graphAttributes, nodesWithChildren, nodeTypeColorMap, joinTypeColorMapping, theme, reduxDispatch]);
+
+    // Handle publish from edge
+    const handlePublish = useCallback((edgeId, edgeData) => {
+        try {
+            const { edgeInfo } = edgeData;
+
+            if (!edgeInfo) {
+                console.error('Missing edge information for publish');
+                return;
+            }
+
+            // Create chart_configuration payload from edge data
+            const chart_configuration = {
+                edge_id: edgeId,
+                ...clearxpath(cloneDeep(edgeInfo))
+            };
+
+            console.log('EDGE PUBLISH PAYLOAD:', JSON.stringify(chart_configuration, null, 2));
+
+            // TODO: Uncomment when backend is ready
+            // axios.post(`${EDGE_PUBLISH_URL}`, chart_configuration)
+            //     .then(response => {
+            //         console.log('Edge configuration published successfully:', response.data);
+            //     })
+            //     .catch(error => {
+            //         console.error('Failed to publish edge configuration:', error);
+            //     });
+
+        } catch (error) {
+            console.error('Publish error:', error);
+            console.error(`Publish failed: ${error.message}`);
+        }
+    }, []);
 
     // Handle node selection
     const handleNodeSelection = useCallback(async (e, node) => {
@@ -1056,11 +1102,19 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
 
     // Handle edge click
     const handleEdgeClick = useCallback(async (event, edge) => {
-        const isAnalyzeClick = event.target.textContent === 'Analyze' ||
-            event.target.closest('[class*="nodrag nopan"]')?.textContent?.includes('Analyze');
+        // Check if click is on Analyze button (icon or its parent)
+        const isAnalyzeClick = event.target.closest('[title="Analyze"]');
+
+        // Check if click is on Publish button (icon or its parent)
+        const isPublishClick = event.target.closest('[title="Publish"]');
 
         if (isAnalyzeClick) {
             await handleAnalyse(edge.id, edge.data);
+            return;
+        }
+
+        if (isPublishClick) {
+            handlePublish(edge.id, edge.data);
             return;
         }
 
@@ -1073,7 +1127,7 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
             const targetName = get(targetNode, graphAttributes.nodeNameField);
             prepareAndOpenModal(sourceName, targetName);
         }
-    }, [mode, graphAttributes, handleAnalyse, prepareAndOpenModal]);
+    }, [mode, graphAttributes, handleAnalyse, handlePublish, prepareAndOpenModal]);
 
     // Handle node selector change
     const handleNodeSelectorChange = (selectedOptions) => {
@@ -1101,6 +1155,12 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
             set(newObject, graphAttributes.nodeNameField, optionName);
             set(newObject, graphAttributes.nodeTypeField, get(option, graphAttributes.nodeTypeField));
             set(newObject, graphAttributes.nodeAccessField, get(option, graphAttributes.nodeAccessField));
+
+            // Set the entity_base_url if it exists in the option
+            const nodeUrl = get(option, graphAttributes.nodeUrlField);
+            if (nodeUrl) {
+                set(newObject, graphAttributes.nodeUrlField, nodeUrl);
+            }
 
             newNodes.add(optionName);
             return newObject;
@@ -1184,6 +1244,7 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
                                 nodeNameField={graphAttributes.nodeNameField}
                                 nodeTypeField={graphAttributes.nodeTypeField}
                                 nodeAccessField={graphAttributes.nodeAccessField}
+                                nodeUrlField={graphAttributes.nodeUrlField}
                             />
                         </Box>
                     </Box>
@@ -1273,14 +1334,14 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 1, flexWrap: 'wrap' }}>
                             {Object.entries(joinColorMapForLegend).map(([joinType, schemaColor]) => {
                                 if (joinType === 'JOIN_TYPE_UNSPECIFIED') return null;
-                                const color = getNodeTypeColor(schemaColor, theme)?.main;
+                                const color = getResolvedColor(schemaColor, theme);
                                 if (!color) return null;
                                 return (
                                     <React.Fragment key={joinType}>
                                         <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'capitalize' }}>
                                             {joinType.replace('_', ' ').toLowerCase()}:
                                         </Typography>
-                                        <Box sx={{ width: 20, height: 2, bgcolor: color }} />
+                                        <Box sx={{ width: 20, height: 2, backgroundColor: color }} />
                                     </React.Fragment>
                                 );
                             })}

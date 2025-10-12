@@ -42,6 +42,7 @@ message ContactLimits {
     IncludeDataframeClients: true,   // currently set for tests, once real use-case is found this cmt can be removed
     EnableLargeDBObject: true
   };
+  option (FluxMsgGetFilterCountQuery) = true;
 
   // todo: take coordinates from yaml for projects in project_specific plugin
   option (FluxMsgWidgetUIDataElement) = {
@@ -87,6 +88,19 @@ message ShadowBrokers{
     DeleteOp: AggregateType_UNSPECIFIED,
     DeleteByIdListOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED,
+  };
+  option (FluxMsgGetFilterCountQuery) = true;
+  option (FluxMsgWidgetUIDataElement) = {
+    x: 10,
+    y: 57,
+    w: 8,
+    h: 10,
+    is_repeated: true,
+    server_running_status_lvl: 1,
+    widget_ui_data: {
+      view_layout: UI_TABLE
+    },
+    is_read_only: true
   };
   option (FluxMsgJsonQuery) = {
     QueryName: "get_dismiss_filter_contact_limit_brokers",

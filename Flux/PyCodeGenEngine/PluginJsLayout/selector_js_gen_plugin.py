@@ -27,7 +27,8 @@ class SelectorJsGenPlugin(BaseJSLayoutPlugin):
         output_str = ""
         for message in self.root_msg_list:
             message_name_camel_cased = capitalized_to_camel_case(message.proto.name)
-            output_str += f"const {message_name_camel_cased}Selector = (state) => state.{message_name_camel_cased};\n"
+            message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
+            output_str += f"const {message_name_camel_cased}Selector = (state) => state.{message_name_snake_cased};\n"
         output_str += "\n"
         return output_str
 

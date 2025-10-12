@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # packaging notes (automated in this script)
-# 0. cp package.json to web-ui/.
+# 0. cp package.json and vite.config.js to web-ui/.
 # 1. rename email_book_service_json_schema.json to schema.json ; then copy to web-ui/public/.
 # 2. cp *.jsx to web-ui/src/widgets/.
 # 3. cp store.js, selectors.js, projectSpecificUtils.js and config.js to web-ui/src/.
@@ -50,8 +50,9 @@ else  # test WebUi exist in the current project
   fi
 fi
 
-# 0. cp package.json to web-ui/.
+# 0. cp package.json and vite.config.js to web-ui/.
 cp -p "$PWD"/generated/JsLayout/package.json "$PWD"/web-ui/.
+cp -p "$PWD"/generated/JsLayout/vite.config.js "$PWD"/web-ui/.
 # 1. rename email_book_service_json_schema.json to schema.json ; then copy to web-ui/public/.
 FILES_TO_COPY=$(ls "$PWD"/generated/JSONSchema/*_json_schema.json)
 cp -p "$FILES_TO_COPY" "$PWD"/web-ui/public/schema.json

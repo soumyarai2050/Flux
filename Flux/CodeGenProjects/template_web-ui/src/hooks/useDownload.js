@@ -6,7 +6,7 @@ import { getErrorDetails } from '../utils/core/errorUtils';
 // --- Start of new shared logic ---
 
 // 1. Create the worker instance once at the module level. It's now a singleton.
-const sharedWorker = new Worker(new URL('../workers/downloader.worker.js', import.meta.url));
+const sharedWorker = new Worker(new URL('../workers/downloader.worker.js', import.meta.url), { type: 'module' });
 
 // 2. Create a Map to hold the callbacks for each active download request.
 const listeners = new Map();
@@ -65,13 +65,14 @@ const useDownload = (modelName, fieldsMetadata, xpath, modelType = null) => {
 
     /**
      * @function downloadCSV
-     * @description Initiates the CSV download process. Fetches data if not provided, then sends it to a Web Worker for CSV generation.
-     * @param {Array<object>} [storedData=null] - Optional: The data array to convert to CSV. If null, data will be fetched via API.
+     * @description Initiates the CSV download process. Context-aware: uses provided data directly or fetches complete dataset with filters/sorting.
+     * @param {Array<object>|object|null} [storedData=null] - Optional: Complete data to convert to CSV. If null, data will be fetched from server.
      * @param {object} [args={}] - Arguments for API call if data needs to be fetched.
      * @param {string} [args.url] - Base URL for the API call.
      * @param {string} [args.endpoint] - Specific API endpoint to use.
-     * @param {number} [args.uiLimit] - UI limit for the number of items.
      * @param {object} [args.params] - Query parameters for the API call.
+     * @param {Array} [args.filters] - Filters to apply when fetching data from server.
+     * @param {Array} [args.sortOrders] - Sort orders to apply when fetching data from server.
      * @returns {Promise<string>} A promise that resolves with the generated CSV content string.
      */
     const downloadCSV = (storedData = null, args = {}) => {
@@ -84,12 +85,24 @@ const useDownload = (modelName, fieldsMetadata, xpath, modelType = null) => {
             setIsDownloading(true);
 
             let dataToProcess;
+
             if (!storedData) {
+                // Fetch complete dataset from server with filters and sorting
+                const { url, endpoint, params, filters = [], sortOrders = [] } = args;
                 const defaultEndpoint = `get-all-${modelName}`;
-                const { url, endpoint, uiLimit = null, params } = args;
-                const [apiUrl, apiParams] = getApiUrlMetadata(defaultEndpoint, url, endpoint, uiLimit, params, true);
+                const [baseApiUrl, baseApiParams] = getApiUrlMetadata(defaultEndpoint, url, endpoint, params, true);
+
+                // Add filters and sort orders to API params if provided
+                const downloadParams = { ...baseApiParams };
+                if (filters && filters.length > 0) {
+                    downloadParams.filters = JSON.stringify(filters);
+                }
+                if (sortOrders && sortOrders.length > 0) {
+                    downloadParams.sort_order = JSON.stringify(sortOrders);
+                }
+
                 try {
-                    const res = await axios.get(apiUrl, { params: apiParams });
+                    const res = await axios.get(baseApiUrl, { params: downloadParams });
                     dataToProcess = res.data;
                 } catch (err) {
                     const errorDetails = getErrorDetails(err);
@@ -99,6 +112,7 @@ const useDownload = (modelName, fieldsMetadata, xpath, modelType = null) => {
                     return;
                 }
             } else {
+                // Use provided stored data as-is (already complete/processed)
                 dataToProcess = storedData;
             }
 

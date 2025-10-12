@@ -11,7 +11,7 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { clearxpath } from '../../../../utils/core/dataAccess';
 import { isValidJsonString, toCamelCase, capitalizeCamelCase } from '../../../../utils/core/stringUtils';
 import { getSizeFromValue, getShapeFromValue, getHoverTextType, getReducerArrayFromCollections } from '../../../../utils/ui/uiUtils';
-import { getColorTypeFromValue } from '../../../../utils/ui/colorUtils';
+import { getResolvedColor, getColorTypeFromValue } from '../../../../utils/ui/colorUtils';
 import { getValueFromReduxStoreFromXpath } from '../../../../utils/redux/reduxUtils';
 import { floatToInt, getLocalizedValueAndSuffix } from '../../../../utils/formatters/numberUtils';
 import { validateConstraints } from '../../../../utils/validation/validationUtils';
@@ -341,7 +341,7 @@ const Cell = (props) => {
         }
     }
     let color = getColorTypeFromValue(collection, currentValue);
-    let tableCellColorClass = classes[color];
+    const colorStyle = getResolvedColor(color, theme, null, true);
     let tableCellRemove = dataRemove ? classes.remove : dataAdd ? classes.add : '';
     let disabledClass = disabled ? classes.disabled : '';
     if (props.ignoreDisable) {
@@ -379,11 +379,11 @@ const Cell = (props) => {
         if (typeof value === DATA_TYPES.NUMBER) {
             value = value.toLocaleString();
         }
-        const classesStr = `${classes.cell} ${selectedClass} ${disabledClass} ${tableCellColorClass} ${tableCellRemove} ${newUpdateClass}`;
+        const classesStr = `${classes.cell} ${selectedClass} ${disabledClass} ${tableCellRemove} ${newUpdateClass}`;
         return (
             <TableCell
                 className={classesStr}
-                sx={{ backgroundColor: dataSourceColor, ...stickyClass }}
+                sx={{ backgroundColor: dataSourceColor, ...stickyClass, ...colorStyle }}
                 align={textAlign}
                 size='small'
                 data-xpath={xpath}
@@ -1040,6 +1040,7 @@ const Cell = (props) => {
                                 onClose={onCloseTooltip}
                                 usePopover={true}
                                 anchorEl={jsonTableRef.current}
+                                fieldsMetadata={collection.subCollections || []}
                             />
                         </>
                     )}
@@ -1160,7 +1161,7 @@ const Cell = (props) => {
                 onMouseEnter={handleCellMouseEnter}
                 data-xpath={xpath}
                 data-dataxpath={dataxpath}>
-                <div className={tableCellColorClass}>
+                <div style={colorStyle}>
                     {originalValue ? <span className={classes.previous}>{originalValue}{numberSuffix}</span> : <span className={classes.previous}>{originalValue}</span>}
                     {value ? <span className={classes.modified}>{value}{numberSuffix}</span> : <span className={classes.modified}>{value}</span>}
                     {validationError.current && (
@@ -1188,9 +1189,9 @@ const Cell = (props) => {
                 onMouseEnter={handleCellMouseEnter}
                 data-xpath={xpath}
                 data-dataxpath={dataxpath}>
-                <div className={tableCellColorClass}>
-                    {/* {collection.displayType === 'time' ? <LinkText text={text} linkText={linkText} /> : */}
-                    {/* value ? <span>{value}{numberSuffix}</span> : <span>{value}</span>} */}
+                <div style={colorStyle}>
+                    {/* {collection.displayType === 'time' ? <LinkText text={text} linkText={linkText} /> :
+                    // value ? <span>{value}{numberSuffix}</span> : <span>{value}</span>} */}
                     {value ? <span>{value}{numberSuffix}</span> : <span>{value}</span>}
                     {validationError.current && (
                         <Tooltip title={validationError.current} sx={{ marginLeft: '20px' }} disableInteractive><Error color='error' /></Tooltip>

@@ -99,7 +99,7 @@ const useDataSourcesWebsocketWorker = ({
   useEffect(() => {
     dataSources.forEach(({ name }) => {
       if (!connectionsRef.current[name]) {
-        const worker = new Worker(new URL('../workers/websocket-update.worker.js', import.meta.url));
+        const worker = new Worker(new URL('../workers/websocket-update.worker.js', import.meta.url), { type: 'module' });
         connectionsRef.current[name] = {
           worker,
           messageBuffer: [],

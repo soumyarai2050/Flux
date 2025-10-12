@@ -288,7 +288,8 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
             raise HTTPException(detail=err_str_, status_code=404)
         return self.filtered_dash_by_dash_filters_callable, dash_filter_agg_pipeline
 
-    async def filtered_dash_by_dash_filters_callable(self, obj_json_str: str, obj_id_or_list: int | List[int], **kwargs):
+    async def filtered_dash_by_dash_filters_callable(self, **kwargs):
+        obj_id_or_list = kwargs.get("obj_id_or_list")
         if isinstance(obj_id_or_list, int):
             obj_id_or_list = [obj_id_or_list]
         filtered_dash_list: List[Dash] = await self.underlying_filtered_dash_by_dash_filters(kwargs.get("dash_name"), obj_id_or_list)

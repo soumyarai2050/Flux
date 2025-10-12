@@ -100,17 +100,35 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                     # if some abbreviated message is dependent on this message
                     is_abbreviation_source = True
             # else not required: ignore if this message itself is abbreviated type
-        dependent_msg_name_list: List[str] = self.msg_name_to_dependent_msg_name_list_dict.get(message_name)
         output_str = f"const {message_name} = withModelData({model_type_str}, " + "{\n"
         output_str += JsxFileGenPlugin.indentation_space + f"modelName: '{message_name_snake_cased}',\n"
-        if dependent_msg_name_list:
-            output_str += JsxFileGenPlugin.indentation_space + f"dataSources: [\n"
-            for dependent_msg_name in dependent_msg_name_list:
-                dependent_msg_name_snake_cased = convert_camel_case_to_specific_case(dependent_msg_name)
-                output_str += JsxFileGenPlugin.indentation_space*2 + f"'{dependent_msg_name_snake_cased}',\n"
-            output_str += JsxFileGenPlugin.indentation_space + "],\n"
+
+        # Check if this is an abbreviated model
+        is_abbreviated = model_type == JsxFileGenPlugin.abbreviated_merge_type
+
+        if is_abbreviated:
+            # For abbreviated models: use dataSources array
+            dependent_msg_name_list: List[str] = self.msg_name_to_dependent_msg_name_list_dict.get(message_name)
+            if dependent_msg_name_list:
+                output_str += JsxFileGenPlugin.indentation_space + f"dataSources: [\n"
+                for dependent_msg_name in dependent_msg_name_list:
+                    dependent_msg_name_snake_cased = convert_camel_case_to_specific_case(dependent_msg_name)
+                    output_str += JsxFileGenPlugin.indentation_space*2 + f"'{dependent_msg_name_snake_cased}',\n"
+                output_str += JsxFileGenPlugin.indentation_space + "],\n"
+            else:
+                output_str += JsxFileGenPlugin.indentation_space + f"dataSources: null,\n"
         else:
-            output_str += JsxFileGenPlugin.indentation_space + f"dataSources: null,\n"
+            # For non-abbreviated models: use modelDependencyMap
+            dependency_dict = self.msg_name_to_dependency_dict.get(message_name)
+            if dependency_dict:
+                output_str += JsxFileGenPlugin.indentation_space + f"modelDependencyMap: {{\n"
+                for key, dep_msg_name in dependency_dict.items():
+                    dep_msg_name_snake_cased = convert_camel_case_to_specific_case(dep_msg_name)
+                    output_str += JsxFileGenPlugin.indentation_space*2 + f"{key}: '{dep_msg_name_snake_cased}',\n"
+                output_str += JsxFileGenPlugin.indentation_space + "},\n"
+            else:
+                output_str += JsxFileGenPlugin.indentation_space + f"modelDependencyMap: null,\n"
+
         if is_abbreviation_source:
             output_str += JsxFileGenPlugin.indentation_space + f"isAbbreviationSource: true,\n"
         if root_message_name_snake_cased is not None:

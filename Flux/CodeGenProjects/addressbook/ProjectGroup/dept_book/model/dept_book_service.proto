@@ -68,6 +68,7 @@ message Dash {
     DeleteAllOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
+  option (FluxMsgGetFilterCountQuery) = true;
   option (FluxMsgJsonQuery) = {
       QueryName: "search_n_update_dash",
       QueryParams: {
@@ -114,6 +115,7 @@ message DashCollection {
     DeleteAllOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
+  option (FluxMsgGetFilterCountQuery) = true;
   option (FluxMsgWidgetUIDataElement) = {
     x: 4,
     y: 0,
@@ -150,6 +152,7 @@ message DashFilters {
     DeleteAllOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
+  option (FluxMsgGetFilterCountQuery) = true;
   option (FluxMsgWidgetUIDataElement) = {
     x: 0,
     y: 14,
@@ -185,6 +188,7 @@ message DashFiltersCollection {
     DeleteOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
+  option (FluxMsgGetFilterCountQuery) = true;
   option (FluxMsgWidgetUIDataElement) = {
     x: 0,
     y: 0,
@@ -216,6 +220,7 @@ message ImpliedVolData {
     Granularity: Sec,
     ExpireAfterSeconds: 31536000  // one year worth of seconds
   };
+  option (FluxMsgGetFilterCountQuery) = true;
   option (FluxMsgStringLength) = 128;
   required int32 id = 1;
   required SymbolNExchId symbol_n_exch_id = 2 [(FluxFldPk) = "symbol", (FluxFldValMetaField) = true];
@@ -238,6 +243,7 @@ message Dummy {
     DeleteOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
+  option (FluxMsgGetFilterCountQuery) = true;
   //Server generated unique Id
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   optional Severity severity = 2;
@@ -270,6 +276,7 @@ message MarketMeta {
     DeleteOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
+  option (FluxMsgGetFilterCountQuery) = true;
   option (FluxMsgStringLength) = 128;
 
   //Server generated unique Id

@@ -1,70 +1,99 @@
-# Getting Started with Create React App
+# Template Web UI
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+This is a template React application built with [Vite](https://vitejs.dev/) for fast development and optimized production builds.
 
 ## Available Scripts
 
 In the project directory, you can run:
 
-### `npm start`
+### `npm start` or `npm run dev`
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+Runs the app in development mode with Vite's fast HMR (Hot Module Replacement).
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+The dev server typically starts in under 2 seconds. The page will update instantly when you make changes without losing component state.
 
 ### `npm test`
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+Launches the test runner in interactive watch mode (if tests are configured).
 
 ### `npm run build`
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+Builds the app for production to the `build` folder.
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+It correctly bundles React in production mode and optimizes the build for the best performance. The build is minified and filenames include content hashes for optimal caching.
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+### `npm run preview`
 
-### `npm run eject`
+Previews the production build locally. Run `npm run build` first, then use this command to serve the built application.
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+## Configuration
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+### Vite Configuration
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+The project uses `vite.config.js` for build configuration. Key features:
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+- **Fast dev server**: ESM-based dev server with instant HMR
+- **Optimized builds**: Rollup-based production builds
+- **JSX support**: Automatic JSX transformation for `.js` and `.jsx` files
+- **Modern output**: Generates optimized bundles for modern browsers
+
+### Port Configuration
+
+The dev server port is configured in `vite.config.js`:
+
+```javascript
+export default defineConfig({
+  server: {
+    port: 3000, // Default port (customize as needed)
+  },
+  // ... other config
+})
+```
+
+### ESLint Configuration
+
+ESLint is configured via `.eslintrc.js` in the project root.
+
+## Project Structure
+
+```
+template_web-ui/
+├── index.html          # Entry HTML file (root level for Vite)
+├── vite.config.js      # Vite configuration
+├── .eslintrc.js        # ESLint configuration
+├── public/             # Static assets served as-is
+│   ├── favicon.ico
+│   ├── manifest.json
+│   └── robots.txt
+└── src/
+    ├── index.jsx       # Application entry point
+    ├── components/     # React components
+    ├── containers/     # Container components
+    ├── hooks/          # Custom React hooks
+    └── services/       # API services and utilities
+```
+
+## Key Features
+
+### Web Workers
+
+The template includes optimized web worker support with Vite's module-based workers:
+
+```javascript
+const worker = new Worker(
+  new URL('./worker.js', import.meta.url),
+  { type: 'module' }
+);
+```
+
+### Performance
+
+- **Dev server**: Starts in <2 seconds
+- **HMR**: Instant updates without full page reload
+- **Production builds**: Optimized bundle sizes with tree-shaking and code splitting
 
 ## Learn More
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+- [Vite Documentation](https://vitejs.dev/)
+- [React Documentation](https://react.dev/)
+- [Vite Plugin React](https://github.com/vitejs/vite-plugin-react)

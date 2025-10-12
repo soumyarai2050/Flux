@@ -5,7 +5,9 @@
 
 import React from 'react';
 import PropTypes from 'prop-types';
-import { Badge } from '@mui/material';
+import { Badge, useTheme } from '@mui/material';
+import { getResolvedColor } from '../../../utils/ui/colorUtils';
+import { getContrastColor } from '../../../utils/ui/uiUtils';
 import classes from './AlertBubble.module.css';
 
 /**
@@ -17,13 +19,34 @@ import classes from './AlertBubble.module.css';
  * @returns {React.ReactElement} The rendered AlertBubble component.
  */
 const AlertBubble = ({ content, color }) => {
-    let alertBubbleClass = classes.alert_bubble;
-    if (color) {
-        alertBubbleClass += ` ${classes[color]}`;
-    }
+    const theme = useTheme();
+
+    // Resolve color using the centralized utility with animation support
+    const colorStyleObj = getResolvedColor(color, theme, null, true);
+
+    // Determine the final background color
+    const backgroundColor = colorStyleObj ? (colorStyleObj.backgroundColor || colorStyleObj.color) : null;
+
+    // Calculate the contrasting text color
+    const textColor = backgroundColor ? getContrastColor(backgroundColor) : 'inherit';
+
+    // Create sx styles for the dynamic color
+    const colorSx = backgroundColor ? {
+        '& .MuiBadge-badge': {
+            // Spread all style properties (color, backgroundColor, animation, etc.)
+            ...colorStyleObj,
+            backgroundColor: backgroundColor,
+            color: textColor // Apply the contrast color to the text
+        }
+    } : {};
 
     return (
-        <Badge className={alertBubbleClass} badgeContent={content} max={999} />
+        <Badge
+            className={classes.alert_bubble}
+            sx={colorSx}
+            badgeContent={content}
+            max={999}
+        />
     );
 };
 

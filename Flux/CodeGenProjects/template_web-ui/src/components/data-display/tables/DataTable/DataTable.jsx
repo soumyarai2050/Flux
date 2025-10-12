@@ -65,6 +65,7 @@ const DataTable = ({
   selectedRows: externalSelectedRows,
   lastSelectedRowId: externalLastSelectedRowId,
   onSelectionChange: externalOnSelectionChange,
+  totalCount,
 }) => {
 
   const { schema: projectSchema } = useSelector((state) => state.schema);
@@ -719,11 +720,12 @@ const DataTable = ({
         onLeftScrollClick={handleLeftScrollClick}
       />
       {
-        rows.length > 6 && (
+        (totalCount ?? rows.length) > rowsPerPage && (
           <TablePaginationControl
             rows={rows}
             page={page}
             rowsPerPage={rowsPerPage}
+            totalCount={totalCount}
             onPageChange={onPageChange}
             onRowsPerPageChange={handleRowsPerPageChange}
             rowsPerPageOptions={[25, 50, 100]} // Optional

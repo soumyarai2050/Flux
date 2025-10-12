@@ -12,6 +12,10 @@
 # @@protoc_insertion_point(handle_slice_map_imports)
 
 import * as Selectors from '../selectors';
+import { createGenericSlice } from '../utils/redux/sliceFactory';
+import { getModelTypeFromSchema, getSliceConfig } from '../utils/dynamicSchemaUtils/modelTypeUtils';
+import { getDataSourceSelector } from '../utils/redux/selectorUtils';
+import { createSelector } from 'reselect';
 
 /**
  * A map of Redux slice keys to their respective actions and selectors.
@@ -25,3 +29,89 @@ import * as Selectors from '../selectors';
 export const sliceMap = {
 # @@protoc_insertion_point(handle_slice_map)
 };
+
+/**
+ * Creates a dynamic slice and selector for a given model name.
+ * Directly adds the slice to sliceMap instead of using a separate cache.
+ * This ensures single source of truth and automatic cleanup on app reload.
+ *
+ * @param {string} modelName - The name of the model to create slice for
+ * @returns {Object} Object with actions and selector
+ */
+function createDynamicSlice(modelName) {
+  // Check if already exists in sliceMap (no separate cache needed!)
+  if (sliceMap[modelName]) {
+    return sliceMap[modelName];
+  }
+
+  // Get schema from Redux store if available
+  let modelSchema = {};
+  let allowedOperations = null;
+  if (typeof window !== 'undefined' && window.store) {
+    const state = window.store.getState();
+    modelSchema = state.schema?.schema?.[modelName] || {};
+    // Extract allowedOperations directly from schema's json_root for dynamic slices
+    allowedOperations = modelSchema?.json_root || null;
+  }
+
+  // Determine model type from schema
+  const modelType = getModelTypeFromSchema(modelSchema);
+
+  // Extract additional slice configuration from schema
+  const sliceConfigFromSchema = getSliceConfig(modelSchema, modelName);
+  const { isAlertModel, isAbbreviationSource, extraState, injectedReducers } = sliceConfigFromSchema;
+
+  // Create slice using the generic factory
+  const { actions, reducer } = createGenericSlice({
+    modelName,
+    modelType,
+    isAlertModel,
+    isAbbreviationSource,
+    extraState,
+    injectedReducers,
+    allowedOperations
+  });
+
+  // Inject the reducer into the Redux store
+  if (typeof window !== 'undefined' && window.store && window.store.injectReducer) {
+    window.store.injectReducer(modelName, reducer);
+  }
+
+  // Create a memoized selector that properly transforms the state
+  const baseSelector = (state) => state[modelName];
+  const selector = createSelector(
+    [baseSelector],
+    (modelState) => getDataSourceSelector(modelName, modelState)
+  );
+
+  // ✅ DIRECTLY ADD TO sliceMap (single source of truth!)
+  // No separate cache needed - app reload automatically clears this
+  const sliceConfig = { actions, selector };
+  sliceMap[modelName] = sliceConfig;
+
+  return sliceConfig;
+}
+
+/**
+ * Enhanced sliceMap with Proxy fallback for dynamic models.
+ * If a slice isn't found in the static map, creates one dynamically.
+ */
+export const sliceMapWithFallback = new Proxy(sliceMap, {
+  get(target, prop) {
+    // 1. Return existing slice if found
+    if (target[prop]) {
+      return target[prop];
+    }
+
+    // 2. Ignore React internal properties and symbols
+    if (typeof prop === 'symbol' || prop.startsWith('$$') || prop === '_owner' || prop === '_store') {
+      return undefined;
+    }
+
+    // 3. Create dynamic slice for unknown models
+    return createDynamicSlice(prop);
+  }
+});
+
+// Export the enhanced map as default for backward compatibility
+export default sliceMapWithFallback;

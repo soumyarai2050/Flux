@@ -22,7 +22,6 @@ import styles from './FilterMenu.module.css';
  *          - elaborateTitle: {boolean} (Optional) If true, use tableTitle as the display name.
  *          - tableTitle: {string} Display name when elaborateTitle is true.
  *          - title: {string} Display name when elaborateTitle is false.
- * @param {function} props.onOpen - Callback function.
  * @returns {JSX.Element} The rendered FilterMenu component.
  */
 const FilterMenu = ({
@@ -114,7 +113,6 @@ FilterMenu.propTypes = {
       title: PropTypes.string,
     })
   ).isRequired,
-  onOpen: PropTypes.func.isRequired
 };
 
 export default FilterMenu;

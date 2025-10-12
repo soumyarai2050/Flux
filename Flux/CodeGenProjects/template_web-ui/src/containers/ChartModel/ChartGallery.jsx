@@ -86,7 +86,7 @@ const ChartGallery = ({
                 <Box className={styles.galleryContainer}>
                     {chartData.length > 0 ? (
                         <Box className={styles.autoGridContainer}>
-                            {chartData.map((chart) => {
+                            {chartData.map((chart, index) => {
                                 const chartType = chart.series[0]?.type;
                                 const styleInfo = chartTypeStyles[chartType];
                                 const iconColor = styleInfo?.color || theme.palette.grey[500];
@@ -94,7 +94,7 @@ const ChartGallery = ({
 
                                 return (
                                     <Card
-                                        key={chart._id}
+                                        key={chart._id || index}
                                         className={styles.chartCard}
                                         style={{
                                             '--chart-color': iconColor,

@@ -2,6 +2,7 @@
 
 .galleryContainer {
     padding: 24px;
+    overflow: auto;
 }
 
 .autoGridContainer {
@@ -68,4 +69,5 @@
     flex: 1;
     padding: 16px;
     min-height: 400px;
+    overflow: auto;
 }

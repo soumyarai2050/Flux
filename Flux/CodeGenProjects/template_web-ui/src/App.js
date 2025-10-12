@@ -15,8 +15,6 @@ import Layout from './components/layout/Layout';
 import { DraggableProvider } from './contexts/DraggableContext';
 // import { ScrollableProvider } from './contexts/ScrollableContext';
 
-
-
 function App() {
     // Redux state
     const { loading } = useSelector((state) => state.schema);

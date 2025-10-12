@@ -43,6 +43,25 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             return widget_ui_data_element_dict.get(option_name, None)
         return None
 
+    def get_json_root_crud_operations(self, message: protogen.Message) -> Dict[str, bool]:
+        """Extract CRUD operations from FluxMsgJsonRoot or FluxMsgJsonRootTimeSeries option"""
+        crud_ops_dict = {}
+
+        if self.is_option_enabled(message, self.flux_msg_json_root):
+            json_root_option_dict = self.get_complex_option_value_from_proto(message, self.flux_msg_json_root)
+        elif self.is_option_enabled(message, self.flux_msg_json_root_time_series):
+            json_root_option_dict = self.get_complex_option_value_from_proto(message, self.flux_msg_json_root_time_series)
+        else:
+            return crud_ops_dict
+
+        # Extract all operation fields that end with "Op"
+        for key, value in json_root_option_dict.items():
+            if key.endswith("Op"):
+                # If the value is not None/empty, the operation is enabled
+                crud_ops_dict[key] = True if value else False
+
+        return crud_ops_dict
+
     def handle_slice_content(self, message: protogen.Message) -> str:
         message_name = message.proto.name
         message_name_camel_cased = capitalized_to_camel_case(message_name)
@@ -53,7 +72,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         output_str = "import { MODEL_TYPES } from '../constants.js';\n"
         output_str += "import createGenericSlice from '../utils/redux/sliceFactory.js';\n"
         if message_name == "UILayout":
-            output_str += "import { defaultLayouts } from '../projectSpecificUtils.js';\n\n"
+            output_str += "import { staticLayouts } from '../projectSpecificUtils.js';\n\n"
             output_str += "const injectedReducers = {\n"
             output_str += JsSliceFileGenPlugin.indentation_space + "setStoredObjByName(state, action) {\n"
             output_str += JsSliceFileGenPlugin.indentation_space*2 + f"const storedObjKey = 'stored{message_name}Obj';\n"
@@ -115,6 +134,19 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
         else:
             output_str += JsSliceFileGenPlugin.indentation_space + f"modelType: MODEL_TYPES.ROOT,\n"
 
+        # Add allowedOperations property with CRUD operations
+        crud_operations = self.get_json_root_crud_operations(message)
+        if crud_operations:
+            output_str += JsSliceFileGenPlugin.indentation_space + "allowedOperations: {\n"
+            for idx, (op_name, op_enabled) in enumerate(crud_operations.items()):
+                is_last = (idx == len(crud_operations) - 1)
+                output_str += (JsSliceFileGenPlugin.indentation_space * 2 +
+                             f"{op_name}: {'true' if op_enabled else 'false'}")
+                if not is_last:
+                    output_str += ","
+                output_str += "\n"
+            output_str += JsSliceFileGenPlugin.indentation_space + "},\n"
+
         # adding attribute telling some abbreviated msg is dependent on this message
         for abb_msg in self.abbreviated_merge_layout_msg_list:
             dependent_msg_list = self.msg_name_to_dependent_msg_name_list_dict.get(abb_msg.proto.name)
@@ -125,7 +157,7 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
 
         if message_name == "UILayout":
             output_str += JsSliceFileGenPlugin.indentation_space + "extraState: {\n"
-            output_str += JsSliceFileGenPlugin.indentation_space*2 + f"stored{message_name}Obj: "+"{ profile_id: 'default', widget_ui_data_elements: defaultLayouts },\n"
+            output_str += JsSliceFileGenPlugin.indentation_space*2 + f"stored{message_name}Obj: "+"{ profile_id: 'default', widget_ui_data_elements: staticLayouts },\n"
             output_str += JsSliceFileGenPlugin.indentation_space*2 + f"isLoading: true,\n"
             output_str += JsSliceFileGenPlugin.indentation_space + "},\n"
             output_str += JsSliceFileGenPlugin.indentation_space + "injectedReducers\n"
@@ -140,7 +172,8 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
             output_str += JsSliceFileGenPlugin.indentation_space + "extraState: {\n"
             output_str += JsSliceFileGenPlugin.indentation_space * 2 + "node: null,\n"
             output_str += JsSliceFileGenPlugin.indentation_space * 2 + "selectedDataPoints: [],\n"
-            output_str += JsSliceFileGenPlugin.indentation_space * 2 + "lastSelectedDataPoint: null\n"
+            output_str += JsSliceFileGenPlugin.indentation_space * 2 + "lastSelectedDataPoint: null,\n"
+            output_str += JsSliceFileGenPlugin.indentation_space * 2 + "isAnalysis: false\n"
             output_str += JsSliceFileGenPlugin.indentation_space + "},\n"
             output_str += JsSliceFileGenPlugin.indentation_space + "injectedReducers\n"
         output_str += "});\n\n"

@@ -40,6 +40,7 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
         self.abbreviated_merge_layout_msg_list: List[protogen.Message] = []
         self.alert_type_message_list: List[protogen.Message] = []
         self.msg_name_to_dependent_msg_name_list_dict: Dict[str, List[str]] = {}
+        self.msg_name_to_dependency_dict: Dict[str, Dict[str, str]] = {}
         self.current_proto_file_name: str | None = None
         self.proto_file_name_to_message_list_dict: Dict[str, List[protogen.Message]] = {}
         self.file_name_to_dependency_file_names_dict: Dict[str, List[str]] = {}
@@ -165,14 +166,19 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
                             if is_repeated is not None and is_repeated:
                                 self.repeated_msg_list.append(message)
 
-                            # checking if this message has dependency on any model - if it has then updating msg_name_to_dependent_msg_name_list_dict
+                            # Build modelDependencyMap for non-abbreviated models
+                            dependency_map = {}
+
+                            # Check for urlOverride (depending_proto_model_name)
                             dependent_msg_name = widget_ui_data_option_value_dict.get(
                                 BaseJSLayoutPlugin.widget_ui_option_depending_proto_model_name_field)
                             if dependent_msg_name is not None and dependent_msg_name in message_name_list:
+                                dependency_map['urlOverride'] = dependent_msg_name
+                                # Keep old structure for backward compatibility
                                 self.msg_name_to_dependent_msg_name_list_dict[message.proto.name] = [
                                     dependent_msg_name]
-                            # else not required: if no dependency then no need to update msg_name_to_dependent_msg_name_list_dict
 
+                            # Check for crudOverride (override_default_crud)
                             if BaseProtoPlugin.is_option_enabled(message,
                                                                    BaseJSLayoutPlugin.flux_msg_override_default_crud):
                                 override_default_crud_option_val_list: List[Dict] = (
@@ -184,9 +190,23 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
                                     crud_dependent_msg_name = override_default_crud_option_val.get(
                                         BaseJSLayoutPlugin.override_default_crud_option_query_src_model_name_field)
                                     if crud_dependent_msg_name is not None and crud_dependent_msg_name in message_name_list:
+                                        dependency_map['crudOverride'] = crud_dependent_msg_name
+                                        # Keep old structure for backward compatibility
                                         self.msg_name_to_dependent_msg_name_list_dict[message.proto.name] = [
                                             crud_dependent_msg_name]
-                            # else not required: if no dependency then no need to update msg_name_to_dependent_msg_name_list_dict
+
+                            # Check for defaultFilter (FluxMsgDefaultFilterParam)
+                            if BaseProtoPlugin.is_option_enabled(message,
+                                                                   BaseJSLayoutPlugin.flux_msg_default_filter_param):
+                                default_filter_param_dict = BaseJSLayoutPlugin.get_complex_option_value_from_proto(
+                                    message, BaseJSLayoutPlugin.flux_msg_default_filter_param)
+                                filter_src_model_name = default_filter_param_dict.get('param_src_model_name')
+                                if filter_src_model_name is not None and filter_src_model_name in message_name_list:
+                                    dependency_map['defaultFilter'] = filter_src_model_name
+
+                            # Store the dependency map if it has any entries
+                            if dependency_map:
+                                self.msg_name_to_dependency_dict[message.proto.name] = dependency_map
                         elif BaseJSLayoutPlugin.flux_msg_abbreviated_filter_layout_value == layout_type:
                             self.abbreviated_merge_layout_msg_list.append(message)
                             dependent_msg_name_list = self._get_msg_names_list_used_in_abb_option_val(message)

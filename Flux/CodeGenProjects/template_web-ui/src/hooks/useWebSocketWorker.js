@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { WEBSOCKET_CLOSE_CODES, WEBSOCKET_RETRY_CODES } from '../constants';
 import { clearWebSocketConnection, setWebSocketConnection } from '../cache/websocketConnectionCache';
+import { buildWebSocketQueryParams, createWebSocketPaginatedEndpoint } from '../utils/core/paginationUtils';
 
 function useWebSocketWorker({
   url,
@@ -12,11 +13,16 @@ function useWebSocketWorker({
   selector,
   onWorkerUpdate,
   onReconnect,
-  uiLimit = null,
   isAlertModel = false,
   crudOverrideDict = null,
+  defaultFilterParamDict = null,
   params = null,
-  isCppModel = false
+  isCppModel = false,
+  // Parameters for unified endpoint with dynamic parameter inclusion
+  filters = null,
+  sortOrders = null,
+  pagination = null,
+  uiLimit = null  // Client-side limit (null when server-side pagination is enabled)
 }) {
   // Get the current stored array from Redux (slice can be dynamic)
   const { storedArray } = useSelector(selector);
@@ -31,7 +37,7 @@ function useWebSocketWorker({
   const [, setIsConnected] = useState(false);
 
   if (!connectionRef.current) {
-    const worker = new Worker(new URL('../workers/websocket-update.worker.js', import.meta.url));
+    const worker = new Worker(new URL('../workers/websocket-update.worker.js', import.meta.url), { type: 'module' });
     connectionRef.current = {
       worker,
       messageBuffer: [],
@@ -51,24 +57,38 @@ function useWebSocketWorker({
     if (!url || isDisabled) return;
 
     const wsUrl = url.replace('http', 'ws');
-    let apiUrl = `${wsUrl}/get-all-${modelName}-ws`;
-    if (uiLimit && !isCppModel) {
-      apiUrl += `?limit_obj_count=${uiLimit}`
-    }
+    let apiUrl;
+
+    // Always use unified endpoint with dynamic parameter inclusion
+    let queryParams;
+    let baseEndpoint;
+
+    // Priority 1: CRUD override (custom endpoint)
     if (crudOverrideDict?.GET_ALL) {
+      // Handle CRUD override case - uses custom endpoint with query params
       const { endpoint, paramDict } = crudOverrideDict.GET_ALL;
       if (!params && Object.keys(paramDict).length > 0) return;
-      apiUrl = `${wsUrl}/ws-${endpoint}`;
-      if (uiLimit && !isCppModel) {
-        apiUrl += `?limit_obj_count=${uiLimit}`
-      }
+
+      baseEndpoint = `${wsUrl}/ws-${endpoint}`;
+      queryParams = buildWebSocketQueryParams(filters || [], sortOrders || [], pagination, uiLimit, isCppModel);
+
+      // Add custom params as query params for CRUD override
       if (params) {
-        let paramsStr = uiLimit && !isCppModel ? '&' : '?';
-        paramsStr += Object.keys(params).map((k) => `${k}=${params[k]}`).join('&');
-        apiUrl += paramsStr;
+        Object.keys(params).forEach(key => {
+          queryParams.append(key, params[key]);
+        });
       }
     }
+    // Priority 2: Standard endpoint (defaultFilterParamDict or no params)
+    else {
+      // Use standard paginated endpoint
+      // defaultFilterParamDict params are now included in filters array
+      baseEndpoint = createWebSocketPaginatedEndpoint(wsUrl, modelName);
+      queryParams = buildWebSocketQueryParams(filters || [], sortOrders || [], pagination, uiLimit, isCppModel);
+    }
 
+    apiUrl = queryParams.toString() ? `${baseEndpoint}?${queryParams.toString()}` : baseEndpoint;
+    
     const connection = connectionRef.current;
     const { messageBuffer } = connection;
     const ws = new WebSocket(apiUrl);
@@ -77,6 +97,10 @@ function useWebSocketWorker({
 
     // Update state when connection opens
     ws.onopen = () => {
+      // Clear previous snapshot on new connection
+      snapshotRef.current = null;
+      // Clear message buffer on new connection
+      messageBuffer.length = 0;
       setIsConnected(true);
       isNewlyConnectedRef.current = true;
     };
@@ -131,7 +155,7 @@ function useWebSocketWorker({
         setIsConnected(false);
       }
     };
-  }, [url, isDisabled, params, reconnectCounter, modelName]);
+  }, [url, isDisabled, params, reconnectCounter, modelName, JSON.stringify(filters), JSON.stringify(sortOrders), JSON.stringify(pagination), uiLimit, isCppModel, crudOverrideDict, defaultFilterParamDict]);
 
   // Periodically send snapshot or accumulated messages to the worker
   useEffect(() => {
@@ -145,20 +169,20 @@ function useWebSocketWorker({
           const snapshot = snapshotRef.current;
           snapshotRef.current = null;
           connection.isWorkerBusy = true;
-          worker.postMessage({ 
+          worker.postMessage({
             snapshot,
-            storedArray: storedArrayRef.current, 
-            uiLimit, 
+            storedArray: storedArrayRef.current,
+            uiLimit,
             isAlertModel
           });
         } else if (messageBuffer.length > 0) {
           const messages = [...messageBuffer];
           connection.messageBuffer.length = 0;
           connection.isWorkerBusy = true;
-          worker.postMessage({ 
-            messages, 
-            storedArray: storedArrayRef.current, 
-            uiLimit, 
+          worker.postMessage({
+            messages,
+            storedArray: storedArrayRef.current,
+            uiLimit,
             isAlertModel
           });
         }

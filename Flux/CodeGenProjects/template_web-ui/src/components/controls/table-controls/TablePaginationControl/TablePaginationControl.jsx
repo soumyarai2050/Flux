@@ -6,11 +6,14 @@ const TablePaginationControl = (
 {  rows,
   page,
   rowsPerPage,
+  totalCount,
   onPageChange,
   onRowsPerPageChange,
   rowsPerPageOptions = [25, 50, 100]}
 ) => {
-    const totalPages = Math.ceil(rows.length / rowsPerPage);
+    // Use totalCount if provided (server-side pagination), otherwise use rows.length (client-side)
+    const effectiveTotal = totalCount ?? rows.length;
+    const totalPages = Math.ceil(effectiveTotal / rowsPerPage);
 
 
   
@@ -78,7 +81,7 @@ const TablePaginationControl = (
         }}
       >
         <Select
-          value={`${page * rowsPerPage + 1}-${Math.min((page + 1) * rowsPerPage, rows.length)}`}
+          value={`${page * rowsPerPage + 1}-${Math.min((page + 1) * rowsPerPage, effectiveTotal)}`}
           onChange={(e) => {
             const selectedRange = e.target.value;
             const start = parseInt(selectedRange.split('-')[0], 10);
@@ -88,10 +91,10 @@ const TablePaginationControl = (
         >
           {Array.from({ length: totalPages }, (_, i) => {
             const start = i * rowsPerPage + 1;
-            const end = Math.min((i + 1) * rowsPerPage, rows.length);
+            const end = Math.min((i + 1) * rowsPerPage, effectiveTotal);
             return (
               <MenuItem key={i} value={`${start}-${end}`}>
-                {`${start}-${end} of ${rows.length}`}
+                {`${start}-${end} of ${effectiveTotal}`}
               </MenuItem>
             );
           })}

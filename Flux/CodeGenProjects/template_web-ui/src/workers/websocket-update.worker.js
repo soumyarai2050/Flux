@@ -1,8 +1,10 @@
 import { DB_ID } from '../constants';
 import { sortAlertArray } from '../utils/network/websocketUtils';
+import { stableSort } from '../utils/core/dataSorting';
+import { SortComparator } from '../utils/core/sortUtils';
 
 onmessage = (event) => {
-    const { messages, snapshot, storedArray, uiLimit, isAlertModel, activeItemIdMap = null } = event.data;
+    const { messages, snapshot, storedArray, uiLimit, isAlertModel, activeItemIdMap = null, sortOrders = null } = event.data;
     
     // If snapshot is provided, process it as full replacement
     if (snapshot) {
@@ -19,6 +21,8 @@ onmessage = (event) => {
     }
 
     const updatesMap = new Map();
+    let newTopMarker = null;
+    let newBottomMarker = null;
 
     // Build update map from the messages
     messages.forEach((msg) => {
@@ -27,8 +31,19 @@ onmessage = (event) => {
             if (Array.isArray(updatedArrayOrObj)) {
                 updatedArrayOrObj.forEach((o) => {
                     const id = o[DB_ID];
+
+                    // Track pagination markers and remove marker attributes
+                    if (o._new_top === true) {
+                        newTopMarker = id;
+                        delete o._new_top;
+                    }
+                    if (o._new_bottom === true) {
+                        newBottomMarker = id;
+                        delete o._new_bottom;
+                    }
+
                     if (!activeItemIdMap || activeItemIdMap.get(id)) {
-                        if ((isAlertModel && o.dismiss) || Object.keys(o).length === 1) {
+                        if (Object.keys(o).length === 1) {
                             updatesMap.set(id, null);
                         } else {
                             updatesMap.set(id, o);
@@ -37,8 +52,19 @@ onmessage = (event) => {
                 })
             } else {
                 const id = updatedArrayOrObj[DB_ID];
+
+                // Track pagination markers and remove marker attributes
+                if (updatedArrayOrObj._new_top === true) {
+                    newTopMarker = id;
+                    delete updatedArrayOrObj._new_top;
+                }
+                if (updatedArrayOrObj._new_bottom === true) {
+                    newBottomMarker = id;
+                    delete updatedArrayOrObj._new_bottom;
+                }
+
                 if (!activeItemIdMap || activeItemIdMap.get(id)) {
-                    if ((isAlertModel && updatedArrayOrObj.dismiss) || Object.keys(updatedArrayOrObj).length === 1) {
+                    if (Object.keys(updatedArrayOrObj).length === 1) {
                         updatesMap.set(id, null);
                     } else {
                         updatesMap.set(id, updatedArrayOrObj);
@@ -73,29 +99,63 @@ onmessage = (event) => {
         }
     }
 
-    // Merge new updates based on uiLimit.
-    // If uiLimit is negative, batch prepend new updates; otherwise, append them.
-    let finalArray;
-    if (uiLimit !== null && uiLimit < 0) {
-        // Prepend new updates in one operation to avoid multiple unshift calls.
-        finalArray = newUpdates.concat(mergedArray);
-    } else {
-        finalArray = mergedArray.concat(newUpdates);
+    // Merge new updates with existing array.
+    let finalArray = mergedArray.concat(newUpdates);
+
+    // Apply sorting based on sortOrders
+    if (sortOrders && sortOrders.length > 0) {
+        const comparator = SortComparator.getInstance(sortOrders);
+        finalArray = stableSort(finalArray, comparator);
     }
 
-    // If a UI limit is set, trim the final array to the limit.
-    if (uiLimit !== null) {
-        const limit = Math.abs(uiLimit);
-        if (finalArray.length > limit) {
-            finalArray = uiLimit >= 0
-                ? finalArray.slice(finalArray.length - limit) // For positive uiLimit, keep latest items.
-                : finalArray.slice(0, limit);                  // For negative uiLimit, keep from the start.
+    // Apply additional alert-specific sorting
+    if (isAlertModel) {
+        sortAlertArray(finalArray);
+    }
+
+    // Apply pagination pruning based on markers
+    if (newTopMarker !== null || newBottomMarker !== null) {
+        let topIndex = -1;
+        let bottomIndex = -1;
+
+        // Find indices of marker objects in sorted array
+        if (newTopMarker !== null) {
+            topIndex = finalArray.findIndex(item => item[DB_ID] === newTopMarker);
+        }
+        if (newBottomMarker !== null) {
+            bottomIndex = finalArray.findIndex(item => item[DB_ID] === newBottomMarker);
+        }
+
+        // Slice array based on available markers
+        if (newTopMarker !== null && newBottomMarker !== null) {
+            // Both markers present
+            if (topIndex !== -1 && bottomIndex !== -1) {
+                finalArray = finalArray.slice(topIndex, bottomIndex + 1);
+            } else {
+                console.warn('Pagination markers found but objects not in array. Top:', topIndex, 'Bottom:', bottomIndex);
+            }
+        } else if (newTopMarker !== null) {
+            // Only top marker present
+            if (topIndex !== -1) {
+                finalArray = finalArray.slice(topIndex);
+            } else {
+                console.warn('Top pagination marker found but object not in array.');
+            }
+        } else if (newBottomMarker !== null) {
+            // Only bottom marker present
+            if (bottomIndex !== -1) {
+                finalArray = finalArray.slice(0, bottomIndex + 1);
+            } else {
+                console.warn('Bottom pagination marker found but object not in array.');
+            }
         }
     }
 
-    // For negative uiLimit in alert mode, apply additional sorting if required.
-    if (uiLimit !== null && uiLimit < 0 && isAlertModel) {
-        sortAlertArray(finalArray);
+    // Apply client-side limit (for non-server-side-paginated models)
+    // Only trim if uiLimit is set and positive
+    // Keep items from beginning (index 0 to uiLimit)
+    if (uiLimit && uiLimit > 0 && finalArray.length > uiLimit) {
+        finalArray = finalArray.slice(0, uiLimit);
     }
 
     postMessage(finalArray);

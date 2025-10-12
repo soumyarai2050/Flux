@@ -161,7 +161,7 @@ TreeExpansionControls.propTypes = {
     treeData: PropTypes.array.isRequired,
     onExpandAll: PropTypes.func.isRequired,
     onCollapseAll: PropTypes.func.isRequired,
-    hasChildren: PropTypes.bool.isRequired,
+    hasChildren: PropTypes.bool,
     expandedNodeXPaths: PropTypes.object,
     disabled: PropTypes.bool,
     onNodeToggle: PropTypes.func

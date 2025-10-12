@@ -12,7 +12,7 @@ onmessage = (e) => {
         items, itemsDataDict, itemProps, abbreviation, loadedProps, page, pageSize, sortOrders, filters,
         joinBy, joinSort, mode, enableOverride, disableOverride, showMore, showLess, showAll, moreAll, showHidden,
         columnOrders, frozenColumns, columnNameOverride, highlightUpdateOverride, noCommonKeyOverride,
-        centerJoin, flip, rowIds
+        centerJoin, flip, rowIds, serverSidePaginationEnabled
     } = e.data;
     const rows = getRowsFromAbbreviation(items, itemsDataDict, itemProps, abbreviation, loadedProps);  // not used externally
     const filterFieldsMetadata = itemProps.filter((meta) => meta.filterEnable);
@@ -21,7 +21,12 @@ onmessage = (e) => {
     const filteredRows = applyFilter(rows, filters);
     const rowIdsFilteredRows = applyRowIdsFilter(filteredRows, rowIds);
     const groupedRows = getGroupedTableRows(rowIdsFilteredRows, joinBy, joinSort);
-    const { sortedRows, activeRows } = getActiveRows(groupedRows, page, pageSize, sortOrders, true);
+
+    // If server-side pagination is enabled, skip client-side pagination slice
+    // The items already contain only the data for the current page
+    const { sortedRows, activeRows } = serverSidePaginationEnabled
+        ? getActiveRows(groupedRows, 0, pageSize, sortOrders, true)
+        : getActiveRows(groupedRows, page, pageSize, sortOrders, true);
     const modelItemIdField = itemProps.find(meta => meta.tableTitle === DB_ID)?.key;
     const activeIds = getActiveIds(activeRows, modelItemIdField);
     const maxRowSize = getMaxRowSize(activeRows);

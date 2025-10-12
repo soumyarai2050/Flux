@@ -26,7 +26,7 @@ import MarkdownRenderer from './MarkdownRenderer';
 import ClipboardCopier from '../../utility/ClipboardCopier';
 import ChatMessage from './ChatMessage';
 import { DB_ID, MODES } from '../../../constants';
-import { clearxpath, generateObjectFromSchema, getModelSchema, snakeToCamel } from '../../../utils';
+import { clearxpath, generateObjectFromSchema, getModelSchema } from '../../../utils';
 import styles from './ChatView.module.css';
 
 /**
@@ -76,7 +76,7 @@ function ChatView({
     const { schema: projectSchema } = useSelector(state => state.schema);
     const { actions, selector, fieldsMetadata } = modelDataSource;
     const { updatedObj, mode, loading, error } = useSelector(selector);
-    const { contextId } = useSelector(state => state[snakeToCamel(modelName)]);
+    const { contextId } = useSelector(state => state[modelName]);
     const dispatch = useDispatch();
 
     // Local UI state
@@ -539,7 +539,7 @@ function ChatView({
                         ),
                     }}
                     size="small"
-                    sx={{ 
+                    sx={{
                         '& .MuiInputBase-input': { fontSize: '0.75rem' },
                         '& .MuiInputBase-root': { fontSize: '0.75rem' }
                     }}
@@ -585,7 +585,7 @@ function ChatView({
                             onChange={(e) => handleModalTextChange(e.target.value)}
                             variant="outlined"
                             placeholder="Enter your message..."
-                            sx={{ 
+                            sx={{
                                 '& .MuiInputBase-input': { fontSize: '0.75rem' },
                                 '& .MuiInputBase-root': { fontSize: '0.75rem' }
                             }}

@@ -1,10 +1,10 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo} from 'react';
 import PropTypes from 'prop-types';
 import { useSelector, useDispatch } from 'react-redux';
 import { Responsive, WidthProvider } from 'react-grid-layout';
 import { Grid, Popover, MenuItem } from '@mui/material';
 import { Brightness4, Brightness7, DashboardCustomize, DoNotTouch, PanTool, SaveAs, ViewComfy, Palette, SpaceDashboard } from '@mui/icons-material';
-import { defaultLayouts } from '../../../projectSpecificUtils';
+import { getAllLayouts } from '../../../projectSpecificUtils';
 import { actions as LayoutActions } from '../../../features/uiLayoutSlice';
 import * as Selectors from '../../../selectors';
 import { fastClone } from '../../../utils/core/dataUtils';
@@ -22,7 +22,7 @@ import { BaseColor, cssVar, baseColorPalettes, Theme, DEFAULT_BASE_COLOR } from 
 import GlobalScrollbarStyle from '../GlobalScrollbarStyle';
 import DropdownButton from '../../ui/DropdownButton';
 import { useDraggableContext } from '../../../contexts/DraggableContext';
-import { componentMap } from '../../../models/componentMap';
+import { componentMapWithFallback as componentMap } from '../../../models/componentMap';
 
 const defaultGridProps = {
   className: 'layout',
@@ -74,6 +74,7 @@ const ResponsiveGridLayout = WidthProvider(Responsive);
  */
 const Layout = ({ projectName, theme, onThemeToggle, baseColor, onBaseColorChange }) => {
   const { storedArray, storedObj, isLoading } = useSelector(Selectors.selectUILayout);
+  const schemaState = useSelector((state) => state.schema);
   const [layout, setLayout] = useState(null);
   const [visibleComponents, setVisibleComponents] = useState([]);
   const [anchorEl, setAnchorEl] = useState(null);
@@ -97,6 +98,9 @@ const Layout = ({ projectName, theme, onThemeToggle, baseColor, onBaseColorChang
   const profileOptions = ['reset', ...(storedArray || []).map((profile) => profile.profile_id)];
   const currentProfileValue = profileId || 'reset';
   const dropdownSelectedIndex = profileOptions.indexOf(currentProfileValue);
+
+  //fetch all layouts once
+  const allLayouts = useMemo(() => getAllLayouts(schemaState), [schemaState]);
 
   const handleWorkerUpdate = (updatedArray) => {
     dispatch(LayoutActions.setStoredArray(updatedArray));
@@ -135,10 +139,10 @@ const Layout = ({ projectName, theme, onThemeToggle, baseColor, onBaseColorChang
     if (!activeLayoutId) {
       // Reset to default if no layout parameter (inline logic instead of calling handleReset)
       sessionStorage.removeItem(COOKIE_NAME);
-      setLayout(defaultLayouts);
-      const newVisibleComponents = defaultLayouts.map((item) => item.i);
+      setLayout(allLayouts);
+      const newVisibleComponents = allLayouts.map((item) => item.i);
       setVisibleComponents(newVisibleComponents);
-      dispatch(LayoutActions.setStoredObj({ profile_id: 'default', widget_ui_data_elements: defaultLayouts, base_color: DEFAULT_BASE_COLOR }));
+      dispatch(LayoutActions.setStoredObj({ profile_id: 'default', widget_ui_data_elements: allLayouts, base_color: DEFAULT_BASE_COLOR }));
       setProfileId('');
 
       // Reset base color to default
@@ -161,11 +165,22 @@ const Layout = ({ projectName, theme, onThemeToggle, baseColor, onBaseColorChang
     if (activeLayoutId) {
       const activeLayout = fastClone(storedArray?.find(o => o.profile_id === activeLayoutId));
       if (activeLayout) {
-        const updatedDataElememts = activeLayout.widget_ui_data_elements.map((item) => {
-          const { x, y, w, h, widget_ui_data, chart_data, filters, join_sort, pivot_data } = item;
-          const defaultElement = defaultLayouts.find((o) => o.i === item.i);
-          return { ...defaultElement, x, y, w, h, widget_ui_data, chart_data, filters, join_sort, pivot_data };
-        })
+        const updatedDataElememts = activeLayout.widget_ui_data_elements
+          .map((item) => {
+            const { x, y, w, h, widget_ui_data, chart_data, filters, join_sort, pivot_data } = item;
+            // Look in both static and dynamic layouts
+            const defaultElement = allLayouts.find((o) => o.i === item.i);
+
+            // Skip if widget no longer exists in schema
+            if (!defaultElement) {
+              console.error(`⚠️  Widget "${item.i}" not found in current schema, skipping`);
+              return null;
+            }
+
+            return { ...defaultElement, x, y, w, h, widget_ui_data, chart_data, filters, join_sort, pivot_data };
+          })
+          .filter(item => item !== null); // Remove null entries
+
         activeLayout.widget_ui_data_elements = updatedDataElememts;
         newLayout = updatedDataElememts;
         newVisibleComponents = newLayout.map(item => item.i);
@@ -186,8 +201,8 @@ const Layout = ({ projectName, theme, onThemeToggle, baseColor, onBaseColorChang
     if (!newLayout) {
       // Clean up sessionStorage if the active layout no longer exists.
       if (activeLayoutId) sessionStorage.removeItem(COOKIE_NAME);
-      newLayout = defaultLayouts;
-      newVisibleComponents = defaultLayouts.map(item => item.i);
+      newLayout = allLayouts;
+      newVisibleComponents = allLayouts.map(item => item.i);
 
       // Use default base color when falling back to default layout
       setSelectedBaseColor(DEFAULT_BASE_COLOR);
@@ -224,13 +239,30 @@ const Layout = ({ projectName, theme, onThemeToggle, baseColor, onBaseColorChang
           setLayout((prevLayout) => prevLayout.filter((item) => item.i !== component));
           return prev.filter((item) => item !== component);
         } else {
-          const defaultPosition = defaultLayouts.find((item) => item.i === component);
+         
+          const defaultPosition = allLayouts.find((item) => item.i === component);
+
+          
+
           const currentPosition = layout?.find((item) => item.i === component);
           const newPosition = currentPosition
             ? currentPosition
             : { ...defaultPosition, x: 0, y: getMaxY() };
-          setLayout((prevLayout) => [...(prevLayout || []), newPosition]);
-          dispatch(LayoutActions.setStoredObj({ ...storedObj, widget_ui_data_elements: [...storedObj.widget_ui_data_elements, newPosition] }));
+
+          setLayout((prevLayout) => {
+            // Prevent race conditions, double click protection
+            const exists = prevLayout.find(item => item.i === component);
+            if (exists) {
+              console.warn(`⚠️  Widget "${component}" already in layout, not adding duplicate`);
+              return prevLayout;
+            }
+            return [...prevLayout, newPosition];
+          });
+
+          dispatch(LayoutActions.setStoredObj({
+            ...storedObj,
+            widget_ui_data_elements: [...storedObj.widget_ui_data_elements.filter(w => w.i !== component), newPosition]
+          }));
           return [...prev, component];
         }
       });
@@ -436,10 +468,10 @@ const Layout = ({ projectName, theme, onThemeToggle, baseColor, onBaseColorChang
 
   const handleReset = () => {
     sessionStorage.removeItem(COOKIE_NAME);
-    setLayout(defaultLayouts);
-    const newVisibleComponents = defaultLayouts.map(item => item.i);
+    setLayout(allLayouts);
+    const newVisibleComponents = allLayouts.map(item => item.i);
     setVisibleComponents(newVisibleComponents);
-    dispatch(LayoutActions.setStoredObj({ profile_id: 'default', widget_ui_data_elements: defaultLayouts, base_color: DEFAULT_BASE_COLOR }));
+    dispatch(LayoutActions.setStoredObj({ profile_id: 'default', widget_ui_data_elements: allLayouts, base_color: DEFAULT_BASE_COLOR }));
     setProfileId('');
 
     // Reset base color to default
@@ -527,7 +559,7 @@ const Layout = ({ projectName, theme, onThemeToggle, baseColor, onBaseColorChang
           }}
         >
           <Grid container spacing={1} sx={{ padding: '5px', width: '300px' }}>
-            {defaultLayouts.map((item) => (
+            {allLayouts.map((item) => (
               <Grid item key={item.i} lg={2}>
                 <ToggleIcon
                   title={item.i}
@@ -552,6 +584,12 @@ const Layout = ({ projectName, theme, onThemeToggle, baseColor, onBaseColorChang
         >
           {visibleComponents.map((key) => {
             const Component = componentMap[key];
+            // Validate that widget exists in layout
+            const layoutItem = layout?.find(item => item.i === key);
+            if (!layoutItem) {
+              console.error(`❌ Widget "${key}" in visibleComponents but not in layout, skipping render`);
+              return null;
+            }
             return (
               <div
                 key={key}

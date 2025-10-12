@@ -46,7 +46,9 @@ class JsProjectSpecificUtilsPlugin(BaseJSLayoutPlugin):
         # sorting created message lists
         self.layout_msg_list.sort(key=lambda message_: message_.proto.name)
 
-        output_str = "export const defaultLayouts = [\n"
+        # Add imports for dynamic layout utilities
+        output_str = "import { addDynamicLayouts, getAllLayouts as getCombinedLayouts } from './utils/dynamicSchemaUtils/layoutUtils';\n\n"
+        output_str += "export const staticLayouts = [\n"
         for index, message in enumerate(self.layout_msg_list):
             if self.is_option_enabled(message, JsProjectSpecificUtilsPlugin.flux_msg_widget_ui_data_element):
                 widget_ui_data_option_value_dict = \
@@ -112,7 +114,16 @@ class JsProjectSpecificUtilsPlugin(BaseJSLayoutPlugin):
                 #               ' },\n'
                 output_str += f"{widget_ui_option_dict_str}, \n"
 
-        output_str += "]\n\n"
+        output_str += "];\n"
+
+        # Add dynamic layout exports
+        output_str += "// Export static layouts separately for reference\n"
+        output_str += "export const getStaticLayouts = () => staticLayouts;\n\n"
+        output_str += "// Export function to get only dynamic layouts\n"
+        output_str += "export const getDynamicLayouts = (schemaFromStore = null) => addDynamicLayouts(schemaFromStore, staticLayouts);\n\n"
+        output_str += "// Export function to get combined layouts at runtime\n"
+        output_str += "export const getAllLayouts = (schemaFromStore = null) => getCombinedLayouts(staticLayouts, schemaFromStore);\n\n"
+
         output_str += "export function flux_toggle(value) {\n"
         output_str += JsProjectSpecificUtilsPlugin.indentation_space + "return !value;\n"
         output_str += "}\n\n"

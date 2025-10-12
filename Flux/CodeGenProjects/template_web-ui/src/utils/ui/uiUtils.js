@@ -369,7 +369,7 @@ export function getReducerArrayFromCollections(collections) {
                     if (property === 'autocomplete' && !col.dynamic_autocomplete) {
                         return;
                     }
-                    const reducerName = toCamelCase(col[property].split('.')[0]);
+                    const reducerName = col[property].split('.')[0];
                     if (!reducerArray.includes(reducerName)) {
                         reducerArray.push(reducerName);
                     }
@@ -435,11 +435,11 @@ export function getBufferAbbreviatedOptionLabel(bufferOption, bufferListFieldAtt
 
 
 /**
- * Calculates the contrast color (complementary color) for a given color.
- * This function supports hex and RGB color formats and returns the complementary color in hex format.
+ * Calculates the best contrasting color (black or white) for a given background color.
+ * This function determines if the background color is light or dark and returns white or black respectively.
  *
  * @param {string} color - The input color in hex (e.g., '#RRGGBB') or RGB (e.g., 'rgb(R, G, B)') format.
- * @returns {string} The contrast color in hex format.
+ * @returns {string} The contrast color, either '#000000' (black) or '#FFFFFF' (white).
  * @throws {Error} If an unsupported color format is provided.
  */
 export function getContrastColor(color) {
@@ -464,28 +464,22 @@ export function getContrastColor(color) {
         // If it's already in rgb format
         if (color.startsWith('rgb')) {
             var match = color.match(/(\d+), (\d+), (\d+)/);
-            return [parseInt(match[1]), parseInt(match[2]), parseInt(match[3])];
+            if (match) {
+                return [parseInt(match[1]), parseInt(match[2]), parseInt(match[3])];
+            }
         }
         // Add other color formats if needed
         throw new Error('Unsupported color format');
     }
 
-    // Function to convert RGB to hex
-    function rgbToHex(r, g, b) {
-        return '#' + [r, g, b].map(x => {
-            const hex = x.toString(16);
-            return hex.length === 1 ? '0' + hex : hex;
-        }).join('');
-    }
-
     // Get RGB components of the color
-    const rgb = colorToRgb(color);
+    const [r, g, b] = colorToRgb(color);
 
-    // Calculate complementary color
-    const compRgb = rgb.map(c => 255 - c);
+    // Calculate luminance
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b);
 
-    // Convert complementary RGB to hex
-    return rgbToHex(compRgb[0], compRgb[1], compRgb[2]);
+    // Return black for light colors, white for dark colors
+    return luminance > 186 ? '#000000' : '#FFFFFF';
 }
 
 
@@ -701,6 +695,48 @@ export function getCrudOverrideDict(modelSchema) {
         acc[ui_crud_type] = { endpoint: `query-${query_name}`, paramDict };
         return acc;
     }, {}) || null;
+}
+
+
+/**
+ * Extracts default filter parameters from the model schema.
+ * Unlike `getCrudOverrideDict`, this does not replace the endpoint but appends filter parameters
+ * to the standard GET_ALL endpoint.
+ *
+ * @param {Object} modelSchema - The schema of the model, potentially containing `default_filter_param`.
+ * @returns {Object|null} A dictionary containing paramDict for default filtering, or null if not defined.
+ */
+export function getDefaultFilterParamDict(modelSchema) {
+    const defaultFilter = modelSchema.default_filter_param;
+
+    // Check if default_filter_param exists and is an object (not array)
+    if (!defaultFilter || typeof defaultFilter !== 'object' || Array.isArray(defaultFilter)) {
+        return null;
+    }
+
+    // Check if ui_query_params exists
+    if (!defaultFilter.ui_filter_params || !Array.isArray(defaultFilter.ui_filter_params)) {
+        return null;
+    }
+
+    let paramDict = null;
+    defaultFilter.ui_filter_params.forEach(({ param_name, param_value_src, param_value }) => {
+        if (!paramDict) {
+            paramDict = {};
+        }
+
+        // Support both derived values (from other models) and direct values
+        if (param_value_src) {
+            // Derived value - extract the path after the model name and store with type
+            const extractedPath = param_value_src.substring(param_value_src.indexOf('.') + 1);
+            paramDict[param_name] = { type: 'src', value: extractedPath };
+        } else if (param_value !== undefined && param_value !== null) {
+            // Direct value - store as-is with type
+            paramDict[param_name] = { type: 'val', value: param_value };
+        }
+    });
+
+    return paramDict && Object.keys(paramDict).length > 0 ? paramDict : null;
 }
 
 

@@ -73,6 +73,17 @@ message OverrideDefaultCRUD{
   repeated UIQueryParam ui_query_params = 4;
 }
 
+message UIFilterParam{
+  required string param_name = 1;
+  optional string param_value_src = 2;
+  optional string param_value = 3;
+}
+
+message DefaultFilterParam{
+  optional string param_src_model_name = 1;  // Source can be only one
+  repeated UIFilterParam ui_filter_params = 2;
+}
+
 message JoinSort {
   required SortOrder sort_order = 1;
   repeated string placeholders = 2;

@@ -104,7 +104,7 @@ const DataTree = ({
     // Initializes and terminates the data processing web worker.
     useEffect(() => {
         if (!workerRef.current) {
-            workerRef.current = new Worker(new URL('../../../../workers/dataTree.worker.js', import.meta.url));
+            workerRef.current = new Worker(new URL('../../../../workers/dataTree.worker.js', import.meta.url), { type: 'module' });
         }
 
         return () => {
@@ -520,6 +520,12 @@ const DataTree = ({
         }
     }, [itemVisualStates]);
 
+    // Early validation to prevent TreeView warnings when data is not ready
+    // Only check updatedData (storedData can be empty during create mode)
+    if (!updatedData || Object.keys(updatedData).length === 0) {
+        return null;
+    }
+
     if (!treeData || treeData.length === 0) return null;
 
     const activeNodeIdsSet = new Set(treeData.map((node) => node.id));
@@ -641,12 +647,12 @@ DataTree.propTypes = {
     modelName: PropTypes.string.isRequired,
     updatedData: PropTypes.object.isRequired,
     storedData: PropTypes.object.isRequired,
-    subtree: PropTypes.object.isRequired,
+    subtree: PropTypes.object,
     mode: PropTypes.string.isRequired,
     xpath: PropTypes.string,
     onUpdate: PropTypes.func.isRequired,
     onUserChange: PropTypes.func.isRequired,
-    selectedId: PropTypes.string,
+    selectedId: PropTypes.number,
     showHidden: PropTypes.bool,
     enableObjectPagination: PropTypes.bool,
     treeLevel: PropTypes.number,

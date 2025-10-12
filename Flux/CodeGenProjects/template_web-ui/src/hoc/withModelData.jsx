@@ -10,7 +10,7 @@ import React, { useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import { getModelSchema } from '../utils/core/schemaUtils';
 import { getServerUrl } from '../utils/network/networkUtils';
-import { sliceMap } from '../models/sliceMap';
+import { sliceMapWithFallback } from '../models/sliceMap';
 
 /**
  * HOC that injects model metadata and data source config into a component.
@@ -18,9 +18,10 @@ import { sliceMap } from '../models/sliceMap';
  * @param {React.ComponentType<any>} ModelComponent - The component to wrap.
  * @param {object} config - Configuration for the HOC.
  * @param {string} config.modelName - Name of the primary model.
- * @param {string[]} [config.dataSources] - Optional secondary models used by the component.
+ * @param {string[]} [config.dataSources] - source models for AbbreviationMergeModel.
  * @param {boolean} [config.isAbbreviationSource=false] - Whether the model is an abbreviation source.
  * @param {string|null} [config.modelRootName=null] - Name of the root model if different from modelName.
+ * @param {object|null} [config.modelDependencyMap=null] - Map with optional keys (urlOverride, crudOverride, defaultFilter) where each value is a dataSource name.
  *
  * @returns {React.FC} - Enhanced component with model metadata props.
  */
@@ -30,6 +31,7 @@ export function withModelData(ModelComponent, config) {
     dataSources: dataSourceNames = [],
     isAbbreviationSource = false,
     modelRootName = null,
+    modelDependencyMap = null,
   } = config;
 
   /**
@@ -42,66 +44,83 @@ export function withModelData(ModelComponent, config) {
     const { schema, schemaCollections } = useSelector((state) => state.schema);
 
     /**
-     * Generate metadata for the primary model.
+     * Helper function to build dataSource object for a given model name.
+     * @param {string} dsName - The model name to use for schema lookup
+     * @param {string} [sliceLookupName] - Optional override for slice lookup (defaults to dsName)
+     * @param {object} [extraProps] - Additional properties to merge into the dataSource
      */
-    const modelDataSource = useMemo(() => {
+    const buildDataSource = useMemo(() => (dsName, sliceLookupName, extraProps = {}) => {
       if (!schema || !schemaCollections) return null;
 
-      const modelSchema = getModelSchema(modelName, schema);
-      const slice = sliceMap[modelRootName ?? modelName];
+      const lookupName = sliceLookupName ?? dsName;
+      const dsSchema = getModelSchema(dsName, schema);
+      const dsSlice = sliceMapWithFallback[lookupName];
 
-      if (!slice) {
-        console.warn(`[withModelData] Model "${modelName}" not found in sliceMap.`);
+      if (!dsSlice) {
+        console.warn(`[withModelData] Data source "${lookupName}" not found in sliceMapWithFallback.`);
         return null;
       }
 
       return {
-        name: modelName,
-        actions: slice.actions,
-        selector: slice.selector,
-        schema: modelSchema,
-        url: getServerUrl(modelSchema),
-        viewUrl: getServerUrl(modelSchema, undefined, undefined, undefined, true),
-        fieldsMetadata: schemaCollections[modelName],
-        isAbbreviationSource,
+        name: dsName,
+        actions: dsSlice.actions,
+        selector: dsSlice.selector,
+        schema: dsSchema,
+        url: getServerUrl(dsSchema),
+        viewUrl: getServerUrl(dsSchema, undefined, undefined, undefined, true),
+        fieldsMetadata: schemaCollections[dsName],
+        ...extraProps,
       };
     }, [schema, schemaCollections]);
+
+    /**
+     * Generate metadata for the primary model.
+     */
+    const modelDataSource = useMemo(() => {
+      const sliceLookupName = modelRootName ?? modelName;
+
+      return buildDataSource(modelName, sliceLookupName, { isAbbreviationSource });
+    }, [buildDataSource, modelName, modelRootName, isAbbreviationSource]);
 
     /**
      * Generate metadata for any secondary data sources.
      */
     const dataSources = useMemo(() => {
-      if (!schema || !schemaCollections || !dataSourceNames?.length) return null;
+      if (!dataSourceNames?.length) return null;
 
-      return dataSourceNames.map((dsName) => {
-        const dsSchema = getModelSchema(dsName, schema);
-        const dsSlice = sliceMap[dsName];
-
-        if (!dsSlice) {
-          console.warn(`[withModelData] Data source "${dsName}" not found in sliceMap.`);
-          return null;
-        }
-
-        return {
-          name: dsName,
-          actions: dsSlice.actions,
-          selector: dsSlice.selector,
-          schema: dsSchema,
-          url: getServerUrl(dsSchema),
-          viewUrl: getServerUrl(dsSchema, undefined, undefined, undefined, true),
-          fieldsMetadata: schemaCollections[dsName],
-        };
-      }).filter(Boolean); // Remove nulls due to missing slices
-    }, [schema, schemaCollections]);
+      return dataSourceNames
+        .map((dsName) => buildDataSource(dsName, null, {}))
+        .filter(Boolean);
+    }, [buildDataSource, dataSourceNames]);
 
     /**
-     * Inject either `dataSource` or `dataSources` prop based on component type.
+     * Process modelDependencyMap by replacing dataSource names with their corresponding dataSource objects.
+     * Only applicable for Root/NonRoot/RepeatedRoot models (not AbbreviationMergeModel).
+     */
+    const processedModelDependencyMap = useMemo(() => {
+      if (!modelDependencyMap) return null;
+
+      const processed = {};
+
+      for (const [key, dsName] of Object.entries(modelDependencyMap)) {
+        processed[key] = dsName ? buildDataSource(dsName, null, {}) : null;
+      }
+
+      return processed;
+    }, [modelDependencyMap, buildDataSource]);
+
+    /**
+     * Inject props based on component type:
+     * - AbbreviationMergeModel: only dataSources
+     * - Root/NonRoot/RepeatedRoot models: only modelDependencyMap and modelRootName
      * NOTE: Relying on component name (ModelComponent?.name) is brittle and should be refactored
      * to a more robust mechanism (e.g., explicit prop in config) if possible.
      */
-    const dataSourceProps = ModelComponent?.displayName === 'AbbreviationMergeModel'
-      ? { dataSources, modelRootName }
-      : { dataSource: dataSources?.[0] ?? null, modelRootName };
+    const isAbbreviationMerge = ModelComponent?.displayName === 'AbbreviationMergeModel';
+
+    const dataSourceProps = isAbbreviationMerge
+      ? { dataSources }
+      : { modelDependencyMap: processedModelDependencyMap, modelRootName };
 
     return (
       <ModelComponent

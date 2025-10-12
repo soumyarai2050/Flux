@@ -190,8 +190,7 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             underlying_read_contact_alert_http, underlying_create_all_contact_alert_http,
             underlying_read_plan_alert_http, underlying_delete_by_id_list_plan_alert_http,
             underlying_update_all_contact_alert_http, underlying_create_all_plan_alert_http,
-            underlying_update_all_plan_alert_http,
-            underlying_filtered_plan_alert_by_plan_id_query_http, underlying_delete_plan_alert_http,
+            underlying_update_all_plan_alert_http, underlying_delete_plan_alert_http,
             underlying_handle_plan_alerts_with_symbol_side_query_http,
             underlying_handle_plan_alerts_with_plan_id_query_http,
             underlying_read_plan_alert_http_json_dict)
@@ -209,8 +208,8 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
             underlying_read_plan_alert_http)
         LogBookServiceRoutesCallbackBaseNativeOverride.underlying_read_plan_alert_http_json_dict = (
             underlying_read_plan_alert_http_json_dict)
-        LogBookServiceRoutesCallbackBaseNativeOverride.underlying_filtered_plan_alert_by_plan_id_query_http = (
-            underlying_filtered_plan_alert_by_plan_id_query_http)
+        # LogBookServiceRoutesCallbackBaseNativeOverride.underlying_filtered_plan_alert_by_plan_id_query_http = (
+        #     underlying_filtered_plan_alert_by_plan_id_query_http)
         LogBookServiceRoutesCallbackBaseNativeOverride.underlying_delete_plan_alert_http = (
             underlying_delete_plan_alert_http)
         LogBookServiceRoutesCallbackBaseNativeOverride.underlying_delete_by_id_list_plan_alert_http = (
@@ -1746,7 +1745,17 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
         return []
 
     async def dismiss_all_plan_alert_by_plan_id_query_pre(self, plan_alert_class_type: Type[PlanAlert], plan_id: int):
-        return []
+        async with PlanAlert.reentrant_lock:
+            existing_plan_alerts: List[PlanAlert] = await (
+                LogBookServiceRoutesCallbackBaseNativeOverride.underlying_read_plan_alert_http(
+                    filters=[{"column_name": "plan_id", "filtered_values": [plan_id]}]))
+
+            for existing_plan_alert in existing_plan_alerts:
+                existing_plan_alert.dismiss = True
+
+            await LogBookServiceRoutesCallbackBaseNativeOverride.underlying_update_all_plan_alert_http(
+                existing_plan_alerts)
+
 
     async def handle_plan_pause_from_symbol_side_log_query_pre(
             self, handle_plan_pause_from_symbol_side_log_class_type: Type[HandlePlanPauseFromSymbolSideLog],
@@ -1801,10 +1810,9 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
     async def get_filtered_contact_alert_count_query_ws_pre(self, *args):
         return self.get_filtered_contact_alert_count_query_ws_callable, self.get_cascading_multi_filter_count_contact_alert_pipeline
 
-    async def get_filtered_contact_alert_count_query_ws_callable(
-            self, obj_json_str: str, obj_id_or_list: int | List[int], **kwargs):
+    async def get_filtered_contact_alert_count_query_ws_callable(self, **kwargs):
         # no additional filter required
-        return obj_json_str
+        return kwargs.get("json_obj_str")
 
     async def get_filtered_plan_alert_count_query_pre(self, plan_alert_class_type: Type[PlanAlert], filter_kwargs: List[Dict[str, Any]]):
         agg_pipeline = get_cascading_multi_filter_count_pipeline(PlanAlert, filter_kwargs)
@@ -1826,10 +1834,9 @@ class LogBookServiceRoutesCallbackBaseNativeOverride(LogBookServiceRoutesCallbac
     async def get_filtered_plan_alert_count_query_ws_pre(self, *args):
         return self.get_filtered_plan_alert_count_query_ws_callable, self.get_cascading_multi_filter_count_plan_alert_pipeline
 
-    async def get_filtered_plan_alert_count_query_ws_callable(
-            self, obj_json_str: str, obj_id_or_list: int | List[int], **kwargs):
+    async def get_filtered_plan_alert_count_query_ws_callable(self, **kwargs):
         # no additional filter required
-        return obj_json_str
+        return kwargs.get("json_obj_str")
 
 def _handle_plan_alert_ids_list_update_for_start_id_in_filter_callable(
         plan_alert_obj_json: Dict, plan_id: int, plan_id_to_start_alert_obj_list_dict: Dict, res_json_list: List):
@@ -1860,7 +1867,10 @@ def _handle_plan_alert_ids_list_update_for_start_id_in_filter_callable(
         # else not required: mismatched start_id case - not this ws' plan_id
 
 
-async def filtered_plan_alert_by_plan_id_query_callable(plan_alert_obj_json_str: str, obj_id_or_list: int | List[int], **kwargs):
+async def filtered_plan_alert_by_plan_id_query_callable(**kwargs):
+    plan_alert_obj_json_str = kwargs.get("json_obj_str")
+    obj_id_or_list = kwargs.get("obj_id_or_list")
+
     plan_id: int = kwargs.get('plan_id')
     if plan_id is None:
         err_str_ = ("filtered_plan_alert_by_plan_id_query_callable failed: received inappropriate **kwargs to be "

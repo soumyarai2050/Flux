@@ -154,6 +154,7 @@ message DealsLedger{
     DeleteOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
+  option (FluxMsgGetFilterCountQuery) = true;
   option (FluxMsgWidgetUIDataElement) = {
     x: 0,
     y: 58,
@@ -171,7 +172,7 @@ message DealsLedger{
     is_read_only: true
   };
   option (FluxMsgCRUDSharedLock) = "ledger_shared_lock";
-  option (FluxMsgUIGetAllLimit) = "-100";
+  option (FluxMsgUIGetAllLimit) = "100";
   option (FluxMsgJsonQuery) = {
       QueryName: "get_symbol_side_underlying_account_cumulative_fill_qty",
       AggregateVarName: "get_symbol_side_underlying_account_cumulative_fill_qty",

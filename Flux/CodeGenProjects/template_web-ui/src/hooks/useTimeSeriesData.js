@@ -64,7 +64,7 @@ const useTimeSeriesData = ({
             return chartDataWorkerRef.current;
         }
 
-        const worker = new Worker(new URL('../workers/chart-data.worker.js', import.meta.url));
+        const worker = new Worker(new URL('../workers/chart-data.worker.js', import.meta.url), { type: 'module' });
 
         // Handle messages from the specialized worker
         worker.onmessage = (event) => {
@@ -184,14 +184,13 @@ const useTimeSeriesData = ({
         const socket = new WebSocket(wsUrl);
 
         // Create WebSocket processing worker
-        const worker = new Worker(new URL('../workers/websocket-update.worker.js', import.meta.url));
+        const worker = new Worker(new URL('../workers/websocket-update.worker.js', import.meta.url), { type: 'module' });
 
         // Forward WebSocket messages to processing worker
         socket.onmessage = (event) => {
             worker.postMessage({
                 messages: [event.data],
                 storedArray: [],
-                uiLimit: null,
                 isAlertModel: false
             });
         };

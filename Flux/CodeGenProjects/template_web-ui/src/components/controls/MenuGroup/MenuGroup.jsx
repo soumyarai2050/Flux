@@ -27,7 +27,7 @@ import ButtonQuery from '../../ui/ButtonQuery';
  * @param {string} props.mode - Current application mode (e.g., 'read', 'edit').
  * @param {Array<string>} props.joinBy - Columns used for joining data.
  * @param {number} props.maxRowSize - Maximum number of rows to display.
- * @param {object} props.dataSourceColors - Colors associated with different data sources.
+ * @param {Array} props.dataSourceColors - Colors associated with different data sources.
  * @param {Array<object>} props.fieldsMetadata - Metadata for all fields.
  * @param {Array<object>} props.filters - Active filters.
  * @param {boolean} props.centerJoin - State for center join.
@@ -148,8 +148,8 @@ const MenuGroup = ({
     onButtonToggle,
     pinned,
     onPinToggle,
-    isAbbreviationSource,
-    isCreating,
+    isAbbreviationSource = false,
+    isCreating = false,
     onReload,
     onDiscard,
     charts = [],
@@ -177,7 +177,8 @@ const MenuGroup = ({
     onHighlightDurationChange,
     noCommonKeyOverride,
     onNoCommonKeyOverrideChange,
-    autoBoundParams = {}
+    autoBoundParams = {},
+    isReadOnly = false
 }) => {
     const [anchorEl, setAnchorEl] = useState(null);
 
@@ -444,7 +445,7 @@ const MenuGroup = ({
                         onMenuClose={handleMenuClose}
                         onPinToggle={handlePinToggle}
                         isAbbreviationSource={isAbbreviationSource}
-                        disableCreate={disableCreate}
+                        disableCreate={isReadOnly || disableCreate}
                     />
                 );
             case 'download':
@@ -470,7 +471,7 @@ const MenuGroup = ({
                         isPinned={pinned.includes(menuName)}
                         onMenuClose={handleMenuClose}
                         onPinToggle={handlePinToggle}
-                        disabled={isAbbreviationSource && isCreating}
+                        disabled={isReadOnly || (isAbbreviationSource && isCreating)}
                     />
                 );
             case 'layout-switch':
@@ -590,7 +591,7 @@ MenuGroup.propTypes = {
     mode: PropTypes.string.isRequired,
     joinBy: PropTypes.array.isRequired,
     maxRowSize: PropTypes.number.isRequired,
-    dataSourceColors: PropTypes.object.isRequired,
+    dataSourceColors: PropTypes.array.isRequired,
     fieldsMetadata: PropTypes.array.isRequired,
     filters: PropTypes.array.isRequired,
     centerJoin: PropTypes.bool.isRequired,
@@ -631,15 +632,15 @@ MenuGroup.propTypes = {
     onButtonToggle: PropTypes.func.isRequired,
     pinned: PropTypes.array.isRequired,
     onPinToggle: PropTypes.func.isRequired,
-    isAbbreviationSource: PropTypes.bool.isRequired,
-    isCreating: PropTypes.bool.isRequired,
+    isAbbreviationSource: PropTypes.bool,
+    isCreating: PropTypes.bool,
     onReload: PropTypes.func.isRequired,
     onDiscard: PropTypes.func,
     charts: PropTypes.array,
-    onChartToggle: PropTypes.func.isRequired,
+    onChartToggle: PropTypes.func,
     chartEnableOverride: PropTypes.array,
     pivots: PropTypes.array,
-    onPivotToggle: PropTypes.func.isRequired,
+    onPivotToggle: PropTypes.func,
     pivotEnableOverride: PropTypes.array,
     disableCreate: PropTypes.bool,
     commonKeyCollapse: PropTypes.bool,
@@ -661,6 +662,7 @@ MenuGroup.propTypes = {
     noCommonKeyOverride: PropTypes.array,
     onNoCommonKeyOverrideChange: PropTypes.func,
     autoBoundParams: PropTypes.object,
+    isReadOnly: PropTypes.bool,
 };
 
 export default MenuGroup;

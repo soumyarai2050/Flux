@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import WebSocketManager from "../services/WebSocketManger";
+import WebSocketManager from "../services/WebSocketManager";
 
 /**
  * @function useWebSocket

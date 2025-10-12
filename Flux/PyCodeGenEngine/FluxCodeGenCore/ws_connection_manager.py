@@ -1,18 +1,30 @@
 from typing import Dict, Set, List, Any, ClassVar, Tuple, Callable
-from fastapi import WebSocket, WebSocketDisconnect
 import logging
 import asyncio
 
+# 3rd party imports
+from fastapi import WebSocket, WebSocketDisconnect
+from msgspec import field
+
 # Project imports
 from FluxPythonUtils.scripts.async_rlock import AsyncRLock
-from FluxPythonUtils.scripts.model_base_utils import MsgspecBaseModel
+from FluxPythonUtils.scripts.model_base_utils import UniqueStrIdMsgspec
 
 
-class WSData(MsgspecBaseModel, kw_only=True):
+class WSData(UniqueStrIdMsgspec, kw_only=True):
+    id: str | None = field(default_factory=(lambda: WSData.next_id()))
     ws_object: WebSocket
     filter_callable: Callable[..., Any] | None = None
     filter_callable_kwargs: Dict[Any, Any] | None = None,
     projection_agg_pipeline_callable: Callable[..., Any] | None = None
+    has_pagination_with_or_without_filters: bool = False
+    has_only_filters: bool = False
+    allow_full_db_read_on_updates: bool = False
+    id_list_for_filter_only_ws: List[Any] = field(default_factory=list)
+
+    def __post_init__(self):
+        if self.id is None:
+            self.id = WSData.next_id()
 
 
 class WSConnectionManager:
@@ -85,32 +97,53 @@ class WSConnectionManager:
 class PathWSConnectionManager(WSConnectionManager):
     def __init__(self):
         super().__init__()
-        self.active_ws_data_list: List[WSData] = []
+        self.active_ws_data_dict: Dict[str, WSData] = {}
 
     def __str__(self):
         ret_str = "active_ws_set: "
         with self.rlock:
-            for ws_data in self.active_ws_data_list:
+            for ws_data in self.active_ws_data_dict.values():
                 ret_str += str(ws_data.ws_object)
             return ret_str + "\n" + str(super)
 
     async def connect(self, ws: WebSocket, filter_callable: Callable[..., Any] | None = None,
                       callable_kwargs: Dict[Any, Any] | None = None,
-                      projection_agg_pipeline_callable: Callable[..., Any] | None = None) -> bool:
+                      projection_agg_pipeline_callable: Callable[..., Any] | None = None, **kwargs) -> Tuple[bool, str]:
 
         async with self.rlock:
             is_new_ws: bool = await WSConnectionManager.add_to_master_ws_set(ws)
             # if ws not in self.active_ws_n_callable_tuple_set:
-            if not any(ws == active_ws_data.ws_object
-                       for active_ws_data in self.active_ws_data_list):
+
+            ws_exists: bool = False
+            for active_ws_data in self.active_ws_data_dict.values():
+                if ws == active_ws_data.ws_object:
+                    found_ws_data = active_ws_data
+                    ws_exists = True
+                    break
+
+            if not ws_exists:
                 # old or new ws does not matter - may have been added to master via a different path
                 if callable_kwargs is None:
                     callable_kwargs = {}
-                self.active_ws_data_list.append(WSData(ws_object=ws, filter_callable=filter_callable,
-                                                       filter_callable_kwargs=callable_kwargs,
-                                                       projection_agg_pipeline_callable=
-                                                       projection_agg_pipeline_callable))
-                return True
+                has_pagination_with_or_without_filters = False
+                if callable_kwargs.get("pagination"):
+                    has_pagination_with_or_without_filters = True
+
+                has_only_filters = False
+                if callable_kwargs.get("filters") and not callable_kwargs.get("pagination"):
+                    has_only_filters = True
+
+                allow_full_db_read_on_updates = kwargs.get("allow_full_db_read_on_updates", False)
+
+                ws_data = WSData(ws_object=ws, filter_callable=filter_callable,
+                                 filter_callable_kwargs=callable_kwargs,
+                                 projection_agg_pipeline_callable=
+                                 projection_agg_pipeline_callable,
+                                 has_pagination_with_or_without_filters=has_pagination_with_or_without_filters,
+                                 has_only_filters=has_only_filters,
+                                 allow_full_db_read_on_updates=allow_full_db_read_on_updates)
+                self.active_ws_data_dict[ws_data.id] = ws_data
+                return True, ws_data.id
             elif is_new_ws:
                 raise Exception(f"Unexpected! ws: {ws} is in active_ws_n_callable_tuple_set "
                                 f"while not in master: {str(self)}")
@@ -119,14 +152,13 @@ class PathWSConnectionManager(WSConnectionManager):
                 # present already in active_ws_n_callable_tuple_set
                 logging.debug("connect called on a pre-added ws from active_ws_n_callable_tuple_set, "
                               "investigate: maybe ignorable bug")
-                return False  # helps avoid starting a second recv call on this ws by caller
-        return True
+                return False, found_ws_data.id  # helps avoid starting a second recv call on this ws by caller
 
     async def disconnect(self, ws: WebSocket):
         async with self.rlock:
-            for fetched_ws_data in self.active_ws_data_list:
+            for fetched_ws_data in self.active_ws_data_dict.values():
                 if fetched_ws_data.ws_object == ws:
-                    self.active_ws_data_list.remove(fetched_ws_data)
+                    del self.active_ws_data_dict[fetched_ws_data.id]
                     break
             else:
                 logging.error(f"Unexpected! likely bug, ws: {ws} not in active_ws_n_callable_tuple_set: {str(self)}")
@@ -142,7 +174,8 @@ class PathWSConnectionManager(WSConnectionManager):
                 kwargs_dict = ws_data.filter_callable_kwargs
                 # somehow this was found as a string
                 if filter_callable is not None:
-                    json_str = await filter_callable(json_str, obj_id_or_list, **kwargs_dict)
+                    json_str = await filter_callable(ws_data=ws_data, json_obj_str=json_str,
+                                                     obj_id_or_list=obj_id_or_list, **kwargs_dict)
                 # else not required: if no filter_callable exists then pass json_str as is
 
                 if json_str:
@@ -164,43 +197,61 @@ class PathWSConnectionManager(WSConnectionManager):
                 await self.disconnect(remove_websocket)
 
     def get_activ_ws_data_list(self) -> List[WSData]:
-        return self.active_ws_data_list
+        return list(self.active_ws_data_dict.values())
 
+    def get_active_ws_data_by_ws_id(self, ws_id: str) -> WSData:
+        return self.active_ws_data_dict.get(ws_id)
 
 class PathWithIdWSConnectionManager(WSConnectionManager):
     def __init__(self):
         super().__init__()
-        self.id_to_active_ws_data_list_dict: Dict[Any, List[WSData]] = dict()
+        self.id_to_ws_id_to_active_ws_data_dict: Dict[Any, Dict[str, WSData]] = {}
 
     def __str__(self):
         ret_str = "active_ws_set: "
         with self.rlock:
-            for obj_id, active_ws_data_list in self.id_to_active_ws_data_list_dict.items():
-                set_as_str = "".join([str(ws_data.ws_object) for ws_data in active_ws_data_list])
+            for obj_id, active_ws_data_dict in self.id_to_ws_id_to_active_ws_data_dict.items():
+                set_as_str = "".join([str(ws_data.ws_object) for ws_data in active_ws_data_dict.values()])
                 ret_str += f"obj_id: {obj_id} set: {set_as_str}\n"
             return ret_str + "\n" + str(super)
 
     async def connect(self, ws: WebSocket, obj_id: Any, filter_callable: Callable[..., Any] | None = None,
                       callable_kwargs: Dict[Any, Any] | None = None,
-                      projection_agg_pipeline_callable: Callable[..., Any] | None = None) -> bool:
+                      projection_agg_pipeline_callable: Callable[..., Any] | None = None, **kwargs) -> Tuple[bool, str]:
 
         async with self.rlock:
             is_new_ws: bool = await WSConnectionManager.add_to_master_ws_set(ws)
             if callable_kwargs is None:
                 callable_kwargs = {}
+            has_pagination_with_or_without_filters = False
+            if callable_kwargs.get("pagination"):
+                has_pagination_with_or_without_filters = True
+
+            has_only_filters = False
+            if callable_kwargs.get("filters") is not None and callable_kwargs.get("pagination") is None:
+                has_only_filters = True
+
+            allow_full_db_read_on_updates = kwargs.get("allow_full_db_read_on_updates", False)
+
             # new or not, if id is not in dict, it's new for this path
-            if obj_id not in self.id_to_active_ws_data_list_dict:
-                self.id_to_active_ws_data_list_dict[obj_id] = []
-                self.id_to_active_ws_data_list_dict[obj_id].append(
-                    WSData(ws_object=ws, filter_callable=filter_callable, filter_callable_kwargs=callable_kwargs,
-                           projection_agg_pipeline_callable=projection_agg_pipeline_callable))
+            if obj_id not in self.id_to_ws_id_to_active_ws_data_dict:
+                self.id_to_ws_id_to_active_ws_data_dict[obj_id] = {}
+                ws_data = WSData(ws_object=ws, filter_callable=filter_callable, filter_callable_kwargs=callable_kwargs,
+                           projection_agg_pipeline_callable=projection_agg_pipeline_callable,
+                           has_pagination_with_or_without_filters=has_pagination_with_or_without_filters,
+                           has_only_filters=has_only_filters,
+                           allow_full_db_read_on_updates=allow_full_db_read_on_updates)
+                self.id_to_ws_id_to_active_ws_data_dict[obj_id][ws_data.id] = ws_data
             elif is_new_ws:  # we have the obj_id in our dict but master did not have this websocket
-                active_ws_n_filter_callable_tuple_list: List[WSData] = \
-                    self.id_to_active_ws_data_list_dict[obj_id]
-                if not (ws in [ws_data.ws_object for ws_data in active_ws_n_filter_callable_tuple_list]):
-                    self.id_to_active_ws_data_list_dict[obj_id].append(
-                        WSData(ws_object=ws, filter_callable=filter_callable, filter_callable_kwargs=callable_kwargs,
-                               projection_agg_pipeline_callable=projection_agg_pipeline_callable))
+                active_ws_dict: Dict[str, WSData] = \
+                    self.id_to_ws_id_to_active_ws_data_dict[obj_id]
+                if not (ws in [ws_data.ws_object for ws_data in active_ws_dict.values()]):
+                    ws_data = WSData(ws_object=ws, filter_callable=filter_callable, filter_callable_kwargs=callable_kwargs,
+                               projection_agg_pipeline_callable=projection_agg_pipeline_callable,
+                               has_pagination_with_or_without_filters=has_pagination_with_or_without_filters,
+                               has_only_filters=has_only_filters,
+                               allow_full_db_read_on_updates=allow_full_db_read_on_updates)
+                    self.id_to_ws_id_to_active_ws_data_dict[obj_id][ws_data.id] = ws_data
                     logging.debug("new client web-socket connect called on a pre-added obj_id-web-path")
                 else:
                     raise Exception(
@@ -208,19 +259,20 @@ class PathWithIdWSConnectionManager(WSConnectionManager):
                         f"but not in master: {str(self)}, likely a bug")
             else:
                 pass
-        return is_new_ws
+        return is_new_ws, ws_data.id
 
     async def disconnect(self, ws: WebSocket, obj_id: Any):
         async with self.rlock:
-            for fetched_ws_data in self.id_to_active_ws_data_list_dict[obj_id]:
+            fetched_active_ws_data_dict = self.id_to_ws_id_to_active_ws_data_dict.get(obj_id)
+            for fetched_ws_data in fetched_active_ws_data_dict.values():
                 if fetched_ws_data.ws_object == ws:
-                    self.id_to_active_ws_data_list_dict[obj_id].remove(fetched_ws_data)
+                    del fetched_active_ws_data_dict[fetched_ws_data.id]
                     break
             else:
                 logging.error(f"Unexpected! likely bug, ws: {ws} not in active_ws_n_callable_tuple_set "
                               f"for obj_id {obj_id}: {str(self)}")
-            if len(self.id_to_active_ws_data_list_dict[obj_id]) == 0:
-                del self.id_to_active_ws_data_list_dict[obj_id]
+            if len(self.id_to_ws_id_to_active_ws_data_dict[obj_id]) == 0:
+                del self.id_to_ws_id_to_active_ws_data_dict[obj_id]
             await WSConnectionManager.remove_from_master_ws_set(ws)
 
     # async def receive_in_json(self, websocket: WebSocket):
@@ -230,8 +282,15 @@ class PathWithIdWSConnectionManager(WSConnectionManager):
     #     else:
     #         return cleaned_json_data_str
 
-    def get_activ_ws_tuple_list_with_id(self, obj_id) -> Set[WSData] | None:
-        return self.id_to_active_ws_data_list_dict.get(obj_id)
+    def get_activ_ws_tuple_list_with_id(self, obj_id) -> List[WSData] | None:
+        fetched_active_ws_data_dict = self.id_to_ws_id_to_active_ws_data_dict.get(obj_id)
+        if fetched_active_ws_data_dict:
+            return list(fetched_active_ws_data_dict.values())
+        return None
+
+    def get_activ_ws_with_id_n_ws_id(self, obj_id, ws_id: str) -> WSData:
+        fetched_active_ws_data_dict = self.id_to_ws_id_to_active_ws_data_dict.get(obj_id)
+        return fetched_active_ws_data_dict.get(ws_id)
 
     async def broadcast(self, json_str, obj_id: int, ws_data: WSData, task_list: List[asyncio.Task]):
         async with self.rlock:
@@ -241,7 +300,8 @@ class PathWithIdWSConnectionManager(WSConnectionManager):
                 filter_callable_kwargs = ws_data.filter_callable_kwargs
                 # somehow this was found as a string
                 if filter_callable is not None:
-                    json_str = await filter_callable(json_str, obj_id, **filter_callable_kwargs)
+                    json_str = await filter_callable(ws_data=ws_data, json_obj_str=json_str,
+                                                     obj_id_or_list=obj_id, **filter_callable_kwargs)
                 # else not required: if no filter_callable exists then pass json_str as is
 
                 if json_str:
@@ -261,6 +321,6 @@ class PathWithIdWSConnectionManager(WSConnectionManager):
                 logging.exception(f"Exception: {e}, ws: {remove_websocket}")
             finally:
                 if remove_websocket is not None:
-                    if remove_websocket in self.id_to_active_ws_data_list_dict[obj_id]:
+                    if remove_websocket in list(self.id_to_ws_id_to_active_ws_data_dict[obj_id].values()):
                         await self.disconnect(remove_websocket, obj_id)
 

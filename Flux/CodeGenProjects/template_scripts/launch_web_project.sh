@@ -78,7 +78,6 @@ install_dev() {
   fi
   cd ../web-ui
   npm install
-  npm install react-json-view -f
   cd - || (echo "cd - failed from dir: $PWD"; exit 1)
   echo "Installed npm packages."
 }
@@ -167,19 +166,17 @@ run
 # go to web-ui folder and install npm dependencies
 #cd web-ui
 #npm install  # everytime any project file changes - this can be simplified TBD
-# some dependencies are not supported by react-18 and thus we need to force install them:
-#npm install react-json-view  -f
 
 # usage notes:
-# 1. In web in Dev / Debug mode (schema is serviced via react dev server):
+# 1. In web in Dev / Debug mode (schema is serviced via Vite dev server):
 # - API_PUBLIC_URL in file in web-ui/src/constants.js is already set to : 'http://127.0.0.1:3000'
-#   - 3K is default react port - upon startup confirm exact port
+#   - Port is configured in vite.config.js (read from project's data/config.yaml)
 
 # additional install for prod mode:
 # To start web in Prod mode (schema is serviced via fast-api server):
 # - set API_PUBLIC_URL in file in web-ui/src/constants.js to "static" URL of Fast API server
 # - export PUBLIC_URL=http://127.0.0.1:8000/static
-# - from web-ui dir , npm run build  # creates a build folder inside the Web-UI
+# - from web-ui dir , npm run build  # creates a build folder inside the Web-UI (using Vite)
 # - copy content generated in the build folder from above step to "static" folder of fast-api
 # cp -r build/* ../scripts/static/.
 # move index.html to templates folder
@@ -195,7 +192,7 @@ run
 
 # additional run notes when running UI in Dev/Debug mode Only
 # go inside web-ui directory and run:
-# - npm start
+# - npm start  # Runs Vite dev server (configured in package.json)
 
 
 # gotchas :

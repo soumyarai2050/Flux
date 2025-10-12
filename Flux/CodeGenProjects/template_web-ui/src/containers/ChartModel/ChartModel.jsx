@@ -5,7 +5,7 @@ import { getWidgetTitle, toCamelCase } from '../../utils';
 import { MODEL_TYPES } from '../../constants';
 import { useTheme } from '@emotion/react';
 import { generateChartOption, packageChartDataWithSchema, fetchChartSchema, transformChartTileData } from '../../utils/core/serviceUtils';
-import { sliceMap } from '../../models/sliceMap';
+import { sliceMapWithFallback as sliceMap } from '../../models/sliceMap';
 import ChartGallery from './ChartGallery';
 import { FullScreenModalOptional } from '../../components/ui/Modal';
 import { ModelCard, ModelCardHeader, ModelCardContent } from '../../components/utility/cards';
@@ -29,7 +29,7 @@ function ChartModel({ modelName, modelDataSource }) {
     const {
         selectedDataPoints,
         lastSelectedDataPoint,
-    } = useSelector(state => state[toCamelCase(modelName) + 'Node'] || {});
+    } = useSelector(state => state[modelName + '_node'] || {});
 
     const { storedArray: storedNodeArray } = useSelector(nodeSelector);
 
@@ -46,7 +46,6 @@ function ChartModel({ modelName, modelDataSource }) {
     useEffect(() => {
         if (detailedView && storedNodeArray && storedNodeArray.length > 0) {
             const realChartData = transformChartTileData(storedNodeArray);
-            console.log("this time useEffect set the data", realChartData)
             setSelectedChartData(realChartData);
         } else if (detailedView && (!storedNodeArray || storedNodeArray.length === 0)) {
             setSelectedChartData([]);

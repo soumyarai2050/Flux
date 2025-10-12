@@ -26,6 +26,7 @@ message SymbolSideSnapshot{
     DeleteOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
+  option (FluxMsgGetFilterCountQuery) = true;
   option (FluxMsgJsonQuery) = {
       QueryName: "get_symbol_side_snapshot_from_symbol_side",
       AggregateVarName: "get_symbol_side_snapshot_from_symbol_side",
@@ -95,6 +96,7 @@ message PlanStatus{
     DeleteOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
+  option (FluxMsgGetFilterCountQuery) = true;
   option (FluxMsgWidgetUIDataElement) = {
     x: 4,
     y: 23,
@@ -201,6 +203,7 @@ message PlanLimits{
     PassStoredObjToUpdatePrePostCallback: True,
     PassStoredObjToPartialUpdatePostCallback: True
   };
+  option (FluxMsgGetFilterCountQuery) = true;
   option (FluxMsgWidgetUIDataElement) = {
     x: 7,
     y: 0,

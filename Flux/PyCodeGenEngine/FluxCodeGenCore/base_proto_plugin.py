@@ -153,12 +153,18 @@ class BaseProtoPlugin(ABC):
     widget_ui_option_bind_id_fld_field: ClassVar[str] = "bind_id_fld"
     widget_ui_option_dynamic_widget_title_fld_field: ClassVar[str] = "dynamic_widget_title_fld"
     flux_msg_override_default_crud: ClassVar[str] = "FluxMsgOverrideDefaultCrud"
+    flux_msg_default_filter_param: ClassVar[str] = "FluxMsgDefaultFilterParam"
     override_default_crud_option_ui_crud_type_field: ClassVar[str] = "ui_crud_type"
     override_default_crud_option_query_name_field: ClassVar[str] = "query_name"
     override_default_crud_option_query_src_model_name_field: ClassVar[str] = "query_src_model_name"
     override_default_crud_option_ui_query_params_field: ClassVar[str] = "ui_query_params"
     override_default_crud_option_ui_query_params_name_field: ClassVar[str] = "query_param_name"
     override_default_crud_option_ui_query_params_value_src_field: ClassVar[str] = "query_param_value_src"
+    default_filter_param_src_model_name_field: ClassVar[str] = "param_src_model_name"
+    default_filter_param_ui_filter_params_field: ClassVar[str] = "ui_filter_params"
+    default_filter_param_params_name_field: ClassVar[str] = "param_name"
+    default_filter_param_value_src_field: ClassVar[str] = "param_value_src"
+    default_filter_param_param_value_field: ClassVar[str] = "param_value"
     widget_ui_option_depending_proto_model_field_name_for_host: ClassVar[str] = \
         "depending_proto_model_field_name_for_host"
     widget_ui_option_depending_proto_model_field_name_for_port: ClassVar[str] = \
@@ -205,6 +211,7 @@ class BaseProtoPlugin(ABC):
     flux_fld_column_direction: ClassVar[str] = "FluxFldColumnDirection"
     flux_fld_micro_separator: ClassVar[str] = "FluxFldMicroSeparator"
     flux_msg_ui_get_all_limit: ClassVar[str] = "FluxMsgUIGetAllLimit"
+    flux_msg_server_side_pagination: ClassVar[str] = "FluxMsgServerSidePagination"
     flux_fld_abbreviated_link: ClassVar[str] = "FluxFldAbbreviatedLink"
     flux_fld_mapping_underlying_meta_field: ClassVar[str] = "FluxFldMappingUnderlyingMetaField"
     flux_fld_mapping_src: ClassVar[str] = "FluxFldMappingSrc"
@@ -291,9 +298,12 @@ class BaseProtoPlugin(ABC):
         widget_ui_option_bind_id_fld_field,
         widget_ui_option_dynamic_widget_title_fld_field
     ]
-    override_default_crud_option_fields_having_msg_names: List[str] = [
+    override_default_crud_n_default_filter_params_option_fields_having_msg_names: List[str] = [
         override_default_crud_option_query_src_model_name_field,
         override_default_crud_option_ui_query_params_value_src_field,
+        default_filter_param_src_model_name_field,
+        default_filter_param_value_src_field
+
     ]
 
     def __init__(self, base_dir_path: str):
@@ -471,27 +481,23 @@ class BaseProtoPlugin(ABC):
                 if field_name_search_str in option_string:
                     field_name_index = option_string.index(field_name_search_str)
                     option_string_sliced = option_string[field_name_index + len(field_name_search_str):]
-                    new_line_index = option_string_sliced.index("\n")
-                    field_val = BaseProtoPlugin._type_cast_option_str_val_to_type(option_string_sliced[:new_line_index],
-                                                                                  field.kind.name.lower())
-
-                    is_repeated = False
-                    field_val_list = []
                     if field.cardinality.name.lower() == "repeated":
-                        is_repeated = True
-                        field_val_list.append(field_val)
-                        while field_name_search_str in option_string_sliced:
-                            field_name_index = option_string_sliced.index(field_name_search_str)
-                            option_string_sliced = option_string_sliced[field_name_index+len(field_name_search_str):]
-                            new_line_index = option_string_sliced.index("\n")
+                        option_string_sliced_list = option_string_sliced.split(field_name_search_str)
+                        field_val_list = []
+                        for option_string_sliced_ in option_string_sliced_list:
+                            new_line_index = option_string_sliced_.index("\n")
                             field_val = \
-                                BaseProtoPlugin._type_cast_option_str_val_to_type(option_string_sliced[:new_line_index],
+                                BaseProtoPlugin._type_cast_option_str_val_to_type(option_string_sliced_[:new_line_index],
                                                                                   field.kind.name.lower())
                             field_val_list.append(field_val)
 
-                    if is_repeated:
                         output_dict[field.proto.name] = field_val_list
                     else:
+                        new_line_index = option_string_sliced.index("\n")
+                        field_val = BaseProtoPlugin._type_cast_option_str_val_to_type(
+                            option_string_sliced[:new_line_index],
+                            field.kind.name.lower())
+
                         output_dict[field.proto.name] = field_val
 
             else:
@@ -499,26 +505,22 @@ class BaseProtoPlugin(ABC):
                 if field_name_search_str in option_string:
                     field_name_index = option_string.index(field_name_search_str)
                     option_string_sliced = option_string[field_name_index + len(field_name_search_str):]
-                    field_val = (
-                        BaseProtoPlugin._get_complex_option_value_from_proto(option_string_sliced, option_type=field.message))
-
-                    is_repeated = False
-                    field_val_list = []
                     if field.cardinality.name.lower() == "repeated":
-                        is_repeated = True
-                        field_val_list.append(field_val)
-                        while field_name_search_str in option_string_sliced:
-                            field_name_index = option_string_sliced.index(field_name_search_str)
-                            option_string_sliced = option_string_sliced[field_name_index + len(field_name_search_str):]
+                        field_val_list = []
+                        option_string_sliced_list = option_string_sliced.split(field_name_search_str)
+                        for option_string_sliced_ in option_string_sliced_list:
                             field_val = (
-                                BaseProtoPlugin._get_complex_option_value_from_proto(option_string_sliced,
+                                BaseProtoPlugin._get_complex_option_value_from_proto(option_string_sliced_,
                                                                                      option_type=field.message))
                             field_val_list.append(field_val)
 
-                    if is_repeated:
                         output_dict[field.proto.name] = field_val_list
                     else:
+                        field_val = (
+                            BaseProtoPlugin._get_complex_option_value_from_proto(option_string_sliced,
+                                                                                 option_type=field.message))
                         output_dict[field.proto.name] = field_val
+
         return output_dict
 
     @staticmethod
@@ -1097,31 +1099,53 @@ class BaseProtoPlugin(ABC):
         widget_ui_data_option_value_dict = remove_none_values(widget_ui_data_option_value_dict)
         return widget_ui_data_option_value_dict
 
+    def _handle_override_defaul_crud_option_values_having_msg_name(
+            self, override_default_crud_option_value_dict_list,
+            all_message_dict: Dict[str, protogen.Message]):
+        for idx, override_default_crud_option_val in enumerate(override_default_crud_option_value_dict_list):
+            override_default_crud_option_value_dict_list[idx] = self._handle_default_filter_params_option_values_having_msg_name(override_default_crud_option_val,
+                                                                                                                                 all_message_dict)
+        # removing none from dict
+        override_default_crud_option_value_dict_list = remove_none_values(override_default_crud_option_value_dict_list)
+        return override_default_crud_option_value_dict_list
+
+    def _handle_default_filter_params_option_values_having_msg_name(self, option_value,
+                                                                    all_message_dict: Dict[str, protogen.Message]):
+        for option_field_key, option_val in option_value.items():
+            if option_field_key in BaseProtoPlugin.override_default_crud_n_default_filter_params_option_fields_having_msg_names:
+                case_handled_value = self.handle_options_value_having_msg_or_fld_name(option_val,
+                                                                                      option_field_key,
+                                                                                      all_message_dict,
+                                                                                      hard_msg_check=True)
+                option_value[option_field_key] = case_handled_value
+            elif option_field_key in [BaseProtoPlugin.override_default_crud_option_ui_query_params_field,
+                                               BaseProtoPlugin.default_filter_param_ui_filter_params_field]:
+                for idx, ui_query_params_option_val_dict in enumerate(option_val):
+                    for ui_query_params_key, ui_query_params_val in ui_query_params_option_val_dict.items():
+                        if ui_query_params_key in BaseProtoPlugin.override_default_crud_n_default_filter_params_option_fields_having_msg_names:
+                            case_handled_value = self.handle_options_value_having_msg_or_fld_name(
+                                ui_query_params_val, ui_query_params_key,
+                                all_message_dict, hard_msg_check=True)
+                            ui_query_params_option_val_dict[ui_query_params_key] = case_handled_value
+        # removing none from dict
+        option_value = remove_none_values(option_value)
+        return option_value
+
     def handle_n_get_override_default_crud_option_value_having_msg_name(self, message: protogen.Message,
                                                                         all_message_dict: Dict[str, protogen.Message]):
         override_default_crud_option_value_dict_list = \
             self.get_complex_option_value_from_proto(message,
                                                      BaseProtoPlugin.flux_msg_override_default_crud,
                                                      is_option_repeated=True)
-        for idx, override_default_crud_option_val in enumerate(override_default_crud_option_value_dict_list):
-            for override_default_crud_key, override_default_crud_value in override_default_crud_option_val.items():
-                if override_default_crud_key in BaseProtoPlugin.override_default_crud_option_fields_having_msg_names:
-                    case_handled_value = self.handle_options_value_having_msg_or_fld_name(override_default_crud_value,
-                                                                                          override_default_crud_key,
-                                                                                          all_message_dict,
-                                                                                          hard_msg_check=True)
-                    override_default_crud_option_val[override_default_crud_key] = case_handled_value
-                elif override_default_crud_key == BaseProtoPlugin.override_default_crud_option_ui_query_params_field:
-                    for idx, ui_query_params_option_val_dict in enumerate(override_default_crud_value):
-                        for ui_query_params_key, ui_query_params_val in ui_query_params_option_val_dict.items():
-                            if ui_query_params_key in BaseProtoPlugin.override_default_crud_option_fields_having_msg_names:
-                                case_handled_value = self.handle_options_value_having_msg_or_fld_name(
-                                    ui_query_params_val, ui_query_params_key,
-                                    all_message_dict, hard_msg_check=True)
-                                ui_query_params_option_val_dict[ui_query_params_key] = case_handled_value
-        # removing none from dict
-        override_default_crud_option_value_dict_list = remove_none_values(override_default_crud_option_value_dict_list)
-        return override_default_crud_option_value_dict_list
+        return self._handle_override_defaul_crud_option_values_having_msg_name(override_default_crud_option_value_dict_list, all_message_dict)
+
+    def handle_n_get_default_filter_param_value_having_msg_name(self, message: protogen.Message,
+                                                                all_message_dict: Dict[str, protogen.Message]):
+        default_filter_param_value_dict_list = \
+            self.get_complex_option_value_from_proto(message,
+                                                     BaseProtoPlugin.flux_msg_default_filter_param)
+        return self._handle_default_filter_params_option_values_having_msg_name(
+            default_filter_param_value_dict_list, all_message_dict)
 
     def _get_core_dependency_file_list(self, project_service_file: protogen.File) -> List[protogen.File]:
         core_dependency_file_list = []

@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux'; // TODO: SPOOFING - useDispatch added for testing without backend
 // third-party package imports
 import {
     Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Divider, List, ListItem, ListItemButton, ListItemText
 } from '@mui/material';
 import { cloneDeep, get, isEqual } from 'lodash';
-import { Add, Close, Delete, Save, Error } from '@mui/icons-material';
+import { Add, Close, Delete, Save, Error, Publish } from '@mui/icons-material';
 // project constants and common utility function imports
 import { DATA_TYPES, MODES, API_ROOT_URL, MODEL_TYPES, DB_ID } from '../../../../constants';
 import { addxpath, clearxpath } from '../../../../utils/core/dataAccess';
@@ -15,8 +15,7 @@ import {
     updateChartDataObj, updateChartSchema, updatePartitionFldSchema
 } from '../../../../utils/core/chartUtils';
 import { generateObjectFromSchema, getModelSchema } from '../../../../utils/core/schemaUtils';
-import { getIdFromAbbreviatedKey } from '../../../../utils/core/dataUtils';
-import { getCollectionByName } from '../../../../utils/core/dataUtils';
+import { sliceMapWithFallback as sliceMap } from '../../../../models/sliceMap'; // TODO: SPOOFING - for chart_tile injection
 // custom component imports
 import Icon from '../../../ui/Icon';
 import FullScreenModal from '../../../ui/Modal';
@@ -29,12 +28,15 @@ import DataTree from '../../trees/DataTree';
 import { ModelCard, ModelCardContent, ModelCardHeader } from '../../../utility/cards';
 import QuickFilterPin from '../../../controls/QuickFilterPin';
 import ContentCopier from '../../../ui/ContentCopier';
+import { CHART_PUBLISH_URL } from '../../../../config';
 // custom hooks
 import useTimeSeriesData from '../../../../hooks/useTimeSeriesData';
 
 const CHART_SCHEMA_NAME = 'chart_data';
 
 function ChartView({
+    modelName,
+    sourceBaseUrl,
     chartData,
     chartRows,
     fieldsMetadata,
@@ -57,8 +59,11 @@ function ChartView({
     lastSelectedRowId
 }) {
     // redux states
+    const dispatch = useDispatch(); // TODO: SPOOFING - dispatch for testing without backend -remove when backend is ready
     const theme = useTheme();
     const { schema: projectSchema, schemaCollections } = useSelector(state => state.schema);
+    // TODO: SPOOFING - Get chart_tile Redux state for spoofing
+    const chartTileState = useSelector(sliceMap['chart_tile']?.selector || (() => ({ storedArray: [] })));
 
     // Core chart state
     const [storedChartObj, setStoredChartObj] = useState({});     // Original chart configuration from props
@@ -521,6 +526,57 @@ function ChartView({
         }
     }
 
+    const handlePublish = (e, chart) => {
+        e.stopPropagation();
+
+        // Validate that we have the required metadata
+        if (!modelName || !sourceBaseUrl) {
+            console.error('Cannot publish: missing source metadata', { modelName, sourceBaseUrl });
+            return;
+        }
+
+        // Prepare the payload
+        const publishPayload = {
+            _id: Date.now(), // Generate temp ID
+            chart_data: clearxpath(cloneDeep(chart)),
+            source_model_name: modelName,
+            source_model_base_url: sourceBaseUrl
+        };
+
+        console.log('PUBLISH PAYLOAD:', JSON.stringify(publishPayload, null, 2));
+
+        // ========================================
+        // TODO: SPOOFING - Direct Redux injection for testing without backend
+        // Remove this section when backend is ready
+        // ========================================
+        try {
+            const chartTileSlice = sliceMap['chart_tile'];
+            if (chartTileSlice && chartTileSlice.actions) {
+                // Use chartTileState from top-level useSelector
+                const updatedArray = [...(chartTileState.storedArray || []), publishPayload];
+
+                // Dispatch to Redux store
+                dispatch(chartTileSlice.actions.setStoredArray(updatedArray));
+            } else {
+                console.warn('⚠️ chart_tile slice not found in sliceMap');
+            }
+        } catch (error) {
+            console.error('❌ SPOOFING failed:', error);
+        }
+        // ========================================
+        // End SPOOFING section
+        // ========================================
+
+        // TODO: Real backend call (uncomment when ready)
+        // axios.post(`${CHART_PUBLISH_URL}`, publishPayload)
+        //     .then(response => {
+        //         console.log('Chart published successfully:', response.data);
+        //     })
+        //     .catch(error => {
+        //         console.error('Failed to publish chart:', error);
+        //     });
+    }
+
     const handleDoubleClick = (index) => {
         handleSelect(index);
         if (mode === MODES.READ) {
@@ -907,6 +963,9 @@ function ChartView({
 
                         <>
                             <ContentCopier text={item.chart_name} />
+                            <Icon title='Publish' onClick={(e) => handlePublish(e, item)}>
+                                <Publish fontSize='small' />
+                            </Icon>
                             <Icon title='Delete' onClick={(e) => handleChartDelete(e, item.chart_name, index)}>
                                 <Delete fontSize='small' />
                             </Icon>

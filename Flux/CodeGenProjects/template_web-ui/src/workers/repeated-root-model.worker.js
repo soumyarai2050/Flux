@@ -13,7 +13,7 @@ onmessage = (e) => {
     const { storedArray, updatedObj, fieldsMetadata, filters, mode, page, rowsPerPage, sortOrders,
         joinBy, joinSort, enableOverride, disableOverride, showLess, showHidden, showAll, showMore, moreAll,
         columnOrders, frozenColumns, columnNameOverride, highlightUpdateOverride, noCommonKeyOverride,
-        centerJoin, flip, rowIds
+        centerJoin, flip, rowIds, serverSidePaginationEnabled
     } = e.data;
     const filterFieldsMetadata = fieldsMetadata.filter((meta) => meta.filterEnable);
     const filterAppliedFields = new Set(filters?.map((o) => o.column_name) ?? []);
@@ -24,7 +24,13 @@ onmessage = (e) => {
     const rows = getTableRows(fieldsMetadata, mode, filteredArray, updatedArray, null, true);
     const rowIdsFilteredRows = applyRowIdsFilter(rows, rowIds);
     const groupedRows = getGroupedTableRows(rowIdsFilteredRows, joinBy, joinSort);
-    const { sortedRows, activeRows } = getActiveRows(groupedRows, page, rowsPerPage, sortOrders, true);
+
+    // If server-side pagination is enabled, skip client-side pagination slice
+    //we have used serverSidePaginationEnabled here to skip client-side pagination
+    // The storedArray already contains only the rows for the current page
+    const { sortedRows, activeRows } = serverSidePaginationEnabled
+        ? getActiveRows(groupedRows, 0, rowsPerPage, sortOrders, true)
+        : getActiveRows(groupedRows, page, rowsPerPage, sortOrders, true);
     const maxRowSize = getMaxRowSize(activeRows);
     const updatedMode = mode === MODES.EDIT && !rowIds ? mode : MODES.READ;
     const columns = getTableColumns(fieldsMetadata, updatedMode, {

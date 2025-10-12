@@ -25,7 +25,7 @@ import CustomEdge from '../Edges/CustomEdge';
 import NodeSelector from '../NodeSelector';
 import useClickIntent from '../../../../hooks/useClickIntent';
 import { fetchNodeData, getCachedNodeData, fetchAnalysedData } from '../../../../services/GraphNodeService';
-import { sliceMap } from '../../../../models/sliceMap';
+import { sliceMapWithFallback as sliceMap } from '../../../../models/sliceMap';
 import { DB_ID, MODES } from '../../../../constants';
 import { generateObjectFromSchema, getModelSchema, snakeToCamel } from '../../../../utils';
 import { getJoinColor } from '../../../../utils/ui/colorUtils';
@@ -133,7 +133,7 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
     const { schema: projectSchema, schemaCollections } = useSelector(state => state.schema);
     const { selector, actions, fieldsMetadata } = modelDataSource;
     const { updatedObj, mode } = useSelector(selector);
-    const { contextId } = useSelector(state => state[snakeToCamel(modelName)]);
+    const { contextId } = useSelector(state => state[modelName]);
     const dispatch = useDispatch();
 
     const theme = useTheme();

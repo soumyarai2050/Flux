@@ -424,13 +424,16 @@ class FastapiHttpClientFileHandler(BaseFastapiPlugin, ABC):
             output_str = " " * 4 + f"def {query_name}_query_client(self, {params_str}) -> " \
                                     f"List[{container_model_name}]:\n"
             params_dict_str = \
-                ', '.join([f'"{query_param}": orjson.dumps({query_param})' for query_param in query_params])
+                ', '.join([f'"{query_param}": {query_param}' for query_param in query_params])
             if route_type is None or route_type == FastapiHttpClientFileHandler.flux_json_query_route_get_type_field_val:
                 for query_param in query_params:
                     output_str += " " * 4 + (f"    {query_param} = generic_encoder({query_param}, "
                                              f"{message_name}.enc_hook, "
                                              "exclude_none=True)   # removes none values from dict\n")
                 output_str += " " * 4 + "    query_params_dict = {" + f"{params_dict_str}" + "}\n"
+                output_str += " " * 4 + "    for query_param_name, query_param_val in query_params_dict.items(): \n"
+                output_str += " " * 4 + ("        query_params_dict[query_param_name] = "
+                                         "orjson.dumps(query_param_val, default=non_jsonable_types_handler)\n")
                 output_str += " " * 4 + f"    return generic_http_get_query_client(self.query_{query_name}_url, " \
                                         f"query_params_dict, {container_model_name})\n\n"
             else:

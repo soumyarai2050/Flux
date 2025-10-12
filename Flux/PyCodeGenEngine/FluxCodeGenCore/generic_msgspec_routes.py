@@ -29,6 +29,7 @@ from FluxPythonUtils.scripts.general_utility_functions import (
 from Flux.PyCodeGenEngine.FluxCodeGenCore.generic_route_utils import get_aggregate_pipeline, generic_perf_benchmark
 from FluxPythonUtils.scripts.model_base_utils import MsgspecBaseModel, remove_none_values
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_aggregate import *
+from FluxPythonUtils.scripts.async_rlock import AsyncRLock
 
 """
 1. FilterAggregate [only filters the returned value]
@@ -62,7 +63,7 @@ async def broadcast_all_from_active_ws_data_set(active_ws_data_set: List[WSData]
                                                 db_obj_id_list: List[Any], db_obj_dict_list: List[Dict[str, Any]],
                                                 broadcast_callable: Callable,
                                                 tasks_list: List[asyncio.Task],
-                                                has_links: bool | None = None):
+                                                has_links: bool | None = None, **kwargs):
     for ws_data in active_ws_data_set:
         projection_agg_params = ws_data.filter_callable_kwargs
         projection_agg_pipeline_callable = ws_data.projection_agg_pipeline_callable
@@ -71,7 +72,8 @@ async def broadcast_all_from_active_ws_data_set(active_ws_data_set: List[WSData]
             filter_agg_pipeline: Dict[str, List] = projection_agg_pipeline_callable(**projection_agg_params)
 
             # inserting match by obj_list as top match filter
-            filter_agg_pipeline["aggregate"].insert(0, get_match_layer_for_obj_id_list(db_obj_id_list))
+            if not ws_data.allow_full_db_read_on_updates:
+                filter_agg_pipeline["aggregate"].insert(0, get_match_layer_for_obj_id_list(db_obj_id_list))
 
             db_obj_dict_list = await get_obj_list(msgspec_class_type, db_obj_id_list,
                                                   filter_agg_pipeline=filter_agg_pipeline,
@@ -85,10 +87,67 @@ async def broadcast_all_from_active_ws_data_set(active_ws_data_set: List[WSData]
             for obj_json in db_obj_dict_list:
                 # handling all datetime fields - converting to epoch int values before passing to ws network
                 msgspec_class_type.convert_ts_fields_from_datetime_to_epoch_int(obj_json)
-        # else not required: passing provided db_obj_dict_list if ws_data is not of projection type to avoid
-        # multiple look-ups as fetched db_obj_dict_list will also be exact same unless some projection is required on it
 
-        json_str = orjson.dumps(db_obj_dict_list, default=non_jsonable_types_handler).decode('utf-8')
+            if ws_data.allow_full_db_read_on_updates:
+                # full db read is done for projecting to single obj for example counting
+                # filtered docs - sending it as obj instead of list
+                json_str = orjson.dumps(db_obj_dict_list[0], default=non_jsonable_types_handler).decode('utf-8')
+            else:
+                json_str = orjson.dumps(db_obj_dict_list, default=non_jsonable_types_handler).decode('utf-8')
+
+        elif ws_data.has_pagination_with_or_without_filters:    # has pagination might also have filters and sort along with pagination
+            page_changes = kwargs.get("page_changes")
+            if page_changes is not None:
+                for page_change in page_changes:
+                    if page_change.get("page_id") == ws_data.id:
+                        change_list = page_change.get("changes")
+                        if not change_list:
+                            # create or delete didn't impact in any change on this page
+                            continue
+                        if len(change_list) == 1:
+                            # to send obj to ws notification if only single obj is to be sent - this is how
+                            # UI expects ws updates
+                            change_list = change_list[0]
+                        json_str = orjson.dumps(change_list, default=non_jsonable_types_handler).decode("utf-8")
+                        break
+                else:
+                    logging.error("Unexpected: ws found with ws_data having flag has_pagination_with_or_without_filters True but page_id not "
+                                  f"found in detected changes ;;; {ws_data=}, {page_changes=}")
+                    continue
+            else:
+                # Either create/delete happened after ws pages so no impact on any page or put/patch happened
+                # before or after page on attributes which doesn't affect pages
+                continue
+        elif ws_data.has_only_filters:   # filter
+
+            filtered_db_obj_list = []
+
+            id_list_for_filter_only_ws = ws_data.id_list_for_filter_only_ws
+
+            for db_obj_dict in db_obj_dict_list:
+                fetched_id = db_obj_dict.get("_id")
+                if fetched_id in id_list_for_filter_only_ws:
+                    if len(db_obj_dict) == 1:
+                        # delete case
+                        id_list_for_filter_only_ws.remove(fetched_id)
+                        filtered_db_obj_list.append(db_obj_dict)
+                    else:
+                        # create/update case
+                        json_obj_list = await _handle_filter_on_paginated_or_filter_ws(db_obj_id_list,
+                                                                                       **ws_data.filter_callable_kwargs)
+                        filtered_db_obj_list.extend(json_obj_list)
+                else:
+                    # this id doesn't belong to this ws's filtered docs - no update notification is required
+                    continue
+
+            if not filtered_db_obj_list:
+                continue
+            json_str = orjson.dumps(filtered_db_obj_list, default=non_jsonable_types_handler).decode("utf-8")
+
+        else:
+            # when ws is without any filter, sort or pagination
+            json_str = orjson.dumps(db_obj_dict_list, default=non_jsonable_types_handler).decode("utf-8")
+
         await broadcast_callable(json_str, db_obj_id_list, ws_data, tasks_list)
 
 
@@ -97,7 +156,7 @@ async def broadcast_from_active_ws_data_set(active_ws_data_set: List[WSData], ms
                                             broadcast_callable: Callable,
                                             tasks_list: List[asyncio.Task],
                                             broadcast_with_id: bool | None = None,
-                                            has_links: bool | None = None):
+                                            has_links: bool | None = None, **kwargs):
     for ws_data in active_ws_data_set:
         projection_agg_params = ws_data.filter_callable_kwargs
         projection_agg_pipeline_callable = ws_data.projection_agg_pipeline_callable
@@ -106,7 +165,8 @@ async def broadcast_from_active_ws_data_set(active_ws_data_set: List[WSData], ms
             filter_agg_pipeline = projection_agg_pipeline_callable(**projection_agg_params)
 
             # inserting match by obj_list as top match filter
-            filter_agg_pipeline["aggregate"].insert(0, get_match_layer_for_obj_id_list([db_obj_id]))
+            if not ws_data.allow_full_db_read_on_updates:
+                filter_agg_pipeline["aggregate"].insert(0, get_match_layer_for_obj_id_list([db_obj_id]))
 
             db_obj_dict = await get_obj(msgspec_class_type, db_obj_id,
                                         filter_agg_pipeline=filter_agg_pipeline,
@@ -119,16 +179,88 @@ async def broadcast_from_active_ws_data_set(active_ws_data_set: List[WSData], ms
 
             # handling all datetime fields - converting to epoch int values before passing to ws network
             msgspec_class_type.convert_ts_fields_from_datetime_to_epoch_int(db_obj_dict)
+            json_str = orjson.dumps(db_obj_dict, default=non_jsonable_types_handler).decode("utf-8")
 
         # else not required: passing provided db_obj_dict if ws_data is not of projection type to avoid
         # multiple look-ups as fetched object will also be exact same unless some projection is required on it
 
-        json_str = orjson.dumps(db_obj_dict, default=non_jsonable_types_handler).decode("utf-8")
+        elif ws_data.has_pagination_with_or_without_filters:    # might also have filters and sort along with pagination - handled already
+            if "page_changes" in kwargs:
+                # when this was create or delete - websockets paginating may receive page changes - having
+                # "page_changes" is way to know if it is create/delete as it is only set in create or delete operation
+                page_changes = kwargs.get("page_changes")
+                if page_changes is not None:
+                    for page_change in page_changes:
+                        if page_change.get("page_id") == ws_data.id:
+                            change_list = page_change.get("changes")
+                            if not change_list:
+                                # create or delete didn't impact in any change on this page
+                                continue
+                            if len(change_list) == 1:
+                                # to send obj to ws notification if only single obj is to be sent - this is how
+                                # UI expects ws updates
+                                change_list = change_list[0]
+                            json_str = orjson.dumps(change_list, default=non_jsonable_types_handler).decode("utf-8")
+                            break
+                    else:
+                        logging.error("Unexpected: ws found with ws_data having flag has_pagination_with_or_without_filters True but page_id not "
+                                      f"found in detected changes ;;; {ws_data=}, {page_changes=}")
+                        continue
+                else:
+                    # create/delete happened after ws pages so no impact on current pages
+                    continue
+            else:
+                # if it was put/patch - since page will not change so no page_changes will be detected so handling
+                # it as usual update
+                json_obj_list = await _handle_filter_on_paginated_or_filter_ws([db_obj_id],
+                                                                               **ws_data.filter_callable_kwargs)
+                # since it is single update
+                json_str = orjson.dumps(json_obj_list[0], default=non_jsonable_types_handler).decode("utf-8")
+        elif ws_data.has_only_filters:   # filter
+
+            id_list_for_filter_only_ws = ws_data.id_list_for_filter_only_ws
+            fetched_id = db_obj_dict.get("_id")
+            if fetched_id in id_list_for_filter_only_ws:
+                if len(db_obj_dict) == 1:
+                    # delete case
+                    id_list_for_filter_only_ws.remove(fetched_id)
+                    json_str = orjson.dumps(db_obj_dict, default=non_jsonable_types_handler).decode("utf-8")
+                else:
+                    # create/update case
+                    json_obj_list = await _handle_filter_on_paginated_or_filter_ws([db_obj_id],
+                                                                                   **ws_data.filter_callable_kwargs)
+                    # since it is single update
+                    json_str = orjson.dumps(json_obj_list[0], default=non_jsonable_types_handler).decode("utf-8")
+            else:
+                # this id doesn't belong to this ws's filtered docs - no update notification is required
+                continue
+        else:
+            # when ws is without any filter, sort or pagination
+            json_str = orjson.dumps(db_obj_dict, default=non_jsonable_types_handler).decode("utf-8")
         await broadcast_callable(json_str, db_obj_id, ws_data, tasks_list)
+
+async def _handle_filter_on_paginated_or_filter_ws(obj_id_or_list: List[int], **kwargs):
+    agg_pipeline = []
+
+    if kwargs.get("filter_agg_pipeline_param") is not None:
+        # if this ws had extra filter aggregation set by proto model option
+        agg_pipeline.extend(kwargs.get("filter_agg_pipeline_param")["agg"])
+
+    msgspec_class_type = kwargs.get("class_type")
+    agg_pipeline.extend(get_filter_sort_pagination_pipeline_with_passed_agg(msgspec_class_type, **kwargs))
+
+    # Adding match by obj_id or obj_id_list after filter, sort and pagination layer to first let proper page get
+    # build - its bug if done otherwise as it will first filter all docs based on ids and then page will be build
+    # which will be different from case when pages are built on whole db first
+    agg_pipeline.append(get_match_layer_for_obj_id_list(obj_id_or_list))
+
+    agg_pipeline_dict = {"agg": agg_pipeline}
+    json_obj_list = await _get_obj_list_n_handle_datetime(msgspec_class_type, agg_pipeline_dict, has_links=False)
+    return json_obj_list
 
 
 async def publish_ws(msgspec_class_type: Type[MsgspecModel], db_obj_id: Any, db_obj_dict: Dict[str, Any],
-                     has_links: bool | None = None, update_ws_with_id: bool | None = None):
+                     has_links: bool | None = None, update_ws_with_id: bool | None = None, **kwargs):
     """
     :param msgspec_class_type: Dataclass SubClass Type
     :param db_obj_id: db_obj_id for create/update/delete
@@ -143,7 +275,7 @@ async def publish_ws(msgspec_class_type: Type[MsgspecModel], db_obj_id: Any, db_
         async with msgspec_class_type.read_ws_path_ws_connection_manager.rlock:
             await broadcast_from_active_ws_data_set(active_ws_data_list, msgspec_class_type, db_obj_id, db_obj_dict,
                                                     msgspec_class_type.read_ws_path_ws_connection_manager.broadcast,
-                                                    tasks_list, has_links=has_links)
+                                                    tasks_list, has_links=has_links, **kwargs)
     if update_ws_with_id:
         active_ws_data_list_for_id: List[WSData] = \
             msgspec_class_type.read_ws_path_with_id_ws_connection_manager.get_activ_ws_tuple_list_with_id(
@@ -154,14 +286,14 @@ async def publish_ws(msgspec_class_type: Type[MsgspecModel], db_obj_id: Any, db_
                 await broadcast_from_active_ws_data_set(
                     active_ws_data_list_for_id, msgspec_class_type, db_obj_id, db_obj_dict,
                     msgspec_class_type.read_ws_path_with_id_ws_connection_manager.broadcast,
-                    tasks_list, broadcast_with_id=True, has_links=has_links)
+                    tasks_list, broadcast_with_id=True, has_links=has_links, **kwargs)
     if tasks_list:
         await execute_tasks_list_with_all_completed(tasks_list, msgspec_class_type)
 
 
 async def publish_ws_all(msgspec_class_type: Type[MsgspecModel], db_obj_id_list: List[Any],
                          db_obj_dict_list: List[Dict[str, Any]],
-                         has_links: bool | None = None, update_ws_with_id: bool | None = None):
+                         has_links: bool | None = None, update_ws_with_id: bool | None = None, **kwargs):
     """
     :param msgspec_class_type: MsgspecModel SubClass Type
     :param db_obj_id_list: List of db_obj_ids for create/update/delete
@@ -178,7 +310,7 @@ async def publish_ws_all(msgspec_class_type: Type[MsgspecModel], db_obj_id_list:
             await broadcast_all_from_active_ws_data_set(active_ws_data_list, msgspec_class_type,
                                                         db_obj_id_list, db_obj_dict_list,
                                                         msgspec_class_type.read_ws_path_ws_connection_manager.broadcast,
-                                                        tasks_list, has_links)
+                                                        tasks_list, has_links, **kwargs)
     # TODO: this can be optimized by sending array of messages to ws instead of sending one message at a time per ws
     #       in most use-case the consumer of one id is interested in all ids.
     if update_ws_with_id:
@@ -193,7 +325,7 @@ async def publish_ws_all(msgspec_class_type: Type[MsgspecModel], db_obj_id_list:
                     await broadcast_from_active_ws_data_set(
                         active_ws_data_list_for_id, msgspec_class_type, db_obj_id, db_obj_dict,
                         msgspec_class_type.read_ws_path_with_id_ws_connection_manager.broadcast,
-                        tasks_list, broadcast_with_id=True, has_links=has_links)
+                        tasks_list, broadcast_with_id=True, has_links=has_links, **kwargs)
     if tasks_list:
         await execute_tasks_list_with_all_completed(tasks_list, msgspec_class_type)
 
@@ -250,6 +382,38 @@ async def execute_update_agg_pipeline(msgspec_class_type: Type[MsgspecModel],
         await publish_ws_all(msgspec_class_type, id_list, aggregated_dict_list, update_ws_with_id=True)
 
 
+async def get_detected_changes_in_pagination(msgspec_class_type: Type[MsgspecModel], created_obj_list: List[Any],
+                                             deleted_obj_list: List[Any], update_obj_list: List[Any]) -> Dict | None:
+    active_ws_data_list: List[
+        WSData] = msgspec_class_type.read_ws_path_ws_connection_manager.get_activ_ws_data_list()
+    page_definitions = []
+    for active_ws_data in active_ws_data_list:
+        if active_ws_data.has_pagination_with_or_without_filters:
+            page_definitions.append({
+                "page_id": active_ws_data.id,
+                "filters": active_ws_data.filter_callable_kwargs.get("filters"),
+                "sort_order": active_ws_data.filter_callable_kwargs.get("sort_order"),
+                "pagination": active_ws_data.filter_callable_kwargs.get("pagination")})
+         # else not required: No special handling required for ws without pagination
+
+    if page_definitions:
+        detected_changes: List[Dict] = await detect_multiple_page_changes(msgspec_class_type.collection_obj,
+                                                                          page_definitions, created_obj_list,
+                                                                          deleted_obj_list, msgspec_class_type,
+                                                                          update_obj_list)
+
+        for page_change in detected_changes:
+            change_detected_obj_json_list = page_change.get("changes")
+            # handling all datetime fields - converting to epoch int values - caller of this function will handle
+            # these fields back if required
+            for change_detected_obj_json in change_detected_obj_json_list:
+                msgspec_class_type.convert_ts_fields_from_datetime_to_epoch_int(change_detected_obj_json)
+
+        return {"page_changes": detected_changes}
+    # else not required: no pagination ws is connected yet - no page detection required
+    return {"page_changes": []}
+
+
 @http_except_n_log_error(status_code=500)
 @generic_perf_benchmark
 async def generic_post_http(msgspec_class_type: Type[MsgspecModel],
@@ -261,6 +425,7 @@ async def generic_post_http(msgspec_class_type: Type[MsgspecModel],
     if obj_id is not None:
         msgspec_class_type.init_max_id(obj_id, None)    # updates max_id to this id if is > than existing max_id
 
+    detected_changes: Dict = {"page_changes": []}
     if msgspec_class_type.enable_large_db_object:
         gridfs_bucket_obj: motor.motor_asyncio.AsyncIOMotorGridFSBucket = msgspec_class_type.gridfs_bucket_obj
         await gridfs_bucket_obj.upload_from_stream_with_id(
@@ -269,6 +434,10 @@ async def generic_post_http(msgspec_class_type: Type[MsgspecModel],
             source=create_obj.to_json_str(),
         )
     else:
+        # handling pagination before db create
+        detected_changes = await get_detected_changes_in_pagination(msgspec_class_type,
+                                                                    [obj_json], [], [])
+
         collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.collection_obj
         insert_one_result: pymongo.results.InsertOneResult = await collection_obj.insert_one(obj_json)
 
@@ -281,8 +450,52 @@ async def generic_post_http(msgspec_class_type: Type[MsgspecModel],
     # these fields back if required
     msgspec_class_type.convert_ts_fields_from_datetime_to_epoch_int(obj_json)
 
-    await publish_ws(msgspec_class_type, obj_id, obj_json, has_links)
+    # replacing change detected json objs with objs after update agg execution
+    if update_agg_pipeline:
+        await update_pagination_change_data_post_update_agg_execution(msgspec_class_type, detected_changes)
+    # else not required: no update aggregation applied - no replacement required
+
+    await publish_ws(msgspec_class_type, obj_id, obj_json, has_links, **detected_changes)
     return obj_json
+
+
+async def update_pagination_change_data_post_update_agg_execution(msgspec_class_type, detected_changes: Dict):
+    page_changes = detected_changes.get("page_changes")
+
+    fetch_id_list = []
+    for page_change in page_changes:    # each page
+        for json_obj in page_change.get("changes"):     # each change detected doc in page
+            if len(json_obj) > 1:       # if is not deleted obj
+                _id = json_obj.get("_id")
+                fetch_id_list.append(_id)
+
+    if fetch_id_list:
+        # fetching all these ids from db
+        obj_json_list = await get_obj_list(msgspec_class_type, fetch_id_list)
+
+        id_to_obj_json_dict = {}
+        for obj_json in obj_json_list:
+            # handling all datetime fields - converting to epoch int values - caller of this function will handle
+            # these fields back if required
+            msgspec_class_type.convert_ts_fields_from_datetime_to_epoch_int(obj_json)
+
+            id_to_obj_json_dict[obj_json.get("_id")] = obj_json
+
+        for page_change in page_changes:  # each page
+            changes_list = page_change.get("changes")
+            for idx, json_obj in enumerate(changes_list):  # each change detected doc in page
+                if len(json_obj) > 1:  # if is not deleted obj
+                    _id = json_obj.get("_id")
+                    new_top = json_obj.get("new_top")
+                    new_bottom = json_obj.get("new_bottom")
+
+                    fetched_json_obj = id_to_obj_json_dict.get(_id)
+                    if new_top:
+                        fetched_json_obj["new_top"] = new_top
+                    if new_bottom:
+                        fetched_json_obj["new_bottom"] = new_bottom
+
+                    changes_list[idx] = fetched_json_obj
 
 
 @http_except_n_log_error(status_code=500)
@@ -298,6 +511,7 @@ async def generic_post_all_http(msgspec_class_type: Type[MsgspecModel], proto_pa
         if obj_id is not None:
             msgspec_class_type.init_max_id(obj_id, None)  # updates max_id to this id if is > than existing max_id
     obj_json_list = msgspec.to_builtins(create_obj_list, builtin_types=[DateTime])
+    detected_changes: Dict = {"page_changes": []}
     if msgspec_class_type.enable_large_db_object:
         for create_obj in create_obj_list:
             gridfs_bucket_obj: motor.motor_asyncio.AsyncIOMotorGridFSBucket = msgspec_class_type.gridfs_bucket_obj
@@ -307,6 +521,10 @@ async def generic_post_all_http(msgspec_class_type: Type[MsgspecModel], proto_pa
                 source=create_obj.to_json_str(),
             )
     else:
+        # handling pagination before db create
+        detected_changes = await get_detected_changes_in_pagination(msgspec_class_type,
+                                                                                obj_json_list, [], [])
+
         collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.collection_obj
         insert_many_result: pymongo.results.InsertManyResult = await collection_obj.insert_many(obj_json_list)
 
@@ -319,7 +537,13 @@ async def generic_post_all_http(msgspec_class_type: Type[MsgspecModel], proto_pa
             # handling all datetime fields - converting to epoch int values - caller of this function will handle
             # these fields back if required
             msgspec_class_type.convert_ts_fields_from_datetime_to_epoch_int(obj_json)
-    await publish_ws_all(msgspec_class_type, obj_id_list, obj_json_list, has_links)
+
+        # replacing change detected json objs with objs after update agg execution
+        if update_agg_pipeline:
+            await update_pagination_change_data_post_update_agg_execution(msgspec_class_type, detected_changes)
+        # else not required: no update aggregation applied - no replacement required
+
+    await publish_ws_all(msgspec_class_type, obj_id_list, obj_json_list, has_links, **detected_changes)
     return obj_json_list
 
 
@@ -336,6 +560,7 @@ async def _underlying_patch_n_put(msgspec_class_type: Type[MsgspecModel], proto_
         Underlying interface for Single object Put & Patch
     """
     _id = updated_json_obj_dict.get("_id")
+    detected_changes: Dict = {"page_changes": []}
 
     if msgspec_class_type.enable_large_db_object:
         gridfs_bucket_obj: motor.motor_asyncio.AsyncIOMotorGridFSBucket = msgspec_class_type.gridfs_bucket_obj
@@ -352,6 +577,10 @@ async def _underlying_patch_n_put(msgspec_class_type: Type[MsgspecModel], proto_
     else:
         collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.collection_obj
 
+        # handling pagination before db update
+        detected_changes = await get_detected_changes_in_pagination(msgspec_class_type, [], [],
+                                                                    update_obj_list=[updated_json_obj_dict])
+
         if msgspec_class_type.is_time_series:
             await _update_time_series(collection_obj, [_id], [updated_json_obj_dict])
 
@@ -363,11 +592,16 @@ async def _underlying_patch_n_put(msgspec_class_type: Type[MsgspecModel], proto_
         if update_agg_pipeline or filter_agg_pipeline:
             updated_json_obj_dict = await get_obj(msgspec_class_type, _id, filter_agg_pipeline, has_links)
 
+        # replacing change detected json objs with objs after update agg execution
+        if update_agg_pipeline:
+            await update_pagination_change_data_post_update_agg_execution(msgspec_class_type, detected_changes)
+        # else not required: no update aggregation applied - no replacement required
+
     # handling all datetime fields - converting to epoch int values - caller of this function will handle
     # these fields back if required
     msgspec_class_type.convert_ts_fields_from_datetime_to_epoch_int(updated_json_obj_dict)
 
-    await publish_ws(msgspec_class_type, _id, updated_json_obj_dict, has_links, update_ws_with_id=True)
+    await publish_ws(msgspec_class_type, _id, updated_json_obj_dict, has_links, update_ws_with_id=True, **detected_changes)
     return updated_json_obj_dict
 
 
@@ -380,6 +614,7 @@ async def _underlying_patch_n_put_all(msgspec_class_type: Type[MsgspecModel], pr
     Underlying interface for Put-All & Patch-All
     """
     missing_ids: List[int] = []
+    detected_changes: Dict = {"page_changes": []}
     if msgspec_class_type.enable_large_db_object:
         for updated_json_obj_dict in updated_json_obj_dict_list:
             _id = updated_json_obj_dict.get("_id")
@@ -399,6 +634,10 @@ async def _underlying_patch_n_put_all(msgspec_class_type: Type[MsgspecModel], pr
             )
     else:
         collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.collection_obj
+
+        # handling pagination before db update
+        detected_changes = await get_detected_changes_in_pagination(msgspec_class_type, [], [],
+                                                                    update_obj_list=updated_json_obj_dict_list)
 
         if msgspec_class_type.is_time_series:
             await _update_time_series(collection_obj, updated_obj_id_list, updated_json_obj_dict_list)
@@ -424,6 +663,12 @@ async def _underlying_patch_n_put_all(msgspec_class_type: Type[MsgspecModel], pr
                                                f"{msgspec_class_type.__name__} ;;;"
                                                f"{agg_cursor_list=}, {updated_json_obj_dict_list=}", status_code=400)
 
+            # replacing change detected json objs with objs after update agg execution
+            if update_agg_pipeline:
+                await update_pagination_change_data_post_update_agg_execution(msgspec_class_type,
+                                                                              detected_changes)
+            # else not required: no update aggregation applied - no replacement required
+
         await execute_update_agg_pipeline(msgspec_class_type, proto_package_name, update_agg_pipeline)
         if update_agg_pipeline or filter_agg_pipeline:
             updated_json_obj_dict_list = await get_obj_list(msgspec_class_type, updated_obj_id_list, filter_agg_pipeline, has_links)
@@ -433,7 +678,7 @@ async def _underlying_patch_n_put_all(msgspec_class_type: Type[MsgspecModel], pr
         # these fields back if required
         msgspec_class_type.convert_ts_fields_from_datetime_to_epoch_int(obj_json)
     await publish_ws_all(msgspec_class_type, updated_obj_id_list, updated_json_obj_dict_list,
-                         has_links, update_ws_with_id=True)
+                         has_links, update_ws_with_id=True, **detected_changes)
     return updated_json_obj_dict_list, missing_ids
 
 
@@ -726,13 +971,22 @@ async def generic_delete_http(msgspec_class_type: Type[MsgspecModel], proto_pack
             logging.error(err_str)
             raise HTTPException(status_code=404, detail=err_str)
     else:
+        # handling pagination before db create
+        detected_changes: Dict | None = await get_detected_changes_in_pagination(msgspec_class_type,
+                                                                                [], [db_obj_id], [])
+
         collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.collection_obj
         delete_res = await collection_obj.delete_one({"_id": db_obj_id})
         if delete_res.deleted_count == 1:
             await execute_update_agg_pipeline(msgspec_class_type, proto_package_name, update_agg_pipeline)
 
+            # replacing change detected json objs with objs after update agg execution
+            if update_agg_pipeline:
+                await update_pagination_change_data_post_update_agg_execution(msgspec_class_type, detected_changes)
+            # else not required: no update aggregation applied - no replacement required
+
             empty_obj_dict = {'_id': db_obj_id}
-            await publish_ws(msgspec_class_type, db_obj_id, empty_obj_dict, has_links=has_links, update_ws_with_id=True)
+            await publish_ws(msgspec_class_type, db_obj_id, empty_obj_dict, has_links=has_links, update_ws_with_id=True, **detected_changes)
 
             # Setting back incremental id to 0 if collection gets empty
             if id_is_int_type:
@@ -755,6 +1009,7 @@ async def generic_delete_all_http(msgspec_class_type: Type[MsgspecModel], proto_
                                   msgspec_dummy_model: Type[MsgspecModel], **kwargs) -> DefaultMsgspecWebResponse | bool:
     id_is_int_type = (msgspec_class_type.__annotations__.get("_id") == int)
 
+    detected_changes: Dict = {"page_changes": []}
     if msgspec_class_type.enable_large_db_object:
         gridfs_bucket_obj: motor.motor_asyncio.AsyncIOMotorGridFSBucket = msgspec_class_type.gridfs_bucket_obj
         collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.gridfs_files_collection_obj
@@ -784,9 +1039,6 @@ async def generic_delete_all_http(msgspec_class_type: Type[MsgspecModel], proto_
         motor_cursor: motor.motor_asyncio.AsyncIOMotorCursor = collection_obj.find({}, {"_id": 1})
         stored_id_dict_list = await motor_cursor.to_list(None)
 
-        # deleting all
-        delete_result: pymongo.results.DeleteResult = await collection_obj.delete_many({})
-
         # preparing success message
         del_success.id = []
         empty_obj_dict_list: List[Dict[str, Any]] = []
@@ -795,12 +1047,19 @@ async def generic_delete_all_http(msgspec_class_type: Type[MsgspecModel], proto_
             del_success.id.append(_id)
             empty_obj_dict_list.append({'_id': _id})
 
+        # handling pagination before db delete op
+        detected_changes = await get_detected_changes_in_pagination(msgspec_class_type,
+                                                                    [], del_success.id, [])
+
+        # deleting all
+        delete_result: pymongo.results.DeleteResult = await collection_obj.delete_many({})
+
     # Setting back incremental id to 0 if collection gets empty
     if id_is_int_type:
         await handle_reset_int_id(collection_obj, msgspec_class_type)
     # else not required: if id is not int then it must be of ObjectId so no handling required
 
-    await publish_ws_all(msgspec_class_type, del_success.id, empty_obj_dict_list, update_ws_with_id=True)
+    await publish_ws_all(msgspec_class_type, del_success.id, empty_obj_dict_list, update_ws_with_id=True, **detected_changes)
     return del_success
 
 
@@ -811,6 +1070,7 @@ async def generic_delete_by_id_list_http(
         model_dummy_model, db_obj_id_list: List[int | str | Any], update_agg_pipeline: Any = None,
         has_links: bool = False, **kwargs) -> DefaultMsgspecWebResponse | bool:
     id_is_int_type = isinstance(db_obj_id_list[0], int)  # checking only first obj type assuming all will have same
+    detected_changes: Dict = {"page_changes": []}
     if msgspec_class_type.enable_large_db_object:
         gridfs_bucket_obj: motor.motor_asyncio.AsyncIOMotorGridFSBucket = msgspec_class_type.gridfs_bucket_obj
         collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.gridfs_files_collection_obj
@@ -835,6 +1095,10 @@ async def generic_delete_by_id_list_http(
                           f"{del_success.id} out of requested id list")
     else:
         collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.collection_obj
+
+        # handling pagination before db create
+        detected_changes = await get_detected_changes_in_pagination(msgspec_class_type,
+                                                                                [], db_obj_id_list, [])
 
         # fetching document objs based using requested id list to verify if all ids exist
         motor_cursor: motor.motor_asyncio.AsyncIOMotorCursor = collection_obj.find({'_id': {'$in': db_obj_id_list}})
@@ -866,8 +1130,14 @@ async def generic_delete_by_id_list_http(
             logging.error(err_str)
             raise HTTPException(status_code=404, detail=err_str)
 
+        # replacing change detected json objs with objs after update agg execution
+        if update_agg_pipeline:
+            await update_pagination_change_data_post_update_agg_execution(msgspec_class_type, detected_changes)
+        # else not required: no update aggregation applied - no replacement required
+
     await publish_ws_all(msgspec_class_type, db_obj_id_list, empty_obj_dict_list,
-                         has_links=has_links, update_ws_with_id=True)
+                         has_links=has_links, update_ws_with_id=True, **detected_changes)
+
     # Setting back incremental id to 0 if collection gets empty
     if id_is_int_type:
         await handle_reset_int_id(collection_obj, msgspec_class_type)
@@ -908,25 +1178,37 @@ async def generic_read_http(msgspec_class_type: Type[MsgspecModel], proto_packag
     return json_obj_list
 
 
-async def _get_obj_list_n_dump_to_bytes(msgspec_class_type: Type[MsgspecModel],
-                                        filter_agg_pipeline: Dict[str, Any], has_links: bool):
+async def _get_obj_list_n_handle_datetime(msgspec_class_type: Type[MsgspecModel],
+                                          filter_agg_pipeline: Dict[str, Any], has_links: bool):
     json_obj_list = \
         await get_obj_list(msgspec_class_type, filter_agg_pipeline=filter_agg_pipeline, has_links=has_links)
     for obj_json in json_obj_list:
         # handling all datetime fields - converting to epoch int values - caller of this function will handle
         # these fields back if required
         msgspec_class_type.convert_ts_fields_from_datetime_to_epoch_int(obj_json)
-    json_obj_list_str = json.dumps(json_obj_list, default=non_jsonable_types_handler)
-    return json_obj_list_str
+    return json_obj_list
 
 
 async def _generic_read_ws(msgspec_class_type: Type[MsgspecModel], ws: WebSocket,
                            filter_agg_pipeline, need_initial_snapshot: bool,
-                           is_new_ws: bool, has_links: bool):
+                           is_new_ws: bool, has_links: bool, **kwargs):
     need_disconnect = False
     try:
         if need_initial_snapshot is None or need_initial_snapshot:
-            json_obj_list_str = await _get_obj_list_n_dump_to_bytes(msgspec_class_type, filter_agg_pipeline, has_links)
+            json_obj_list = await _get_obj_list_n_handle_datetime(msgspec_class_type, filter_agg_pipeline, has_links)
+
+            ws_id = kwargs.pop("ws_id", None)
+            if kwargs.get("filters") is not None or kwargs.get("pagination") is not None:
+                async with msgspec_class_type.read_ws_path_ws_connection_manager.rlock:
+                    ws_data = msgspec_class_type.read_ws_path_ws_connection_manager.get_active_ws_data_by_ws_id(ws_id)
+                    obj_id_list = []
+                    for _json_obj in json_obj_list:
+                        obj_id_list.append(_json_obj.get("_id"))
+                    ws_data.id_list_for_filter_only_ws = obj_id_list
+                    # else not required: already present in dict
+            # else not required: if no filter or pagination - it is simple get-all ws so no special handling required
+
+            json_obj_list_str = orjson.dumps(json_obj_list, default=non_jsonable_types_handler).decode('utf-8')
             await msgspec_class_type.read_ws_path_ws_connection_manager. \
                 send_json_to_websocket(json_obj_list_str, ws)
         # else not required: no initial snapshot is provided on this connection
@@ -969,34 +1251,25 @@ async def _generic_read_ws(msgspec_class_type: Type[MsgspecModel], ws: WebSocket
 
 
 def get_filter_sort_pagination_pipeline_with_passed_agg(msgspec_class_type: Type[MsgspecModel], **kwargs):
-    passed_filter_agg_pipeline: Dict | None = kwargs.get("filter_agg_pipeline")
+    passed_filter_agg_pipeline: Dict | None = kwargs.get("filter_agg_pipeline_param")
+
+    filter_sort_pagination_agg_pipeline: List[Dict[str, Any]] = []
+    if passed_filter_agg_pipeline is not None:
+        filter_sort_pagination_agg_pipeline: List[Dict[str, Any]] = passed_filter_agg_pipeline.get("agg")
 
     filters = kwargs.get("filters")
     sort_order = kwargs.get("sort_order")
     pagination = kwargs.get("pagination")
 
-    filter_sort_pagination_agg_pipeline = create_cascading_multi_filter_pipeline(msgspec_class_type, filters,
-                                                                                 sort_order, pagination)
-
-    if passed_filter_agg_pipeline is not None:
-        filter_sort_pagination_agg_pipeline.extend(passed_filter_agg_pipeline.get("agg"))
+    filter_sort_pagination_agg_pipeline.extend(create_cascading_multi_filter_pipeline(msgspec_class_type, filters,
+                                                                                      sort_order, pagination))
 
     return filter_sort_pagination_agg_pipeline
 
 
-async def ws_get_all_filter_callable(obj_json_str: str, obj_id_or_list: int | List[int], **kwargs):
-    if isinstance(obj_id_or_list, int):
-        obj_id_or_list = [obj_id_or_list]
-
-    agg_pipeline = []
-
-    agg_pipeline.append(get_match_layer_for_obj_id_list(obj_id_or_list))
-    msgspec_class_type = kwargs.get("class_type")
-    agg_pipeline.extend(get_filter_sort_pagination_pipeline_with_passed_agg(msgspec_class_type, **kwargs))
-
-    agg_pipeline = {"agg": agg_pipeline}
-    json_obj_list_str = await _get_obj_list_n_dump_to_bytes(msgspec_class_type, agg_pipeline, has_links=False)
-    return json_obj_list_str
+async def ws_get_all_filter_callable(**kwargs):
+    obj_json_str = kwargs.get("json_obj_str")
+    return obj_json_str
 
 
 @http_except_n_log_error(status_code=500)
@@ -1006,9 +1279,9 @@ async def generic_read_ws(ws: WebSocket, project_name: str, msgspec_class_type: 
 
     # required in ws_get_all_filter_callable to create aggregate pipeline for match by filter, sort and pagination
     filter_kwargs["class_type"] = msgspec_class_type
-    filter_kwargs["filter_agg_pipeline"] = filter_agg_pipeline
+    filter_kwargs["filter_agg_pipeline_param"] = filter_agg_pipeline
 
-    is_new_ws: bool = await msgspec_class_type.read_ws_path_ws_connection_manager.connect(ws,
+    is_new_ws, ws_id = await msgspec_class_type.read_ws_path_ws_connection_manager.connect(ws,
                                                                                           ws_get_all_filter_callable,
                                                                                           filter_kwargs)
     logging.debug(f"websocket client requested to connect: {ws.client}")
@@ -1017,7 +1290,8 @@ async def generic_read_ws(ws: WebSocket, project_name: str, msgspec_class_type: 
         msgspec_class_type, **filter_kwargs)
     agg_pipeline = {"agg": filter_sort_pagination_agg_pipeline_with_passed_agg}
 
-    await _generic_read_ws(msgspec_class_type, ws, agg_pipeline, need_initial_snapshot, is_new_ws, has_links)
+    await _generic_read_ws(msgspec_class_type, ws, agg_pipeline, need_initial_snapshot, is_new_ws,
+                           has_links, ws_id=ws_id, **filter_kwargs)
 
 
 @http_except_n_log_error(status_code=500)
@@ -1026,10 +1300,11 @@ async def generic_query_ws(ws: WebSocket, project_name: str, msgspec_class_type:
                            ws_filter_callable_kwargs: Dict[Any, Any] | None = None,
                            filter_agg_pipeline: Any = None, has_links: bool = False,
                            need_initial_snapshot: bool = True):
-    is_new_ws: bool = await msgspec_class_type.read_ws_path_ws_connection_manager.connect(ws, ws_filter_callable,
+    is_new_ws, _ = await msgspec_class_type.read_ws_path_ws_connection_manager.connect(ws, ws_filter_callable,
                                                                                             ws_filter_callable_kwargs)
     logging.debug(f"websocket client requested to connect: {ws.client}")
-    await _generic_read_ws(msgspec_class_type, ws, filter_agg_pipeline, need_initial_snapshot, is_new_ws, has_links)
+    await _generic_read_ws(msgspec_class_type, ws, filter_agg_pipeline, need_initial_snapshot, is_new_ws,
+                           has_links)
 
 
 @http_except_n_log_error(status_code=500)
@@ -1037,14 +1312,15 @@ async def generic_projection_query_ws(ws: WebSocket, project_name: str, msgspec_
                                       filter_callable: Callable[..., Any] | None = None,
                                       filter_callable_kwargs: Dict[Any, Any] | None = None,
                                       projection_agg_pipeline_callable: Callable[..., Any] | None = None,
-                                      need_initial_snapshot: bool = True):
+                                      need_initial_snapshot: bool = True, **kwargs):
     if filter_callable_kwargs is None:
         filter_callable_kwargs = {}
 
-    is_new_ws: bool = \
+    is_new_ws, _ = \
         await msgspec_class_type.read_ws_path_ws_connection_manager.connect(ws, filter_callable,
                                                                             filter_callable_kwargs,
-                                                                            projection_agg_pipeline_callable)
+                                                                            projection_agg_pipeline_callable,
+                                                                            **kwargs)
     logging.debug(f"websocket client requested to connect: {ws.client}")
     need_disconnect = False
     try:
@@ -1119,7 +1395,7 @@ async def generic_read_by_id_ws(ws: WebSocket, project_name: str, msgspec_class_
                                 db_obj_id: Any, filter_agg_pipeline: Any = None, has_links: bool = False,
                                 need_initial_snapshot: bool | None = True):
     # prevent duplicate addition
-    is_new_ws: bool = await msgspec_class_type.read_ws_path_with_id_ws_connection_manager.connect(ws, db_obj_id)
+    is_new_ws, _ = await msgspec_class_type.read_ws_path_with_id_ws_connection_manager.connect(ws, db_obj_id)
 
     logging.debug(f"websocket client requested to connect: {ws.client}")
     need_disconnect: bool = False

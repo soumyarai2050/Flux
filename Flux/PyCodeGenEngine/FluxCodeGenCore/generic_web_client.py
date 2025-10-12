@@ -51,9 +51,7 @@ def generic_http_get_all_client(url: str, model_type: Type[MsgspecModel], limit_
     if limit_obj_count:
         params["limit_obj_count"] = limit_obj_count
 
-    for param_name, param_value in params.items():
-        params[param_name] = orjson.dumps(param_value)
-
+    params = _dump_kwargs(params)
     response: requests.Response = requests.get(url, timeout=120, params=params)     # TIMEOUT for get-all set to 60 sec
     return http_response_as_class_type(url, response, 200, model_type, HTTPRequestType.GET)
 
@@ -66,17 +64,23 @@ def generic_http_get_all_df_client(url: str, limit_obj_count: int | None = None,
         params = {}
     if limit_obj_count:
         params["limit_obj_count"] = limit_obj_count
+
+    params = _dump_kwargs(params)
     response: requests.Response = requests.get(url, timeout=120, params=params)     # TIMEOUT for get-all set to 60 sec
     return http_response_as_df(url, response, 200, HTTPRequestType.GET)
 
 
-def _get_params_from_kwargs(return_copy_obj: bool | None = True, **kwargs):
+def _dump_kwargs(kwargs: dict):
     if kwargs:
-        params = kwargs
-    else:
-        params = {}
+        for key, value in kwargs.items():
+            kwargs[key] = orjson.dumps(value)
+    return kwargs
+
+
+def _get_params_from_kwargs(return_copy_obj: bool | None = True, **kwargs):
+    params = _dump_kwargs(kwargs)
     if return_copy_obj:
-        params["return_obj_copy"] = return_copy_obj
+        params["return_obj_copy"] = orjson.dumps(return_copy_obj)
     return params
 
 @log_n_except
@@ -191,8 +195,8 @@ def generic_http_get_client(url: str, query_param: Any, model_type: Type[Msgspec
             url = f"{url}{query_param}"
         else:
             url = f"{url}/{query_param}"
-
     # else not required: When used for queries, like get last date query, there is no query_param in case of query
+    kwargs = _dump_kwargs(kwargs)
     response: requests.Response = requests.get(url, params=kwargs)
     return http_response_as_class_type(url, response, 200, model_type, HTTPRequestType.GET)
 
@@ -455,6 +459,7 @@ def generic_http_index_client(url: str, query_params: List[Any], model_type: Typ
     else:
         url = f"{url}/{query_params}"
 
+    kwargs = _dump_kwargs(kwargs)
     response: requests.Response = requests.get(url, params=kwargs)
     return http_response_as_class_type(url, response, 200, model_type, HTTPRequestType.GET)
 

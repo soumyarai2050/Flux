@@ -151,16 +151,19 @@ const TableHeader = ({
         let updatedSortOrderDict = {};
 
         setFilterDict((prev) => {
-            updatedFilterDict = {
-                ...prev,
-                [filterName]: {
-                    ...prev[filterName],
+            updatedFilterDict = { ...prev };
+
+            if (values && values.length > 0) {
+                updatedFilterDict[filterName] = {
                     column_name: filterName,
                     filtered_values: values,
                     text_filter: textFilter,
                     text_filter_type: textFilterType
-                }
-            };
+                };
+            } else {
+                delete updatedFilterDict[filterName];
+            }
+
             return updatedFilterDict;
         });
 
@@ -172,19 +175,21 @@ const TableHeader = ({
                     sort_direction: sortDirection,
                     is_absolute_sort: isAbsoluteSort
                 }
-            } : { [filterName]: {
-                ...prev[filterName],
-                sort_direction: sortDirection,
-                is_absolute_sort: isAbsoluteSort
-            } };
+            } : {
+                [filterName]: {
+                    ...prev[filterName],
+                    sort_direction: sortDirection,
+                    is_absolute_sort: isAbsoluteSort
+                }
+            };
             if (!sortDirection) {
                 delete updatedSortOrderDict[filterName];
             }
-
             const updatedFilters = Object.keys(updatedFilterDict).map((filterName) => ({
                 ...updatedFilterDict[filterName],
                 filtered_values: updatedFilterDict[filterName].filtered_values?.join(',') ?? null,
             }));
+            
             const updatedSortOrders = Object.keys(updatedSortOrderDict).map((sortBy) => ({
                 sort_by: sortBy,
                 sort_direction: updatedSortOrderDict[sortBy].sort_direction,

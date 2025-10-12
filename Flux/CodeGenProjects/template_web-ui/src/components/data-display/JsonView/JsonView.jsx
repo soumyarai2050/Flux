@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ClickAwayListener, Tooltip } from '@mui/material';
-import ReactJson from 'react-json-view'
+import { JsonViewer } from '@textea/json-viewer';
 import PropTypes from 'prop-types';
 import { useTheme } from '@emotion/react';
 import styles from './JsonView.module.css';
@@ -9,8 +9,46 @@ import ClipboardCopier from '../../utility/ClipboardCopier';
 const JsonView = (props) => {
     const theme = useTheme();
     const [clipboardText, setClipboardText] = useState(null);
-    const jsonViewTheme = theme.palette.mode === 'dark' ? 'tube' : 'rjv-default';
+    const isDarkMode = theme.palette.mode === 'dark';
 
+    // Custom copy handler that uses ClipboardCopier instead of navigator API
+    const handleCopy = (path, value) => {
+        setClipboardText(JSON.stringify(value, null, 2));
+        // Return false to prevent default @textea/json-viewer copy behavior
+        return false;
+    };
+
+    const jsonViewerComponent = (
+        <div className={styles.jsonViewerContainer}>
+            <JsonViewer
+                value={props.src}
+                theme={isDarkMode ? 'dark' : 'light'}
+                displayDataTypes={false}
+                displayObjectSize={false}
+                enableClipboard={props.enableClipboard}
+                onCopy={props.enableClipboard ? handleCopy : undefined}
+                indentWidth={6}
+                rootName={false}
+                defaultInspectDepth={props.collapsed !== undefined ? props.collapsed : 0}
+                style={{
+                    padding: '5px',
+                    borderRadius: '5px',
+                }}
+            />
+        </div>
+    );
+
+    // Standalone mode: just return the JSON viewer component
+    if (!props.showWrapper) {
+        return (
+            <>
+                {props.enableClipboard && <ClipboardCopier text={clipboardText} />}
+                {jsonViewerComponent}
+            </>
+        );
+    }
+
+    // Tooltip mode: wrap with ClickAwayListener and Tooltip
     return (
         <ClickAwayListener onClickAway={props.onClose}>
             <div className={styles.text}>
@@ -23,35 +61,29 @@ const JsonView = (props) => {
                     disableTouchListener
                     placement='bottom-start'
                     onClose={props.onClose}
-                    title={
-                        <ReactJson
-                            theme={jsonViewTheme}
-                            displayDataTypes={false}
-                            displayObjectSize={false}
-                            enableClipboard={(o) => setClipboardText(JSON.stringify(o.src, null, 2))}
-                            iconStyle='square'
-                            indentWidth={6}
-                            name={false}
-                            src={props.src}
-                        />
-                    }>
+                    title={jsonViewerComponent}>
                     <span>{JSON.stringify(props.src)}</span>
                 </Tooltip>
             </div>
         </ClickAwayListener>
-    )
-}
+    );
+};
 
 JsonView.propTypes = {
-    open: PropTypes.bool.isRequired,
     src: PropTypes.oneOfType([PropTypes.array, PropTypes.object]).isRequired,
-    onClose: PropTypes.func.isRequired
-}
+    open: PropTypes.bool,
+    onClose: PropTypes.func,
+    collapsed: PropTypes.number,
+    showWrapper: PropTypes.bool,
+    enableClipboard: PropTypes.bool
+};
 
 JsonView.defaultProps = {
     open: false,
-    src: {}
-}
+    src: {},
+    collapsed: 0,
+    showWrapper: true,
+    enableClipboard: true
+};
 
 export default JsonView;
-

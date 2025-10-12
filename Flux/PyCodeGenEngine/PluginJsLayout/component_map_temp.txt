@@ -31,3 +31,35 @@ export const componentMap = Object.fromEntries(
     withModelLoader(Component, { modelName }),
   ])
 );
+
+// Fallback component for dynamic widgets
+const GenericModel = lazy(() => import('../containers/GenericModel'));
+
+/**
+ * Enhanced componentMap with Proxy fallback for dynamic widgets.
+ * If a component isn't found in the static map, creates and caches a generic widget.
+ * Components are added directly to componentMap (no separate cache needed).
+ * App reload automatically clears dynamic components.
+ */
+export const componentMapWithFallback = new Proxy(componentMap, {
+  get(target, prop) {
+    // 1. Return existing component if found (static or previously created dynamic)
+    if (target[prop]) {
+      return target[prop];
+    }
+
+    // 2. Ignore React internal properties and symbols
+    if (typeof prop === 'symbol' || prop.startsWith('$$') || prop === '_owner' || prop === '_store') {
+      return undefined;
+    }
+
+    // 3. Create and add generic component for unknown widgets
+    // DIRECTLY ADD TO componentMap (single source of truth!)
+    const dynamicComponent = withModelLoader(GenericModel, { modelName: prop });
+    target[prop] = dynamicComponent;
+    return dynamicComponent;
+  }
+});
+
+// Export the enhanced map as default for backward compatibility
+export default componentMapWithFallback;

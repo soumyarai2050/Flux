@@ -9,6 +9,7 @@ import {
     Typography,
     useTheme
 } from '@mui/material';
+import { getResolvedColor } from '../../../../utils/ui/colorUtils';
 
 const NodeSelector = ({ 
     availableNodes = [], 
@@ -19,27 +20,35 @@ const NodeSelector = ({
     nodeNameField,
     nodeTypeField,
     nodeAccessField,
+    nodeUrlField,
     placeholder = "Search nodes...",
     label = ""
 }) => {
     const theme = useTheme();
 
-    // Parse node string format: "name|type|availability"
+    // Parse node string format: "name|type|availability|url"
     const parseNodeString = (nodeString) => {
         if (!nodeString || typeof nodeString !== 'string') return null;
-        
-        const parts = nodeString.split('|'); 
-        
-        const [name, nodeType, availabilityPart] = parts;
-        const isAvailable = availabilityPart.includes('true'); 
-        
-        return {
-            [nodeNameField]: name.trim(),
-            displayName: name.trim(), // Keep original for display
-            [nodeTypeField]: nodeType.trim(),
+
+        const parts = nodeString.split('|');
+
+        const [name, nodeType, availabilityPart, url] = parts;
+        const isAvailable = availabilityPart?.includes('true');
+
+        const parsedNode = {
+            [nodeNameField]: name?.trim(),
+            displayName: name?.trim(), // Keep original for display
+            [nodeTypeField]: nodeType?.trim(),
             [nodeAccessField]: isAvailable,
             originalString: nodeString
         };
+
+        // Add URL field if it exists and nodeUrlField is provided
+        if (url && nodeUrlField) {
+            parsedNode[nodeUrlField] = url.trim();
+        }
+
+        return parsedNode;
     };
 
     // Parse all available nodes from strings
@@ -49,21 +58,10 @@ const NodeSelector = ({
             .filter(Boolean);
     }, [availableNodes]);
 
-    // Get color for node type from MUI theme
+    // Get color for node type using centralized color resolution
     const getNodeTypeColor = (nodeType) => {
         const colorType = nodeTypeColorMap[nodeType];
-        if (!colorType) return theme.palette.grey[500]; // Grey fallback
-        
-        const colorMap = {
-            critical: theme.palette.error.main,
-            error: theme.palette.error.main,
-            warning: theme.palette.warning.main,
-            info: theme.palette.info.main,
-            debug: theme.palette.grey[600],
-            success: theme.palette.success.main
-        };
-        
-        return colorMap[colorType] || theme.palette.grey[500];
+        return getResolvedColor(colorType, theme, theme.palette.grey[500]);
     };
 
     // Handle autocomplete change
@@ -194,12 +192,13 @@ const NodeSelector = ({
 NodeSelector.propTypes = {
     availableNodes: PropTypes.arrayOf(PropTypes.string),
     selectedNodes: PropTypes.arrayOf(PropTypes.object),
-    nodeTypeColorMap: PropTypes.objectOf(PropTypes.oneOf(['critical', 'error', 'warning', 'info', 'debug', 'success'])),
+    nodeTypeColorMap: PropTypes.objectOf(PropTypes.string), // Can be any color identifier (theme colors, CSS colors, etc.)
     mode: PropTypes.oneOf(['edit', 'read']),
     onChange: PropTypes.func,
     nodeNameField: PropTypes.string.isRequired,
     nodeTypeField: PropTypes.string.isRequired,
     nodeAccessField: PropTypes.string.isRequired,
+    nodeUrlField: PropTypes.string,
     placeholder: PropTypes.string,
     label: PropTypes.string
 };

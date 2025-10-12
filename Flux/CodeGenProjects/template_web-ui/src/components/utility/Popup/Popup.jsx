@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Button, Typography, Box, TextField, Autocomplete } from '@mui/material';
 import { Edit, Delete, ThumbUp, Save } from '@mui/icons-material';
-import ReactJson from 'react-json-view';
+import JsonView from '../../data-display/JsonView/JsonView';
 import classes from './Popup.module.css';
 import { useTheme } from '@mui/material/styles';
 import { getDataSourceColor } from '../../../utils/ui/themeUtils';
@@ -21,9 +21,6 @@ import PropTypes from 'prop-types';
  * @returns {React.ReactElement} The rendered ConfirmSavePopup component.
  */
 export const ConfirmSavePopup = (props) => {
-    const theme = useTheme();
-    const jsonViewTheme = theme.palette.mode === 'dark' ? 'tube' : 'rjv-default';
-
     const handleClose = (e, reason) => {
         if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;
         props.onClose();
@@ -62,16 +59,11 @@ export const ConfirmSavePopup = (props) => {
                 )}
 
                 <DialogContentText>Review changes:</DialogContentText>
-                <ReactJson
-                    theme={jsonViewTheme}
-                    displayDataTypes={false}
-                    displayObjectSize={false}
-                    indentWidth={6}
-                    enableClipboard={true}
-                    name={false}
-                    iconStyle='square'
+                <JsonView
                     src={props.src}
                     collapsed={collapseLevel}
+                    showWrapper={false}
+                    enableClipboard={true}
                 />
             </DialogContent>
             <DialogActions>
@@ -86,8 +78,8 @@ ConfirmSavePopup.propTypes = {
     open: PropTypes.bool.isRequired,
     onClose: PropTypes.func.isRequired,
     onSave: PropTypes.func.isRequired,
-    title: PropTypes.string.isRequired,
-    src: PropTypes.object.isRequired,
+    title: PropTypes.string,
+    src: PropTypes.object,
 };
 
 /**
@@ -101,9 +93,6 @@ ConfirmSavePopup.propTypes = {
  * @returns {React.ReactElement} The rendered WebsocketUpdatePopup component.
  */
 export const WebsocketUpdatePopup = (props) => {
-    const theme = useTheme();
-    const jsonViewTheme = theme.palette.mode === 'dark' ? 'tube' : 'rjv-default';
-
     const handleClose = (e, reason) => {
         if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;
         props.onClose();
@@ -114,16 +103,11 @@ export const WebsocketUpdatePopup = (props) => {
             <DialogTitle className={classes.dialog_title}>{props.title}</DialogTitle>
             <DialogContent className={classes.dialog_body}>
                 <DialogContentText>New update detected from server. Your changes may be lost. Following unsaved changes are discarded:</DialogContentText>
-                <ReactJson
-                    theme={jsonViewTheme}
-                    displayDataTypes={false}
-                    displayObjectSize={false}
-                    indentWidth={6}
-                    enableClipboard={true}
-                    name={false}
-                    iconStyle='square'
+                <JsonView
                     src={props.src}
                     collapsed={1}
+                    showWrapper={false}
+                    enableClipboard={true}
                 />
             </DialogContent>
             <DialogActions>
@@ -152,9 +136,6 @@ WebsocketUpdatePopup.propTypes = {
  * @returns {React.ReactElement} The rendered FormValidation component.
  */
 export const FormValidation = (props) => {
-    const theme = useTheme();
-    const jsonViewTheme = theme.palette.mode === 'dark' ? 'tube' : 'rjv-default';
-
     const handleClose = (e, reason) => {
         if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;
         props.onClose();
@@ -165,16 +146,11 @@ export const FormValidation = (props) => {
             <DialogTitle className={classes.dialog_title}>{props.title}</DialogTitle>
             <DialogContent className={classes.dialog_body}>
                 <DialogContentText className={classes.dialog_text}>Form validation failed due to following errors:</DialogContentText>
-                <ReactJson
-                    theme={jsonViewTheme}
-                    displayDataTypes={false}
-                    displayObjectSize={false}
-                    indentWidth={6}
-                    enableClipboard={true}
-                    name={false}
-                    iconStyle='square'
+                <JsonView
                     src={props.src}
                     collapsed={1}
+                    showWrapper={false}
+                    enableClipboard={true}
                 />
             </DialogContent>
             <DialogActions>

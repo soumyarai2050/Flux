@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { cloneDeep, get, isEqual, set } from 'lodash';
+import { useDispatch, useSelector, shallowEqual } from 'react-redux';
+import { cloneDeep, isEqual, set } from 'lodash';
 import { saveAs } from 'file-saver';
 // project imports
 import { DB_ID, DEFAULT_HIGHLIGHT_DURATION, LAYOUT_TYPES, MODEL_TYPES, MODES } from '../../constants';
@@ -9,14 +9,15 @@ import { generateObjectFromSchema, getModelSchema } from '../../utils/core/schem
 import { compareJSONObjects } from '../../utils/core/objectUtils';
 import { getServerUrl, isWebSocketActive } from '../../utils/network/networkUtils';
 import {
-    getWidgetTitle, getCrudOverrideDict, getCSVFileName,
+    getWidgetTitle, getCrudOverrideDict, getDefaultFilterParamDict, getCSVFileName,
     updateFormValidation,
     snakeToCamel
 } from '../../utils/ui/uiUtils';
 import { createAutoBoundParams } from '../../utils/core/parameterBindingUtils';
 import { removeRedundantFieldsFromRows } from '../../utils/core/dataTransformation';
 import { cleanAllCache } from '../../cache/attributeCache';
-import { useWebSocketWorker, useDownload, useModelLayout, useConflictDetection } from '../../hooks';
+import { useWebSocketWorker, useDownload, useModelLayout, useConflictDetection, useCountQuery } from '../../hooks';
+import { massageDataForBackend, shouldUsePagination, buildDefaultFilters, extractCrudParams } from '../../utils/core/paginationUtils';
 // custom components
 import { FullScreenModalOptional } from '../../components/ui/Modal';
 import { ModelCard, ModelCardHeader, ModelCardContent } from '../../components/utility/cards';
@@ -25,23 +26,46 @@ import { ConfirmSavePopup, FormValidation } from '../../components/utility/Popup
 import CommonKeyWidget from '../../components/data-display/CommonKeyWidget';
 import { DataTable, PivotTable } from '../../components/data-display/tables';
 import { ChartView } from '../../components/data-display/charts';
-import { sliceMap } from '../../models/sliceMap';
+import { sliceMapWithFallback as sliceMap } from '../../models/sliceMap';
 import ConflictPopup from '../../components/utility/ConflictPopup';
 
-function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
+function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap }) {
     const { schema: projectSchema, schemaCollections } = useSelector((state) => state.schema);
 
     const { actions, selector } = modelDataSource;
     const { storedArray, storedObj, updatedObj, objId, mode, allowUpdates, error, isLoading, popupStatus } = useSelector(selector);
-    const { node, selectedDataPoints, lastSelectedDataPoint, isAnalysis } = useSelector(state => state[snakeToCamel(modelName)] ?? {});
+    const { node, selectedDataPoints, lastSelectedDataPoint, isAnalysis } = useSelector(state => state[modelName] ?? {});
     const nodeModelName = useMemo(() => node?.modelName ?? null, [node]);
     const nodeUrl = useMemo(() => node?.url ?? null, [node]);
-    const modelSchema = useMemo(() => node?.modelSchema ?? modelDataSource.schema, [node])
+    const modelSchema = useMemo(() => node?.modelSchema ?? modelDataSource.schema, [node]);
+    // Extract allowedOperations directly from schema's json_root
+    const allowedOperations = useMemo(() => modelSchema?.json_root || null, [modelSchema])
     const fieldsMetadata = useMemo(() => node?.fieldsMetadata ?? modelDataSource.fieldsMetadata, [node]);
     const derivedModelName = useMemo(() => nodeModelName ?? modelName, [nodeModelName]);
-    const { storedObj: dataSourceStoredObj } = useSelector(dataSource?.selector ?? (() => ({ storedObj: null })), (prev, curr) => {
-        return JSON.stringify(prev) === JSON.stringify(curr);
-    });
+
+    // Extract the three data sources from dictionary
+    const urlOverrideDataSource = modelDependencyMap?.urlOverride ?? null;
+    const crudOverrideDataSource = modelDependencyMap?.crudOverride ?? null;
+    const defaultFilterDataSource = modelDependencyMap?.defaultFilter ?? null;
+
+    // Create stable selector functions
+    const urlOverrideSelector = useMemo(
+        () => urlOverrideDataSource?.selector ?? (() => ({ storedObj: null })),
+        [urlOverrideDataSource]
+    );
+    const crudOverrideSelector = useMemo(
+        () => crudOverrideDataSource?.selector ?? (() => ({ storedObj: null })),
+        [crudOverrideDataSource]
+    );
+    const defaultFilterSelector = useMemo(
+        () => defaultFilterDataSource?.selector ?? (() => ({ storedObj: null })),
+        [defaultFilterDataSource]
+    );
+
+    // Subscribe to each data source's Redux store using shallow equality
+    const { storedObj: urlOverrideDataSourceStoredObj } = useSelector(urlOverrideSelector, shallowEqual);
+    const { storedObj: crudOverrideDataSourceStoredObj } = useSelector(crudOverrideSelector, shallowEqual);
+    const { storedObj: defaultFilterDataSourceStoredObj } = useSelector(defaultFilterSelector, shallowEqual);
 
     const [rows, setRows] = useState([]);
     const [groupedRows, setGroupedRows] = useState([]);
@@ -51,17 +75,9 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
     const [commonKeys, setCommonKeys] = useState([]);
     const [sortedCells, setSortedCells] = useState([]);
     const [uniqueValues, setUniqueValues] = useState({});
-    const [url, setUrl] = useState(modelDataSource.url);
-    const [viewUrl, setViewUrl] = useState(modelDataSource.viewUrl);
     const [isProcessingUserActions, setIsProcessingUserActions] = useState(false);
     const [reconnectCounter, setReconnectCounter] = useState(0);
     const [rowIds, setRowIds] = useState(null);
-    const [params, setParams] = useState(null);
-
-    useEffect(() => {
-        setUrl(nodeUrl);
-        setViewUrl(nodeUrl);
-    }, [nodeUrl])
 
     const {
         modelLayoutOption,
@@ -110,6 +126,107 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
         handleShowMoreToggle,
     } = useModelLayout(modelName, objId, MODEL_TYPES.REPEATED_ROOT, setHeadCells, mode);
 
+    const crudOverrideDictRef = useRef(getCrudOverrideDict(modelSchema));
+    const defaultFilterParamDictRef = useRef(getDefaultFilterParamDict(modelSchema));
+    const hasReadByIdWsProperty = allowedOperations?.ReadByIDWebSocketOp === true;
+
+    // Determine if server-side pagination is enabled from schema
+    const serverSidePaginationEnabled = modelSchema.server_side_pagination === true && modelSchema.is_large_db_object !== true;
+
+    // Extract ui_limit from schema ONLY when server-side pagination is disabled
+    // When server-side is enabled, uiLimit will be null (limit handled by pagination)
+    const uiLimit = !serverSidePaginationEnabled ? (modelSchema.ui_get_all_limit ?? null) : null;
+
+    // Build default filters (server-side) for use in multiple places
+    const defaultFilters = useMemo(() => {
+        return buildDefaultFilters(defaultFilterDataSourceStoredObj, defaultFilterParamDictRef.current);
+    }, [defaultFilterDataSourceStoredObj]);
+
+    // Check if all required default filter values are ready
+    const areDefaultFiltersReady = useMemo(() => {
+        if (!defaultFilterParamDictRef.current || Object.keys(defaultFilterParamDictRef.current).length === 0) {
+            return true; // No default filters required
+        }
+        // Check if all required default filters have valid values
+        const filterMap = new Map(defaultFilters.map(f => [f.column_name, f.filtered_values]));
+        return Object.keys(defaultFilterParamDictRef.current).every(key => {
+            const filterValues = filterMap.get(key);
+            return filterValues !== undefined && filterValues !== null &&
+                   (!Array.isArray(filterValues) || filterValues.length > 0);
+        });
+    }, [defaultFilters]);
+
+    // Construct base URLs using urlOverrideDataSource (must be before useCountQuery)
+    const baseUrl = useMemo(() =>
+        getServerUrl(modelSchema, urlOverrideDataSourceStoredObj, urlOverrideDataSource?.fieldsMetadata),
+        [modelSchema, urlOverrideDataSourceStoredObj, urlOverrideDataSource?.fieldsMetadata]
+    );
+
+    const baseViewUrl = useMemo(() =>
+        getServerUrl(modelSchema, urlOverrideDataSourceStoredObj, urlOverrideDataSource?.fieldsMetadata, undefined, true),
+        [modelSchema, urlOverrideDataSourceStoredObj, urlOverrideDataSource?.fieldsMetadata]
+    );
+
+    // Final URL values (overridden by nodeUrl if present)
+    const url = useMemo(() => nodeUrl ?? baseUrl, [nodeUrl, baseUrl]);
+    const viewUrl = useMemo(() => nodeUrl ?? baseViewUrl, [nodeUrl, baseViewUrl]);
+
+    // Extract params for CRUD override using crudOverrideDataSource (must be before useEffects)
+    const params = useMemo(() =>
+        extractCrudParams(crudOverrideDataSourceStoredObj, crudOverrideDictRef.current),
+        [crudOverrideDataSourceStoredObj]
+    );
+
+    // Process data for backend consumption
+    // Use modelLayoutData with JSON.stringify to handle reference stability
+    const processedData = useMemo(() => {
+        const rowsPerPage = modelLayoutData.rows_per_page || 25;
+        const filters = modelLayoutOption.filters || [];
+        const sortOrders = modelLayoutData.sort_orders || [];
+
+        // Merge UI filters with default filters
+        const mergedFilters = [...filters, ...defaultFilters];
+
+        const result = massageDataForBackend(mergedFilters, sortOrders, page, rowsPerPage);
+
+        return result;
+    }, [
+        JSON.stringify(modelLayoutOption.filters),
+        JSON.stringify(modelLayoutData.sort_orders),
+        page,
+        modelLayoutData.rows_per_page,
+        defaultFilters
+    ]);
+
+    // Unified count query - automatically uses HTTP or WebSocket based on allowedOperations
+    const {
+        count,
+        isLoading: isCountLoading,
+        isSynced
+    } = useCountQuery(
+        url,
+        derivedModelName,
+        processedData.filters,
+        serverSidePaginationEnabled && areDefaultFiltersReady,
+        hasReadByIdWsProperty  // Pass hasReadByIdWsProperty to determine transport type
+    );
+
+    // Derive waiting state - only wait if server-side pagination is enabled
+    const isWaitingForCount = serverSidePaginationEnabled && (count === null || isCountLoading || !isSynced);
+
+    // Determine if pagination should be used
+    const usePagination = useMemo(() => {
+        // Short-circuit if server-side pagination is not enabled
+        if (!serverSidePaginationEnabled) {
+            return false;
+        }
+        if (isWaitingForCount) {
+            return false;
+        }
+        const rowsPerPage = modelLayoutData.rows_per_page || 25;
+        return shouldUsePagination(count, rowsPerPage);
+    }, [serverSidePaginationEnabled, count, modelLayoutData.rows_per_page, isWaitingForCount]);
+
     // Local state multiselect pattern for non-ChartTileNode models
     // Node models use Redux-based selectedDataPoints/lastSelectedDataPoint
     const isChartModel = nodeModelName !== null && nodeModelName !== undefined;
@@ -146,7 +263,6 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
     const pendingUpdateRef = useRef(null);
     const changesRef = useRef({});
     const formValidationRef = useRef({});
-    const crudOverrideDictRef = useRef(getCrudOverrideDict(modelSchema));
     const allowedLayoutTypesRef = useRef([LAYOUT_TYPES.TABLE, LAYOUT_TYPES.PIVOT_TABLE, LAYOUT_TYPES.CHART]);
     // refs to identify change
     const optionsRef = useRef(null);
@@ -154,7 +270,6 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
 
     // calculated fields
     const modelTitle = getWidgetTitle(modelLayoutOption, modelSchema, modelName, storedObj);
-    const uiLimit = modelSchema.ui_get_all_limit ?? null;
 
     // Auto-bound parameters for query parameter binding - uses selected row data
     const autoBoundParams = useMemo(() => {
@@ -185,51 +300,70 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
 
     const effectiveStoredArray = storedArray.map((obj) => effectiveStoredData && effectiveStoredData[DB_ID] === obj[DB_ID] ? effectiveStoredData : obj)
 
+    // Initial GET_ALL request - only for models without WebSocket support
     useEffect(() => {
-        const url = getServerUrl(modelSchema, dataSourceStoredObj, dataSource?.fieldsMetadata);
-        setUrl(url);
-        const viewUrl = getServerUrl(modelSchema, dataSourceStoredObj, dataSource?.fieldsMetadata, undefined, true);
-        setViewUrl(viewUrl);
-        let updatedParams = null;
-        if (dataSourceStoredObj && Object.keys(dataSourceStoredObj).length > 0 && crudOverrideDictRef.current?.GET_ALL) {
-            const { paramDict } = crudOverrideDictRef.current.GET_ALL;
-            if (Object.keys(paramDict).length > 0) {
-                Object.keys(paramDict).forEach((k) => {
-                    const paramSrc = paramDict[k];
-                    const paramValue = get(dataSourceStoredObj, paramSrc);
-                    if (paramValue !== null && paramValue !== undefined) {
-                        if (!updatedParams) {
-                            updatedParams = {};
-                        }
-                        updatedParams[k] = paramValue;
-                    }
-                })
-            }
+        // If ReadByIDWebSocketOp exists, skip HTTP GET_ALL (WebSocket will handle it)
+        if (hasReadByIdWsProperty) {
+            return;
         }
-        setParams((prev) => {
-            if (JSON.stringify(prev) === JSON.stringify(updatedParams)) {
-                return prev;
-            }
-            return updatedParams;
-        })
-    }, [dataSourceStoredObj]);
 
-    // useEffect(() => {
-    //     if (viewUrl) {
-    //         let args = { url: viewUrl };
-    //         if (crudOverrideDictRef.current?.GET_ALL) {
-    //             const { endpoint, paramDict } = crudOverrideDictRef.current.GET_ALL;
-    //             if (!params && Object.keys(paramDict).length > 0) {
-    //                 return;
-    //             }
-    //             args = { ...args, endpoint, params, uiLimit };
-    //         }
-    //         dispatch(actions.getAll({ ...args }));
-    //     }
-    // }, [viewUrl, params])
+        // Wait for count query to complete if server-side pagination is enabled
+        if (isWaitingForCount) {
+            return;
+        }
+
+        // Wait for default filters to be ready
+        if (!areDefaultFiltersReady) {
+            return;
+        }
+
+        if (viewUrl) {
+            let args = { url: viewUrl };
+
+            // Add uiLimit to args (not queryParams) - it will be handled by sliceFactory
+            if (uiLimit) {
+                args.uiLimit = uiLimit;
+            }
+
+            // Build query params similar to WebSocket implementation
+            // JSON-stringify filters, sortOrders, and pagination to match WebSocket format
+            const queryParams = {};
+
+            // Add filters if they exist (JSON-stringified)
+            if (processedData.filters && processedData.filters.length > 0) {
+                queryParams.filters = JSON.stringify(processedData.filters);
+            }
+
+            // Add sort orders if they exist (JSON-stringified)
+            if (processedData.sortOrders && processedData.sortOrders.length > 0) {
+                queryParams.sort_order = JSON.stringify(processedData.sortOrders);
+            }
+
+            // Only add pagination if server-side pagination is enabled and needed (JSON-stringified)
+            if (serverSidePaginationEnabled && usePagination) {
+                queryParams.pagination = JSON.stringify(processedData.pagination);
+            }
+
+            // Handle CRUD override - merge custom endpoint and params
+            if (crudOverrideDictRef.current?.GET_ALL) {
+                const { endpoint, paramDict } = crudOverrideDictRef.current.GET_ALL;
+                if (!params && Object.keys(paramDict).length > 0) {
+                    return;
+                }
+                // Merge CRUD params with query params (CRUD params are not JSON-stringified)
+                args = { ...args, endpoint, params: { ...params, ...queryParams } };
+            } else {
+                // Standard endpoint - just pass query params
+                args = { ...args, params: queryParams };
+            }
+
+            dispatch(actions.getAll(args));
+        }
+    }, [viewUrl, JSON.stringify(params), hasReadByIdWsProperty, processedData.filters, processedData.sortOrders, processedData.pagination, 
+        serverSidePaginationEnabled, usePagination, isWaitingForCount, defaultFilters, uiLimit])
 
     useEffect(() => {
-        workerRef.current = new Worker(new URL("../../workers/repeated-root-model.worker.js", import.meta.url));
+        workerRef.current = new Worker(new URL("../../workers/repeated-root-model.worker.js", import.meta.url), { type: 'module' });
 
         workerRef.current.onmessage = (event) => {
             const { rows, groupedRows, activeRows, maxRowSize, headCells, commonKeys, uniqueValues, sortedCells } = event.data;
@@ -306,7 +440,8 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                 joinSort: modelLayoutOption.join_sort || null,
                 centerJoin: modelLayoutData.joined_at_center,
                 flip: modelLayoutData.flip,
-                rowIds
+                rowIds,
+                serverSidePaginationEnabled, // Pass dynamic server-side pagination flag to worker
             }
 
             const updatedOptionsRef = {
@@ -341,7 +476,7 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
         }
     }, [
         storedArray, updatedObj, fieldsMetadata, modelLayoutData, modelLayoutOption, page, mode,
-        showMore, moreAll, showHidden, showAll, rowIds
+        showMore, moreAll, showHidden, showAll, rowIds, usePagination
     ])
 
     const handleModelDataSourceUpdate = (updatedArray) => {
@@ -352,21 +487,35 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
         setReconnectCounter((prev) => prev + 1);
     }
 
-    const isWebSocketDisabled = isAnalysis ?? false;
+    // Determine if WebSocket should be disabled
+    // 1. If model is in analysis mode
+    // 2. If model doesn't support ReadByIDWebSocketOp
+    const isWebSocketDisabled = (isAnalysis ?? false) || !hasReadByIdWsProperty;
+    // Wait for count query to complete before establishing WebSocket connection
+    // This prevents double connection (once without pagination, once with pagination)
+    // isWaitingForCount handles both: (1) initial load and (2) filter changes
+    // Also wait for default filters to be ready
+    const isWebSocketDelayed = isWebSocketDisabled || isWaitingForCount || !areDefaultFiltersReady;
 
     socketRef.current = useWebSocketWorker({
         url: (modelSchema.is_large_db_object || modelSchema.is_time_series || modelLayoutOption.depending_proto_model_for_cpp_port) ? url : viewUrl,
         modelName: derivedModelName,
-        isDisabled: isWebSocketDisabled,
+        isDisabled: isWebSocketDelayed,
         reconnectCounter,
         selector,
         onWorkerUpdate: handleModelDataSourceUpdate,
         onReconnect: handleReconnect,
         params,
         crudOverrideDict: crudOverrideDictRef.current,
-        uiLimit,
+        defaultFilterParamDict: defaultFilterParamDictRef.current,
         isAlertModel: modelLayoutOption.is_model_alert_type,
-        isCppModel: modelLayoutOption.depending_proto_model_for_cpp_port
+        isCppModel: modelLayoutOption.depending_proto_model_for_cpp_port,
+        // Parameters for unified endpoint with dynamic parameter inclusion
+        // Filters now include merged default filter params
+        filters: processedData.filters,
+        sortOrders: processedData.sortOrders,
+        pagination: (serverSidePaginationEnabled && usePagination) ? processedData.pagination : null,
+        uiLimit: uiLimit  // Client-side limit (null when server-side pagination is enabled)
     })
 
     const handleModeToggle = () => {
@@ -382,7 +531,7 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
         if (modelLayoutData[layoutTypeKey] && modelLayoutData[layoutTypeKey] !== layoutType) {
             handleLayoutTypeChange(modelLayoutData[layoutTypeKey], updatedMode);
         }
-    };
+    }
 
     const handleReload = () => {
         handleDiscard();
@@ -411,7 +560,11 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
     }
 
     const handleDownload = async () => {
-        let args = { url: viewUrl };
+        let args = {
+            url: viewUrl,
+            filters: processedData.filters,
+            sortOrders: processedData.sortOrders
+        };
         if (crudOverrideDictRef.current?.GET_ALL) {
             const { endpoint, paramDict } = crudOverrideDictRef.current.GET_ALL;
             if (!params && Object.keys(paramDict).length > 0) {
@@ -421,7 +574,8 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
         }
         const fileName = getCSVFileName(modelName);
         try {
-            const csvContent = await downloadCSV(uiLimit ? null : storedArray, args);
+            // Pass null as storedData to fetch complete dataset with filters/sorting
+            const csvContent = await downloadCSV(null, args);
             const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
             saveAs(blob, fileName);
         } catch (error) {
@@ -673,6 +827,8 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
             case LAYOUT_TYPES.CHART:
                 Wrapper = ChartView
                 wrapperProps = {
+                    modelName: derivedModelName,
+                    sourceBaseUrl: url,
                     onReload: handleReload,
                     chartRows: cleanedRows,
                     onChartDataChange: handleChartDataChange,
@@ -711,6 +867,7 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                     onSortOrdersChange={handleSortOrdersChange}
                     page={page}
                     rowsPerPage={modelLayoutData.rows_per_page || 25}
+                    totalCount={count}
                     dataSourceColors={modelLayoutData.data_source_colors || []}
                     selectedId={objId}
                     onPageChange={handlePageChange}
@@ -794,6 +951,7 @@ function RepeatedRootModel({ modelName, modelDataSource, dataSource }) {
                         // download
                         onDownload={handleDownload}
                         // edit save
+                        isReadOnly={modelLayoutOption.is_read_only ?? false}
                         onModeToggle={handleModeToggle}
                         onSave={handleSave}
                         // layout switch

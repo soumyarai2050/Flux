@@ -2,7 +2,7 @@ import React, { Fragment, useRef, useState } from 'react';
 import { Box, Tooltip, ClickAwayListener, IconButton, Collapse } from '@mui/material';
 import PropTypes from 'prop-types';
 import { clearxpath } from '../../../utils/core/dataAccess';
-import { getColorTypeFromValue } from '../../../utils/ui/colorUtils';
+import { getColorTypeFromValue, getResolvedColor } from '../../../utils/ui/colorUtils';
 import { isValidJsonString } from '../../../utils/core/stringUtils';
 import { floatToInt, getLocalizedValueAndSuffix } from '../../../utils/formatters/numberUtils';
 import { groupCommonKeys } from '../../../utils/core/dataGrouping';
@@ -116,12 +116,13 @@ const CommonKey = (props) => {
             abbreviatedField = updatedData ? (
                 <div className={classes.abbreviated_json} ref={jsonTableRef}>
                     <span>{JSON.stringify(updatedData)}</span>
-                    <VerticalDataTable 
+                    <VerticalDataTable
                         isOpen={open}
                         data={updatedData}
                         onClose={onCloseAbbreviatedField}
                         anchorEl={jsonTableRef.current}
                         usePopover={true}
+                        fieldsMetadata={collection.subCollections || []}
                     />
                 </div>
                 // <JsonView open={open} onClose={onCloseAbbreviatedField} src={updatedData} />
@@ -170,10 +171,8 @@ const CommonKey = (props) => {
     let commonkeyColor = 'var(--dark-text-primary)';
 
     if (collection.color && !collection.progressBar && !collection.button) {
-        const color = getColorTypeFromValue(collection, collection.value);
-        if (theme.palette.text[color]) {
-            commonkeyColor = theme.palette.text[color];
-        }
+        const colorIdentifier = getColorTypeFromValue(collection, collection.value);
+        commonkeyColor = getResolvedColor(colorIdentifier, theme, 'var(--dark-text-primary)');
     }
 
     let commonkeyTitleColor = theme.palette.text.tertiary;

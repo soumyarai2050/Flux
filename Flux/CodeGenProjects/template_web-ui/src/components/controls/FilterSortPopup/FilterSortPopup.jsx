@@ -34,6 +34,7 @@ const FilterSortPopup = ({
   // Local state for changes before applying
   const [localSelectedFilters, setLocalSelectedFilters] = useState([]);
   const [originalSelectedFilters, setOriginalSelectedFilters] = useState([]);
+  const [serverSideAppliedFilters, setServerSideAppliedFilters] = useState([]);
   const [localTextFilter, setLocalTextFilter] = useState('');
   const [localTextFilterType, setLocalTextFilterType] = useState('contains');
   const [localSortDirection, setLocalSortDirection] = useState(null);
@@ -58,6 +59,7 @@ const FilterSortPopup = ({
 
       setLocalSelectedFilters(initialFilters);
       setOriginalSelectedFilters(initialFilters);
+      setServerSideAppliedFilters([...selectedFilters]);
       setLocalTextFilter(textFilter || '');
       setLocalTextFilterType(textFilterType || 'contains');
       setLocalSortDirection(sortDirection);
@@ -123,10 +125,23 @@ const FilterSortPopup = ({
     setAddCurrentSelectionToFilter(e.target.checked);
   };
 
+  // Normalize value for comparison (handle type mismatches between numbers and strings)
+  const normalizeValue = (val) => {
+    // Convert to string for consistent comparison
+    return String(val === null || val === undefined ? '' : val);
+  };
+
+  // Check if a value is in the selected filters (type-safe comparison)
+  const isValueSelected = (value) => {
+    const normalizedValue = normalizeValue(value);
+    return localSelectedFilters.some(filter => normalizeValue(filter) === normalizedValue);
+  };
+
   // Handle individual filter selection
   const handleFilterChange = (value) => {
-    if (localSelectedFilters.includes(value)) {
-      setLocalSelectedFilters(localSelectedFilters.filter(item => item !== value));
+    const normalizedValue = normalizeValue(value);
+    if (isValueSelected(value)) {
+      setLocalSelectedFilters(localSelectedFilters.filter(item => normalizeValue(item) !== normalizedValue));
     } else {
       setLocalSelectedFilters([...localSelectedFilters, value]);
     }
@@ -220,8 +235,27 @@ const FilterSortPopup = ({
 
   // Handle Apply button click
   const handleApply = () => {
-    const updatedSelectedFilters = originalSelectedFilters && addCurrentSelectionToFilter ? [...originalSelectedFilters, ...localSelectedFilters] : [...localSelectedFilters];
-    onApply && onApply(columnId, updatedSelectedFilters.length !== uniqueValues.length ? updatedSelectedFilters : null, localTextFilter,
+    // Determine final filter values to send to TableHeader
+    let finalFilterValues;
+
+    if (serverSideAppliedFilters.length === 0 && localSelectedFilters.length === uniqueValues.length) {
+      // No server-side filters and all local values selected = no filtering
+      finalFilterValues = null;
+    } else if (serverSideAppliedFilters.length === 0 && localSelectedFilters.length < uniqueValues.length) {
+      // Cleared server-side filters, but user has local selections
+      finalFilterValues = localSelectedFilters.length > 0 ? localSelectedFilters : null;
+    } else if (serverSideAppliedFilters.length > 0 && localSelectedFilters.length === uniqueValues.length) {
+      // Server-side filters exist, user selected all visible values - preserve server filters
+      finalFilterValues = serverSideAppliedFilters;
+    } else {
+      // User made new selections or modified existing ones
+      const updatedSelectedFilters = originalSelectedFilters && addCurrentSelectionToFilter
+        ? [...originalSelectedFilters, ...localSelectedFilters]
+        : [...localSelectedFilters];
+      finalFilterValues = updatedSelectedFilters.length !== uniqueValues.length ? updatedSelectedFilters : null;
+    }
+
+    onApply && onApply(columnId, finalFilterValues, localTextFilter,
       localTextFilterType, localSortDirection, localAbsoluteSort, multiSortRef.current);
     handleClose();
   };
@@ -243,6 +277,7 @@ const FilterSortPopup = ({
   // Clear all filters
   const clearAllFilters = () => {
     setLocalSelectedFilters([...uniqueValues]);
+    setServerSideAppliedFilters([]);
     setLocalTextFilter('');
     setLocalSortDirection(null);
     setLocalAbsoluteSort(null);
@@ -259,14 +294,16 @@ const FilterSortPopup = ({
 
   // Calculate checkbox states for visible items
   const allVisibleSelected = filteredUniqueValues.length > 0 &&
-    filteredUniqueValues.every(value => localSelectedFilters.includes(value));
+    filteredUniqueValues.every(value => isValueSelected(value));
 
   const someVisibleSelected = filteredUniqueValues.some(value =>
-    localSelectedFilters.includes(value)) && !allVisibleSelected;
+    isValueSelected(value)) && !allVisibleSelected;
 
   // Calculate if any filter is actually applied
   const hasFilters = uniqueValues.length > 1;
-  const isFiltered = selectedFilters.length !== 0 && selectedFilters.length < uniqueValues.length || textFilter;
+  // If selectedFilters has values, it means a filter is applied (active filtering)
+  // This works because selectedFilters is only populated when user explicitly filters
+  const isFiltered = (selectedFilters.length !== 0) || textFilter;
   const hasLocalFilterOrSort = localSelectedFilters.length !== 0 && localSelectedFilters.length < uniqueValues.length || localTextFilter || localSortDirection;
 
   // Count occurrences of each value
@@ -425,10 +462,10 @@ const FilterSortPopup = ({
                 <Divider className={styles.menuDivider} />
               </>
             )}
-            {hasLocalFilterOrSort && (
+            {(hasLocalFilterOrSort || isFiltered) && (
               <div className={styles.clearFilterOption}
-                onClick={hasLocalFilterOrSort ? clearAllFilters : undefined}
-                style={{ opacity: hasLocalFilterOrSort ? 1 : 0.5, pointerEvents: hasLocalFilterOrSort ? 'auto' : 'none' }}
+                onClick={(hasLocalFilterOrSort || isFiltered) ? clearAllFilters : undefined}
+                style={{ opacity: (isFiltered || hasLocalFilterOrSort )? 1 : 0.5, pointerEvents: (isFiltered || hasLocalFilterOrSort ) ? 'auto' : 'none' }}
               >
                 <div className={styles.sortIcon}></div>
                 <div className={styles.sortIconPlaceholder}>
@@ -442,8 +479,25 @@ const FilterSortPopup = ({
           <Divider />
 
           {/* Filter section */}
-          {filterEnable && uniqueValues.length > 1 && (
+          {filterEnable && (
             <div className={styles.section}>
+              {/* Show server-side applied filters when filters are active */}
+              {/* {selectedFilters.length > 0 && uniqueValues.length >= 1 && (
+                <div className={styles.serverFiltersSection}>
+                  <Typography variant="caption" className={styles.serverFiltersTitle}>
+                    Server Side Filters ({selectedFilters.length} applied):
+                  </Typography>
+                  <div className={styles.serverFiltersList}>
+                    {selectedFilters.map((value, index) => (
+                      <div key={index} className={styles.serverFilterItem}>
+                        {value === null || value === undefined ? '(Blank)' : String(value)}
+                      </div>
+                    ))}
+                  </div>
+                  <Divider className={styles.menuDivider} />
+                </div>
+              )} */}
+
               <div className={styles.searchContainer}>
                 <TextField
                   placeholder="Search"
@@ -512,7 +566,7 @@ const FilterSortPopup = ({
                           <FormControlLabel
                             control={
                               <Checkbox
-                                checked={localSelectedFilters.includes(value)}
+                                checked={isValueSelected(value)}
                                 onChange={() => handleFilterChange(value)}
                                 className={styles.checkbox}
                               />
@@ -577,7 +631,7 @@ FilterSortPopup.propTypes = {
   onCopy: PropTypes.func.isRequired,
   filterEnable: PropTypes.bool,
   clipboardText: PropTypes.string,
-  valueCounts: PropTypes.objectOf(PropTypes.string)
+  valueCounts: PropTypes.instanceOf(Map)
 };
 
 FilterSortPopup.defaultProps = {

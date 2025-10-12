@@ -1,37 +1,44 @@
-.analyzeButton {
-  background: rgba(255, 255, 255, 0.95);
-  color: rgba(0, 0, 0, 0.87);
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  border-radius: 4px;
-  padding: 3px 8px;
-  font-size: 9px;
-  font-weight: 500;
+.iconContainer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.98);
+  padding: 2px;
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.edgeButton {
+  background: transparent;
+  color: rgba(0, 0, 0, 0.7);
+  border: none;
+  border-radius: 6px;
+  padding: 6px;
   cursor: pointer;
-  backdrop-filter: blur(8px);
-  box-shadow: 0px 1px 3px rgba(0, 0, 0, 0.12), 0px 1px 1px rgba(0, 0, 0, 0.14);
-  transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
   user-select: none;
-  min-width: 48px;
-  text-align: center;
-  letter-spacing: 0.00938em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-family: "Roboto", "Helvetica", "Arial", sans-serif;
+  position: relative;
 }
 
-.analyzeButton:hover {
-  background: rgba(0, 0, 0, 0.04);
-  border-color: rgba(0, 0, 0, 0.23);
-  box-shadow: 0px 2px 4px rgba(0, 0, 0, 0.2), 0px 1px 10px rgba(0, 0, 0, 0.12);
+.edgeButton:hover {
+  background: rgba(25, 118, 210, 0.1);
+  color: #1976d2;
+  transform: scale(1.08);
 }
 
-.analyzeButton.selected {
-  background: #1976d2;
+.edgeButton.selected {
+  background: linear-gradient(135deg, #1976d2 0%, #1565c0 100%);
   color: #ffffff;
-  border-color: #1976d2;
-  box-shadow: 0px 2px 4px rgba(25, 118, 210, 0.2), 0px 1px 10px rgba(25, 118, 210, 0.12);
+  box-shadow: 0px 2px 8px rgba(25, 118, 210, 0.35);
 }
 
-.analyzeButton.selected:hover {
-  background: #1565c0;
-  border-color: #1565c0;
-  box-shadow: 0px 3px 5px rgba(25, 118, 210, 0.2), 0px 1px 18px rgba(25, 118, 210, 0.12);
+.edgeButton.selected:hover {
+  background: linear-gradient(135deg, #1565c0 0%, #0d47a1 100%);
+  transform: scale(1.08);
+  box-shadow: 0px 3px 10px rgba(25, 118, 210, 0.45);
 }

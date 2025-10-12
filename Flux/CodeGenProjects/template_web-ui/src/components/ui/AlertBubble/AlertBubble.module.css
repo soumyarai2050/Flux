@@ -3,7 +3,7 @@
     color: white !important;
 }
 
-.critical :global .MuiBadge-badge {
+/* .critical :global .MuiBadge-badge {
     background-color: var(--red-critical) !important;
     animation: blink 0.5s step-start infinite;
 }
@@ -44,4 +44,4 @@
     to {
         opacity: 1
     }
-}
+} */

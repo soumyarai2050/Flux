@@ -8,3 +8,17 @@
     text-overflow: ellipsis;
     cursor: pointer;
 }
+
+/* Reserve space for copy button to prevent layout shift */
+.jsonViewerContainer :global(.data-key-pair) {
+    width: max-content;
+    padding-right: 16px;
+    position: relative;
+}
+
+/* Position copy button absolutely so it doesn't affect layout */
+.jsonViewerContainer :global(.data-key-pair > .MuiBox-root:last-child:has(svg)) {
+    position: absolute;
+    right: 0;
+    top: 0;
+}

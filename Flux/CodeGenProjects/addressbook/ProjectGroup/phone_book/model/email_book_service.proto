@@ -70,6 +70,10 @@ message ChoreLimits {
     DeleteOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
+  option (FluxMsgGetFilterCountQuery) = true;
+  option (FluxMsgJsonQuery) = {
+    QueryName: "get_chore_limits_schema"
+  };
   option (FluxMsgWidgetUIDataElement) = {
     x: 4,
     y: 15,
@@ -114,6 +118,10 @@ message SystemControl {
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED,
     PassStoredObjToUpdatePrePostCallback: true,
     PassStoredObjToPartialUpdatePostCallback: True,
+  };
+  option (FluxMsgGetFilterCountQuery) = true;
+  option (FluxMsgJsonQuery) = {
+    QueryName: "get_system_control_schema"
   };
   option (FluxMsgWidgetUIDataElement) = {
     x: 4,
@@ -196,6 +204,10 @@ message ContactStatus {
     DeleteOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
+  option (FluxMsgGetFilterCountQuery) = true;
+  option (FluxMsgJsonQuery) = {
+    QueryName: "get_contact_status_schema"
+  };
   option (FluxMsgWidgetUIDataElement) = {
     x: 11,
     y: 25,
@@ -254,6 +266,10 @@ message PairPlan {
     PassStoredObjToUpdatePrePostCallback: true,
     PassStoredObjToPartialUpdatePostCallback: True,
     PassStoredObjToPartialUpdateAllPostCallback: True
+  };
+    option (FluxMsgGetFilterCountQuery) = true;
+  option (FluxMsgJsonQuery) = {
+    QueryName: "get_pair_plan_schema"
   };
     option (FluxMsgJsonQuery) = {
       QueryName: "get_pair_plan_sec_filter_json",
@@ -366,6 +382,7 @@ message PlanCollection {
     DeleteOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
+  option (FluxMsgGetFilterCountQuery) = true;
   option (FluxMsgWidgetUIDataElement) = {
     x: 0,
     y: 0,
@@ -432,6 +449,7 @@ message SampleModel{
     PassStoredObjToPartialUpdateAllPostCallback: True,
     IncludeDataframeClients: true,
   };
+  option (FluxMsgGetFilterCountQuery) = true;
   option (FluxMsgAggregateQueryVarName) = "sample_cum_aggregate_pipeline";
   option (FluxMsgJsonQuery) = {
       QueryName: "file_upload_from_sample_model",

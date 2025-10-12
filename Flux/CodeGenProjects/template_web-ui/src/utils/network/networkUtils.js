@@ -123,23 +123,23 @@ function jsonify(obj) {
 /**
  * Utility function to build API URL and parameters.
  * It constructs the full API URL by combining a base URL and an endpoint,
- * and adds a `limitObjCount` parameter if `uiLimit` is provided.
+ * and adds a `limit_obj_count` parameter if `uiLimit` is provided.
  * @param {string} defaultEndpoint - The default endpoint string (e.g., 'data', 'config').
  * @param {string} overrideUrl - Optional. A URL to override the default base URL (API_ROOT_URL or API_ROOT_VIEW_URL).
  * @param {string} overrideEndpoint - Optional. An endpoint to override the `defaultEndpoint`.
- * @param {number} uiLimit - The UI limit for the number of items to retrieve. If provided, it's added as `limitObjCount` to parameters.
  * @param {Object} params - Additional parameters to be included in the API request.
  * @param {boolean} [isViewUrl=false] - If true, uses `API_ROOT_VIEW_URL` as the base URL; otherwise, `API_ROOT_URL`.
+ * @param {number} [uiLimit=null] - The UI limit for the number of items to retrieve. If provided, it's added as `limit_obj_count` to parameters.
  * @returns {[string, Object]} A tuple containing the constructed API URL and the parameters object.
  */
-export function getApiUrlMetadata(defaultEndpoint, overrideUrl, overrideEndpoint, uiLimit, params, isViewUrl = false) {
+export function getApiUrlMetadata(defaultEndpoint, overrideUrl, overrideEndpoint, params, isViewUrl = false, uiLimit = null) {
     const baseUrl = overrideUrl || (isViewUrl ? API_ROOT_VIEW_URL : API_ROOT_URL);
     const baseEndpoint = overrideEndpoint || defaultEndpoint;
     const apiUrl = `${baseUrl}/${baseEndpoint}`;
     const apiParams = params ? { ...params } : {};
-    // If uiLimit is provided, add it as 'limitObjCount' to the parameters.
+    // If uiLimit is provided, add it as 'limit_obj_count' to the parameters.
     if (uiLimit) {
-        apiParams['limitObjCount'] = uiLimit;
+        apiParams['limit_obj_count'] = uiLimit;
     }
     return [apiUrl, apiParams];
 }

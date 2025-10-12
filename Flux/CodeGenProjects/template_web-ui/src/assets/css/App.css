@@ -106,17 +106,3 @@ div.MuiBackdrop-root:has(> div[style*="opacity: 0"]) {
   box-shadow: -2px -2px 3px rgba(0, 0, 0, 0.4);
   z-index: 1000;
 }
-
-.react-json-view .copy-to-clipboard-container {
-  display: inline-block !important;
-}
-
-.react-json-view .string-value {
-  overflow-wrap: anywhere;
-}
-
-.react-json-view {
-  /* background-color: var(--grey-200) !important; */
-  padding: 5px;
-  border-radius: 5px;
-}

@@ -35,16 +35,6 @@ class PackageJsonGenPlugin(BaseJSLayoutPlugin):
         output_str = f'"name": "{self.proto_package_name}",'
         return output_str
 
-    def handle_port(self, file: protogen.File) -> str:
-        ui_port = os.environ.get("UI_PORT")
-        if ui_port is None or len(ui_port) == 0:
-            err_str = (f"Env var 'UI_PORT' found as '{ui_port}', "
-                       f"likely bug in setting env var from launch of this plugin")
-            logging.error(err_str)
-            raise Exception(err_str)
-        output_str = f'"start": "cross-env PORT={ui_port} react-scripts start",'
-        return output_str
-
     def output_file_generate_handler(self, file: protogen.File):
         output_file_name = "package.json"
         py_code_gen_engine_path = None
@@ -60,8 +50,7 @@ class PackageJsonGenPlugin(BaseJSLayoutPlugin):
         self.output_file_name_to_template_file_path_dict[output_file_name] = str(template_file_path)
         return {
             output_file_name: {
-                "tmp_project_name": self.handle_temp_project_name(file),
-                "port_handling": self.handle_port(file)
+                "tmp_project_name": self.handle_temp_project_name(file)
             }
         }
 

@@ -52,6 +52,7 @@ message ChoreLedger {
     DeleteOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
+  option (FluxMsgGetFilterCountQuery) = true;
   option (FluxMsgWidgetUIDataElement) = {
     x: 0,
     y: 91,
@@ -85,7 +86,7 @@ message ChoreLedger {
     QueryRouteType: PATCH
   };
   option (FluxMsgCRUDSharedLock) = "ledger_shared_lock";
-  option (FluxMsgUIGetAllLimit) = "-100";
+  option (FluxMsgUIGetAllLimit) = "100";
   option (FluxMsgExecutorOptions) = {
     IsWebSocketModel: true,
     EnableNotifyAll: false,
@@ -120,6 +121,7 @@ message ChoreSnapshot {
     DeleteOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
+  option (FluxMsgGetFilterCountQuery) = true;
   option (FluxMsgWidgetUIDataElement) = {
     x: 0,
     y: 74,
@@ -151,7 +153,7 @@ message ChoreSnapshot {
     CacheAsDictWithKeyField: "chore_brief.chore_id"
   };
   option (FluxMsgCRUDSharedLock) = "residual_compute_shared_lock";
-  option (FluxMsgUIGetAllLimit) = "-100";
+  option (FluxMsgUIGetAllLimit) = "100";
   option (FluxMsgStringLength) = 128;
 
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];

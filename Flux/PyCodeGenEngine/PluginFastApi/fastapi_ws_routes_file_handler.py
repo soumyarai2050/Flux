@@ -252,6 +252,17 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             # is supported as mongo change stream works with usual collections
         return output_str
 
+    def handle_query_ws_params_json_parsing(self):
+        output_str = f"    query_params = dict(websocket.query_params)\n"
+        output_str += f"    for query_param_name, query_param_val in query_params.items():\n"
+        output_str += f"        try:\n"
+        output_str += f"            # Attempt to parse the value as JSON\n"
+        output_str += f"            query_params[query_param_name] = orjson.loads(query_param_val)\n"
+        output_str += f"        except orjson.JSONDecodeError:\n"
+        output_str += f"            # If it fails, it's not a JSON string, so store the original string value\n"
+        output_str += f"            query_params[query_param_name] = query_param_val\n"
+        return output_str
+
     def handle_GET_ALL_ws_gen(self, message: protogen.Message, aggregation_type: str,
                               shared_lock_list: List[str] | None = None):
         message_name = message.proto.name
@@ -260,9 +271,7 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str += f"\n"
         output_str += (f'@{self.api_router_app_name}.websocket("/get-all-{message_name_snake_cased}-ws")\n')
         output_str += (f"async def read_{message_name_snake_cased}_ws(websocket: WebSocket) -> None:\n")
-        output_str += f"    query_params = dict(websocket.query_params)\n"
-        output_str += f"    for query_param_name, query_param_val in query_params.items():\n"
-        output_str += f"        query_params[query_param_name] = orjson.loads(query_param_val)\n"
+        output_str += self.handle_query_ws_params_json_parsing()
         output_str += f"    limit_obj_count = query_params.pop('limit_obj_count', None)\n"
         output_str += f"    need_initial_snapshot = query_params.pop('need_initial_snapshot', True)\n"
         additional_agg_option_val_dict = \
@@ -413,10 +422,34 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         output_str += "\n\n\n"
         return output_str
 
+    def _handle_ws_filtered_count_query_str(self, message: protogen.Message) -> str:
+        message_name_snake_cased = convert_camel_case_to_specific_case(message.proto.name)
+        output_str = f"@perf_benchmark\n"
+        output_str += (f"async def underlying_{message_name_snake_cased}_filtered_count_query_ws(websocket: WebSocket):\n")
+        output_str += self.handle_query_ws_params_json_parsing()
+        output_str += f'    need_initial_snapshot = query_params.pop("need_initial_snapshot", True)\n'
+        output_str += f'    query_params["model_class"] = {message.proto.name}\n'
+        output_str += f'    async def temp_callable(**kwargs):\n'
+        output_str += f'        return kwargs.get(\"json_obj_str\")\n'
+        output_str += (f"    await generic_projection_query_ws(websocket, "
+                       f"{FastapiWsRoutesFileHandler.proto_package_var_name}, "
+                       f"{message.proto.name}, temp_callable, query_params, "
+                       f"get_cascading_multi_filter_count_pipeline, "
+                       f"need_initial_snapshot=need_initial_snapshot, "
+                       "allow_full_db_read_on_updates=True)\n")
+        output_str += f"\n\n"
+        output_str += f'@{self.api_router_app_name}.websocket("/ws-query-{message_name_snake_cased}_filtered_count")\n'
+        output_str += (f"async def {message_name_snake_cased}_filtered_count_query_ws(websocket: WebSocket):\n")
+        output_str += f'    """\n'
+        output_str += f'    WS Query of {message.proto.name} for filtered count\n'
+        output_str += f'    """\n'
+        output_str += self._get_view_check_code_for_ws(message)
+        output_str += (f"    await underlying_{message_name_snake_cased}_filtered_count_query_ws(websocket)")
+        output_str += "\n\n\n"
+        return output_str
+
     def _add_query_params_handling(self, param_name_to_param_type_dict: Dict[str, str]):
-        output_str = f"    query_params = dict(websocket.query_params)\n"
-        output_str += f"    for query_param_name, query_param_val in query_params.items():\n"
-        output_str += f"        query_params[query_param_name] = orjson.loads(query_param_val)\n"
+        output_str = self.handle_query_ws_params_json_parsing()
         output_str += f"    need_initial_snapshot: bool | None = query_params.pop('need_initial_snapshot', None)\n"
         for param_name, param_type in param_name_to_param_type_dict.items():
             if "None" in param_type:
@@ -615,6 +648,8 @@ class FastapiWsRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
         for message in self.root_message_list + self.non_root_message_list:
             if FastapiWsRoutesFileHandler.is_option_enabled(message, FastapiWsRoutesFileHandler.flux_msg_json_query):
                 output_str += self._handle_ws_query_methods(message, model_type)
+            if self.is_bool_option_enabled(message, FastapiWsRoutesFileHandler.flux_msg_get_filter_count_query):
+                output_str += self._handle_ws_filtered_count_query_str(message)
 
         for message in self.root_message_list:
             if FastapiWsRoutesFileHandler.is_option_enabled(message,

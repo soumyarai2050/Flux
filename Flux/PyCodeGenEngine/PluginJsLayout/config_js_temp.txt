@@ -59,3 +59,15 @@ export const API_ROOT_VIEW_URL = ENABLE_PROXY ? PROXY_SERVER_ROOT : API_VIEW_ROO
  * @type {string}
  */
 export const COOKIE_NAME = PROJECT_NAME;
+
+/**
+ * The URL for publishing edge/join configurations.
+ * @type {string}
+ */
+# @@protoc_insertion_point(edge_publish_url)
+
+/**
+ * The URL for publishing chart configurations.
+ * @type {string}
+ */
+# @@protoc_insertion_point(chart_publish_url)

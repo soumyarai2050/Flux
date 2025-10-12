@@ -282,32 +282,25 @@ class AddressDataManagerServiceRoutesCallbackBaseNativeOverride(AddressDataManag
     async def filter_one_min_bar_data_query_ws_pre(self, *args):
         pass
 
-async def get_vwap_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str, obj_id_or_list: int | List[int],
-                                                            **kwargs):
-    return bar_data_obj_json_str
+async def get_vwap_projection_from_bar_data_filter_callable(**kwargs):
+    return kwargs.get("json_obj_str")
 
 
-async def get_vwap_n_vwap_change_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str,
-                                                                          obj_id_or_list: int | List[int], **kwargs):
-    return bar_data_obj_json_str
+async def get_vwap_n_vwap_change_projection_from_bar_data_filter_callable(**kwargs):
+    return kwargs.get("json_obj_str")
 
 
-async def get_vwap_change_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str,
-                                                                   obj_id_or_list: int | List[int], **kwargs):
-    return bar_data_obj_json_str
+async def get_vwap_change_projection_from_bar_data_filter_callable(**kwargs):
+    return kwargs.get("json_obj_str")
 
 
-async def get_premium_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str,
-                                                               obj_id_or_list: int | List[int], **kwargs):
-    return bar_data_obj_json_str
+async def get_premium_projection_from_bar_data_filter_callable(**kwargs):
+    return kwargs.get("json_obj_str")
 
 
-async def get_premium_n_premium_change_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str,
-                                                                                obj_id_or_list: int | List[int],
-                                                                                **kwargs):
-    return bar_data_obj_json_str
+async def get_premium_n_premium_change_projection_from_bar_data_filter_callable(**kwargs):
+    return kwargs.get("json_obj_str")
 
 
-async def get_premium_change_projection_from_bar_data_filter_callable(bar_data_obj_json_str: str,
-                                                                      obj_id_or_list: int | List[int], **kwargs):
-    return bar_data_obj_json_str
+async def get_premium_change_projection_from_bar_data_filter_callable(**kwargs):
+    return kwargs.get("json_obj_str")

@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import { COLOR_TYPES, DATA_TYPES, MODES } from '../../../../constants';
-import { Select, MenuItem, TextField, Autocomplete, Checkbox, InputAdornment, Tooltip, IconButton } from '@mui/material';
+import { Select, MenuItem, TextField, Autocomplete, Checkbox, InputAdornment, Tooltip, IconButton, useTheme } from '@mui/material';
 import { Error, Clear } from '@mui/icons-material';
 import PropTypes from 'prop-types';
 import { NumericFormat } from 'react-number-format';
-import { getColorTypeFromValue } from '../../../../utils/ui/colorUtils';
+import { getColorTypeFromValue, getResolvedColor } from '../../../../utils/ui/colorUtils';
 import { getValueFromReduxStoreFromXpath } from '../../../../utils/redux/reduxUtils';
 import { isAllowedNumericValue, floatToInt } from '../../../../utils/formatters/numberUtils';
 import { validateConstraints } from '../../../../utils/validation/validationUtils';
@@ -24,6 +24,7 @@ dayjs.extend(timezone);
 const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 const NodeField = (props) => {
+    const theme = useTheme();
 
     // const state = useSelector(state => state);
     const reducerArray = useMemo(() => getReducerArrayFromCollections([props.data]), [props.data]);
@@ -133,13 +134,32 @@ const NodeField = (props) => {
     if (props.data.color) {
         color = getColorTypeFromValue(props.data, props.data.value);
     }
-    let colorClass = classes[color];
 
-    // Add classes based on dataStatus
+    // Resolve color using the centralized utility instead of CSS class lookup
+    const resolvedColor = getResolvedColor(color, theme);
+
+    // Create sx styles for the dynamic color, including overrides for disabled state
+    const colorSx = resolvedColor ? {
+        // --- Rules for Select ---
+        '& .MuiSelect-select': {
+            '&.Mui-disabled': {
+                backgroundColor: resolvedColor,
+            }
+        },
+        '& .MuiCheckbox-root': {
+            color: resolvedColor,
+            '&.Mui-disabled': {
+                color: resolvedColor,
+            }
+        }
+    } : {};
+
+    // Handle dataStatus classes
+    let dataStatusClass = '';
     if (props.data.dataStatus === 'new') {
-        colorClass = `${colorClass} ${classes.new_node_field}`.trim();
+        dataStatusClass = classes.new_node_field;
     } else if (props.data.dataStatus === 'modified') {
-        colorClass = `${colorClass} ${classes.modified_node_field}`.trim();
+        dataStatusClass = classes.modified_node_field;
     }
 
     let nodeFieldRemove = props.data['data-remove'] ? classes.remove : '';
@@ -169,8 +189,8 @@ const NodeField = (props) => {
                 variant='outlined'
                 size='small'
                 fullWidth
-                sx={{ minWidth: '150px !important' }}
-                className={`${classes.text_field} ${nodeFieldRemove} ${colorClass}`}
+                sx={{ minWidth: '150px !important', color :{colorSx} }}
+                className={`${classes.text_field} ${nodeFieldRemove} ${dataStatusClass}`}
                 required={props.data.required}
                 value={value}
                 inputValue={autocompleteInputValue}
@@ -236,7 +256,8 @@ const NodeField = (props) => {
                 id={props.data.key}
                 name={props.data.key}
                 onClick={handleClick}
-                className={`${classes.checkbox} ${nodeFieldRemove} ${colorClass}`}
+                className={`${classes.checkbox} ${nodeFieldRemove} ${dataStatusClass}`}
+                sx={colorSx}
                 defaultValue={false}
                 required={props.data.required}
                 checked={value}
@@ -256,7 +277,8 @@ const NodeField = (props) => {
             <Select
                 id={props.data.key}
                 name={props.data.key}
-                className={`${classes.select} ${nodeFieldRemove} ${colorClass}`}
+                className={`${classes.select} ${nodeFieldRemove} ${dataStatusClass}`}
+                sx={colorSx}
                 value={value}
                 onClick={handleClick}
                 onChange={(e) => {
@@ -345,7 +367,8 @@ const NodeField = (props) => {
 
         return (
             <NumericFormat
-                className={`${classes.text_field} ${nodeFieldRemove} ${colorClass}`}
+                className={`${classes.text_field} ${nodeFieldRemove} ${dataStatusClass}`}
+                sx={colorSx}
                 customInput={TextField}
                 id={props.data.key}
                 name={props.data.key}
@@ -405,7 +428,8 @@ const NodeField = (props) => {
                 <DateTimePicker
                     id={props.data.key}
                     name={props.data.key}
-                    className={`${classes.text_field} ${nodeFieldRemove} ${colorClass}`}
+                    className={`${classes.text_field} ${nodeFieldRemove} ${dataStatusClass}`}
+                sx={colorSx}
                     disabled={disabled}
                     error={validationError.current !== null}
                     value={value}
@@ -477,7 +501,8 @@ const NodeField = (props) => {
         const isMultiline = props.data.text_area ?? false;
         return (
             <TextField
-                className={`${classes.text_field} ${nodeFieldRemove} ${colorClass}`}
+                className={`${classes.text_field} ${nodeFieldRemove} ${dataStatusClass}`}
+                sx={colorSx}
                 id={props.data.key}
                 name={props.data.key}
                 multiline={isMultiline}

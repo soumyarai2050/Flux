@@ -18,7 +18,8 @@ import { createAutoBoundParams } from '../../utils/core/parameterBindingUtils';
 import { removeRedundantFieldsFromRows } from '../../utils/core/dataTransformation';
 import { dataSourcesSelectorEquality } from '../../utils/redux/selectorUtils';
 import { cleanAllCache } from '../../cache/attributeCache';
-import { useWebSocketWorker, useDataSourcesWebsocketWorker, useDownload, useModelLayout, useConflictDetection } from '../../hooks';
+import { useWebSocketWorker, useDataSourcesWebsocketWorker, useDownload, useModelLayout, useConflictDetection, useCountQuery } from '../../hooks';
+import { massageDataForBackend, shouldUsePagination } from '../../utils/core/paginationUtils';
 // custom components
 import { FullScreenModalOptional } from '../../components/ui/Modal';
 import { ModelCard, ModelCardHeader, ModelCardContent } from '../../components/utility/cards';
@@ -55,6 +56,8 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
 
     const { schema: modelSchema, fieldsMetadata: modelFieldsMetadata, actions, selector } = modelDataSource;
     const { storedObj, updatedObj, objId, mode, isCreating, error, isLoading, popupStatus } = useSelector(selector);
+    // Extract allowedOperations directly from schema's json_root
+    const allowedOperations = useMemo(() => modelSchema?.json_root || null, [modelSchema]);
     const {
         storedArrayDict: dataSourcesStoredArrayDict,
         storedObjDict: dataSourcesStoredObjDict,
@@ -140,6 +143,47 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         handleShowHiddenToggle,
         handleShowMoreToggle,
     } = useModelLayout(modelName, objId, MODEL_TYPES.ABBREVIATION_MERGE, setHeadCells, mode);
+
+    const hasReadByIdWsProperty = allowedOperations?.ReadByIDWebSocketOp === true;
+
+    // Collection views do not support server-side-pagination as the backend is not aware of these tables
+    const serverSidePaginationEnabled = false;
+
+    // Process data for backend consumption
+    // Use modelLayoutData with JSON.stringify to handle reference stability
+    const processedData = useMemo(() => {
+        const rowsPerPage = modelLayoutData.rows_per_page || 25;
+        const filters = modelLayoutOption.filters || [];
+        const sortOrders = modelLayoutData.sort_orders || [];
+
+        const result = massageDataForBackend(filters, sortOrders, page, rowsPerPage);
+
+        return result;
+    }, [
+        JSON.stringify(modelLayoutOption.filters),
+        JSON.stringify(modelLayoutData.sort_orders),
+        page,
+        modelLayoutData.rows_per_page
+    ]);
+
+    // Unified count query - automatically uses HTTP or WebSocket based on allowedOperations
+    const {
+        count,
+        isLoading: isCountLoading,
+        isSynced
+    } = useCountQuery(
+        url,
+        modelName,
+        processedData.filters,
+        serverSidePaginationEnabled,
+        hasReadByIdWsProperty
+    );
+
+    // Derive waiting state - true if no count yet OR if count doesn't match current filters OR if loading
+    const isWaitingForCount = serverSidePaginationEnabled && (count === null || isCountLoading || !isSynced);
+
+    //Keeping it false to enforce client side pagination
+    const usePagination = false;
 
     // Current chart's multiselect state (derived after modelLayoutData is available)
     const currentChartName = modelLayoutData.selected_chart_name;
@@ -309,9 +353,13 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         });
     }, [storedObj])
 
-    // useEffect(() => {
-    //     dispatch(actions.getAll());
-    // }, [])
+    useEffect(() => {
+        if (hasReadByIdWsProperty) {
+            return;
+        }
+
+        dispatch(actions.getAll());
+    }, [hasReadByIdWsProperty])
 
     useEffect(() => {
         if (dataSourcesCrudOverrideDictRef.current) return;
@@ -332,7 +380,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     }, [dataSourcesParams])
 
     useEffect(() => {
-        workerRef.current = new Worker(new URL('../../workers/abbreviation-merge-model.worker.js', import.meta.url));
+        workerRef.current = new Worker(new URL('../../workers/abbreviation-merge-model.worker.js', import.meta.url), { type: 'module' });
 
         workerRef.current.onmessage = (event) => {
             const { rows, groupedRows, activeRows, maxRowSize, headCells, commonKeys, uniqueValues, sortedCells, activeIds } = event.data;
@@ -412,7 +460,8 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                 joinSort: modelLayoutOption.join_sort || null,
                 centerJoin: modelLayoutData.joined_at_center,
                 flip: modelLayoutData.flip,
-                rowIds
+                rowIds,
+                serverSidePaginationEnabled: false // Pass this false as in case of Abbreviation Merge Model we want to enforce client side pagination control in both cases 
             }
 
             const updatedOptionsRef = {
@@ -463,15 +512,28 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         setReconnectCounter((prev) => prev + 1);
     }
 
+    // Determine if WebSocket should be disabled
+    const isWebSocketDisabled = !hasReadByIdWsProperty;
+
+    // Wait for count query to complete before establishing WebSocket connection
+    // This prevents double connection (once without pagination, once with pagination)
+    // isWaitingForCount handles both: (1) initial load and (2) filter changes
+    const isWebSocketDelayed = isWebSocketDisabled || isWaitingForCount;
+
     socketRef.current = useWebSocketWorker({
         url: (modelSchema.is_large_db_object || modelSchema.is_time_series || modelLayoutOption.depending_proto_model_for_cpp_port) ? url : viewUrl,
         modelName,
-        isDisabled: false,
+        isDisabled: isWebSocketDelayed,
         reconnectCounter,
         selector,
         onWorkerUpdate: handleModelDataSourceUpdate,
         onReconnect: handleReconnect,
-        isCppModel: modelLayoutOption.depending_proto_model_for_cpp_port
+        isCppModel: modelLayoutOption.depending_proto_model_for_cpp_port,
+        // Parameters for unified endpoint with dynamic parameter inclusion
+        //Passing these nulls because collection view does not support these on backend side 
+        filters: null,
+        sortOrders: null,
+        pagination: null
     })
 
     useDataSourcesWebsocketWorker({
@@ -834,6 +896,13 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         debouncedRowSelect(id);
     }
 
+    const cleanedRows = useMemo(() => {
+        if ([LAYOUT_TYPES.CHART, LAYOUT_TYPES.PIVOT_TABLE].includes(layoutType)) {
+            return removeRedundantFieldsFromRows(rows);
+        }
+        return [];
+    }, [rows, layoutType])
+
     const handleMultiSelectChange = useCallback((selectedIds, mostRecentId) => {
         if (Object.values(dataSourcesModeDict).includes(MODES.EDIT)) {
             return;
@@ -841,10 +910,15 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
 
         // Update chart-specific multiselect state
         if (currentChartName) {
+            // Convert IDs to row objects for ChartView
+            const selectedRowObjects = (selectedIds || [])
+                .map(id => cleanedRows.find(row => row['data-id'] === id || row[DB_ID] === id))
+                .filter(Boolean); // Remove any undefined entries
+
             setChartMultiSelectState(prev => ({
                 ...prev,
                 [currentChartName]: {
-                    selectedRows: selectedIds || [],
+                    selectedRows: selectedRowObjects,
                     lastSelectedRowId: mostRecentId || null
                 }
             }));
@@ -863,14 +937,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
             });
             handleSelectedSourceIdChangeHandler(null);
         }
-    }, [dataSources, dataSourcesModeDict, dispatch, currentChartName]);
-
-    const cleanedRows = useMemo(() => {
-        if ([LAYOUT_TYPES.CHART, LAYOUT_TYPES.PIVOT_TABLE].includes(layoutType)) {
-            return removeRedundantFieldsFromRows(rows);
-        }
-        return [];
-    }, [rows, layoutType])
+    }, [dataSources, dataSourcesModeDict, dispatch, currentChartName, cleanedRows])
 
     // A helper function to decide which content to render based on layoutType
     const renderContent = () => {
@@ -949,6 +1016,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                     dataSourceColors={modelLayoutData.data_source_colors || []}
                     page={page}
                     rowsPerPage={modelLayoutData.rows_per_page || 25}
+                    totalCount={rows.length} //in AbbreviationMergeModel we dont depend on count query count for total rows 
                     onPageChange={handlePageChange}
                     onRowsPerPageChange={handleRowsPerPageChange}
                     onRowSelect={handleRowSelect}
@@ -1028,6 +1096,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                         onDownload={handleDownload}
                         // edit save
                         onModeToggle={handleModeToggle}
+                        isReadOnly={modelLayoutOption.is_read_only ?? false}
                         onSave={handleSave}
                         // layout switch
                         layout={layoutType}
@@ -1036,6 +1105,9 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                         // maximize
                         isMaximized={isMaximized}
                         onMaximizeToggle={handleFullScreenToggle}
+                        // dynamic menu
+                        commonKeys={commonKeys}
+                        onButtonToggle={handleButtonToggle}
                         // button query menu
                         modelSchema={modelSchema}
                         url={url}
@@ -1082,7 +1154,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                     isDisabled={isLoading || isCreating || isProcessingUserActions}
                     error={error}
                     onClear={handleErrorClear}
-                    isDisconnected={!isWebSocketActive(socketRef.current)}
+                    isDisconnected={!isWebSocketActive(socketRef.current) && !isWebSocketDisabled}
                     onReconnect={handleReconnect}
                     isDownloading={isDownloading}
                     progress={progress}
@@ -1099,7 +1171,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                 captionDict={captionDictRef.current}
             />
             <FormValidation
-                title={sourceRef.current}
+                title={sourceRef.current || ''}
                 open={popupStatus.formValidation}
                 onClose={handleFormValidationPopupClose}
                 onContinue={handleContinue}
