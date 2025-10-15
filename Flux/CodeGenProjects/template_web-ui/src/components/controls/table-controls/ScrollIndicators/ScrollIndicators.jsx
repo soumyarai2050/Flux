@@ -1,5 +1,6 @@
 import React from 'react';
-import { KeyboardArrowRight, KeyboardArrowLeft } from '@mui/icons-material';
+import KeyboardArrowRight from '@mui/icons-material/KeyboardArrowRight';
+import KeyboardArrowLeft from '@mui/icons-material/KeyboardArrowLeft';
 import styles from './ScrollIndicators.module.css';
 
 const ScrollIndicators = ({

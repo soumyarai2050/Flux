@@ -2,9 +2,11 @@ import React from 'react';
 import styles from './ModelCardContent.module.css';
 import { BeatLoader } from 'react-spinners';
 import { AlertErrorMessage } from '../../../ui/Alert';
-import { LinkOff } from '@mui/icons-material';
-import { Backdrop, Button, LinearProgress } from '@mui/material';
-import { useTheme } from '@emotion/react';
+import LinkOff from '@mui/icons-material/LinkOff';
+import Backdrop from '@mui/material/Backdrop';
+import Button from '@mui/material/Button';
+import LinearProgress from '@mui/material/LinearProgress';
+import { useTheme } from '@mui/material/styles';
 // import { useBoundaryScrollDetection } from '../../../hooks';
 
 const ModelCardContent = ({

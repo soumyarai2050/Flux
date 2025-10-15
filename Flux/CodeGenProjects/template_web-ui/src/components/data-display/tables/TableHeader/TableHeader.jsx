@@ -2,8 +2,10 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import { SortableContext, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { TableHead, TableRow, TableCell } from '@mui/material';
-import { useTheme } from '@emotion/react';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+import TableCell from '@mui/material/TableCell';
+import { useTheme } from '@mui/material/styles';
 import { useDraggableContext } from '../../../../contexts/DraggableContext';
 import { getFilterDict } from '../../../../utils/core/dataFiltering';
 import { getSortOrderDict } from '../../../../utils/core/dataSorting';
@@ -27,7 +29,8 @@ const SortableHeaderCell = ({
     sortLevel,
     onApply,
     onCopy,
-    clipboardText
+    clipboardText,
+    serverSideFilterSortEnabled
 }) => {
     const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
         id: columnId,
@@ -107,6 +110,7 @@ const SortableHeaderCell = ({
                 onCopy={onCopy}
                 filterEnable={column.filterEnable ?? false}
                 clipboardText={clipboardText}
+                serverSideFilterSortEnabled={serverSideFilterSortEnabled}
             />
         </TableCell>
     );
@@ -123,7 +127,8 @@ const TableHeader = ({
     columnRefs,
     stickyHeader = true,
     getStickyPosition,
-    groupedRows = []
+    groupedRows = [],
+    serverSideFilterSortEnabled
 }) => {
     const { isDraggable } = useDraggableContext();
     const theme = useTheme();
@@ -153,12 +158,16 @@ const TableHeader = ({
         setFilterDict((prev) => {
             updatedFilterDict = { ...prev };
 
-            if (values && values.length > 0) {
+            // Check if there are any filters applied (value-based OR text filter)
+            const hasValueFilters = values && values.length > 0;
+            const hasTextFilter = textFilter && textFilter.trim() !== '';
+
+            if (hasValueFilters || hasTextFilter) {
                 updatedFilterDict[filterName] = {
                     column_name: filterName,
-                    filtered_values: values,
-                    text_filter: textFilter,
-                    text_filter_type: textFilterType
+                    filtered_values: values || [],
+                    text_filter: textFilter || null,
+                    text_filter_type: hasTextFilter ? textFilterType : null
                 };
             } else {
                 delete updatedFilterDict[filterName];
@@ -185,11 +194,16 @@ const TableHeader = ({
             if (!sortDirection) {
                 delete updatedSortOrderDict[filterName];
             }
-            const updatedFilters = Object.keys(updatedFilterDict).map((filterName) => ({
-                ...updatedFilterDict[filterName],
-                filtered_values: updatedFilterDict[filterName].filtered_values?.join(',') ?? null,
-            }));
-            
+            const updatedFilters = Object.keys(updatedFilterDict).map((filterName) => {
+                const filter = updatedFilterDict[filterName];
+                const hasValues = filter.filtered_values && filter.filtered_values.length > 0;
+
+                return {
+                    ...filter,
+                    filtered_values: hasValues ? filter.filtered_values.join(',') : null,
+                };
+            });
+
             const updatedSortOrders = Object.keys(updatedSortOrderDict).map((sortBy) => ({
                 sort_by: sortBy,
                 sort_direction: updatedSortOrderDict[sortBy].sort_direction,
@@ -254,7 +268,7 @@ const TableHeader = ({
                                 theme={theme}
                                 stickyPosition={getStickyPosition(columnKey)}
                                 columnRefs={columnRefs}
-                                uniqueValues={columnUniqueValues ?? []}
+                                uniqueValues={columnUniqueValues ?? new Map()}
                                 selectedFilters={columnFilter?.filtered_values ?? []}
                                 textFilter={columnFilter?.text_filter ?? null}
                                 textFilterType={columnFilter?.text_filter_type ?? 'contains'}
@@ -264,6 +278,7 @@ const TableHeader = ({
                                 onApply={handleApply}
                                 onCopy={handleCopy}
                                 clipboardText={clipboardText}
+                                serverSideFilterSortEnabled={serverSideFilterSortEnabled}
                             />
                         );
                     })}

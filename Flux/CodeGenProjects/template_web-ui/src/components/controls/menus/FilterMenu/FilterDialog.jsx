@@ -1,13 +1,17 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { debounce } from 'lodash';
 import PropTypes from 'prop-types';
-import { Box, Dialog, DialogTitle, DialogContent, TextField } from '@mui/material';
+import Box from '@mui/material/Box';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import TextField from '@mui/material/TextField';
+import FilterAlt from '@mui/icons-material/FilterAlt';
 import styles from './FilterDialog.module.css';
 import FilterSortPopup from '../../FilterSortPopup/FilterSortPopup';
 import LinkText from '../../../ui/LinkText';
 import { getFilterDict } from '../../../../utils/core/dataFiltering';
 import { getSortOrderDict } from '../../../../utils/core/dataSorting';
-import { FilterAlt } from '@mui/icons-material';
 
 /**
  * FilterMenu renders a dialog that allows users to apply filters on a data set.
@@ -43,7 +47,8 @@ const FilterDialog = ({
   uniqueValues,
   sortOrders,
   onSortOrdersChange,
-  groupedRows
+  groupedRows,
+  serverSideFilterSortEnabled
 }) => {
   const [filteredColumns, setFilteredColumns] = useState(fieldsMetadata);
   const [searchValue, setSearchValue] = useState('');
@@ -100,16 +105,23 @@ const FilterDialog = ({
     let updatedSortOrderDict = {};
 
     setFilterDict((prev) => {
-      updatedFilterDict = {
-        ...prev,
-        [filterName]: {
-          ...prev[filterName],
+      updatedFilterDict = { ...prev };
+
+      // Check if there are any filters applied (value-based OR text filter)
+      const hasValueFilters = values && values.length > 0;
+      const hasTextFilter = textFilter && textFilter.trim() !== '';
+
+      if (hasValueFilters || hasTextFilter) {
+        updatedFilterDict[filterName] = {
           column_name: filterName,
-          filtered_values: values,
-          text_filter: textFilter,
-          text_filter_type: textFilterType
-        }
-      };
+          filtered_values: values || [],
+          text_filter: textFilter || null,
+          text_filter_type: hasTextFilter ? textFilterType : null
+        };
+      } else {
+        delete updatedFilterDict[filterName];
+      }
+
       return updatedFilterDict;
     });
 
@@ -132,10 +144,15 @@ const FilterDialog = ({
         delete updatedSortOrderDict[filterName];
       }
 
-      const updatedFilters = Object.keys(updatedFilterDict).map((filterName) => ({
-        ...updatedFilterDict[filterName],
-        filtered_values: updatedFilterDict[filterName].filtered_values?.join(',') ?? null,
-      }));
+      const updatedFilters = Object.keys(updatedFilterDict).map((filterName) => {
+        const filter = updatedFilterDict[filterName];
+        const hasValues = filter.filtered_values && filter.filtered_values.length > 0;
+
+        return {
+          ...filter,
+          filtered_values: hasValues ? filter.filtered_values.join(',') : null,
+        };
+      });
       const updatedSortOrders = Object.keys(updatedSortOrderDict).map((sortBy) => ({
         sort_by: sortBy,
         sort_direction: updatedSortOrderDict[sortBy].sort_direction,
@@ -254,6 +271,7 @@ const FilterDialog = ({
                   onCopy={handleCopy}
                   filterEnable={meta.filterEnable ?? false}
                   clipboardText={clipboardText}
+                  serverSideFilterSortEnabled={serverSideFilterSortEnabled}
                 />
                 {filterDict[fieldName]?.filtered_values && (
                   <LinkText

@@ -1,6 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import { Dialog, Slide } from '@mui/material';
+import Dialog from '@mui/material/Dialog';
+import Slide from '@mui/material/Slide';
 import classes from './Modal.module.css';
 
 /**

@@ -1,13 +1,19 @@
 import React, { useRef, useEffect } from 'react';
-import { Box, Tooltip } from '@mui/material';
+import Box from '@mui/material/Box';
+import Tooltip from '@mui/material/Tooltip';
 import { capitalizeFirstLetter } from '../../../../utils/core/stringUtils';
-import { HelpOutline, HelpSharp, LiveHelp, RemoveCircle, PushPin, PushPinOutlined } from '@mui/icons-material';
+import HelpOutline from '@mui/icons-material/HelpOutline';
+import HelpSharp from '@mui/icons-material/HelpSharp';
+import LiveHelp from '@mui/icons-material/LiveHelp';
+import RemoveCircle from '@mui/icons-material/RemoveCircle';
+import PushPin from '@mui/icons-material/PushPin';
+import PushPinOutlined from '@mui/icons-material/PushPinOutlined';
 import { Icon } from '../../../ui/Icon';
 import NodeField from '../NodeField';
 import PropTypes from 'prop-types';
 import classes from './Node.module.css';
 import { MODES } from '../../../../constants';
-import { useTheme } from '@emotion/react';
+import { useTheme } from '@mui/material/styles';
 
 // Helper function to determine if a field should show the quick filter icon based on metadata
 const isFilterableField = (nodeData) => {

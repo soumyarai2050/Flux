@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
-import { ClickAwayListener, Tooltip } from '@mui/material';
+import ClickAwayListener from '@mui/material/ClickAwayListener';
+import Tooltip from '@mui/material/Tooltip';
 import classes from './LinkText.module.css';
 
 const LinkText = (props) => {

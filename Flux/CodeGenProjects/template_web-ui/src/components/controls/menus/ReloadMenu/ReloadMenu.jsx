@@ -1,6 +1,8 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import { Refresh, PushPin, PushPinOutlined } from '@mui/icons-material';
+import Refresh from '@mui/icons-material/Refresh';
+import PushPin from '@mui/icons-material/PushPin';
+import PushPinOutlined from '@mui/icons-material/PushPinOutlined';
 import Icon from '../../../ui/Icon';
 import MenuItem from '../../../ui/MenuItem';
 

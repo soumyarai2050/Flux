@@ -3,25 +3,21 @@ import { useSelector, useDispatch } from 'react-redux';
 import { cloneDeep, get, set } from 'lodash';
 import { ErrorBoundary } from 'react-error-boundary';
 import PropTypes from 'prop-types';
-import {
-    Box,
-    Typography,
-    useTheme,
-    IconButton,
-    Dialog,
-    DialogContent,
-    Button,
-    Tooltip,
-    CircularProgress,
-    Alert,
-    TextField,
-    InputAdornment
-} from '@mui/material';
-import {
-    ChevronLeft,
-    ChevronRight,
-    Send
-} from '@mui/icons-material';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import { useTheme } from '@mui/material/styles';
+import IconButton from '@mui/material/IconButton';
+import Dialog from '@mui/material/Dialog';
+import DialogContent from '@mui/material/DialogContent';
+import Button from '@mui/material/Button';
+import Tooltip from '@mui/material/Tooltip';
+import CircularProgress from '@mui/material/CircularProgress';
+import Alert from '@mui/material/Alert';
+import TextField from '@mui/material/TextField';
+import InputAdornment from '@mui/material/InputAdornment';
+import ChevronLeft from '@mui/icons-material/ChevronLeft';
+import ChevronRight from '@mui/icons-material/ChevronRight';
+import Send from '@mui/icons-material/Send';
 import MarkdownRenderer from './MarkdownRenderer';
 import ClipboardCopier from '../../utility/ClipboardCopier';
 import ChatMessage from './ChatMessage';

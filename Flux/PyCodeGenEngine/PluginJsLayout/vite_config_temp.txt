@@ -1,10 +1,17 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import { nodePolyfills } from 'vite-plugin-node-polyfills';
 
 export default defineConfig(({ mode }) => {
   return {
-    plugins: [react()],
+    plugins: [
+      react(),
+      nodePolyfills({
+        // Whether to polyfill `node:` protocol imports
+        protocolImports: true,
+      }),
+    ],
 
     esbuild: {
       loader: 'jsx',
@@ -25,16 +32,25 @@ export default defineConfig(({ mode }) => {
       rollupOptions: {
         output: {
           manualChunks: {
-            'vendor-react': ['react', 'react-dom', 'react-redux'],
-            'vendor-mui': ['@mui/material', '@mui/icons-material'],
-            'vendor-charts': ['echarts', 'plotly.js'],
-          }
+            'vendor-react': ['react', 'react-dom', 'react-redux', '@reduxjs/toolkit', 'prop-types', 'react-error-boundary', 'reselect'],
+            'vendor-mui': ['@mui/material', '@mui/icons-material', '@mui/x-date-pickers', '@emotion/react', '@emotion/styled'],
+            'vendor-ui': ['framer-motion', 'react-accessible-treeview', 'react-grid-layout', 'react-markdown', 'react-number-format', 'react-spinners'],
+            'vendor-utils': ['axios', 'dayjs', 'lodash', 'file-saver', 'js-sha256', 'xlsx'],
+            'vendor-json': ['@textea/json-viewer'],
+            'vendor-echarts': ['echarts'],
+            'vendor-plotly': ['plotly.js', 'react-plotly.js'],
+            'vendor-xyflow': ['@xyflow/react'],
+            'vendor-pivot': ['react-pivottable'],
+            'vendor-dnd': ['@dnd-kit/core', '@dnd-kit/sortable', '@dnd-kit/utilities'],
+          },
         }
       },
       worker: {
         format: 'es',
       }
     },
+
+    base: mode === 'development' ? '/' : '/static/',
 
     resolve: {
       alias: {
@@ -51,16 +67,7 @@ export default defineConfig(({ mode }) => {
         loader: {
           '.js': 'jsx',
         },
-      },
-      include: [
-        'react',
-        'react-dom',
-        'react-redux',
-        '@reduxjs/toolkit',
-        '@mui/material',
-        'echarts',
-        'lodash',
-      ]
+      }
     }
   };
 });

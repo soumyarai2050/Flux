@@ -1,5 +1,6 @@
 import React from 'react';
-import { Skeleton as SkeletonBox, Box } from '@mui/material';
+import SkeletonBox from '@mui/material/Skeleton';
+import Box from '@mui/material/Box';
 import { ModelCard, ModelCardHeader, ModelCardContent } from '../../utility/cards';
 import styles from './Skeleton.module.css';
 

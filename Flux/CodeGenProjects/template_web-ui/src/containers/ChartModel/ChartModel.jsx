@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useWebSocketWorker, useModelLayout } from '../../hooks';
 import { getWidgetTitle, toCamelCase } from '../../utils';
 import { MODEL_TYPES } from '../../constants';
-import { useTheme } from '@emotion/react';
+import { useTheme } from '@mui/material/styles';
 import { generateChartOption, packageChartDataWithSchema, fetchChartSchema, transformChartTileData } from '../../utils/core/serviceUtils';
 import { sliceMapWithFallback as sliceMap } from '../../models/sliceMap';
 import ChartGallery from './ChartGallery';

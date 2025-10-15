@@ -1,14 +1,12 @@
 import React, { useMemo } from 'react';
 import PropTypes from 'prop-types';
-import {
-    Autocomplete,
-    TextField,
-    Checkbox,
-    Box,
-    Chip,
-    Typography,
-    useTheme
-} from '@mui/material';
+import Autocomplete from '@mui/material/Autocomplete';
+import TextField from '@mui/material/TextField';
+import Checkbox from '@mui/material/Checkbox';
+import Box from '@mui/material/Box';
+import Chip from '@mui/material/Chip';
+import Typography from '@mui/material/Typography';
+import useTheme from '@mui/material/styles/useTheme';
 import { getResolvedColor } from '../../../../utils/ui/colorUtils';
 
 const NodeSelector = ({ 
@@ -110,7 +108,7 @@ const NodeSelector = ({
                                 width: 10, 
                                 height: 10, 
                                 borderRadius: '50%',
-                                backgroundColor: getNodeTypeColor(option[nodeTypeField]),
+                                // backgroundColor: getNodeTypeColor(option[nodeTypeField]),
                                 border: option[nodeAccessField] ? 'none' : `2px dotted ${getNodeTypeColor(option[nodeTypeField])}`, 
                                 backgroundColor: option[nodeAccessField] ? getNodeTypeColor(option[nodeTypeField]) : 'transparent',
                                 mr: 0.5

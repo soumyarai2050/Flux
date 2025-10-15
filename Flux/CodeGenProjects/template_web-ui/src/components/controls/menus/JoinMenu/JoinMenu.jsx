@@ -1,8 +1,14 @@
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import { Icon } from '../../../ui/Icon';
-import { JoinInner, VerticalAlignCenter, SwapHoriz, PushPin, PushPinOutlined } from '@mui/icons-material';
-import { Popover, FormControlLabel, Checkbox } from '@mui/material';
+import JoinInner from '@mui/icons-material/JoinInner';
+import VerticalAlignCenter from '@mui/icons-material/VerticalAlignCenter';
+import SwapHoriz from '@mui/icons-material/SwapHoriz';
+import PushPin from '@mui/icons-material/PushPin';
+import PushPinOutlined from '@mui/icons-material/PushPinOutlined';
+import Popover from '@mui/material/Popover';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Checkbox from '@mui/material/Checkbox';
 import MenuItem from '../../../ui/MenuItem';
 import { MODEL_TYPES } from '../../../../constants';
 

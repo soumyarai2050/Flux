@@ -1,21 +1,19 @@
 import React from 'react';
-import {
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    Button,
-    Typography,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
-    Paper,
-    Box
-} from '@mui/material';
-import { Warning } from '@mui/icons-material';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import Button from '@mui/material/Button';
+import Typography from '@mui/material/Typography';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+// import Paper from '@mui/material/Paper';
+import Box from '@mui/material/Box';
+import Warning from '@mui/icons-material/Warning';
 
 const ConflictPopup = ({ 
     open, 
@@ -56,7 +54,7 @@ const ConflictPopup = ({
                 </Typography>
                 
                 <Box sx={{ mt: 2 }}>
-                    <TableContainer component={Paper} variant="outlined">
+                    <TableContainer variant="outlined">
                         <Table size="small">
                             <TableHead>
                                 <TableRow sx={{ backgroundColor: '#cc3e3e' }}>

@@ -1,5 +1,6 @@
 import React from 'react';
-import { Select, MenuItem } from '@mui/material';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
 
 const DropdownWrapper = ({ value, onChange, options = [], disabled, ...props }) => {
   return (

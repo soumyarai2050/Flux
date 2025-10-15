@@ -1,5 +1,9 @@
 import React, { Fragment, useRef, useState } from 'react';
-import { Box, Tooltip, ClickAwayListener, IconButton, Collapse } from '@mui/material';
+import Box from '@mui/material/Box';
+import Tooltip from '@mui/material/Tooltip';
+import ClickAwayListener from '@mui/material/ClickAwayListener';
+import IconButton from '@mui/material/IconButton';
+import Collapse from '@mui/material/Collapse';
 import PropTypes from 'prop-types';
 import { clearxpath } from '../../../utils/core/dataAccess';
 import { getColorTypeFromValue, getResolvedColor } from '../../../utils/ui/colorUtils';
@@ -16,9 +20,9 @@ import classes from './CommonKeyWidget.module.css';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import timezone from 'dayjs/plugin/timezone';
-import { useTheme } from '@emotion/react';
+import { useTheme } from '@mui/material/styles';
 import ClipboardCopier from '../../utility/ClipboardCopier';
-import { ContentCopy } from '@mui/icons-material';
+import ContentCopy from '@mui/icons-material/ContentCopy';
 dayjs.extend(utc);
 dayjs.extend(timezone);
 

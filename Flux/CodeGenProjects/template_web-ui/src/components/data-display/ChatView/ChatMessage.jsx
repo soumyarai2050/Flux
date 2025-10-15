@@ -1,18 +1,14 @@
 import React from 'react';
-import {
-    Box,
-    Paper,
-    IconButton,
-    Tooltip,
-    TextField,
-    useTheme,
-    Button
-} from '@mui/material';
-import {
-    Psychology,
-    Edit,
-    ContentCopy
-} from '@mui/icons-material';
+import Box from '@mui/material/Box';
+import Paper from '@mui/material/Paper';
+import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
+import TextField from '@mui/material/TextField';
+import { useTheme } from '@mui/material/styles';
+import Button from '@mui/material/Button';
+import Psychology from '@mui/icons-material/Psychology';
+import Edit from '@mui/icons-material/Edit';
+import ContentCopy from '@mui/icons-material/ContentCopy';
 import MarkdownRenderer from './MarkdownRenderer';
 import styles from './ChatView.module.css';
 

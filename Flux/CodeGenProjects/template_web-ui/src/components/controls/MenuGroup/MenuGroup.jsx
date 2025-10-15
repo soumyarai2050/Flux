@@ -11,9 +11,10 @@ import {
 } from '../menus';
 import { MODEL_TYPES } from '../../../constants';
 import { cloneDeep } from 'lodash';
-import { Menu } from '@mui/material';
+import Menu from '@mui/material/Menu';
 import Icon from '../../ui/Icon';
-import { MenuOpen, Menu as MenuIcon } from '@mui/icons-material';
+import MenuOpen from '@mui/icons-material/MenuOpen';
+import MenuIcon from '@mui/icons-material/Menu';
 import ButtonQuery from '../../ui/ButtonQuery';
 
 /**
@@ -178,7 +179,8 @@ const MenuGroup = ({
     noCommonKeyOverride,
     onNoCommonKeyOverrideChange,
     autoBoundParams = {},
-    isReadOnly = false
+    isReadOnly = false,
+    serverSideFilterSortEnabled
 }) => {
     const [anchorEl, setAnchorEl] = useState(null);
 
@@ -384,6 +386,7 @@ const MenuGroup = ({
                         sortOrders={sortOrders}
                         onSortOrdersChange={onSortOrdersChange}
                         groupedRows={groupedRows}
+                        serverSideFilterSortEnabled={serverSideFilterSortEnabled}
                     />
                 );
             case 'visibility':

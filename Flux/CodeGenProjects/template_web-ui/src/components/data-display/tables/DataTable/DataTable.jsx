@@ -1,5 +1,15 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { ListItemIcon, ListItemText, Menu, MenuItem, Table, TableBody, TableContainer, TableRow, FormControl, InputLabel, Box } from '@mui/material';
+import ListItemIcon from '@mui/material/ListItemIcon';
+import ListItemText from '@mui/material/ListItemText';
+import Menu from '@mui/material/Menu';
+import MenuItem from '@mui/material/MenuItem';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableContainer from '@mui/material/TableContainer';
+import TableRow from '@mui/material/TableRow';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
+import Box from '@mui/material/Box';
 import {
   DndContext,
   closestCenter,
@@ -13,7 +23,8 @@ import {
 import TableHeader from '../TableHeader';
 import Cell from '../Cell';
 import styles from './DataTable.module.css';
-import { ClearAll, Save } from '@mui/icons-material';
+import ClearAll from '@mui/icons-material/ClearAll';
+import Save from '@mui/icons-material/Save';
 import { getDataxpathV2, generateRowTrees } from '../../../../utils/core/dataAccess';
 import { cloneDeep, get, set } from 'lodash';
 import { DB_ID, MODES, DATA_TYPES, MODEL_TYPES } from '../../../../constants';
@@ -66,6 +77,7 @@ const DataTable = ({
   lastSelectedRowId: externalLastSelectedRowId,
   onSelectionChange: externalOnSelectionChange,
   totalCount,
+  serverSideFilterSortEnabled,
 }) => {
 
   const { schema: projectSchema } = useSelector((state) => state.schema);
@@ -588,6 +600,7 @@ const DataTable = ({
               stickyHeader={stickyHeader}
               getStickyPosition={getStickyPosition}
               groupedRows={rows}
+              serverSideFilterSortEnabled={serverSideFilterSortEnabled}
             />
             <TableBody>
               {activeRows.map((groupedRow, idx) => {
@@ -722,10 +735,9 @@ const DataTable = ({
       {
         (totalCount ?? rows.length) > rowsPerPage && (
           <TablePaginationControl
-            rows={rows}
+            rowsLength={totalCount ?? rows.length}
             page={page}
             rowsPerPage={rowsPerPage}
-            totalCount={totalCount}
             onPageChange={onPageChange}
             onRowsPerPageChange={handleRowsPerPageChange}
             rowsPerPageOptions={[25, 50, 100]} // Optional

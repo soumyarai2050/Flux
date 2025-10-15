@@ -27,12 +27,11 @@ export function applyFilter(data, filters = []) {
 
             // Get the value of the column from the current row.
             const value = row[columnId];
-            // Convert the value to a string for consistent comparison, handling null/undefined.
-            const strValue = String((value === null || value === undefined) ? '' : value);
 
-            // Check if the string value is included in the `filtered_values` list (if provided).
+            // Check if the value is included in the `filtered_values` list (if provided).
+            // Now uses type-aware comparison (numbers match numbers, booleans match booleans, etc.)
             // If `filtered_values` is null or undefined, this check always passes.
-            const passesValueFilter = filterObj.filtered_values?.includes(strValue) ?? true;
+            const passesValueFilter = filterObj.filtered_values?.includes(value) ?? true;
 
             // Check if the value passes the text filter (if `text_filter` is present).
             const passesTextFilter = filterByText(value, filterObj.text_filter, filterObj.text_filter_type);
@@ -96,18 +95,20 @@ export function filterByText(value, textFilter, textFilterType) {
 
 /**
  * Transforms an array of filter objects into a dictionary, keyed by `column_name`.
- * It also processes the `filtered_values` string in each filter object,
- * splitting it into an array of strings if it exists, otherwise setting it to `null`.
- * @param {Array<Object>} filters - An array of filter objects. Each object is expected to have a `column_name` property and optionally a `filtered_values` string.
+ * Handles filtered_values as either arrays (typed values from container) or strings (legacy format).
+ * @param {Array<Object>} filters - An array of filter objects. Each object is expected to have a `column_name` property and optionally a `filtered_values` array or string.
  * @returns {Object<string, Object>} A dictionary where keys are `column_name` and values are the processed filter objects.
  */
 export function getFilterDict(filters) {
     return filters.reduce((acc, item) => {
         acc[item.column_name] = {
             ...item,
-            // Split the comma-separated `filtered_values` string into an array.
-            // If `filtered_values` is null or undefined, set it to null.
-            filtered_values: item.filtered_values?.split(',') ?? null
+            // Handle both typed arrays (from container) and legacy strings (from old layouts)
+            // Already an array - use as-is (typed values like [1, 2, 3])
+            // String - split into array (legacy format like "1,2,3")
+            filtered_values: Array.isArray(item.filtered_values)
+                ? item.filtered_values
+                : (item.filtered_values?.split(',') ?? null)
         };
         return acc;
     }, {});

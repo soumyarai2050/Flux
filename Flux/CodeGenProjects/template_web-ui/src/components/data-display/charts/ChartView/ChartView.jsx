@@ -1,11 +1,20 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux'; // TODO: SPOOFING - useDispatch added for testing without backend
 // third-party package imports
-import {
-    Box, Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Divider, List, ListItem, ListItemButton, ListItemText
-} from '@mui/material';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogContentText from '@mui/material/DialogContentText';
+import DialogTitle from '@mui/material/DialogTitle';
+import Divider from '@mui/material/Divider';
 import { cloneDeep, get, isEqual } from 'lodash';
-import { Add, Close, Delete, Save, Error, Publish } from '@mui/icons-material';
+import Close from '@mui/icons-material/Close';
+import Delete from '@mui/icons-material/Delete';
+import Save from '@mui/icons-material/Save';
+import Error from '@mui/icons-material/Error';
+import Publish from '@mui/icons-material/Publish';
 // project constants and common utility function imports
 import { DATA_TYPES, MODES, API_ROOT_URL, MODEL_TYPES, DB_ID } from '../../../../constants';
 import { addxpath, clearxpath } from '../../../../utils/core/dataAccess';
@@ -23,7 +32,7 @@ import Resizer from '../../../ui/Resizer/Resizer';
 import EChart from '../EChart';
 import ListPanel from '../../../ui/ListPanel/ListPanel';
 import styles from './ChartView.module.css';
-import { useTheme } from '@emotion/react';
+import { useTheme } from '@mui/material/styles';
 import DataTree from '../../trees/DataTree';
 import { ModelCard, ModelCardContent, ModelCardHeader } from '../../../utility/cards';
 import QuickFilterPin from '../../../controls/QuickFilterPin';

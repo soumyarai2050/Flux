@@ -5,8 +5,11 @@
 
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
-import { Snackbar, Alert as AlertComponent, IconButton, Typography } from '@mui/material';
-import { Close } from '@mui/icons-material';
+import Snackbar from '@mui/material/Snackbar';
+import AlertComponent from '@mui/material/Alert';
+import IconButton from '@mui/material/IconButton';
+import Typography from '@mui/material/Typography';
+import Close from '@mui/icons-material/Close';
 import { isObject } from 'lodash';
 
 import { DATA_TYPES } from '../../../constants';

@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
-import { Popover, FormControlLabel, Checkbox } from '@mui/material';
-import { Visibility, PushPin, PushPinOutlined } from '@mui/icons-material';
+import Popover from '@mui/material/Popover';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Checkbox from '@mui/material/Checkbox';
+import Visibility from '@mui/icons-material/Visibility';
+import PushPin from '@mui/icons-material/PushPin';
+import PushPinOutlined from '@mui/icons-material/PushPinOutlined';
 import Icon from '../../../ui/Icon';
 import MenuItem from '../../../ui/MenuItem';
 

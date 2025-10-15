@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Slider as MuiSlider, Typography, Box } from '@mui/material';
+import MuiSlider from '@mui/material/Slider';
+import Typography from '@mui/material/Typography';
+import Box from '@mui/material/Box';
 import { debounce } from 'lodash';
 import PropTypes from 'prop-types';
 import styles from './Slider.module.css';

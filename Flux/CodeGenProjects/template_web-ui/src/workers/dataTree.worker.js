@@ -134,7 +134,7 @@ onmessage = (e) => {
     const callerPropsForWorker = {
         'data': cloneDeep(updatedData), // Worker operates on its own copy
         'isOpen': true, // Affects root of generated tree if not in worker's treeState
-        'hide': !showHidden ?? false,
+        'hide': !showHidden,
         'showDataType': false,
         'originalData': cloneDeep(storedData),
         'subtree': subtree,

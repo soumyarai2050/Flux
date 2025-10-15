@@ -1,4 +1,5 @@
 import { get } from 'lodash';
+import { MODEL_TYPES } from '../../constants';
 
 /**
  * @fileoverview Pagination utilities for server-side data fetching with filter support
@@ -7,11 +8,12 @@ import { get } from 'lodash';
  */
 
 /**
- * Converts a string value to its appropriate data type (number, boolean, or string)
- * @param {string} val - The string value to convert
- * @returns {number|boolean|string} The value converted to its appropriate type
+ * Converts a value to its appropriate data type based on schema's underlyingType
+ * @param {string} val - The value to convert
+ * @param {string} underlyingType - The underlying type from schema (e.g., 'string', 'int32', 'int64', 'float', 'double', 'bool')
+ * @returns {number|boolean|string} The value converted to its schema-defined type
  */
-function convertToAppropriateType(val) {
+export function convertToAppropriateType(val, underlyingType) {
   // Handle empty or null values
   if (val === null || val === undefined || val === '') {
     return val;
@@ -20,24 +22,69 @@ function convertToAppropriateType(val) {
   // Convert to string for processing (in case it's not already)
   const stringVal = String(val).trim();
 
-  // Check for boolean values first (case-insensitive)
-  const lowerVal = stringVal.toLowerCase();
-  if (lowerVal === 'true') {
-    return true;
-  }
-  if (lowerVal === 'false') {
-    return false;
-  }
+  // Convert based on schema's underlyingType
+  switch (underlyingType) {
+    case 'string':
+      return stringVal;
 
-  // Check if it's a valid number (including decimals, negatives, etc.)
-  const num = Number(stringVal);
-  if (!isNaN(num) && stringVal !== '' && !isNaN(parseFloat(stringVal)) && isFinite(num)) {
-    return num;
-  }
+    case 'bool':
+    case 'boolean':
+      // Case-insensitive boolean conversion
+      const lowerVal = stringVal.toLowerCase();
+      if (lowerVal === 'true') return true;
+      if (lowerVal === 'false') return false;
+      return stringVal; // Return as-is if not valid boolean
 
-  // If it's neither boolean nor number, return as string
-  return stringVal;
+    case 'int32':
+    case 'int64':
+    case 'integer':
+      const intVal = parseInt(stringVal, 10);
+      return !isNaN(intVal) ? intVal : stringVal;
+
+    case 'float':
+    case 'double':
+    case 'number':
+      const floatVal = parseFloat(stringVal);
+      return !isNaN(floatVal) ? floatVal : stringVal;
+
+    default:
+      // If underlyingType is not recognized, return as string
+      return stringVal;
+  }
 }
+
+/**
+ * Converts filter values from strings to their appropriate data types based on schema metadata.
+ * This is intended to be used once at the container level to ensure
+ * filters have the correct types before being passed to child components.
+ *
+ * @param {Array} filters - Array of filter objects, where filtered_values is a string.
+ * @param {Array} fieldsMetadata - Array of field metadata objects containing underlyingtype information.
+ * @returns {Array} A new array of filter objects with typed filtered_values.
+ */
+export function convertFilterTypes(filters, fieldsMetadata, modelType) {
+  if (!filters) {
+    return [];
+  }
+
+  return filters.map(filter => {
+    // Determine how to match field metadata based on model type
+    const matchField = (modelType === MODEL_TYPES.ABBREVIATION_MERGE)
+      ? fieldsMetadata?.find(f => f.key === filter.column_name)
+      : fieldsMetadata?.find(f => f.tableTitle === filter.column_name);
+
+    const underlyingType = matchField?.underlyingtype || matchField?.type;
+
+    return {
+      ...filter,
+      filtered_values:
+        filter.filtered_values
+          ?.split(',')
+          .map(val => convertToAppropriateType(val, underlyingType)) ?? null
+    };
+  });
+}
+
 
 /**
  * Processes UI filters, sort orders, and pagination parameters for backend consumption
@@ -54,20 +101,12 @@ export function massageDataForBackend(filters = [], sortOrders = [], page = 0, r
       column_name: filter.column_name
     };
 
-    // Handle filtered_values - ensure it's an  and preserve numeric types
+    // Handle filtered_values - filters are already type-converted at container level
+    // Just ensure it's an array format
     if (filter.filtered_values !== undefined && filter.filtered_values !== null) {
-      if (Array.isArray(filter.filtered_values)) {
-        processedFilter.filtered_values = filter.filtered_values;
-      } else if (typeof filter.filtered_values === 'string') {
-        // Split comma-separated values and convert to appropriate types
-        const values = filter.filtered_values.split(',').map(val => val.trim()).filter(val => val.length > 0);
-
-        // Convert each value to its appropriate type (number, boolean, or string)
-        processedFilter.filtered_values = values.map(convertToAppropriateType);
-      } else {
-        // Convert single value to array, preserving type
-        processedFilter.filtered_values = [convertToAppropriateType(filter.filtered_values)];
-      }
+      processedFilter.filtered_values = Array.isArray(filter.filtered_values)
+        ? filter.filtered_values
+        : [filter.filtered_values];
     }
 
     // Handle text filter
@@ -241,8 +280,7 @@ export function buildDefaultFilters(dataSourceStoredObj, defaultFilterParamDict)
       }
       value = get(dataSourceStoredObj, paramConfig.value);
     } else if (paramConfig.type === 'val') {
-      // Direct value - use as-is, convert to appropriate type
-      value = convertToAppropriateType(paramConfig.value);
+      value = paramConfig.value;
     }
 
     if (value !== null && value !== undefined) {
@@ -287,8 +325,8 @@ export function extractCrudParams(dataSourceStoredObj, crudOverrideDict) {
       }
       paramValue = get(dataSourceStoredObj, paramConfig.value);
     } else if (paramConfig.type === 'val') {
-      // Direct value - use as-is, convert to appropriate type
-      paramValue = convertToAppropriateType(paramConfig.value);
+
+      paramValue = paramConfig.value;
     }
 
     if (paramValue !== null && paramValue !== undefined) {

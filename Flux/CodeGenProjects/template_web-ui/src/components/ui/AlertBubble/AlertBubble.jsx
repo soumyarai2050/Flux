@@ -5,7 +5,8 @@
 
 import React from 'react';
 import PropTypes from 'prop-types';
-import { Badge, useTheme } from '@mui/material';
+import Badge from '@mui/material/Badge';
+import { useTheme } from '@mui/material/styles';
 import { getResolvedColor } from '../../../utils/ui/colorUtils';
 import { getContrastColor } from '../../../utils/ui/uiUtils';
 import classes from './AlertBubble.module.css';

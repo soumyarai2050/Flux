@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
-import { ColorLens, PushPin, PushPinOutlined } from '@mui/icons-material';
+import ColorLens from '@mui/icons-material/ColorLens';
+import PushPin from '@mui/icons-material/PushPin';
+import PushPinOutlined from '@mui/icons-material/PushPinOutlined';
 import Icon from '../../../ui/Icon';
 import MenuItem from '../../../ui/MenuItem';
 import { DataSourceHexColorPopup } from '../../../utility/Popup';

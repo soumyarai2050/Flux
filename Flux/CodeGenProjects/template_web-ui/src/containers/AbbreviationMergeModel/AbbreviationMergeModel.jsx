@@ -19,7 +19,7 @@ import { removeRedundantFieldsFromRows } from '../../utils/core/dataTransformati
 import { dataSourcesSelectorEquality } from '../../utils/redux/selectorUtils';
 import { cleanAllCache } from '../../cache/attributeCache';
 import { useWebSocketWorker, useDataSourcesWebsocketWorker, useDownload, useModelLayout, useConflictDetection, useCountQuery } from '../../hooks';
-import { massageDataForBackend, shouldUsePagination } from '../../utils/core/paginationUtils';
+import { massageDataForBackend, convertFilterTypes } from '../../utils/core/paginationUtils';
 // custom components
 import { FullScreenModalOptional } from '../../components/ui/Modal';
 import { ModelCard, ModelCardHeader, ModelCardContent } from '../../components/utility/cards';
@@ -144,47 +144,6 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         handleShowMoreToggle,
     } = useModelLayout(modelName, objId, MODEL_TYPES.ABBREVIATION_MERGE, setHeadCells, mode);
 
-    const hasReadByIdWsProperty = allowedOperations?.ReadByIDWebSocketOp === true;
-
-    // Collection views do not support server-side-pagination as the backend is not aware of these tables
-    const serverSidePaginationEnabled = false;
-
-    // Process data for backend consumption
-    // Use modelLayoutData with JSON.stringify to handle reference stability
-    const processedData = useMemo(() => {
-        const rowsPerPage = modelLayoutData.rows_per_page || 25;
-        const filters = modelLayoutOption.filters || [];
-        const sortOrders = modelLayoutData.sort_orders || [];
-
-        const result = massageDataForBackend(filters, sortOrders, page, rowsPerPage);
-
-        return result;
-    }, [
-        JSON.stringify(modelLayoutOption.filters),
-        JSON.stringify(modelLayoutData.sort_orders),
-        page,
-        modelLayoutData.rows_per_page
-    ]);
-
-    // Unified count query - automatically uses HTTP or WebSocket based on allowedOperations
-    const {
-        count,
-        isLoading: isCountLoading,
-        isSynced
-    } = useCountQuery(
-        url,
-        modelName,
-        processedData.filters,
-        serverSidePaginationEnabled,
-        hasReadByIdWsProperty
-    );
-
-    // Derive waiting state - true if no count yet OR if count doesn't match current filters OR if loading
-    const isWaitingForCount = serverSidePaginationEnabled && (count === null || isCountLoading || !isSynced);
-
-    //Keeping it false to enforce client side pagination
-    const usePagination = false;
-
     // Current chart's multiselect state (derived after modelLayoutData is available)
     const currentChartName = modelLayoutData.selected_chart_name;
     const multiSelectedRows = chartMultiSelectState[currentChartName]?.selectedRows || [];
@@ -238,6 +197,53 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     }, [modelItemFieldsMetadata, dataSourcesUpdatedObjDict]);
 
     const { downloadCSV, isDownloading, progress } = useDownload(modelName, modelItemFieldsMetadata, null, MODEL_TYPES.ABBREVIATION_MERGE);
+
+    const hasReadByIdWsProperty = allowedOperations?.ReadByIDWebSocketOp === true;
+
+    // Collection views do not support server-side-pagination as the backend is not aware of these tables
+    const serverSidePaginationEnabled = false;
+    const serverSideFilterSortEnabled = false;
+
+    const uiFilters = useMemo(() => {
+        const layoutFilters = modelLayoutOption.filters || [];
+        return convertFilterTypes(layoutFilters, modelItemFieldsMetadata, MODEL_TYPES.ABBREVIATION_MERGE);
+    }, [JSON.stringify(modelLayoutOption.filters), modelItemFieldsMetadata]);
+
+    // Process data for backend consumption
+    // Use modelLayoutData with JSON.stringify to handle reference stability
+    const processedData = useMemo(() => {
+        const rowsPerPage = modelLayoutData.rows_per_page || 25;
+        const sortOrders = modelLayoutData.sort_orders || [];
+
+        const result = massageDataForBackend(uiFilters, sortOrders, page, rowsPerPage);
+
+        return result;
+    }, [
+        uiFilters,
+        JSON.stringify(modelLayoutData.sort_orders),
+        page,
+        modelLayoutData.rows_per_page
+    ]);
+
+    // Unified count query - automatically uses HTTP or WebSocket based on allowedOperations
+    const {
+        count,
+        isLoading: isCountLoading,
+        isSynced
+    } = useCountQuery(
+        url,
+        modelName,
+        processedData.filters,
+        serverSidePaginationEnabled,
+        hasReadByIdWsProperty
+    );
+
+    // Derive waiting state - true if no count yet OR if count doesn't match current filters OR if loading
+    const isWaitingForCount = serverSidePaginationEnabled && (count === null || isCountLoading || !isSynced);
+
+    //Keeping it false to enforce client side pagination
+    const usePagination = false;
+
 
     // Conflict detection for handling websocket updates during editing
     const {
@@ -442,7 +448,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                 page,
                 pageSize: modelLayoutData.rows_per_page || 25,
                 sortOrders: modelLayoutData.sort_orders || [],
-                filters: modelLayoutOption.filters || [],
+                filters: uiFilters || [],
                 mode,
                 enableOverride: modelLayoutData.enable_override || [],
                 disableOverride: modelLayoutData.disable_override || [],
@@ -1031,7 +1037,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                     onSelectionChange={handleMultiSelectChange}
                     stickyHeader={modelLayoutData.sticky_header ?? true}
                     frozenColumns={modelLayoutData.frozen_columns || []}
-                    filters={modelLayoutOption.filters || []}
+                    filters={uiFilters || []}
                     onFiltersChange={handleFiltersChange}
                     uniqueValues={uniqueValues}
                     highlightDuration={modelLayoutData.highlight_duration ?? DEFAULT_HIGHLIGHT_DURATION}
@@ -1067,10 +1073,11 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                         onColumnOrdersChange={handleColumnOrdersChange}
                         onShowLessChange={handleShowLessChange}
                         // filter
-                        filters={modelLayoutOption.filters || []}
+                        filters={uiFilters || []}
                         fieldsMetadata={modelItemFieldsMetadata || []}
                         onFiltersChange={handleFiltersChange}
                         uniqueValues={uniqueValues}
+                        serverSideFilterSortEnabled={false} //this model does not support this
                         // visibility
                         showMore={showMore}
                         showHidden={showHidden}

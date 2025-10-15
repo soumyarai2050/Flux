@@ -1,18 +1,16 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import PropTypes from 'prop-types';
-import {
-  Popover,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  IconButton,
-  Paper,
-  Box,
-  TablePagination,
-} from '@mui/material';
+import Popover from '@mui/material/Popover';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableContainer from '@mui/material/TableContainer';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+import IconButton from '@mui/material/IconButton';
+import Paper from '@mui/material/Paper';
+import Box from '@mui/material/Box';
+import TablePagination from '@mui/material/TablePagination';
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
 import ContentCopy from '@mui/icons-material/ContentCopy';
 import Check from '@mui/icons-material/Check';

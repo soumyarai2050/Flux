@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
-import { FilterAlt, PushPin, PushPinOutlined } from '@mui/icons-material';
+import FilterAlt from '@mui/icons-material/FilterAlt';
+import PushPin from '@mui/icons-material/PushPin';
+import PushPinOutlined from '@mui/icons-material/PushPinOutlined';
 import { MODEL_TYPES } from '../../../../constants';
 import Icon from '../../../ui/Icon';
 import MenuItem from '../../../ui/MenuItem';
@@ -36,7 +38,8 @@ const FilterMenu = ({
   uniqueValues,
   sortOrders,
   onSortOrdersChange,
-  groupedRows
+  groupedRows,
+  serverSideFilterSortEnabled
 }) => {
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const menuName = 'filter';
@@ -97,6 +100,7 @@ const FilterMenu = ({
         sortOrders={sortOrders}
         onSortOrdersChange={onSortOrdersChange}
         groupedRows={groupedRows}
+        serverSideFilterSortEnabled={serverSideFilterSortEnabled}
       />
     </>
   );

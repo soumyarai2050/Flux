@@ -1,6 +1,9 @@
 import React from 'react';
-import { Box, LinearProgress, Typography, Button } from '@mui/material';
-import { Close } from '@mui/icons-material';
+import Box from '@mui/material/Box';
+import LinearProgress from '@mui/material/LinearProgress';
+import Typography from '@mui/material/Typography';
+import Button from '@mui/material/Button';
+import Close from '@mui/icons-material/Close';
 import PropTypes from 'prop-types';
 
 const ProgressOverlay = ({

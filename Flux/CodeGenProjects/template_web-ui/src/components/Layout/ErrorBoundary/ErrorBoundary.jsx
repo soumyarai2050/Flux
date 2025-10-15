@@ -4,9 +4,13 @@
 
 import React from 'react';
 import PropTypes from 'prop-types';
-import { Alert, Typography, Box, Button, Stack } from '@mui/material';
+import Alert from '@mui/material/Alert';
+import Typography from '@mui/material/Typography';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Stack from '@mui/material/Stack';
+import ErrorOutline from '@mui/icons-material/ErrorOutline';
 import { ErrorBoundary as Boundary } from 'react-error-boundary';
-import { ErrorOutline } from '@mui/icons-material';
 
 /**
  * @function ErrorFallback

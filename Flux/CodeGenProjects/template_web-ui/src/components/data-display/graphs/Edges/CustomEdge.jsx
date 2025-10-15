@@ -1,6 +1,7 @@
 import React from 'react';
 import { BaseEdge, EdgeLabelRenderer, getBezierPath } from '@xyflow/react';
-import { TroubleshootOutlined, SendOutlined } from '@mui/icons-material';
+import TroubleshootOutlined from '@mui/icons-material/TroubleshootOutlined';
+import SendOutlined from '@mui/icons-material/SendOutlined';
 import styles from './CustomEdge.module.css';
 
 const CustomEdge = ({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style = {}, data, markerEnd }) => {

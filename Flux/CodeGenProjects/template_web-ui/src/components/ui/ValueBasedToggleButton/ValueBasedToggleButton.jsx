@@ -1,15 +1,42 @@
-import React, { useRef } from 'react';
-import { ToggleButton, useTheme } from '@mui/material';
-import * as MuiIcon from '@mui/icons-material'
+import React, { useRef, Suspense } from 'react';
+import ToggleButton from '@mui/material/ToggleButton';
+import { useTheme } from '@mui/material/styles';
 import PropTypes from 'prop-types';
 import { getResolvedColor } from '../../../utils/ui/colorUtils';
 import { getContrastColor } from '../../../utils/ui/uiUtils';
 import classes from './ValueBasedToggleButton.module.css';
 
+// const DynamicIcon = React.memo(({ iconName }) => {
+//     if (!iconName) return null;
+
+//     const IconComponent = React.lazy(() =>
+//         import(/* @vite-ignore */ `@mui/icons-material/${iconName}`).catch(() => ({
+//             default: () => null, // Return a component that renders nothing on error
+//         }))
+//     );
+
+//     return (
+//         <Suspense fallback={null}>
+//             <IconComponent />
+//         </Suspense>
+//     );
+// });
+
+
+const DynamicIcon = React.memo(({ iconName }) => {
+    if (!iconName) return null;
+
+    return null;
+});
+
+
+DynamicIcon.propTypes = {
+    iconName: PropTypes.string,
+};
+
 
 const ValueBasedToggleButton = (props) => {
     const theme = useTheme();
-    const Icon = props.iconName ? MuiIcon[props.iconName] : null;
     let disabledClass = '';
     if (props.disabled) {
         disabledClass = classes.disabled;
@@ -68,7 +95,7 @@ const ValueBasedToggleButton = (props) => {
             disabled={props.disabled ? props.disabled : false}
             value={props.caption}
             onClick={handleClicks}>
-            {props.iconName && <Icon />}
+            {props.iconName && <DynamicIcon iconName={props.iconName} />}
             {!props.hideCaption && props.caption}
         </ToggleButton>
     )

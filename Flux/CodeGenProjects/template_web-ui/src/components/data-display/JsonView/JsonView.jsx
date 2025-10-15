@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { ClickAwayListener, Tooltip } from '@mui/material';
+import ClickAwayListener from '@mui/material/ClickAwayListener';
+import Tooltip from '@mui/material/Tooltip';
 import { JsonViewer } from '@textea/json-viewer';
 import PropTypes from 'prop-types';
-import { useTheme } from '@emotion/react';
+import { useTheme } from '@mui/material/styles';
 import styles from './JsonView.module.css';
 import ClipboardCopier from '../../utility/ClipboardCopier';
 

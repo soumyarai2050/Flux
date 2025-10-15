@@ -15,7 +15,7 @@ import {
 import { createAutoBoundParams } from '../../utils/core/parameterBindingUtils';
 import { cleanAllCache } from '../../cache/attributeCache';
 import { useWebSocketWorker, useDownload, useModelLayout, useConflictDetection, useCountQuery } from '../../hooks';
-import { massageDataForBackend, shouldUsePagination, buildDefaultFilters, extractCrudParams } from '../../utils/core/paginationUtils';
+import { massageDataForBackend, shouldUsePagination, buildDefaultFilters, extractCrudParams, convertFilterTypes } from '../../utils/core/paginationUtils';
 // custom components
 import { FullScreenModalOptional } from '../../components/ui/Modal';
 import { ModelCard, ModelCardHeader, ModelCardContent } from '../../components/utility/cards';
@@ -123,6 +123,7 @@ function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRoo
 
     // Determine if server-side pagination is enabled from schema
     const serverSidePaginationEnabled = modelSchema.server_side_pagination === true && modelSchema.is_large_db_object !== true;
+    const serverSideFilterSortEnabled = modelSchema.server_side_filter_sort === true;
 
     // Extract ui_limit from schema unconditionally for NonRootModel (client-side pagination enforced)
     // NonRootModel always uses client-side pagination regardless of server-side settings
@@ -143,9 +144,14 @@ function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRoo
         return Object.keys(defaultFilterParamDictRef.current).every(key => {
             const filterValues = filterMap.get(key);
             return filterValues !== undefined && filterValues !== null &&
-                   (!Array.isArray(filterValues) || filterValues.length > 0);
+                (!Array.isArray(filterValues) || filterValues.length > 0);
         });
     }, [defaultFilters]);
+
+    const uiFilters = useMemo(() => {
+        const layoutFilters = modelLayoutOption.filters || [];
+        return convertFilterTypes(layoutFilters, modelRootFieldsMetadata, MODEL_TYPES.NON_ROOT);
+    }, [JSON.stringify(modelLayoutOption.filters), modelRootFieldsMetadata]);
 
     // Construct URLs using urlOverrideDataSource (must be before useCountQuery)
     const url = useMemo(() =>
@@ -168,17 +174,16 @@ function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRoo
     // Use modelLayoutData with JSON.stringify to handle reference stability
     const processedData = useMemo(() => {
         const rowsPerPage = modelLayoutData.rows_per_page || 25;
-        const filters = modelLayoutOption.filters || [];
         const sortOrders = modelLayoutData.sort_orders || [];
 
         // Merge UI filters with default filters
-        const mergedFilters = [...filters, ...defaultFilters];
+        const mergedFilters = [...uiFilters, ...defaultFilters];
 
         const result = massageDataForBackend(mergedFilters, sortOrders, page, rowsPerPage);
 
         return result;
     }, [
-        JSON.stringify(modelLayoutOption.filters),
+        uiFilters,
         JSON.stringify(modelLayoutData.sort_orders),
         page,
         modelLayoutData.rows_per_page,
@@ -306,7 +311,7 @@ function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRoo
 
             dispatch(actions.getAll(args));
         }
-    }, [viewUrl, JSON.stringify(params), hasReadByIdWsProperty, processedData.filters, processedData.sortOrders, processedData.pagination, 
+    }, [viewUrl, JSON.stringify(params), hasReadByIdWsProperty, processedData.filters, processedData.sortOrders, processedData.pagination,
         serverSidePaginationEnabled, usePagination, isWaitingForCount, defaultFilters, uiLimit])
 
     useEffect(() => {
@@ -369,7 +374,7 @@ function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRoo
                 page,
                 rowsPerPage: modelLayoutData.rows_per_page || 25,
                 sortOrders: modelLayoutData.sort_orders || [],
-                filters: modelLayoutOption.filters || [],
+                filters: uiFilters || [],
                 mode,
                 enableOverride: modelLayoutData.enable_override || [],
                 disableOverride: modelLayoutData.disable_override || [],
@@ -384,7 +389,7 @@ function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRoo
                 columnOrders: modelLayoutData.column_orders || [],
                 noCommonKeyOverride: modelLayoutData.no_common_key_override || [],
                 xpath: modelName,
-                serverSidePaginationEnabled : false  // Pass this false as in case of Non-RootModel we want to enforce client side pagination control in both cases 
+                serverSidePaginationEnabled: false  // Pass this false as in case of Non-RootModel we want to enforce client side pagination control in both cases 
             }
 
             const updatedOptionsRef = {
@@ -690,10 +695,11 @@ function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRoo
                             onColumnOrdersChange={handleColumnOrdersChange}
                             stickyHeader={modelLayoutData.sticky_header ?? true}
                             frozenColumns={modelLayoutData.frozen_columns || []}
-                            filters={modelLayoutOption.filters || []}
+                            filters={uiFilters || []}
                             onFiltersChange={handleFiltersChange}
                             uniqueValues={uniqueValues}
                             highlightDuration={modelLayoutData.highlight_duration ?? DEFAULT_HIGHLIGHT_DURATION}
+                            serverSideFilterSortEnabled={serverSideFilterSortEnabled}
                         />
                     </>
                 );
@@ -744,10 +750,11 @@ function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRoo
                         onColumnOrdersChange={handleColumnOrdersChange}
                         onShowLessChange={handleShowLessChange}
                         // filter
-                        filters={modelLayoutOption.filters || []}
+                        filters={uiFilters || []}
                         fieldsMetadata={fieldsMetadata || []}
                         onFiltersChange={handleFiltersChange}
                         uniqueValues={uniqueValues}
+                        serverSideFilterSortEnabled={serverSideFilterSortEnabled}
                         // visibility
                         showMore={showMore}
                         showHidden={showHidden}

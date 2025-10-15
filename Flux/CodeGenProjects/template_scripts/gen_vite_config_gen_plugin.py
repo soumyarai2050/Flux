@@ -10,7 +10,7 @@ if __name__ == "__main__":
     code_gen_engine_env_manager = CodeGenEngineEnvManager.get_instance()
     env_var_dict = CodeGenEngineEnvManager.default_gen_env_var_dict
     env_var_dict["PLUGIN_FILE_NAME"] = "vite_config_gen_plugin.py"
-    env_var_dict["TEMPLATE_FILE_NAME"] = "template.txt"
+    env_var_dict["TEMPLATE_FILE_NAME"] = "vite_config_temp.txt"
     # Add any custom env variable required in plugin like above
 
     code_gen_engine_env_manager.init_env_and_update_sys_path("template_project_name", "_", "PluginJsLayout", env_var_dict)

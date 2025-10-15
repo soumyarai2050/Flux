@@ -1,5 +1,5 @@
 import React from 'react';
-import { useTheme } from '@emotion/react';
+import { useTheme } from '@mui/material/styles';
 import { snakeToTitle } from '../../../../utils/ui/uiUtils';
 import styles from './ModelCardHeader.module.css';
 

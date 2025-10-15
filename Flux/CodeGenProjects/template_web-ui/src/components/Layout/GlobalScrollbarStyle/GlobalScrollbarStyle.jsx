@@ -1,5 +1,5 @@
 import React from 'react';
-import { GlobalStyles } from '@mui/material';
+import GlobalStyles from '@mui/material/GlobalStyles';
 import { useTheme } from '@mui/material/styles';
 import { cssVar, baseColorPalettes, BaseColor } from '../../../theme'; // Assuming theme utilities are here
 

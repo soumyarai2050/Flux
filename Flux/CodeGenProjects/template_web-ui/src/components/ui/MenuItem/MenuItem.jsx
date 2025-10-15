@@ -1,4 +1,4 @@
-import { MenuItem as Item } from '@mui/material'
+import Item from '@mui/material/MenuItem';
 import styles from './MenuItem.module.css';
 
 const MenuItem = ({ children, ...rest }) => {

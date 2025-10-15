@@ -1,5 +1,6 @@
 import React from 'react';
-import { LinearProgress, Tooltip } from '@mui/material';
+import LinearProgress from '@mui/material/LinearProgress';
+import Tooltip from '@mui/material/Tooltip';
 import { HOVER_TEXT_TYPES } from '../../../constants';
 import { getColorTypeFromPercentage } from '../../../utils/ui/colorUtils';
 import { normalise } from '../../../utils/formatters/numberUtils';

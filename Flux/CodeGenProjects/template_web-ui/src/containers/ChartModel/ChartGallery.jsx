@@ -1,19 +1,14 @@
-import {
-    Box,
-    Typography,
-    Paper,
-    Grid,
-    Card,
-    CardContent,
-    IconButton,
-} from '@mui/material';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import Paper from '@mui/material/Paper';
+import Card from '@mui/material/Card';
+import CardContent from '@mui/material/CardContent';
+import IconButton from '@mui/material/IconButton';
 import { alpha } from '@mui/material/styles';
-import {
-    ArrowBack,
-    ShowChart,
-    BarChart,
-    ScatterPlot,
-} from '@mui/icons-material';
+import ArrowBack from '@mui/icons-material/ArrowBack';
+import ShowChart from '@mui/icons-material/ShowChart';
+import BarChart from '@mui/icons-material/BarChart';
+import ScatterPlot from '@mui/icons-material/ScatterPlot';
 import EChart from '../../components/data-display/charts/EChart';
 import styles from './ChartGallery.module.css';
 import useClickIntent from '../../hooks/useClickIntent';

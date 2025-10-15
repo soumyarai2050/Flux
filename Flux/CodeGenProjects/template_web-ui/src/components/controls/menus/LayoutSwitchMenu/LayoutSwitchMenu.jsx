@@ -1,16 +1,17 @@
 import React, { useState, useMemo } from 'react';
 import PropTypes from 'prop-types';
-import { Popover, ToggleButtonGroup, ToggleButton, Tooltip } from '@mui/material';
-import {
-  AccountTree,
-  BarChart,
-  FormatListNumberedSharp,
-  PivotTableChartSharp,
-  TableChartSharp,
-  PushPin,
-  PushPinOutlined,
-  Hub
-} from '@mui/icons-material';
+import Popover from '@mui/material/Popover';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import ToggleButton from '@mui/material/ToggleButton';
+import Tooltip from '@mui/material/Tooltip';
+import AccountTree from '@mui/icons-material/AccountTree';
+import BarChart from '@mui/icons-material/BarChart';
+import FormatListNumberedSharp from '@mui/icons-material/FormatListNumberedSharp';
+import PivotTableChartSharp from '@mui/icons-material/PivotTableChartSharp';
+import TableChartSharp from '@mui/icons-material/TableChartSharp';
+import PushPin from '@mui/icons-material/PushPin';
+import PushPinOutlined from '@mui/icons-material/PushPinOutlined';
+import Hub from '@mui/icons-material/Hub';
 import Icon from '../../../ui/Icon';
 import MenuItem from '../../../ui/MenuItem';
 import { LAYOUT_TYPES } from '../../../../constants';

@@ -1,8 +1,10 @@
 import React from 'react';
 import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-import { TextField, IconButton, InputAdornment } from '@mui/material';
-import { Clear } from '@mui/icons-material';
+import TextField from '@mui/material/TextField';
+import IconButton from '@mui/material/IconButton';
+import InputAdornment from '@mui/material/InputAdornment';
+import Clear from '@mui/icons-material/Clear';
 
 const DateTimeWrapper = ({ type, value, onChange, disabled, ...props }) => {
   return (

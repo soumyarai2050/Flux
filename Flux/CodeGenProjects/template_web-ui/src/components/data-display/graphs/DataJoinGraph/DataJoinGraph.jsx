@@ -2,15 +2,13 @@ import React, { useReducer, useEffect, useCallback, useMemo, useRef } from 'reac
 import PropTypes from 'prop-types';
 import { useSelector, useDispatch } from 'react-redux';
 import { cloneDeep, get, set } from 'lodash';
-import {
-    Box,
-    Typography,
-    useTheme,
-    Button,
-    IconButton,
-    Tooltip,
-    Chip
-} from '@mui/material';
+import Box from '@mui/material/Box';
+import Typography from '@mui/material/Typography';
+import { useTheme } from '@mui/material/styles';
+import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
+import Chip from '@mui/material/Chip';
 import CloseIcon from '@mui/icons-material/Close';
 import {
     ReactFlow,

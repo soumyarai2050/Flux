@@ -9,11 +9,18 @@ import PropTypes from 'prop-types';
 import axios from 'axios';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
-import {
-    Dialog, DialogTitle, DialogContent, DialogActions, Button,
-    DialogContentText, TextField, Box, FormControlLabel, Switch
-} from '@mui/material';
-import { PlayArrow, Delete } from '@mui/icons-material';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import Button from '@mui/material/Button';
+import DialogContentText from '@mui/material/DialogContentText';
+import TextField from '@mui/material/TextField';
+import Box from '@mui/material/Box';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Switch from '@mui/material/Switch';
+import PlayArrow from '@mui/icons-material/PlayArrow';
+import Delete from '@mui/icons-material/Delete';
 import ValueBasedToggleButton from '../ValueBasedToggleButton';
 import { API_ROOT_URL, API_ROOT_VIEW_URL } from '../../../constants';
 import { AlertErrorMessage } from '../Alert';

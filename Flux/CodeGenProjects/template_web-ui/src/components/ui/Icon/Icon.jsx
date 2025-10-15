@@ -5,7 +5,10 @@
 
 import React from 'react';
 import PropTypes from 'prop-types';
-import { Avatar, IconButton, ToggleButton, Tooltip } from '@mui/material';
+import Avatar from '@mui/material/Avatar';
+import IconButton from '@mui/material/IconButton';
+import ToggleButton from '@mui/material/ToggleButton';
+import Tooltip from '@mui/material/Tooltip';
 import classes from './Icon.module.css';
 
 /**

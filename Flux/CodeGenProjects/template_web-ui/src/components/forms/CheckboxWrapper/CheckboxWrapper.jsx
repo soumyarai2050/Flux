@@ -1,5 +1,5 @@
 import React from 'react';
-import { Checkbox } from '@mui/material';
+import Checkbox from '@mui/material/Checkbox';
 
 const CheckboxWrapper = ({ type, value, onChange, disabled, ...props }) => {
   return (

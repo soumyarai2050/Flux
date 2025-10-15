@@ -1,7 +1,8 @@
 
 import React, { useState } from 'react';
-import { IconButton } from '@mui/material';
-import { ContentCopy, Check } from '@mui/icons-material';
+import IconButton from '@mui/material/IconButton';
+import ContentCopy from '@mui/icons-material/ContentCopy';
+import Check from '@mui/icons-material/Check';
 
 const ContentCopier = ({ text }) => {
     const [copied, setCopied] = useState(false);

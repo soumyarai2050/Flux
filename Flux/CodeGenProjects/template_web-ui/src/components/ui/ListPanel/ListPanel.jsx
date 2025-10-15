@@ -1,6 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Box, Button, List, ListItem, ListItemButton, ListItemText, Tooltip, ClickAwayListener } from '@mui/material';
-import { Add, Menu, MenuOpen, BarChart, PivotTableChartSharp, Done, Close } from '@mui/icons-material';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import ListItemButton from '@mui/material/ListItemButton';
+import ListItemText from '@mui/material/ListItemText';
+import Tooltip from '@mui/material/Tooltip';
+import ClickAwayListener from '@mui/material/ClickAwayListener';
+import Add from '@mui/icons-material/Add';
+import Menu from '@mui/icons-material/Menu';
+import MenuOpen from '@mui/icons-material/MenuOpen';
+import BarChart from '@mui/icons-material/BarChart';
+import PivotTableChartSharp from '@mui/icons-material/PivotTableChartSharp';
+import Done from '@mui/icons-material/Done';
+import Close from '@mui/icons-material/Close';
 import styles from './ListPanel.module.css';
 import { MODES } from '../../../constants';
 

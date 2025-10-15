@@ -1,6 +1,9 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import { CloseFullscreen, Fullscreen, PushPin, PushPinOutlined } from '@mui/icons-material';
+import CloseFullscreen from '@mui/icons-material/CloseFullscreen';
+import Fullscreen from '@mui/icons-material/Fullscreen';
+import PushPin from '@mui/icons-material/PushPin';
+import PushPinOutlined from '@mui/icons-material/PushPinOutlined';
 import MenuItem from '../../../ui/MenuItem';
 import Icon from '../../../ui/Icon';
 

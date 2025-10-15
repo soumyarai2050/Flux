@@ -1,16 +1,124 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
-import {
-  Popover, Typography, Checkbox, TextField, Button,
-  Divider, List, ListItem, FormControlLabel, Box,
-  IconButton, InputAdornment, MenuItem, Select, FormControl
-} from '@mui/material';
-import {
-  ArrowDropDown, Search, Clear, ContentCopy, FilterAlt,
-  ArrowUpward, ArrowDownward
-} from '@mui/icons-material';
+import Popover from '@mui/material/Popover';
+import Typography from '@mui/material/Typography';
+import Checkbox from '@mui/material/Checkbox';
+import TextField from '@mui/material/TextField';
+import Button from '@mui/material/Button';
+import Divider from '@mui/material/Divider';
+import List from '@mui/material/List';
+import ListItem from '@mui/material/ListItem';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Box from '@mui/material/Box';
+import IconButton from '@mui/material/IconButton';
+import InputAdornment from '@mui/material/InputAdornment';
+import MenuItem from '@mui/material/MenuItem';
+import Select from '@mui/material/Select';
+import FormControl from '@mui/material/FormControl';
+import Tooltip from '@mui/material/Tooltip';
+import ArrowDropDown from '@mui/icons-material/ArrowDropDown';
+import Search from '@mui/icons-material/Search';
+import Clear from '@mui/icons-material/Clear';
+import ContentCopy from '@mui/icons-material/ContentCopy';
+import FilterAlt from '@mui/icons-material/FilterAlt';
+import ArrowUpward from '@mui/icons-material/ArrowUpward';
+import ArrowDownward from '@mui/icons-material/ArrowDownward';
+import { debounce } from 'lodash';
 import ClipboardCopier from '../../utility/ClipboardCopier';
 import styles from './FilterSortPopup.module.css';
+
+// Simple virtual scrolling component
+const VirtualizedList = ({ items, height, itemHeight, renderItem, noItemsComponent }) => {
+  const [scrollTop, setScrollTop] = useState(0);
+  const containerRef = useRef();
+
+  const visibleStart = Math.floor(scrollTop / itemHeight);
+  const visibleEnd = Math.min(visibleStart + Math.ceil(height / itemHeight) + 1, items.length);
+
+  const totalHeight = items.length * itemHeight;
+  const offsetY = visibleStart * itemHeight;
+
+  const handleScroll = (e) => {
+    setScrollTop(e.target.scrollTop);
+  };
+
+  if (items.length === 0) {
+    return noItemsComponent;
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      style={{ height, overflowY: 'auto' }}
+      onScroll={handleScroll}
+      className={styles.virtualizedContainer}
+    >
+      <div style={{ height: totalHeight, position: 'relative' }}>
+        <div style={{ transform: `translateY(${offsetY}px)` }}>
+          {items.slice(visibleStart, visibleEnd).map((item, index) =>
+            renderItem({ item, index: visibleStart + index })
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Extract constants
+const TEXT_FILTER_TYPES = {
+  EQUALS: 'equals',
+  NOT_EQUAL: 'notEqual',
+  CONTAINS: 'contains',
+  NOT_CONTAINS: 'notContains',
+  BEGINS_WITH: 'beginsWith',
+  ENDS_WITH: 'endsWith'
+};
+
+const TEXT_FILTER_LABELS = {
+  [TEXT_FILTER_TYPES.EQUALS]: 'Equals...',
+  [TEXT_FILTER_TYPES.NOT_EQUAL]: 'Does not equal...',
+  [TEXT_FILTER_TYPES.CONTAINS]: 'Contains...',
+  [TEXT_FILTER_TYPES.NOT_CONTAINS]: 'Does not contain...',
+  [TEXT_FILTER_TYPES.BEGINS_WITH]: 'Begins with...',
+  [TEXT_FILTER_TYPES.ENDS_WITH]: 'Ends with...'
+};
+
+// Memoized sub-component for filter list items
+const FilterListItem = React.memo(({ value, isChecked, count, onChange }) => {
+  const handleChange = useCallback(() => onChange(value), [value, onChange]);
+
+  return (
+    <ListItem disablePadding className={styles.checkboxItem}>
+      <FormControlLabel
+        control={
+          <Checkbox
+            checked={isChecked}
+            onChange={handleChange}
+            className={styles.checkbox}
+          />
+        }
+        label={
+          <div className={styles.valueWithCount}>
+            <span className={styles.checkboxLabel}>
+              {value == null || value === undefined ? '(Blank)' : String(value)}
+            </span>
+            <span className={styles.valueCount}>
+              {count}
+            </span>
+          </div>
+        }
+      />
+    </ListItem>
+  );
+}, (prevProps, nextProps) => {
+  // Custom comparison function for better memoization
+  return prevProps.value === nextProps.value &&
+    prevProps.isChecked === nextProps.isChecked &&
+    prevProps.count === nextProps.count &&
+    prevProps.onChange === nextProps.onChange;
+});
+
+FilterListItem.displayName = 'FilterListItem';
 
 /**
  * Excel-style filter and sort popup component with integrated column header icon
@@ -29,187 +137,224 @@ const FilterSortPopup = ({
   onApply,
   onCopy,
   filterEnable,
-  clipboardText
+  clipboardText,
+  serverSideFilterSortEnabled
 }) => {
-  // Local state for changes before applying
-  const [localSelectedFilters, setLocalSelectedFilters] = useState([]);
-  const [originalSelectedFilters, setOriginalSelectedFilters] = useState([]);
+  // Use Set for O(1) lookups instead of array
+  const [localSelectedFiltersSet, setLocalSelectedFiltersSet] = useState(new Set());
+  const [originalSelectedFiltersSet, setOriginalSelectedFiltersSet] = useState(new Set());
   const [serverSideAppliedFilters, setServerSideAppliedFilters] = useState([]);
   const [localTextFilter, setLocalTextFilter] = useState('');
-  const [localTextFilterType, setLocalTextFilterType] = useState('contains');
+  const [localTextFilterType, setLocalTextFilterType] = useState(TEXT_FILTER_TYPES.CONTAINS);
   const [localSortDirection, setLocalSortDirection] = useState(null);
   const [localAbsoluteSort, setLocalAbsoluteSort] = useState(null);
   const [searchValue, setSearchValue] = useState('');
+  const [debouncedSearchValue, setDebouncedSearchValue] = useState('');
   const [showTextFilter, setShowTextFilter] = useState(false);
   const [addCurrentSelectionToFilter, setAddCurrentSelectionToFilter] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const multiSortRef = useRef(true);
-
+  const isInitialized = useRef(false);
   // Internal state for popup open/close
   const [anchorEl, setAnchorEl] = useState(null);
   const open = Boolean(anchorEl);
 
+  // Use a ref to prevent re-creating debounce function on every render
+  const debouncedSearchRef = useRef(
+    debounce((value, currentSelectedSet, originalSet, addToFilter, uniqueValsSet) => {
+      setDebouncedSearchValue(value);
+      if (value) {
+        const searchLower = value.toLowerCase();
+        const newFilteredValues = [];
+        for (const val of uniqueValsSet) {
+          const stringValue = String(val ?? '').toLowerCase();
+          if (stringValue.includes(searchLower)) {
+            newFilteredValues.push(val);
+          }
+        }
+
+        if (addToFilter) {
+          const newSet = new Set(currentSelectedSet);
+          newFilteredValues.forEach(v => newSet.add(v));
+          setLocalSelectedFiltersSet(newSet);
+        } else {
+          setLocalSelectedFiltersSet(new Set(newFilteredValues));
+        }
+      } else {
+        // Restore original when clearing search
+        setLocalSelectedFiltersSet(new Set(originalSet));
+      }
+    }, 300)
+  );
+
+  // Memoize uniqueValues Set for faster lookups
+  const uniqueValuesSet = useMemo(() => new Set(uniqueValues), [uniqueValues]);
+
   // Initialize local state when popup opens
   useEffect(() => {
     if (open) {
+      if (isInitialized.current) return;
+
       // If no filters have been applied yet, select all values by default
       const initialFilters = selectedFilters.length > 0
-        ? [...selectedFilters]
-        : [...uniqueValues];
+        ? new Set(selectedFilters)
+        : new Set(uniqueValuesSet);
 
-      setLocalSelectedFilters(initialFilters);
-      setOriginalSelectedFilters(initialFilters);
+      setLocalSelectedFiltersSet(initialFilters);
+      setOriginalSelectedFiltersSet(new Set(initialFilters)); // Keep a copy of the initial state
       setServerSideAppliedFilters([...selectedFilters]);
       setLocalTextFilter(textFilter || '');
-      setLocalTextFilterType(textFilterType || 'contains');
+      setLocalTextFilterType(textFilterType || TEXT_FILTER_TYPES.CONTAINS);
       setLocalSortDirection(sortDirection);
       setLocalAbsoluteSort(absoluteSort);
       setSearchValue('');
-      setShowTextFilter(textFilter && textFilter.length > 0);
+      setDebouncedSearchValue('');
+      setShowTextFilter(Boolean(textFilter));
       setAddCurrentSelectionToFilter(false);
+      isInitialized.current = true;
+    } else {
+      isInitialized.current = false;
+
     }
-  }, [open, JSON.stringify(selectedFilters), textFilter, textFilterType, sortDirection, JSON.stringify(uniqueValues)]);
+  }, [open, JSON.stringify(selectedFilters), textFilter, textFilterType, sortDirection, absoluteSort, uniqueValuesSet]);
+
 
   // Handle icon click to open/close popup
-  const handleIconClick = (event) => {
+  const handleIconClick = useCallback((event) => {
     event.stopPropagation();
     setAnchorEl(anchorEl ? null : event.currentTarget);
-  };
+  }, [anchorEl]);
 
-  // Filter unique values based on search
-  const filteredUniqueValues = uniqueValues.filter(value => {
-    if (!searchValue) return true;
-    // Ensure value is a string for comparison, handle null/undefined
-    const stringValue = String(value === null || value === undefined ? '' : value);
-    return stringValue.toLowerCase().includes(searchValue.toLowerCase());
-  });
+  // Memoized filter unique values based on search
+  const filteredUniqueValues = useMemo(() => {
+    if (!debouncedSearchValue) return Array.from(uniqueValuesSet);
+    const searchLower = debouncedSearchValue.toLowerCase();
+    const filtered = [];
+    for (const value of uniqueValuesSet) {
+      const stringValue = String(value ?? '').toLowerCase();
+      if (stringValue.includes(searchLower)) {
+        filtered.push(value);
+      }
+    }
+    return filtered;
+  }, [uniqueValuesSet, debouncedSearchValue]);
+
+  // Memoize checkbox states
+  const { allVisibleSelected, someVisibleSelected } = useMemo(() => {
+    if (filteredUniqueValues.length === 0) {
+      return { allVisibleSelected: false, someVisibleSelected: false };
+    }
+
+    let selectedCount = 0;
+    for (const value of filteredUniqueValues) {
+      if (localSelectedFiltersSet.has(value)) {
+        selectedCount++;
+      }
+    }
+    return {
+      allVisibleSelected: selectedCount === filteredUniqueValues.length,
+      someVisibleSelected: selectedCount > 0 && selectedCount < filteredUniqueValues.length
+    };
+  }, [filteredUniqueValues, localSelectedFiltersSet]);
+
 
   // Handle select/deselect all search results
-  const handleSelectAllSearchResults = () => {
-    if (searchValue) {
+  const handleSelectAllSearchResults = useCallback(() => {
+    if (debouncedSearchValue) {
+      // Search is active - handle filtered results
       if (addCurrentSelectionToFilter) {
         // Keep current selections and add search results
-        const currentSelection = new Set(localSelectedFilters);
-        filteredUniqueValues.forEach(value => currentSelection.add(value));
-        setLocalSelectedFilters([...currentSelection]);
+        const newSet = new Set(localSelectedFiltersSet);
+        filteredUniqueValues.forEach(value => newSet.add(value));
+        setLocalSelectedFiltersSet(newSet);
       } else {
-        // Replace with only search results
-        const nonSearchValues = uniqueValues.filter(item => !filteredUniqueValues.includes(item));
-        setLocalSelectedFilters([...filteredUniqueValues, ...localSelectedFilters.filter(item => nonSearchValues.includes(item))]);
+        // Replace with only search results, but keep non-searched items that were selected
+        const newSet = new Set();
+        filteredUniqueValues.forEach(value => newSet.add(value));
+        for (const value of uniqueValuesSet) {
+          if (!filteredUniqueValues.includes(value) && localSelectedFiltersSet.has(value)) {
+            newSet.add(value);
+          }
+        }
+        setLocalSelectedFiltersSet(newSet);
       }
     } else {
-      // When no search is active, this behaves like regular select all
-      setLocalSelectedFilters([...uniqueValues]);
+      // No search active - select/deselect all unique values
+      setLocalSelectedFiltersSet(new Set(uniqueValuesSet));
     }
-  };
+  }, [debouncedSearchValue, addCurrentSelectionToFilter, filteredUniqueValues, uniqueValuesSet, localSelectedFiltersSet]);
 
-  const handleDeselectAllSearchResults = () => {
-    if (searchValue) {
-      if (addCurrentSelectionToFilter) {
-        // Keep selections that aren't in search results
-        setLocalSelectedFilters(localSelectedFilters.filter(
-          item => !filteredUniqueValues.includes(item)
-        ));
-      } else {
-        // Remove all search results from selection
-        setLocalSelectedFilters(localSelectedFilters.filter(item => !filteredUniqueValues.includes(item)));
-      }
+  const handleDeselectAllSearchResults = useCallback(() => {
+    if (debouncedSearchValue) {
+      // Search is active - only deselect filtered results
+      const newSet = new Set(localSelectedFiltersSet);
+      filteredUniqueValues.forEach(value => newSet.delete(value));
+      setLocalSelectedFiltersSet(newSet);
     } else {
-      // When no search is active, this clears all selections
-      setLocalSelectedFilters([]);
+      // No search - clear all selections
+      setLocalSelectedFiltersSet(new Set());
     }
-  };
+  }, [debouncedSearchValue, filteredUniqueValues, localSelectedFiltersSet]);
+
 
   // Handle "Add current selection to filter" toggle
   const handleAddCurrentSelectionChange = (e) => {
     setAddCurrentSelectionToFilter(e.target.checked);
-  };
-
-  // Normalize value for comparison (handle type mismatches between numbers and strings)
-  const normalizeValue = (val) => {
-    // Convert to string for consistent comparison
-    return String(val === null || val === undefined ? '' : val);
-  };
-
-  // Check if a value is in the selected filters (type-safe comparison)
-  const isValueSelected = (value) => {
-    const normalizedValue = normalizeValue(value);
-    return localSelectedFilters.some(filter => normalizeValue(filter) === normalizedValue);
-  };
-
-  // Handle individual filter selection
-  const handleFilterChange = (value) => {
-    const normalizedValue = normalizeValue(value);
-    if (isValueSelected(value)) {
-      setLocalSelectedFilters(localSelectedFilters.filter(item => normalizeValue(item) !== normalizedValue));
-    } else {
-      setLocalSelectedFilters([...localSelectedFilters, value]);
-    }
-  };
-
-  // Handle sorting
-  const handleSortChange = (e, direction) => {
-    if (e.ctrlKey) {
-      multiSortRef.current = true;
-    } else {
-      multiSortRef.current = false;
-    }
-    setLocalSortDirection(localSortDirection === direction ? null : direction);
-  };
-
-  // Handle absolute sorting
-  const handleAbsoluteSortToggle = () => {
-    setLocalAbsoluteSort(!localAbsoluteSort);
   }
 
-  // Handle text filter type change
-  const handleTextFilterTypeChange = (e) => {
-    setLocalTextFilterType(e.target.value);
-  };
-
-  // Handle text filter change
-  const handleTextFilterChange = (e) => {
-    setLocalTextFilter(e.target.value);
-  };
+  // Handle individual filter selection change
+  const handleFilterChange = useCallback((value) => {
+    const newSet = new Set(localSelectedFiltersSet);
+    if (newSet.has(value)) {
+      newSet.delete(value);
+    } else {
+      newSet.add(value);
+    }
+    setLocalSelectedFiltersSet(newSet);
+  }, [localSelectedFiltersSet]);
 
   // Handle search input for filtering the value list
-  const handleSearchChange = (e) => {
-    const newSearchValue = e.target.value;
+  const handleSearchChange = useCallback((e) => {
+    const value = e.target.value;
+    setSearchValue(value);
+    // Immediate UI update, then trigger debounced search
+    debouncedSearchRef.current(
+      value,
+      localSelectedFiltersSet,
+      originalSelectedFiltersSet,
+      addCurrentSelectionToFilter,
+      uniqueValuesSet
+    );
+  }, [localSelectedFiltersSet, originalSelectedFiltersSet, addCurrentSelectionToFilter, uniqueValuesSet]);
 
-    if (newSearchValue) {
-      // When entering a search term, auto-select all search results by default
-      // in Excel's behavior
-      const newFilteredValues = uniqueValues.filter(value => {
-        const stringValue = String(value === null || value === undefined ? '' : value);
-        return stringValue.toLowerCase().includes(newSearchValue.toLowerCase());
-      });
 
-      setLocalSelectedFilters([
-        ...newFilteredValues,
-        // ...localSelectedFilters.filter(item => nonFilteredValues.includes(item))
-      ]);
+  // Clear search text
+  const handleClearSearch = useCallback(() => {
+    setSearchValue('');
+    setDebouncedSearchValue('');
+    // When clearing search, it restores the original selection
+    setLocalSelectedFiltersSet(new Set(originalSelectedFiltersSet));
+  }, [originalSelectedFiltersSet]);
 
-      // In Excel, when you type in search, it automatically selects all filtered items
-      // but doesn't auto-check "Add current selection to filter"
-      // if (!addCurrentSelectionToFilter) {
-      //   const nonFilteredValues = uniqueValues.filter(value => !newFilteredValues.includes(value));
-      //   setLocalSelectedFilters([
-      //     ...newFilteredValues,
-      //     // ...localSelectedFilters.filter(item => nonFilteredValues.includes(item))
-      //   ]);
-      // } else {
-      //   // If "Add current selection" is checked, we merge the selections
-      //   const currentSelection = new Set(localSelectedFilters);
-      //   newFilteredValues.forEach(value => currentSelection.add(value));
-      //   setLocalSelectedFilters([...currentSelection]);
-      // }
-    } else {
-      // When clearing search, restore original selection that was applied before search
-      setLocalSelectedFilters(originalSelectedFilters);
-    }
+  // Handle sorting
+  const handleSortChange = useCallback((e, direction) => {
+    multiSortRef.current = e.ctrlKey;
+    setLocalSortDirection(localSortDirection === direction ? null : direction);
+  }, [localSortDirection]);
 
-    setSearchValue(newSearchValue);
-  };
+  // Handle absolute sorting
+  const handleAbsoluteSortToggle = useCallback(() => {
+    setLocalAbsoluteSort(prev => !prev);
+  }, []);
+
+  // Handle text filter type change
+  const handleTextFilterTypeChange = useCallback((e) => {
+    setLocalTextFilterType(e.target.value);
+  }, []);
+  // Handle text filter input change
+  const handleTextFilterChange = useCallback((e) => {
+    setLocalTextFilter(e.target.value);
+  }, []);
 
   // Handle key down events
   const handleKeyDown = (e) => {
@@ -221,50 +366,60 @@ const FilterSortPopup = ({
     }
   };
 
-  // Clear search text
-  const handleClearSearch = () => {
-    // When clearing search in Excel, it restores the original selection
-    setLocalSelectedFilters(originalSelectedFilters);
-    setSearchValue('');
-  };
-
   // Handle popup close
-  const handleClose = () => {
+  const handleClose = useCallback(() => {
     setAnchorEl(null);
-  };
+  }, []);
 
-  // Handle Apply button click
-  const handleApply = () => {
-    // Determine final filter values to send to TableHeader
+  // Handle apply button click
+  const handleApply = useCallback(() => {
     let finalFilterValues;
 
-    if (serverSideAppliedFilters.length === 0 && localSelectedFilters.length === uniqueValues.length) {
-      // No server-side filters and all local values selected = no filtering
+    // Scenario 1: No server-side filters + all visible values selected = no filtering
+    if (serverSideAppliedFilters.length === 0 && localSelectedFiltersSet.size === uniqueValuesSet.size) {
       finalFilterValues = null;
-    } else if (serverSideAppliedFilters.length === 0 && localSelectedFilters.length < uniqueValues.length) {
-      // Cleared server-side filters, but user has local selections
-      finalFilterValues = localSelectedFilters.length > 0 ? localSelectedFilters : null;
-    } else if (serverSideAppliedFilters.length > 0 && localSelectedFilters.length === uniqueValues.length) {
-      // Server-side filters exist, user selected all visible values - preserve server filters
+    }
+    // Scenario 2: Server-side filters exist + all visible values selected = preserve server filters
+    else if (serverSideAppliedFilters.length > 0 && localSelectedFiltersSet.size === uniqueValuesSet.size) {
       finalFilterValues = serverSideAppliedFilters;
-    } else {
-      // User made new selections or modified existing ones
-      const updatedSelectedFilters = originalSelectedFilters && addCurrentSelectionToFilter
-        ? [...originalSelectedFilters, ...localSelectedFilters]
-        : [...localSelectedFilters];
-      finalFilterValues = updatedSelectedFilters.length !== uniqueValues.length ? updatedSelectedFilters : null;
+    }
+    // Scenario 3: User made new selections
+    else {
+      let updatedFilters;
+      if (addCurrentSelectionToFilter && originalSelectedFiltersSet.size > 0) {
+        // Merge the sets and convert to array only when needed
+        updatedFilters = Array.from(new Set([...originalSelectedFiltersSet, ...localSelectedFiltersSet]));
+      } else {
+        // Convert to array only here, at the last possible moment
+        updatedFilters = Array.from(localSelectedFiltersSet);
+      }
+
+      finalFilterValues = updatedFilters.length !== uniqueValuesSet.size ? updatedFilters : null;
     }
 
-    onApply && onApply(columnId, finalFilterValues, localTextFilter,
-      localTextFilterType, localSortDirection, localAbsoluteSort, multiSortRef.current);
+    onApply?.(
+      columnId,
+      finalFilterValues,
+      localTextFilter || null,
+      localTextFilter ? localTextFilterType : null,
+      localSortDirection,
+      localAbsoluteSort,
+      multiSortRef.current
+    );
     handleClose();
-  };
+  }, [
+    columnId, localSelectedFiltersSet, originalSelectedFiltersSet,
+    serverSideAppliedFilters, uniqueValuesSet, addCurrentSelectionToFilter,
+    localTextFilter, localTextFilterType, localSortDirection,
+    localAbsoluteSort, onApply, handleClose
+  ]);
 
-  // Handle Cancel button click
-  const handleCancel = () => {
-    // In Excel, Cancel just discards changes
+
+  // Handle cancel button click
+  const handleCancel = useCallback(() => {
+    // In Excel , Cancel just discards changes
     handleClose();
-  };
+  }, [handleClose]);
 
   // Toggle text filter visibility
   const toggleTextFilter = () => {
@@ -275,59 +430,31 @@ const FilterSortPopup = ({
   };
 
   // Clear all filters
-  const clearAllFilters = () => {
-    setLocalSelectedFilters([...uniqueValues]);
+  const clearAllFilters = useCallback(() => {
+    setLocalSelectedFiltersSet(new Set(uniqueValuesSet));
     setServerSideAppliedFilters([]);
     setLocalTextFilter('');
     setLocalSortDirection(null);
-    setLocalAbsoluteSort(null);
+    setLocalAbsoluteSort(false);
     setSearchValue('');
-  };
+    setDebouncedSearchValue('');
+  }, [uniqueValuesSet]);
 
-  const handleCopy = () => {
+
+  const handleCopy = useCallback(() => {
     setIsCopied(true);
     onCopy(columnId, columnName);
-    setTimeout(() => {
-      setIsCopied(false);
-    }, 2000);
-  };
+    setTimeout(() => setIsCopied(false), 2000)
+  }, [columnId, columnName, onCopy]);
 
-  // Calculate checkbox states for visible items
-  const allVisibleSelected = filteredUniqueValues.length > 0 &&
-    filteredUniqueValues.every(value => isValueSelected(value));
 
-  const someVisibleSelected = filteredUniqueValues.some(value =>
-    isValueSelected(value)) && !allVisibleSelected;
-
-  // Calculate if any filter is actually applied
-  const hasFilters = uniqueValues.length > 1;
-  // If selectedFilters has values, it means a filter is applied (active filtering)
-  // This works because selectedFilters is only populated when user explicitly filters
-  const isFiltered = (selectedFilters.length !== 0) || textFilter;
-  const hasLocalFilterOrSort = localSelectedFilters.length !== 0 && localSelectedFilters.length < uniqueValues.length || localTextFilter || localSortDirection;
-
-  // Count occurrences of each value
-  // const valueCounts = {};
-  // totalValues.forEach(value => {
-  //   valueCounts[value] = (valueCounts[value] || 0) + 1;
-  // });
-
-  // Get text for filter operator
-  const getTextFilterOperatorLabel = (type) => {
-    switch (type) {
-      case 'equals': return 'Equals...';
-      case 'notEqual': return 'Does not equal...';
-      case 'contains': return 'Contains...';
-      case 'notContains': return 'Does not contain...';
-      case 'beginsWith': return 'Begins with...';
-      case 'endsWith': return 'Ends with...';
-      default: return 'Contains...';
-    }
-  };
-
-  // Check if search is active
-  const hasActiveSearch = searchValue.length > 0;
-  const sortLevelClass = sortLevel && sortLevel > 2 ? styles.multiLevelSort : sortLevel === 1 ? styles.firstLevelSort : sortLevel === 2 ? styles.secondLevelSort : '';
+  // Memoize computed values - if any filter is actually applied
+  const hasFilters = uniqueValuesSet.size > 1;
+  const isFiltered = selectedFilters.length != 0 || textFilter;
+  const hasActiveFilterOrSort = localSelectedFiltersSet.size != 0 && localSelectedFiltersSet.size < uniqueValuesSet.size || localTextFilter || localSortDirection || serverSideAppliedFilters.length > 0;
+  const sortLevelClass = sortLevel && sortLevel > 2 ? styles.multiLevelSort :
+    sortLevel > 1 ? styles.firstLevelSort :
+      sortLevel == 2 ? styles.secondLevelSort : '';
 
   return (
     <>
@@ -335,7 +462,7 @@ const FilterSortPopup = ({
       <div className={`${styles.filterIconWrapper} ${open ? styles.popupOpen : ''}`}>
         <IconButton
           size="small"
-          className={`${styles.filterButton} ${(isFiltered) ? styles.activeFilter : hasFilters ? styles.hasFilter : ''}`}
+          className={`${styles.filterButton} ${isFiltered ? styles.activeFilter : hasFilters ? styles.hasFilter : ''}`}
           onClick={handleIconClick}
           aria-label="Filter and sort"
         >
@@ -359,19 +486,12 @@ const FilterSortPopup = ({
         open={open}
         anchorEl={anchorEl}
         onClose={handleCancel}
-        anchorOrigin={{
-          vertical: 'bottom',
-          horizontal: 'left',
-        }}
-        transformOrigin={{
-          vertical: 'top',
-          horizontal: 'left',
-        }}
-        classes={{
-          paper: styles.popoverPaper,
-        }}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+        transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+        classes={{ paper: styles.popoverPaper }}
       >
         <div className={styles.popupContainer}>
+
           {/* Copy section */}
           <div className={styles.section}>
             <div className={styles.copyOption} onClick={handleCopy}>
@@ -381,7 +501,7 @@ const FilterSortPopup = ({
               <div className={styles.sortIconPlaceholder}>
                 <ContentCopy fontSize="small" className={styles.menuIcon} />
               </div>
-              <Typography>{`Copy`}</Typography>
+              <Typography>Copy</Typography>
             </div>
           </div>
 
@@ -419,9 +539,9 @@ const FilterSortPopup = ({
               <Typography>Absolute Sort</Typography>
             </div>
 
-            <Divider className={styles.menuDivider} />
+            {(filterEnable || hasActiveFilterOrSort) && <Divider className={styles.menuDivider} />}
 
-            {/* Text Filters dropdown */}
+            {/* Text Filters */}
             {filterEnable && (
               <>
                 <div className={styles.textFiltersHeader} onClick={toggleTextFilter}>
@@ -438,16 +558,15 @@ const FilterSortPopup = ({
                         displayEmpty
                         variant="outlined"
                       >
-                        <MenuItem value="equals">Equals</MenuItem>
-                        <MenuItem value="notEqual">Does not equal</MenuItem>
-                        <MenuItem value="contains">Contains</MenuItem>
-                        <MenuItem value="notContains">Does not contain</MenuItem>
-                        <MenuItem value="beginsWith">Begins with</MenuItem>
-                        <MenuItem value="endsWith">Ends with</MenuItem>
+                        {Object.entries(TEXT_FILTER_TYPES).map(([key, value]) => (
+                          <MenuItem key={key} value={value}>
+                            {TEXT_FILTER_LABELS[value].replace('...', '')}
+                          </MenuItem>
+                        ))}
                       </Select>
                     </FormControl>
                     <TextField
-                      placeholder={getTextFilterOperatorLabel(localTextFilterType)}
+                      placeholder={TEXT_FILTER_LABELS[localTextFilterType]}
                       variant="outlined"
                       size="small"
                       fullWidth
@@ -459,19 +578,20 @@ const FilterSortPopup = ({
                   </div>
                 )}
 
-                <Divider className={styles.menuDivider} />
+                {hasActiveFilterOrSort && <Divider className={styles.menuDivider} />}
               </>
             )}
-            {(hasLocalFilterOrSort || isFiltered) && (
-              <div className={styles.clearFilterOption}
-                onClick={(hasLocalFilterOrSort || isFiltered) ? clearAllFilters : undefined}
-                style={{ opacity: (isFiltered || hasLocalFilterOrSort )? 1 : 0.5, pointerEvents: (isFiltered || hasLocalFilterOrSort ) ? 'auto' : 'none' }}
+
+            {hasActiveFilterOrSort && (
+              <div
+                className={styles.clearFilterOption}
+                onClick={clearAllFilters}
               >
                 <div className={styles.sortIcon}></div>
                 <div className={styles.sortIconPlaceholder}>
                   <FilterAlt fontSize="small" className={styles.menuIcon} />
                 </div>
-                <Typography>{`Clear Filter/Sort`}</Typography>
+                <Typography>Clear Filter/Sort</Typography>
               </div>
             )}
           </div>
@@ -479,25 +599,8 @@ const FilterSortPopup = ({
           <Divider />
 
           {/* Filter section */}
-          {filterEnable && (
+          {filterEnable && uniqueValuesSet.size > 1 && (
             <div className={styles.section}>
-              {/* Show server-side applied filters when filters are active */}
-              {/* {selectedFilters.length > 0 && uniqueValues.length >= 1 && (
-                <div className={styles.serverFiltersSection}>
-                  <Typography variant="caption" className={styles.serverFiltersTitle}>
-                    Server Side Filters ({selectedFilters.length} applied):
-                  </Typography>
-                  <div className={styles.serverFiltersList}>
-                    {selectedFilters.map((value, index) => (
-                      <div key={index} className={styles.serverFilterItem}>
-                        {value === null || value === undefined ? '(Blank)' : String(value)}
-                      </div>
-                    ))}
-                  </div>
-                  <Divider className={styles.menuDivider} />
-                </div>
-              )} */}
-
               <div className={styles.searchContainer}>
                 <TextField
                   placeholder="Search"
@@ -525,7 +628,7 @@ const FilterSortPopup = ({
                 />
               </div>
 
-              {hasActiveSearch && (
+              {debouncedSearchValue && (
                 <div className={styles.addSelectionContainer}>
                   <FormControlLabel
                     control={
@@ -553,43 +656,42 @@ const FilterSortPopup = ({
                         className={styles.checkbox}
                       />
                     }
-                    label={hasActiveSearch ? "Select All Search Results" : "(Select All)"}
+                    label={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {debouncedSearchValue ? "Select All Search Results" : "(Select All)"}
+                        {serverSideFilterSortEnabled && (
+                          <Tooltip title="Server-side filter is active. This list is a subset of all data.">
+                            <div className={styles.serverFilterChipInSearch}>
+                              Srv
+                            </div>
+                          </Tooltip>
+                        )}
+                      </Box>
+                    }
                     className={styles.selectAllCheckbox}
                   />
                 </div>
 
                 <div className={styles.checkboxListContainer}>
-                  <List className={styles.checkboxList} dense disablePadding>
-                    {filteredUniqueValues.length > 0 ? (
-                      filteredUniqueValues.map((value, index) => (
-                        <ListItem key={index} dense disablePadding className={styles.checkboxItem}>
-                          <FormControlLabel
-                            control={
-                              <Checkbox
-                                checked={isValueSelected(value)}
-                                onChange={() => handleFilterChange(value)}
-                                className={styles.checkbox}
-                              />
-                            }
-                            label={
-                              <div className={styles.valueWithCount}>
-                                <span className={styles.checkboxLabel}>
-                                  {value === null || value === undefined ? '(Blank)' : String(value)}
-                                </span>
-                                <span className={styles.valueCount}>
-                                  ({valueCounts.get(value) ?? 0})
-                                </span>
-                              </div>
-                            }
-                          />
-                        </ListItem>
-                      ))
-                    ) : (
+                  <VirtualizedList
+                    items={filteredUniqueValues}
+                    height={200}
+                    itemHeight={32}
+                    renderItem={({ item: value, index }) => (
+                      <FilterListItem
+                        key={`${value}.${index}`}
+                        value={value}
+                        isChecked={localSelectedFiltersSet.has(value)}
+                        count={valueCounts.get(value) ?? 0}
+                        onChange={handleFilterChange}
+                      />
+                    )}
+                    noItemsComponent={
                       <Typography variant="body2" className={styles.noResults}>
                         No matching values found
                       </Typography>
-                    )}
-                  </List>
+                    }
+                  />
                 </div>
               </div>
             </div>
@@ -623,10 +725,12 @@ FilterSortPopup.propTypes = {
   columnId: PropTypes.string.isRequired,
   columnName: PropTypes.string.isRequired,
   uniqueValues: PropTypes.array.isRequired,
-  selectedFilters: PropTypes.array.isRequired,
+  selectedFilters: PropTypes.array,
   textFilter: PropTypes.string,
-  textFilterType: PropTypes.oneOf(['equals', 'notEqual', 'contains', 'notContains', 'beginsWith', 'endsWith']),
+  textFilterType: PropTypes.oneOf(Object.values(TEXT_FILTER_TYPES)),
   sortDirection: PropTypes.oneOf(['asc', 'desc', null]),
+  absoluteSort: PropTypes.bool,
+  sortLevel: PropTypes.number,
   onApply: PropTypes.func.isRequired,
   onCopy: PropTypes.func.isRequired,
   filterEnable: PropTypes.bool,
@@ -636,9 +740,11 @@ FilterSortPopup.propTypes = {
 
 FilterSortPopup.defaultProps = {
   textFilter: '',
-  textFilterType: 'contains',
+  textFilterType: TEXT_FILTER_TYPES.CONTAINS,
   sortDirection: null,
+  absoluteSort: false,
   filterEnable: false,
+  sortLevel: 0,
   uniqueValues: [],
   selectedFilters: [],
   valueCounts: new Map()

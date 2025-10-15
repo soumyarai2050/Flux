@@ -11,13 +11,12 @@ import { getServerUrl, isWebSocketActive } from '../../utils/network/networkUtil
 import {
     getWidgetTitle, getCrudOverrideDict, getDefaultFilterParamDict, getCSVFileName,
     updateFormValidation,
-    snakeToCamel
 } from '../../utils/ui/uiUtils';
 import { createAutoBoundParams } from '../../utils/core/parameterBindingUtils';
 import { removeRedundantFieldsFromRows } from '../../utils/core/dataTransformation';
 import { cleanAllCache } from '../../cache/attributeCache';
 import { useWebSocketWorker, useDownload, useModelLayout, useConflictDetection, useCountQuery } from '../../hooks';
-import { massageDataForBackend, shouldUsePagination, buildDefaultFilters, extractCrudParams } from '../../utils/core/paginationUtils';
+import { massageDataForBackend, shouldUsePagination, buildDefaultFilters, extractCrudParams, convertFilterTypes } from '../../utils/core/paginationUtils';
 // custom components
 import { FullScreenModalOptional } from '../../components/ui/Modal';
 import { ModelCard, ModelCardHeader, ModelCardContent } from '../../components/utility/cards';
@@ -31,7 +30,6 @@ import ConflictPopup from '../../components/utility/ConflictPopup';
 
 function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap }) {
     const { schema: projectSchema, schemaCollections } = useSelector((state) => state.schema);
-
     const { actions, selector } = modelDataSource;
     const { storedArray, storedObj, updatedObj, objId, mode, allowUpdates, error, isLoading, popupStatus } = useSelector(selector);
     const { node, selectedDataPoints, lastSelectedDataPoint, isAnalysis } = useSelector(state => state[modelName] ?? {});
@@ -132,6 +130,7 @@ function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap }) {
 
     // Determine if server-side pagination is enabled from schema
     const serverSidePaginationEnabled = modelSchema.server_side_pagination === true && modelSchema.is_large_db_object !== true;
+    const serverSideFilterSortEnabled = modelSchema.server_side_filter_sort === true;
 
     // Extract ui_limit from schema ONLY when server-side pagination is disabled
     // When server-side is enabled, uiLimit will be null (limit handled by pagination)
@@ -152,9 +151,14 @@ function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap }) {
         return Object.keys(defaultFilterParamDictRef.current).every(key => {
             const filterValues = filterMap.get(key);
             return filterValues !== undefined && filterValues !== null &&
-                   (!Array.isArray(filterValues) || filterValues.length > 0);
+                (!Array.isArray(filterValues) || filterValues.length > 0);
         });
     }, [defaultFilters]);
+
+    const uiFilters = useMemo(() => {
+        const layoutFilters = modelLayoutOption.filters || [];
+        return convertFilterTypes(layoutFilters, fieldsMetadata, MODEL_TYPES.REPEATED_ROOT);
+    }, [JSON.stringify(modelLayoutOption.filters), fieldsMetadata]);
 
     // Construct base URLs using urlOverrideDataSource (must be before useCountQuery)
     const baseUrl = useMemo(() =>
@@ -181,17 +185,16 @@ function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap }) {
     // Use modelLayoutData with JSON.stringify to handle reference stability
     const processedData = useMemo(() => {
         const rowsPerPage = modelLayoutData.rows_per_page || 25;
-        const filters = modelLayoutOption.filters || [];
         const sortOrders = modelLayoutData.sort_orders || [];
 
         // Merge UI filters with default filters
-        const mergedFilters = [...filters, ...defaultFilters];
+        const mergedFilters = [...uiFilters, ...defaultFilters];
 
         const result = massageDataForBackend(mergedFilters, sortOrders, page, rowsPerPage);
 
         return result;
     }, [
-        JSON.stringify(modelLayoutOption.filters),
+        uiFilters,
         JSON.stringify(modelLayoutData.sort_orders),
         page,
         modelLayoutData.rows_per_page,
@@ -330,12 +333,12 @@ function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap }) {
             const queryParams = {};
 
             // Add filters if they exist (JSON-stringified)
-            if (processedData.filters && processedData.filters.length > 0) {
+            if (serverSideFilterSortEnabled && processedData.filters && processedData.filters.length > 0) {
                 queryParams.filters = JSON.stringify(processedData.filters);
             }
 
             // Add sort orders if they exist (JSON-stringified)
-            if (processedData.sortOrders && processedData.sortOrders.length > 0) {
+            if (serverSideFilterSortEnabled && processedData.sortOrders && processedData.sortOrders.length > 0) {
                 queryParams.sort_order = JSON.stringify(processedData.sortOrders);
             }
 
@@ -359,8 +362,8 @@ function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap }) {
 
             dispatch(actions.getAll(args));
         }
-    }, [viewUrl, JSON.stringify(params), hasReadByIdWsProperty, processedData.filters, processedData.sortOrders, processedData.pagination, 
-        serverSidePaginationEnabled, usePagination, isWaitingForCount, defaultFilters, uiLimit])
+    }, [viewUrl, JSON.stringify(params), hasReadByIdWsProperty, processedData.filters, processedData.sortOrders, processedData.pagination,
+        serverSidePaginationEnabled, usePagination, isWaitingForCount, defaultFilters, uiLimit, serverSideFilterSortEnabled])
 
     useEffect(() => {
         workerRef.current = new Worker(new URL("../../workers/repeated-root-model.worker.js", import.meta.url), { type: 'module' });
@@ -422,7 +425,7 @@ function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap }) {
                 page,
                 rowsPerPage: modelLayoutData.rows_per_page || 25,
                 sortOrders: modelLayoutData.sort_orders || [],
-                filters: modelLayoutOption.filters || [],
+                filters: uiFilters || [],
                 mode,
                 enableOverride: modelLayoutData.enable_override || [],
                 disableOverride: modelLayoutData.disable_override || [],
@@ -512,8 +515,8 @@ function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap }) {
         isCppModel: modelLayoutOption.depending_proto_model_for_cpp_port,
         // Parameters for unified endpoint with dynamic parameter inclusion
         // Filters now include merged default filter params
-        filters: processedData.filters,
-        sortOrders: processedData.sortOrders,
+        filters: serverSideFilterSortEnabled ? processedData.filters : null,
+        sortOrders: serverSideFilterSortEnabled ? processedData.sortOrders : null,
         pagination: (serverSidePaginationEnabled && usePagination) ? processedData.pagination : null,
         uiLimit: uiLimit  // Client-side limit (null when server-side pagination is enabled)
     })
@@ -886,7 +889,7 @@ function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap }) {
                     onColumnOrdersChange={handleColumnOrdersChange}
                     stickyHeader={modelLayoutData.sticky_header ?? true}
                     frozenColumns={modelLayoutData.frozen_columns || []}
-                    filters={modelLayoutOption.filters || []}
+                    filters={uiFilters || []}
                     onFiltersChange={handleFiltersChange}
                     uniqueValues={uniqueValues}
                     highlightDuration={modelLayoutData.highlight_duration ?? DEFAULT_HIGHLIGHT_DURATION}
@@ -894,6 +897,7 @@ function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap }) {
                     selectedRows={finalSelectedRowIds}
                     lastSelectedRowId={finalLastSelectedRowId}
                     onSelectionChange={handleTableSelectionChange}
+                    serverSideFilterSortEnabled={serverSideFilterSortEnabled}
                 />
             </Wrapper>
         )
@@ -923,10 +927,11 @@ function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap }) {
                         onColumnOrdersChange={handleColumnOrdersChange}
                         onShowLessChange={handleShowLessChange}
                         // filter
-                        filters={modelLayoutOption.filters || []}
+                        filters={uiFilters || []}
                         fieldsMetadata={fieldsMetadata || []}
                         onFiltersChange={handleFiltersChange}
                         uniqueValues={uniqueValues}
+                        serverSideFilterSortEnabled={serverSideFilterSortEnabled}
                         // visibility
                         showMore={showMore}
                         showHidden={showHidden}

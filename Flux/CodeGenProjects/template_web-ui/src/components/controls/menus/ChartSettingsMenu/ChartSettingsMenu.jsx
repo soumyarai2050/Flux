@@ -1,8 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { cloneDeep, debounce } from 'lodash';
-import { Box, Popover, TextField } from '@mui/material';
-import { PushPin, PushPinOutlined, Settings } from '@mui/icons-material';
+import Box from '@mui/material/Box';
+import Popover from '@mui/material/Popover';
+import TextField from '@mui/material/TextField';
+import PushPin from '@mui/icons-material/PushPin';
+import PushPinOutlined from '@mui/icons-material/PushPinOutlined';
+import Settings from '@mui/icons-material/Settings';
 import Icon from '../../../ui/Icon';
 import MenuItem from '../../../ui/MenuItem';
 import ValueBasedToggleButton from '../../../ui/ValueBasedToggleButton';

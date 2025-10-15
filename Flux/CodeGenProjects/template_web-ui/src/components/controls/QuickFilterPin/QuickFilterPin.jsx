@@ -1,17 +1,13 @@
 import React from 'react';
-import { 
-    Box, 
-    Chip, 
-    Switch, 
-    FormControlLabel, 
-    IconButton, 
-    Select, 
-    MenuItem, 
-    TextField,
-    Autocomplete,
-    Tooltip
-} from '@mui/material';
-import { Close } from '@mui/icons-material';
+import Box from '@mui/material/Box';
+import Chip from '@mui/material/Chip';
+import Switch from '@mui/material/Switch';
+import IconButton from '@mui/material/IconButton';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
+import TextField from '@mui/material/TextField';
+import Tooltip from '@mui/material/Tooltip';
+import Close from '@mui/icons-material/Close';
 import styles from './QuickFilterPin.module.css';
 
 const QuickFilterPin = ({ 

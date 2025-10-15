@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import PropTypes from 'prop-types';
-import { Box } from '@mui/material';
+import Box from '@mui/material/Box';
 import { DATA_TYPES } from '../../../../constants';
 import { getColorTypeFromValue } from '../../../../utils/ui/colorUtils';
 import { getShapeFromValue, getSizeFromValue, getHoverTextType, getReducerArrayFromCollections } from '../../../../utils/ui/uiUtils';

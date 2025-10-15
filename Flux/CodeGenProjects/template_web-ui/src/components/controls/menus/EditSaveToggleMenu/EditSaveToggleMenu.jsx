@@ -1,6 +1,10 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import { Edit, Save, Close, PushPin, PushPinOutlined } from '@mui/icons-material';
+import Edit from '@mui/icons-material/Edit';
+import Save from '@mui/icons-material/Save';
+import Close from '@mui/icons-material/Close';
+import PushPin from '@mui/icons-material/PushPin';
+import PushPinOutlined from '@mui/icons-material/PushPinOutlined';
 import { MODES } from '../../../../constants';
 import Icon from '../../../ui/Icon';
 import MenuItem from '../../../ui/MenuItem';

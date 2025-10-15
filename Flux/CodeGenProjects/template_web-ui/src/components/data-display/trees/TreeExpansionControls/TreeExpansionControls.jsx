@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
-import { Box, Tooltip, IconButton } from "@mui/material";
-import { KeyboardDoubleArrowDown, KeyboardDoubleArrowUp, DragHandle } from "@mui/icons-material";
+import Box from '@mui/material/Box';
+import Tooltip from '@mui/material/Tooltip';
+import IconButton from '@mui/material/IconButton';
+import KeyboardDoubleArrowDown from '@mui/icons-material/KeyboardDoubleArrowDown';
+import KeyboardDoubleArrowUp from '@mui/icons-material/KeyboardDoubleArrowUp';
+import DragHandle from '@mui/icons-material/DragHandle';
 import { BeatLoader } from 'react-spinners';
 import PropTypes from 'prop-types';
 

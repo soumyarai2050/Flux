@@ -1,6 +1,8 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import { FileDownload, PushPin, PushPinOutlined } from '@mui/icons-material';
+import FileDownload from '@mui/icons-material/FileDownload';
+import PushPin from '@mui/icons-material/PushPin';
+import PushPinOutlined from '@mui/icons-material/PushPinOutlined';
 import Icon from '../../../ui/Icon';
 import MenuItem from '../../../ui/MenuItem';
 

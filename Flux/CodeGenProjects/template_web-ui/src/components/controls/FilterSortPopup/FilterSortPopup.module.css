@@ -1,12 +1,14 @@
-/* Filter icon */
 .filterIconWrapper {
   display: inline-flex;
   align-items: center;
+  width: 24px;
+  height: 24px;
   position: relative;
   background-color: rgba(255, 255, 255, 0.2);
-  /* background-color: inherit; */
-  border-radius: 2px;
-  margin-left: 4px;
+  /* Example - adjust as needed /
+border-radius: 4px;
+margin-left: 4px;
+color: #666; / Default icon color */
 }
 
 .filterButton {
@@ -15,8 +17,8 @@
 }
 
 .hasFilter {
-  /* Office blue */
   color: #0078d4 !important;
+  /* Office blue */
 }
 
 .activeFilter {
@@ -26,7 +28,7 @@
 .sortIndicator {
   position: absolute;
   left: 0px;
-  top: 2px;
+  top: 20px;
   font-size: 10px;
   display: flex;
   align-items: center;
@@ -36,7 +38,7 @@
 .absoluteSortIndicator {
   position: absolute;
   right: 0px;
-  top: 2px;
+  top: 20px;
   font-size: 10px;
   display: flex;
   align-items: center;
@@ -53,15 +55,17 @@
 
 .secondLevelSort {
   color: var(--green-success);
+  /* Example - adjust as needed */
 }
 
 .multiLevelSort {
   color: var(--red-error);
+  /* Example - adjust as needed */
 }
 
 /* Main popup container */
 .popoverPaper {
-  max-height: 80vh;
+  min-width: 80px;
   min-width: 280px;
   max-width: 320px;
   overflow: hidden;
@@ -83,26 +87,23 @@
   align-items: center;
   padding: 6px 12px;
   cursor: pointer;
-  /* color: #212121; */
 }
 
 .copyOption:hover {
-  /* Excel's light blue hover */
-  /* background-color: #e5f3ff; */
+  /*Excel's light blue hover */
+  /*background-color : #e5f3ff */
 }
 
-/* Sort options */
 .sortOption {
   display: flex;
   align-items: center;
   padding: 6px 12px;
   cursor: pointer;
-  /* color: #212121; */
 }
 
 .sortOption:hover {
-  /* Excel's light blue hover */
-  /* background-color: #e5f3ff; */
+  /*Excel's light blue hover */
+  /*background-color : #e5f3ff */
 }
 
 .clearFilterOption {
@@ -110,12 +111,11 @@
   align-items: center;
   padding: 6px 12px;
   cursor: pointer;
-  /* color: #212121; */
 }
 
 .clearFilterOption:hover {
-  /* Excel's light blue hover */
-  /* background-color: #e5f3ff; */
+  /*Excel's light blue hover */
+  /*background-color : #e5f3ff */
 }
 
 .sortIcon {
@@ -126,7 +126,6 @@
 }
 
 .checkMark {
-  /* Office blue */
   color: #0078d4;
   font-weight: bold;
 }
@@ -144,24 +143,17 @@
   /* color: #666; */
 }
 
-/* Text filters */
 .textFiltersHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 6px 12px;
   cursor: pointer;
-  /* color: #212121; */
-}
-
-.textFiltersHeader:hover {
-  /* Excel's light blue hover */
-  /* background-color: #e5f3ff; */
 }
 
 .textFilterSection {
   padding: 12px;
-  /* background-color: #f5f5f5; */
+  background-color: #f5f5f5;
 }
 
 .filterTypeSelect {
@@ -170,11 +162,12 @@
 
 .textFilterField {
   margin-top: 8px;
+  /* Added for spacing */
 }
 
-/* Search section */
 .searchContainer {
-  padding: 12px 12px 8px 12px;
+  padding: 12px 12px 0 12px;
+  /* Adjusted padding */
 }
 
 .searchField {
@@ -193,15 +186,14 @@
   margin: 0 !important;
 }
 
-/* Filter list */
 .valuesList {
-  margin: 0 12px 12px;
+  margin: 0 12px 0 12px;
   border: 1px solid #e0e0e0;
 }
 
 .selectAllContainer {
   border-bottom: 1px solid #e0e0e0;
-  /* background-color: #f5f5f5; */
+  background-color: #f5f5f5;
 }
 
 .selectAllCheckbox {
@@ -213,21 +205,37 @@
 .checkboxListContainer {
   max-height: 200px;
   overflow-y: auto;
+  padding: 0 10px !important;
+}
+
+.virtualizedContainer {
+  border: none;
+}
+
+/* Custom scrollbar for webkit browsers */
+.virtualizedContainer::-webkit-scrollbar {
+  width: 8px;
+}
+
+.virtualizedContainer::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
 }
 
 .checkboxList {
   padding: 0 8px !important;
   max-height: 200px;
+  /* Redundant if using VirtualizedList with fixed height */
 }
 
 .checkbox {
-  /* Office blue */
   color: #0078d4 !important;
+  /* Office blue */
 }
 
 .checkbox.Mui-checked {
-  /* Office blue */
   color: #0078d4 !important;
+  /* Office blue */
 }
 
 .checkboxItem {
@@ -236,7 +244,6 @@
 }
 
 .checkboxItem:hover {
-  /* Excel's light blue hover */
   /* background-color: #e5f3ff; */
 }
 
@@ -252,6 +259,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 200px;
+  /* Adjust as needed */
   font-size: 13px;
 }
 
@@ -279,35 +287,51 @@
   font-size: 12px !important;
   text-transform: none !important;
   min-width: 80px !important;
-  /* Office blue */
   background-color: #0078d4 !important;
+  /* Office blue /
 }
 
 .okButton:hover {
-  /* Darker Office blue */
-  background-color: #106ebe !important;
+background-color: #106ebe !important; /* Darker Office blue */
 }
 
 .cancelButton {
   font-size: 12px !important;
   text-transform: none !important;
   min-width: 80px !important;
-  /* color: #333 !important; */
-  /* border-color: #080505 !important; */
-  background-color: #999;
+  color: #333 !important;
+  border-color: #808080 !important;
+  /* Gray border */
 }
 
 .cancelButton:hover {
-  background-color: #666;
+  background-color: #e0e0e0 !important;
+  /* Light gray hover */
 }
 
 .noResults {
   padding: 16px;
   text-align: center;
   color: rgba(0, 0, 0, 0.54);
-  font-size: 13px !important;
+  font-size: 13px;
 }
 
 .popupOpen {
   background-color: #dbee32;
+}
+
+.serverFilterChipInSearch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem; /* very small text */
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 8px;
+  background-color: #f0e9e5;
+  border: 1px solid #d3c0b3;
+  color: #7d6b60;
+  cursor: help;
+  margin-right: 4px; /* Space between chip and clear button */
+  white-space: nowrap; /* Prevent text wrapping */
 }

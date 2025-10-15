@@ -1,5 +1,6 @@
 import React from 'react';
-import { Autocomplete, TextField } from '@mui/material';
+import Autocomplete from '@mui/material/Autocomplete';
+import TextField from '@mui/material/TextField';
 
 const AutocompleteWrapper = ({ value, onChange, options = [], disabled, ...props }) => {
   return (

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { TextField } from '@mui/material';
+import TextField from '@mui/material/TextField';
 import { NumericFormat } from 'react-number-format';
 import { debounce } from 'lodash';
 

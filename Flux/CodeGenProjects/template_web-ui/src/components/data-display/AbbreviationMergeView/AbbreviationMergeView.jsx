@@ -1,19 +1,17 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { cloneDeep, get, set } from 'lodash';
-import {
-  Autocomplete,
-  Box,
-  Button,
-  Chip,
-  Divider,
-  Table,
-  TableBody,
-  TableContainer,
-  TableRow,
-  TextField
-} from '@mui/material';
-import { Download } from '@mui/icons-material';
+import Autocomplete from '@mui/material/Autocomplete';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Chip from '@mui/material/Chip';
+import Divider from '@mui/material/Divider';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableContainer from '@mui/material/TableContainer';
+import TableRow from '@mui/material/TableRow';
+import TextField from '@mui/material/TextField';
+import Download from '@mui/icons-material/Download';
 import {
   DndContext,
   closestCenter,
@@ -27,7 +25,7 @@ import {
 import { DB_ID, DATA_TYPES, MODES, MODEL_TYPES } from '../../../constants';
 import TableHeader from '../tables/TableHeader';
 import Cell from '../tables/Cell';
-import { getBufferAbbreviatedOptionLabel } from '../../../utils/ui/uiUtils.js';
+import { getBufferAbbreviatedOptionLabel } from '../../../utils/ui/uiUtils';
 import styles from './AbbreviationMergeView.module.css';
 import { flux_toggle, flux_trigger_strat } from '../../../projectSpecificUtils';
 import { useScrollIndicators, useKeyboardNavigation } from '../../../hooks';
@@ -697,7 +695,7 @@ const LoadedView = ({
       />
       {rows.length > 6 && (
         <TablePaginationControl
-          rows={rows}
+          rowsLength={rows.length}
           page={page}
           rowsPerPage={rowsPerPage}
           onPageChange={onPageChange}

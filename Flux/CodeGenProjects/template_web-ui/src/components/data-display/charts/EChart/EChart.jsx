@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { init, getInstanceByDom } from 'echarts';
-import { useTheme } from '@emotion/react';
+import { useTheme } from '@mui/material/styles';
 import { cloneDeep } from 'lodash';
 
 function EChart({ option, theme, loading, selectedData, selectedSeriesIdx, onSelectDataChange, activeDataId }) {
