@@ -178,6 +178,15 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
                                 self.msg_name_to_dependent_msg_name_list_dict[message.proto.name] = [
                                     dependent_msg_name]
 
+                            # Check for idDependent (depending_proto_model_name_for_id)
+                            dependent_msg_name = widget_ui_data_option_value_dict.get(
+                                BaseJSLayoutPlugin.widget_ui_option_depending_proto_model_name_for_id_field)
+                            if dependent_msg_name is not None and dependent_msg_name in message_name_list:
+                                dependency_map['idDependent'] = dependent_msg_name
+                                # Keep old structure for backward compatibility
+                                self.msg_name_to_dependent_msg_name_list_dict[message.proto.name] = [
+                                    dependent_msg_name]
+
                             # Check for crudOverride (override_default_crud)
                             if BaseProtoPlugin.is_option_enabled(message,
                                                                    BaseJSLayoutPlugin.flux_msg_override_default_crud):

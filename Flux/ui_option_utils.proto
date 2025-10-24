@@ -119,7 +119,7 @@ message WidgetUIDataElement {
   repeated ColumnFilter filters = 15;
   optional string depending_proto_model_name = 16;   // other project's proto model name present in proto_file_name
                                           // on which current model is dependent
-  optional bool depends_on_other_model_for_id = 17 [default=false];
+  optional string depending_proto_model_name_for_id = 17;
   optional string depending_proto_model_field_name_for_host = 18;
   optional string depending_proto_model_field_name_for_port = 19;
   optional string depending_proto_model_field_name_for_view_port = 20;

@@ -75,13 +75,20 @@ export function convertFilterTypes(filters, fieldsMetadata, modelType) {
 
     const underlyingType = matchField?.underlyingtype || matchField?.type;
 
-    return {
+    const convertedFilter = {
       ...filter,
       filtered_values:
         filter.filtered_values
           ?.split(',')
           .map(val => convertToAppropriateType(val, underlyingType)) ?? null
     };
+     //placeholder code to convert text filter also to appropriate type
+    // Also convert text_filter to appropriate type if it exists
+    // if (filter.text_filter !== undefined && filter.text_filter !== null && filter.text_filter !== '') {
+    //   convertedFilter.text_filter = convertToAppropriateType(filter.text_filter, underlyingType);
+    // }
+
+    return convertedFilter;
   });
 }
 

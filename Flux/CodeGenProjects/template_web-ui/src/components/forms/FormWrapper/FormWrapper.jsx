@@ -6,7 +6,7 @@ import CheckboxWrapper from '../CheckboxWrapper';
 import DateTimeWrapper from '../DateTimeWrapper';
 import NumericFieldWrapper from '../NumericFieldWrapper';
 import MenuItemWrapper from '../MenuItemWrapper';
-import { DATA_TYPES } from '../../constants';
+import { DATA_TYPES } from '../../../constants';
 
 
 const FormWrapper = (props) => {

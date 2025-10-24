@@ -12,7 +12,7 @@ import { floatToInt, getLocalizedValueAndSuffix } from '../../../utils/formatter
 import { groupCommonKeys } from '../../../utils/core/dataGrouping';
 import { excludeNullFromObject, formatJSONObjectOrArray } from '../../../utils/core/objectUtils';
 import { getDateTimeFromInt } from '../../../utils/formatters/dateUtils';
-import { DATA_TYPES, MODES } from '../../../constants';
+import { DATA_TYPES, DATE_TIME_FORMATS, MODES } from '../../../constants';
 import JsonView from '../JsonView';
 import VerticalDataTable from '../tables/VerticalDataTable';
 import _, { cloneDeep, isObject } from 'lodash';
@@ -63,7 +63,7 @@ const CommonKeyWidget = React.forwardRef((props, ref) => {
                     return (
                         <Fragment key={i}>
                             {props.lineBreakStart && collection.groupStart && <div className={classes.break_line} />}
-                            <CommonKey collection={collection} truncateDateTime={props.truncateDateTime} />
+                            <CommonKey collection={collection} />
                             {props.lineBreakEnd && collection.groupEnd && <div className={classes.break_line} />}
                         </Fragment>
                     )
@@ -109,7 +109,7 @@ const CommonKey = (props) => {
             if (collection.type === DATA_TYPES.OBJECT || collection.type === DATA_TYPES.ARRAY) {
                 updatedData = updatedData ? cloneDeep(updatedData) : null;
                 if (updatedData) {
-                    formatJSONObjectOrArray(updatedData, collection.subCollections, props.truncateDateTime);
+                    formatJSONObjectOrArray(updatedData, collection.subCollections);
                     updatedData = clearxpath(updatedData);
                 }
             } else {
@@ -190,10 +190,12 @@ const CommonKey = (props) => {
     let value = collection.value;
     if (collection.type === DATA_TYPES.DATE_TIME && value) {
         const dateTimeWithTimezone = getDateTimeFromInt(value);
-        if (collection.displayType === 'datetime') {
-            value = dateTimeWithTimezone.format('YYYY-MM-DD HH:mm:ss.SSS');
+        if (collection.displayType === 'date') {
+            value = dateTimeWithTimezone.format(DATE_TIME_FORMATS.DATE);
+        } else if (collection.displayType === 'datetime') {
+            value = dateTimeWithTimezone.format(DATE_TIME_FORMATS.DATETIME);
         } else {
-            value = dateTimeWithTimezone.isSame(dayjs(), 'day') ? dateTimeWithTimezone.format('HH:mm:ss.SSS') : dateTimeWithTimezone.format('YYYY-MM-DD HH:mm:ss.SSS');
+            value = dateTimeWithTimezone.isSame(dayjs(), 'day') ? dateTimeWithTimezone.format(DATE_TIME_FORMATS.TIME) : dateTimeWithTimezone.format(DATE_TIME_FORMATS.DATETIME);
         }
     } else if (value && (collection.type === DATA_TYPES.NUMBER || typeof (value) === DATA_TYPES.NUMBER)) {
         if (collection.displayType === DATA_TYPES.INTEGER) {

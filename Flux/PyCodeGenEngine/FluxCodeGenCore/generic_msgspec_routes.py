@@ -1,4 +1,5 @@
 # system imports
+import copy
 import json
 import asyncio
 from typing import List, Any, Dict, Final, Callable, Type, Tuple, TypeVar
@@ -118,32 +119,6 @@ async def broadcast_all_from_active_ws_data_set(active_ws_data_set: List[WSData]
                 # Either create/delete happened after ws pages so no impact on any page or put/patch happened
                 # before or after page on attributes which doesn't affect pages
                 continue
-        elif ws_data.has_only_filters:   # filter
-
-            filtered_db_obj_list = []
-
-            id_list_for_filter_only_ws = ws_data.id_list_for_filter_only_ws
-
-            for db_obj_dict in db_obj_dict_list:
-                fetched_id = db_obj_dict.get("_id")
-                if fetched_id in id_list_for_filter_only_ws:
-                    if len(db_obj_dict) == 1:
-                        # delete case
-                        id_list_for_filter_only_ws.remove(fetched_id)
-                        filtered_db_obj_list.append(db_obj_dict)
-                    else:
-                        # create/update case
-                        json_obj_list = await _handle_filter_on_paginated_or_filter_ws(db_obj_id_list,
-                                                                                       **ws_data.filter_callable_kwargs)
-                        filtered_db_obj_list.extend(json_obj_list)
-                else:
-                    # this id doesn't belong to this ws's filtered docs - no update notification is required
-                    continue
-
-            if not filtered_db_obj_list:
-                continue
-            json_str = orjson.dumps(filtered_db_obj_list, default=non_jsonable_types_handler).decode("utf-8")
-
         else:
             # when ws is without any filter, sort or pagination
             json_str = orjson.dumps(db_obj_dict_list, default=non_jsonable_types_handler).decode("utf-8")
@@ -185,78 +160,31 @@ async def broadcast_from_active_ws_data_set(active_ws_data_set: List[WSData], ms
         # multiple look-ups as fetched object will also be exact same unless some projection is required on it
 
         elif ws_data.has_pagination_with_or_without_filters:    # might also have filters and sort along with pagination - handled already
-            if "page_changes" in kwargs:
-                # when this was create or delete - websockets paginating may receive page changes - having
-                # "page_changes" is way to know if it is create/delete as it is only set in create or delete operation
-                page_changes = kwargs.get("page_changes")
-                if page_changes is not None:
-                    for page_change in page_changes:
-                        if page_change.get("page_id") == ws_data.id:
-                            change_list = page_change.get("changes")
-                            if not change_list:
-                                # create or delete didn't impact in any change on this page
-                                continue
-                            if len(change_list) == 1:
-                                # to send obj to ws notification if only single obj is to be sent - this is how
-                                # UI expects ws updates
-                                change_list = change_list[0]
-                            json_str = orjson.dumps(change_list, default=non_jsonable_types_handler).decode("utf-8")
-                            break
-                    else:
-                        logging.error("Unexpected: ws found with ws_data having flag has_pagination_with_or_without_filters True but page_id not "
-                                      f"found in detected changes ;;; {ws_data=}, {page_changes=}")
-                        continue
+            page_changes = kwargs.get("page_changes")
+            if page_changes is not None:
+                for page_change in page_changes:
+                    if page_change.get("page_id") == ws_data.id:
+                        change_list = page_change.get("changes")
+                        if not change_list:
+                            # create or delete didn't impact in any change on this page
+                            continue
+                        if len(change_list) == 1:
+                            # to send obj to ws notification if only single obj is to be sent - this is how
+                            # UI expects ws updates
+                            change_list = change_list[0]
+                        json_str = orjson.dumps(change_list, default=non_jsonable_types_handler).decode("utf-8")
+                        break
                 else:
-                    # create/delete happened after ws pages so no impact on current pages
+                    logging.error("Unexpected: ws found with ws_data having flag has_pagination_with_or_without_filters True but page_id not "
+                                  f"found in detected changes ;;; {ws_data=}, {page_changes=}")
                     continue
             else:
-                # if it was put/patch - since page will not change so no page_changes will be detected so handling
-                # it as usual update
-                json_obj_list = await _handle_filter_on_paginated_or_filter_ws([db_obj_id],
-                                                                               **ws_data.filter_callable_kwargs)
-                # since it is single update
-                json_str = orjson.dumps(json_obj_list[0], default=non_jsonable_types_handler).decode("utf-8")
-        elif ws_data.has_only_filters:   # filter
-
-            id_list_for_filter_only_ws = ws_data.id_list_for_filter_only_ws
-            fetched_id = db_obj_dict.get("_id")
-            if fetched_id in id_list_for_filter_only_ws:
-                if len(db_obj_dict) == 1:
-                    # delete case
-                    id_list_for_filter_only_ws.remove(fetched_id)
-                    json_str = orjson.dumps(db_obj_dict, default=non_jsonable_types_handler).decode("utf-8")
-                else:
-                    # create/update case
-                    json_obj_list = await _handle_filter_on_paginated_or_filter_ws([db_obj_id],
-                                                                                   **ws_data.filter_callable_kwargs)
-                    # since it is single update
-                    json_str = orjson.dumps(json_obj_list[0], default=non_jsonable_types_handler).decode("utf-8")
-            else:
-                # this id doesn't belong to this ws's filtered docs - no update notification is required
+                # create/delete happened after ws pages to be detected so no impact on current pages
                 continue
         else:
             # when ws is without any filter, sort or pagination
             json_str = orjson.dumps(db_obj_dict, default=non_jsonable_types_handler).decode("utf-8")
         await broadcast_callable(json_str, db_obj_id, ws_data, tasks_list)
-
-async def _handle_filter_on_paginated_or_filter_ws(obj_id_or_list: List[int], **kwargs):
-    agg_pipeline = []
-
-    if kwargs.get("filter_agg_pipeline_param") is not None:
-        # if this ws had extra filter aggregation set by proto model option
-        agg_pipeline.extend(kwargs.get("filter_agg_pipeline_param")["agg"])
-
-    msgspec_class_type = kwargs.get("class_type")
-    agg_pipeline.extend(get_filter_sort_pagination_pipeline_with_passed_agg(msgspec_class_type, **kwargs))
-
-    # Adding match by obj_id or obj_id_list after filter, sort and pagination layer to first let proper page get
-    # build - its bug if done otherwise as it will first filter all docs based on ids and then page will be build
-    # which will be different from case when pages are built on whole db first
-    agg_pipeline.append(get_match_layer_for_obj_id_list(obj_id_or_list))
-
-    agg_pipeline_dict = {"agg": agg_pipeline}
-    json_obj_list = await _get_obj_list_n_handle_datetime(msgspec_class_type, agg_pipeline_dict, has_links=False)
-    return json_obj_list
 
 
 async def publish_ws(msgspec_class_type: Type[MsgspecModel], db_obj_id: Any, db_obj_dict: Dict[str, Any],
@@ -389,11 +317,31 @@ async def get_detected_changes_in_pagination(msgspec_class_type: Type[MsgspecMod
     page_definitions = []
     for active_ws_data in active_ws_data_list:
         if active_ws_data.has_pagination_with_or_without_filters:
+
+            passed_filter_agg_pipeline: Dict | None = active_ws_data.filter_callable_kwargs.get("filter_agg_pipeline_param")
+
+            custom_aggregation_before_filter_sort_pagination: List[Dict[str, Any]] = []
+            if passed_filter_agg_pipeline is not None:
+                custom_aggregation_before_filter_sort_pagination: List[Dict[str, Any]] = copy.deepcopy(passed_filter_agg_pipeline.get("agg"))
+
+            filters = active_ws_data.filter_callable_kwargs.get("filters")
+            sort_order = active_ws_data.filter_callable_kwargs.get("sort_order")
+            pagination = active_ws_data.filter_callable_kwargs.get("pagination")
+
+            if not pagination:
+                # if pagination is not set then not passing sort - this is only for create/update/delete ws page
+                # change detection not on first ws snapshot as sort adds unnecessary aggregate layer if pagination
+                # is not set. Since Sort is applied before pagination to order items to be shaped into pages - without
+                # page params sort doesn't make sense
+                sort_order = []
+            # else not required: if pagination is set then passing sort order
+
             page_definitions.append({
                 "page_id": active_ws_data.id,
-                "filters": active_ws_data.filter_callable_kwargs.get("filters"),
-                "sort_order": active_ws_data.filter_callable_kwargs.get("sort_order"),
-                "pagination": active_ws_data.filter_callable_kwargs.get("pagination")})
+                "filters": filters,
+                "sort_order": sort_order,
+                "pagination": pagination,
+                "custom_aggregation_before_filter_sort_pagination": custom_aggregation_before_filter_sort_pagination})
          # else not required: No special handling required for ws without pagination
 
     if page_definitions:
@@ -1153,11 +1101,23 @@ async def generic_read_http(msgspec_class_type: Type[MsgspecModel], proto_packag
                             read_ids_list: List[Any] | None = None, projection_model=None, **kwargs):
     json_obj_list: List[msgspec_class_type]
 
-    filter_sort_pagination_agg_pipeline = create_cascading_multi_filter_pipeline(msgspec_class_type, **kwargs)
+    aggregate_pipeline = []
 
-    if filter_agg_pipeline is not None:
-        filter_sort_pagination_agg_pipeline += filter_agg_pipeline.get("agg", [])
-    filter_sort_pagination_agg_pipeline = {"agg": filter_sort_pagination_agg_pipeline}
+    if filter_agg_pipeline:
+
+        passed_agg = filter_agg_pipeline.get("agg", [])
+        passed_aggregate = filter_agg_pipeline.get("aggregate", [])
+
+        # we will only receive agg key or aggregate key if we see filter_agg_pipeline is non-empty so only one
+        # will be extended
+        aggregate_pipeline.extend(passed_agg)
+        aggregate_pipeline.extend(passed_aggregate)
+
+    filter_sort_pagination_agg_pipeline = create_cascading_multi_filter_pipeline(msgspec_class_type, **kwargs)
+    if filter_sort_pagination_agg_pipeline:
+        aggregate_pipeline.extend(filter_sort_pagination_agg_pipeline)
+
+    filter_sort_pagination_agg_pipeline = {"agg": aggregate_pipeline}
 
     json_obj_list = \
         await get_obj_list(msgspec_class_type, read_ids_list,
@@ -1196,17 +1156,6 @@ async def _generic_read_ws(msgspec_class_type: Type[MsgspecModel], ws: WebSocket
     try:
         if need_initial_snapshot is None or need_initial_snapshot:
             json_obj_list = await _get_obj_list_n_handle_datetime(msgspec_class_type, filter_agg_pipeline, has_links)
-
-            ws_id = kwargs.pop("ws_id", None)
-            if kwargs.get("filters") is not None or kwargs.get("pagination") is not None:
-                async with msgspec_class_type.read_ws_path_ws_connection_manager.rlock:
-                    ws_data = msgspec_class_type.read_ws_path_ws_connection_manager.get_active_ws_data_by_ws_id(ws_id)
-                    obj_id_list = []
-                    for _json_obj in json_obj_list:
-                        obj_id_list.append(_json_obj.get("_id"))
-                    ws_data.id_list_for_filter_only_ws = obj_id_list
-                    # else not required: already present in dict
-            # else not required: if no filter or pagination - it is simple get-all ws so no special handling required
 
             json_obj_list_str = orjson.dumps(json_obj_list, default=non_jsonable_types_handler).decode('utf-8')
             await msgspec_class_type.read_ws_path_ws_connection_manager. \
@@ -1255,7 +1204,7 @@ def get_filter_sort_pagination_pipeline_with_passed_agg(msgspec_class_type: Type
 
     filter_sort_pagination_agg_pipeline: List[Dict[str, Any]] = []
     if passed_filter_agg_pipeline is not None:
-        filter_sort_pagination_agg_pipeline: List[Dict[str, Any]] = passed_filter_agg_pipeline.get("agg")
+        filter_sort_pagination_agg_pipeline: List[Dict[str, Any]] = copy.deepcopy(passed_filter_agg_pipeline.get("agg"))
 
     filters = kwargs.get("filters")
     sort_order = kwargs.get("sort_order")
@@ -1595,7 +1544,22 @@ async def watch_specific_collection_with_stream(msgspec_class_type: Type[Msgspec
                                                 filter_ws_updates_callable: Callable | None = None,
                                                 filter_agg_pipeline_callable_for_create_obj: Callable | None = None,
                                                 filter_agg_pipeline_callable_for_update_obj: Callable | None = None):
-    """Watches a specific collection for changes."""
+    """
+    Watches a specific collection for changes.
+    Note: Currently only supports general get and query ws(s)
+          - big db type not supported as it is implemented in gridfs and not in mongodb's motor
+          - timeseries not supprted as updates in timeseries are not supported and in our implementation
+          we since we do delete and create to simulate update in timeseries there is no handling to handle 2 ws
+          notifications for single update call
+          - no support for any ws with generic filter, sort and pagination support in get-all ws as page detection
+          logic works on simulating operation on page before actual db operation but stream is only invoked when
+          there is actual db operation
+
+    filter_ws_updates_callable: Callable: Required for cases when update_aggregate_type is set on put/patch operation
+    on model - this callable is required as update aggregate_type applies one more update db operation with aggregation
+    which also sends stream callback here, so to only allow aggregated update notification to broadcast over ws this
+    callable is required to be implemented to return True for only obj that is update aggregated.
+    """
 
     collection_cursor: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.collection_obj
 

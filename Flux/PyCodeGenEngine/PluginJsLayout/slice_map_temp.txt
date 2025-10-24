@@ -59,7 +59,7 @@ function createDynamicSlice(modelName) {
 
   // Extract additional slice configuration from schema
   const sliceConfigFromSchema = getSliceConfig(modelSchema, modelName);
-  const { isAlertModel, isAbbreviationSource, extraState, injectedReducers } = sliceConfigFromSchema;
+  const { isAlertModel, isAbbreviationSource, isIdDependent, extraState, injectedReducers } = sliceConfigFromSchema;
 
   // Create slice using the generic factory
   const { actions, reducer } = createGenericSlice({
@@ -67,6 +67,7 @@ function createDynamicSlice(modelName) {
     modelType,
     isAlertModel,
     isAbbreviationSource,
+    isIdDependent,
     extraState,
     injectedReducers,
     allowedOperations

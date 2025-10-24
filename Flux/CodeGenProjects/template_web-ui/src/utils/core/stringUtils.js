@@ -112,3 +112,76 @@ export function snakeToPascal(snakeStr) {
         .map(word => word === 'ui' ? word.toUpperCase() : word.charAt(0).toUpperCase() + word.slice(1))
         .join('');
 }
+
+/**
+ * Copies text to the clipboard with fallback support for older browsers.
+ * First attempts to use the modern Clipboard API, and if not available,
+ * falls back to using document.execCommand('copy').
+ *
+ * @param {string} text - The text content to be copied to the clipboard.
+ * @returns {Promise<boolean>} A promise that resolves to true if copy was successful, false otherwise.
+ */
+export function copyToClipboard(text) {
+    return new Promise((resolve, reject) => {
+        // First try using the modern Clipboard API
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+            navigator.clipboard
+                .writeText(text)
+                .then(() => {
+                    resolve(true);
+                })
+                .catch((err) => {
+                    console.error('Failed to copy text using Clipboard API:', err);
+                    // If Clipboard API fails, try the fallback method
+                    const success = copyToClipboardFallback(text);
+                    if (success) {
+                        resolve(true);
+                    } else {
+                        reject(err);
+                    }
+                });
+        } else {
+            // Fallback for older browsers or insecure contexts
+            const success = copyToClipboardFallback(text);
+            if (success) {
+                resolve(true);
+            } else {
+                reject(new Error('Clipboard copy not supported'));
+            }
+        }
+    });
+}
+
+/**
+ * Fallback method to copy text to clipboard using document.execCommand.
+ * Creates a temporary textarea element, selects its content, and executes the copy command.
+ *
+ * @param {string} text - The text content to be copied to the clipboard.
+ * @returns {boolean} True if copy was successful, false otherwise.
+ */
+function copyToClipboardFallback(text) {
+    try {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-9999px';
+        textArea.style.top = '-9999px';
+        textArea.style.opacity = '0';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+
+        let success = false;
+        if (document.queryCommandSupported && document.queryCommandSupported('copy')) {
+            success = document.execCommand('copy');
+        } else {
+            console.error('Copy command is not supported');
+        }
+
+        document.body.removeChild(textArea);
+        return success;
+    } catch (err) {
+        console.error('Failed to copy text using execCommand:', err);
+        return false;
+    }
+}

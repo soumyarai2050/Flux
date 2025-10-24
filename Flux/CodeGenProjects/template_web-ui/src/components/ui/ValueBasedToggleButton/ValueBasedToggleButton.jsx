@@ -1,39 +1,32 @@
-import React, { useRef, Suspense } from 'react';
+import React, { useRef } from 'react';
 import ToggleButton from '@mui/material/ToggleButton';
 import { useTheme } from '@mui/material/styles';
 import PropTypes from 'prop-types';
 import { getResolvedColor } from '../../../utils/ui/colorUtils';
 import { getContrastColor } from '../../../utils/ui/uiUtils';
 import classes from './ValueBasedToggleButton.module.css';
+import ClearIcon from '@mui/icons-material/Clear';
+import DeleteIcon from '@mui/icons-material/Delete';
+import PauseIcon from '@mui/icons-material/Pause';
+import RecyclingIcon from '@mui/icons-material/Recycling';
 
-// const DynamicIcon = React.memo(({ iconName }) => {
-//     if (!iconName) return null;
-
-//     const IconComponent = React.lazy(() =>
-//         import(/* @vite-ignore */ `@mui/icons-material/${iconName}`).catch(() => ({
-//             default: () => null, // Return a component that renders nothing on error
-//         }))
-//     );
-
-//     return (
-//         <Suspense fallback={null}>
-//             <IconComponent />
-//         </Suspense>
-//     );
-// });
-
+const ICONS = {
+  Clear: ClearIcon,
+  Delete: DeleteIcon,
+  Pause: PauseIcon,
+  Recycling: RecyclingIcon,
+};
 
 const DynamicIcon = React.memo(({ iconName }) => {
-    if (!iconName) return null;
+  const IconComponent = ICONS[iconName];
+  if (!IconComponent) return null;
 
-    return null;
+  return <IconComponent />;
 });
-
 
 DynamicIcon.propTypes = {
     iconName: PropTypes.string,
 };
-
 
 const ValueBasedToggleButton = (props) => {
     const theme = useTheme();
@@ -45,7 +38,7 @@ const ValueBasedToggleButton = (props) => {
     // Resolve color using the centralized utility instead of CSS class lookup
     const resolvedColor = getResolvedColor(props.color, theme);
     const contrastColor = resolvedColor ? getContrastColor(resolvedColor) : 'inherit';
-    
+
     // Create sx styles for the dynamic color
     const colorSx = resolvedColor ? {
         backgroundColor: `${resolvedColor} !important`,

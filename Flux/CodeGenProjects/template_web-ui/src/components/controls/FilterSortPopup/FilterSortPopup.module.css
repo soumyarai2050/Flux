@@ -28,7 +28,7 @@ color: #666; / Default icon color */
 .sortIndicator {
   position: absolute;
   left: 0px;
-  top: 20px;
+  top: 2px;
   font-size: 10px;
   display: flex;
   align-items: center;
@@ -38,7 +38,7 @@ color: #666; / Default icon color */
 .absoluteSortIndicator {
   position: absolute;
   right: 0px;
-  top: 20px;
+  top: 2px;
   font-size: 10px;
   display: flex;
   align-items: center;
@@ -153,7 +153,7 @@ color: #666; / Default icon color */
 
 .textFilterSection {
   padding: 12px;
-  background-color: #f5f5f5;
+  /* background-color: #fafafa; */
 }
 
 .filterTypeSelect {
@@ -193,7 +193,7 @@ color: #666; / Default icon color */
 
 .selectAllContainer {
   border-bottom: 1px solid #e0e0e0;
-  background-color: #f5f5f5;
+  /* background-color: #f5f5f5; */
 }
 
 .selectAllCheckbox {

@@ -43,7 +43,7 @@ export function getModelTypeFromSchema(modelSchema) {
  * Extracts slice configuration from schema
  * @param {Object} modelSchema - The schema object for a specific model
  * @param {string} modelName - The name of the model (needed for abbreviation source lookup)
- * @returns {Object} Configuration object with isAlertModel, isAbbreviationSource, extraState, and injectedReducers
+ * @returns {Object} Configuration object with isAlertModel, isAbbreviationSource, isIdDependent, extraState, and injectedReducers
  */
 export function getSliceConfig(modelSchema, modelName) {
   const sliceConfig = {};
@@ -63,6 +63,12 @@ export function getSliceConfig(modelSchema, modelName) {
     if (Array.isArray(abbreviationSourcesSet) && abbreviationSourcesSet.includes(modelName)) {
       sliceConfig.isAbbreviationSource = true;
     }
+  }
+
+  // Check if this model is ID-dependent (depends on another model for ID selection)
+  // Extract from depending_proto_model_name_for_id property in schema
+  if (modelSchema?.depending_proto_model_name_for_id) {
+    sliceConfig.isIdDependent = true;
   }
 
   // Check for graph node model

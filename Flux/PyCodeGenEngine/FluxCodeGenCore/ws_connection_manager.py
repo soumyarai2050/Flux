@@ -18,9 +18,7 @@ class WSData(UniqueStrIdMsgspec, kw_only=True):
     filter_callable_kwargs: Dict[Any, Any] | None = None,
     projection_agg_pipeline_callable: Callable[..., Any] | None = None
     has_pagination_with_or_without_filters: bool = False
-    has_only_filters: bool = False
     allow_full_db_read_on_updates: bool = False
-    id_list_for_filter_only_ws: List[Any] = field(default_factory=list)
 
     def __post_init__(self):
         if self.id is None:
@@ -126,12 +124,8 @@ class PathWSConnectionManager(WSConnectionManager):
                 if callable_kwargs is None:
                     callable_kwargs = {}
                 has_pagination_with_or_without_filters = False
-                if callable_kwargs.get("pagination"):
+                if callable_kwargs.get("pagination") or callable_kwargs.get("filters"):
                     has_pagination_with_or_without_filters = True
-
-                has_only_filters = False
-                if callable_kwargs.get("filters") and not callable_kwargs.get("pagination"):
-                    has_only_filters = True
 
                 allow_full_db_read_on_updates = kwargs.get("allow_full_db_read_on_updates", False)
 
@@ -140,7 +134,6 @@ class PathWSConnectionManager(WSConnectionManager):
                                  projection_agg_pipeline_callable=
                                  projection_agg_pipeline_callable,
                                  has_pagination_with_or_without_filters=has_pagination_with_or_without_filters,
-                                 has_only_filters=has_only_filters,
                                  allow_full_db_read_on_updates=allow_full_db_read_on_updates)
                 self.active_ws_data_dict[ws_data.id] = ws_data
                 return True, ws_data.id
@@ -227,10 +220,6 @@ class PathWithIdWSConnectionManager(WSConnectionManager):
             if callable_kwargs.get("pagination"):
                 has_pagination_with_or_without_filters = True
 
-            has_only_filters = False
-            if callable_kwargs.get("filters") is not None and callable_kwargs.get("pagination") is None:
-                has_only_filters = True
-
             allow_full_db_read_on_updates = kwargs.get("allow_full_db_read_on_updates", False)
 
             # new or not, if id is not in dict, it's new for this path
@@ -239,7 +228,6 @@ class PathWithIdWSConnectionManager(WSConnectionManager):
                 ws_data = WSData(ws_object=ws, filter_callable=filter_callable, filter_callable_kwargs=callable_kwargs,
                            projection_agg_pipeline_callable=projection_agg_pipeline_callable,
                            has_pagination_with_or_without_filters=has_pagination_with_or_without_filters,
-                           has_only_filters=has_only_filters,
                            allow_full_db_read_on_updates=allow_full_db_read_on_updates)
                 self.id_to_ws_id_to_active_ws_data_dict[obj_id][ws_data.id] = ws_data
             elif is_new_ws:  # we have the obj_id in our dict but master did not have this websocket
@@ -249,7 +237,6 @@ class PathWithIdWSConnectionManager(WSConnectionManager):
                     ws_data = WSData(ws_object=ws, filter_callable=filter_callable, filter_callable_kwargs=callable_kwargs,
                                projection_agg_pipeline_callable=projection_agg_pipeline_callable,
                                has_pagination_with_or_without_filters=has_pagination_with_or_without_filters,
-                               has_only_filters=has_only_filters,
                                allow_full_db_read_on_updates=allow_full_db_read_on_updates)
                     self.id_to_ws_id_to_active_ws_data_dict[obj_id][ws_data.id] = ws_data
                     logging.debug("new client web-socket connect called on a pre-added obj_id-web-path")

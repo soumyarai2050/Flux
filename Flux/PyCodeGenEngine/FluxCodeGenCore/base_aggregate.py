@@ -7,6 +7,8 @@ import typing
 from typing import Type, Any, Dict
 import re
 import hashlib
+import copy
+from pymongo import UpdateOne
 
 # project imports
 from FluxPythonUtils.scripts.general_utility_functions import non_jsonable_types_handler
@@ -169,7 +171,6 @@ def get_array_path_for_key(model_class, key: str) -> list[str]:
         else:
             break
     return array_path
-
 
 
 def create_cascading_multi_filter_pipeline(model_class: Type,
@@ -426,66 +427,62 @@ def create_cascading_multi_filter_pipeline(model_class: Type,
                 }
             })
 
+    # Handle sorting after filter for efficiency - without pagination sort layer is redundant
+    if sort_order:
+        add_fields_for_abs_sort = {}
+        sort_spec = {}
+
+        # This list will store the fields to be removed after sorting
+        unset_fields = []
+
+        for so in sort_order:
+            field = so['sort_by']
+            direction = so['sort_direction']
+
+            if so.get('is_absolute_sort', False):
+                # For absolute sorting, we need to sort by the absolute value first,
+                # and then by the original value to handle ties (e.g., -5 and 5).
+
+                # 1. Create a temporary field for the absolute value.
+                temp_field = f"abs_{field.replace('.', '_')}"
+                add_fields_for_abs_sort[temp_field] = {'$abs': f'${field}'}
+
+                # 2. The primary sort key is the temporary absolute value field.
+                sort_spec[temp_field] = direction
+
+                # 3. The secondary sort key is the original field itself.
+                # This ensures that if absolute values are the same (e.g., abs(-5) and abs(5)),
+                # the original values are used to break the tie.
+                # Sorting by the original field in the same direction ensures that
+                # for a descending sort, 5 comes before -5, and for an ascending sort, -5 comes before 5.
+                sort_spec[field] = direction
+
+                # 4. Mark the temporary field for removal after the sort.
+                unset_fields.append(temp_field)
+            else:
+                # For regular sorting, just use the field and direction.
+                sort_spec[field] = direction
+
+        # Add the temporary fields to the pipeline if any were created.
+        if add_fields_for_abs_sort:
+            pipeline.append({"$addFields": add_fields_for_abs_sort})
+
+        # Add the sort stage to the pipeline if there are any sort specifications.
+        if sort_spec:
+            pipeline.append({"$sort": sort_spec})
+
+        # Remove the temporary fields from the pipeline if any were created.
+        if unset_fields:
+            pipeline.append({"$unset": unset_fields})
+
     if pagination:
-        # Handle sorting after filter for efficiency - without pagination sort layer is redundant
-        if sort_order:
-            add_fields_for_abs_sort = {}
-            sort_spec = {}
-
-            # This list will store the fields to be removed after sorting
-            unset_fields = []
-
-            for so in sort_order:
-                field = so['sort_by']
-                direction = so['sort_direction']
-
-                if so.get('is_absolute_sort', False):
-                    # For absolute sorting, we need to sort by the absolute value first,
-                    # and then by the original value to handle ties (e.g., -5 and 5).
-
-                    # 1. Create a temporary field for the absolute value.
-                    temp_field = f"abs_{field.replace('.', '_')}"
-                    add_fields_for_abs_sort[temp_field] = {'$abs': f'${field}'}
-
-                    # 2. The primary sort key is the temporary absolute value field.
-                    sort_spec[temp_field] = direction
-
-                    # 3. The secondary sort key is the original field itself.
-                    # This ensures that if absolute values are the same (e.g., abs(-5) and abs(5)),
-                    # the original values are used to break the tie.
-                    # Sorting by the original field in the same direction ensures that
-                    # for a descending sort, 5 comes before -5, and for an ascending sort, -5 comes before 5.
-                    sort_spec[field] = direction
-
-                    # 4. Mark the temporary field for removal after the sort.
-                    unset_fields.append(temp_field)
-                else:
-                    # For regular sorting, just use the field and direction.
-                    sort_spec[field] = direction
-
-            # Add the temporary fields to the pipeline if any were created.
-            if add_fields_for_abs_sort:
-                pipeline.append({"$addFields": add_fields_for_abs_sort})
-
-            # Add the sort stage to the pipeline if there are any sort specifications.
-            if sort_spec:
-                pipeline.append({"$sort": sort_spec})
-
-            # Remove the temporary fields from the pipeline if any were created.
-            if unset_fields:
-                pipeline.append({"$unset": unset_fields})
-
         # Handle pagination at the end of the pipeline
-        page_number = pagination.get('page_number', 1)
-        page_size = pagination.get('page_size', 10)
+        page_number = pagination.get('page_number')
+        page_size = pagination.get('page_size')
         if page_number > 0 and page_size > 0:
             skip = (page_number - 1) * page_size
             pipeline.append({"$skip": skip})
             pipeline.append({"$limit": page_size})
-    else:
-        # When no pagination is provided, add default sorting by _id for consistency
-        # This ensures consistent ordering between before and after pipelines
-        pipeline.append({"$sort": {"_id": 1}})
     # else not required: If pagination is present then no sort required as sort is
     # only useful when pagination is required - without pagination sort layer is redundant
 
@@ -579,32 +576,90 @@ def item_matches_filters(item: dict, filters: list[dict]) -> bool:
     return True
 
 
+def is_relevant_update(before_item: Dict[str, Any], after_item: Dict[str, Any], filters: List[Dict[str, Any]],
+                       sort_order: List[Dict[str, Any]]) -> bool:
+    """
+    Check if an update affects filter or sort fields (i.e., if it's relevant for change detection).
+
+    Args:
+        before_item: The item before the update
+        after_item: The item after the update
+        filters: List of filter definitions
+        sort_order: List of sort definitions
+
+    Returns:
+        True if the update affects filter/sort fields, False otherwise
+    """
+    # If no filters or sort, any update is irrelevant
+    if not filters and not sort_order:
+        return False
+
+    # Check filter field changes
+    if filters:
+        before_matches = item_matches_filters(before_item, filters)
+        after_matches = item_matches_filters(after_item, filters)
+        if before_matches != after_matches:
+            return True
+
+    # Check sort field changes
+    if sort_order:
+        for sort_def in sort_order:
+            sort_by = sort_def["sort_by"]
+
+            # Get field values using dot notation
+            def get_field_value(item, field_path):
+                value = item
+                for part in field_path.split('.'):
+                    if isinstance(value, dict) and part in value:
+                        value = value[part]
+                    else:
+                        return None
+                return value
+
+            before_value = get_field_value(before_item, sort_by)
+            after_value = get_field_value(after_item, sort_by)
+
+            if before_value != after_value:
+                return True
+
+    return False
+
+
 async def detect_multiple_page_changes(
-        collection,
-        page_definitions: list[dict],
-        created_items: list[dict],
-        deleted_item_ids: list,
-        model_class,
-        updated_items: list[dict] = None
+        collection,  # MongoDB collection instance
+        page_definitions: list[dict],  # List of page definitions with filters, sort, pagination
+        created_items: list[dict],  # List of newly created documents (must have _id)
+        deleted_item_ids: list,  # List of _id values for deleted documents
+        model_class,  # Model class for type hints and structure
+        updated_items: list[dict] = None  # List of updated documents (must have _id and at least one updated field)
 ) -> list[dict]:
     """
-    Detects changes across multiple pages of data in a single database operation
-    using temporary collections for created and updated items to ensure compatibility.
-
-    Supports create, delete, and update operations with comprehensive change detection.
+    Detects changes across multiple pages of data using MongoDB aggregation pipeline.
+    All logic is handled in MongoDB aggregation pipeline for performance benefits.
 
     Args:
         collection: MongoDB collection instance
         page_definitions: List of page definitions with filters, sort, pagination
         created_items: List of newly created documents (must have _id)
         deleted_item_ids: List of _id values for deleted documents
-        updated_items: List of updated documents (must have _id and at least one updated field)
         model_class: Model class for type hints and structure
+        updated_items: List of updated documents (must have _id and at least one updated field)
 
     Returns:
         List of change reports for each page with detected changes
     """
-    # Validate updated_items structure
+    # Validate operation constraints - only one type of operation allowed per call
+    operation_count = sum([
+        bool(created_items),
+        bool(deleted_item_ids),
+        bool(updated_items)
+    ])
+
+    if operation_count > 1:
+        raise ValueError("Only one type of operation (create, delete, or update) can be performed per call. "
+                         "Parameters must be mutually exclusive.")
+
+    # Validate updated_items structure if provided
     if updated_items is None:
         updated_items = []
     elif updated_items:
@@ -615,11 +670,13 @@ async def detect_multiple_page_changes(
                 raise ValueError(f"updated_items[{i}] must contain '_id' field")
             if len(item) < 2:  # Only _id field, no updated fields
                 raise ValueError(f"updated_items[{i}] must contain at least one updated field besides '_id'")
+
     # Create temporary collections for created and updated items
     # Use hash-based naming to avoid namespace length limitations
-
-    created_items_hash = hashlib.md5(orjson.dumps(created_items, default=non_jsonable_types_handler)).hexdigest()[:16] if created_items else "empty"
-    updated_items_hash = hashlib.md5(orjson.dumps(updated_items, default=non_jsonable_types_handler)).hexdigest()[:16] if updated_items else "empty"
+    created_items_hash = hashlib.md5(orjson.dumps(created_items, default=non_jsonable_types_handler)).hexdigest()[
+        :16] if created_items else "empty"
+    updated_items_hash = hashlib.md5(orjson.dumps(updated_items, default=non_jsonable_types_handler)).hexdigest()[
+        :16] if updated_items else "empty"
 
     created_temp_name = f"temp_created_{created_items_hash}"
     updated_temp_name = f"temp_updated_{updated_items_hash}"
@@ -631,9 +688,32 @@ async def detect_multiple_page_changes(
         if created_items:
             await created_temp.insert_many(created_items)
         if updated_items:
-            await updated_temp.insert_many(updated_items)
+            # Check for duplicate _id values in updated_items and remove duplicates
+            unique_updated_items = {}
+            for item in updated_items:
+                item_id = item["_id"]
+                # Merge items with the same _id, with later items taking precedence
+                if item_id in unique_updated_items:
+                    unique_updated_items[item_id].update(item)
+                else:
+                    unique_updated_items[item_id] = item.copy()
+
+            # Convert back to list and use bulk_write with upsert to handle duplicates safely
+            deduplicated_items = list(unique_updated_items.values())
+            if deduplicated_items:
+                # Use bulk_write with upsert operations to avoid duplicate key errors
+                operations = [
+                    UpdateOne(
+                        {"_id": item["_id"]},
+                        {"$set": item},
+                        upsert=True
+                    )
+                    for item in deduplicated_items
+                ]
+                await updated_temp.bulk_write(operations)
 
         facet_stage = {}
+        has_relevant_updates = False
         for page_def in page_definitions:
             page_id = page_def["page_id"]
             filters = page_def.get("filters", [])
@@ -645,12 +725,17 @@ async def detect_multiple_page_changes(
             pagination = page_def.get("pagination", {})
             if pagination is None:
                 pagination = {}
+            custom_aggregation_before_filter_sort_pagination = page_def.get(
+                "custom_aggregation_before_filter_sort_pagination", [])
+            if custom_aggregation_before_filter_sort_pagination is None:
+                custom_aggregation_before_filter_sort_pagination = []
 
             # --- "Before" Pipeline ---
             before_pipeline = create_cascading_multi_filter_pipeline(
                 model_class=model_class, filters=filters, sort_order=sort_order, pagination=pagination
             )
-            facet_stage[f"{page_id}_before"] = before_pipeline
+            facet_stage[f"{page_id}_before"] = copy.deepcopy(custom_aggregation_before_filter_sort_pagination)
+            facet_stage[f"{page_id}_before"].extend(before_pipeline)
 
             # --- "After" Pipeline ---
             # Create base pipeline that excludes deleted items
@@ -659,13 +744,34 @@ async def detect_multiple_page_changes(
                 after_filters.append(
                     {"column_name": "_id", "filtered_values": deleted_item_ids, "filter_type": "notIn"})
 
-            # Exclude original versions of updated items - they'll be replaced by updated versions
+            # Exclude only relevant updated items from original pipeline
+            # Relevant updates are those that affect filter or sort fields
             if updated_items:
+                # Fetch original versions of updated items to compare
                 updated_ids = [item["_id"] for item in updated_items]
-                after_filters.append({"column_name": "_id", "filtered_values": updated_ids, "filter_type": "notIn"})
+                original_items_cursor = collection.find({"_id": {"$in": updated_ids}})
+                original_items_dict = {item["_id"]: item for item in await original_items_cursor.to_list(length=None)}
+
+                relevant_updated_ids = []
+                for updated_item in updated_items:
+                    item_id = updated_item["_id"]
+                    original_item = original_items_dict.get(item_id)
+
+                    if original_item:
+                        # Check if this update is relevant (affects filter/sort fields)
+                        if is_relevant_update(original_item, updated_item, filters, sort_order):
+                            relevant_updated_ids.append(item_id)
+                    else:
+                        # Original item not found, treat as relevant by default
+                        relevant_updated_ids.append(item_id)
+
+                if relevant_updated_ids:
+                    has_relevant_updates = True
+                    after_filters.append(
+                        {"column_name": "_id", "filtered_values": relevant_updated_ids, "filter_type": "notIn"})
 
             after_pipeline = create_cascading_multi_filter_pipeline(
-                model_class=model_class, filters=after_filters, sort_order=None, pagination=None
+                model_class=model_class, filters=after_filters, sort_order=sort_order, pagination=None
             )
 
             # Union created and updated items
@@ -674,9 +780,34 @@ async def detect_multiple_page_changes(
                 if created_items:
                     after_pipeline.append({"$unionWith": {"coll": created_temp_name}})
 
-                # Then union updated items (they were excluded from original data)
+                # Then union updated items (only if they were excluded from original data)
                 if updated_items:
-                    after_pipeline.append({"$unionWith": {"coll": updated_temp_name}})
+                    # Check if we excluded relevant updated items from the original pipeline
+                    # Only union updated items that were actually excluded
+                    excluded_updated_ids = []
+                    if updated_items and (filters or sort_order):
+                        # Only when there are filters or sort order could updates be excluded
+                        updated_ids = [item["_id"] for item in updated_items]
+                        original_items_cursor = collection.find({"_id": {"$in": updated_ids}})
+                        original_items_dict = {item["_id"]: item for item in
+                                               await original_items_cursor.to_list(length=None)}
+
+                        for updated_item in updated_items:
+                            item_id = updated_item["_id"]
+                            original_item = original_items_dict.get(item_id)
+
+                            if original_item:
+                                # Check if this update is relevant (affects filter/sort fields)
+                                if is_relevant_update(original_item, updated_item, filters, sort_order):
+                                    excluded_updated_ids.append(item_id)
+                            else:
+                                # Original item not found, treat as excluded
+                                excluded_updated_ids.append(item_id)
+
+                    if excluded_updated_ids:
+                        after_pipeline.append({"$unionWith": {"coll": updated_temp_name}})
+                    else:
+                        pass
 
                 # After union, apply the page filters to maintain filter isolation
                 # This ensures only items matching filters affect the final result
@@ -735,11 +866,12 @@ async def detect_multiple_page_changes(
                 pass  # Keep natural order
 
             if pagination:
-                page_number, page_size = pagination.get('page_number', 1), pagination.get('page_size', 10)
+                page_number, page_size = pagination.get('page_number'), pagination.get('page_size')
                 if page_number > 0 and page_size > 0:
                     after_pipeline.extend([{"$skip": (page_number - 1) * page_size}, {"$limit": page_size}])
 
-            facet_stage[f"{page_id}_after"] = after_pipeline
+            facet_stage[f"{page_id}_after"] = copy.deepcopy(custom_aggregation_before_filter_sort_pagination)
+            facet_stage[f"{page_id}_after"].extend(after_pipeline)
 
         if not facet_stage:
             return []
@@ -754,6 +886,20 @@ async def detect_multiple_page_changes(
         for page_def in page_definitions:
             page_id = page_def["page_id"]
             filters = page_def.get("filters", [])  # Extract filters from page definition
+            if filters is None:
+                filters = []
+            sort_order = page_def.get("sort_order", [])
+            if sort_order is None:
+                sort_order = []
+            pagination = page_def.get("pagination", {})
+            if pagination is None:
+                pagination = {}
+            # Store the original custom aggregation for later use
+            custom_aggregation_before_filter_sort_pagination = page_def.get(
+                "custom_aggregation_before_filter_sort_pagination", [])
+            if custom_aggregation_before_filter_sort_pagination is None:
+                custom_aggregation_before_filter_sort_pagination = []
+
             before_items = all_pages_data.get(f"{page_id}_before", [])
             after_items = all_pages_data.get(f"{page_id}_after", [])
             before_ids = {item["_id"] for item in before_items}
@@ -764,6 +910,23 @@ async def detect_multiple_page_changes(
 
             changes = []
 
+            # Helper function to get deterministic sort key for tie resolution
+            def get_sort_key(item, sort_order_list):
+                """Create a deterministic sort key including _id for tie-breaking"""
+                key = []
+                for so in sort_order_list:
+                    field = so['sort_by']
+                    direction = so['sort_direction']
+                    value = item.get(field, None)
+                    # Handle None values consistently
+                    if value is None:
+                        key.append(None if direction == 1 else float('inf'))
+                    else:
+                        key.append(value)
+                # Add _id as final tie-breaker for deterministic ordering
+                key.append(item['_id'])
+                return tuple(key)
+
             # --- Deletion Detection ---
             deleted_on_page = before_ids - after_ids
             for item_id in deleted_on_page:
@@ -771,541 +934,343 @@ async def detect_multiple_page_changes(
                     changes.append({"_id": item_id})
 
             # --- Update Detection ---
-            # Check for updates that affect filter eligibility
             if filters:
-                updated_on_page = before_ids & after_ids & updated_ids
-                for item_id in updated_on_page:
-                    # Find the updated item in the updated_items list
+                # For filtered pages, check filter-eligibility changes
+                for item_id in updated_ids:
                     updated_item = next((item for item in updated_items if item["_id"] == item_id), None)
                     if updated_item:
-                        # Check if this update affects filter eligibility
+                        # For items not found in before_items, check if they should be there by querying the database
                         before_item = next((item for item in before_items if item["_id"] == item_id), None)
-                        if before_item:
-                            # Determine if update causes filter status change
-                            before_matches = item_matches_filters(before_item, filters)
-                            after_matches = item_matches_filters(updated_item, filters)
+                        if before_item is None:
+                            # Item not in before_items, check if it exists in database and matches filters
+                            try:
+                                db_item = await collection.find_one({"_id": item_id})
+                                if db_item and item_matches_filters(db_item, filters):
+                                    # Item exists in DB and matches filters, should be in before_items but isn't
+                                    # This could be due to pagination/limiting issues
+                                    before_item = db_item
+                            except Exception:
+                                # If we can't check the database, continue with before_item as None
+                                pass
 
+                        before_matches = item_matches_filters(before_item, filters) if before_item else False
+                        after_matches = item_matches_filters(updated_item, filters)
+
+                        # Only process if the item was originally in the page OR will be in the page after
+                        was_in_page_before = item_id in before_ids
+                        # Check if the item will actually be in the page after the update
+                        will_be_in_page_after = after_matches and item_id in after_ids
+
+                        if was_in_page_before:
+                            # Item was in the page before
                             if before_matches and not after_matches:
                                 # Update makes item no longer match filters - treat as deletion
                                 changes.append({"_id": item_id})
-                            elif not before_matches and after_matches:
-                                # Update makes item match filters - treat as creation
-                                changes.append(updated_item)
-                            elif before_matches and after_matches:
-                                # Update doesn't change filter eligibility but item is within page - return updated item
-                                changes.append(updated_item)
+                            elif after_matches:
+                                # Update keeps item in filters - check for sort position changes
+                                if sort_order and pagination:
+                                    # Check if position changed within the page using deterministic sort keys
+                                    before_item = next((item for item in before_items if item["_id"] == item_id), None)
+                                    after_item = next((item for item in after_items if item["_id"] == item_id), None)
 
-            # --- Filter-Ignorant Update Detection ---
-            # For filter-ignorant mode (no filters), handle updates differently
-            if not filters and updated_items:
-                # Return all items that were originally in the page and updated, regardless of movement
-                originally_in_page_updated = before_ids & updated_ids
-                for item_id in originally_in_page_updated:
-                    updated_item = next((item for item in updated_items if item["_id"] == item_id), None)
-                    if updated_item:
-                        changes.append(updated_item)
+                                    if before_item and after_item:
+                                        # Compare actual sort keys instead of array positions
+                                        before_key = get_sort_key(before_item, sort_order)
+                                        after_key = get_sort_key(after_item, sort_order)
 
-                # For items that moved into page from outside, detect as boundary changes
-                moved_into_page = after_ids & updated_ids - before_ids
-                for item_id in moved_into_page:
-                    updated_item = next((item for item in updated_items if item["_id"] == item_id), None)
-                    if updated_item:
-                        changes.append({**updated_item, "new_top": True})
+                                        if before_key != after_key:
+                                            # Item's sort position changed
+                                            after_top_key = get_sort_key(after_items[0], sort_order)
+                                            after_bottom_key = get_sort_key(after_items[-1], sort_order)
 
-            # Check for updates that remove items from the page (item in before but not in after)
-            updates_causing_exclusion = (before_ids & updated_ids) - after_ids
-            for item_id in updates_causing_exclusion:
-                # Find the updated item to verify it should be excluded
-                updated_item = next((item for item in updated_items if item["_id"] == item_id), None)
-                if updated_item:
-                    before_item = next((item for item in before_items if item["_id"] == item_id), None)
-                    if before_item:
-                        # Use the updated item for filter matching, but fall back to original if field missing
-                        combined_item = {**before_item, **updated_item}
-                        before_matches = item_matches_filters(before_item, filters)
-                        after_matches = item_matches_filters(combined_item, filters)
-
-                        if before_matches and not after_matches:
-                            # Update excludes item from page, treat as deletion
-                            changes.append({"_id": item_id})
-                        elif before_matches and after_matches:
-                            # Update doesn't change filter eligibility but item was excluded due to union artifact
-                            # Return the full updated document
-                            changes.append({**before_item, **updated_item})
-
-            # Check for updates that add items to the page (item not in before but in after)
-            updates_causing_inclusion = after_ids & updated_ids - before_ids
-            for item_id in updates_causing_inclusion:
-                # Find the updated item to verify it should be included
-                updated_item = next((item for item in updated_items if item["_id"] == item_id), None)
-                if updated_item:
-                    # For filtered pages, apply boundary change logic
-                    # For filter-ignorant pages, this was handled above
-                    if filters:
-                        # Try to find the original item (it might not be in before_items)
-                        try:
-                            original_item = await collection.find_one({"_id": item_id})
-                            if original_item:
-                                before_matches = item_matches_filters(original_item, filters)
-                                after_matches = item_matches_filters(updated_item, filters)
-
-                                if not before_matches and after_matches:
-                                    # Update includes item in page, treat as creation
-                                    changes.append(updated_item)
-                        except:
-                            # If we can't find the original, just check if updated item matches filters
-                            after_matches = item_matches_filters(updated_item, filters)
-                            if after_matches:
-                                # Update includes item in page, treat as creation
-                                changes.append(updated_item)
-
-            # --- External Update Detection ---
-            # Check for updates before the page that could cause shifts
-            if updated_items and before_items and after_items:
-                # Get updated item IDs that are not in current page
-                external_updated_ids = updated_ids - before_ids
-
-                # Only detect boundary changes if:
-                # 1. There are external updates that could cause shifts, OR
-                # 2. There are creation/deletion events
-                has_external_updates = bool(external_updated_ids)
-                is_filtered_page = bool(filters)
-                has_creations = bool(created_items)
-                has_deletions = bool(deleted_item_ids)
-                page_composition_changed = before_ids != after_ids
-
-                # Only detect boundary changes if:
-                # 1. There are external updates that could cause shifts, OR
-                # 2. There are creation/deletion events, OR
-                # 3. There are updates that change filter eligibility
-                has_external_updates = bool(external_updated_ids)
-                is_filtered_page = bool(filters)
-                has_creations = bool(created_items)
-                has_deletions = bool(deleted_item_ids)
-                page_composition_changed = before_ids != after_ids
-
-                # Check if there are filter-affecting updates
-                filter_affecting_updates = False
-                if is_filtered_page and updated_items and before_items:
-                    for updated_item in updated_items:
-                        if updated_item["_id"] in before_ids:
-                            before_item = next((item for item in before_items if item["_id"] == updated_item["_id"]),
-                                               None)
-                            if before_item:
-                                before_matches = item_matches_filters(before_item, filters)
-                                after_matches = item_matches_filters({**before_item, **updated_item}, filters)
-                                if before_matches != after_matches:
-                                    filter_affecting_updates = True
-                                    break
-
-                # Check if there are sort-affecting updates for filter-ignorant pages with sort order
-                sort_affecting_updates = False
-                if not is_filtered_page and sort_order and updated_items and before_items and after_items:
-                    # Check if any updated item moved between pages due to sort changes
-                    for updated_item in updated_items:
-                        if updated_item["_id"] in before_ids and updated_item["_id"] not in after_ids:
-                            sort_affecting_updates = True
-                            break
-                        elif updated_item["_id"] not in before_ids and updated_item["_id"] in after_ids:
-                            sort_affecting_updates = True
-                            break
-
-                should_detect_boundary_changes = (
-                        has_external_updates or
-                        has_creations or
-                        has_deletions or
-                        filter_affecting_updates or
-                        sort_affecting_updates
-                )
-
-                if should_detect_boundary_changes:
-                    # For filter-ignorant pages without external updates, skip boundary detection
-                    if not has_external_updates and not is_filtered_page:
-                        pass  # Skip boundary detection for filter-ignorant pages with only internal updates
-                    else:
-                        # Mark boundary changes if they haven't been marked already
-                        if not any(change.get("new_top") for change in changes):
-                            top_after = after_items[0] if after_items else None
-                            if top_after and (not before_items or top_after["_id"] != before_items[0]["_id"]):
-                                changes.append({**top_after, "new_top": True})
-
-                        if not any(change.get("new_bottom") for change in changes):
-                            bottom_after = after_items[-1] if after_items else None
-                            if bottom_after and (not before_items or bottom_after["_id"] != before_items[-1]["_id"]):
-                                # Don't mark same item as both new_top and new_bottom
-                                is_already_marked_top = any(
-                                    change.get("new_top") and change["_id"] == bottom_after["_id"]
-                                    for change in changes
-                                )
-                                if not is_already_marked_top:
-                                    changes.append({**bottom_after, "new_bottom": True})
-
-            # --- Creation and New Item Detection ---
-            # Boundary changes should only be detected for legitimate reasons:
-            # - Filtered pages (always detect)
-            # - Creation/deletion events (always detect)
-            # - Items moving between pages due to external factors
-            has_creations = bool(created_items)
-            has_deletions = bool(deleted_item_ids)
-            # Check if there are updates to items not originally in the page
-            # We need to check what items would be in the page without updates first
-            if before_items and updated_items:
-                has_external_updates = bool(
-                    set(item['_id'] for item in updated_items) - set(item['_id'] for item in before_items))
-            else:
-                has_external_updates = False  # Can't determine without before_items
-
-            # Check if there are sort-induced position changes within the same page
-            sort_position_changes = False
-            if sort_order and updated_items and before_items and after_items:
-                # For sorted pages, check if any updated item changed its position within the page
-                for updated_item in updated_items:
-                    if updated_item["_id"] in before_ids and updated_item["_id"] in after_ids:
-                        # Item is still in the page, check if it changed position
-                        before_position = next(
-                            (i for i, item in enumerate(before_items) if item["_id"] == updated_item["_id"]), None)
-                        after_position = next(
-                            (i for i, item in enumerate(after_items) if item["_id"] == updated_item["_id"]), None)
-                        if before_position is not None and after_position is not None and before_position != after_position:
-                            # Item changed position within the page
-                            if after_position == len(after_items) - 1:  # Moved to bottom
-                                sort_position_changes = True
-                                break
-                            elif after_position == 0:  # Moved to top
-                                sort_position_changes = True
-                                break
-
-            # Check for cross-page movements due to sorting in filter-ignorant pages
-            cross_page_sort_movements = False
-            if not filters and sort_order and updated_items and before_items and after_ids:
-                # Check if any updated item moved between pages due to sorting
-                for updated_item in updated_items:
-                    moved_out_of_page = updated_item["_id"] in before_ids and updated_item["_id"] not in after_ids
-                    moved_into_page = updated_item["_id"] not in before_ids and updated_item["_id"] in after_ids
-
-                    if moved_out_of_page or moved_into_page:
-                        cross_page_sort_movements = True
-                        break
-
-            has_external_factors = has_creations or has_deletions or has_external_updates
-
-            # For pages without sort order, be more restrictive about boundary detection
-            should_detect_creation_boundary_changes = (
-                    (filters and sort_position_changes) or  # Filtered pages with sort position changes
-                    has_creations or  # Creation events
-                    has_deletions or  # Deletion events (this should handle the failing test)
-                    has_external_updates or  # External updates
-                    cross_page_sort_movements or  # Cross-page movements due to sorting
-                    (not filters and has_external_factors)  # Filter-ignorant pages with external factors
-            )
-
-            print(
-                f"DEBUG: should_detect_creation_boundary_changes={should_detect_creation_boundary_changes} (type: {type(should_detect_creation_boundary_changes)})")
-
-            if after_items and should_detect_creation_boundary_changes:
-                # Check for new top item
-                top_item = after_items[0]
-                top_changed = False
-                if top_item["_id"] not in before_ids:
-                    if top_item["_id"] in created_ids:
-                        changes.append({**top_item, "new_top": True})
-                        top_changed = True
-                    else:
-                        # Item moved into this page from outside - this is a boundary change
-                        changes.append({**top_item, "new_top": True})
-                        top_changed = True
-                # Only check for top change if the top item actually changed from a different page
-                elif before_items and top_item["_id"] != before_items[0]["_id"]:
-                    # Only mark as boundary if the previous top item is no longer in this page
-                    if before_items[0]["_id"] not in after_ids:
-                        changes.append({**top_item, "new_top": True})
-                        top_changed = True
-
-                # Check for new bottom item
-                if len(after_items) > 0:
-                    bottom_item = after_items[-1]
-                    bottom_changed = False
-
-                    # Only check for bottom change if the bottom item actually changed
-                    if not before_items or bottom_item["_id"] != before_items[-1]["_id"]:
-                        if bottom_item["_id"] not in before_ids:
-                            # Item moved into this page from outside - this is a boundary change
-                            if bottom_item["_id"] in created_ids:
-                                changes.append({**bottom_item, "new_bottom": True})
-                                bottom_changed = True
-                            else:
-                                changes.append({**bottom_item, "new_bottom": True})
-                                bottom_changed = True
-                        # Only mark as boundary if the previous bottom item is no longer in this page
-                        elif before_items and before_items[-1]["_id"] not in after_ids:
-                            changes.append({**bottom_item, "new_bottom": True})
-                            bottom_changed = True
-                        else:
-                            # Item moved within page - check if it's an updated item that changed position
-                            if bottom_item["_id"] in updated_ids:
-                                # Check if this updated item changed position within the page
-                                original_bottom_position = next(
-                                    (i for i, item in enumerate(before_items) if item["_id"] == bottom_item["_id"]),
-                                    None)
-                                new_bottom_position = next(
-                                    (i for i, item in enumerate(after_items) if item["_id"] == bottom_item["_id"]),
-                                    None)
-                                if original_bottom_position is not None and new_bottom_position is not None and original_bottom_position != new_bottom_position:
-                                    # Item changed position within the page due to sorting
-                                    changes.append({**bottom_item, "new_bottom": True})
-                                    bottom_changed = True
-
-            # --- Created Items Detection (separate from boundary changes) ---
-            # Add created items that are within page boundaries but don't cause boundary changes
-            created_in_page = [item for item in after_items if item["_id"] in created_ids]
-            for created_item in created_in_page:
-                # Only add if not already marked as new_top or new_bottom
-                if not any(change["_id"] == created_item["_id"] for change in changes):
-                    # Add created items without special flags to distinguish them from deleted items
-                    # This way they won't be caught by the deleted_ids filter if the test logic is correct
-                    # But they will be caught by the created_items_in_changes filter
-                    changes.append(created_item)
-                elif len(after_items) == 1 and len(before_items) == 0:
-                    # Special case: single created item in empty page - ensure both flags are set
-                    existing_change = next((change for change in changes if change["_id"] == created_item["_id"]), None)
-                    if existing_change and existing_change.get("new_top") and not existing_change.get("new_bottom"):
-                        existing_change["new_bottom"] = True
-
-            # --- Remove Duplicate Boundary Changes for Filter-Ignorant Updates ---
-            # Filter-ignorant updates should not have boundary flags UNLESS they moved into the page
-            # OR changed position within the page due to sorting
-            updated_item_ids_in_changes = {item["_id"] for item in changes if item["_id"] in updated_ids}
-            for change in changes:
-                if change["_id"] in updated_item_ids_in_changes and (change.get("new_top") or change.get("new_bottom")):
-                    # This is an updated item with boundary flags - check if it's truly a boundary change
-                    # Look for the original item to see if it was already in the filtered set before the update
-                    try:
-                        original_item = await collection.find_one({"_id": change["_id"]})
-                        if original_item:
-                            # Check if this item moved into the page (wasn't originally in the page)
-                            was_originally_in_page = change["_id"] in before_ids
-                            is_now_in_page = change["_id"] in after_ids
-
-                            # Check if this item changed position within the page due to sorting
-                            if was_originally_in_page and is_now_in_page and sort_order:
-                                original_position = next(
-                                    (i for i, item in enumerate(before_items) if item["_id"] == change["_id"]), None)
-                                new_position = next(
-                                    (i for i, item in enumerate(after_items) if item["_id"] == change["_id"]), None)
-                                position_changed = original_position is not None and new_position is not None and original_position != new_position
-
-                                # If position changed due to sorting, keep boundary flags
-                                if position_changed:
-                                    print(
-                                        f"DEBUG: Keeping boundary flags for {change['_id']} due to position change (was {original_position}, now {new_position})")
-                                    continue  # Don't remove boundary flags
-
-                            # If the item was originally in the page and is still in the page,
-                            # remove boundary flags (in-place update)
-                            if was_originally_in_page and is_now_in_page and not position_changed:
-                                # If the item was originally in the page and is still in the page,
-                                # remove boundary flags (in-place update)
-                                if was_originally_in_page and is_now_in_page and not position_changed:
-                                    print(f"DEBUG: Removing boundary flags for {change['_id']} (in-place update)")
-                                    if "new_top" in change:
-                                        del change["new_top"]
-                                    if "new_bottom" in change:
-                                        del change["new_bottom"]
-                                # If the item moved into the page, keep the boundary flags
-                                elif not was_originally_in_page and is_now_in_page:
-                                    # Keep boundary flags - this is a genuine boundary change
-                                    pass
-                                # If position changed within the page due to sorting, keep boundary flags
-                                elif was_originally_in_page and is_now_in_page and position_changed:
-                                    print(
-                                        f"DEBUG: Keeping boundary flags for {change['_id']} (position changed from {original_position} to {new_position})")
-                                    pass
-                    except:
-                        # If we can't find the original item, be conservative and keep boundary flags
-                        pass
-
-            # --- Operation-Induced Shift Detection ---
-            # Detect existing items that shifted due to creations and updates (not deletions)
-            if (created_items or updated_items) and before_items and after_items and before_ids != after_ids:
-                # Only apply this logic for multi-page scenarios where shifts between pages are expected
-                if len(page_definitions) > 1:
-                    # Only detect items that moved from previous pages to this page
-                    # These are existing items that are in the current page after but were not in this page before
-                    # We need to get the full dataset to identify all existing items
-                    temp_collection_name = f"temp_created_shift_{hashlib.md5(orjson.dumps(created_items, default=non_jsonable_types_handler)).hexdigest()[:16] if created_items else "empty"}"
-                    temp_collection = collection.database[temp_collection_name]
-
-                    try:
-                        # Get the full dataset after creation
-                        full_after_pipeline = create_cascading_multi_filter_pipeline(
-                            model_class=model_class, filters=[], sort_order=None, pagination=None
-                        )
-                        if created_items:
-                            full_after_pipeline.append({"$unionWith": {"coll": temp_collection_name}})
-                        # Apply sorting if provided, otherwise sort by _id for consistent ordering
-                        if sort_order:
-                            # Apply the provided sort order
-                            add_fields_for_abs_sort = {}
-                            sort_spec = {}
-                            unset_fields = []
-                            for so in sort_order:
-                                field, direction = so['sort_by'], so['sort_direction']
-                                if so.get('is_absolute_sort', False):
-                                    temp_field = f"abs_{field.replace('.', '_')}"
-                                    add_fields_for_abs_sort[temp_field] = {'$abs': f'${field}'}
-                                    sort_spec[temp_field], sort_spec[field] = direction, direction
-                                    unset_fields.append(temp_field)
+                                            if after_key == after_top_key:
+                                                # Moved to top position
+                                                changes.append({**updated_item, "_new_top": True})
+                                            elif after_key == after_bottom_key:
+                                                # Moved to bottom position
+                                                changes.append({**updated_item, "_new_bottom": True})
+                                            else:
+                                                # Still in page but no boundary change
+                                                changes.append(updated_item)
+                                        else:
+                                            # Sort position unchanged, just return the updated item
+                                            changes.append(updated_item)
+                                    elif before_item and not after_item:
+                                        # Item was in the page before but moved out due to sort change - treat as deletion
+                                        changes.append({"_id": item_id})
+                                    else:
+                                        # Item couldn't be determined or unchanged
+                                        changes.append(updated_item)
                                 else:
-                                    sort_spec[field] = direction
-                            if add_fields_for_abs_sort: full_after_pipeline.append(
-                                {"$addFields": add_fields_for_abs_sort})
-                            if sort_spec: full_after_pipeline.append({"$sort": sort_spec})
-                            if unset_fields: full_after_pipeline.append({"$unset": unset_fields})
+                                    # No sort or no pagination, just return updated item
+                                    changes.append(updated_item)
+                        elif will_be_in_page_after and not was_in_page_before:
+                            # Update makes item match filters and it's now in the page - treat as creation
+                            changes.append(updated_item)
                         else:
-                            full_after_pipeline.append({"$sort": {"_id": 1}})  # Default sort by _id
+                            pass
+            else:
+                # For filter-ignorant pages, only process updates that affect the page
+                if sort_order and pagination:
+                    for item_id in updated_ids:
+                        updated_item = next((item for item in updated_items if item["_id"] == item_id), None)
+                        if updated_item:
+                            # Check if item was in the page before
+                            before_item = next((item for item in before_items if item["_id"] == item_id), None)
+                            if before_item:
+                                # Item was in the page before, check if it's still in the page after
+                                after_item = next((item for item in after_items if item["_id"] == item_id), None)
+                                if after_item:
+                                    # Item is still in the page, check position change
+                                    before_position = next(
+                                        (i for i, item in enumerate(before_items) if item["_id"] == item_id), None)
+                                    after_position = next(
+                                        (i for i, item in enumerate(after_items) if item["_id"] == item_id), None)
 
-                        full_after_result = await collection.aggregate(full_after_pipeline).to_list(None)
-                        all_existing_ids = {item["_id"] for item in full_after_result if item["_id"] not in created_ids}
+                                    if before_position is not None and after_position is not None:
+                                        if after_position == 0 and before_position != 0:
+                                            # Moved to top
+                                            changes.append({**updated_item, "_new_top": True})
+                                        elif after_position == len(after_items) - 1 and before_position != len(
+                                                after_items) - 1:
+                                            # Moved to bottom
+                                            changes.append({**updated_item, "_new_bottom": True})
+                                        else:
+                                            # Still in page but no boundary change
+                                            changes.append(updated_item)
+                                else:
+                                    # Item moved out of page due to sort change
+                                    changes.append({"_id": item_id})
+                            else:
+                                # Item wasn't in page before, check if it moved into page
+                                after_item = next((item for item in after_items if item["_id"] == item_id), None)
+                                if after_item:
+                                    if after_items and after_item["_id"] == after_items[0]["_id"]:
+                                        changes.append({**updated_item, "_new_top": True})
+                                    elif after_items and after_item["_id"] == after_items[-1]["_id"]:
+                                        changes.append({**updated_item, "_new_bottom": True})
+                                    else:
+                                        changes.append(updated_item)
+                else:
+                    # No sort or no pagination, just return updated items that were in the page
+                    for item_id in updated_ids:
+                        if item_id in before_ids:
+                            updated_item = next((item for item in updated_items if item["_id"] == item_id), None)
+                            if updated_item:
+                                changes.append(updated_item)
+                        else:
+                            pass
 
-                        # Only detect items that moved to this page from other pages
-                        # Not items that just changed position within the same page due to insertions
-                        items_moved_to_this_page = {item["_id"] for item in after_items if
-                                                    item["_id"] in all_existing_ids and item["_id"] not in before_ids}
+            # --- Created Items Detection ---
+            for item_id in created_ids:
+                if item_id in after_ids:
+                    created_item = next((item for item in created_items if item["_id"] == item_id), None)
+                    if created_item:
+                        # Mark created items with boundary flags if they're at boundaries
+                        if pagination and after_items:
+                            if item_id == after_items[0]["_id"]:
+                                changes.append({**created_item, "_new_top": True})
+                            elif item_id == after_items[-1]["_id"]:
+                                changes.append({**created_item, "_new_bottom": True})
+                            else:
+                                changes.append(created_item)
+                        else:
+                            changes.append(created_item)
 
-                        for item_id in items_moved_to_this_page:
-                            if not any(change["_id"] == item_id for change in changes):
-                                # Find the item in after_items
-                                moved_item = next((item for item in after_items if item["_id"] == item_id), None)
-                                if moved_item:
-                                    changes.append(moved_item)
-                    finally:
+            # --- Boundary Change Detection (only when pagination is provided) ---
+            if pagination and after_items and before_items:
+                # Detect top boundary change with tie resolution
+                before_top_key = get_sort_key(before_items[0], sort_order)
+                after_top_key = get_sort_key(after_items[0], sort_order)
+
+                # Check if top boundary actually changed (accounting for ties)
+                if before_top_key != after_top_key:
+                    if not any(change.get("_new_top") and change["_id"] == after_items[0]["_id"] for change in changes):
+                        changes.append({**after_items[0], "_new_top": True})
+
+                # Detect bottom boundary change with tie resolution
+                before_bottom_key = get_sort_key(before_items[-1], sort_order)
+                after_bottom_key = get_sort_key(after_items[-1], sort_order)
+
+                # Check if bottom boundary actually changed (accounting for ties)
+                if before_bottom_key != after_bottom_key:
+                    if not any(
+                            change.get("_new_bottom") and change["_id"] == after_items[-1]["_id"] for change in changes):
+                        # For single item pages, ensure both flags are set
+                        if len(after_items) == 1:
+                            existing_change = next(
+                                (change for change in changes if change["_id"] == after_items[0]["_id"]), None)
+                            if existing_change and existing_change.get("_new_top"):
+                                existing_change["_new_bottom"] = True
+                            else:
+                                changes.append({**after_items[0], "_new_bottom": True})
+                        else:
+                            changes.append({**after_items[-1], "_new_bottom": True})
+
+            # --- Special Cases ---
+
+            # Handle items that moved into page due to deletions/shifts
+            if pagination and (deleted_item_ids or has_relevant_updates):
+                moved_into_page = []
+                for item in after_items:
+                    if item["_id"] not in before_ids and item["_id"] not in created_ids and item[
+                        "_id"] not in updated_ids:
+                        moved_into_page.append(item)
+
+                for moved_item in moved_into_page:
+                    moved_key = get_sort_key(moved_item, sort_order)
+
+                    # Check if moved item is at top boundary using deterministic comparison
+                    if moved_key == get_sort_key(after_items[0], sort_order):
+                        if not any(change.get("_new_top") and change["_id"] == moved_item["_id"] for change in changes):
+                            changes.append({**moved_item, "_new_top": True})
+                    # Check if moved item is at bottom boundary using deterministic comparison
+                    elif moved_key == get_sort_key(after_items[-1], sort_order):
+                        if not any(
+                                change.get("_new_bottom") and change["_id"] == moved_item["_id"] for change in changes):
+                            changes.append({**moved_item, "_new_bottom": True})
+                    else:
+                        # For items moved into middle position:
+                        # Include them for single-page deletion scenarios (shifts from next pages)
+                        # Include them for filter scenarios (filter compliance changes)
+                        # BUT be more selective in multi-page deletion scenarios
+                        if deleted_item_ids:
+                            # Multi-page deletion scenario - only include if this is the only page being processed
+                            if len(page_definitions) == 1:
+                                changes.append(moved_item)
+                            else:
+                                pass
+                        elif filters and has_relevant_updates:
+                            changes.append(moved_item)
+                        else:
+                            pass
+
+            # Handle case where page size changed due to filter deletion
+            if pagination and filters and has_relevant_updates:
+                expected_page_size = pagination.get('page_size')
+                actual_after_size = len(after_items)
+
+                # Check if we lost items and the page is not full
+                if actual_after_size < expected_page_size:
+                    # We lost items, find what should be the new bottom item
+                    try:
+                        # Build the pipeline to find the next item using the same logic as the page definition
+                        extended_pipeline = []
+
+                        # Add custom aggregation if present
+                        if custom_aggregation_before_filter_sort_pagination:
+                            extended_pipeline.extend(copy.deepcopy(custom_aggregation_before_filter_sort_pagination))
+
+                        # Build the base pipeline with filters and sort but without pagination
+                        base_pipeline = create_cascading_multi_filter_pipeline(
+                            model_class=model_class,
+                            filters=filters,
+                            sort_order=sort_order,
+                            pagination=None  # No pagination for finding next item
+                        )
+                        extended_pipeline.extend(base_pipeline)
+
+                        # Skip the items we already have and get the next one
+                        extended_pipeline.extend([
+                            {"$skip": actual_after_size},  # Skip current after_items
+                            {"$limit": 1}  # Get just the next item
+                        ])
+
+                        next_items = await collection.aggregate(extended_pipeline).to_list(1)
+                        if next_items:
+                            next_item = next_items[0]
+                            # Add this item as _new_bottom
+                            changes.append({**next_item, "_new_bottom": True})
+                    except Exception:
+                        # If we can't find the next item, just continue without it
                         pass
 
-            # --- External Shift Detection ---
-            # Only detect shifts if there are actual changes in the page content
-            if deleted_item_ids and before_items and after_items and before_ids != after_ids:
-                # Check if the page content actually shifted due to deletions before this page
-                # Only mark as shifted if there are differences in the page content
-                has_top_change = before_items[0]["_id"] != after_items[0]["_id"]
-                has_bottom_change = before_items[-1]["_id"] != after_items[-1]["_id"]
-
-                # Only mark top as changed if it actually changed and wasn't already marked
-                if has_top_change and not any(change.get("new_top") for change in changes):
-                    changes.append({**after_items[0], "new_top": True})
-
-                # Only mark bottom as changed if it actually changed and wasn't already marked
-                if has_bottom_change and not any(change.get("new_bottom") for change in changes):
-                    # Don't mark the same item as both new_top and new_bottom
-                    is_already_marked_top = any(
-                        change.get("new_top") and change["_id"] == after_items[-1]["_id"]
-                        for change in changes
-                    )
-                    if not is_already_marked_top:
-                        changes.append({**after_items[-1], "new_bottom": True})
-
-                # --- Deletion-Induced Shift Detection ---
-                # Detect existing items that shifted due to deletions (not creations)
-                # Only detect items that moved from later pages to this page due to deletions
-                # Get the full dataset after deletions
-                try:
-                    full_after_pipeline = create_cascading_multi_filter_pipeline(
-                        model_class=model_class,
-                        filters=[{"column_name": "_id", "filtered_values": deleted_item_ids, "filter_type": "notIn"}],
-                        sort_order=sort_order if sort_order else [{"sort_by": "_id", "sort_direction": 1}],
-                        pagination=None
-                    )
-                    # Sorting is already handled by create_cascading_multi_filter_pipeline above
-                    # No additional sort needed here
-
-                    full_after_result = await collection.aggregate(full_after_pipeline).to_list(None)
-                    all_existing_ids = {item["_id"] for item in full_after_result}
-
-                    # Only detect items that moved to this page from later pages due to deletions
-                    # These are existing items that are in the current page after but were not in this page before
-                    items_moved_to_this_page = {item["_id"] for item in after_items
-                                                if item["_id"] in all_existing_ids
-                                                and item["_id"] not in before_ids
-                                                and item["_id"] not in deleted_item_ids}
-
-                    for item_id in items_moved_to_this_page:
-                        if not any(change["_id"] == item_id for change in changes):
-                            # Find the item in after_items
-                            moved_item = next((item for item in after_items if item["_id"] == item_id), None)
-                            if moved_item:
-                                changes.append(moved_item)
-                except:
-                    pass
-
-            # Special case: if only one item remains, it should be both new_top and new_bottom
-            if (len(after_items) == 1 and (len(before_items) > 1 or len(before_items) == 0)):
-                remaining_item = after_items[0]
-
-                # Find any existing change for this item
-                existing_change = next((change for change in changes if change["_id"] == remaining_item["_id"]), None)
-
-                if existing_change:
-                    # Remove the existing change and replace with both flags
-                    changes = [change for change in changes if change["_id"] != remaining_item["_id"]]
-                    changes.append({**remaining_item, "new_top": True, "new_bottom": True})
-                else:
-                    # No existing change, add both flags
-                    changes.append({**remaining_item, "new_top": True, "new_bottom": True})
-
-            # Special case: single item page expanded to multiple items
-            if (len(before_items) == 1 and len(after_items) > 1):
-                original_single_item = before_items[0]
-                new_top_item = after_items[0]
-                new_bottom_item = after_items[-1]
-
-                # If the original single item is now the bottom, mark it as new_bottom
-                if (original_single_item["_id"] == new_bottom_item["_id"] and
-                        original_single_item["_id"] != new_top_item["_id"] and
-                        not any(change.get("new_bottom") and change["_id"] == new_bottom_item["_id"] for change in
-                                changes)):
-                    # Don't mark the same item as both new_top and new_bottom
-                    is_already_marked_top = any(
-                        change.get("new_top") and change["_id"] == new_bottom_item["_id"]
-                        for change in changes
-                    )
-                    if not is_already_marked_top:
-                        changes.append({**new_bottom_item, "new_bottom": True})
-
-            # Special handling for pages that became empty or had significant changes
-            if before_items and not after_items and deleted_on_page:
-                # All items on this page were deleted
-                pass  # Just the deletion markers are enough
-            elif not before_items and after_items and created_ids:
-                # New page populated entirely by created items
-                for item in after_items:
-                    if item["_id"] in created_ids:
-                        # For single item pages, mark as both new_top and new_bottom
-                        if len(after_items) == 1:
-                            changes.append({**item, "new_top": True, "new_bottom": True})
-                        else:
-                            changes.append({**item, "new_top": True})
-                        break
-
-            # Deduplicate changes by _id, keeping the one with the most flags/info
+            # --- Final Deduplication and Cleanup ---
+            # Remove duplicate changes by _id, but keep different types of changes separately
             unique_changes = {}
             for change in changes:
                 change_id = change["_id"]
-                if change_id in unique_changes:
-                    # Merge changes, keeping the one with more information
-                    existing = unique_changes[change_id]
-                    # Prefer the change with boundary flags or more information
-                    has_existing_flags = any(key in existing for key in ["new_top", "new_bottom"])
-                    has_new_flags = any(key in change for key in ["new_top", "new_bottom"])
-                    if has_new_flags or (len(change) > len(existing) and not has_existing_flags):
-                        unique_changes[change_id] = change
-                else:
-                    unique_changes[change_id] = change
+                change_type = "deletion" if len(change) == 1 else "full_item"
+
+                # Create a unique key based on _id and change type
+                unique_key = f"{change_id}_{change_type}"
+
+                # Store the change with its unique key
+                unique_changes[unique_key] = change
 
             final_changes = list(unique_changes.values())
 
-            # --- Filter-Ignorant Final Filtering ---
-            # Apply filter-ignorant logic: if no filters and all updates are outside the monitored page, return no changes
-            if not filters and updated_items and not any(item_id in before_ids for item_id in updated_ids):
-                final_changes = []
+            # Sort changes according to sort_order if provided
+            if sort_order and final_changes:
+                # Create a mapping of item_id to full item data for sorting
+                item_data_map = {}
+
+                # First, populate with updated_items data
+                for updated_item in updated_items:
+                    item_id = updated_item["_id"]
+                    item_data_map[item_id] = updated_item
+
+                # For items that are filtered out (only have _id), fetch from database
+                filtered_out_ids = [change["_id"] for change in final_changes if len(change) == 1]
+                if filtered_out_ids:
+                    try:
+                        db_items_cursor = collection.find({"_id": {"$in": filtered_out_ids}})
+                        db_items_dict = {item["_id"]: item for item in await db_items_cursor.to_list(length=None)}
+                        item_data_map.update(db_items_dict)
+                    except Exception:
+                        pass  # If we can't fetch from DB, continue with available data
+
+                def get_sort_value(change, sort_def):
+                    field = sort_def['sort_by']
+                    direction = sort_def['sort_direction']
+                    item_id = change["_id"]
+
+                    # Get the full item data for sorting
+                    sort_item = item_data_map.get(item_id, change)
+                    value = sort_item.get(field, 0)
+
+                    # Handle absolute sorting
+                    if sort_def.get('is_absolute_sort', False) and isinstance(value, (int, float)):
+                        value = abs(value)
+
+                    # Handle None values
+                    if value is None:
+                        value = 0
+
+                    return value if direction > 0 else -value
+
+                try:
+                    # Separate items into "full items" and "filtered out items"
+                    # Full items: have more than just _id field (remain in filters)
+                    # Filtered out items: only have _id field (filtered out)
+                    full_items = [change for change in final_changes if len(change) > 1]
+                    filtered_items = [change for change in final_changes if len(change) == 1]
+
+                    # Sort each group separately
+                    if full_items:
+                        full_items.sort(key=lambda change: tuple(
+                            get_sort_value(change, sort_def) for sort_def in sort_order
+                        ))
+
+                    if filtered_items:
+                        filtered_items.sort(key=lambda change: tuple(
+                            get_sort_value(change, sort_def) for sort_def in sort_order
+                        ))
+
+                    # Combine: full items first, then filtered items
+                    final_changes = full_items + filtered_items
+
+                except Exception:
+                    # If sorting fails, keep original order
+                    pass
+
+            # Remove boundary flags when no pagination
+            if not pagination:
+                for change in final_changes:
+                    if "_new_top" in change:
+                        del change["_new_top"]
+                    if "_new_bottom" in change:
+                        del change["_new_bottom"]
 
             final_reports.append({"page_id": page_id, "changes": final_changes})
 

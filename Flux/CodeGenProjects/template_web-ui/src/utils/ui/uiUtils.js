@@ -680,19 +680,33 @@ export function getUniqueValues(rows, filterFieldsMetadata, isAbbreviationMerge 
  * This dictionary maps UI CRUD types to their corresponding query endpoints and parameters.
  *
  * @param {Object} modelSchema - The schema of the model, potentially containing `override_default_crud`.
+ * @param {Array<string>} availableModelNames - Array of model names that exist in the schema.
  * @returns {Object|null} A dictionary of CRUD overrides or null if no overrides are defined.
  */
-export function getCrudOverrideDict(modelSchema) {
+export function getCrudOverrideDict(modelSchema, availableModelNames = null) {
     return modelSchema.override_default_crud?.reduce((acc, { ui_crud_type, query_name, ui_query_params }) => {
         let paramDict = null;
         ui_query_params?.forEach(({ query_param_name, query_param_value_src }) => {
-            const param_value_src = query_param_value_src.substring(query_param_value_src.indexOf('.') + 1);
-            if (!paramDict) {
-                paramDict = {};
+            // Extract model name from query_param_value_src
+            const sourceModelName = query_param_value_src.split('.')[0];
+
+            // Only include param if no validation needed OR source model exists in schema
+            if (!availableModelNames || availableModelNames.includes(sourceModelName)) {
+                const param_value_src = query_param_value_src.substring(query_param_value_src.indexOf('.') + 1);
+                if (!paramDict) {
+                    paramDict = {};
+                }
+                paramDict[query_param_name] = param_value_src;
             }
-            paramDict[query_param_name] = param_value_src;
+            // else: skip this param (source model doesn't exist in schema)
         })
-        acc[ui_crud_type] = { endpoint: `query-${query_name}`, paramDict };
+
+        // Only add CRUD operation if it has valid params OR no params were defined
+        // Skip if all params were filtered out (paramDict would be null but ui_query_params existed)
+        if (paramDict !== null || !ui_query_params || ui_query_params.length === 0) {
+            acc[ui_crud_type] = { endpoint: `query-${query_name}`, paramDict };
+        }
+
         return acc;
     }, {}) || null;
 }
@@ -704,9 +718,10 @@ export function getCrudOverrideDict(modelSchema) {
  * to the standard GET_ALL endpoint.
  *
  * @param {Object} modelSchema - The schema of the model, potentially containing `default_filter_param`.
+ * @param {Array<string>} availableModelNames - Array of model names that exist in the schema.
  * @returns {Object|null} A dictionary containing paramDict for default filtering, or null if not defined.
  */
-export function getDefaultFilterParamDict(modelSchema) {
+export function getDefaultFilterParamDict(modelSchema, availableModelNames = null) {
     const defaultFilter = modelSchema.default_filter_param;
 
     // Check if default_filter_param exists and is an object (not array)
@@ -721,17 +736,26 @@ export function getDefaultFilterParamDict(modelSchema) {
 
     let paramDict = null;
     defaultFilter.ui_filter_params.forEach(({ param_name, param_value_src, param_value }) => {
-        if (!paramDict) {
-            paramDict = {};
-        }
-
         // Support both derived values (from other models) and direct values
         if (param_value_src) {
-            // Derived value - extract the path after the model name and store with type
-            const extractedPath = param_value_src.substring(param_value_src.indexOf('.') + 1);
-            paramDict[param_name] = { type: 'src', value: extractedPath };
+            // Extract model name from param_value_src (e.g., "pair_strat._id" -> "pair_strat")
+            const sourceModelName = param_value_src.split('.')[0];
+
+            // Only include param if no validation needed OR source model exists in schema
+            if (!availableModelNames || availableModelNames.includes(sourceModelName)) {
+                // Derived value - extract the path after the model name and store with type
+                const extractedPath = param_value_src.substring(param_value_src.indexOf('.') + 1);
+                if (!paramDict) {
+                    paramDict = {};
+                }
+                paramDict[param_name] = { type: 'src', value: extractedPath };
+            }
+            // else: skip this param (source model doesn't exist in schema)
         } else if (param_value !== undefined && param_value !== null) {
-            // Direct value - store as-is with type
+            // Direct value - store as-is with type (always include - no dependency on source models)
+            if (!paramDict) {
+                paramDict = {};
+            }
             paramDict[param_name] = { type: 'val', value: param_value };
         }
     });
@@ -745,15 +769,20 @@ export function getDefaultFilterParamDict(modelSchema) {
  * It iterates through the provided data sources and applies `getCrudOverrideDict` to each.
  *
  * @param {Array<Object>} dataSources - An array of data source objects, each containing a `name` and `schema`.
+ * @param {Array<string>} availableModelNames - Array of model names that exist in the schema.
  * @returns {Object|null} A dictionary where keys are data source names and values are their CRUD override dictionaries, or null if no overrides are found.
  */
-export function getDataSourcesCrudOverrideDict(dataSources) {
+export function getDataSourcesCrudOverrideDict(dataSources, availableModelNames = null) {
     const dataSourcesCrudOverrideDict = {};
     dataSources.forEach(({ name, schema }) => {
-        const crudOverrideDict = getCrudOverrideDict(schema);
-        if (crudOverrideDict) {
-            dataSourcesCrudOverrideDict[name] = crudOverrideDict;
+        // Only process data source if no validation needed OR if the data source model exists in schema
+        if (!availableModelNames || availableModelNames.includes(name)) {
+            const crudOverrideDict = getCrudOverrideDict(schema, availableModelNames);
+            if (crudOverrideDict) {
+                dataSourcesCrudOverrideDict[name] = crudOverrideDict;
+            }
         }
+        // else: skip this data source (model doesn't exist in schema)
     });
     if (Object.keys(dataSourcesCrudOverrideDict).length === 0) {
         return null;

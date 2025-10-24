@@ -107,7 +107,6 @@ message PlanStatus{
     },
     server_running_status_lvl: 2,
     depending_proto_model_name: "PairPlan",
-    depends_on_other_model_for_id: true,
     depending_proto_model_field_name_for_host: "PairPlan.host",
     depending_proto_model_field_name_for_port: "PairPlan.port",
     depending_proto_model_field_name_for_view_port: "PairPlan.view_port"
@@ -214,7 +213,6 @@ message PlanLimits{
     },
     server_running_status_lvl: 2,
     depending_proto_model_name: "PairPlan",
-    depends_on_other_model_for_id: true,
     depending_proto_model_field_name_for_host: "PairPlan.host",
     depending_proto_model_field_name_for_port: "PairPlan.port",
     depending_proto_model_field_name_for_view_port: "PairPlan.view_port"

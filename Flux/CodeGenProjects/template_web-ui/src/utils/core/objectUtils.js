@@ -1,6 +1,6 @@
 import { isObject, isEmpty, get, isEqual } from 'lodash';
 import dayjs from 'dayjs';
-import { DB_ID, DATA_TYPES, primitiveDataTypes } from '../../constants';
+import { DB_ID, DATA_TYPES, DATE_TIME_FORMATS, primitiveDataTypes } from '../../constants';
 import { getLocalizedValueAndSuffix } from '../formatters/numberUtils';
 import { getDateTimeFromInt } from '../formatters/dateUtils';
 import { mergeObjects } from './dataAccess';
@@ -363,24 +363,23 @@ export function checkConstraints(storedObj, updatedObj) {
 }
 
 
-export function formatJSONObjectOrArray(json, fieldProps, truncateDateTime = false) {
+export function formatJSONObjectOrArray(json, fieldProps) {
 
     /**
      * Helper function to format an array of JSON objects.
      * @param {Array<Object>} arr - The array to format.
      * @param {Array<Object>} fieldProps - Field properties.
-     * @param {boolean} truncateDateTime - Truncate date-time flag.
      */
-    function formatJSONArray(arr, fieldProps, truncateDateTime) {
+    function formatJSONArray(arr, fieldProps) {
         for (let i = 0; i < arr.length; i++) {
             if (arr[i] instanceof Object) {
-                formatJSONObjectOrArray(arr[i], fieldProps, truncateDateTime);
+                formatJSONObjectOrArray(arr[i], fieldProps);
             }
         }
     }
 
     if (json instanceof Array) {
-        formatJSONArray(json, fieldProps, truncateDateTime);
+        formatJSONArray(json, fieldProps);
     } else if (json instanceof Object) {
         for (const key in json) {
             if (key.includes('xpath')) {
@@ -389,16 +388,18 @@ export function formatJSONObjectOrArray(json, fieldProps, truncateDateTime = fal
             const prop = fieldProps.find(p => p.key === key);
             if (prop) {
                 if (json[key] instanceof Array) {
-                    formatJSONArray(json[key], fieldProps, truncateDateTime);
+                    formatJSONArray(json[key], fieldProps);
                 } else if (json[key] instanceof Object) {
-                    formatJSONObjectOrArray(json[key], fieldProps, truncateDateTime);
+                    formatJSONObjectOrArray(json[key], fieldProps);
                 } else if (prop.type === DATA_TYPES.DATE_TIME) {
                     if (json[key]) {
                         const dateTimeWithTimezone = getDateTimeFromInt(json[key]);
-                        if (prop.displayType === 'datetime') {
-                            json[key] = dateTimeWithTimezone.format('YYYY-MM-DD HH:mm:ss.SSS');
+                        if (prop.displayType === 'date') {
+                            json[key] = dateTimeWithTimezone.format(DATE_TIME_FORMATS.DATE);
+                        } else if (prop.displayType === 'datetime') {
+                            json[key] = dateTimeWithTimezone.format(DATE_TIME_FORMATS.DATETIME);
                         } else {
-                            json[key] = dateTimeWithTimezone.isSame(dayjs(), 'day') ? dateTimeWithTimezone.format('HH:mm:ss.SSS') : dateTimeWithTimezone.format('YYYY-MM-DD HH:mm:ss.SSS');
+                            json[key] = dateTimeWithTimezone.isSame(dayjs(), 'day') ? dateTimeWithTimezone.format(DATE_TIME_FORMATS.TIME) : dateTimeWithTimezone.format(DATE_TIME_FORMATS.DATETIME);
                         }
                     }
                 } else if (typeof json[key] === DATA_TYPES.NUMBER) {

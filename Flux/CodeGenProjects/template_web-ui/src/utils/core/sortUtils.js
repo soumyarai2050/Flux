@@ -48,7 +48,10 @@ export class SortComparator {
         let retVal;
 
         // Apply descending or ascending sort based on `sort_direction`.
-        if (sortOrder.sort_direction === SortType.DESCENDING) {
+        // Handle both string format ('desc', 'asc') and numeric format (-1, 1)
+        const isDescending = sortOrder.sort_direction === SortType.DESCENDING || sortOrder.sort_direction === -1;
+
+        if (isDescending) {
             retVal = SortComparator.descendingSort(a, b, sortOrder, nestedArray);
         } else { // order is asc
             // For ascending sort, negate the result of descending sort.

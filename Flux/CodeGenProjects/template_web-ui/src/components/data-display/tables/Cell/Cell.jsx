@@ -29,7 +29,7 @@ import { validateConstraints } from '../../../../utils/validation/validationUtil
 import { excludeNullFromObject, formatJSONObjectOrArray } from '../../../../utils/core/objectUtils';
 import { getDateTimeFromInt } from '../../../../utils/formatters/dateUtils';
 import { getDataSourceColor } from '../../../../utils/ui/themeUtils';
-import { COLOR_TYPES, DATA_TYPES, HIGHLIGHT_STATES, MODEL_TYPES, MODES } from '../../../../constants';
+import { COLOR_TYPES, DATA_TYPES, DATE_TIME_FORMATS, HIGHLIGHT_STATES, MODEL_TYPES, MODES } from '../../../../constants';
 import JsonView from '../../JsonView';
 import VerticalDataTable from '../VerticalDataTable';
 import ValueBasedToggleButton from '../../../ui/ValueBasedToggleButton';
@@ -66,7 +66,7 @@ const Cell = (props) => {
     } = props;
 
     const theme = useTheme();
-    const {collection} = props;
+    const { collection } = props;
     // const state = useSelector(state => state);
     const reducerArray = useMemo(() => getReducerArrayFromCollections([props.collection]), [props.collection]);
     const reducerDict = useSelector(state => {
@@ -378,10 +378,12 @@ const Cell = (props) => {
         if (type === DATA_TYPES.DATE_TIME) {
             if (value !== '') {
                 const dateTimeWithTimezone = getDateTimeFromInt(value);
-                if (collection.displayType === 'datetime') {
-                    value = dateTimeWithTimezone.format('YYYY-MM-DD HH:mm:ss.SSS');
+                if (collection.displayType === 'date') {
+                    value = dateTimeWithTimezone.format(DATE_TIME_FORMATS.DATE);
+                } else if (collection.displayType === 'datetime') {
+                    value = dateTimeWithTimezone.format(DATE_TIME_FORMATS.DATETIME);
                 } else {
-                    value = dateTimeWithTimezone.isSame(dayjs(), 'day') ? dateTimeWithTimezone.format('HH:mm:ss.SSS') : dateTimeWithTimezone.format('YYYY-MM-DD HH:mm:ss.SSS');
+                    value = dateTimeWithTimezone.isSame(dayjs(), 'day') ? dateTimeWithTimezone.format(DATE_TIME_FORMATS.TIME) : dateTimeWithTimezone.format(DATE_TIME_FORMATS.DATETIME);
                 }
             }
         }
@@ -391,10 +393,12 @@ const Cell = (props) => {
             value = value.toLocaleString();
         }
         const classesStr = `${classes.cell} ${selectedClass} ${disabledClass} ${tableCellRemove} ${newUpdateClass}`;
+        // Only apply colorStyle when there's no highlight update class active
+        const appliedColorStyle = newUpdateClass ? {} : colorStyle;
         return (
             <TableCell
                 className={classesStr}
-                sx={{ backgroundColor: dataSourceColor, ...stickyClass, ...colorStyle }}
+                sx={{ backgroundColor: dataSourceColor, ...stickyClass, ...appliedColorStyle }}
                 align={textAlign}
                 size='small'
                 data-xpath={xpath}
@@ -680,14 +684,15 @@ const Cell = (props) => {
                 endAdornment: endAdornment
             } : {};
             // default input format
-            let inputFormat = 'YYYY-MM-DD HH:mm:ss'
+            let inputFormat = DATE_TIME_FORMATS.DATETIME_INPUT;
             if (value) {
                 const dateTimeWithTimezone = getDateTimeFromInt(value);
-                if (collection.displayType !== 'datetime') {
-                    if (dateTimeWithTimezone.isSame(dayjs(), 'day')) {
-                        inputFormat = 'HH:mm:ss';
-                    }
-                    // else - use default input format
+                if (collection.displayType === 'date') {
+                    inputFormat = DATE_TIME_FORMATS.DATE;
+                } else if (collection.displayType === 'datetime') {
+                    inputFormat = DATE_TIME_FORMATS.DATETIME_INPUT;
+                } else if (dateTimeWithTimezone.isSame(dayjs(), 'day')) {
+                    inputFormat = DATE_TIME_FORMATS.TIME_INPUT;
                 }
                 // else - use default input format
             }
@@ -1020,7 +1025,7 @@ const Cell = (props) => {
             if (type === DATA_TYPES.OBJECT || type === DATA_TYPES.ARRAY) {
                 updatedData = updatedData ? cloneDeep(updatedData) : null;
                 if (updatedData) {
-                    formatJSONObjectOrArray(updatedData, collection.subCollections, props.truncateDateTime);
+                    formatJSONObjectOrArray(updatedData, collection.subCollections);
                     updatedData = clearxpath(updatedData);
                 }
             } else {
@@ -1132,10 +1137,14 @@ const Cell = (props) => {
             text = null;
         } else {
             const dateTimeWithTimezone = getDateTimeFromInt(linkText);
-            if (collection.displayType === 'datetime') {
-                text = dateTimeWithTimezone.format('YYYY-MM-DD HH:mm:ss.SSS');
+
+            if (collection.displayType === 'date') {
+                text = dateTimeWithTimezone.format(DATE_TIME_FORMATS.DATE);
+            } else if (collection.displayType === 'datetime') {
+                text = dateTimeWithTimezone.format(DATE_TIME_FORMATS.DATETIME);
             } else {
-                text = dateTimeWithTimezone.isSame(dayjs(), 'day') ? dateTimeWithTimezone.format('HH:mm:ss.SSS') : dateTimeWithTimezone.format('YYYY-MM-DD HH:mm:ss.SSS');
+                //show time for today , full datetime for other days
+                text = dateTimeWithTimezone.isSame(dayjs(), 'day') ? dateTimeWithTimezone.format(DATE_TIME_FORMATS.TIME) : dateTimeWithTimezone.format(DATE_TIME_FORMATS.DATETIME);
             }
         }
         value = text;
@@ -1189,6 +1198,8 @@ const Cell = (props) => {
             classesArray.push(newUpdateClass);
         }
         const classesStr = classesArray.join(' ');
+        // Only apply colorStyle when there's no highlight update class active
+        const appliedColorStyle = newUpdateClass ? {} : colorStyle;
         return (
             <TableCell
                 className={classesStr}
@@ -1200,7 +1211,7 @@ const Cell = (props) => {
                 onMouseEnter={handleCellMouseEnter}
                 data-xpath={xpath}
                 data-dataxpath={dataxpath}>
-                <div style={colorStyle}>
+                <div style={appliedColorStyle}>
                     {/* {collection.displayType === 'time' ? <LinkText text={text} linkText={linkText} /> :
                     // value ? <span>{value}{numberSuffix}</span> : <span>{value}</span>} */}
                     {value ? <span>{value}{numberSuffix}</span> : <span>{value}</span>}

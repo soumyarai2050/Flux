@@ -52,7 +52,7 @@ function getEffectiveStoredArrayDict(dataSourcesStoredArrayDict, effectiveStored
 }
 
 function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
-    const { schema: projectSchema } = useSelector((state) => state.schema);
+    const { schema: projectSchema, schemaCollections } = useSelector((state) => state.schema);
 
     const { schema: modelSchema, fieldsMetadata: modelFieldsMetadata, actions, selector } = modelDataSource;
     const { storedObj, updatedObj, objId, mode, isCreating, error, isLoading, popupStatus } = useSelector(selector);
@@ -87,7 +87,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     const [sortedCells, setSortedCells] = useState([]);
     const [uniqueValues, setUniqueValues] = useState({});
     const [url, setUrl] = useState(modelDataSource.url);
-    const [viewUrl, setViewUrl] = useState(modelDataSource.viewUrl);
+    const [httpViewUrl, setHttpViewUrl] = useState(modelDataSource.viewUrl);
     const [isProcessingUserActions, setIsProcessingUserActions] = useState(false);
     const [reconnectCounter, setReconnectCounter] = useState(0);
     const [rowIds, setRowIds] = useState(null);
@@ -163,7 +163,8 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     const changesRef = useRef({});
     const formValidationRef = useRef({});
     const sourceRef = useRef(null);
-    const dataSourcesCrudOverrideDictRef = useRef(getDataSourcesCrudOverrideDict(dataSources));
+    const availableModelNames = useMemo(() => Object.keys(schemaCollections), [schemaCollections]);
+    const dataSourcesCrudOverrideDictRef = useRef(getDataSourcesCrudOverrideDict(dataSources, availableModelNames));
     const allowedLayoutTypesRef = useRef([LAYOUT_TYPES.ABBREVIATION_MERGE, LAYOUT_TYPES.PIVOT_TABLE, LAYOUT_TYPES.CHART]);
     // refs to identify change
     const optionsRef = useRef(null);
@@ -203,6 +204,22 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     // Collection views do not support server-side-pagination as the backend is not aware of these tables
     const serverSidePaginationEnabled = false;
     const serverSideFilterSortEnabled = false;
+
+    // Determine if WebSocket should use base URL instead of view URL
+    const shouldUseBaseUrl = useMemo(() =>
+        modelSchema.is_large_db_object || modelSchema.is_time_series ||
+        modelLayoutOption.depending_proto_model_for_cpp_port ||
+        serverSidePaginationEnabled || serverSideFilterSortEnabled,
+        [modelSchema.is_large_db_object, modelSchema.is_time_series,
+         modelLayoutOption.depending_proto_model_for_cpp_port,
+         serverSidePaginationEnabled, serverSideFilterSortEnabled]
+    );
+
+    // WebSocket View URL - uses base URL when shouldUseBaseUrl, otherwise uses view URL
+    const wsViewUrl = useMemo(() =>
+        shouldUseBaseUrl ? url : httpViewUrl,
+        [shouldUseBaseUrl, url, httpViewUrl]
+    );
 
     const uiFilters = useMemo(() => {
         const layoutFilters = modelLayoutOption.filters || [];
@@ -527,7 +544,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     const isWebSocketDelayed = isWebSocketDisabled || isWaitingForCount;
 
     socketRef.current = useWebSocketWorker({
-        url: (modelSchema.is_large_db_object || modelSchema.is_time_series || modelLayoutOption.depending_proto_model_for_cpp_port) ? url : viewUrl,
+        url: wsViewUrl,
         modelName,
         isDisabled: isWebSocketDelayed,
         reconnectCounter,
@@ -1118,7 +1135,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
                         // button query menu
                         modelSchema={modelSchema}
                         url={url}
-                        viewUrl={viewUrl}
+                        viewUrl={httpViewUrl}
                         autoBoundParams={autoBoundParams}
                         // misc
                         enableOverride={modelLayoutData.enable_override || []}

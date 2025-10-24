@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useSelector } from 'react-redux';
-import { COLOR_TYPES, DATA_TYPES, MODES } from '../../../../constants';
+import { COLOR_TYPES, DATA_TYPES, DATE_TIME_FORMATS, MODES } from '../../../../constants';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
@@ -419,16 +419,17 @@ const NodeField = (props) => {
             endAdornment: endAdornment
         } : {};
         // default input format
-        let inputFormat = 'YYYY-MM-DD HH:mm:ss'
+        let inputFormat = DATE_TIME_FORMATS.DATETIME_INPUT;
         if (value) {
             const dateTimeWithTimezone = getDateTimeFromInt(value);
-            if (props.data.displayType !== 'datetime') {
-                if (dateTimeWithTimezone.isSame(dayjs(), 'day')) {
-                    inputFormat = 'HH:mm:ss';
-                }
-                // else not same day - use default input format
+            if (props.data.displayType === 'date') {
+                inputFormat = DATE_TIME_FORMATS.DATE;
+            } else if (props.data.displayType === 'datetime') {
+                inputFormat = DATE_TIME_FORMATS.DATETIME_INPUT;
+            } else if (dateTimeWithTimezone.isSame(dayjs(), 'day')) {
+                inputFormat = DATE_TIME_FORMATS.TIME_INPUT;
             }
-            // else displayType is datetime -  use default input format
+            // else - use default input format
         }
         // else date is null - use default input format
 

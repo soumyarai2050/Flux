@@ -15,6 +15,7 @@
 .card_title {
     color: var(--dark-text-primary);
     flex: 1;
+    pointer-events: none;
 }
 
 .card_menu {

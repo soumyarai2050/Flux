@@ -26,6 +26,7 @@ import { DB_ID, DATA_TYPES, MODES, MODEL_TYPES } from '../../../constants';
 import TableHeader from '../tables/TableHeader';
 import Cell from '../tables/Cell';
 import { getBufferAbbreviatedOptionLabel } from '../../../utils/ui/uiUtils';
+import { copyToClipboard } from '../../../utils/core/stringUtils';
 import styles from './AbbreviationMergeView.module.css';
 import { flux_toggle, flux_trigger_strat } from '../../../projectSpecificUtils';
 import { useScrollIndicators, useKeyboardNavigation } from '../../../hooks';
@@ -286,7 +287,7 @@ const LoadedView = ({
     // Combine headers and rows into a single string.
     const tsvString = [headers, ...tsvRows].filter(Boolean).join('\n');
 
-    navigator.clipboard.writeText(tsvString).then(() => {
+    copyToClipboard(tsvString).then(() => {
       console.log('Selected rows copied to clipboard in TSV format.');
     }).catch(err => {
       console.error('Failed to copy selected rows to clipboard:', err);
@@ -656,7 +657,6 @@ const LoadedView = ({
                           onButtonClick={handleButtonClick}
                           onTextChange={handleTextChange}
                           forceUpdate={mode === MODES.READ}
-                          truncateDateTime={false}
                           modelType={MODEL_TYPES.ABBREVIATION_MERGE}
                           onForceSave={onForceSave}
                           onRowSelect={handleCellRowSelect}

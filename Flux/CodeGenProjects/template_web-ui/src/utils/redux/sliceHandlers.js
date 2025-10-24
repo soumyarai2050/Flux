@@ -27,7 +27,7 @@ import { fastClone } from '../core/dataUtils';
  *   - {boolean} isAbbreviationSource - Flag for abbreviation source models.
  */
 export function setStoredArrayHandler(state, action, config) {
-  const { modelKeys, modelName, modelType, initialState, isAbbreviationSource } = config;
+  const { modelKeys, modelName, modelType, initialState, isAbbreviationSource, isIdDependent } = config;
   const { storedArrayKey, storedObjKey, updatedObjKey, objIdKey } = modelKeys;
   state[storedArrayKey] = action.payload;
   // if (modelName === 'ui_layout') return;
@@ -53,7 +53,7 @@ export function setStoredArrayHandler(state, action, config) {
     }
   } else {
     if (modelName === 'ui_layout') return;
-    if ([MODEL_TYPES.ABBREVIATION_MERGE, MODEL_TYPES.ROOT, MODEL_TYPES.NON_ROOT].includes(modelType) && !isAbbreviationSource) {
+    if ([MODEL_TYPES.ABBREVIATION_MERGE, MODEL_TYPES.ROOT, MODEL_TYPES.NON_ROOT].includes(modelType) && !isAbbreviationSource && !isIdDependent) {
       if (action.payload.length > 0) {
         const obj = getObjectWithLeastId(action.payload);
         state[objIdKey] = obj[DB_ID];
@@ -191,7 +191,7 @@ export function setPopupStatusHandler(state, action, config) {
  *   - {boolean} isAbbreviationSource - Flag for abbreviation source models.
  */
 export function handleGetAll(builder, thunk, config) {
-  const { modelKeys, initialState, modelName, isAbbreviationSource } = config;
+  const { modelKeys, initialState, modelName, isAbbreviationSource, isIdDependent } = config;
   const { storedArrayKey, storedObjKey, updatedObjKey, objIdKey } = modelKeys;
   builder.addCase(thunk.pending, (state) => {
     state.isLoading = true;
@@ -205,7 +205,7 @@ export function handleGetAll(builder, thunk, config) {
     state[storedArrayKey] = action.payload || [];
     if (!action.payload || action.payload.length === 0) {
       // no action required - all state already cleared in pending
-    } else if (modelName !== 'ui_layout' && !isAbbreviationSource) {
+    } else if (modelName !== 'ui_layout' && !isAbbreviationSource && !isIdDependent) {
       const obj = getObjectWithLeastId(action.payload);
       state[objIdKey] = obj[DB_ID];
       state[storedObjKey] = obj;

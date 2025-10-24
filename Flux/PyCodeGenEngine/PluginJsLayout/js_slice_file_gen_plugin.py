@@ -155,6 +155,11 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                 # itself is not abbreviated type
                 output_str += JsSliceFileGenPlugin.indentation_space + f"isAbbreviationSource: true,\n"
 
+        # Check if this model has ID dependency (depending_proto_model_name_for_id)
+        depending_proto_model_name_for_id = self.get_model_option_from_widget_ui_data_element(message, "depending_proto_model_name_for_id")
+        if depending_proto_model_name_for_id:
+            output_str += JsSliceFileGenPlugin.indentation_space + f"isIdDependent: true,\n"
+
         if message_name == "UILayout":
             output_str += JsSliceFileGenPlugin.indentation_space + "extraState: {\n"
             output_str += JsSliceFileGenPlugin.indentation_space*2 + f"stored{message_name}Obj: "+"{ profile_id: 'default', widget_ui_data_elements: staticLayouts },\n"

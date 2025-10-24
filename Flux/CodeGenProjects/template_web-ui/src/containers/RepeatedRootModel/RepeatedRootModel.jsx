@@ -37,14 +37,15 @@ function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap }) {
     const nodeUrl = useMemo(() => node?.url ?? null, [node]);
     const modelSchema = useMemo(() => node?.modelSchema ?? modelDataSource.schema, [node]);
     // Extract allowedOperations directly from schema's json_root
-    const allowedOperations = useMemo(() => modelSchema?.json_root || null, [modelSchema])
+    const allowedOperations = useMemo(() => modelSchema?.json_root || null, [modelSchema]);
     const fieldsMetadata = useMemo(() => node?.fieldsMetadata ?? modelDataSource.fieldsMetadata, [node]);
     const derivedModelName = useMemo(() => nodeModelName ?? modelName, [nodeModelName]);
 
-    // Extract the three data sources from dictionary
+    // Extract the four data sources from dictionary
     const urlOverrideDataSource = modelDependencyMap?.urlOverride ?? null;
     const crudOverrideDataSource = modelDependencyMap?.crudOverride ?? null;
     const defaultFilterDataSource = modelDependencyMap?.defaultFilter ?? null;
+    const idDependentDataSource = modelDependencyMap?.idDependent ?? null;
 
     // Create stable selector functions
     const urlOverrideSelector = useMemo(
@@ -59,11 +60,16 @@ function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap }) {
         () => defaultFilterDataSource?.selector ?? (() => ({ storedObj: null })),
         [defaultFilterDataSource]
     );
+    const idDependentSelector = useMemo(
+        () => idDependentDataSource?.selector ?? (() => ({ objId: null })),
+        [idDependentDataSource]
+    );
 
     // Subscribe to each data source's Redux store using shallow equality
     const { storedObj: urlOverrideDataSourceStoredObj } = useSelector(urlOverrideSelector, shallowEqual);
     const { storedObj: crudOverrideDataSourceStoredObj } = useSelector(crudOverrideSelector, shallowEqual);
     const { storedObj: defaultFilterDataSourceStoredObj } = useSelector(defaultFilterSelector, shallowEqual);
+    const { objId: idDependentDataSourceObjId } = useSelector(idDependentSelector, shallowEqual);
 
     const [rows, setRows] = useState([]);
     const [groupedRows, setGroupedRows] = useState([]);
@@ -124,13 +130,14 @@ function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap }) {
         handleShowMoreToggle,
     } = useModelLayout(modelName, objId, MODEL_TYPES.REPEATED_ROOT, setHeadCells, mode);
 
-    const crudOverrideDictRef = useRef(getCrudOverrideDict(modelSchema));
-    const defaultFilterParamDictRef = useRef(getDefaultFilterParamDict(modelSchema));
+    const availableModelNames = useMemo(() => Object.keys(schemaCollections), [schemaCollections]);
+    const crudOverrideDictRef = useRef(getCrudOverrideDict(modelSchema, availableModelNames));
+    const defaultFilterParamDictRef = useRef(getDefaultFilterParamDict(modelSchema, availableModelNames));
     const hasReadByIdWsProperty = allowedOperations?.ReadByIDWebSocketOp === true;
 
     // Determine if server-side pagination is enabled from schema
     const serverSidePaginationEnabled = modelSchema.server_side_pagination === true && modelSchema.is_large_db_object !== true;
-    const serverSideFilterSortEnabled = modelSchema.server_side_filter_sort === true;
+    const serverSideFilterSortEnabled = serverSidePaginationEnabled ? true : modelSchema.server_side_filter_sort === true;
 
     // Extract ui_limit from schema ONLY when server-side pagination is disabled
     // When server-side is enabled, uiLimit will be null (limit handled by pagination)
@@ -173,7 +180,25 @@ function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap }) {
 
     // Final URL values (overridden by nodeUrl if present)
     const url = useMemo(() => nodeUrl ?? baseUrl, [nodeUrl, baseUrl]);
-    const viewUrl = useMemo(() => nodeUrl ?? baseViewUrl, [nodeUrl, baseViewUrl]);
+
+    // Determine if WebSocket should use base URL instead of view URL
+    const shouldUseBaseUrl = useMemo(() =>
+        modelSchema.is_large_db_object || modelSchema.is_time_series ||
+        modelLayoutOption.depending_proto_model_for_cpp_port ||
+        serverSidePaginationEnabled || serverSideFilterSortEnabled,
+        [modelSchema.is_large_db_object, modelSchema.is_time_series,
+        modelLayoutOption.depending_proto_model_for_cpp_port,
+            serverSidePaginationEnabled, serverSideFilterSortEnabled]
+    );
+
+    // HTTP View URL - always uses view URL for HTTP GET/GET_ALL requests
+    const httpViewUrl = useMemo(() => nodeUrl ?? baseViewUrl, [nodeUrl, baseViewUrl]);
+
+    // WebSocket View URL - uses base URL when shouldUseBaseUrl, otherwise uses view URL
+    const wsViewUrl = useMemo(() =>
+        shouldUseBaseUrl ? (nodeUrl ?? baseUrl) : httpViewUrl,
+        [shouldUseBaseUrl, nodeUrl, baseUrl, httpViewUrl]
+    );
 
     // Extract params for CRUD override using crudOverrideDataSource (must be before useEffects)
     const params = useMemo(() =>
@@ -303,6 +328,14 @@ function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap }) {
 
     const effectiveStoredArray = storedArray.map((obj) => effectiveStoredData && effectiveStoredData[DB_ID] === obj[DB_ID] ? effectiveStoredData : obj)
 
+    // ID Dependency: Auto-assign objId based on dependent model's selection
+    useEffect(() => {
+        if (idDependentDataSource && idDependentDataSourceObjId && objId !== idDependentDataSourceObjId) {
+            // Dispatch setObjId to update to the dependent model's ID
+            dispatch(actions.setObjId(idDependentDataSourceObjId));
+        }
+    }, [idDependentDataSourceObjId, idDependentDataSource]);
+
     // Initial GET_ALL request - only for models without WebSocket support
     useEffect(() => {
         // If ReadByIDWebSocketOp exists, skip HTTP GET_ALL (WebSocket will handle it)
@@ -320,8 +353,8 @@ function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap }) {
             return;
         }
 
-        if (viewUrl) {
-            let args = { url: viewUrl };
+        if (httpViewUrl) {
+            let args = { url: httpViewUrl };
 
             // Add uiLimit to args (not queryParams) - it will be handled by sliceFactory
             if (uiLimit) {
@@ -362,7 +395,7 @@ function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap }) {
 
             dispatch(actions.getAll(args));
         }
-    }, [viewUrl, JSON.stringify(params), hasReadByIdWsProperty, processedData.filters, processedData.sortOrders, processedData.pagination,
+    }, [httpViewUrl, JSON.stringify(params), hasReadByIdWsProperty, processedData.filters, processedData.sortOrders, processedData.pagination,
         serverSidePaginationEnabled, usePagination, isWaitingForCount, defaultFilters, uiLimit, serverSideFilterSortEnabled])
 
     useEffect(() => {
@@ -501,7 +534,7 @@ function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap }) {
     const isWebSocketDelayed = isWebSocketDisabled || isWaitingForCount || !areDefaultFiltersReady;
 
     socketRef.current = useWebSocketWorker({
-        url: (modelSchema.is_large_db_object || modelSchema.is_time_series || modelLayoutOption.depending_proto_model_for_cpp_port) ? url : viewUrl,
+        url: wsViewUrl,
         modelName: derivedModelName,
         isDisabled: isWebSocketDelayed,
         reconnectCounter,
@@ -564,7 +597,7 @@ function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap }) {
 
     const handleDownload = async () => {
         let args = {
-            url: viewUrl,
+            url: httpViewUrl,
             filters: processedData.filters,
             sortOrders: processedData.sortOrders
         };
@@ -972,7 +1005,7 @@ function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap }) {
                         // button query menu
                         modelSchema={modelSchema}
                         url={url}
-                        viewUrl={viewUrl}
+                        viewUrl={httpViewUrl}
                         autoBoundParams={autoBoundParams}
                         // misc
                         enableOverride={modelLayoutData.enable_override || []}

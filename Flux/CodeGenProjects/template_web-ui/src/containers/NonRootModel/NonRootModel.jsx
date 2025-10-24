@@ -35,10 +35,11 @@ function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRoo
     // Extract allowedOperations from the PARENT ROOT model's json_root, not the non-root model's
     const allowedOperations = useMemo(() => modelRootSchema?.json_root || null, [modelRootSchema]);
 
-    // Extract the three data sources from dictionary
+    // Extract the four data sources from dictionary
     const urlOverrideDataSource = modelDependencyMap?.urlOverride ?? null;
     const crudOverrideDataSource = modelDependencyMap?.crudOverride ?? null;
     const defaultFilterDataSource = modelDependencyMap?.defaultFilter ?? null;
+    const idDependentDataSource = modelDependencyMap?.idDependent ?? null;
 
     // Create stable selector functions
     const urlOverrideSelector = useMemo(
@@ -53,11 +54,16 @@ function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRoo
         () => defaultFilterDataSource?.selector ?? (() => ({ storedObj: null })),
         [defaultFilterDataSource]
     );
+    const idDependentSelector = useMemo(
+        () => idDependentDataSource?.selector ?? (() => ({ objId: null })),
+        [idDependentDataSource]
+    );
 
     // Subscribe to each data source's Redux store using shallow equality
     const { storedObj: urlOverrideDataSourceStoredObj } = useSelector(urlOverrideSelector, shallowEqual);
     const { storedObj: crudOverrideDataSourceStoredObj } = useSelector(crudOverrideSelector, shallowEqual);
     const { storedObj: defaultFilterDataSourceStoredObj } = useSelector(defaultFilterSelector, shallowEqual);
+    const { objId: idDependentDataSourceObjId } = useSelector(idDependentSelector, shallowEqual);
 
     const [rows, setRows] = useState([]);
     const [groupedRows, setGroupedRows] = useState([]);
@@ -117,13 +123,14 @@ function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRoo
         handleShowMoreToggle,
     } = useModelLayout(modelName, objId, MODEL_TYPES.NON_ROOT, setHeadCells, mode);
 
-    const crudOverrideDictRef = useRef(getCrudOverrideDict(modelSchema));
-    const defaultFilterParamDictRef = useRef(getDefaultFilterParamDict(modelSchema));
+    const availableModelNames = useMemo(() => Object.keys(schemaCollections), [schemaCollections]);
+    const crudOverrideDictRef = useRef(getCrudOverrideDict(modelSchema, availableModelNames));
+    const defaultFilterParamDictRef = useRef(getDefaultFilterParamDict(modelSchema, availableModelNames));
     const hasReadByIdWsProperty = allowedOperations?.ReadByIDWebSocketOp === true;
 
     // Determine if server-side pagination is enabled from schema
     const serverSidePaginationEnabled = modelSchema.server_side_pagination === true && modelSchema.is_large_db_object !== true;
-    const serverSideFilterSortEnabled = modelSchema.server_side_filter_sort === true;
+    const serverSideFilterSortEnabled = serverSidePaginationEnabled ? true : modelSchema.server_side_filter_sort === true;
 
     // Extract ui_limit from schema unconditionally for NonRootModel (client-side pagination enforced)
     // NonRootModel always uses client-side pagination regardless of server-side settings
@@ -159,9 +166,26 @@ function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRoo
         [modelSchema, urlOverrideDataSourceStoredObj, urlOverrideDataSource?.fieldsMetadata]
     );
 
-    const viewUrl = useMemo(() =>
+    // HTTP View URL - always uses view URL for HTTP GET/GET_ALL requests
+    const httpViewUrl = useMemo(() =>
         getServerUrl(modelSchema, urlOverrideDataSourceStoredObj, urlOverrideDataSource?.fieldsMetadata, undefined, true),
         [modelSchema, urlOverrideDataSourceStoredObj, urlOverrideDataSource?.fieldsMetadata]
+    );
+
+    // Determine if WebSocket should use base URL instead of view URL
+    const shouldUseBaseUrl = useMemo(() =>
+        modelSchema.is_large_db_object || modelSchema.is_time_series ||
+        modelLayoutOption.depending_proto_model_for_cpp_port ||
+        serverSidePaginationEnabled || serverSideFilterSortEnabled,
+        [modelSchema.is_large_db_object, modelSchema.is_time_series,
+         modelLayoutOption.depending_proto_model_for_cpp_port,
+         serverSidePaginationEnabled, serverSideFilterSortEnabled]
+    );
+
+    // WebSocket View URL - uses base URL when shouldUseBaseUrl, otherwise uses view URL
+    const wsViewUrl = useMemo(() =>
+        shouldUseBaseUrl ? url : httpViewUrl,
+        [shouldUseBaseUrl, url, httpViewUrl]
     );
 
     // Extract params for CRUD override using crudOverrideDataSource (must be before useEffects)
@@ -252,6 +276,14 @@ function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRoo
         getBaselineForComparison,
     } = useConflictDetection(storedObj, updatedObj, mode, modelRootFieldsMetadata, isCreating, allowUpdates);
 
+    // ID Dependency: Auto-assign objId based on dependent model's selection
+    useEffect(() => {
+        if (idDependentDataSource && idDependentDataSourceObjId && objId !== idDependentDataSourceObjId) {
+            // Dispatch setObjId to update to the dependent model's ID
+            dispatch(actions.setObjId(idDependentDataSourceObjId));
+        }
+    }, [idDependentDataSourceObjId, idDependentDataSource]);
+
     // Initial GET_ALL request - only for models without WebSocket support
     useEffect(() => {
         // If ReadByIDWebSocketOp exists, skip HTTP GET_ALL (WebSocket will handle it)
@@ -269,8 +301,8 @@ function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRoo
             return;
         }
 
-        if (viewUrl && !isAbbreviationSource) {
-            let args = { url: viewUrl };
+        if (httpViewUrl && !isAbbreviationSource) {
+            let args = { url: httpViewUrl };
 
             // Add uiLimit to args (not queryParams) - it will be handled by sliceFactory
             if (uiLimit) {
@@ -282,12 +314,12 @@ function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRoo
             const queryParams = {};
 
             // Add filters if they exist (JSON-stringified)
-            if (processedData.filters && processedData.filters.length > 0) {
+            if (serverSideFilterSortEnabled && processedData.filters && processedData.filters.length > 0) {
                 queryParams.filters = JSON.stringify(processedData.filters);
             }
 
             // Add sort orders if they exist (JSON-stringified)
-            if (processedData.sortOrders && processedData.sortOrders.length > 0) {
+            if (serverSideFilterSortEnabled && processedData.sortOrders && processedData.sortOrders.length > 0) {
                 queryParams.sort_order = JSON.stringify(processedData.sortOrders);
             }
 
@@ -311,8 +343,8 @@ function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRoo
 
             dispatch(actions.getAll(args));
         }
-    }, [viewUrl, JSON.stringify(params), hasReadByIdWsProperty, processedData.filters, processedData.sortOrders, processedData.pagination,
-        serverSidePaginationEnabled, usePagination, isWaitingForCount, defaultFilters, uiLimit])
+    }, [httpViewUrl, JSON.stringify(params), hasReadByIdWsProperty, processedData.filters, processedData.sortOrders, processedData.pagination,
+        serverSidePaginationEnabled, usePagination, isWaitingForCount, defaultFilters, uiLimit, serverSideFilterSortEnabled])
 
     useEffect(() => {
         workerRef.current = new Worker(new URL("../../workers/non-root-model.worker.js", import.meta.url), { type: 'module' });
@@ -444,7 +476,7 @@ function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRoo
     const isWebSocketDelayed = isWebSocketDisabled || isWaitingForCount || !areDefaultFiltersReady;
 
     socketRef.current = useWebSocketWorker({
-        url: (modelSchema.is_large_db_object || modelSchema.is_time_series || modelLayoutOption.depending_proto_model_for_cpp_port) ? url : viewUrl,
+        url: wsViewUrl,
         modelName: modelRootName,
         isDisabled: isWebSocketDelayed,
         reconnectCounter,
@@ -458,8 +490,8 @@ function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRoo
         isCppModel: modelLayoutOption.depending_proto_model_for_cpp_port,
         // Parameters for unified endpoint with dynamic parameter inclusion
         // Filters now include merged default filter params
-        filters: processedData.filters,
-        sortOrders: processedData.sortOrders,
+        filters: serverSideFilterSortEnabled ? processedData.filters : null,
+        sortOrders: serverSideFilterSortEnabled ? processedData.sortOrders : null,
         pagination: (serverSidePaginationEnabled && usePagination) ? processedData.pagination : null,
         uiLimit: uiLimit  // Client-side limit (always enabled for NonRootModel)
     })
@@ -796,7 +828,7 @@ function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRoo
                         // button query menu
                         modelSchema={modelSchema}
                         url={url}
-                        viewUrl={viewUrl}
+                        viewUrl={httpViewUrl}
                         autoBoundParams={autoBoundParams}
                         // misc
                         enableOverride={modelLayoutData.enable_override || []}

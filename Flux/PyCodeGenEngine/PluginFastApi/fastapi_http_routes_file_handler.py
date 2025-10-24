@@ -4074,8 +4074,6 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
             output_str += f'    """\n'
             output_str += f'    Get Query of {message.proto.name} with aggregate - {query_name}\n'
             output_str += f'    """\n'
-            if query_param_having_dt:
-                output_str += self._add_datetime_params_handling_in_query(query_param_having_dt)
             if model_type == ModelType.Msgspec:
                 output_str += self.handle_query_http_params_json_parsing()
                 for param_name, param_type in param_name_to_param_type_dict.items():
@@ -4088,9 +4086,12 @@ class FastapiHttpRoutesFileHandler(FastapiBaseRoutesFileHandler, ABC):
                         output_str += (f"        raise HTTPException("
                                        f"detail=f\"Couldn't find key {param_name} in query params passed by user {{e}}\", "
                                        f"status_code=400)\n")
-
+                if query_param_having_dt:
+                    output_str += self._add_datetime_params_handling_in_query(query_param_having_dt)
                 output_str += f"    return await underlying_{query_name}_query_http_bytes({query_params_str})"
             else:
+                if query_param_having_dt:
+                    output_str += self._add_datetime_params_handling_in_query(query_param_having_dt)
                 output_str += f"    return await underlying_{query_name}_query_http({query_params_str})"
             output_str += "\n\n\n"
         elif route_type in [FastapiHttpRoutesFileHandler.flux_json_query_route_patch_type_field_val,

@@ -6,6 +6,7 @@ import Checkbox from '@mui/material/Checkbox';
 import Visibility from '@mui/icons-material/Visibility';
 import PushPin from '@mui/icons-material/PushPin';
 import PushPinOutlined from '@mui/icons-material/PushPinOutlined';
+import useClickIntent from '../../../../hooks/useClickIntent';
 import Icon from '../../../ui/Icon';
 import MenuItem from '../../../ui/MenuItem';
 
@@ -56,17 +57,26 @@ const VisibilityMenu = ({
     setAnchorEl(null);
   };
 
+  // Capture the current state when handlers are created to avoid timing issues
+  const currentState = React.useRef({ showMore, showHidden });
+  React.useEffect(() => {
+    currentState.current = { showMore, showHidden };
+  }, [showMore, showHidden]);
+
   const handleClick = () => {
     if (onVisibilityMenuClick) {
-      onVisibilityMenuClick(showMore || showHidden);
+      onVisibilityMenuClick(currentState.current.showMore || currentState.current.showHidden);
     }
   };
 
   const handleDoubleClick = () => {
     if (onVisibilityMenuDoubleClick) {
-      onVisibilityMenuDoubleClick(showMore || showHidden);
+      onVisibilityMenuDoubleClick(currentState.current.showMore || currentState.current.showHidden);
     }
   };
+
+  // Use click intent hook to handle single vs double clicks properly
+  const handleIconClick = useClickIntent(handleClick, handleDoubleClick);
 
   const handlePinToggle = (e) => {
     e.stopPropagation();
@@ -92,8 +102,7 @@ const VisibilityMenu = ({
           <Icon
             name={menuName}
             title={menuName}
-            onClick={handleClick}
-            onDoubleClick={handleDoubleClick}
+            onClick={handleIconClick}
           >
             <Visibility fontSize='small' color={visibilityColor === 'inherit' ? 'white' : visibilityColor} />
           </Icon>

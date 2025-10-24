@@ -28,10 +28,18 @@ function useWebSocketWorker({
   const { storedArray } = useSelector(selector);
   const connectionRef = useRef(null);
   const storedArrayRef = useRef(storedArray);
-  
+
   // New refs for snapshot logic
   const snapshotRef = useRef(null);
   const isNewlyConnectedRef = useRef(false);
+
+  // Refs to track latest values for worker messages
+  const sortOrdersRef = useRef(sortOrders);
+  const uiLimitRef = useRef(uiLimit);
+
+  // Update refs directly (no useEffect needed)
+  sortOrdersRef.current = sortOrders;
+  uiLimitRef.current = uiLimit;
 
   // State to notify UI about connection status changes
   const [, setIsConnected] = useState(false);
@@ -172,7 +180,8 @@ function useWebSocketWorker({
           worker.postMessage({
             snapshot,
             storedArray: storedArrayRef.current,
-            uiLimit,
+            uiLimit : uiLimitRef.current,
+            sortOrders : sortOrdersRef.current,
             isAlertModel
           });
         } else if (messageBuffer.length > 0) {
@@ -182,7 +191,8 @@ function useWebSocketWorker({
           worker.postMessage({
             messages,
             storedArray: storedArrayRef.current,
-            uiLimit,
+            uiLimit: uiLimitRef.current,
+            sortOrders: sortOrdersRef.current,
             isAlertModel
           });
         }

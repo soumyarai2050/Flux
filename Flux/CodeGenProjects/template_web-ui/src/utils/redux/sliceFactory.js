@@ -80,7 +80,8 @@ export function createGenericSlice({
   isAlertModel = false,
   injectedReducers = {},
   isAbbreviationSource = false,
-  allowedOperations = null
+  allowedOperations = null,
+  isIdDependent = false
 }) {
   // Dynamically construct keys for state properties based on modelName.
   const endpointBase = modelName;
@@ -125,7 +126,8 @@ export function createGenericSlice({
     modelType,
     isAlertModel,
     initialState,
-    isAbbreviationSource
+    isAbbreviationSource,
+    isIdDependent
   };
 
   /* Async Thunks for CRUD Operations */

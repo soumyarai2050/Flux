@@ -3,37 +3,21 @@ import React, { useState } from 'react';
 import IconButton from '@mui/material/IconButton';
 import ContentCopy from '@mui/icons-material/ContentCopy';
 import Check from '@mui/icons-material/Check';
+import { copyToClipboard } from '../../../utils/core/stringUtils';
 
 const ContentCopier = ({ text }) => {
     const [copied, setCopied] = useState(false);
 
     const handleCopy = (e) => {
         e.stopPropagation();
-        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-            navigator.clipboard.writeText(text)
-                .then(() => {
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 1000);
-                })
-                .catch((err) => console.error('Failed to copy text using Clipboard API:', err));
-        } else {
-            // Fallback for older browsers or insecure contexts
-            try {
-                const textArea = document.createElement('textarea');
-                textArea.value = text;
-                textArea.style.position = 'fixed';
-                textArea.style.left = '-9999px';
-                document.body.appendChild(textArea);
-                textArea.focus();
-                textArea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textArea);
+        copyToClipboard(text)
+            .then(() => {
                 setCopied(true);
                 setTimeout(() => setCopied(false), 1000);
-            } catch (err) {
-                console.error('Failed to copy text using execCommand:', err);
-            }
-        }
+            })
+            .catch((err) => {
+                console.error('Failed to copy text to clipboard:', err);
+            });
     };
 
     return (

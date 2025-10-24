@@ -140,6 +140,12 @@ export function getModelDependencyMap(modelSchema) {
     dependencyMap.defaultFilter = defaultFilter.param_src_model_name;
   }
 
+  // Extract idDependent (from depending_proto_model_name_for_id)
+  const idDependentModelName = modelSchema?.depending_proto_model_name_for_id;
+  if (idDependentModelName) {
+    dependencyMap.idDependent = idDependentModelName;
+  }
+
   // Return null if no dependencies found, otherwise return the map
   return Object.keys(dependencyMap).length > 0 ? dependencyMap : null;
 }

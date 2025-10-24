@@ -102,10 +102,32 @@ onmessage = (event) => {
     // Merge new updates with existing array.
     let finalArray = mergedArray.concat(newUpdates);
 
-    // Apply sorting based on sortOrders
+    // Apply sorting based on conditions
     if (sortOrders && sortOrders.length > 0) {
+        // sortOrders exist: apply sortOrders (regardless of uiLimit)
         const comparator = SortComparator.getInstance(sortOrders);
         finalArray = stableSort(finalArray, comparator);
+    } else if (uiLimit && (!sortOrders || sortOrders.length === 0)) {
+        // Only uiLimit exists (no sortOrders): sort by _id based on uiLimit sign
+        if (uiLimit > 0) {
+            // Sort by _id ascending
+            finalArray = stableSort(finalArray, (a, b) => {
+                const idA = a[DB_ID];
+                const idB = b[DB_ID];
+                if (idA < idB) return -1;
+                if (idA > idB) return 1;
+                return 0;
+            });
+        } else {
+            // Sort by _id descending
+            finalArray = stableSort(finalArray, (a, b) => {
+                const idA = a[DB_ID];
+                const idB = b[DB_ID];
+                if (idA > idB) return -1;
+                if (idA < idB) return 1;
+                return 0;
+            });
+        }
     }
 
     // Apply additional alert-specific sorting
@@ -152,10 +174,9 @@ onmessage = (event) => {
     }
 
     // Apply client-side limit (for non-server-side-paginated models)
-    // Only trim if uiLimit is set and positive
-    // Keep items from beginning (index 0 to uiLimit)
-    if (uiLimit && uiLimit > 0 && finalArray.length > uiLimit) {
-        finalArray = finalArray.slice(0, uiLimit);
+    // Keep items from beginning (index 0 to Math.abs(uiLimit))
+    if (uiLimit && Math.abs(uiLimit) > 0 && finalArray.length > Math.abs(uiLimit)) {
+        finalArray = finalArray.slice(0, Math.abs(uiLimit));
     }
 
     postMessage(finalArray);

@@ -96,18 +96,26 @@ export function withModelData(ModelComponent, config) {
     /**
      * Process modelDependencyMap by replacing dataSource names with their corresponding dataSource objects.
      * Only applicable for Root/NonRoot/RepeatedRoot models (not AbbreviationMergeModel).
+     * Validates that the data source exists in schema before building it.
      */
     const processedModelDependencyMap = useMemo(() => {
-      if (!modelDependencyMap) return null;
+      if (!modelDependencyMap || !schemaCollections) return null;
 
       const processed = {};
+      const availableModelNames = Object.keys(schemaCollections);
 
       for (const [key, dsName] of Object.entries(modelDependencyMap)) {
-        processed[key] = dsName ? buildDataSource(dsName, null, {}) : null;
+        // Only build dataSource if the model exists in schema
+        if (dsName && availableModelNames.includes(dsName)) {
+          processed[key] = buildDataSource(dsName, null, {});
+        } else {
+          // Model doesn't exist in schema, set to null
+          processed[key] = null;
+        }
       }
 
       return processed;
-    }, [modelDependencyMap, buildDataSource]);
+    }, [modelDependencyMap, buildDataSource, schemaCollections]);
 
     /**
      * Inject props based on component type:

@@ -453,11 +453,10 @@ def sort_alerts_based_on_severity_n_last_update_analyzer_time(
 
     if limit is not None:   # putting limit at last layer
         if limit > 0:
-            limit = abs(limit)
             agg_pipeline[3]["$sort"]["last_update_analyzer_time"] = 1
 
         agg_pipeline.append({
-            "$limit": limit
+            "$limit": abs(limit)
         })
     return agg_pipeline
 

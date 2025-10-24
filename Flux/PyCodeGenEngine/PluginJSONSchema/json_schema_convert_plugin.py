@@ -118,7 +118,8 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
     flx_msg_simple_non_repeated_attribute_options: List[str] = [
         BaseProtoPlugin.flux_msg_server_populate,
         BaseProtoPlugin.flux_msg_ui_get_all_limit,
-        BaseProtoPlugin.flux_msg_server_side_pagination
+        BaseProtoPlugin.flux_msg_server_side_pagination,
+        BaseProtoPlugin.flux_msg_server_side_filter_sort
     ]
     flx_msg_simple_repeated_attribute_options: List[str] = [
         # put this category's options here

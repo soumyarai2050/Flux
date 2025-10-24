@@ -14,8 +14,9 @@ const ModelCardHeader = ({
     const backgroundColor = theme.palette.primary.dark;
 
     // Handle double-click to toggle maximize/restore
-    const handleDoubleClick = () => {
-        if (onMaximizeToggle) {
+    const handleDoubleClick = (e) => {
+        // Only trigger if the double-click originated from the header itself,
+        if (onMaximizeToggle && e.target === e.currentTarget) {
             onMaximizeToggle();
         }
     };

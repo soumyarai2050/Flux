@@ -26,6 +26,7 @@ import styles from './DataTable.module.css';
 import ClearAll from '@mui/icons-material/ClearAll';
 import Save from '@mui/icons-material/Save';
 import { getDataxpathV2, generateRowTrees } from '../../../../utils/core/dataAccess';
+import { copyToClipboard } from '../../../../utils/core/stringUtils';
 import { cloneDeep, get, set } from 'lodash';
 import { DB_ID, MODES, DATA_TYPES, MODEL_TYPES } from '../../../../constants';
 import { flux_toggle, flux_trigger_strat } from '../../../../projectSpecificUtils';
@@ -239,7 +240,7 @@ const DataTable = ({
     // Combine headers and rows into a single string.
     const tsvString = [headers, ...tsvRows].filter(Boolean).join('\n');
 
-    navigator.clipboard.writeText(tsvString).then(() => {
+    copyToClipboard(tsvString).then(() => {
       console.log('Selected rows copied to clipboard in TSV format.');
     }).catch(err => {
       console.error('Failed to copy selected rows to clipboard:', err);
@@ -696,7 +697,6 @@ const DataTable = ({
                           onTextChange={handleTextChange}
                           index={selectedId}
                           forceUpdate={isModalOpen}
-                          truncateDateTime={false}
                           modelType={modelType}
                           onForceSave={() => { }}
                           onRowSelect={handleRowSelect}

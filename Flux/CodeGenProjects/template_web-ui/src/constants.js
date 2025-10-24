@@ -231,3 +231,16 @@ export const DEFAULT_HIGHLIGHT_DURATION = 2; // in sec
 export const THEME_MODE_STORAGE_KEY = 'appThemeMode';
 
 export const BASE_COLOR_STORAGE_KEY = 'appBaseColor';
+
+/**
+ * Date and time format constants for consistent formatting across the application.
+ * @readonly
+ * @enum {string}
+ */
+export const DATE_TIME_FORMATS = Object.freeze({
+  DATE: 'YYYY-MM-DD',
+  TIME: 'HH:mm:ss.SSS',
+  DATETIME: 'YYYY-MM-DD HH:mm:ss.SSS',
+  DATETIME_INPUT: 'YYYY-MM-DD HH:mm:ss',
+  TIME_INPUT: 'HH:mm:ss'
+});

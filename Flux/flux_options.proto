@@ -270,6 +270,7 @@ extend google.protobuf.MessageOptions
   repeated OverrideDefaultCRUD FluxMsgOverrideDefaultCrud = 55263;
   optional DefaultFilterParam FluxMsgDefaultFilterParam = 55264;
   optional bool FluxMsgServerSidePagination = 55265;
+  optional bool FluxMsgServerSideFilterSort = 55266; // If true, signals that filters and sort options should be passed to the backend
 
   //Complexity Option - 56
   optional string FluxMsgCmplxHigh = 56151;
@@ -330,7 +331,7 @@ extend google.protobuf.FieldOptions
   optional bool FluxFldFilterEnable = 55267;
   optional bool FluxFldNoCommonKey = 55268;
   optional string FluxFldNumberFormat = 55269; // currently only symbol `%.2` is supported , in future we can add precision etc.
-  optional string FluxFldDisplayType = 55270; // Use this to set display data type for field
+  optional string FluxFldDisplayType = 55270; // Use this to set display data type for field. Supported values: "int", "datetime", "date" (date only, no time), etc.
   optional bool FluxFldDisplayZero = 55271;  // Use this to show field even if its value is 0
   optional string FluxFldTextAlign = 55272;  // Use this to set text alignment
   optional string FluxFldMicroSeparator = 55273;  // Use this to replace field separator

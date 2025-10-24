@@ -146,7 +146,7 @@ class BaseProtoPlugin(ABC):
     flux_msg_widget_ui_data_element: ClassVar[str] = "FluxMsgWidgetUIDataElement"
     flux_msg_widget_ui_option: ClassVar[str] = "FluxMsgWidgetUIOption"
     widget_ui_option_depending_proto_model_name_field: ClassVar[str] = "depending_proto_model_name"
-    widget_ui_option_depends_on_other_model_for_id_field: ClassVar[str] = "depends_on_other_model_for_id"
+    widget_ui_option_depending_proto_model_name_for_id_field: ClassVar[str] = "depending_proto_model_name_for_id"
     widget_ui_option_depending_proto_model_for_cpp_port_field: ClassVar[str] = "depending_proto_model_for_cpp_port"
     widget_ui_option_alert_bubble_source_field: ClassVar[str] = "alert_bubble_source"
     widget_ui_option_alert_bubble_color_field: ClassVar[str] = "alert_bubble_color"
@@ -212,6 +212,7 @@ class BaseProtoPlugin(ABC):
     flux_fld_micro_separator: ClassVar[str] = "FluxFldMicroSeparator"
     flux_msg_ui_get_all_limit: ClassVar[str] = "FluxMsgUIGetAllLimit"
     flux_msg_server_side_pagination: ClassVar[str] = "FluxMsgServerSidePagination"
+    flux_msg_server_side_filter_sort: ClassVar[str] = "FluxMsgServerSideFilterSort"
     flux_fld_abbreviated_link: ClassVar[str] = "FluxFldAbbreviatedLink"
     flux_fld_mapping_underlying_meta_field: ClassVar[str] = "FluxFldMappingUnderlyingMetaField"
     flux_fld_mapping_src: ClassVar[str] = "FluxFldMappingSrc"
@@ -290,6 +291,7 @@ class BaseProtoPlugin(ABC):
     ]
     widget_ui_option_fields_having_msg_names: List[str] = [
         widget_ui_option_depending_proto_model_name_field,
+        widget_ui_option_depending_proto_model_name_for_id_field,
         widget_ui_option_depending_proto_model_field_name_for_host,
         widget_ui_option_depending_proto_model_field_name_for_port,
         widget_ui_option_depending_proto_model_field_name_for_view_port,
