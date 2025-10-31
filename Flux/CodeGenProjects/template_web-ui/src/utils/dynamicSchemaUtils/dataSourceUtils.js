@@ -93,26 +93,15 @@ export function getDataSourcesFromSchema(modelSchema) {
 
 /**
  * Extract modelDependencyMap from schema.
- * Returns an object with optional keys (urlOverride, crudOverride, defaultFilter)
+ * Returns an object with optional keys (urlOverride, crudOverride, defaultFilter, idDependent)
  * where each value is a dataSource name.
- * Only applicable for non-abbreviated models (Root/NonRoot/RepeatedRoot).
+ * Applicable for all model types (Root/NonRoot/RepeatedRoot/AbbreviationMerge).
  *
  * @param {object} modelSchema - The schema for a specific model
  * @returns {object|null} - Map of dependency configurations or null
  */
 export function getModelDependencyMap(modelSchema) {
   if (!modelSchema) {
-    return null;
-  }
-
-  // Check if this is an abbreviated model
-  const widgetUiData = modelSchema?.widget_ui_data_element?.widget_ui_data;
-  const isAbbreviatedModel = widgetUiData?.some(
-    (uiData) => uiData?.view_layout === 'UI_ABBREVIATED_FILTER'
-  );
-
-  // ModelDependencyMap only applies to non-abbreviated models
-  if (isAbbreviatedModel) {
     return null;
   }
 
@@ -151,6 +140,21 @@ export function getModelDependencyMap(modelSchema) {
 }
 
 
+/**
+ * Computes model-to-dependent mappings for all widget models in the schema.
+ * This function processes both abbreviated and non-abbreviated models to extract:
+ *
+ * 1. abbreviationModelToSourcesMap: Maps abbreviated models to their data source models
+ * 2. modelToDependencyMap: Maps all models to their dependency configurations
+ *    (urlOverride, crudOverride, defaultFilter, idDependent)
+ * 3. abbreviationSourcesSet: Set of all models that serve as data sources for abbreviated models
+ *
+ * @param {object} schema - The complete schema object containing all model definitions
+ * @returns {object} - Object with three properties:
+ *   - abbreviationModelToSourcesMap: { [modelName]: string[] }
+ *   - modelToDependencyMap: { [modelName]: { urlOverride?, crudOverride?, defaultFilter?, idDependent? } }
+ *   - abbreviationSourcesSet: Set<string>
+ */
 export function computeModelToDependentMap(schema) {
   if (!schema || typeof schema !== 'object') {
     console.warn('[computemodelToDependentMap] Invalid schema provided');
@@ -192,12 +196,12 @@ export function computeModelToDependentMap(schema) {
           abbreviationSourcesSet.add(source);
         });
       }
-    } else {
-      // For non-abbreviated models: compute modelDependencyMap
-      const dependencyMap = getModelDependencyMap(modelSchema);
-      if (dependencyMap) {
-        modelToDependencyMap[modelName] = dependencyMap;
-      }
+    }
+
+    // Compute modelDependencyMap for ALL models (both abbreviated and non-abbreviated)
+    const dependencyMap = getModelDependencyMap(modelSchema);
+    if (dependencyMap) {
+      modelToDependencyMap[modelName] = dependencyMap;
     }
   });
 

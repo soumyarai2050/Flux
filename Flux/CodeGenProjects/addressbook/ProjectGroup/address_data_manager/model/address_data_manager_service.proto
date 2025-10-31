@@ -39,7 +39,6 @@ message BarData {
     ExpireAfterSeconds: 31536000,  // one year worth of seconds
     IncludeDataframeClients: true
   };
-  option (FluxMsgGetFilterCountQuery) = true;
   option (FluxMsgJsonQuery) = {
     QueryName: "get_latest_bar_data",
     QueryParams: {
@@ -133,7 +132,6 @@ message ErrorBarData {
     CreateAllOp: AggregateType_UNSPECIFIED
     IncludeDataframeClients: true
   };
-  option (FluxMsgGetFilterCountQuery) = true;
   option (FluxMsgStringLength) = 128;
   required int32 id = 1;
   required BarMetaData bar_meta_data = 2 [(FluxFldPk) = "symbol"];
@@ -192,7 +190,6 @@ message BarDataAvailability {
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
     IncludeDataframeClients: true
   };
-  option (FluxMsgGetFilterCountQuery) = true;
   option (FluxMsgStringLength) = 128;
 
   //Server generated unique Id

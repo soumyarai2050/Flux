@@ -1004,7 +1004,7 @@ async def get_obj_list(dataclass_class_type: Type[dataclass], find_ids: List[Any
         return json_list
 
 
-# {'aggregate': }
+# {'agg': }
 @http_except_n_log_error(status_code=500)
 @generic_perf_benchmark
 async def projection_read_http(dataclass_class_type: Type[dataclass], proto_package_name: str,
@@ -1019,7 +1019,7 @@ async def projection_read_http(dataclass_class_type: Type[dataclass], proto_pack
     if projection_model is None:
         projection_model = dataclass_class_type
     else:
-        agg_pipeline = filter_agg_pipeline["aggregate"]
+        agg_pipeline = filter_agg_pipeline["agg"]
     try:
         collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = dataclass_class_type.collection_obj
         fetched_objs_cursor: motor.motor_asyncio.AsyncIOMotorCommandCursor = collection_obj.aggregate(agg_pipeline)
@@ -1046,7 +1046,7 @@ async def get_filtered_obj_list(filter_agg_pipeline: Dict, dataclass_class_type:
     if projection_model is None:
         projection_model = dataclass_class_type
     else:
-        agg_pipeline = filter_agg_pipeline["aggregate"]
+        agg_pipeline = filter_agg_pipeline["agg"]
 
     collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = dataclass_class_type.collection_obj
 

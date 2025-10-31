@@ -40,30 +40,6 @@ message RollingMaxChoreCount{
   optional int32 rolling_tx_count_period_seconds = 2 [(FluxFldHelp) = "sliding window interval of above count enforcement, not setting this value implies SOD is window-start & checking-time as window-end"];
 }
 
-enum PlanState{
-  //set this state for plans just created by user
-  PlanState_UNSPECIFIED = 0;
-  // set this state post required constraint validation of plan - such as system checked all required plan params are
-  // present and are as expected, do this for:
-  // 1. new plans before moving them to ready state upon user explicit save request
-  // 2. existing plans when loading them from store (if validation fails - raise alert and put them in ERROR state)
-  PlanState_READY = 1;
-  // set PlanStatus.ACTIVE state upon explicit user request, check:
-  // 1. all required plans and contact level limit checks are passing else reject user's request
-  // 2. plan is in PlanStatus.READY state (user triggers a plan)
-  // 3. plan is in PlanStatus.PAUSED state (resume paused plan)
-  PlanState_ACTIVE = 2;
-  // set PlanStatus.PAUSED state upon explicit user request, check plan is currently in PlanStatus.READY state
-  PlanState_PAUSED = 3;
-  // this is set in any exception scenario - dev/support/business involvement is needed to find the gap and bridge
-  // for future handling of similar scenario, day-1 block plan (only engine restart can allow plan to be restarted)
-  PlanState_ERROR = 4;
-  // set PlanStatus.PAUSED state when plan has completed its set target
-  PlanState_DONE = 5;
-  // set PlanState_SNOOZED state when plan is unloaded from collection
-  PlanState_SNOOZED = 6;
-}
-
 
 enum PlanMode{
   PlanMode_Normal = 0;

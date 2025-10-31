@@ -36,10 +36,12 @@ function useWebSocketWorker({
   // Refs to track latest values for worker messages
   const sortOrdersRef = useRef(sortOrders);
   const uiLimitRef = useRef(uiLimit);
+  const isAlertModelRef = useRef(isAlertModel);
 
   // Update refs directly (no useEffect needed)
   sortOrdersRef.current = sortOrders;
   uiLimitRef.current = uiLimit;
+  isAlertModelRef.current = isAlertModel;
 
   // State to notify UI about connection status changes
   const [, setIsConnected] = useState(false);
@@ -96,7 +98,7 @@ function useWebSocketWorker({
     }
 
     apiUrl = queryParams.toString() ? `${baseEndpoint}?${queryParams.toString()}` : baseEndpoint;
-    
+
     const connection = connectionRef.current;
     const { messageBuffer } = connection;
     const ws = new WebSocket(apiUrl);
@@ -170,7 +172,7 @@ function useWebSocketWorker({
     const interval = setInterval(() => {
       const connection = connectionRef.current;
       const { messageBuffer, isWorkerBusy, worker } = connection;
-      
+
       if (!isWorkerBusy) {
         // Send snapshot if available, otherwise send messageBuffer
         if (snapshotRef.current) {
@@ -180,9 +182,9 @@ function useWebSocketWorker({
           worker.postMessage({
             snapshot,
             storedArray: storedArrayRef.current,
-            uiLimit : uiLimitRef.current,
-            sortOrders : sortOrdersRef.current,
-            isAlertModel
+            uiLimit: uiLimitRef.current,
+            sortOrders: sortOrdersRef.current,
+            isAlertModel: isAlertModelRef.current
           });
         } else if (messageBuffer.length > 0) {
           const messages = [...messageBuffer];
@@ -193,7 +195,7 @@ function useWebSocketWorker({
             storedArray: storedArrayRef.current,
             uiLimit: uiLimitRef.current,
             sortOrders: sortOrdersRef.current,
-            isAlertModel
+            isAlertModel: isAlertModelRef.current
           });
         }
       }

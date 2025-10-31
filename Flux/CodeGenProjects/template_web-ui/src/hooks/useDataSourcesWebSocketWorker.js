@@ -37,7 +37,8 @@ const useDataSourcesWebsocketWorker = ({
   dataSourcesCrudOverrideDict = null,
   dataSourcesParams = null,
   connectionByGetAll = false,
-  activeIds = []
+  activeIds = [],
+  dataSourcesUrlOverrideDict
 }) => {
   const dispatch = useDispatch();
 
@@ -131,9 +132,11 @@ const useDataSourcesWebsocketWorker = ({
 
     const currentConnectionDict = connectionsRef.current;
     dataSources.forEach(({ name, url }) => {
-      if (!url || isDisabled) return;
+      if (isDisabled) return;
+      const baseUrl = dataSourcesUrlOverrideDict[name];
+      if (!baseUrl) return;
 
-      const wsUrl = getWebSocketUrl(url);
+      const wsUrl = getWebSocketUrl(baseUrl);
       let apiUrl = `${wsUrl}/get-all-${name}-ws`;
       const crudOverrideDict = dataSourcesCrudOverrideDict?.[name];
       const params = dataSourcesParams?.[name] ?? null;
@@ -196,7 +199,8 @@ const useDataSourcesWebsocketWorker = ({
   }, [
     dataSourcesParams,
     isDisabled,
-    reconnectCounter
+    reconnectCounter,
+    JSON.stringify(dataSourcesUrlOverrideDict)
   ]);
 
   // -----------------------------

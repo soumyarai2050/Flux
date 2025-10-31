@@ -19,3 +19,13 @@
 .pivot_table {
     overflow: auto;
 }
+
+
+.no_data_message {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    font-size: 1.2rem;
+    color: var(--grey-debug);
+}

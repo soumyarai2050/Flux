@@ -91,7 +91,5 @@ def get_aggregate_pipeline(encap_agg_pipeline: Dict):
     if additional_agg is not None:
         agg_pipeline.extend(additional_agg)
         return agg_pipeline
-    elif len(agg_pipeline) != 0:
-        return agg_pipeline
     else:
-        return encap_agg_pipeline.get("aggregate")
+        return agg_pipeline

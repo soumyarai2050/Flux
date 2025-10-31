@@ -74,27 +74,27 @@ async def broadcast_all_from_active_ws_data_set(active_ws_data_set: List[WSData]
 
             # inserting match by obj_list as top match filter
             if not ws_data.allow_full_db_read_on_updates:
-                filter_agg_pipeline["aggregate"].insert(0, get_match_layer_for_obj_id_list(db_obj_id_list))
+                filter_agg_pipeline["agg"].insert(0, get_match_layer_for_obj_id_list(db_obj_id_list))
 
-            db_obj_dict_list = await get_obj_list(msgspec_class_type, db_obj_id_list,
+            projected_db_obj_dict_list = await get_obj_list(msgspec_class_type, db_obj_id_list,
                                                   filter_agg_pipeline=filter_agg_pipeline,
                                                   has_links=has_links, is_projection_type=True)
-            if not db_obj_dict_list:
+            if not projected_db_obj_dict_list:
                 # if this projection filter has some filter param that filters out all available db objs, in that case
                 # db_obj_dict_list will be empty so no ws update is required
                 continue
             # else not required: all good if fetched projection applied object list - will publish this now
 
-            for obj_json in db_obj_dict_list:
+            for obj_json in projected_db_obj_dict_list:
                 # handling all datetime fields - converting to epoch int values before passing to ws network
                 msgspec_class_type.convert_ts_fields_from_datetime_to_epoch_int(obj_json)
 
             if ws_data.allow_full_db_read_on_updates:
                 # full db read is done for projecting to single obj for example counting
                 # filtered docs - sending it as obj instead of list
-                json_str = orjson.dumps(db_obj_dict_list[0], default=non_jsonable_types_handler).decode('utf-8')
+                json_str = orjson.dumps(projected_db_obj_dict_list[0], default=non_jsonable_types_handler).decode('utf-8')
             else:
-                json_str = orjson.dumps(db_obj_dict_list, default=non_jsonable_types_handler).decode('utf-8')
+                json_str = orjson.dumps(projected_db_obj_dict_list, default=non_jsonable_types_handler).decode('utf-8')
 
         elif ws_data.has_pagination_with_or_without_filters:    # has pagination might also have filters and sort along with pagination
             page_changes = kwargs.get("page_changes")
@@ -141,20 +141,20 @@ async def broadcast_from_active_ws_data_set(active_ws_data_set: List[WSData], ms
 
             # inserting match by obj_list as top match filter
             if not ws_data.allow_full_db_read_on_updates:
-                filter_agg_pipeline["aggregate"].insert(0, get_match_layer_for_obj_id_list([db_obj_id]))
+                filter_agg_pipeline["agg"].insert(0, get_match_layer_for_obj_id_list([db_obj_id]))
 
-            db_obj_dict = await get_obj(msgspec_class_type, db_obj_id,
+            projected_db_obj_dict = await get_obj(msgspec_class_type, db_obj_id,
                                         filter_agg_pipeline=filter_agg_pipeline,
                                         has_links=has_links, is_projection_type=True)
-            if db_obj_dict is None:
+            if projected_db_obj_dict is None:
                 # if this projection filter has some filter param that mismatches to this update, in that case
                 # db_obj_dict will be None so no ws update is required
                 continue
             # else not required: all good if fetched projection applied object - will publish this now
 
             # handling all datetime fields - converting to epoch int values before passing to ws network
-            msgspec_class_type.convert_ts_fields_from_datetime_to_epoch_int(db_obj_dict)
-            json_str = orjson.dumps(db_obj_dict, default=non_jsonable_types_handler).decode("utf-8")
+            msgspec_class_type.convert_ts_fields_from_datetime_to_epoch_int(projected_db_obj_dict)
+            json_str = orjson.dumps(projected_db_obj_dict, default=non_jsonable_types_handler).decode("utf-8")
 
         # else not required: passing provided db_obj_dict if ws_data is not of projection type to avoid
         # multiple look-ups as fetched object will also be exact same unless some projection is required on it
@@ -1099,6 +1099,8 @@ async def generic_delete_by_id_list_http(
 async def generic_read_http(msgspec_class_type: Type[MsgspecModel], proto_package_name: str,
                             filter_agg_pipeline: Any = None, has_links: bool = False,
                             read_ids_list: List[Any] | None = None, projection_model=None, **kwargs):
+    if filter_agg_pipeline is None:
+        filter_agg_pipeline = {}
     json_obj_list: List[msgspec_class_type]
 
     aggregate_pipeline = []
@@ -1106,22 +1108,20 @@ async def generic_read_http(msgspec_class_type: Type[MsgspecModel], proto_packag
     if filter_agg_pipeline:
 
         passed_agg = filter_agg_pipeline.get("agg", [])
-        passed_aggregate = filter_agg_pipeline.get("aggregate", [])
 
         # we will only receive agg key or aggregate key if we see filter_agg_pipeline is non-empty so only one
         # will be extended
         aggregate_pipeline.extend(passed_agg)
-        aggregate_pipeline.extend(passed_aggregate)
 
     filter_sort_pagination_agg_pipeline = create_cascading_multi_filter_pipeline(msgspec_class_type, **kwargs)
     if filter_sort_pagination_agg_pipeline:
         aggregate_pipeline.extend(filter_sort_pagination_agg_pipeline)
 
-    filter_sort_pagination_agg_pipeline = {"agg": aggregate_pipeline}
+    filter_agg_pipeline["agg"] = aggregate_pipeline
 
     json_obj_list = \
         await get_obj_list(msgspec_class_type, read_ids_list,
-                           filter_agg_pipeline=filter_sort_pagination_agg_pipeline, has_links=has_links)
+                           filter_agg_pipeline=filter_agg_pipeline, has_links=has_links)
     if read_ids_list and len(json_obj_list) != len(set(read_ids_list)):
         existing_ids = set()
         for json_obj in json_obj_list:
@@ -1199,23 +1199,6 @@ async def _generic_read_ws(msgspec_class_type: Type[MsgspecModel], ws: WebSocket
             logging.debug(f"Disconnected to websocket: {ws.client}")
 
 
-def get_filter_sort_pagination_pipeline_with_passed_agg(msgspec_class_type: Type[MsgspecModel], **kwargs):
-    passed_filter_agg_pipeline: Dict | None = kwargs.get("filter_agg_pipeline_param")
-
-    filter_sort_pagination_agg_pipeline: List[Dict[str, Any]] = []
-    if passed_filter_agg_pipeline is not None:
-        filter_sort_pagination_agg_pipeline: List[Dict[str, Any]] = copy.deepcopy(passed_filter_agg_pipeline.get("agg"))
-
-    filters = kwargs.get("filters")
-    sort_order = kwargs.get("sort_order")
-    pagination = kwargs.get("pagination")
-
-    filter_sort_pagination_agg_pipeline.extend(create_cascading_multi_filter_pipeline(msgspec_class_type, filters,
-                                                                                      sort_order, pagination))
-
-    return filter_sort_pagination_agg_pipeline
-
-
 async def ws_get_all_filter_callable(**kwargs):
     obj_json_str = kwargs.get("json_obj_str")
     return obj_json_str
@@ -1235,11 +1218,22 @@ async def generic_read_ws(ws: WebSocket, project_name: str, msgspec_class_type: 
                                                                                           filter_kwargs)
     logging.debug(f"websocket client requested to connect: {ws.client}")
 
-    filter_sort_pagination_agg_pipeline_with_passed_agg = get_filter_sort_pagination_pipeline_with_passed_agg(
-        msgspec_class_type, **filter_kwargs)
-    agg_pipeline = {"agg": filter_sort_pagination_agg_pipeline_with_passed_agg}
+    filters = filter_kwargs.get("filters")
+    sort_order = filter_kwargs.get("sort_order")
+    pagination = filter_kwargs.get("pagination")
 
-    await _generic_read_ws(msgspec_class_type, ws, agg_pipeline, need_initial_snapshot, is_new_ws,
+    filter_sort_pagination_agg_pipeline = create_cascading_multi_filter_pipeline(msgspec_class_type, filters,
+                                                                                 sort_order, pagination)
+    if filter_agg_pipeline is not None:
+        filter_agg_pipeline_ = copy.deepcopy(filter_agg_pipeline)
+    else:
+        filter_agg_pipeline_ = {}
+    if agg_pipeline:=filter_agg_pipeline_.get("agg"):
+        agg_pipeline.extend(filter_sort_pagination_agg_pipeline)
+    else:
+        filter_agg_pipeline_["agg"] = filter_sort_pagination_agg_pipeline
+
+    await _generic_read_ws(msgspec_class_type, ws, filter_agg_pipeline_, need_initial_snapshot, is_new_ws,
                            has_links, ws_id=ws_id, **filter_kwargs)
 
 
@@ -1470,7 +1464,7 @@ async def projection_read_http(msgspec_class_type: Type[MsgspecModel], proto_pac
     if projection_model is None:
         projection_model = msgspec_class_type
     else:
-        agg_pipeline = filter_agg_pipeline["aggregate"]
+        agg_pipeline = filter_agg_pipeline["agg"]
     try:
         collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.collection_obj
         fetched_objs_cursor: motor.motor_asyncio.AsyncIOMotorCommandCursor = collection_obj.aggregate(agg_pipeline)
@@ -1501,7 +1495,7 @@ async def get_filtered_obj_list(filter_agg_pipeline: Dict, msgspec_class_type: T
     if not is_projection_type:
         agg_pipeline = get_aggregate_pipeline(filter_agg_pipeline_copy)
     else:
-        agg_pipeline = filter_agg_pipeline["aggregate"]
+        agg_pipeline = filter_agg_pipeline["agg"]
 
     collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = msgspec_class_type.collection_obj
 

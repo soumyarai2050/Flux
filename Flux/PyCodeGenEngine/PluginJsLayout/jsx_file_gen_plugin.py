@@ -106,8 +106,19 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
         # Check if this is an abbreviated model
         is_abbreviated = model_type == JsxFileGenPlugin.abbreviated_merge_type
 
+        # Add modelDependencyMap for all models (abbreviated and non-abbreviated)
+        dependency_dict = self.msg_name_to_dependency_dict.get(message_name)
+        if dependency_dict:
+            output_str += JsxFileGenPlugin.indentation_space + f"modelDependencyMap: {{\n"
+            for key, dep_msg_name in dependency_dict.items():
+                dep_msg_name_snake_cased = convert_camel_case_to_specific_case(dep_msg_name)
+                output_str += JsxFileGenPlugin.indentation_space*2 + f"{key}: '{dep_msg_name_snake_cased}',\n"
+            output_str += JsxFileGenPlugin.indentation_space + "},\n"
+        else:
+            output_str += JsxFileGenPlugin.indentation_space + f"modelDependencyMap: null,\n"
+
+        # Add dataSources only for abbreviated models
         if is_abbreviated:
-            # For abbreviated models: use dataSources array
             dependent_msg_name_list: List[str] = self.msg_name_to_dependent_msg_name_list_dict.get(message_name)
             if dependent_msg_name_list:
                 output_str += JsxFileGenPlugin.indentation_space + f"dataSources: [\n"
@@ -117,17 +128,6 @@ class JsxFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += JsxFileGenPlugin.indentation_space + "],\n"
             else:
                 output_str += JsxFileGenPlugin.indentation_space + f"dataSources: null,\n"
-        else:
-            # For non-abbreviated models: use modelDependencyMap
-            dependency_dict = self.msg_name_to_dependency_dict.get(message_name)
-            if dependency_dict:
-                output_str += JsxFileGenPlugin.indentation_space + f"modelDependencyMap: {{\n"
-                for key, dep_msg_name in dependency_dict.items():
-                    dep_msg_name_snake_cased = convert_camel_case_to_specific_case(dep_msg_name)
-                    output_str += JsxFileGenPlugin.indentation_space*2 + f"{key}: '{dep_msg_name_snake_cased}',\n"
-                output_str += JsxFileGenPlugin.indentation_space + "},\n"
-            else:
-                output_str += JsxFileGenPlugin.indentation_space + f"modelDependencyMap: null,\n"
 
         if is_abbreviation_source:
             output_str += JsxFileGenPlugin.indentation_space + f"isAbbreviationSource: true,\n"

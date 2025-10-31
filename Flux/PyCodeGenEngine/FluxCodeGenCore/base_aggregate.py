@@ -88,7 +88,7 @@ def get_nested_field_max_id(nested_field_name):
 
 
 def get_raw_perf_data_callable_names_pipeline():
-    agg_pipeline = {"aggregate": [
+    agg_pipeline = {"agg": [
         {
             '$group': {
                 '_id': '$callable_name',
@@ -108,7 +108,7 @@ def get_raw_perf_data_callable_names_pipeline():
 
 
 def get_raw_performance_data_from_callable_name_agg_pipeline(callable_name: str):
-    return {"aggregate": [
+    return {"agg": [
         {
             "$match": {
                 "callable_name": callable_name
@@ -229,23 +229,67 @@ def create_cascading_multi_filter_pipeline(model_class: Type,
             text_filter_type = f['text_filter_type']
             escaped_text = re.escape(text_filter)
 
-            text_op = None
-            if text_filter_type == 'equals':
-                text_op = {"$eq": text_filter}
-            elif text_filter_type == 'notEqual':
-                text_op = {"$ne": text_filter}
-            elif text_filter_type == 'contains':
-                text_op = {"$regex": escaped_text, "$options": "i"}
-            elif text_filter_type == 'notContains':
-                match_and_conditions.append({key: {"$not": re.compile(escaped_text, re.IGNORECASE)}})
-                continue
-            elif text_filter_type == 'beginsWith':
-                text_op = {"$regex": f"^{escaped_text}", "$options": "i"}
-            elif text_filter_type == 'endsWith':
-                text_op = {"$regex": f"{escaped_text}$", "$options": "i"}
+            # For equals/notEqual, use type-aware matching with $or conditions
+            if text_filter_type in ['equals', 'notEqual']:
+                # Use the common helper function for type-aware conditions
+                type_aware_conditions = create_type_aware_filter_conditions(key, text_filter, text_filter_type)
 
-            if text_op:
-                match_and_conditions.append({key: text_op})
+                # Use $or to match any of the type-specific conditions
+                if len(type_aware_conditions) > 1:
+                    match_and_conditions.append({"$or": type_aware_conditions})
+                else:
+                    match_and_conditions.extend(type_aware_conditions)
+            else:
+                # For contains/notContains/beginsWith/endsWith, use string-based regex matching
+                # Use $toString for multi-type support, but handle nested array fields properly
+                text_op = None
+                if text_filter_type == 'contains':
+                    # Check if this is a nested field (contains dots)
+                    if '.' in key:
+                        # For nested fields, use $regex directly without $toString to avoid array conversion issues
+                        text_op = {key: {"$regex": escaped_text, "$options": "i"}}
+                    else:
+                        # For top-level fields, use $regexMatch with $toString
+                        text_op = {"$regexMatch": {"input": {"$toString": f"${key}"},
+                                                   "regex": escaped_text, "options": "i"}}
+                elif text_filter_type == 'notContains':
+                    # Check if this is a nested field (contains dots)
+                    if '.' in key:
+                        # For nested fields, use $not with $regex directly
+                        match_and_conditions.append({key: {"$not": {"$regex": escaped_text, "$options": "i"}}})
+                        continue
+                    else:
+                        # For top-level fields, use $regexMatch with $toString
+                        match_and_conditions.append(
+                            {"$expr": {"$not": {"$regexMatch": {"input": {"$toString": f"${key}"},
+                                                                "regex": escaped_text, "options": "i"}}}})
+                        continue
+                elif text_filter_type == 'beginsWith':
+                    # Check if this is a nested field (contains dots)
+                    if '.' in key:
+                        # For nested fields, use $regex directly
+                        text_op = {key: {"$regex": f"^{escaped_text}", "$options": "i"}}
+                    else:
+                        # For top-level fields, use $regexMatch with $toString
+                        text_op = {"$regexMatch": {"input": {"$toString": f"${key}"},
+                                                   "regex": f"^{escaped_text}", "options": "i"}}
+                elif text_filter_type == 'endsWith':
+                    # Check if this is a nested field (contains dots)
+                    if '.' in key:
+                        # For nested fields, use $regex directly
+                        text_op = {key: {"$regex": f"{escaped_text}$", "$options": "i"}}
+                    else:
+                        # For top-level fields, use $regexMatch with $toString
+                        text_op = {"$regexMatch": {"input": {"$toString": f"${key}"},
+                                                   "regex": f"{escaped_text}$", "options": "i"}}
+
+                if text_op:
+                    # For nested fields, text_op is already a match condition
+                    # For top-level fields, text_op needs to be wrapped in $expr
+                    if '.' in key:
+                        match_and_conditions.append(text_op)
+                    else:
+                        match_and_conditions.append({"$expr": text_op})
 
     if match_and_conditions:
         pipeline.append({"$match": {"$and": match_and_conditions}})
@@ -299,26 +343,64 @@ def create_cascading_multi_filter_pipeline(model_class: Type,
                             escaped_text = re.escape(text_filter)
                             field_path_expr = f"$${item_as_variable}.{field_in_element}"
 
-                            text_condition = None
-                            if text_filter_type == 'equals':
-                                text_condition = {"$eq": [field_path_expr, text_filter]}
-                            elif text_filter_type == 'notEqual':
-                                text_condition = {"$ne": [field_path_expr, text_filter]}
-                            elif text_filter_type == 'contains':
-                                text_condition = {
-                                    "$regexMatch": {"input": field_path_expr, "regex": escaped_text, "options": "i"}}
-                            elif text_filter_type == 'notContains':
-                                text_condition = {"$not": [
-                                    {"$regexMatch": {"input": field_path_expr, "regex": escaped_text, "options": "i"}}]}
-                            elif text_filter_type == 'beginsWith':
-                                text_condition = {"$regexMatch": {"input": field_path_expr, "regex": f"^{escaped_text}",
-                                                                  "options": "i"}}
-                            elif text_filter_type == 'endsWith':
-                                text_condition = {"$regexMatch": {"input": field_path_expr, "regex": f"{escaped_text}$",
-                                                                  "options": "i"}}
+                            # For equals/notEqual, use type-aware matching with $or conditions
+                            if text_filter_type in ['equals', 'notEqual']:
+                                # Create type-aware conditions for innermost array filtering
+                                type_aware_conditions = []
 
-                            if text_condition:
-                                single_filter_conditions.append(text_condition)
+                                # String matching
+                                if text_filter_type == 'equals':
+                                    type_aware_conditions.append({"$eq": [field_path_expr, text_filter]})
+                                else:  # notEqual
+                                    type_aware_conditions.append({"$ne": [field_path_expr, text_filter]})
+
+                                # Try numeric matching if text_filter looks like a number
+                                try:
+                                    if '.' in text_filter:
+                                        numeric_value = float(text_filter)
+                                    else:
+                                        numeric_value = int(text_filter)
+
+                                    if text_filter_type == 'equals':
+                                        type_aware_conditions.append({"$eq": [field_path_expr, numeric_value]})
+                                    else:  # notEqual
+                                        type_aware_conditions.append({"$ne": [field_path_expr, numeric_value]})
+                                except ValueError:
+                                    pass  # Not a numeric value, skip numeric conditions
+
+                                # Try boolean matching if text_filter looks like a boolean
+                                if text_filter.lower() in ['true', 'false', '1', '0', 'yes', 'no', 'on', 'off']:
+                                    bool_value = text_filter.lower() in ['true', '1', 'yes', 'on']
+                                    if text_filter_type == 'equals':
+                                        type_aware_conditions.append({"$eq": [field_path_expr, bool_value]})
+                                    else:  # notEqual
+                                        type_aware_conditions.append({"$ne": [field_path_expr, bool_value]})
+
+                                # Use $or to match any of the type-specific conditions
+                                if len(type_aware_conditions) > 1:
+                                    single_filter_conditions.append({"$or": type_aware_conditions})
+                                else:
+                                    single_filter_conditions.extend(type_aware_conditions)
+                            else:
+                                # For contains/notContains/beginsWith/endsWith, use regex directly on string fields
+                                # Avoid $toString on array fields to prevent conversion errors
+                                text_condition = None
+                                if text_filter_type == 'contains':
+                                    # Use $regex directly - works on string fields in nested documents
+                                    text_condition = {"$regexMatch": {"input": field_path_expr,
+                                                                      "regex": escaped_text, "options": "i"}}
+                                elif text_filter_type == 'notContains':
+                                    text_condition = {"$not": {"$regexMatch": {"input": field_path_expr,
+                                                                               "regex": escaped_text, "options": "i"}}}
+                                elif text_filter_type == 'beginsWith':
+                                    text_condition = {"$regexMatch": {"input": field_path_expr,
+                                                                      "regex": f"^{escaped_text}", "options": "i"}}
+                                elif text_filter_type == 'endsWith':
+                                    text_condition = {"$regexMatch": {"input": field_path_expr,
+                                                                      "regex": f"{escaped_text}$", "options": "i"}}
+
+                                if text_condition:
+                                    single_filter_conditions.append(text_condition)
 
                         if single_filter_conditions:
                             if len(single_filter_conditions) > 1:
@@ -375,29 +457,64 @@ def create_cascading_multi_filter_pipeline(model_class: Type,
                                 escaped_text = re.escape(text_filter)
                                 field_path_expr = f"$${filter_item_var}.{field_in_element}"
 
-                                text_condition = None
-                                if text_filter_type == 'equals':
-                                    text_condition = {"$eq": [field_path_expr, text_filter]}
-                                elif text_filter_type == 'notEqual':
-                                    text_condition = {"$ne": [field_path_expr, text_filter]}
-                                elif text_filter_type == 'contains':
-                                    text_condition = {"$regexMatch": {"input": field_path_expr, "regex": escaped_text,
-                                                                      "options": "i"}}
-                                elif text_filter_type == 'notContains':
-                                    text_condition = {"$not": [{"$regexMatch": {"input": field_path_expr,
-                                                                                "regex": escaped_text,
-                                                                                "options": "i"}}]}
-                                elif text_filter_type == 'beginsWith':
-                                    text_condition = {
-                                        "$regexMatch": {"input": field_path_expr, "regex": f"^{escaped_text}",
-                                                        "options": "i"}}
-                                elif text_filter_type == 'endsWith':
-                                    text_condition = {
-                                        "$regexMatch": {"input": field_path_expr, "regex": f"{escaped_text}$",
-                                                        "options": "i"}}
+                                # For equals/notEqual, use type-aware matching with $or conditions
+                                if text_filter_type in ['equals', 'notEqual']:
+                                    # Create type-aware conditions for nested array filtering
+                                    type_aware_conditions = []
 
-                                if text_condition:
-                                    single_filter_conditions.append(text_condition)
+                                    # String matching
+                                    if text_filter_type == 'equals':
+                                        type_aware_conditions.append({"$eq": [field_path_expr, text_filter]})
+                                    else:  # notEqual
+                                        type_aware_conditions.append({"$ne": [field_path_expr, text_filter]})
+
+                                    # Try numeric matching if text_filter looks like a number
+                                    try:
+                                        if '.' in text_filter:
+                                            numeric_value = float(text_filter)
+                                        else:
+                                            numeric_value = int(text_filter)
+
+                                        if text_filter_type == 'equals':
+                                            type_aware_conditions.append({"$eq": [field_path_expr, numeric_value]})
+                                        else:  # notEqual
+                                            type_aware_conditions.append({"$ne": [field_path_expr, numeric_value]})
+                                    except ValueError:
+                                        pass  # Not a numeric value, skip numeric conditions
+
+                                    # Try boolean matching if text_filter looks like a boolean
+                                    if text_filter.lower() in ['true', 'false', '1', '0', 'yes', 'no', 'on', 'off']:
+                                        bool_value = text_filter.lower() in ['true', '1', 'yes', 'on']
+                                        if text_filter_type == 'equals':
+                                            type_aware_conditions.append({"$eq": [field_path_expr, bool_value]})
+                                        else:  # notEqual
+                                            type_aware_conditions.append({"$ne": [field_path_expr, bool_value]})
+
+                                    # Use $or to match any of the type-specific conditions
+                                    if len(type_aware_conditions) > 1:
+                                        single_filter_conditions.append({"$or": type_aware_conditions})
+                                    else:
+                                        single_filter_conditions.extend(type_aware_conditions)
+                                else:
+                                    # For contains/notContains/beginsWith/endsWith, use regex directly
+                                    # Avoid $toString on array fields to prevent conversion errors
+                                    text_condition = None
+                                    if text_filter_type == 'contains':
+                                        text_condition = {"$regexMatch": {"input": field_path_expr,
+                                                                          "regex": escaped_text, "options": "i"}}
+                                    elif text_filter_type == 'notContains':
+                                        text_condition = {"$not": [{"$regexMatch": {"input": field_path_expr,
+                                                                                    "regex": escaped_text,
+                                                                                    "options": "i"}}]}
+                                    elif text_filter_type == 'beginsWith':
+                                        text_condition = {"$regexMatch": {"input": field_path_expr,
+                                                                          "regex": f"^{escaped_text}", "options": "i"}}
+                                    elif text_filter_type == 'endsWith':
+                                        text_condition = {"$regexMatch": {"input": field_path_expr,
+                                                                          "regex": f"{escaped_text}$", "options": "i"}}
+
+                                    if text_condition:
+                                        single_filter_conditions.append(text_condition)
 
                             if single_filter_conditions:
                                 if len(single_filter_conditions) > 1:
@@ -495,7 +612,108 @@ def get_cascading_multi_filter_count_pipeline(model_class: Type, filters: List[D
     # Finally, count the documents that match all criteria.
     pipeline.append({"$count": "filtered_count"})
 
-    return {"aggregate": pipeline}
+    return {"agg": pipeline}
+
+
+def create_type_aware_filter_conditions(field_name: str, text_filter: str, text_filter_type: str) -> list:
+    """
+    Create type-aware filter conditions for multi-type text filtering.
+
+    Supports boolean, integer, float, and string matching with proper type conversion.
+    """
+    conditions = []
+
+    # For equals/notEqual, use type-aware matching with $or conditions
+    if text_filter_type in ['equals', 'notEqual']:
+        # String matching condition
+        if text_filter_type == 'equals':
+            conditions.append({field_name: {"$eq": text_filter}})
+        else:  # notEqual
+            conditions.append({field_name: {"$ne": text_filter}})
+
+        # Try numeric matching if text_filter looks like a number
+        try:
+            if '.' in text_filter:
+                numeric_value = float(text_filter)
+            else:
+                numeric_value = int(text_filter)
+
+            if text_filter_type == 'equals':
+                conditions.append({field_name: {"$eq": numeric_value}})
+            else:  # notEqual
+                conditions.append({field_name: {"$ne": numeric_value}})
+        except ValueError:
+            pass  # Not a numeric value, skip numeric conditions
+
+        # Try boolean matching if text_filter looks like a boolean
+        if text_filter.lower() in ['true', 'false', '1', '0', 'yes', 'no', 'on', 'off']:
+            bool_value = text_filter.lower() in ['true', '1', 'yes', 'on']
+            if text_filter_type == 'equals':
+                conditions.append({field_name: {"$eq": bool_value}})
+            else:  # notEqual
+                conditions.append({field_name: {"$ne": bool_value}})
+
+    return conditions
+
+
+def check_multi_type_match(field_value: Any, text_filter: str, text_filter_type: str) -> bool:
+    """
+    Check if a field value matches a text filter using multi-type aware comparison.
+
+    Used in item_matches_filters for client-side filtering with same logic as pipeline.
+    """
+    # Convert both to lowercase string for comparison
+    field_str_value = str(field_value).lower()
+    filter_str_value = str(text_filter).lower()
+
+    # For equals/notEqual operations, try type-aware comparison first
+    if text_filter_type in ["equals", "notEqual"]:
+        try:
+            if isinstance(field_value, bool):
+                # Handle boolean comparison
+                filter_bool = text_filter.lower() in ["true", "1", "yes", "on"]
+                if text_filter_type == "equals":
+                    return field_value == filter_bool
+                else:  # notEqual
+                    return field_value != filter_bool
+            elif isinstance(field_value, int):
+                # Handle integer comparison
+                filter_int = int(text_filter)
+                if text_filter_type == "equals":
+                    return field_value == filter_int
+                else:  # notEqual
+                    return field_value != filter_int
+            elif isinstance(field_value, float):
+                # Handle float comparison
+                filter_float = float(text_filter)
+                if text_filter_type == "equals":
+                    return field_value == filter_float
+                else:  # notEqual
+                    return field_value != filter_float
+            else:
+                # Fall back to string comparison for other types
+                if text_filter_type == "equals":
+                    return field_str_value == filter_str_value
+                else:  # notEqual
+                    return field_str_value != filter_str_value
+        except (ValueError, TypeError):
+            # If type conversion fails, fall back to string comparison
+            if text_filter_type == "equals":
+                return field_str_value == filter_str_value
+            else:  # notEqual
+                return field_str_value != filter_str_value
+    else:
+        # For contains/notContains/beginsWith/endsWith operations, use string matching
+        if text_filter_type == "contains":
+            return filter_str_value in field_str_value
+        elif text_filter_type == "notContains":
+            return filter_str_value not in field_str_value
+        elif text_filter_type == "beginsWith":
+            return field_str_value.startswith(filter_str_value)
+        elif text_filter_type == "endsWith":
+            return field_str_value.endswith(filter_str_value)
+
+    return False
 
 
 def item_matches_filters(item: dict, filters: list[dict]) -> bool:
@@ -548,30 +766,9 @@ def item_matches_filters(item: dict, filters: list[dict]) -> bool:
             text_filter = filter_def["text_filter"]
             text_filter_type = filter_def.get("text_filter_type", "contains")
 
-            if not isinstance(field_value, str):
+            # Use the common helper function for multi-type text filtering
+            if not check_multi_type_match(field_value, text_filter, text_filter_type):
                 return False
-
-            text_lower = str(field_value).lower()
-            filter_lower = text_filter.lower()
-
-            if text_filter_type == "equals":
-                if text_lower != filter_lower:
-                    return False
-            elif text_filter_type == "notEqual":
-                if text_lower == filter_lower:
-                    return False
-            elif text_filter_type == "contains":
-                if filter_lower not in text_lower:
-                    return False
-            elif text_filter_type == "notContains":
-                if filter_lower in text_lower:
-                    return False
-            elif text_filter_type == "beginsWith":
-                if not text_lower.startswith(filter_lower):
-                    return False
-            elif text_filter_type == "endsWith":
-                if not text_lower.endswith(filter_lower):
-                    return False
 
     return True
 
@@ -824,24 +1021,65 @@ async def detect_multiple_page_changes(
                             text_filter = filter_def["text_filter"]
                             text_filter_type = filter_def.get("text_filter_type", "contains")
 
-                            if text_filter_type == "contains":
-                                regex_pattern = f".*{re.escape(text_filter)}.*"
-                            elif text_filter_type == "beginsWith":
-                                regex_pattern = f"^{re.escape(text_filter)}.*"
-                            elif text_filter_type == "endsWith":
-                                regex_pattern = f".*{re.escape(text_filter)}$"
-                            elif text_filter_type == "equals":
-                                regex_pattern = f"^{re.escape(text_filter)}$"
-                            elif text_filter_type == "notEqual":
-                                regex_pattern = f"^(?!.*{re.escape(text_filter)}).*$"
-                            elif text_filter_type == "notContains":
-                                regex_pattern = f"^(?!.*{re.escape(text_filter)}).*$"
-                            else:
-                                regex_pattern = f".*{text_filter}.*"
+                            # For equals/notEqual, use type-aware matching with $or conditions
+                            if text_filter_type in ["equals", "notEqual"]:
+                                # Create type-aware conditions for post-union filtering
+                                type_aware_conditions = []
 
-                            after_pipeline.append({
-                                "$match": {column_name: {"$regex": regex_pattern, "$options": "i"}}
-                            })
+                                # String matching
+                                if text_filter_type == "equals":
+                                    type_aware_conditions.append({column_name: {"$eq": text_filter}})
+                                else:  # notEqual
+                                    type_aware_conditions.append({column_name: {"$ne": text_filter}})
+
+                                # Try numeric matching if text_filter looks like a number
+                                try:
+                                    if '.' in text_filter:
+                                        numeric_value = float(text_filter)
+                                    else:
+                                        numeric_value = int(text_filter)
+
+                                    if text_filter_type == "equals":
+                                        type_aware_conditions.append({column_name: {"$eq": numeric_value}})
+                                    else:  # notEqual
+                                        type_aware_conditions.append({column_name: {"$ne": numeric_value}})
+                                except ValueError:
+                                    pass  # Not a numeric value, skip numeric conditions
+
+                                # Try boolean matching if text_filter looks like a boolean
+                                if text_filter.lower() in ['true', 'false', '1', '0', 'yes', 'no', 'on', 'off']:
+                                    bool_value = text_filter.lower() in ['true', '1', 'yes', 'on']
+                                    if text_filter_type == "equals":
+                                        type_aware_conditions.append({column_name: {"$eq": bool_value}})
+                                    else:  # notEqual
+                                        type_aware_conditions.append({column_name: {"$ne": bool_value}})
+
+                                # Use $or to match any of the type-specific conditions
+                                if len(type_aware_conditions) > 1:
+                                    after_pipeline.append({"$match": {"$or": type_aware_conditions}})
+                                else:
+                                    after_pipeline.append(
+                                        {"$match": type_aware_conditions[0] if type_aware_conditions else {}})
+                            else:
+                                # For contains/notContains/beginsWith/endsWith, use string-based regex matching
+                                if text_filter_type == "contains":
+                                    regex_pattern = f".*{re.escape(text_filter)}.*"
+                                elif text_filter_type == "beginsWith":
+                                    regex_pattern = f"^{re.escape(text_filter)}.*"
+                                elif text_filter_type == "endsWith":
+                                    regex_pattern = f".*{re.escape(text_filter)}$"
+                                elif text_filter_type == "equals":
+                                    regex_pattern = f"^{re.escape(text_filter)}$"
+                                elif text_filter_type == "notEqual":
+                                    regex_pattern = f"^(?!.*{re.escape(text_filter)}).*$"
+                                elif text_filter_type == "notContains":
+                                    regex_pattern = f"^(?!.*{re.escape(text_filter)}).*$"
+                                else:
+                                    regex_pattern = f".*{text_filter}.*"
+
+                                after_pipeline.append({
+                                    "$match": {column_name: {"$regex": regex_pattern, "$options": "i"}}
+                                })
 
             # Add sorting and pagination after the union
             if sort_order:
@@ -1094,8 +1332,8 @@ async def detect_multiple_page_changes(
 
                 # Check if bottom boundary actually changed (accounting for ties)
                 if before_bottom_key != after_bottom_key:
-                    if not any(
-                            change.get("_new_bottom") and change["_id"] == after_items[-1]["_id"] for change in changes):
+                    if not any(change.get("_new_bottom") and change["_id"] == after_items[-1]["_id"] for change in
+                               changes):
                         # For single item pages, ensure both flags are set
                         if len(after_items) == 1:
                             existing_change = next(

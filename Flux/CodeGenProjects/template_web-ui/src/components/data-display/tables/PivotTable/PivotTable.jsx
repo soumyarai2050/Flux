@@ -56,6 +56,7 @@ function PivotTable({
     const [updatedPivotObj, setUpdatedPivotObj] = useState({});
     const [isPivotOptionOpen, setIsPivotOptionOpen] = useState(false);
     const [isCellActive, setIsCellActive] = useState(false);
+    const [isCreate, setIsCreate] = useState(false);
 
     useEffect(() => {
         const updatedIndex = selectedPivotName ? pivotData.findIndex((o) => o.pivot_name === selectedPivotName) : null;
@@ -122,18 +123,34 @@ function PivotTable({
         updatedObj.value_filter = JSON.stringify({});
         setUpdatedPivotObj(updatedObj);
         setStoredPivotObj({});
+        setIsCreate(true);
         onModeToggle();
         setIsPivotOptionOpen(true);
     }
 
     const handlePivotOptionClose = (e, reason) => {
         if (reason === 'backdropClick' || reason === 'escapeKeyDown') return;
+        if (isCreate) {
+            // If we cancel creation, restore the previously selected pivot
+            if (selectedIndex !== null && pivotData[selectedIndex]) {
+                const selectedPivotOption = pivotData[selectedIndex];
+                setStoredPivotObj(selectedPivotOption);
+                setUpdatedPivotObj(addxpath(cloneDeep(selectedPivotOption)));
+            } else {
+                // Or clear if nothing was selected
+                setStoredPivotObj({});
+                setUpdatedPivotObj({});
+            }
+        }
         setIsPivotOptionOpen(false);
+        setIsCreate(false);
         onModeToggle();
     }
 
     const handleSave = () => {
         onModeToggle();
+        const wasCreating = isCreate;
+        setIsCreate(false);
         setIsPivotOptionOpen(false);
         const updatedObj = clearxpath(cloneDeep(updatedPivotObj));
         const idx = pivotData.findIndex((o) => o.pivot_name === updatedObj.pivot_name);
@@ -229,7 +246,7 @@ function PivotTable({
                 />
                 <Divider orientation='vertical' flexItem />
                 <Box className={styles.pivot_container}>
-                    {updatedPivotObj && Object.keys(updatedPivotObj).length > 0 && (
+                    {(updatedPivotObj && Object.keys(updatedPivotObj).length > 0) ? (
                         <>
                             <Box className={styles.pivot_table} style={{ height: `${tableHeight}px` }}>
                                 <PivotTableUI
@@ -246,20 +263,25 @@ function PivotTable({
                                     }}
                                 />
                             </Box>
+                            <Resizer
+                                direction="horizontal"
+                                onResize={handleTableResize}
+                                minSize={100}
+                                maxSize={containerRef.current ? containerRef.current.clientHeight - 100 : 600}
+                            />
                             {isCellActive && (
                                 <>
-                                    <Resizer
-                                        direction="horizontal"
-                                        onResize={handleTableResize}
-                                        minSize={100}
-                                        maxSize={containerRef.current ? containerRef.current.clientHeight - 100 : 600}
-                                    />
+
                                     <Box style={{ flex: 1, overflow: 'auto' }}>
                                         {children}
                                     </Box>
                                 </>
                             )}
                         </>
+                    ) : (
+                        <Box className={styles.no_data_message}>
+                            No Pivot Selected
+                        </Box>
                     )}
                 </Box>
                 <FullScreenModal

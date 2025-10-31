@@ -24,7 +24,6 @@ message BasketChore{
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED,
     PassStoredObjToPartialUpdatePostCallback: true
   };
-  option (FluxMsgGetFilterCountQuery) = true;
   option (FluxMsgWidgetUIDataElement) = {
     x: 4,
     y: 15,

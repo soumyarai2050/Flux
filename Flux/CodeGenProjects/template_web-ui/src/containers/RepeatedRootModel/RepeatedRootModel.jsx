@@ -42,6 +42,7 @@ function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap }) {
     const derivedModelName = useMemo(() => nodeModelName ?? modelName, [nodeModelName]);
 
     // Extract the four data sources from dictionary
+    // if node is there , modelDependencyMap is empty 
     const urlOverrideDataSource = modelDependencyMap?.urlOverride ?? null;
     const crudOverrideDataSource = modelDependencyMap?.crudOverride ?? null;
     const defaultFilterDataSource = modelDependencyMap?.defaultFilter ?? null;
@@ -279,6 +280,36 @@ function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap }) {
     const finalLastSelectedRowId = isChartModel ? lastSelectedDataPoint?._id : localLastSelectedRowId;
 
     const dispatch = useDispatch();
+
+    // Profile change detection - reset selections when layout profile changes
+    const currentProfileId = useSelector(state => state.ui_layout?.storedUILayoutObj?.profile_id);
+    const prevProfileIdRef = useRef(currentProfileId);
+
+    useEffect(() => {
+        if (prevProfileIdRef.current && prevProfileIdRef.current !== currentProfileId) {
+
+            // Reset local chart multiselect state
+            setChartMultiSelectState({});
+
+            // Reset Redux objId (single row selection for tables)
+            dispatch(actions.setObjId(null));
+
+            // Reset Redux selections for chart models
+            if (isChartModel) {
+                if (nodeActions) {
+                    dispatch(nodeActions.setSelectedDataPoints([]));
+                    dispatch(nodeActions.setLastSelectedDataPoint(null));
+                    // Clear the node state when layout profile changes
+                    dispatch(nodeActions.setNode(null));
+                    dispatch(nodeActions.setStoredArray([]));
+                }
+            }
+            prevProfileIdRef.current = currentProfileId;
+        } else if (!prevProfileIdRef.current) {
+            // Initialize ref on first render
+            prevProfileIdRef.current = currentProfileId;
+        }
+    }, [currentProfileId, isChartModel, nodeModelName, dispatch, actions]);
     const [, startTransition] = useTransition();
 
     // refs
@@ -476,7 +507,7 @@ function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap }) {
                 joinSort: modelLayoutOption.join_sort || null,
                 centerJoin: modelLayoutData.joined_at_center,
                 flip: modelLayoutData.flip,
-                rowIds,
+                rowIds: layoutType === LAYOUT_TYPES.PIVOT_TABLE ? rowIds : null,
                 serverSidePaginationEnabled, // Pass dynamic server-side pagination flag to worker
             }
 
@@ -489,7 +520,7 @@ function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap }) {
                 showAll,
                 modelLayoutOption,
                 modelLayoutData,
-                rowIds,
+                rowIds: layoutType === LAYOUT_TYPES.PIVOT_TABLE ? rowIds : null,
             }
 
             if (!isEqual(optionsRef.current, updatedOptionsRef)) {

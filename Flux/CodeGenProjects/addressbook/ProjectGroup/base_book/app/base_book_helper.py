@@ -8,10 +8,13 @@ from pendulum import DateTime
 
 # project imports
 from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_post_book_n_basket_book_core_msgspec_model import *
-from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_post_book_n_basket_book_core_msgspec_model import ChoreStatusType
+
 from Flux.CodeGenProjects.AddressBook.ORMModel.dept_book_n_mobile_book_n_street_book_n_basket_book_core_msgspec_model import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecordManager, SecurityRecord
 from FluxPythonUtils.scripts.general_utility_functions import parse_to_int
+from Flux.CodeGenProjects.AddressBook.ORMModel.barter_core_msgspec_model import PlanState
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_msgspec_model import PairPlan, \
+    PairPlanBaseModel
 
 
 def chore_has_terminal_state(chore_snapshot: ChoreSnapshot) -> bool:
@@ -141,16 +144,38 @@ def check_n_update_conv_px(ticker: str, conv_px: float | None, security_record: 
     return conv_px
 
 
-def get_pair_plan_id_from_cmd_argv(raise_exception: bool | None = True) -> int | None:
+def get_executor_id_from_cmd_argv(raise_exception: bool | None = True) -> int | None:
     if len(sys.argv) > 2:
         pair_plan_id = sys.argv[1]
         return parse_to_int(pair_plan_id)
     else:
         if raise_exception:
-            err_str_ = ("Can't find pair_plan_id as cmd argument, "
-                        "Usage: python launch_beanie_fastapi.py <PAIR_STRAT_ID>, "
+            err_str_ = ("Can't find executor_id as cmd argument, "
+                        "Usage: python launch_msgspec_fastapi.py <PAIR_STRAT_ID>, "
                         f"current args: {sys.argv}")
             logging.error(err_str_)
             raise Exception(err_str_)
         else:
             return None
+
+
+def get_executor_id_n_recovery_info_from_cmd_argv():
+    executor_id = get_executor_id_from_cmd_argv()
+
+    is_crash_recovery: bool = False
+    if len(sys.argv) == 4:
+        try:
+            is_crash_recovery = bool(parse_to_int(sys.argv[2]))
+        except ValueError as e:
+            err_str_ = (f"Provided cmd argument is_crash_recovery is not valid type, "
+                        f"must be numeric, exception: {e}")
+            logging.error(err_str_)
+            raise Exception(err_str_)
+    try:
+        return parse_to_int(executor_id), is_crash_recovery
+    except ValueError as e:
+        err_str_ = (f"Provided cmd argument executor_id is not valid type, "
+                    f"must be numeric, exception: {e}")
+        logging.error(err_str_)
+        raise Exception(err_str_)
+

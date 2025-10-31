@@ -1,11 +1,11 @@
 import { DB_ID } from '../constants';
-import { sortAlertArray } from '../utils/network/websocketUtils';
+import { getAlertSortComparator } from '../utils/network/websocketUtils';
 import { stableSort } from '../utils/core/dataSorting';
 import { SortComparator } from '../utils/core/sortUtils';
 
 onmessage = (event) => {
     const { messages, snapshot, storedArray, uiLimit, isAlertModel, activeItemIdMap = null, sortOrders = null } = event.data;
-    
+
     // If snapshot is provided, process it as full replacement
     if (snapshot) {
         try {
@@ -107,32 +107,20 @@ onmessage = (event) => {
         // sortOrders exist: apply sortOrders (regardless of uiLimit)
         const comparator = SortComparator.getInstance(sortOrders);
         finalArray = stableSort(finalArray, comparator);
-    } else if (uiLimit && (!sortOrders || sortOrders.length === 0)) {
+    } else if (!isAlertModel && uiLimit && (!sortOrders || sortOrders.length === 0)) {
         // Only uiLimit exists (no sortOrders): sort by _id based on uiLimit sign
-        if (uiLimit > 0) {
-            // Sort by _id ascending
-            finalArray = stableSort(finalArray, (a, b) => {
-                const idA = a[DB_ID];
-                const idB = b[DB_ID];
-                if (idA < idB) return -1;
-                if (idA > idB) return 1;
-                return 0;
-            });
-        } else {
-            // Sort by _id descending
-            finalArray = stableSort(finalArray, (a, b) => {
-                const idA = a[DB_ID];
-                const idB = b[DB_ID];
-                if (idA > idB) return -1;
-                if (idA < idB) return 1;
-                return 0;
-            });
-        }
+        const idSortOrder = [{
+            sort_by: DB_ID,
+            sort_direction: uiLimit > 0 ? 'asc' : 'desc'
+        }];
+        const comparator = SortComparator.getInstance(idSortOrder);
+        finalArray = stableSort(finalArray, comparator);
     }
 
-    // Apply additional alert-specific sorting
+    // Apply additional alert-specific sorting using stable sort
     if (isAlertModel) {
-        sortAlertArray(finalArray);
+        const alertComparator = getAlertSortComparator();
+        finalArray = stableSort(finalArray, alertComparator);
     }
 
     // Apply pagination pruning based on markers
@@ -173,7 +161,7 @@ onmessage = (event) => {
         }
     }
 
-    // Apply client-side limit (for non-server-side-paginated models)
+    // Apply client-side limit using Math.abs(uiLimit)
     // Keep items from beginning (index 0 to Math.abs(uiLimit))
     if (uiLimit && Math.abs(uiLimit) > 0 && finalArray.length > Math.abs(uiLimit)) {
         finalArray = finalArray.slice(0, Math.abs(uiLimit));

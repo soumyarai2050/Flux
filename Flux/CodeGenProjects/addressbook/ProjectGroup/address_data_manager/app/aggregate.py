@@ -125,7 +125,7 @@ def get_vwap_projection_from_bar_data_agg_pipeline(symbol: str, exch_id: str, ba
                 }
             ]
         }
-    return {'aggregate': agg_pipeline}
+    return {'agg': agg_pipeline}
 
 
 def get_vwap_n_vwap_change_projection_from_bar_data_agg_pipeline(
@@ -213,7 +213,7 @@ def get_vwap_n_vwap_change_projection_from_bar_data_agg_pipeline(
                 }
             ]
         }
-    return {'aggregate': agg_pipeline}
+    return {'agg': agg_pipeline}
 
 
 def get_vwap_change_projection_from_bar_data_agg_pipeline(
@@ -300,7 +300,7 @@ def get_vwap_change_projection_from_bar_data_agg_pipeline(
                 }
             ]
         }
-    return {'aggregate': agg_pipeline}
+    return {'agg': agg_pipeline}
 
 
 def get_premium_projection_from_bar_data_agg_pipeline(
@@ -387,7 +387,7 @@ def get_premium_projection_from_bar_data_agg_pipeline(
                 }
             ]
         }
-    return {'aggregate': agg_pipeline}
+    return {'agg': agg_pipeline}
 
 
 def get_premium_n_premium_change_projection_from_bar_data_agg_pipeline(
@@ -475,7 +475,7 @@ def get_premium_n_premium_change_projection_from_bar_data_agg_pipeline(
                 }
             ]
         }
-    return {'aggregate': agg_pipeline}
+    return {'agg': agg_pipeline}
 
 
 def get_premium_change_projection_from_bar_data_agg_pipeline(
@@ -562,7 +562,7 @@ def get_premium_change_projection_from_bar_data_agg_pipeline(
                 }
             ]
         }
-    return {'aggregate': agg_pipeline}
+    return {'agg': agg_pipeline}
 
 
 def get_bar_data_from_symbol_n_start_n_end_datetime(
@@ -612,7 +612,7 @@ def get_bar_data_from_symbol_n_start_n_end_datetime(
                 }
             ]
         }
-    return {'aggregate': agg_pipeline}
+    return {'agg': agg_pipeline}
 
 # --- Add these constants at the beginning of your aggregate.py ---
 NUMBER_WORD_MAP = {
@@ -997,7 +997,7 @@ def _generate_latest_n_bar_pipeline(
     pipeline.append({"$limit": target_bar_counts})
     pipeline.append({"$sort": {"bar_meta_data.exch_id": 1, "bar_meta_data.symbol": 1, "start_time": 1}})
 
-    return {"aggregate": pipeline}
+    return {"agg": pipeline}
 
 
 def _generate_time_range_bar_pipeline(
@@ -1045,7 +1045,7 @@ def _generate_time_range_bar_pipeline(
     # Final stage: Sort the results chronologically. No $limit is applied.
     pipeline.append({"$sort": {"bar_meta_data.exch_id": 1, "bar_meta_data.symbol": 1, "start_time": 1}})
 
-    return {"aggregate": pipeline}
+    return {"agg": pipeline}
 
 
 # --- Wrapper Function ---
@@ -1077,7 +1077,7 @@ def get_bar_aggregation_pipeline(
         symbol_list: Optional list of symbols to filter source data.
 
     Returns:
-        A dictionary containing the MongoDB aggregation pipeline list under the key "aggregate".
+        A dictionary containing the MongoDB aggregation pipeline list under the key "agg".
 
     Raises:
         ValueError: If input parameters are invalid (e.g., both/neither range params,
@@ -1171,7 +1171,7 @@ def get_latest_bar_data_agg(
                         Defaults to the current UTC time if None.
 
     Returns:
-        A dictionary containing the aggregation pipeline list under the key "aggregate".
+        A dictionary containing the aggregation pipeline list under the key "agg".
     """
     pipeline: List[Dict[str, Any]] = []
 
@@ -1236,7 +1236,7 @@ def get_latest_bar_data_agg(
         "bar_meta_data.exch_id": 1,
         "bar_meta_data.symbol": 1
     }})
-    return {"aggregate": pipeline}
+    return {"agg": pipeline}
 
 def filter_one_min_bar_data_agg(
     exch_id_list: List[str] | None = None,
@@ -1263,7 +1263,7 @@ def filter_one_min_bar_data_agg(
                         less than or equal to this value.
 
     Returns:
-        A dictionary containing the aggregation pipeline under the key "aggregate".
+        A dictionary containing the aggregation pipeline under the key "agg".
     """
     pipeline: List[Dict[str, Any]] = []
     match_conditions: List[Dict[str, Any]] = []
@@ -1310,4 +1310,4 @@ def filter_one_min_bar_data_agg(
         "start_time": 1  # Sort by time in ascending (chronological) chore.
     }})
 
-    return {"aggregate": pipeline}
+    return {"agg": pipeline}

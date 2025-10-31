@@ -4,7 +4,7 @@ from Flux.PyCodeGenEngine.FluxCodeGenCore.base_aggregate import *
 
 
 def get_symbol_overview_from_symbol(symbol: str):
-    return {"aggregate": [
+    return {"agg": [
         {
             "$match": {
                 "symbol": symbol
@@ -34,7 +34,7 @@ def get_limited_objs(limit: int):
 
 
 def get_symbol_interest_from_symbol(symbol: str):
-    return {"aggregate": [
+    return {"agg": [
         {
             "$match": {
                 "symbol_name": symbol
@@ -44,4 +44,4 @@ def get_symbol_interest_from_symbol(symbol: str):
 
 
 # Market Depth cumulative average
-cum_px_qty_aggregate_pipeline = {"aggregate": []}
+cum_px_qty_aggregate_pipeline = {"agg": []}

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { useSelector } from 'react-redux';
 import PropTypes from 'prop-types';
 import { cloneDeep, get, set } from 'lodash';
 import Autocomplete from '@mui/material/Autocomplete';
@@ -22,11 +23,12 @@ import {
 import {
   arrayMove,
 } from '@dnd-kit/sortable';
-import { DB_ID, DATA_TYPES, MODES, MODEL_TYPES } from '../../../constants';
+import { DB_ID, DATA_TYPES, MODES, MODEL_TYPES, MIN_ROWS_FOR_PAGINATION } from '../../../constants';
 import TableHeader from '../tables/TableHeader';
 import Cell from '../tables/Cell';
 import { getBufferAbbreviatedOptionLabel } from '../../../utils/ui/uiUtils';
 import { copyToClipboard } from '../../../utils/core/stringUtils';
+import { clearxpath } from '../../../utils/core/dataAccess';
 import styles from './AbbreviationMergeView.module.css';
 import { flux_toggle, flux_trigger_strat } from '../../../projectSpecificUtils';
 import { useScrollIndicators, useKeyboardNavigation } from '../../../hooks';
@@ -272,11 +274,17 @@ const LoadedView = ({
           const rowData = groupedRow[col.sourceIndex];
           const value = rowData?.[col.key];
 
-          // If value is object/array → stringify, else normal string
-          const cellValue =
-            (value !== null && typeof value === 'object')
-              ? JSON.stringify(value)
-              : String(value ?? '');
+          // If value is object/array → clean xpath fields and stringify, else normal string
+          let cellValue;
+          if (value !== null && typeof value === 'object') {
+            // Clone the value to avoid modifying the original data
+            const cleanValue = cloneDeep(value);
+            // Remove xpath fields before stringifying
+            clearxpath(cleanValue);
+            cellValue = JSON.stringify(cleanValue);
+          } else {
+            cellValue = String(value ?? '');
+          }
 
           // Replace newlines so it stays single-line in TSV
           return cellValue.replace(/\n/g, ' ');
@@ -381,6 +389,27 @@ const LoadedView = ({
     // Update our reference for next comparison
     prevSelectedRowsRef.current = selectedRows;
   }, [selectedRows]);
+
+  // Profile change detection - reset selections when layout profile changes
+  const currentProfileId = useSelector(state => state.ui_layout?.storedUILayoutObj?.profile_id);
+  const prevProfileIdRef = useRef(currentProfileId);
+
+  //on profile change resetting all selection points
+  useEffect(() => {
+    if (prevProfileIdRef.current && prevProfileIdRef.current !== currentProfileId) {
+      setLocalSelectedRows([]);
+      setLocalLastSelectedRowId(null);
+      setIsMultiSelectActive(false);
+      setSelectionAnchorId(null);
+      if (onSelectionChange) {
+        onSelectionChange([], null);
+      }
+      prevProfileIdRef.current = currentProfileId;
+    } else if (!prevProfileIdRef.current) {
+      // Initialize ref on first render
+      prevProfileIdRef.current = currentProfileId;
+    }
+  }, [currentProfileId, onSelectionChange]);
 
   // Sort sensors for drag-and-drop
   const sensors = useSensors(
@@ -693,7 +722,7 @@ const LoadedView = ({
         onRightScrollClick={handleRightScrollClick}
         onLeftScrollClick={handleLeftScrollClick}
       />
-      {rows.length > 6 && (
+      {rows.length > MIN_ROWS_FOR_PAGINATION && (
         <TablePaginationControl
           rowsLength={rows.length}
           page={page}

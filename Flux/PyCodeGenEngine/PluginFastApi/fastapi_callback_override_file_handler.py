@@ -592,7 +592,7 @@ class FastapiCallbackOverrideFileHandler(BaseFastapiPlugin, ABC):
             output_str += "            ]\n"
             output_str += "        }\n"
 
-            output_str += "    return {'aggregate': agg_pipeline}\n\n"
+            output_str += "    return {'agg': agg_pipeline}\n\n"
 
         # handling projection ws query filter functions
         for query_name, message, meta_data_field_name_to_field_proto_dict in (

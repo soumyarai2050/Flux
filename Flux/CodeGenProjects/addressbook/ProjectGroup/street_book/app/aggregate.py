@@ -4,7 +4,7 @@ from Flux.PyCodeGenEngine.FluxCodeGenCore.base_aggregate import *
 
 
 def get_symbol_side_snapshot_from_symbol_side(security_id: str, side: str):
-    return {"aggregate": [
+    return {"agg": [
         {
             "$match": {
                 "$and": [
@@ -22,7 +22,7 @@ def get_symbol_side_snapshot_from_symbol_side(security_id: str, side: str):
 
 def get_chore_total_sum_of_last_n_sec(symbol: str, n: int):
     # Model - ChoreSnapshot
-    return {"aggregate": [
+    return {"agg": [
         {
             "$match": {
                 "$expr": {
@@ -68,7 +68,7 @@ def get_chore_total_sum_of_last_n_sec(symbol: str, n: int):
 
 
 def get_chore_by_chore_id_filter(chore_id: str):
-    return {"aggregate": [
+    return {"agg": [
         {
             "$match": {
                 "chore_id": chore_id
@@ -87,7 +87,7 @@ def get_chore_of_matching_suffix_chore_id_filter(chore_id_suffix: str, sort: int
     :return:formatted mongo aggregate query
     """
     regex_chore_id_suffix: str = f".*{chore_id_suffix}$"
-    agg_pipeline = {"aggregate": [{
+    agg_pipeline = {"agg": [{
         "$match": {
             "chore.chore_id": {"$regex": regex_chore_id_suffix}
         }
@@ -97,17 +97,17 @@ def get_chore_of_matching_suffix_chore_id_filter(chore_id_suffix: str, sort: int
         sort_expr = {
             "$sort": {"_id": sort},
         }
-        agg_pipeline["aggregate"].append(sort_expr)
+        agg_pipeline["agg"].append(sort_expr)
     if limit > 0:
         limit_expr = {
             "$limit": limit
         }
-        agg_pipeline["aggregate"].append(limit_expr)
+        agg_pipeline["agg"].append(limit_expr)
     return agg_pipeline
 
 
 def get_plan_brief_from_symbol(security_id: str):
-    return {"aggregate": [
+    return {"agg": [
         {
             "$match": {
                 "$or": [
@@ -128,7 +128,7 @@ def get_plan_brief_from_symbol(security_id: str):
 
 
 def get_max_market_depth_obj(symbol: str, side: str):
-    return {"aggregate": [
+    return {"agg": [
         {
             "$match": {
                 "$and": [
@@ -151,7 +151,7 @@ def get_max_market_depth_obj(symbol: str, side: str):
 
 def get_last_n_sec_first_n_last_barter(symbol: str, last_n_sec: float):
     # Model - LastBarter
-    return {"aggregate": [
+    return {"agg": [
         {
             "$match": {
                 "$expr": {
@@ -185,7 +185,7 @@ def get_last_n_sec_first_n_last_barter(symbol: str, last_n_sec: float):
 
 def get_last_n_sec_total_barter_qty(symbol: str, last_n_sec: float):
     # Model - LastBarter
-    return {"aggregate": [
+    return {"agg": [
         {
             "$match": {
                 "$expr": {
@@ -232,7 +232,7 @@ def get_last_n_sec_total_barter_qty(symbol: str, last_n_sec: float):
 
 
 def get_symbol_overview_from_symbol(symbol: str):
-    return {"aggregate": [
+    return {"agg": [
         {
             "$match": {
                 "symbol": symbol
@@ -242,7 +242,7 @@ def get_symbol_overview_from_symbol(symbol: str):
 
 
 def get_last_barter_with_symbol_n_start_n_end_time(symbol: str, start_datetime: DateTime, end_datetime: DateTime):
-    agg_pipline = {"aggregate": [
+    agg_pipline = {"agg": [
         {
             "$match": {
                 "symbol": symbol
@@ -273,7 +273,7 @@ def get_last_barter_with_symbol_n_start_n_end_time(symbol: str, start_datetime: 
 
 
 def get_chore_snapshot_chore_id_filter_json(chore_id: str):
-    return {"aggregate": [
+    return {"agg": [
         {
             "$match": {
                 "chore_brief.chore_id": chore_id
@@ -283,7 +283,7 @@ def get_chore_snapshot_chore_id_filter_json(chore_id: str):
 
 
 def get_chore_snapshot_from_sec_symbol(symbol: str):
-    return {"aggregate": [
+    return {"agg": [
         {
             "$match": {
                 "chore_brief.security.sec_id": symbol
@@ -296,7 +296,7 @@ def get_chore_snapshots_by_chore_status_list(chore_status_list: List[str]):
     chore_status_match = []
     for chore_status in chore_status_list:
         chore_status_match.append({"chore_status": chore_status})
-    return {"aggregate": [
+    return {"agg": [
         {
             "$match": {
                 '$or': chore_status_match
@@ -306,7 +306,7 @@ def get_chore_snapshots_by_chore_status_list(chore_status_list: List[str]):
 
 
 def get_open_chore_snapshots_for_symbol(symbol: str):
-    return {"aggregate": [
+    return {"agg": [
         {
             "$match": {
                 "$or": [
@@ -367,7 +367,7 @@ def get_open_chore_snapshots_for_symbol(symbol: str):
 
 def get_market_depths(symbol_side_tuple_list: List[Tuple[str, str]]):
     agg_pipeline = {
-        "aggregate": [
+        "agg": [
             {
                 '$match': {
                     '$or': [
@@ -446,13 +446,13 @@ def get_market_depths(symbol_side_tuple_list: List[Tuple[str, str]]):
 
         # Adding first match by symbol
         if symbol not in symbol_set:
-            agg_pipeline["aggregate"][0]["$match"]["$or"].append({
+            agg_pipeline["agg"][0]["$match"]["$or"].append({
                 "symbol": symbol
             })
         symbol_set.add(symbol)
 
         # Adding second match with symbol n side
-        agg_pipeline["aggregate"][1]["$match"]["$or"].append({
+        agg_pipeline["agg"][1]["$match"]["$or"].append({
             '$and': [
                 {
                     'symbol': symbol
@@ -466,7 +466,7 @@ def get_market_depths(symbol_side_tuple_list: List[Tuple[str, str]]):
 
 
 # Market Depth cumulative average
-cum_px_qty_aggregate_pipeline = {"aggregate": [
+cum_px_qty_aggregate_pipeline = {"agg": [
     # {
     #     "$setWindowFields": {
     #         "partitionBy": {"symbol": "$symbol", "side": "$side"},

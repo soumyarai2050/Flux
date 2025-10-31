@@ -13,7 +13,7 @@ def get_dash_filter_by_dash_name(dash_name: str):
             "dash_name": dash_name
         }},
     ]
-    return {'aggregate': agg_pipeline}
+    return {'agg': agg_pipeline}
 
 def filter_dash_from_dash_filters_agg(dash_filters: DashFilters, obj_id_list: List[int] | None = None):
     agg_pipeline: List[Dict] = []

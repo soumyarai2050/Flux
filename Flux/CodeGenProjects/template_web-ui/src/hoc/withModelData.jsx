@@ -128,12 +128,13 @@ export function withModelData(ModelComponent, config) {
 
     const dataSourceProps = isAbbreviationMerge
       ? { dataSources }
-      : { modelDependencyMap: processedModelDependencyMap, modelRootName };
+      : { modelRootName };
 
     return (
       <ModelComponent
         modelName={modelName}
         modelDataSource={modelDataSource}
+        modelDependencyMap={processedModelDependencyMap}
         {...dataSourceProps}
         {...props}
       />

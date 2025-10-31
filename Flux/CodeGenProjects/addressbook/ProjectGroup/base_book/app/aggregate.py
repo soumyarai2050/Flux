@@ -4,7 +4,7 @@ from Flux.PyCodeGenEngine.FluxCodeGenCore.base_aggregate import *
 
 
 def get_symbol_side_underlying_account_cumulative_fill_qty(symbol: str, side: str):
-    return {"aggregate": [
+    return {"agg": [
         {
             '$match': {
                 '$and': [
@@ -44,7 +44,7 @@ def get_symbol_side_underlying_account_cumulative_fill_qty(symbol: str, side: st
 
 
 def get_last_n_chore_ledgers_from_chore_id(chore_id: str, ledger_count: int):
-    return {"aggregate": [
+    return {"agg": [
         {
             "$match": {
                 "chore.chore_id": chore_id
@@ -60,7 +60,7 @@ def get_last_n_chore_ledgers_from_chore_id(chore_id: str, ledger_count: int):
 
 
 def get_objs_from_symbol(symbol: str):
-    return {"aggregate": [
+    return {"agg": [
         {
             "$match": {
                 "symbol": symbol

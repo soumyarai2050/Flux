@@ -1,21 +1,11 @@
 # standard imports
-import json
-import os
 import threading
 import time
-import copy
-import math
 import shutil
-import sys
 import stat
 import subprocess
-from typing import Set
-import ctypes
-import mmap
-import requests
 
 # 3rd party imports
-import posix_ipc
 from sqlalchemy.testing.plugin.plugin_base import logging
 from filelock import FileLock
 from pathlib import Path
@@ -45,12 +35,11 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book_s
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.executor_config_loader import ( EXECUTOR_PROJECT_DIR,
     host, EXECUTOR_PROJECT_DATA_DIR, executor_config_yaml_dict, main_config_yaml_path, EXECUTOR_PROJECT_SCRIPTS_DIR)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book_helper import OTHER_TERMINAL_STATES, \
-    NON_FILLED_TERMINAL_STATES, get_pair_plan_id_from_cmd_argv
+    NON_FILLED_TERMINAL_STATES
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     compute_max_single_leg_notional, get_premium)
 from FluxPythonUtils.scripts.general_utility_functions import (
-    avg_of_new_val_sum_to_avg, find_free_port, except_n_log_alert, handle_http_response, HTTPRequestType,
-    handle_refresh_configurable_data_members, set_package_logger_level, parse_to_int, parse_to_float,
+    avg_of_new_val_sum_to_avg, find_free_port, except_n_log_alert, handle_refresh_configurable_data_members, set_package_logger_level, parse_to_int, parse_to_float,
     YAMLConfigurationManager, find_pids_by_command, terminate_process)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import (
     SecurityRecordManager)
@@ -69,7 +58,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi
     StreetBookServiceHttpClient)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.aggregate import (
     get_chore_total_sum_of_last_n_sec, get_symbol_side_snapshot_from_symbol_side, get_plan_brief_from_symbol,
-    get_open_chore_snapshots_for_symbol, get_symbol_overview_from_symbol, get_last_n_sec_total_barter_qty,
+    get_open_chore_snapshots_for_symbol, get_last_n_sec_total_barter_qty,
     get_market_depths, get_last_n_sec_first_n_last_barter)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.generated.ORMModel.post_book_service_model_imports import (
     ContactStatusUpdatesContainer)
@@ -77,11 +66,11 @@ from FluxPythonUtils.scripts.ws_reader import WSReader
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.ORMModel.photo_book_service_model_imports import (
     PlanViewBaseModel)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.street_book import (
-    StreetBook, BarteringDataManager, get_bartering_link, MarketDepth)
+    StreetBook, BarteringDataManager, MarketDepth)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book_service_routes_callback_base_native_override import BaseBookServiceRoutesCallbackBaseNativeOverride
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.StreetBook.street_book_service_key_handler import StreetBookServiceKeyHandler
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book_helper import (
-    chore_has_terminal_state)
+    chore_has_terminal_state, get_executor_id_n_recovery_info_from_cmd_argv)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.aggregate import get_objs_from_symbol
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.ORMModel.street_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_post_book_n_basket_book_core_msgspec_model import *
@@ -94,6 +83,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service
     remove_plan_alert_by_start_id_log_str)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import (
     symbol_side_key)
+
 
 class FirstLastBarterCont(MsgspecBaseModel):
     id: int | None = msgspec.field(default=None)
@@ -115,27 +105,6 @@ class FirstLastBarterCont(MsgspecBaseModel):
             return get_epoch_from_standard_dt(obj)
         elif isinstance(obj, Timestamp):
             return get_epoch_from_pandas_timestamp(obj)
-
-
-def get_pair_plan_id_n_recovery_info_from_cmd_argv():
-    pair_plan_id = get_pair_plan_id_from_cmd_argv()
-
-    is_crash_recovery: bool = False
-    if len(sys.argv) == 4:
-        try:
-            is_crash_recovery = bool(parse_to_int(sys.argv[2]))
-        except ValueError as e:
-            err_str_ = (f"Provided cmd argument is_crash_recovery is not valid type, "
-                        f"must be numeric, exception: {e}")
-            logging.error(err_str_)
-            raise Exception(err_str_)
-    try:
-        return parse_to_int(pair_plan_id), is_crash_recovery
-    except ValueError as e:
-        err_str_ = (f"Provided cmd argument pair_plan_id is not valid type, "
-                    f"must be numeric, exception: {e}")
-        logging.error(err_str_)
-        raise Exception(err_str_)
 
 
 class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCallbackBaseNativeOverride,
@@ -250,7 +219,7 @@ class StreetBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
         cls.underlying_create_deals_ledger_http = underlying_create_deals_ledger_http
 
     def __init__(self):
-        pair_plan_id, is_crash_recovery = get_pair_plan_id_n_recovery_info_from_cmd_argv()
+        pair_plan_id, is_crash_recovery = get_executor_id_n_recovery_info_from_cmd_argv()
         self.pair_plan_id = pair_plan_id
         self.is_crash_recovery = is_crash_recovery
         super().__init__()      # super init needs pair_plan_id in set_log_simulator_file_name_n_path

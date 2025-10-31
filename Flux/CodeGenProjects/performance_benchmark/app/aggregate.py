@@ -10,7 +10,7 @@ from Flux.PyCodeGenEngine.FluxCodeGenCore.base_aggregate import *
 
 
 def get_callable_delta_list_from_datetime(start_datetime: DateTime | None = None, end_datetime: DateTime | None = None):
-    agg_pipeline = {"aggregate": [
+    agg_pipeline = {"agg": [
             {
                 '$match': {}
             }, {
@@ -24,7 +24,7 @@ def get_callable_delta_list_from_datetime(start_datetime: DateTime | None = None
     ]}
 
     if start_datetime is not None and end_datetime is None:
-        agg_pipeline["aggregate"][0]["$match"] = {
+        agg_pipeline["agg"][0]["$match"] = {
             '$expr': {
                 '$gte': [
                     '$datetime', start_datetime
@@ -32,7 +32,7 @@ def get_callable_delta_list_from_datetime(start_datetime: DateTime | None = None
             }
         }
     elif end_datetime is not None and start_datetime is None:
-        agg_pipeline["aggregate"][0]["$match"] = {
+        agg_pipeline["agg"][0]["$match"] = {
             '$expr': {
                 '$lte': [
                     '$datetime', end_datetime
@@ -40,7 +40,7 @@ def get_callable_delta_list_from_datetime(start_datetime: DateTime | None = None
             }
         }
     elif start_datetime is not None and end_datetime is not None:
-        agg_pipeline["aggregate"][0]["$match"] = {
+        agg_pipeline["agg"][0]["$match"] = {
 
             "$and": [
                 {

@@ -191,6 +191,8 @@ export const MODEL_TYPES = Object.freeze({
   CHART: 'chart'
 });
 
+export const MIN_ROWS_FOR_PAGINATION = 10;
+
 export const WEBSOCKET_CLOSE_CODES = {
   NORMAL_CLOSURE: 1000,
   GOING_AWAY: 1001,

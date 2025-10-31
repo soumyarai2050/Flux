@@ -10,3 +10,9 @@ cp -p ../../template_scripts/* .
 source helper_gen_script.sh
 # its dirty (self replacements) next run will get it fresh from templates (all subsequent runs) - delete
 rm -f helper_gen_script.sh
+cd ..
+PROJECT_NAME=${PWD##*/}          # assign project name to a variable
+cd - > /dev/null
+# Create project-specific symlinks for launch scripts
+ln -sf launch_msgspec_fastapi.py "${PROJECT_NAME}_launch_msgspec_fastapi.py"
+ln -sf launch_msgspec_fastapi.py "${PROJECT_NAME}_launch_msgspec_fastapi_view.py"

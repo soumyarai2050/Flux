@@ -6,7 +6,7 @@ from Flux.PyCodeGenEngine.FluxCodeGenCore.base_aggregate import *
 
 
 def get_open_chore_counts():
-    return {"aggregate": [
+    return {"agg": [
         {
             "$match": {
                 "$or": [
@@ -22,7 +22,7 @@ def get_open_chore_counts():
 
 
 def get_last_n_sec_chores_by_events(last_n_sec: int, chore_event_list: List[str]):
-    agg_query: Dict[str, Any] = {"aggregate": [
+    agg_query: Dict[str, Any] = {"agg": [
         {
             "$match": {
                 "$expr": {
@@ -69,11 +69,11 @@ def get_last_n_sec_chores_by_events(last_n_sec: int, chore_event_list: List[str]
     ]}
 
     if len(chore_event_list) == 1:
-        agg_query["aggregate"][2]["$match"] = {"chore_event": chore_event_list[0]}
+        agg_query["agg"][2]["$match"] = {"chore_event": chore_event_list[0]}
     else:
-        agg_query["aggregate"][2]["$match"] = {"$or": []}
+        agg_query["agg"][2]["$match"] = {"$or": []}
         for chore_event in chore_event_list:
-            agg_query["aggregate"][2]["$match"]["$or"].append({"chore_event": chore_event})
+            agg_query["agg"][2]["$match"]["$or"].append({"chore_event": chore_event})
     return agg_query
 
 
@@ -88,5 +88,5 @@ def get_last_n_sec_chores_by_event_n_symbol(symbol: str | None, last_n_sec: int,
         match_agg = {
             "chore.security.sec_id": symbol
         }
-        agg_query["aggregate"][1]["$match"] = match_agg
+        agg_query["agg"][1]["$match"] = match_agg
     return agg_query

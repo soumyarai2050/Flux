@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import { useDispatch, useSelector, shallowEqual } from 'react-redux';
 import { cloneDeep, get, isEqual, set, isObject, debounce } from 'lodash';
 import { saveAs } from 'file-saver';
 // project imports
@@ -9,7 +9,7 @@ import { clearxpath, addxpath } from '../../utils/core/dataAccess';
 import { generateObjectFromSchema } from '../../utils/core/schemaUtils';
 import { compareJSONObjects } from '../../utils/core/objectUtils';
 import { getNewItem, getIdFromAbbreviatedKey } from '../../utils/core/dataUtils';
-import { isWebSocketActive } from '../../utils/network/networkUtils';
+import { isWebSocketActive, getServerUrl } from '../../utils/network/networkUtils';
 import {
     getWidgetTitle, getDataSourcesCrudOverrideDict, getCSVFileName, getAbbreviatedCollections,
     getDataSourceObj, updateFormValidation
@@ -51,7 +51,7 @@ function getEffectiveStoredArrayDict(dataSourcesStoredArrayDict, effectiveStored
     return dict;
 }
 
-function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
+function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap, dataSources }) {
     const { schema: projectSchema, schemaCollections } = useSelector((state) => state.schema);
 
     const { schema: modelSchema, fieldsMetadata: modelFieldsMetadata, actions, selector } = modelDataSource;
@@ -75,6 +75,31 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
             return acc;
         }, {})
     }, [dataSourcesStoredArrayDict, dataSourcesUpdatedObjDict])
+    const urlOverrideDataSource = modelDependencyMap?.urlOverride ?? null;
+    const urlOverrideSelector = useMemo(
+        () => urlOverrideDataSource?.selector ?? (() => ({ storedObj: null })),
+        [urlOverrideDataSource]
+    );
+    const { storedObj: urlOverrideDataSourceStoredObj } = useSelector(urlOverrideSelector, shallowEqual);
+
+    // Construct URLs using urlOverrideDataSource (must be before useCountQuery)
+    const url = useMemo(() =>
+        getServerUrl(modelSchema, urlOverrideDataSourceStoredObj, urlOverrideDataSource?.fieldsMetadata),
+        [modelSchema, urlOverrideDataSourceStoredObj, urlOverrideDataSource?.fieldsMetadata]
+    );
+
+    // HTTP View URL - always uses view URL for HTTP GET/GET_ALL requests
+    const httpViewUrl = useMemo(() =>
+        getServerUrl(modelSchema, urlOverrideDataSourceStoredObj, urlOverrideDataSource?.fieldsMetadata, undefined, true),
+        [modelSchema, urlOverrideDataSourceStoredObj, urlOverrideDataSource?.fieldsMetadata]
+    );
+
+    const dataSourcesUrlOverrideDict = useMemo(() => {
+        return dataSources.reduce((acc, {name, schema}) => {
+            acc[name] = getServerUrl(schema, urlOverrideDataSourceStoredObj, urlOverrideDataSource?.fieldsMetadata, undefined, false);
+            return acc;
+        }, {});
+    }, [urlOverrideDataSourceStoredObj, urlOverrideDataSource])
 
     const [searchQuery, setSearchQuery] = useState([]);
     const [rows, setRows] = useState([]);
@@ -86,8 +111,8 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
     const [commonKeys, setCommonKeys] = useState([]);
     const [sortedCells, setSortedCells] = useState([]);
     const [uniqueValues, setUniqueValues] = useState({});
-    const [url, setUrl] = useState(modelDataSource.url);
-    const [httpViewUrl, setHttpViewUrl] = useState(modelDataSource.viewUrl);
+    // const [url, setUrl] = useState(modelDataSource.url);
+    // const [httpViewUrl, setHttpViewUrl] = useState(modelDataSource.viewUrl);
     const [isProcessingUserActions, setIsProcessingUserActions] = useState(false);
     const [reconnectCounter, setReconnectCounter] = useState(0);
     const [rowIds, setRowIds] = useState(null);
@@ -568,7 +593,8 @@ function AbbreviationMergeModel({ modelName, modelDataSource, dataSources }) {
         dataSourcesCrudOverrideDict: dataSourcesCrudOverrideDictRef.current,
         dataSourcesParams,
         connectionByGetAll: modelLayoutOption.ws_connection_by_get_all,
-        activeIds
+        activeIds,
+        dataSourcesUrlOverrideDict
     });
 
     useEffect(() => {

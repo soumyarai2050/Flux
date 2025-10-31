@@ -44,7 +44,7 @@ class RawPerformanceDataProcessor:
     def get_callable_names_list(self) -> pandas.DataFrame:
         return read_mongo_collection_as_dataframe(self.mongo_connection_reqs.db,
                                                   self.mongo_connection_reqs.collection,
-                                                  get_raw_perf_data_callable_names_pipeline().get("aggregate"),
+                                                  get_raw_perf_data_callable_names_pipeline().get("agg"),
                                                   self.mongo_connection_reqs.host,
                                                   self.mongo_connection_reqs.port,
                                                   self.mongo_connection_reqs.username,
@@ -56,7 +56,7 @@ class RawPerformanceDataProcessor:
             read_mongo_collection_as_dataframe(self.mongo_connection_reqs.db,
                                                self.mongo_connection_reqs.collection,
                                                get_raw_performance_data_from_callable_name_agg_pipeline(
-                                                   callable_name).get("aggregate"),
+                                                   callable_name).get("agg"),
                                                self.mongo_connection_reqs.host,
                                                self.mongo_connection_reqs.port,
                                                self.mongo_connection_reqs.username,

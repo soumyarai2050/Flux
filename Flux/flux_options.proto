@@ -268,8 +268,8 @@ extend google.protobuf.MessageOptions
   repeated MessageButtonQuery FluxMsgButtonQuery = 55261;   // adds file query for message
   optional MessageJsonRoot FluxMsgCppJsonRoot = 55262;
   repeated OverrideDefaultCRUD FluxMsgOverrideDefaultCrud = 55263;
-  optional DefaultFilterParam FluxMsgDefaultFilterParam = 55264;
-  optional bool FluxMsgServerSidePagination = 55265;
+  optional DefaultFilterParam FluxMsgDefaultFilterParam = 55264; // If set, MUST add `FluxMsgServerSideFilterSort` option
+  optional bool FluxMsgServerSidePagination = 55265; // If true, MUST add `FluxMsgGetFilterCountQuery` option. If true, page options is passed to backend
   optional bool FluxMsgServerSideFilterSort = 55266; // If true, signals that filters and sort options should be passed to the backend
 
   //Complexity Option - 56

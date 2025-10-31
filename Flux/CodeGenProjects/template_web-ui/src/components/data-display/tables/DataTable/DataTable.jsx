@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { useSelector } from 'react-redux';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import Menu from '@mui/material/Menu';
@@ -25,14 +26,13 @@ import Cell from '../Cell';
 import styles from './DataTable.module.css';
 import ClearAll from '@mui/icons-material/ClearAll';
 import Save from '@mui/icons-material/Save';
-import { getDataxpathV2, generateRowTrees } from '../../../../utils/core/dataAccess';
+import { getDataxpathV2, generateRowTrees, clearxpath } from '../../../../utils/core/dataAccess';
 import { copyToClipboard } from '../../../../utils/core/stringUtils';
 import { cloneDeep, get, set } from 'lodash';
-import { DB_ID, MODES, DATA_TYPES, MODEL_TYPES } from '../../../../constants';
+import { DB_ID, MODES, DATA_TYPES, MODEL_TYPES, MIN_ROWS_FOR_PAGINATION } from '../../../../constants';
 import { flux_toggle, flux_trigger_strat } from '../../../../projectSpecificUtils';
 import FullScreenModal from '../../../ui/Modal';
 import { ModelCard, ModelCardHeader, ModelCardContent } from '../../../utility/cards';
-import { useSelector } from 'react-redux';
 import DataTree from '../../trees/DataTree';
 import Icon from '../../../ui/Icon';
 import { useScrollIndicators, useKeyboardNavigation } from '../../../../hooks';
@@ -118,6 +118,26 @@ const DataTable = ({
       setLocalLastSelectedRowId(externalLastSelectedRowId);
     }
   }, [externalSelectedRows, externalLastSelectedRowId]);
+
+  // Profile change detection - reset selections when layout profile changes
+  const currentProfileId = useSelector(state => state.ui_layout?.storedUILayoutObj?.profile_id);
+  const prevProfileIdRef = useRef(currentProfileId);
+  
+  //on profile change resetting all selection points
+  useEffect(() => {
+    if (prevProfileIdRef.current && prevProfileIdRef.current !== currentProfileId) {
+      setLocalSelectedRows([]);
+      setLocalLastSelectedRowId(null);
+      setSelectionAnchorId(null);
+      if (externalOnSelectionChange) {
+        externalOnSelectionChange([], null);
+      }
+      prevProfileIdRef.current = currentProfileId;
+    } else if (!prevProfileIdRef.current) {
+      // Initialize ref on first render
+      prevProfileIdRef.current = currentProfileId;
+    }
+  }, [currentProfileId, externalOnSelectionChange]);
 
   // Internal selection handler that provides immediate UI feedback
   const handleSelectionChange = (newSelectedRows, mostRecentId = null) => {
@@ -225,11 +245,17 @@ const DataTable = ({
           const rowData = groupedRow[col.sourceIndex];
           const value = rowData?.[col.tableTitle];
 
-          // If value is object/array → stringify, else normal string
-          const cellValue =
-            (value !== null && typeof value === 'object')
-              ? JSON.stringify(value)
-              : String(value ?? '');
+          // If value is object/array → clean xpath fields and stringify, else normal string
+          let cellValue;
+          if (value !== null && typeof value === 'object') {
+            // Clone the value to avoid modifying the original data
+            const cleanValue = cloneDeep(value);
+            // Remove xpath fields before stringifying
+            clearxpath(cleanValue);
+            cellValue = JSON.stringify(cleanValue);
+          } else {
+            cellValue = String(value ?? '');
+          }
 
           // Replace newlines so it stays single-line in TSV
           return cellValue.replace(/\n/g, ' ');
@@ -733,7 +759,7 @@ const DataTable = ({
         onLeftScrollClick={handleLeftScrollClick}
       />
       {
-        (totalCount ?? rows.length) > rowsPerPage && (
+        (totalCount ?? rows.length) > MIN_ROWS_FOR_PAGINATION && (
           <TablePaginationControl
             rowsLength={totalCount ?? rows.length}
             page={page}

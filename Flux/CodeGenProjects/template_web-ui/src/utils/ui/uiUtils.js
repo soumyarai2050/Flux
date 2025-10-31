@@ -792,6 +792,33 @@ export function getDataSourcesCrudOverrideDict(dataSources, availableModelNames 
 
 
 /**
+ * Generates a dictionary of default filter parameters for multiple data sources.
+ * It iterates through the provided data sources and applies `getDefaultFilterParamDict` to each.
+ *
+ * @param {Array<Object>} dataSources - An array of data source objects, each containing a `name` and `schema`.
+ * @param {Array<string>} availableModelNames - Array of model names that exist in the schema.
+ * @returns {Object|null} A dictionary where keys are data source names and values are their default filter param dictionaries, or null if no filters are found.
+ */
+export function getDataSourcesDefaultFilterParamDict(dataSources, availableModelNames = null) {
+    const dataSourcesDefaultFilterParamDict = {};
+    dataSources.forEach(({ name, schema }) => {
+        // Only process data source if no validation needed OR if the data source model exists in schema
+        if (!availableModelNames || availableModelNames.includes(name)) {
+            const defaultFilterParamDict = getDefaultFilterParamDict(schema, availableModelNames);
+            if (defaultFilterParamDict) {
+                dataSourcesDefaultFilterParamDict[name] = defaultFilterParamDict;
+            }
+        }
+        // else: skip this data source (model doesn't exist in schema)
+    });
+    if (Object.keys(dataSourcesDefaultFilterParamDict).length === 0) {
+        return null;
+    }
+    return dataSourcesDefaultFilterParamDict;
+}
+
+
+/**
  * Retrieves a data source object by its name from a list of data sources.
  *
  * @param {Array<Object>} dataSources - An array of data source objects.

@@ -47,7 +47,7 @@ class GetAvgOpenForSymbols(YahooFinanceBase):
                 get_bar_data_from_symbol_n_start_n_end_datetime(symbol_with_suffix, start_datetime, end_datetime)
             # Read the MongoDB collection as a DataFrame
             df: pl.DataFrame = \
-                read_mongo_collection_as_dataframe(db, collection, agg_pipeline=agg_pipeline_dict["aggregate"])
+                read_mongo_collection_as_dataframe(db, collection, agg_pipeline=agg_pipeline_dict["agg"])
 
             if not df.is_empty():
                 # Calculate the average open price

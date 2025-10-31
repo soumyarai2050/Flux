@@ -5,7 +5,7 @@ import "flux_options.proto";
 import "projects_core.proto";
 import "barter_core.proto";
 import "email_book_core.proto";
-import "dept_book_n_phone_book_core.proto";
+import "dept_book_n_phone_book_n_ia_engine_core.proto";
 import "phone_book_n_street_book_core.proto";
 
 package phone_book;
@@ -70,10 +70,6 @@ message ChoreLimits {
     DeleteOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
-  option (FluxMsgGetFilterCountQuery) = true;
-  option (FluxMsgJsonQuery) = {
-    QueryName: "get_chore_limits_schema"
-  };
   option (FluxMsgWidgetUIDataElement) = {
     x: 4,
     y: 15,
@@ -117,11 +113,7 @@ message SystemControl {
     DeleteOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED,
     PassStoredObjToUpdatePrePostCallback: true,
-    PassStoredObjToPartialUpdatePostCallback: True,
-  };
-  option (FluxMsgGetFilterCountQuery) = true;
-  option (FluxMsgJsonQuery) = {
-    QueryName: "get_system_control_schema"
+    PassStoredObjToPartialUpdatePostCallback: true,
   };
   option (FluxMsgWidgetUIDataElement) = {
     x: 4,
@@ -204,10 +196,6 @@ message ContactStatus {
     DeleteOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
-  option (FluxMsgGetFilterCountQuery) = true;
-  option (FluxMsgJsonQuery) = {
-    QueryName: "get_contact_status_schema"
-  };
   option (FluxMsgWidgetUIDataElement) = {
     x: 11,
     y: 25,
@@ -254,7 +242,7 @@ message ContactStatus {
 
 // Don't rename fields - if you must , update loaded_plan_keys abbreviation accordingly
 message PairPlan {
-    option (FluxMsgJsonRoot) = {
+  option (FluxMsgJsonRoot) = {
     CreateOp: AggregateType_UNSPECIFIED,
     ReadOp: AggregateType_UNSPECIFIED,
     ReadAllOp: AggregateType_UNSPECIFIED,
@@ -264,19 +252,15 @@ message PairPlan {
     DeleteOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
     PassStoredObjToUpdatePrePostCallback: true,
-    PassStoredObjToPartialUpdatePostCallback: True,
-    PassStoredObjToPartialUpdateAllPostCallback: True
+    PassStoredObjToPartialUpdatePostCallback: true,
+    PassStoredObjToPartialUpdateAllPostCallback: true
   };
-    option (FluxMsgGetFilterCountQuery) = true;
   option (FluxMsgJsonQuery) = {
-    QueryName: "get_pair_plan_schema"
-  };
-    option (FluxMsgJsonQuery) = {
-      QueryName: "get_pair_plan_sec_filter_json",
-      QueryParams: {
-        QueryParamName: "security_id",
-        QueryParamDataType: "str"
-      }
+    QueryName: "get_pair_plan_sec_filter_json",
+    QueryParams: {
+      QueryParamName: "security_id",
+      QueryParamDataType: "str"
+    }
   };
     option (FluxMsgJsonQuery) = {
     QueryName: "get_ongoing_or_single_exact_non_ongoing_pair_plan_from_symbol_side",
@@ -382,7 +366,6 @@ message PlanCollection {
     DeleteOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
-  option (FluxMsgGetFilterCountQuery) = true;
   option (FluxMsgWidgetUIDataElement) = {
     x: 0,
     y: 0,
@@ -445,11 +428,10 @@ message SampleModel{
     DeleteAllOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
     SetReentrantLock: false,
-    PassStoredObjToPartialUpdatePostCallback: True,
-    PassStoredObjToPartialUpdateAllPostCallback: True,
+    PassStoredObjToPartialUpdatePostCallback: true,
+    PassStoredObjToPartialUpdateAllPostCallback: true,
     IncludeDataframeClients: true,
   };
-  option (FluxMsgGetFilterCountQuery) = true;
   option (FluxMsgAggregateQueryVarName) = "sample_cum_aggregate_pipeline";
   option (FluxMsgJsonQuery) = {
       QueryName: "file_upload_from_sample_model",

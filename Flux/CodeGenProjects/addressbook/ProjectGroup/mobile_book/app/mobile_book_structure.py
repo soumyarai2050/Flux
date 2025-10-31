@@ -12,12 +12,12 @@ from FluxPythonUtils.scripts.pthread_shm_mutex import pthread_mutex_t, PThreadSh
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.ORMModel.street_book_service_model_imports import (
     TickType)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.ORMModel.street_book_service_ts_utils import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book_helper import get_pair_plan_id_from_cmd_argv
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book_helper import get_executor_id_from_cmd_argv
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import email_book_service_http_client
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.executor_config_loader import executor_config_yaml_dict
 
 MAX_STRING_LENGTH: Final[int] = 128
-pair_plan_id = get_pair_plan_id_from_cmd_argv(raise_exception=False)
+pair_plan_id = get_executor_id_from_cmd_argv(raise_exception=False)
 if pair_plan_id is not None:
     pair_plan = email_book_service_http_client.get_pair_plan_client(pair_plan_id)
     exch_id = pair_plan.pair_plan_params.plan_leg1.exch_id

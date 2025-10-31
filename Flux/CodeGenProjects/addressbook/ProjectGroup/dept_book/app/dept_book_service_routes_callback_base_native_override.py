@@ -268,7 +268,7 @@ class DeptBookServiceRoutesCallbackBaseNativeOverride(DeptBookServiceRoutesCallb
             dash_filters = dash_filters_list[0]
 
             dash_filter_agg_pipeline = filter_dash_from_dash_filters_agg(dash_filters, obj_id_list)
-            agg_pipeline = {"aggregate": dash_filter_agg_pipeline}
+            agg_pipeline = {"agg": dash_filter_agg_pipeline}
             filtered_dash_list = await DeptBookServiceRoutesCallbackBaseNativeOverride.underlying_read_dash_http(
                 agg_pipeline)
             return filtered_dash_list

@@ -8,7 +8,7 @@ set -e
 if [ $# -lt 1 ] ; then
   cp -pr ../../../../template_web-ui ../.
   mv ../template_web-ui ../web-ui
-  rm -rf ../web-ui/src/docs
+  rm -rf ../web-ui/docs
   cd ../web-ui
   cp -p ../../../template_scripts/helper_gen_script.sh .
   source helper_gen_script.sh
@@ -26,7 +26,7 @@ else
   cd - # back to script folder
   cd ..
   rsync -a -v temp_web-ui/ web-ui/
-  rm -rf web-ui/src/docs
+  rm -rf web-ui/docs
   rm -rf temp_web-ui
   cd -  # back to script folder
 fi

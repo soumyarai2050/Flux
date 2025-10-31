@@ -21,7 +21,6 @@ message SymbolOverview {
     DeleteOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
-  option (FluxMsgGetFilterCountQuery) = true;
   option (FluxMsgWidgetUIDataElement) = {
     x: 0,
     y: 33,
@@ -86,7 +85,6 @@ message TopOfBook {
     DeleteOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
-  option (FluxMsgGetFilterCountQuery) = true;
   option (FluxMsgWidgetUIDataElement) = {
     x: 0,
     y: 108,
@@ -152,7 +150,6 @@ message MarketDepth {
     DeleteOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED
   };
-  option (FluxMsgGetFilterCountQuery) = true;
   option (FluxMsgWidgetUIDataElement) = {
     x: 0,
     y: 130,
@@ -221,7 +218,6 @@ message LastBarter {
     Granularity: Sec,
     ExpireAfterSeconds: 3600
   };
-  option (FluxMsgGetFilterCountQuery) = true;
   option (FluxMsgWidgetUIDataElement) = {
     x: 0,
     y: 119,
@@ -265,7 +261,6 @@ message RawLastBarterHistory {
     Granularity: Sec,
     ExpireAfterSeconds: 3600
   };
-  option (FluxMsgGetFilterCountQuery) = true;
   option (FluxMsgStringLength) = 128;
 
   required int32 id = 1;

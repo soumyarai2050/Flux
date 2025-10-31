@@ -1,6 +1,7 @@
 import { cloneDeep } from 'lodash';
 import { DB_ID, SEVERITY_TYPES } from '../../constants';
 import { AlertCache } from '../../cache/alertCache';
+import { stableSort } from '../core/dataSorting';
 
 /**
  * Applies a WebSocket update to a stored array of data. This function handles create, update, and delete operations.
@@ -44,9 +45,9 @@ export function applyGetAllWebsocketUpdate(storedArray, updatedObj, uiLimit, isA
                                 updatedArray.pop();
                                 updatedArray.push(updatedObj);
                             }
-                            // Sort the alert array after modification.
-                            sortAlertArray(updatedArray);
-                            return updatedArray;
+                            // Sort the alert array after modification using stable sort.
+                            const alertComparator = getAlertSortComparator();
+                            return stableSort(updatedArray, alertComparator);
                         } else {
                             updatedArray.pop();
                         }
@@ -190,57 +191,44 @@ export function applyWebSocketUpdateForAlertModel(storedArray, updatedObj, uiLim
 }
 
 /**
- * Sorts an array of alerts based on severity (highest first), then last update time (newest first),
- * and finally alert count (highest first).
- * @param {Array<Object>} alertArray - The array of alerts to sort.
- * @returns {Array<Object>} The sorted array of alerts.
+ * Creates and returns a comparator function for sorting alert arrays in a stable manner.
+ * The comparator sorts by:
+ * 1. Severity (descending - highest first: CRITICAL > ERROR > WARNING > INFO > DEBUG)
+ * 2. Last update time (descending - newest first)
+ * 3. Alert count (descending - highest first)
+ *
+ * This comparator can be used with stableSort to ensure deterministic sorting
+ * where equal elements maintain their relative order.
+ *
+ * @returns {Function} A comparator function that takes two alert objects (a, b) and returns:
+ *   - negative value if a should come before b
+ *   - positive value if a should come after b
+ *   - zero if they are equal
  */
-export function sortAlertArray(alertArray) {
-    alertArray.sort((a, b) => {
-        const severityA = SEVERITY_TYPES[a.severity];
-        const severityB = SEVERITY_TYPES[b.severity];
+export function getAlertSortComparator() {
+    return (a, b) => {
+        // Convert severity strings to numeric values for comparison
+        const severityA = SEVERITY_TYPES[a.severity] || 0;
+        const severityB = SEVERITY_TYPES[b.severity] || 0;
 
-        // Sort by severity (descending).
+        // Sort by severity (descending - higher severity first)
         if (severityA > severityB) {
             return -1;
         } else if (severityB > severityA) {
             return 1;
-        } else {  // Same severity, sort by last update time.
+        } else {  // Same severity, sort by last update time (descending - newer first)
             if (a.last_update_analyzer_time > b.last_update_analyzer_time) {
                 return -1;
             } else if (b.last_update_analyzer_time > a.last_update_analyzer_time) {
                 return 1;
-            } else {  // Same last update time, sort by alert count.
+            } else {  // Same last update time, sort by alert count (descending - higher count first)
                 if (a.alert_count >= b.alert_count) {
                     return -1;
                 }
                 return 1;
             }
         }
-    });
-    return alertArray;
-
-    // The commented-out section below represents a previous attempt at stable sorting,
-    // which was reverted due to stability issues or other considerations.
-    // reverted as not stable
-    // const stabilized = alertArray.map((el, index) => [el, index]);
-    // stabilized.sort((a, b) => {
-    //     const alertA = a[0];
-    //     const alertB = b[0];
-    //     const severityA = SEVERITY_TYPES[alertA.severity];
-    //     const severityB = SEVERITY_TYPES[alertB.severity];
-    //     if (severityA > severityB) return -1;
-    //     if (severityB > severityA) return 1;
-    //     // same severity
-    //     if (alertA.last_update_analyzer_time > alertB.last_update_analyzer_time) return -1;
-    //     if (alertB.last_update_analyzer_time > alertA.last_update_analyzer_time) return 1;
-    //     // same timestamp
-    //     if (alertA.alert_count > alertB.alert_count) return -1;
-    //     if (alertB.alert_count > alertA.alert_count) return 1;
-    //     // fallback to original index for stability
-    //     return a[1] - b[1];
-    // });
-    // return stabilized.map(pair => pair[0]);
+    };
 }
 
 /**

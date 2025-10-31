@@ -997,7 +997,7 @@ async def get_obj_list(pydantic_class_type: Type[DocumentModel], find_ids: List[
         raise e
 
 
-# {'aggregate': }
+# {'agg': }
 @http_except_n_log_error(status_code=500)
 @generic_perf_benchmark
 async def projection_read_http(pydantic_class_type: Type[DocumentModel], proto_package_name: str,
@@ -1012,7 +1012,7 @@ async def projection_read_http(pydantic_class_type: Type[DocumentModel], proto_p
     if projection_model is None:
         projection_model = pydantic_class_type
     else:
-        agg_pipeline = filter_agg_pipeline["aggregate"]
+        agg_pipeline = filter_agg_pipeline["agg"]
     find_all_resp = pydantic_class_type.find()
     try:
         agg_query_obj = find_all_resp.aggregate(
@@ -1048,7 +1048,7 @@ async def get_filtered_obj_list(filter_agg_pipeline: Dict, pydantic_class_type: 
     if projection_model is None:
         projection_model = pydantic_class_type
     else:
-        agg_pipeline = filter_agg_pipeline["aggregate"]
+        agg_pipeline = filter_agg_pipeline["agg"]
     find_all_resp = pydantic_class_type.find(fetch_links=has_links)
     pydantic_list = await find_all_resp.aggregate(
         aggregation_pipeline=agg_pipeline,

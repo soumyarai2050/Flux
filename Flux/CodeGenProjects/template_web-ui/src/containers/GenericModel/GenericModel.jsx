@@ -31,7 +31,7 @@ const GenericModel = ({ modelName }) => {
     return abbreviationModelToSourcesMap?.[modelName] || [];
   }, [abbreviationModelToSourcesMap, modelName]);
 
-  // Get modelDependencyMap for non-abbreviation models from the precomputed map
+  // Get modelDependencyMap from the precomputed map
   const dependencyMap = useMemo(() => {
     return modelToDependencyMap?.[modelName] || null;
   }, [modelToDependencyMap, modelName]);
@@ -60,8 +60,8 @@ const GenericModel = ({ modelName }) => {
 
     return withModelData(ContainerComponent, {
       modelName,
-      dataSources: isAbbreviationMerge ? abbreviationDataSources : [],
-      modelDependencyMap: !isAbbreviationMerge ? dependencyMap : null,
+      modelDependencyMap: dependencyMap ?? null,
+      dataSources: isAbbreviationMerge ? abbreviationDataSources : []
     });
   }, [ContainerComponent, modelName, modelType, abbreviationDataSources, dependencyMap]);
 

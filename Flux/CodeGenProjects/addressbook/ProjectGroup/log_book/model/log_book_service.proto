@@ -48,7 +48,7 @@ message PlanAlert {
     is_read_only: true,
     is_model_alert_type: true
   };
-  option (FluxMsgGetFilterCountQuery) = true;
+  option (FluxMsgServerSideFilterSort) = true;
   option (FluxMsgDefaultFilterParam) = {
       param_src_model_name: "PairPlan",
       ui_filter_params: {
@@ -150,7 +150,7 @@ message ContactAlert {
     is_read_only: true,
     is_model_alert_type: true
   };
-  option (FluxMsgGetFilterCountQuery) = true;
+  option (FluxMsgServerSideFilterSort) = true;
   option (FluxMsgDefaultFilterParam) = {
       ui_filter_params: {
           param_name: "dismiss",
@@ -241,7 +241,6 @@ message ExecutorEventLedger {
     Granularity: Sec,
     ExpireAfterSeconds: 7776000  // 3 months worth of seconds
   };
-  option (FluxMsgGetFilterCountQuery) = true;
   option (FluxMsgWidgetUIDataElement) = {
     x: 0,
     y: 40,

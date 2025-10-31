@@ -22,7 +22,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.app.mobile_book_s
 from FluxPythonUtils.scripts.general_utility_functions import except_n_log_alert, parse_to_int
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.generated.ORMModel.mobile_book_service_msgspec_model import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.app.mobile_book_shared_memory_producer import MobileBookSharedMemoryProducer
-from ProjectGroup.mobile_book.app.mobile_book_service_helper import md_view_port
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.app.mobile_book_service_helper import md_view_port
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.app.aggregate import (
     get_symbol_interest_from_symbol, get_symbol_overview_from_symbol)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import (

@@ -3,7 +3,7 @@ import os
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *
 from Flux.PyCodeGenEngine.FluxCodeGenCore.base_aggregate import *
 
-cum_price_size_aggregate_json = {"aggregate": [
+cum_price_size_aggregate_json = {"agg": [
     {
         "$setWindowFields": {
             "partitionBy": "$side",
@@ -35,7 +35,7 @@ cum_price_size_aggregate_json = {"aggregate": [
 ]}
 
 # used to test update_aggregate feature
-sample_cum_aggregate_pipeline = {"aggregate": [
+sample_cum_aggregate_pipeline = {"agg": [
     {
         "$setWindowFields": {
             "sortBy": {
@@ -63,7 +63,7 @@ def get_ongoing_or_all_pair_plans_by_sec_id(sec_id: str, side: str):
     sec_id of any leg as passed value
     """
     agg_pipeline = {
-        "aggregate": [
+        "agg": [
             {
                 '$match': {
                     '$or': [
@@ -158,7 +158,7 @@ def get_ongoing_or_all_pair_plans_by_sec_id(sec_id: str, side: str):
 
 
 def get_ongoing_pair_plan_filter(security_id: str | None = None):
-    agg_pipeline = {"aggregate": [
+    agg_pipeline = {"agg": [
         {
             "$match": {}
         },
@@ -186,7 +186,7 @@ def get_ongoing_pair_plan_filter(security_id: str | None = None):
     ]}
 
     if security_id is not None:
-        agg_pipeline["aggregate"][0]["$match"] = {
+        agg_pipeline["agg"][0]["$match"] = {
             "$or": [
                 {
                     "pair_plan_params.plan_leg1.sec.sec_id": {
@@ -206,7 +206,7 @@ def get_ongoing_pair_plan_filter(security_id: str | None = None):
 
 def get_all_pair_plan_from_symbol_n_side(sec_id: str, side: Side):
     agg_pipeline = {
-        "aggregate": [
+        "agg": [
             {
                 "$match": {
                     "$and": [

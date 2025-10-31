@@ -271,7 +271,7 @@ def get_limit_n_sort_direction(limit: int) -> Tuple[int, int]:
 
 
 def get_plan_alerts_by_plan_id(plan_id: int):
-    return {"aggregate": [
+    return {"agg": [
         {
             '$match': {
                 'dismiss': False
@@ -297,7 +297,7 @@ def get_total_plan_alert_count_n_highest_severity(plan_id: int):
         * total_objects: The count of documents in the collection. Defaults to 0 if no data.
         * highest_priority_severity: The severity with the highest priority. Defaults to "No data" if no data.
     """
-    agg_pipeline = {"aggregate": [
+    agg_pipeline = {"agg": [
         {
             '$match': {
                 'dismiss': False
@@ -351,11 +351,11 @@ def get_total_plan_alert_count_n_highest_severity(plan_id: int):
     ]}
 
     counter = len(Severity) - 1     # removing UNSPECIFIED
-    highest_priority_severity = agg_pipeline["aggregate"][2]["$facet"]['highest_priority_severity'][1]['$project'][
+    highest_priority_severity = agg_pipeline["agg"][2]["$facet"]['highest_priority_severity'][1]['$project'][
         "highest_priority_severity"]
     for sev in Severity:
         if sev.value != "Severity_UNSPECIFIED":
-            agg_pipeline["aggregate"][2]["$facet"]['highest_priority_severity'][0]['$group']["maxPriority"]['$max']['$switch']["branches"].append(
+            agg_pipeline["agg"][2]["$facet"]['highest_priority_severity'][0]['$group']["maxPriority"]['$max']['$switch']["branches"].append(
                 {
                     'case': {
                         '$eq': [
@@ -462,7 +462,7 @@ def sort_alerts_based_on_severity_n_last_update_analyzer_time(
 
 
 def get_plan_alert_from_plan_id_n_alert_brief_regex(plan_id: int, brief_regex: str):
-    agg_pipeline = {"aggregate": [
+    agg_pipeline = {"agg": [
         {
             '$match': {
                 'dismiss': False
@@ -485,7 +485,7 @@ def get_plan_alert_from_plan_id_n_alert_brief_regex(plan_id: int, brief_regex: s
 
 
 def get_projection_plan_alert_id_by_plan_id(plan_id: int):
-    agg_pipeline = {"aggregate": [
+    agg_pipeline = {"agg": [
         {
             '$match': {
                 'plan_id': plan_id
