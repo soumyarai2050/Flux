@@ -11,7 +11,7 @@ from FluxPythonUtils.scripts.general_utility_functions import (
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.ORMModel.photo_book_service_model_imports import (
     PlanViewBaseModel)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.model_extensions import BrokerUtil
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecord, SecType
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.static_data import SecurityRecord, SecType
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import (
     get_symbol_side_key)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import pair_plan_client_call_log_str
@@ -589,22 +589,6 @@ def get_internal_web_client():
     else:
         web_client = email_book_service_http_client
     return web_client
-
-
-async def get_dismiss_filter_brokers(underlying_http_callable, static_data, security_id1: str, security_id2: str):
-    ric1, ric2 = static_data.get_connect_n_qfii_rics_from_ticker(security_id1)
-    ric3, ric4 = static_data.get_connect_n_qfii_rics_from_ticker(security_id2)
-    sedol = static_data.get_sedol_from_ticker(security_id1)
-    # get security name from : pair_plan_params.plan_legs and then redact pattern
-    # security.sec_id (a pattern in positions) where there is a value match
-    dismiss_filter_agg_pipeline = {'redact': [("security.sec_id", ric1, ric2, ric3, ric4, sedol)]}
-    filtered_brokers: List[ShadowBrokers] = await underlying_http_callable(dismiss_filter_agg_pipeline)
-
-    eligible_brokers = []
-    for broker in filtered_brokers:
-        if broker.sec_positions:
-            eligible_brokers.append(broker)
-    return eligible_brokers
 
 
 async def handle_shadow_broker_creates(contact_limits_objs: ContactLimits,

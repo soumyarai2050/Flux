@@ -257,6 +257,7 @@ class BaseProtoPlugin(ABC):
     flux_msg_string_length: ClassVar[str] = "FluxMsgStringLength"
     flux_msg_is_shm_model: ClassVar[str] = "FluxMsgIsShmModel"
     flux_msg_is_shm_container: ClassVar[str] = "FluxMsgIsShmContainer"
+    flux_msg_gen_df_serialize_methods: ClassVar[str] = "FluxMsgGenDfSerializeMethods"
     flux_enum_cmnt: ClassVar[str] = "FluxEnumCmnt"
     default_id_field_name: ClassVar[str] = "id"
     default_id_type_var_name: ClassVar[str] = "DefaultIdType"  # to be used in models as default type variable name
@@ -279,6 +280,16 @@ class BaseProtoPlugin(ABC):
         "message": "object",
         "float": "number",
         "double": "number"
+    }
+    proto_type_to_polars_type_dict: Dict[str, str] = {
+        "int32": "pl.Int32",
+        "int64": "pl.Int64",
+        "string": "pl.Utf8",
+        "bool": "pl.Boolean",
+        "float": "pl.Float32",
+        "double": "pl.Float64",
+        "enum": "pl.Utf8",
+        "date_time": "pl.Datetime"
     }
     options_having_msg_fld_names: List[str] = [
         flux_fld_abbreviated,

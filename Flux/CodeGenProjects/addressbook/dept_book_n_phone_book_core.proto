@@ -111,17 +111,6 @@ message ShadowBrokers{
       QueryParamDataType: "str"
     }
   };
-  option (FluxMsgJsonQuery) = {
-    QueryName: "get_dismiss_filter_contact_limit_brokers_from_ric_n_sec_ric",
-    QueryParams: {
-      QueryParamName: "ric",
-      QueryParamDataType: "str"
-    },
-    QueryParams: {
-      QueryParamName: "sec_ric",
-      QueryParamDataType: "str"
-    }
-  };
   option (FluxMsgStringLength) = 128;
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   required bool bkr_disable = 2 [default=false];

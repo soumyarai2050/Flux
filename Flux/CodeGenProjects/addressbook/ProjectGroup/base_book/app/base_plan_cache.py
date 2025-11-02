@@ -6,6 +6,7 @@ from threading import RLock
 # Project imports
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecordManager
 from Flux.CodeGenProjects.AddressBook.ORMModel.dept_book_n_phone_book_core_msgspec_model import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.static_data import SecurityRecordManager
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.symbol_cache import (
     SymbolCache, SymbolCacheContainer)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.pos_cache import PosCache

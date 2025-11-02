@@ -359,6 +359,122 @@ class MsgspecModelPlugin(DataclassModelPlugin):
 
         return output_str
 
+    def handle_get_polars_schema_method(self, message: protogen.Message) -> str:
+        output_str = "    @staticmethod\n"
+        output_str += "    def get_polars_schema() -> dict:\n"
+        output_str += "        \"\"\"\n"
+        output_str += f"        Returns the polars schema definition for {message.proto.name}.\n"
+        output_str += f"        Returns:\n"
+        output_str += f"            Dictionary containing the polars schema\n"
+        output_str += "        \"\"\"\n"
+        output_str += "        return {\n"
+        for field in message.fields:
+            field_name_snake_cased = convert_camel_case_to_specific_case(field.proto.name)
+
+            if self.is_bool_option_enabled(field, MsgspecModelPlugin.flux_fld_val_is_datetime):
+                polars_type = MsgspecModelPlugin.proto_type_to_polars_type_dict.get("date_time")
+            else:
+                polars_type = MsgspecModelPlugin.proto_type_to_polars_type_dict.get(field.kind.name.lower())
+
+            if polars_type is None:
+                # field type is of message type or any other type not supported by polars then ignoring
+                continue
+
+            output_str += f"            '{field_name_snake_cased}': {polars_type},\n"
+        output_str += "        }\n\n"
+
+        output_str += "    @staticmethod\n"
+        output_str += f"    def from_csv(csv_path: str) -> List['{message.proto.name}']:\n"
+        output_str += "        csv_read_options = {\n"
+        output_str += "            \"null_values\": [\"\", \"null\", \"NULL\", \"None\", \"NaN\"],\n"
+        output_str += "            \"schema_overrides\": "+f"{message.proto.name}.get_polars_schema()\n"
+        output_str += "        }\n"
+        output_str += f"        df = pl.read_csv(csv_path, **csv_read_options)\n"
+        output_str += f"        msgspec_obj_list = {message.proto.name}.from_dict_list(df.to_dicts())\n"
+        output_str += f"        return msgspec_obj_list\n\n"
+
+        return output_str
+
+    def handle_get_polars_cast_expressions_method(self, message: protogen.Message) -> str:
+        output_str = "    @staticmethod\n"
+        output_str += "    def get_polars_cast_expressions(cls) -> List[pl.Expr]:\n"
+        output_str += "        \"\"\"\n"
+        output_str += f"        Returns a list of polars expressions for casting columns to their proper types.\n"
+        output_str += f"        Returns:\n"
+        output_str += f"            List of polars expressions for column casting\n"
+        output_str += "        \"\"\"\n"
+        output_str += "        return [\n"
+
+        # adding string type fields
+        str_fields_list = []
+        int_32_fields_list = []
+        int_64_fields_list = []
+        float_32_fields_list = []
+        float_64_fields_list = []
+        bool_fields_list = []
+        datetime_fields_list = []
+        for field in message.fields:
+            if field.proto.name == "_id" or field.proto.name == "id":
+                continue
+
+            if field.kind.name.lower() == "string" or field.kind.name.lower() == "enum":
+                str_fields_list.append(field.proto.name)
+            elif field.kind.name.lower() == "int32":
+                if self.is_bool_option_enabled(field, MsgspecModelPlugin.flux_fld_val_is_datetime):
+                    datetime_fields_list.append(field.proto.name)
+                else:
+                    int_32_fields_list.append(field.proto.name)
+            elif field.kind.name.lower() == "int64":
+                if self.is_bool_option_enabled(field, MsgspecModelPlugin.flux_fld_val_is_datetime):
+                    datetime_fields_list.append(field.proto.name)
+                else:
+                    int_64_fields_list.append(field.proto.name)
+            elif field.kind.name.lower() == "float":
+                float_32_fields_list.append(field.proto.name)
+            elif field.kind.name.lower() == "double":
+                float_64_fields_list.append(field.proto.name)
+            elif field.kind.name.lower() == "bool":
+                bool_fields_list.append(field.proto.name)
+
+        if str_fields_list:
+            output_str += "        # String fields\n"
+            output_str += f"        pl.col({str_fields_list}).cast(pl.Utf8),\n"
+
+        if int_32_fields_list:
+            output_str += "        # Int32 fields\n"
+            output_str += f"        pl.col({int_32_fields_list}).cast(pl.Int32),\n"
+
+        if int_64_fields_list:
+            output_str += "        # Int64 fields\n"
+            output_str += f"        pl.col({int_64_fields_list}).cast(pl.Int64),\n"
+
+        if float_32_fields_list:
+            output_str += "        # Float fields\n"
+            output_str += f"        pl.col({float_32_fields_list}).cast(pl.Float32),\n"
+
+        if float_64_fields_list:
+            output_str += "        # Double fields\n"
+            output_str += f"        pl.col({float_64_fields_list}).cast(pl.Float64),\n"
+
+        if bool_fields_list:
+            output_str += "        # Bool fields\n"
+            output_str += f"        pl.col({bool_fields_list}).cast(pl.Boolean),\n"
+
+        if datetime_fields_list:
+            output_str += "        # DateTime fields\n"
+            output_str += f"        pl.col({datetime_fields_list}).cast(pl.Datetime),\n"
+
+        output_str += "        ]\n\n"
+
+        output_str += "    @classmethod\n"
+        output_str += f"    def to_csv(cls, obj_list: List['{message.proto.name}'], file_path: str, **kwargs) -> None:\n"
+        output_str += f"        obj_dict_list = msgspec.to_builtins(obj_list, builtin_types={message.proto.name}.custom_builtin_types)\n"
+        output_str += f"        df = polars.DataFrame(obj_dict_list, schema_overrides={message.proto.name}.get_polars_schema())\n"
+        output_str += f"        df_casted = df.with_columns(cls.get_polars_cast_expressions())\n"
+        output_str += f"        df_casted.write_csv(file_path)\n\n"
+
+        return output_str
+
     def _handle_config_class_and_other_root_class_versions(self, message: protogen.Message,
                                                            auto_gen_id_type: IdType) -> str:
         alias_name_dict: Dict[str, str] = {}
@@ -371,6 +487,11 @@ class MsgspecModelPlugin(DataclassModelPlugin):
         output_str, _ = self._handle_post_init_handling(message, auto_gen_id_type,
                                                         alias_name_dict=alias_name_dict)
         output_str += "\n\n"
+
+        if self.is_bool_option_enabled(message, MsgspecModelPlugin.flux_msg_gen_df_serialize_methods):
+            output_str += self.handle_get_polars_schema_method(message)
+            output_str += self.handle_get_polars_cast_expressions_method(message)
+        # else not required: avoiding df helper method related code if not required
 
         # Adding other versions for root model class
         output_str += self.handle_dummy_message_gen(message, auto_gen_id_type, alias_name_dict=alias_name_dict)
@@ -497,11 +618,14 @@ class MsgspecModelPlugin(DataclassModelPlugin):
         output_str += "from typing import List, ClassVar, Dict\n"
         output_str += "from msgspec import Struct, field\n"
         output_str += "from bson import ObjectId\n"
+        output_str += "import math\n"
         output_str += "import datetime\n\n"
         output_str += "# 3rd party imports\n"
         output_str += "import pendulum\n"
         output_str += "from pendulum import DateTime\n"
         output_str += "from pandas import Timestamp\n"
+        output_str += "import polars as pl\n"
+        output_str += "import pandas as pd\n"
 
         if self.enum_list:
             if self.enum_type == "int_enum":
@@ -519,6 +643,7 @@ class MsgspecModelPlugin(DataclassModelPlugin):
         output_str += f"from {generic_utils_import_path} import validate_pendulum_datetime\n"
         output_str += f"from FluxPythonUtils.scripts.async_rlock import AsyncRLock\n"
         output_str += f"from FluxPythonUtils.scripts.model_base_utils import *\n"
+        output_str += f"from FluxPythonUtils.scripts.general_utility_functions import transform_to_str, empty_as_none, str_to_datetime\n"
         base_strat_cache_import_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR",
                                                                      f"{self.proto_file_name}_ts_utils")
         output_str += f"from {base_strat_cache_import_path} import *\n"

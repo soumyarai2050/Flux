@@ -7,7 +7,7 @@ import stat
 import random
 import ctypes
 
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecord, SecType
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.static_data import SecurityRecord, SecType
 
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.chore_check import (
     ChoreControl, initialize_chore_control)

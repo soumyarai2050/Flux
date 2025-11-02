@@ -9,7 +9,7 @@ import logging
 
 from pendulum import DateTime
 
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecordManager
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.static_data import SecurityRecordManager
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     MDShellEnvData, create_md_shell_script, create_stop_md_script)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.generated.ORMModel.mobile_book_service_model_imports import SymbolInterestsBaseModel

@@ -12,7 +12,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel
     Position, Side, Broker, BrokerBaseModel, BrokerRoute)
 from FluxPythonUtils.scripts.general_utility_functions import configure_logger
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.markets.market import Market, MarketID
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecordManager
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.static_data import SecurityRecordManager
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.bartering_link import (
     get_bartering_link, BarteringLinkBase)
 

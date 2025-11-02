@@ -41,7 +41,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_ser
 from FluxPythonUtils.scripts.general_utility_functions import (
     avg_of_new_val_sum_to_avg, find_free_port, except_n_log_alert, handle_refresh_configurable_data_members, set_package_logger_level, parse_to_int, parse_to_float,
     YAMLConfigurationManager, find_pids_by_command, terminate_process)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.static_data import (
     SecurityRecordManager)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.service_state import ServiceState
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *

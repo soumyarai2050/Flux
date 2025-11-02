@@ -31,8 +31,9 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_ser
     CURRENT_PROJECT_SCRIPTS_DIR, create_md_shell_script, MDShellEnvData, ps_host, get_new_contact_status,
     get_new_contact_limits, get_new_chore_limits, CURRENT_PROJECT_DATA_DIR, is_ongoing_plan,
     get_plan_key_from_pair_plan, get_id_from_plan_key, get_new_plan_view_obj,
-    get_matching_plan_from_symbol_n_side, get_dismiss_filter_brokers, handle_shadow_broker_updates,
+    get_matching_plan_from_symbol_n_side, handle_shadow_broker_updates,
     handle_shadow_broker_creates, ps_view_port, is_view_service_up)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book_helper import get_dismiss_filter_brokers
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import plan_view_client_call_log_str
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import (
     get_pair_plan_log_key, get_pair_plan_dict_log_key, pair_plan_id_key, symbol_side_key)
@@ -54,7 +55,8 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_hel
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.service_state import ServiceState
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import (
     UpdateType, enable_disable_plan_alerts_log_str)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecordManager
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.static_data import SecurityRecordManager
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.executor_config_loader import executor_config_yaml_dict
 
 is_view_server: Final[bool] = os.environ.get('IS_VIEW_SERVER', False)
 use_view_clients: Final[bool] = config_yaml_dict.get("use_view_clients", False)
@@ -1400,11 +1402,16 @@ class EmailBookServiceRoutesCallbackBaseNativeOverride(Service, EmailBookService
             view_executor = self._start_view_server(pair_plan)
             view_executor_pid = view_executor.pid
 
+        main_server_env_dict = os.environ.copy()
+        exch_to_market_depth_lvl_dict = executor_config_yaml_dict.get("exch_to_market_depth_lvl", {})
+        main_server_env_dict["MARKET_DEPTH_LVL"] = str(exch_to_market_depth_lvl_dict.get(pair_plan.pair_plan_params.plan_leg1.exch_id, ""))
         if is_crash_recovery:
             # 1 is sent to indicate it is recovery restart
-            main_executor = subprocess.Popen(['python', str(executor_path), f'{pair_plan.id}', "1", '&'])
+            main_executor = subprocess.Popen(['python', str(executor_path), f'{pair_plan.id}', "1", '&'],
+                                             env=main_server_env_dict)
         else:
-            main_executor = subprocess.Popen(['python', str(executor_path), f'{pair_plan.id}', '&'])
+            main_executor = subprocess.Popen(['python', str(executor_path), f'{pair_plan.id}', '&'],
+                                             env=main_server_env_dict)
 
         logging.info(f"Launched plan executor for {pair_plan.id=};;;{executor_path=}")
         self.pair_plan_id_to_executor_process_id_dict[pair_plan.id] = (main_executor.pid, view_executor_pid)

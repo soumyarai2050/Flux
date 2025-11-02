@@ -25,7 +25,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.app.mobile_book_s
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.app.mobile_book_service_helper import md_view_port
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.app.aggregate import (
     get_symbol_interest_from_symbol, get_symbol_overview_from_symbol)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.static_data import (
     SecurityRecordManager)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.service_state import ServiceState
 from scripts.general_utility_functions import compare_n_patch_dict

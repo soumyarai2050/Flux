@@ -23,7 +23,7 @@ os.environ["ModelType"] = "msgspec"
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.ORMModel.log_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.email_book_service_http_client import \
     EmailBookServiceHttpClient
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecordManager
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.static_data import SecurityRecordManager
 from FluxPythonUtils.scripts.general_utility_functions import clean_mongo_collections, parse_to_int, \
     get_mongo_db_list, drop_mongo_database, avg_of_new_val_sum_to_avg, run_gbd_terminal_with_pid, get_pid_from_port, \
     ClientError, HTTPRequestType, handle_http_response

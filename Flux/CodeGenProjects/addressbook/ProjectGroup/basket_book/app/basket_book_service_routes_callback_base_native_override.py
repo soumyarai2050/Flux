@@ -27,7 +27,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.ib_bartering_li
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book_helper import (
      create_symbol_overview_pre_helper, update_symbol_overview_pre_helper,
      partial_update_symbol_overview_pre_helper)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.static_data import (
     SecurityRecordManager)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.service_state import ServiceState
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.aggregate import (
@@ -95,8 +95,7 @@ class BasketBookServiceRoutesCallbackBaseNativeOverride(BaseBookServiceRoutesCal
     @classmethod
     def initialize_underlying_http_callables(cls):
         from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.generated.FastApi.basket_book_service_http_routes_imports import (
-            underlying_read_symbol_overview_http, underlying_read_top_of_book_http,
-            underlying_get_symbol_overview_from_symbol_query_http,
+            underlying_read_symbol_overview_http, underlying_get_symbol_overview_from_symbol_query_http,
             underlying_get_top_of_book_from_symbol_query_http,
             underlying_create_deals_ledger_http, underlying_create_chore_ledger_http,
             residual_compute_shared_lock, ledger_shared_lock, underlying_create_chore_snapshot_http,

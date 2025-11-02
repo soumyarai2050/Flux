@@ -10,7 +10,7 @@ from pendulum import DateTime
 from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_post_book_n_basket_book_core_msgspec_model import *
 
 from Flux.CodeGenProjects.AddressBook.ORMModel.dept_book_n_mobile_book_n_street_book_n_basket_book_core_msgspec_model import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import SecurityRecordManager, SecurityRecord
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.static_data import SecurityRecordManager, SecurityRecord
 from FluxPythonUtils.scripts.general_utility_functions import parse_to_int
 from Flux.CodeGenProjects.AddressBook.ORMModel.barter_core_msgspec_model import PlanState
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_msgspec_model import PairPlan, \
@@ -179,3 +179,18 @@ def get_executor_id_n_recovery_info_from_cmd_argv():
         logging.error(err_str_)
         raise Exception(err_str_)
 
+
+async def get_dismiss_filter_brokers(underlying_http_callable, static_data, security_id1: str, security_id2: str):
+    ric1, ric2 = static_data.get_connect_n_qfii_rics_from_ticker(security_id1)
+    ric3, ric4 = static_data.get_connect_n_qfii_rics_from_ticker(security_id2)
+    sedol = static_data.get_sedol_from_ticker(security_id1)
+    # get security name from : pair_plan_params.plan_legs and then redact pattern
+    # security.sec_id (a pattern in positions) where there is a value match
+    dismiss_filter_agg_pipeline = {'redact': [("security.sec_id", ric1, ric2, ric3, ric4, sedol)]}
+    filtered_brokers: List[ShadowBrokers] = await underlying_http_callable(dismiss_filter_agg_pipeline)
+
+    eligible_brokers = []
+    for broker in filtered_brokers:
+        if broker.sec_positions:
+            eligible_brokers.append(broker)
+    return eligible_brokers

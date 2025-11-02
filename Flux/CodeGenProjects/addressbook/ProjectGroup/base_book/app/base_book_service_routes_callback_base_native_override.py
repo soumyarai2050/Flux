@@ -14,7 +14,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book_helpe
 from FluxPythonUtils.scripts.general_utility_functions import (
     except_n_log_alert, create_logger)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.markets.market import Market, MarketID
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.static_data import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.static_data import (
     SecurityRecordManager)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
