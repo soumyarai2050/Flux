@@ -129,6 +129,7 @@ class BaseProtoPlugin(ABC):
     flux_msg_cmnt: ClassVar[str] = "FluxMsgCmnt"
     flux_file_cmnt: ClassVar[str] = "FluxFileCmnt"
     flux_fld_index: ClassVar[str] = "FluxFldIndex"
+    flux_fld_index_is_unique: ClassVar[str] = "FluxFldIndexIsUnique"
     flux_fld_web_socket: ClassVar[str] = "FluxFldWebSocket"
     flux_fld_abbreviated: ClassVar[str] = "FluxFldAbbreviated"
     flux_fld_auto_complete: ClassVar[str] = "FluxFldAutoComplete"
@@ -259,6 +260,12 @@ class BaseProtoPlugin(ABC):
     flux_msg_is_shm_container: ClassVar[str] = "FluxMsgIsShmContainer"
     flux_msg_gen_df_serialize_methods: ClassVar[str] = "FluxMsgGenDfSerializeMethods"
     flux_enum_cmnt: ClassVar[str] = "FluxEnumCmnt"
+    flux_fld_csv_details: ClassVar[str] = "FluxFldCSVDetails"
+    csv_details_csv_name_field: ClassVar[str] = "CSVName"
+    csv_details_csv_type_field: ClassVar[str] = "CSVType"
+    csv_details_csv_time_zone_field: ClassVar[str] = "CSVTimeZone"
+    csv_details_csv_date_time_format_field: ClassVar[str] = "CSVDateTimeFormat"
+    csv_details_csv_epoch_unit_field: ClassVar[str] = "CSVEpochUnit"
     default_id_field_name: ClassVar[str] = "id"
     default_id_type_var_name: ClassVar[str] = "DefaultIdType"  # to be used in models as default type variable name
     proto_package_var_name: ClassVar[str] = "ProtoPackageName"  # to be used in models as proto_package_name variable name
@@ -290,6 +297,26 @@ class BaseProtoPlugin(ABC):
         "double": "pl.Float64",
         "enum": "pl.Utf8",
         "date_time": "pl.Datetime"
+    }
+    supported_polars_enum_type_to_python_type_dict: Dict[str, str] = {
+        "pl_int32": "int32",
+        "pl_int64": "int64",
+        "pl_string": "string",
+        "pl_boolean": "boolean",
+        "pl_float32": "float32",
+        "pl_float64": "float64",
+        "pl_enum": "string",
+        "pl_datetime": "datetime"
+    }
+    supported_polars_enum_type_to_polars_type_dict: Dict[str, str] = {
+        "pl_int32": "pl.Int32",
+        "pl_int64": "pl.Int64",
+        "pl_string": "pl.Utf8",
+        "pl_boolean": "pl.Boolean",
+        "pl_float32": "pl.Float32",
+        "pl_float64": "pl.Float64",
+        "pl_enum": "pl.Utf8",
+        "pl_datetime": "pl.Datetime"
     }
     options_having_msg_fld_names: List[str] = [
         flux_fld_abbreviated,

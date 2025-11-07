@@ -1515,13 +1515,18 @@ async def get_filtered_obj(filter_agg_pipeline: Dict, msgspec_class_type: Type[M
         return None
 
 
-async def get_max_val(model_class_type: Type[MsgspecModel]):
-    collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = model_class_type.collection_obj
+async def find_max_id_val(collection_obj: motor.motor_asyncio.AsyncIOMotorCollection):
     latest_obj = await collection_obj.find_one(sort=[("_id", -1)])
     if latest_obj is not None:
         max_val = latest_obj.get("_id")
     else:
         max_val = 0
+    return max_val
+
+
+async def get_max_val(model_class_type: Type[MsgspecModel]):
+    collection_obj: motor.motor_asyncio.AsyncIOMotorCollection = model_class_type.collection_obj
+    max_val = await find_max_id_val(collection_obj)
     return max_val
 
 

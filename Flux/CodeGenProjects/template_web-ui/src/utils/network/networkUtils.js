@@ -92,6 +92,8 @@ export function getAxiosMethod(queryRouteType) {
 /**
  * Checks if a WebSocket connection is active (i.e., in the OPEN state).
  * Can check a provided WebSocket object directly or retrieve it from a cache using a model name.
+ * If a composite key (e.g., "dash-115") is not found in the cache, it will fallback to checking
+ * the base model name (e.g., "dash") before returning false.
  * @param {WebSocket} webSocket - The WebSocket object to check.
  * @param {string} [modelName=null] - Optional. The name of the model to retrieve the WebSocket connection from the cache.
  * @returns {boolean} True if the WebSocket connection is active and open, false otherwise.
@@ -101,6 +103,12 @@ export function isWebSocketActive(webSocket, modelName = null) {
     // If a modelName is provided, retrieve the WebSocket connection from the cache.
     if (modelName) {
         websocketToCheck = getWebSocketConnection(modelName);
+
+        // If composite key not found , try base model name
+        if (!websocketToCheck && modelName.includes('-')) {
+            const baseModelName = modelName.substring(0, modelName.lastIndexOf('-'));
+            websocketToCheck = getWebSocketConnection(baseModelName);
+        }
     }
     // If a WebSocket object is available, check its readyState.
     if (websocketToCheck) {

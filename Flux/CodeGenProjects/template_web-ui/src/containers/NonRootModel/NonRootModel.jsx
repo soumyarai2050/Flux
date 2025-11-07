@@ -475,6 +475,19 @@ function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRoo
     // Also wait for default filters to be ready
     const isWebSocketDelayed = isWebSocketDisabled || isWaitingForCount || !areDefaultFiltersReady;
 
+    // Check if WebSocket is disconnected
+    const getIsDisconnected = () => {
+        // In BY-ID mode (hasReadByIdWsProperty), check websocketConnectionCache with composite key
+        // Otherwise, check socketRef.current (single WebSocket mode)
+        const ws = hasReadByIdWsProperty ? null : socketRef.current;
+        // For BY-ID mode, use composite key: ${modelRootName}-${objId}
+        const lookupModelName = hasReadByIdWsProperty && objId
+            ? `${modelRootName}-${objId}`
+            : (isAbbreviationSource ? modelRootName : null);
+        const isActive = isWebSocketActive(ws, lookupModelName);
+        return !isCreating && !isActive && !isWebSocketDisabled;
+    };
+
     socketRef.current = useWebSocketWorker({
         url: wsViewUrl,
         modelName: modelRootName,
@@ -865,7 +878,7 @@ function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRoo
                     isDisabled={isLoading || isProcessingUserActions}
                     error={error}
                     onClear={handleErrorClear}
-                    isDisconnected={!isCreating && !isWebSocketActive(socketRef.current, isAbbreviationSource ? modelRootName : null) && !isWebSocketDisabled}
+                    isDisconnected={getIsDisconnected()}
                     onReconnect={handleReconnect}
                     isDownloading={isDownloading}
                     progress={progress}

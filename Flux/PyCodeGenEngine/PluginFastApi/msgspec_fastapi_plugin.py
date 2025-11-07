@@ -204,14 +204,15 @@ class MsgspecFastApiPlugin(FastapiCallbackFileHandler,
                                    f'await cls.instance_object.db_instance.create_collection("{msg.proto.name}")\n')
 
                 # Adding index field initialization with created collection object
-                index_field_name_list = []
+                index_field_name_to_unique_dict = {}
                 for field in msg.fields:
                     if self.is_option_enabled(field, MsgspecFastApiPlugin.flux_fld_index):
-                        index_field_name_list.append(field.proto.name)
+                        is_unique = self.is_bool_option_enabled(field, MsgspecFastApiPlugin.flux_fld_index_is_unique)
+                        index_field_name_to_unique_dict[field.proto.name] = is_unique
 
-                if index_field_name_list:
-                    output_str += (f'            await {msg.proto.name}.collection_obj.create_index('
-                                   f'{index_field_name_list})\n')
+                for index_field_name, is_unique in index_field_name_to_unique_dict.items():
+                    output_str += f'            await {msg.proto.name}.collection_obj.create_index('
+                    output_str += f'\'{index_field_name}\', unique={is_unique})\n'
                 output_str += f'        else:\n'
                 output_str += (f'            {msg.proto.name}.collection_obj = '
                                f'cls.instance_object.db_instance.get_collection("{msg.proto.name}")\n\n')

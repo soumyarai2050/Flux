@@ -2,6 +2,7 @@
 import logging
 import os
 import time
+from tarfile import SUPPORTED_TYPES
 from typing import Tuple, List, Dict
 from FluxPythonUtils.scripts.general_utility_functions import parse_to_int
 
@@ -368,11 +369,19 @@ class MsgspecModelPlugin(DataclassModelPlugin):
         output_str += f"            Dictionary containing the polars schema\n"
         output_str += "        \"\"\"\n"
         output_str += "        return {\n"
+        csv_column_name_list = []
+        field_name_to_csv_name_dict = {}
+        date_time_column_name_to_format_dict = {}
+        epoch_column_name_to_unit_dict = {}
         for field in message.fields:
+            if field.proto.name == "id":
+                continue
+
             field_name_snake_cased = convert_camel_case_to_specific_case(field.proto.name)
 
             if self.is_bool_option_enabled(field, MsgspecModelPlugin.flux_fld_val_is_datetime):
                 polars_type = MsgspecModelPlugin.proto_type_to_polars_type_dict.get("date_time")
+                date_time_column_name_to_format_dict[field_name_snake_cased] = None
             else:
                 polars_type = MsgspecModelPlugin.proto_type_to_polars_type_dict.get(field.kind.name.lower())
 
@@ -380,16 +389,80 @@ class MsgspecModelPlugin(DataclassModelPlugin):
                 # field type is of message type or any other type not supported by polars then ignoring
                 continue
 
+            csv_details_option_val = MsgspecModelPlugin.get_complex_option_value_from_proto(field, MsgspecModelPlugin.flux_fld_csv_details)
+            if csv_details_option_val:
+
+                epoch_unit = csv_details_option_val.get(MsgspecModelPlugin.csv_details_csv_epoch_unit_field)
+                if epoch_unit:
+                    epoch_unit = epoch_unit.lower()
+                    epoch_column_name_to_unit_dict[field_name_snake_cased] = epoch_unit
+                    # only taking field for format if epoch is not set - epoch takes precedence
+                    date_time_column_name_to_format_dict.pop(field_name_snake_cased, None)
+
+                dt_format = csv_details_option_val.get(MsgspecModelPlugin.csv_details_csv_date_time_format_field)
+                if dt_format and field_name_snake_cased not in epoch_column_name_to_unit_dict:
+                    # only taking field for format if epoch is not set - epoch takes precedence
+                    date_time_column_name_to_format_dict[field_name_snake_cased] = dt_format
+
+                csv_name = csv_details_option_val.get(MsgspecModelPlugin.csv_details_csv_name_field)
+                if csv_name:
+                    csv_column_name_list.append(csv_name)
+                    output_str += f"            '{csv_name}': {polars_type},\n"
+                    field_name_to_csv_name_dict[csv_name] = field_name_snake_cased
+                    continue
+
+            # only putting field_name if option value not set for CSVName
+            csv_column_name_list.append(field_name_snake_cased)
             output_str += f"            '{field_name_snake_cased}': {polars_type},\n"
+
         output_str += "        }\n\n"
 
         output_str += "    @staticmethod\n"
-        output_str += f"    def from_csv(csv_path: str) -> List['{message.proto.name}']:\n"
+        output_str += "    def get_epoch_unit_from_col_name(col_name: str):\n"
+        output_str += f"        return {epoch_column_name_to_unit_dict}.get(col_name)\n\n"
+
+        output_str += "    @staticmethod\n"
+        output_str += "    def get_date_time_format_from_col_name(col_name: str):\n"
+        output_str += f"        return {date_time_column_name_to_format_dict}.get(col_name)\n\n"
+
+        output_str += "    @staticmethod\n"
+        output_str += "    def df_from_csv(csv_path: str) -> pd.DataFrame:\n"
+        output_str += f"        expected_column_name = {csv_column_name_list}\n"
         output_str += "        csv_read_options = {\n"
-        output_str += "            \"null_values\": [\"\", \"null\", \"NULL\", \"None\", \"NaN\"],\n"
-        output_str += "            \"schema_overrides\": "+f"{message.proto.name}.get_polars_schema()\n"
-        output_str += "        }\n"
-        output_str += f"        df = pl.read_csv(csv_path, **csv_read_options)\n"
+        output_str += f'            "null_values": {message.proto.name}.df_csv_null_types,\n'
+        output_str += '        }\n'
+        output_str += '        df = pl.read_csv(csv_path, **csv_read_options)\n'
+
+        output_str += '        # Add missing columns as nulls\n'
+        output_str += '        for col in expected_column_name:\n'
+        output_str += '            if col not in df.columns:\n'
+        output_str += '                df = df.with_columns(pl.lit(None).alias(col))\n'
+
+        output_str += f"        schema = {message.proto.name}.get_polars_schema()\n"
+        output_str += f"        for col_name, col_type in schema.items():\n"
+        output_str += f"            if col_name in df.columns:\n"
+        output_str += f"                if col_name in {list(date_time_column_name_to_format_dict.keys())}:\n"
+        output_str += f"                    # Parse datetime columns using pendulum to handle timezone-aware strings\n"
+        output_str += f"                    dt_format = {message.proto.name}.get_date_time_format_from_col_name(col_name)\n"
+        output_str += f'                    df = df.with_columns(pl.col(col_name).str.to_datetime(format=dt_format, time_zone="UTC"))\n'
+        output_str += f"                elif col_name in {list(epoch_column_name_to_unit_dict.keys())}:\n"
+        output_str += f"                    epoch_unit = {message.proto.name}.get_epoch_unit_from_col_name(col_name)\n"
+        output_str += f"                    if epoch_unit:\n"
+        output_str += f"                        if epoch_unit == 's':\n"
+        output_str += f'                            df = df.with_columns((pl.col(col_name)*1000).cast(pl.Datetime("ms", time_zone="UTC")))\n'
+        output_str += f'                        else:\n'
+        output_str += f'                            df = df.with_columns(pl.col(col_name).cast(pl.Datetime(epoch_unit, time_zone="UTC")))\n'
+        output_str += f'                    else:\n'
+        output_str += f'                        df = df.with_columns(pl.col(col_name).cast(pl.Datetime(time_zone="UTC")))\n'
+        output_str += f"                else:\n"
+        output_str += f"                    df = df.with_columns(pl.col(col_name).cast(col_type, strict=False))\n"
+        if field_name_to_csv_name_dict:
+            output_str += f"        df = df.rename({field_name_to_csv_name_dict})\n"
+        output_str += '        return df\n\n'
+
+        output_str += "    @staticmethod\n"
+        output_str += f"    def from_csv(csv_path: str) -> List['{message.proto.name}']:\n"
+        output_str += f"        df = {message.proto.name}.df_from_csv(csv_path)\n"
         output_str += f"        msgspec_obj_list = {message.proto.name}.from_dict_list(df.to_dicts())\n"
         output_str += f"        return msgspec_obj_list\n\n"
 
@@ -397,7 +470,7 @@ class MsgspecModelPlugin(DataclassModelPlugin):
 
     def handle_get_polars_cast_expressions_method(self, message: protogen.Message) -> str:
         output_str = "    @staticmethod\n"
-        output_str += "    def get_polars_cast_expressions(cls) -> List[pl.Expr]:\n"
+        output_str += "    def get_polars_cast_expressions_for_csv() -> List[pl.Expr]:\n"
         output_str += "        \"\"\"\n"
         output_str += f"        Returns a list of polars expressions for casting columns to their proper types.\n"
         output_str += f"        Returns:\n"
@@ -413,28 +486,86 @@ class MsgspecModelPlugin(DataclassModelPlugin):
         float_64_fields_list = []
         bool_fields_list = []
         datetime_fields_list = []
+        field_name_to_csv_rename_dict = {}
+        datetime_field_name_to_csv_time_zone = {}
+        datetime_field_name_to_csv_date_time_format = {}
+        datetime_field_name_to_csv_epoch_unit = {}
         for field in message.fields:
             if field.proto.name == "_id" or field.proto.name == "id":
                 continue
 
-            if field.kind.name.lower() == "string" or field.kind.name.lower() == "enum":
-                str_fields_list.append(field.proto.name)
-            elif field.kind.name.lower() == "int32":
+            field_type = field.kind.name.lower()
+            field_name = field.proto.name
+
+            csv_details_option_val = MsgspecModelPlugin.get_complex_option_value_from_proto(field, MsgspecModelPlugin.flux_fld_csv_details)
+            if csv_details_option_val:
+                csv_name = csv_details_option_val.get(MsgspecModelPlugin.csv_details_csv_name_field)
+                if csv_name:
+                    field_name_to_csv_rename_dict[field_name] = csv_name
+                    # field_name = csv_name
+                if csv_type_option_val:=csv_details_option_val.get(MsgspecModelPlugin.csv_details_csv_type_field):
+                    if csv_type_option_val == "PL_String":
+                        str_fields_list.append(field_name)
+                    elif csv_type_option_val == "PL_Int32":
+                        int_32_fields_list.append(field_name)
+                    elif csv_type_option_val == "PL_Int64":
+                        int_64_fields_list.append(field_name)
+                    elif csv_type_option_val == "PL_Float32":
+                        float_32_fields_list.append(field_name)
+                    elif csv_type_option_val == "PL_Float64":
+                        float_64_fields_list.append(field_name)
+                    elif csv_type_option_val == "PL_Datetime":
+                        datetime_fields_list.append(field_name)
+
+                        if csv_time_zone_option_val:=csv_details_option_val.get(MsgspecModelPlugin.csv_details_csv_time_zone_field):
+                            datetime_field_name_to_csv_time_zone[field_name] = csv_time_zone_option_val
+                        if csv_date_time_format_option_val:=csv_details_option_val.get(MsgspecModelPlugin.csv_details_csv_date_time_format_field):
+                            datetime_field_name_to_csv_date_time_format[field_name] = csv_date_time_format_option_val
+                        if csv_date_time_epoch_unit_option_val:=csv_details_option_val.get(MsgspecModelPlugin.csv_details_csv_epoch_unit_field):
+                            datetime_field_name_to_csv_epoch_unit[field_name] = csv_date_time_epoch_unit_option_val.lower()
+
+                    continue
+                # else not required: using field_type based on model
+
+            if field_type == "string" or field_type == "enum":
+                str_fields_list.append(field_name)
+            elif field_type == "int32":
                 if self.is_bool_option_enabled(field, MsgspecModelPlugin.flux_fld_val_is_datetime):
-                    datetime_fields_list.append(field.proto.name)
+                    datetime_fields_list.append(field_name)
+
+                    if csv_time_zone_option_val := csv_details_option_val.get(
+                            MsgspecModelPlugin.csv_details_csv_time_zone_field):
+                        datetime_field_name_to_csv_time_zone[field_name] = csv_time_zone_option_val
+                    if csv_date_time_format_option_val := csv_details_option_val.get(
+                            MsgspecModelPlugin.csv_details_csv_date_time_format_field):
+                        datetime_field_name_to_csv_date_time_format[field_name] = csv_date_time_format_option_val
+                    if csv_date_time_epoch_unit_option_val:=csv_details_option_val.get(MsgspecModelPlugin.csv_details_csv_epoch_unit_field):
+                        datetime_field_name_to_csv_epoch_unit[field_name] = csv_date_time_epoch_unit_option_val.lower()
+
                 else:
-                    int_32_fields_list.append(field.proto.name)
-            elif field.kind.name.lower() == "int64":
+                    int_32_fields_list.append(field_name)
+            elif field_type == "int64":
                 if self.is_bool_option_enabled(field, MsgspecModelPlugin.flux_fld_val_is_datetime):
-                    datetime_fields_list.append(field.proto.name)
+                    datetime_fields_list.append(field_name)
+
+                    if csv_time_zone_option_val := csv_details_option_val.get(
+                            MsgspecModelPlugin.csv_details_csv_time_zone_field):
+                        datetime_field_name_to_csv_time_zone[field_name] = csv_time_zone_option_val
+                    if csv_date_time_format_option_val := csv_details_option_val.get(
+                            MsgspecModelPlugin.csv_details_csv_date_time_format_field):
+                        datetime_field_name_to_csv_date_time_format[field_name] = csv_date_time_format_option_val
+                    if csv_date_time_epoch_unit_option_val := csv_details_option_val.get(
+                            MsgspecModelPlugin.csv_details_csv_epoch_unit_field):
+                        datetime_field_name_to_csv_epoch_unit[field_name] = csv_date_time_epoch_unit_option_val.lower()
+
                 else:
-                    int_64_fields_list.append(field.proto.name)
-            elif field.kind.name.lower() == "float":
-                float_32_fields_list.append(field.proto.name)
-            elif field.kind.name.lower() == "double":
-                float_64_fields_list.append(field.proto.name)
-            elif field.kind.name.lower() == "bool":
-                bool_fields_list.append(field.proto.name)
+                    int_64_fields_list.append(field_name)
+            elif field_type == "float":
+                float_32_fields_list.append(field_name)
+            elif field_type == "double":
+                float_64_fields_list.append(field_name)
+            elif field_type == "bool":
+                bool_fields_list.append(field_name)
 
         if str_fields_list:
             output_str += "        # String fields\n"
@@ -462,16 +593,53 @@ class MsgspecModelPlugin(DataclassModelPlugin):
 
         if datetime_fields_list:
             output_str += "        # DateTime fields\n"
-            output_str += f"        pl.col({datetime_fields_list}).cast(pl.Datetime),\n"
+            for datetime_field in datetime_fields_list:
+                csv_time_zone = datetime_field_name_to_csv_time_zone.get(datetime_field)
+                if csv_time_zone:
+                    output_str += f"        pl.col('{datetime_field}').cast(pl.Datetime(time_zone='{csv_time_zone}'))"
+                else:
+                    output_str += f"        pl.col('{datetime_field}').cast(pl.Datetime)"
+
+                # if epoch is found - doesn't matter what all values were set to options related to datetime
+                if datetime_field in datetime_field_name_to_csv_epoch_unit:
+                    csv_date_time_epoch_unit_option_val = datetime_field_name_to_csv_epoch_unit.get(datetime_field)
+                    if csv_date_time_epoch_unit_option_val:
+                        if csv_date_time_epoch_unit_option_val == "s":
+                            output_str += f".dt.timestamp('ms').truediv(1000).cast(pl.Int64),    # case when epoch unit option val is 's'\n"
+                        else:
+                            output_str += f".dt.timestamp('{csv_date_time_epoch_unit_option_val}'),\n"
+                    else:
+                        output_str += ".dt.timestamp(),\n"
+                else:
+                    csv_date_time_format = datetime_field_name_to_csv_date_time_format.get(datetime_field)
+                    if csv_date_time_format:
+                        output_str += f".dt.to_string('{csv_date_time_format}'),\n"
+                    else:
+                        output_str += ",\n"
 
         output_str += "        ]\n\n"
 
         output_str += "    @classmethod\n"
+        output_str += f"    def df_to_csv(cls, df: pl.DataFrame, file_path: str, avoid_empty_columns: bool = False, **kwargs) -> None:\n"
+        output_str += f"        df_casted = df.with_columns(cls.get_polars_cast_expressions_for_csv())\n"
+        output_str += f"        df_casted = df_casted.rename({field_name_to_csv_rename_dict})\n"
+        output_str += f"        if avoid_empty_columns:     # dropping empty columns\n"
+        output_str += f"            # Find columns where all values are None\n"
+        output_str += f"            null_cols = [\n"
+        output_str += f"                c for c in df_casted.columns\n"
+        output_str += f"                if df_casted.select(pl.col(c).is_null().all()).item()\n"
+        output_str += f"            ]\n"
+        output_str += f"            # Drop those columns\n"
+        output_str += f"            df_casted = df_casted.drop(null_cols)\n"
+        output_str += f"        # else not required: writing to csv with empty columns\n"
+        output_str += f"        df_casted.write_csv(file_path)\n\n"
+
+
+        output_str += "    @classmethod\n"
         output_str += f"    def to_csv(cls, obj_list: List['{message.proto.name}'], file_path: str, **kwargs) -> None:\n"
         output_str += f"        obj_dict_list = msgspec.to_builtins(obj_list, builtin_types={message.proto.name}.custom_builtin_types)\n"
-        output_str += f"        df = polars.DataFrame(obj_dict_list, schema_overrides={message.proto.name}.get_polars_schema())\n"
-        output_str += f"        df_casted = df.with_columns(cls.get_polars_cast_expressions())\n"
-        output_str += f"        df_casted.write_csv(file_path)\n\n"
+        output_str += f"        df = polars.DataFrame(obj_dict_list)\n"
+        output_str += f"        {message.proto.name}.df_to_csv(df, file_path, **kwargs)\n\n"
 
         return output_str
 
@@ -643,7 +811,7 @@ class MsgspecModelPlugin(DataclassModelPlugin):
         output_str += f"from {generic_utils_import_path} import validate_pendulum_datetime\n"
         output_str += f"from FluxPythonUtils.scripts.async_rlock import AsyncRLock\n"
         output_str += f"from FluxPythonUtils.scripts.model_base_utils import *\n"
-        output_str += f"from FluxPythonUtils.scripts.general_utility_functions import transform_to_str, empty_as_none, str_to_datetime\n"
+        output_str += f"from FluxPythonUtils.scripts.general_utility_functions import transform_to_str, empty_as_none, str_to_datetime, transform_to_datetime\n"
         base_strat_cache_import_path = self.import_path_from_os_path("PLUGIN_OUTPUT_DIR",
                                                                      f"{self.proto_file_name}_ts_utils")
         output_str += f"from {base_strat_cache_import_path} import *\n"

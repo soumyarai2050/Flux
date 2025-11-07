@@ -169,6 +169,33 @@ enum DateTimeGranularity {
 }
 
 
+enum SupportedPolarsCastType {
+    PL_Int32 = 0;
+    PL_Int64 = 1;
+    PL_String = 2;
+    PL_Float32 = 3;
+    PL_Float64 = 4;
+    PL_Datetime = 5;
+}
+
+
+enum SupportedEpochUnits {
+    S = 0;
+    MS = 1;
+    US = 2;
+    NS = 3;
+}
+
+
+message FluxCSVDetails {
+    optional string CSVName = 1;
+    optional SupportedPolarsCastType CSVType = 2;
+    optional string CSVTimeZone = 3;        // useful only when field is datetime type or CSVType is PL_Datetime
+    optional string CSVDateTimeFormat = 4;        // useful only when field is datetime type or CSVType is PL_Datetime
+    optional SupportedEpochUnits CSVEpochUnit = 5;      // useful only when field is datetime type - if set then this field will have int values in csv, no matter CSVType
+}
+
+
 extend google.protobuf.FileOptions 
 {
   //General Options - 51
@@ -306,11 +333,13 @@ extend google.protobuf.FieldOptions
   optional string FluxFldDateTimeFormat = 52159;
   optional bool FluxFldCollectionLink = 52160;
   optional bool FluxFldDynamicAggUpdate = 52161;
+  optional bool FluxFldIndexIsUnique = 52162;
 
   //ORM options - 551
   optional bool FluxFldOrmNoUpdate = 55151;  //The field that gets persisted in create to ORM and subsequently can't be updated has this option set
   optional string FluxFldAbbreviatedLink = 55152;  // Use to connect Data Tables that are not DB connected but share common key
   repeated string FluxFldProjections = 55153; // Use to indicate generated field in subset projection models from source model, Nested Usage: "vwap.vwap_px:1", where left of colan is nested field and right is projection id or name
+  optional FluxCSVDetails FluxFldCSVDetails = 55154;
 
   //UI option 552
   optional string FluxFldAbbreviated = 55251; // Use this to "Abbreviate" msg and show compressed single val

@@ -77,7 +77,7 @@ function useWebSocketWorker({
     if (crudOverrideDict?.GET_ALL) {
       // Handle CRUD override case - uses custom endpoint with query params
       const { endpoint, paramDict } = crudOverrideDict.GET_ALL;
-      if (!params && Object.keys(paramDict).length > 0) return;
+      if (!params && paramDict && Object.keys(paramDict).length > 0) return;
 
       baseEndpoint = `${wsUrl}/ws-${endpoint}`;
       queryParams = buildWebSocketQueryParams(filters || [], sortOrders || [], pagination, uiLimit, isCppModel);
