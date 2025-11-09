@@ -427,9 +427,21 @@ class MsgspecModelPlugin(DataclassModelPlugin):
 
         output_str += "    @staticmethod\n"
         output_str += "    def df_from_csv(csv_path: str) -> pd.DataFrame:\n"
+        output_str += f"        # We use `schema_overrides` only for columns that are known to contain string or identifier-like values\n"
+        output_str += f"        # to ensure they are read as `Utf8` and retain formatting such as leading zeros.\n"
+        output_str += f"        # All other columns are read with Polars' default type inference and are explicitly cast\n"
+        output_str += f"        # to their intended dtypes (Int, Float, Datetime, Boolean, etc.) after DataFrame creation.\n"
+        output_str += f"        # Reason:\n"
+        output_str += f"        # Enforcing numeric or datetime dtypes at read time can cause parse errors or data loss\n"
+        output_str += f"        # if the CSV contains mixed or non-standard representations (e.g. \"1000000.0\", \"N/A\", \"—\").\n"
+        output_str += f"        # Restricting `schema_overrides` to only textual columns avoids these issues while preserving data integrity,\n"
+        output_str += f"        # and deferred casting ensures controlled, type-safe conversion once the raw data is loaded.\n"
         output_str += f"        expected_column_name = {csv_column_name_list}\n"
+        output_str += f"        schema = {message.proto.name}.get_polars_schema()\n"
+        output_str += "        str_schema_overrides = {k: v for k,v in schema.items() if v == pl.Utf8 or v == pl.Float64 or v == pl.Float32}\n"
         output_str += "        csv_read_options = {\n"
         output_str += f'            "null_values": {message.proto.name}.df_csv_null_types,\n'
+        output_str += f'            "schema_overrides": str_schema_overrides,\n'
         output_str += '        }\n'
         output_str += '        df = pl.read_csv(csv_path, **csv_read_options)\n'
 
@@ -438,24 +450,32 @@ class MsgspecModelPlugin(DataclassModelPlugin):
         output_str += '            if col not in df.columns:\n'
         output_str += '                df = df.with_columns(pl.lit(None).alias(col))\n'
 
-        output_str += f"        schema = {message.proto.name}.get_polars_schema()\n"
         output_str += f"        for col_name, col_type in schema.items():\n"
-        output_str += f"            if col_name in df.columns:\n"
-        output_str += f"                if col_name in {list(date_time_column_name_to_format_dict.keys())}:\n"
-        output_str += f"                    # Parse datetime columns using pendulum to handle timezone-aware strings\n"
-        output_str += f"                    dt_format = {message.proto.name}.get_date_time_format_from_col_name(col_name)\n"
-        output_str += f'                    df = df.with_columns(pl.col(col_name).str.to_datetime(format=dt_format, time_zone="UTC"))\n'
-        output_str += f"                elif col_name in {list(epoch_column_name_to_unit_dict.keys())}:\n"
-        output_str += f"                    epoch_unit = {message.proto.name}.get_epoch_unit_from_col_name(col_name)\n"
-        output_str += f"                    if epoch_unit:\n"
-        output_str += f"                        if epoch_unit == 's':\n"
-        output_str += f'                            df = df.with_columns((pl.col(col_name)*1000).cast(pl.Datetime("ms", time_zone="UTC")))\n'
-        output_str += f'                        else:\n'
-        output_str += f'                            df = df.with_columns(pl.col(col_name).cast(pl.Datetime(epoch_unit, time_zone="UTC")))\n'
-        output_str += f'                    else:\n'
-        output_str += f'                        df = df.with_columns(pl.col(col_name).cast(pl.Datetime(time_zone="UTC")))\n'
-        output_str += f"                else:\n"
-        output_str += f"                    df = df.with_columns(pl.col(col_name).cast(col_type, strict=False))\n"
+        output_str += f"            if col_name in df.columns and col_type != pl.Utf8 and col_type != pl.Float64 and col_type != pl.Float32:\n"
+        if date_time_column_name_to_format_dict:
+            output_str += f"                if col_name in {list(date_time_column_name_to_format_dict.keys())}:\n"
+            output_str += f"                    # Parse datetime columns using pendulum to handle timezone-aware strings\n"
+            output_str += f"                    dt_format = {message.proto.name}.get_date_time_format_from_col_name(col_name)\n"
+            output_str += f'                    df = df.with_columns(pl.col(col_name).cast(pl.Utf8).str.to_datetime(format=dt_format, time_zone="UTC"))\n'
+        if epoch_column_name_to_unit_dict:
+            if date_time_column_name_to_format_dict:
+                output_str += f"                elif col_name in {list(epoch_column_name_to_unit_dict.keys())}:\n"
+            else:
+                output_str += f"                if col_name in {list(epoch_column_name_to_unit_dict.keys())}:\n"
+            output_str += f"                    epoch_unit = {message.proto.name}.get_epoch_unit_from_col_name(col_name)\n"
+            output_str += f"                    if epoch_unit:\n"
+            output_str += f"                        if epoch_unit == 's':\n"
+            output_str += f'                            df = df.with_columns((pl.col(col_name).cast(pl.Int64)*1000).cast(pl.Datetime("ms", time_zone="UTC")))\n'
+            output_str += f'                        else:\n'
+            output_str += f'                            df = df.with_columns(pl.col(col_name).cast(pl.Datetime(epoch_unit, time_zone="UTC")))\n'
+            output_str += f'                    else:\n'
+            output_str += f'                        df = df.with_columns(pl.col(col_name).cast(pl.Datetime(time_zone="UTC")))\n'
+        if date_time_column_name_to_format_dict or epoch_column_name_to_unit_dict:
+            output_str += f"                else:\n"
+            output_str += f"                    df = df.with_columns(pl.col(col_name).cast(col_type, strict=False))\n"
+        else:
+            output_str += f"                df = df.with_columns(pl.col(col_name).cast(col_type, strict=False))\n"
+
         if field_name_to_csv_name_dict:
             output_str += f"        df = df.rename({field_name_to_csv_name_dict})\n"
         output_str += '        return df\n\n'
