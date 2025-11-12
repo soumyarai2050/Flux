@@ -373,6 +373,7 @@ class MsgspecModelPlugin(DataclassModelPlugin):
         field_name_to_csv_name_dict = {}
         date_time_column_name_to_format_dict = {}
         epoch_column_name_to_unit_dict = {}
+        col_names_with_comma_num = []
         for field in message.fields:
             if field.proto.name == "id":
                 continue
@@ -403,6 +404,10 @@ class MsgspecModelPlugin(DataclassModelPlugin):
                 if dt_format and field_name_snake_cased not in epoch_column_name_to_unit_dict:
                     # only taking field for format if epoch is not set - epoch takes precedence
                     date_time_column_name_to_format_dict[field_name_snake_cased] = dt_format
+
+                has_comma_num_vals = csv_details_option_val.get(MsgspecModelPlugin.csv_details_csv_num_has_comma_field)
+                if has_comma_num_vals:
+                    col_names_with_comma_num.append(field_name_snake_cased)
 
                 csv_name = csv_details_option_val.get(MsgspecModelPlugin.csv_details_csv_name_field)
                 if csv_name:
@@ -452,16 +457,19 @@ class MsgspecModelPlugin(DataclassModelPlugin):
 
         output_str += f"        for col_name, col_type in schema.items():\n"
         output_str += f"            if col_name in df.columns and col_type != pl.Utf8 and col_type != pl.Float64 and col_type != pl.Float32:\n"
+        has_if_block_already = False
         if date_time_column_name_to_format_dict:
+            has_if_block_already = True
             output_str += f"                if col_name in {list(date_time_column_name_to_format_dict.keys())}:\n"
             output_str += f"                    # Parse datetime columns using pendulum to handle timezone-aware strings\n"
             output_str += f"                    dt_format = {message.proto.name}.get_date_time_format_from_col_name(col_name)\n"
             output_str += f'                    df = df.with_columns(pl.col(col_name).cast(pl.Utf8).str.to_datetime(format=dt_format, time_zone="UTC"))\n'
         if epoch_column_name_to_unit_dict:
-            if date_time_column_name_to_format_dict:
+            if has_if_block_already:
                 output_str += f"                elif col_name in {list(epoch_column_name_to_unit_dict.keys())}:\n"
             else:
                 output_str += f"                if col_name in {list(epoch_column_name_to_unit_dict.keys())}:\n"
+            has_if_block_already = True
             output_str += f"                    epoch_unit = {message.proto.name}.get_epoch_unit_from_col_name(col_name)\n"
             output_str += f"                    if epoch_unit:\n"
             output_str += f"                        if epoch_unit == 's':\n"
@@ -470,7 +478,14 @@ class MsgspecModelPlugin(DataclassModelPlugin):
             output_str += f'                            df = df.with_columns(pl.col(col_name).cast(pl.Datetime(epoch_unit, time_zone="UTC")))\n'
             output_str += f'                    else:\n'
             output_str += f'                        df = df.with_columns(pl.col(col_name).cast(pl.Datetime(time_zone="UTC")))\n'
-        if date_time_column_name_to_format_dict or epoch_column_name_to_unit_dict:
+        if col_names_with_comma_num:
+            if has_if_block_already:
+                output_str += f"                elif col_name in {col_names_with_comma_num}:\n"
+            else:
+                output_str += f"                if col_name in {col_names_with_comma_num}:\n"
+            has_if_block_already = True
+            output_str += "                    df = df.with_columns(pl.col(col_name).str.replace_all(\",\", \"\").cast(col_type, strict=False))\n"
+        if has_if_block_already:
             output_str += f"                else:\n"
             output_str += f"                    df = df.with_columns(pl.col(col_name).cast(col_type, strict=False))\n"
         else:
@@ -510,6 +525,7 @@ class MsgspecModelPlugin(DataclassModelPlugin):
         datetime_field_name_to_csv_time_zone = {}
         datetime_field_name_to_csv_date_time_format = {}
         datetime_field_name_to_csv_epoch_unit = {}
+        col_names_with_comma_num = []
         for field in message.fields:
             if field.proto.name == "_id" or field.proto.name == "id":
                 continue
@@ -523,6 +539,13 @@ class MsgspecModelPlugin(DataclassModelPlugin):
                 if csv_name:
                     field_name_to_csv_rename_dict[field_name] = csv_name
                     # field_name = csv_name
+
+                has_comma_num_vals = csv_details_option_val.get(MsgspecModelPlugin.csv_details_csv_num_has_comma_field)
+                if has_comma_num_vals:
+                    col_names_with_comma_num.append(field_name)
+                    # no need to put column with comma num values in any type as it is going to be handled separately
+                    continue
+
                 if csv_type_option_val:=csv_details_option_val.get(MsgspecModelPlugin.csv_details_csv_type_field):
                     if csv_type_option_val == "PL_String":
                         str_fields_list.append(field_name)
@@ -642,6 +665,12 @@ class MsgspecModelPlugin(DataclassModelPlugin):
         output_str += "    @classmethod\n"
         output_str += f"    def df_to_csv(cls, df: pl.DataFrame, file_path: str, avoid_empty_columns: bool = False, **kwargs) -> None:\n"
         output_str += f"        df_casted = df.with_columns(cls.get_polars_cast_expressions_for_csv())\n"
+        if col_names_with_comma_num:
+            output_str += f"        # setting commas in columns having num values\n"
+            output_str += f"        df_casted = df_casted.with_columns([\n"
+            output_str += '            pl.col(c).map_elements(lambda x: f"{x:,}" if x is not None else None, return_dtype=pl.Utf8).alias(c)\n'
+            output_str += f'            for c in {col_names_with_comma_num}\n'
+            output_str += f'        ])\n'
         output_str += f"        df_casted = df_casted.rename({field_name_to_csv_rename_dict})\n"
         output_str += f"        if avoid_empty_columns:     # dropping empty columns\n"
         output_str += f"            # Find columns where all values are None\n"

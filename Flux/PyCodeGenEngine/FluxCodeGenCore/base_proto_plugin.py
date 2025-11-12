@@ -266,6 +266,7 @@ class BaseProtoPlugin(ABC):
     csv_details_csv_time_zone_field: ClassVar[str] = "CSVTimeZone"
     csv_details_csv_date_time_format_field: ClassVar[str] = "CSVDateTimeFormat"
     csv_details_csv_epoch_unit_field: ClassVar[str] = "CSVEpochUnit"
+    csv_details_csv_num_has_comma_field: ClassVar[str] = "CSVNumHasCommas"
     default_id_field_name: ClassVar[str] = "id"
     default_id_type_var_name: ClassVar[str] = "DefaultIdType"  # to be used in models as default type variable name
     proto_package_var_name: ClassVar[str] = "ProtoPackageName"  # to be used in models as proto_package_name variable name

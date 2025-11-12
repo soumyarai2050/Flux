@@ -193,6 +193,7 @@ message FluxCSVDetails {
     optional string CSVTimeZone = 3;        // useful only when field is datetime type or CSVType is PL_Datetime
     optional string CSVDateTimeFormat = 4;        // useful only when field is datetime type or CSVType is PL_Datetime
     optional SupportedEpochUnits CSVEpochUnit = 5;      // useful only when field is datetime type - if set then this field will have int values in csv, no matter CSVType
+    optional bool CSVNumHasCommas = 6;    // only useful when column CSVType is int or float and contains commas on num values
 }
 
 
