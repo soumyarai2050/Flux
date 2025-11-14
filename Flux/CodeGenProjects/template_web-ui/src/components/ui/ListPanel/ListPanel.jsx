@@ -149,6 +149,7 @@ function ListPanel({
                         onClick={handleCreate}
                         className={styles.add_button_collapsed}
                         title={addButtonText}
+                        disabled={mode === MODES.EDIT}
                     >
                         <Add fontSize='small' />
                     </Button>
@@ -209,6 +210,7 @@ function ListPanel({
                     variant='contained'
                     onClick={handleCreate}
                     className={styles.add_button}
+                    disabled={mode === MODES.EDIT}
                 >
                     <Add fontSize='small' />
                     {addButtonText}

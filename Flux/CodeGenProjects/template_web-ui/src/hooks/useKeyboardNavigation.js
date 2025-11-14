@@ -1079,6 +1079,11 @@ const useKeyboardNavigation = ({
   const handleRowMouseDown = useCallback((e, rowId) => {
     if (!dragSelection || mode !== MODES.READ) return;
 
+    // Ignore right-click (button === 2) - reserved for context menu
+    if (e.button === 2) {
+      return;
+    }
+
     // Only start drag if it's not a modifier click
     if (e.ctrlKey || e.metaKey || e.shiftKey) {
       return;

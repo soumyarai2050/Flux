@@ -198,7 +198,7 @@ const NodeField = (props) => {
                 variant='outlined'
                 size='small'
                 fullWidth
-                sx={{ minWidth: '150px !important', color :{colorSx} }}
+                sx={{ minWidth: '150px !important', color: { colorSx } }}
                 className={`${classes.text_field} ${nodeFieldRemove} ${dataStatusClass}`}
                 required={props.data.required}
                 value={value}
@@ -347,8 +347,8 @@ const NodeField = (props) => {
         }
 
         // let value = props.data.value ? props.data.value : props.data.value === 0 ? 0 : props.data.value === -0 ? -0 : '';
-        let value = inputValue ? cloneDeep(inputValue) : inputValue === 0 ? 0 : inputValue === -0 ? -0 : '';
-        if (props.data.displayType == DATA_TYPES.INTEGER && value !== -0 && value !== '') {
+        let value = inputValue ? cloneDeep(inputValue) : inputValue === 0 ? 0 : Object.is(inputValue, -0) ? -0 : '';
+        if (props.data.displayType == DATA_TYPES.INTEGER && !Object.is(value, -0) && value !== '') {
             value = floatToInt(value);
         }
         validationError.current = validateConstraints(props.data, value, min, max);
@@ -439,7 +439,7 @@ const NodeField = (props) => {
                     id={props.data.key}
                     name={props.data.key}
                     className={`${classes.text_field} ${nodeFieldRemove} ${dataStatusClass}`}
-                sx={colorSx}
+                    sx={colorSx}
                     disabled={disabled}
                     error={validationError.current !== null}
                     value={value}

@@ -14,7 +14,7 @@ import {
 } from '../../utils/ui/uiUtils';
 import { createAutoBoundParams } from '../../utils/core/parameterBindingUtils';
 import { cleanAllCache } from '../../cache/attributeCache';
-import { useWebSocketWorker, useDownload, useModelLayout, useConflictDetection, useCountQuery } from '../../hooks';
+import { useWebSocketWorker, useDownload, useModelLayout, useConflictDetection, useCountQuery, useBulkPatch } from '../../hooks';
 import { massageDataForBackend, shouldUsePagination, buildDefaultFilters, extractCrudParams, convertFilterTypes } from '../../utils/core/paginationUtils';
 // custom components
 import { FullScreenModalOptional } from '../../components/ui/Modal';
@@ -695,6 +695,21 @@ function RootModel({ modelName, modelDataSource, modelDependencyMap }) {
         }
     }
 
+    // Setup bulk patch hook for ROOT model with selective button support
+    const handleSelectiveButtonPatch = useBulkPatch(MODEL_TYPES.ROOT, {
+        diffConfig: {
+            storedObj: getBaselineForComparison(),
+            updatedObj,
+            rows,
+            cells: sortedCells,
+            fieldsMetadata
+        },
+        dispatchConfig: {
+            url: modelSchema?.json_root?.url,
+            action: actions.partialUpdate
+        }
+    });
+
     const handleErrorClear = () => {
         dispatch(actions.setError(null));
     }
@@ -715,7 +730,7 @@ function RootModel({ modelName, modelDataSource, modelDependencyMap }) {
                             onSortOrdersChange={handleSortOrdersChange}
                             page={page}
                             rowsPerPage={modelLayoutData.rows_per_page || 25}
-                            totalCount={rows.length} //In Root Models we will depend on the rows rather than count 
+                            totalCount={rows.length} //In Root Models we will depend on the rows rather than count
                             dataSourceColors={modelLayoutData.data_source_colors || []}
                             selectedId={objId}
                             onPageChange={handlePageChange}
@@ -725,6 +740,7 @@ function RootModel({ modelName, modelDataSource, modelDependencyMap }) {
                             onUpdate={handleUpdate}
                             onUserChange={handleUserChange}
                             onButtonToggle={handleButtonToggle}
+                            onSelectiveButtonPatch={handleSelectiveButtonPatch}
                             modelType={MODEL_TYPES.ROOT}
                             storedData={effectiveStoredData}
                             updatedData={updatedObj}

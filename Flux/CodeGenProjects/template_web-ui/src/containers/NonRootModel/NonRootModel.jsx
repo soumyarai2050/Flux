@@ -14,7 +14,7 @@ import {
 } from '../../utils/ui/uiUtils';
 import { createAutoBoundParams } from '../../utils/core/parameterBindingUtils';
 import { cleanAllCache } from '../../cache/attributeCache';
-import { useWebSocketWorker, useDownload, useModelLayout, useConflictDetection, useCountQuery } from '../../hooks';
+import { useWebSocketWorker, useDownload, useModelLayout, useConflictDetection, useCountQuery, useBulkPatch } from '../../hooks';
 import { massageDataForBackend, shouldUsePagination, buildDefaultFilters, extractCrudParams, convertFilterTypes } from '../../utils/core/paginationUtils';
 // custom components
 import { FullScreenModalOptional } from '../../components/ui/Modal';
@@ -705,6 +705,21 @@ function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRoo
         dispatch(actions.setError(null));
     }
 
+    // Setup bulk patch hook for NON_ROOT model with selective button support
+    const handleSelectiveButtonPatch = useBulkPatch(MODEL_TYPES.NON_ROOT, {
+        diffConfig: {
+            storedObj: getBaselineForComparison(),
+            updatedObj,
+            rows,
+            cells: sortedCells,
+            fieldsMetadata: modelRootFieldsMetadata
+        },
+        dispatchConfig: {
+            url,
+            action: actions.partialUpdate
+        }
+    });
+
     // A helper function to decide which content to render based on layoutType
     const renderContent = () => {
         switch (layoutType) {
@@ -731,7 +746,8 @@ function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRoo
                             onUpdate={handleUpdate}
                             onUserChange={handleUserChange}
                             onButtonToggle={handleButtonToggle}
-                            modelType={MODEL_TYPES.ROOT}
+                            onSelectiveButtonPatch={handleSelectiveButtonPatch}
+                            modelType={MODEL_TYPES.NON_ROOT}
                             storedData={effectiveStoredData}
                             updatedData={updatedObj}
                             modelName={modelName}

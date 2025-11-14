@@ -23,6 +23,7 @@ import ContentCopy from '@mui/icons-material/ContentCopy';
 import FilterAlt from '@mui/icons-material/FilterAlt';
 import ArrowUpward from '@mui/icons-material/ArrowUpward';
 import ArrowDownward from '@mui/icons-material/ArrowDownward';
+import HelpOutline from '@mui/icons-material/HelpOutline';
 import { debounce } from 'lodash';
 import ClipboardCopier from '../../utility/ClipboardCopier';
 import styles from './FilterSortPopup.module.css';
@@ -138,7 +139,8 @@ const FilterSortPopup = ({
   onCopy,
   filterEnable,
   clipboardText,
-  serverSideFilterSortEnabled
+  serverSideFilterSortEnabled,
+  helpText
 }) => {
   // Use Set for O(1) lookups instead of array
   const [localSelectedFiltersSet, setLocalSelectedFiltersSet] = useState(new Set());
@@ -501,7 +503,19 @@ const FilterSortPopup = ({
               <div className={styles.sortIconPlaceholder}>
                 <ContentCopy fontSize="small" className={styles.menuIcon} />
               </div>
-              <Typography>Copy</Typography>
+              <Typography >Copy</Typography>
+              {helpText && (
+                <Tooltip title={helpText} disableInteractive placement="top">
+                  <IconButton
+                    size="small"
+                    className={styles.helpIcon}
+                    onClick={(e) => e.stopPropagation()}
+                    aria-label="Column help"
+                  >
+                    <HelpOutline fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              )}
             </div>
           </div>
 
@@ -735,7 +749,8 @@ FilterSortPopup.propTypes = {
   onCopy: PropTypes.func.isRequired,
   filterEnable: PropTypes.bool,
   clipboardText: PropTypes.string,
-  valueCounts: PropTypes.instanceOf(Map)
+  valueCounts: PropTypes.instanceOf(Map),
+  helpText: PropTypes.string
 };
 
 FilterSortPopup.defaultProps = {

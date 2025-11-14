@@ -13,6 +13,7 @@ import TableContainer from '@mui/material/TableContainer';
 import TableRow from '@mui/material/TableRow';
 import TextField from '@mui/material/TextField';
 import Download from '@mui/icons-material/Download';
+import { ContextMenu } from '../../ui/ContextMenu';
 import {
   DndContext,
   closestCenter,
@@ -27,6 +28,7 @@ import { DB_ID, DATA_TYPES, MODES, MODEL_TYPES, MIN_ROWS_FOR_PAGINATION } from '
 import TableHeader from '../tables/TableHeader';
 import Cell from '../tables/Cell';
 import { getBufferAbbreviatedOptionLabel } from '../../../utils/ui/uiUtils';
+import { aggregateButtonActionsByType, hasButttonActions } from '../../../utils/bulkPatchUtils';
 import { copyToClipboard } from '../../../utils/core/stringUtils';
 import { clearxpath } from '../../../utils/core/dataAccess';
 import styles from './AbbreviationMergeView.module.css';
@@ -162,6 +164,7 @@ const LoadedView = ({
   onButtonToggle,
   onUserChange,
   onColumnOrdersChange,
+  onBulkPatch,
   stickyHeader = true,
   frozenColumns,
   filters,
@@ -416,6 +419,70 @@ const LoadedView = ({
     useSensor(PointerSensor, { activationConstraint: { distance: 10 } })
   );
 
+  // Context menu state for bulk patch
+  const [contextMenuAnchor, setContextMenuAnchor] = useState(null);
+
+  const handleContextMenu = (e) => {
+    // Show context menu if 1+ rows are selected
+    if (localSelectedRows.length >= 1) {
+      e.preventDefault();
+      e.stopPropagation();
+      // Use cursor position for anchor instead of element reference
+      setContextMenuAnchor({
+        clientX: e.clientX,
+        clientY: e.clientY,
+      });
+    }
+  };
+
+  const handleContextMenuClose = () => {
+    setContextMenuAnchor(null);
+  };
+
+  const handleSelectiveButtonPatchClick = async (selectedRows, selectedButtonType) => {
+    if (onBulkPatch) {
+      await onBulkPatch(selectedRows, selectedButtonType);
+    }
+  };
+
+  const handleClearSelection = () => {
+    handleSelectionChange([], null);
+  };
+
+  // Calculate available buttons for selective patching
+  const availableButtons = React.useMemo(() => {
+    if (!localSelectedRows || localSelectedRows.length === 0) return {};
+
+    // For AbbreviationMergeView, rows is a grouped structure: [groupedRow1, groupedRow2, ...]
+    // Each groupedRow is [row1, row2, row3, ...] (one per data source)
+    // We need to flatten this and find the rows matching our selected IDs
+    const selectedRowData = [];
+
+    for (const groupedRow of rows) {
+      if (!Array.isArray(groupedRow)) {
+        // Fallback if not grouped (shouldn't happen, but safe)
+        if (localSelectedRows.includes(groupedRow['data-id'])) {
+          selectedRowData.push(groupedRow);
+        }
+      } else {
+        // Grouped row - check each sub-row
+        for (const subRow of groupedRow) {
+          if (subRow && localSelectedRows.includes(subRow['data-id'])) {
+            selectedRowData.push(subRow);
+          }
+        }
+      }
+    }
+
+    return aggregateButtonActionsByType(
+      localSelectedRows,
+      selectedRowData,
+      cells,
+      {}, // mergedFieldsMetadata - empty for now, will be enhanced later if needed
+      MODEL_TYPES.ABBREVIATION_MERGE
+    );
+  }, [localSelectedRows, rows, cells]);
+
   // Measure column widths after render
   useEffect(() => {
     const widths = {};
@@ -541,6 +608,7 @@ const LoadedView = ({
         ref={tableContainerRef}
         className={tableContainerClasses}
         onScroll={checkHorizontalScroll}
+        onContextMenu={handleContextMenu}
       >
         <DndContext
           sensors={sensors}
@@ -732,6 +800,19 @@ const LoadedView = ({
           rowsPerPageOptions={[25, 50]}
         />
       )}
+
+      {/* Context Menu for selective bulk patch operations */}
+
+      <ContextMenu
+        selectedRows={localSelectedRows}
+        availableButtons={availableButtons}
+        onSelectiveButtonPatch={handleSelectiveButtonPatchClick}
+        onClearSelection={handleClearSelection}
+        anchorEl={contextMenuAnchor}
+        open={Boolean(contextMenuAnchor)}
+        onClose={handleContextMenuClose}
+        isLoading={false}
+      />
     </div>
   );
 };
@@ -751,6 +832,7 @@ LoadedView.propTypes = {
   rowsPerPage: PropTypes.number.isRequired,
   onPageChange: PropTypes.func.isRequired,
   onRowsPerPageChange: PropTypes.func.isRequired,
+  onBulkPatch: PropTypes.func,
 };
 
 /**
@@ -814,6 +896,7 @@ const AbbreviationMergeView = ({
   onUserChange,
   onButtonToggle,
   onColumnOrdersChange,
+  onBulkPatch,
   stickyHeader,
   frozenColumns,
   filters,
@@ -868,6 +951,7 @@ const AbbreviationMergeView = ({
         onUserChange={onUserChange}
         onButtonToggle={onButtonToggle}
         onColumnOrdersChange={onColumnOrdersChange}
+        onBulkPatch={onBulkPatch}
         stickyHeader={stickyHeader}
         frozenColumns={frozenColumns}
         filters={filters}
@@ -908,6 +992,7 @@ AbbreviationMergeView.propTypes = {
   rowsPerPage: PropTypes.number.isRequired,
   onPageChange: PropTypes.func.isRequired,
   onRowsPerPageChange: PropTypes.func.isRequired,
+  onBulkPatch: PropTypes.func,
 };
 
 export default AbbreviationMergeView;

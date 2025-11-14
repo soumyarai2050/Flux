@@ -38,6 +38,8 @@ import Icon from '../../../ui/Icon';
 import { useScrollIndicators, useKeyboardNavigation } from '../../../../hooks';
 import TablePaginationControl from '../../../controls/table-controls/TablePaginationControl';
 import ScrollIndicators from '../../../controls/table-controls/ScrollIndicators';
+import { ContextMenu } from '../../../ui/ContextMenu';
+import { hasButttonActions, aggregateButtonActionsByType } from '../../../../utils/bulkPatchUtils';
 // import { useBoundaryScrollDetection } from '../../../hooks';
 
 const DataTable = ({
@@ -64,6 +66,9 @@ const DataTable = ({
   onUserChange,
   onRowSelect,
   onButtonToggle,
+  onBulkPatch,
+  onSelectiveButtonPatch,
+  availableButtons = {},
   onModeToggle,
   onColumnOrdersChange,
   stickyHeader = true,
@@ -85,7 +90,7 @@ const DataTable = ({
   // Local state for immediate UI feedback
   const [localSelectedRows, setLocalSelectedRows] = useState([]);
   const [localLastSelectedRowId, setLocalLastSelectedRowId] = useState(null);
-  // const [contextMenuAnchorEl, setContextMenuAnchorEl] = useState(null);
+  const [contextMenuAnchorEl, setContextMenuAnchorEl] = useState(null);
   const [selectionAnchorId, setSelectionAnchorId] = useState(null);
   const [dataTree, setDataTree] = useState({});
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -313,18 +318,6 @@ const DataTable = ({
     tableWrapperRef
   });
 
-  // const handleContextMenuOpen = (e) => {
-  //     setContextMenuAnchorEl(e.currentTarget);
-  // }
-
-  // const handleContextMenuClose = () => {
-  //     setContextMenuAnchorEl(null);
-  // }
-
-  // const handleClearAll = () => {
-  //     setSelectedRows([]);
-  //     handleContextMenuClose();
-  // }
 
   const handleButtonClick = (e, action, xpath, value, dataSourceId, source = null, force = false) => {
     if (action === 'flux_toggle') {
@@ -460,6 +453,27 @@ const DataTable = ({
     }
   }
 
+  const handleContextMenu = (e) => {
+
+    // // ALWAYS prevent default context menu and stop propagation immediately
+    e.preventDefault();
+    // e.stopPropagation();
+
+    // Show context menu if 1+ rows are selected
+    if (localSelectedRows.length >= 1) {
+      // Store the cursor position for anchor positioning
+      setContextMenuAnchorEl({
+        clientX: e.clientX,
+        clientY: e.clientY,
+      });
+    }
+  }
+
+  const handleContextMenuClose = () => {
+    setContextMenuAnchorEl(null);
+  }
+
+ 
   const handleRowsPerPageChange = (e) => {
     const updatedRowsPerPage = parseInt(e.target.value, 10);
     onRowsPerPageChange(updatedRowsPerPage);
@@ -580,13 +594,41 @@ const DataTable = ({
     // disableScrolling();
   }
 
+  // Calculate available buttons from currently selected rows
+  const calculatedAvailableButtons = React.useMemo(() => {
+    if (!localSelectedRows || localSelectedRows.length === 0 || !rows || !cells) {
+      return {};
+    }
+
+    // Find the actual row data for each selected row ID
+    const selectedRowData = [];
+    localSelectedRows.forEach(selectedId => {
+      for (const groupedRow of rows) {
+        for (const subRow of groupedRow) {
+          if (subRow && subRow['data-id'] === selectedId) {
+            selectedRowData.push(subRow);
+            break;
+          }
+        }
+      }
+    });
+
+    // Now aggregate button actions from the selected rows
+    return aggregateButtonActionsByType(
+      localSelectedRows,
+      selectedRowData,
+      cells,
+      fieldsMetadata,
+      modelType
+    );
+  }, [localSelectedRows, rows, cells, fieldsMetadata, modelType]);
+
   if (!activeRows || activeRows.length === 0) return null;
 
   // Calculate total pages for the select dropdown
   const totalPages = Math.ceil(rows.length / rowsPerPage);
   const pageOptions = Array.from({ length: totalPages }, (_, i) => i);
 
-  // const isContextMenuOpen = Boolean(contextMenuAnchorEl);
 
   let tableContainerClasses = `${styles.container} ${isDragging ? styles.isDragging : ''}`;
   // if (!isScrollable) {
@@ -639,6 +681,7 @@ const DataTable = ({
                     data-row-id={rowKey}
                     className={styles.row}
                     onDoubleClick={handleRowDoubleClick}
+                    onContextMenu={handleContextMenu}
                   >
                     {columns.map((cell) => {
                       // Get row data based on the cell's source index.
@@ -770,17 +813,6 @@ const DataTable = ({
           />
         )
       }
-      {/* <Menu
-        open={isContextMenuOpen}
-        onClose={handleContextMenuClose}
-      >
-        <MenuItem dense onClick={handleClearAll}>
-          <ListItemIcon>
-            <ClearAll fontSize='small' />
-          </ListItemIcon>
-          <ListItemText>Clear All</ListItemText>
-        </MenuItem>
-      </Menu> */}
       <FullScreenModal
         id={`${modelName}-modal`}
         open={isModalOpen}
@@ -808,6 +840,25 @@ const DataTable = ({
           </ModelCardContent>
         </ModelCard>
       </FullScreenModal>
+
+      {/* Bulk Patch Context Menu - Right-click menu */}
+      {onSelectiveButtonPatch && (
+        <ContextMenu
+          selectedRows={localSelectedRows}
+          availableButtons={calculatedAvailableButtons}
+          onSelectiveButtonPatch={onSelectiveButtonPatch}
+          onClearSelection={() => {
+            handleSelectionChange([], null);
+            // For RepeatedRootModels, also clear the single objId selection
+            if (modelType === MODEL_TYPES.REPEATED_ROOT && onRowSelect) {
+              onRowSelect(null);
+            }
+          }}
+          anchorEl={contextMenuAnchorEl}
+          open={Boolean(contextMenuAnchorEl)}
+          onClose={handleContextMenuClose}
+        />
+      )}
     </div>
   )
 }

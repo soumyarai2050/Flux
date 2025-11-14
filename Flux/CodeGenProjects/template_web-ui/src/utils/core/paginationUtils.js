@@ -305,6 +305,10 @@ export function buildDefaultFilters(dataSourceStoredObj, defaultFilterParamDict)
  * Extracts params from dataSource using crudOverrideDict
  * Used in useEffect to build query params for custom CRUD endpoints
  *
+ * Note: paramDict values are plain strings (field paths), not objects with type/value.
+ * This is because ui_query_param in the schema only supports query_param_value_src (string),
+ * unlike default_filter_param which supports both param_value_src and param_value.
+ *
  * @param {Object|null} dataSourceStoredObj - Stored object from dataSource selector
  * @param {Object|null} crudOverrideDict - CRUD override dict from model schema
  * @param {Function} get - Lodash get function for nested property access
@@ -325,14 +329,21 @@ export function extractCrudParams(dataSourceStoredObj, crudOverrideDict) {
     const paramConfig = paramDict[key];
     let paramValue;
 
-    if (paramConfig.type === 'src') {
-      // Derived value - fetch from dataSource
+    // Handle both object format {type: 'src', value: 'field'} and string format 'field'
+    if (typeof paramConfig === 'string') {
+      // String format - treat as 'src' type (derived from dataSource)
+      if (!dataSourceStoredObj || Object.keys(dataSourceStoredObj).length === 0) {
+        return; // Skip this param if dataSource is not available
+      }
+      paramValue = get(dataSourceStoredObj, paramConfig);
+    } else if (paramConfig.type === 'src') {
+      // Object format with 'src' type - derived value
       if (!dataSourceStoredObj || Object.keys(dataSourceStoredObj).length === 0) {
         return; // Skip this param if dataSource is not available
       }
       paramValue = get(dataSourceStoredObj, paramConfig.value);
     } else if (paramConfig.type === 'val') {
-
+      // Object format with 'val' type - direct value
       paramValue = paramConfig.value;
     }
 

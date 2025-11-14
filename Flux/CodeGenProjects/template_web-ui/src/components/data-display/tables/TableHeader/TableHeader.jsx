@@ -111,6 +111,7 @@ const SortableHeaderCell = ({
                 filterEnable={column.filterEnable ?? false}
                 clipboardText={clipboardText}
                 serverSideFilterSortEnabled={serverSideFilterSortEnabled}
+                helpText={column.help}
             />
         </TableCell>
     );

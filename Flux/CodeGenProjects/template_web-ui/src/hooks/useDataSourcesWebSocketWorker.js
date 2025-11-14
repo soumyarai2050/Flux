@@ -25,8 +25,10 @@ import { clearWebSocketConnection, setWebSocketConnection } from '../cache/webso
  * @param {Object} params.storedArrayDict - Maps dataSource names to their stored arrays.
  * @param {Object} [params.dataSourcesCrudOverrideDict=null] - Optionally override endpoints per dataSource.
  * @param {Object} [params.dataSourcesParams=null] - Optional parameters per dataSource.
+ * @param {Object} [params.dataSourcesDefaultFilters=null] - Optional default filters per dataSource.
  * @param {boolean} [params.connectionByGetAll=false] - If true, use a single WebSocket per dataSource.
  * @param {Array} [params.activeIds=[]] - For by-id mode, an array of active IDs to maintain connections for.
+ * @param {Object} [params.dataSourcesUrlConfig=null] - URL configuration dictionary with url, httpViewUrl, and wsViewUrl per dataSource.
  */
 const useDataSourcesWebsocketWorker = ({
   dataSources,
@@ -36,9 +38,10 @@ const useDataSourcesWebsocketWorker = ({
   storedArrayDict,
   dataSourcesCrudOverrideDict = null,
   dataSourcesParams = null,
+  dataSourcesDefaultFilters = null,
   connectionByGetAll = false,
   activeIds = [],
-  dataSourcesUrlOverrideDict
+  dataSourcesUrlConfig = null
 }) => {
   const dispatch = useDispatch();
 
@@ -133,23 +136,40 @@ const useDataSourcesWebsocketWorker = ({
     const currentConnectionDict = connectionsRef.current;
     dataSources.forEach(({ name, url }) => {
       if (isDisabled) return;
-      const baseUrl = dataSourcesUrlOverrideDict[name];
+      // Use wsViewUrl from config if available, otherwise fall back to url
+      const baseUrl = dataSourcesUrlConfig?.[name]?.wsViewUrl || url;
       if (!baseUrl) return;
 
       const wsUrl = getWebSocketUrl(baseUrl);
       let apiUrl = `${wsUrl}/get-all-${name}-ws`;
       const crudOverrideDict = dataSourcesCrudOverrideDict?.[name];
       const params = dataSourcesParams?.[name] ?? null;
+      const filters = dataSourcesDefaultFilters?.[name] ?? null;
+
+      // Build query params object
+      const queryParams = {};
+      if (filters && filters.length > 0) {
+        queryParams.filters = JSON.stringify(filters);
+      }
+
       if (crudOverrideDict?.GET_ALL) {
         const { endpoint, paramDict } = crudOverrideDict.GET_ALL;
-        if (!params && Object.keys(paramDict).length > 0) return;
+        if (!params && paramDict && Object.keys(paramDict).length > 0) return;
         apiUrl = `${wsUrl}/ws-${endpoint}`;
-        if (params) {
-          const paramsStr = '?' + Object.keys(params)
-            .map((k) => `${encodeURIComponent(k)}=${encodeURIComponent(params[k])}`)
+        // Merge CRUD params with query params
+        const allParams = { ...params, ...queryParams };
+        if (Object.keys(allParams).length > 0) {
+          const paramsStr = '?' + Object.keys(allParams)
+            .map((k) => `${encodeURIComponent(k)}=${encodeURIComponent(allParams[k])}`)
             .join('&');
           apiUrl += paramsStr;
         }
+      } else if (Object.keys(queryParams).length > 0) {
+        // No CRUD override but have filters
+        const paramsStr = '?' + Object.keys(queryParams)
+          .map((k) => `${encodeURIComponent(k)}=${encodeURIComponent(queryParams[k])}`)
+          .join('&');
+        apiUrl += paramsStr;
       }
 
       const connection = currentConnectionDict[name];
@@ -197,10 +217,11 @@ const useDataSourcesWebsocketWorker = ({
       });
     };
   }, [
-    dataSourcesParams,
+    JSON.stringify(dataSourcesParams),
+    JSON.stringify(dataSourcesDefaultFilters),
     isDisabled,
     reconnectCounter,
-    JSON.stringify(dataSourcesUrlOverrideDict)
+    JSON.stringify(dataSourcesUrlConfig)
   ]);
 
   // -----------------------------
@@ -234,16 +255,31 @@ const useDataSourcesWebsocketWorker = ({
       let apiUrl = `${wsUrl}/get-${name}-ws`;
       const crudOverrideDict = dataSourcesCrudOverrideDict?.[name];
       const params = dataSourcesParams?.[name] ?? null;
+      const filters = dataSourcesDefaultFilters?.[name] ?? null;
+
+      // Build query params object
+      const queryParams = {};
+      if (filters && filters.length > 0) {
+        queryParams.filters = JSON.stringify(filters);
+      }
+
       let paramsStr = '';
       if (crudOverrideDict?.GET_ALL) {
         const { endpoint, paramDict } = crudOverrideDict.GET_ALL;
-        if (!params && Object.keys(paramDict).length > 0) return;
+        if (!params && paramDict && Object.keys(paramDict).length > 0) return;
         apiUrl = `${wsUrl}/ws-${endpoint}`;
-        if (params) {
-          paramsStr = '?' + Object.keys(params)
-            .map((k) => `${encodeURIComponent(k)}=${encodeURIComponent(params[k])}`)
+        // Merge CRUD params with query params
+        const allParams = { ...params, ...queryParams };
+        if (Object.keys(allParams).length > 0) {
+          paramsStr = '?' + Object.keys(allParams)
+            .map((k) => `${encodeURIComponent(k)}=${encodeURIComponent(allParams[k])}`)
             .join('&');
         }
+      } else if (Object.keys(queryParams).length > 0) {
+        // No CRUD override but have filters
+        paramsStr = '?' + Object.keys(queryParams)
+          .map((k) => `${encodeURIComponent(k)}=${encodeURIComponent(queryParams[k])}`)
+          .join('&');
       }
 
       const connection = currentConnectionDict[name];
@@ -257,7 +293,8 @@ const useDataSourcesWebsocketWorker = ({
           connection.retryCount = 0;
           socket = new WebSocket(`${apiUrl}/${id}${paramsStr}`);
           ws[normalizedId] = socket;
-          setWebSocketConnection(name, socket);
+          // Store in cache with composite key for BY-ID mode
+          setWebSocketConnection(`${name}-${normalizedId}`, socket);
 
           socket.onopen = () => {
             connection.retryCount = 0;
@@ -292,12 +329,15 @@ const useDataSourcesWebsocketWorker = ({
             socket.close(WEBSOCKET_CLOSE_CODES.NORMAL_CLOSURE, 'Closing inactive socket');
           }
           delete ws[id];
+          // Clear from cache with composite key
+          clearWebSocketConnection(`${name}-${id}`);
         }
       });
     });
   }, [
-    activeIds,
-    dataSourcesParams,
+    JSON.stringify(activeIds),
+    JSON.stringify(dataSourcesParams),
+    JSON.stringify(dataSourcesDefaultFilters),
     isDisabled,
     reconnectCounter
   ]);

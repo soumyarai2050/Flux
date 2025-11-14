@@ -11,15 +11,16 @@ import { compareJSONObjects } from '../../utils/core/objectUtils';
 import { getNewItem, getIdFromAbbreviatedKey } from '../../utils/core/dataUtils';
 import { isWebSocketActive, getServerUrl } from '../../utils/network/networkUtils';
 import {
-    getWidgetTitle, getDataSourcesCrudOverrideDict, getCSVFileName, getAbbreviatedCollections,
-    getDataSourceObj, updateFormValidation
+    getWidgetTitle, getDataSourcesCrudOverrideDict, getCrudOverrideDict, getDefaultFilterParamDict, getCSVFileName, getAbbreviatedCollections,
+    getDataSourceObj, updateFormValidation, getDataSourcesDefaultFilterParamDict
 } from '../../utils/ui/uiUtils';
 import { createAutoBoundParams } from '../../utils/core/parameterBindingUtils';
 import { removeRedundantFieldsFromRows } from '../../utils/core/dataTransformation';
 import { dataSourcesSelectorEquality } from '../../utils/redux/selectorUtils';
 import { cleanAllCache } from '../../cache/attributeCache';
-import { useWebSocketWorker, useDataSourcesWebsocketWorker, useDownload, useModelLayout, useConflictDetection, useCountQuery } from '../../hooks';
-import { massageDataForBackend, convertFilterTypes } from '../../utils/core/paginationUtils';
+import { useWebSocketWorker, useDataSourcesWebsocketWorker, useDownload, useModelLayout, useConflictDetection, useCountQuery, useBulkPatch } from '../../hooks';
+import { massageDataForBackend, convertFilterTypes, extractCrudParams, buildDefaultFilters } from '../../utils/core/paginationUtils';
+import { buildAvailableModelsMap, extractChildDataSourceDependencies, resolveDataSourceDependencies } from '../../utils/dynamicSchemaUtils/dataSourceUtils';
 // custom components
 import { FullScreenModalOptional } from '../../components/ui/Modal';
 import { ModelCard, ModelCardHeader, ModelCardContent } from '../../components/utility/cards';
@@ -75,12 +76,67 @@ function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap
             return acc;
         }, {})
     }, [dataSourcesStoredArrayDict, dataSourcesUpdatedObjDict])
+
+    // Extract data sources from modelDependencyMap
     const urlOverrideDataSource = modelDependencyMap?.urlOverride ?? null;
+    const crudOverrideDataSource = modelDependencyMap?.crudOverride ?? null;
+    const defaultFilterDataSource = modelDependencyMap?.defaultFilter ?? null;
+    const idDependentDataSource = modelDependencyMap?.idDependent ?? null;
+
+    // Create stable selector functions
     const urlOverrideSelector = useMemo(
         () => urlOverrideDataSource?.selector ?? (() => ({ storedObj: null })),
         [urlOverrideDataSource]
     );
+    const crudOverrideSelector = useMemo(
+        () => crudOverrideDataSource?.selector ?? (() => ({ storedObj: null })),
+        [crudOverrideDataSource]
+    );
+    const defaultFilterSelector = useMemo(
+        () => defaultFilterDataSource?.selector ?? (() => ({ storedObj: null })),
+        [defaultFilterDataSource]
+    );
+    const idDependentSelector = useMemo(
+        () => idDependentDataSource?.selector ?? (() => ({ objId: null })),
+        [idDependentDataSource]
+    );
+
+    // Subscribe to each data source's Redux store using shallow equality
     const { storedObj: urlOverrideDataSourceStoredObj } = useSelector(urlOverrideSelector, shallowEqual);
+    const { storedObj: crudOverrideDataSourceStoredObj } = useSelector(crudOverrideSelector, shallowEqual);
+    const { storedObj: defaultFilterDataSourceStoredObj } = useSelector(defaultFilterSelector, shallowEqual);
+    const { objId: idDependentDataSourceObjId } = useSelector(idDependentSelector, shallowEqual);
+
+    // Build available dependency providers for child data sources
+    // Includes parent model + parent's 4 dependencies
+    const childAvailableDependencyProviders = useMemo(() => {
+        const providers = buildAvailableModelsMap([
+            // Parent Model
+            { name: modelName, storedObj, fieldsMetadata: modelFieldsMetadata },
+            // Parent's Dependencies
+            { name: urlOverrideDataSource?.name, storedObj: urlOverrideDataSourceStoredObj, fieldsMetadata: urlOverrideDataSource?.fieldsMetadata },
+            { name: crudOverrideDataSource?.name, storedObj: crudOverrideDataSourceStoredObj, fieldsMetadata: crudOverrideDataSource?.fieldsMetadata },
+            { name: defaultFilterDataSource?.name, storedObj: defaultFilterDataSourceStoredObj, fieldsMetadata: defaultFilterDataSource?.fieldsMetadata },
+            { name: idDependentDataSource?.name, storedObj: idDependentDataSourceObjId ? { [DB_ID]: idDependentDataSourceObjId } : null, fieldsMetadata: idDependentDataSource?.fieldsMetadata }
+        ]);
+        return providers;
+    }, [
+        modelName, storedObj, modelFieldsMetadata,
+        urlOverrideDataSource, urlOverrideDataSourceStoredObj,
+        crudOverrideDataSource, crudOverrideDataSourceStoredObj,
+        defaultFilterDataSource, defaultFilterDataSourceStoredObj,
+        idDependentDataSource, idDependentDataSourceObjId
+    ]);
+
+    // Extract child data source dependency requirements from schemas (Note idDepedency is not supported by child as they controlled by collection)
+    const childDependencyRequirements = useMemo(() => {
+        return extractChildDataSourceDependencies(dataSources, Object.keys(childAvailableDependencyProviders));
+    }, [dataSources, childAvailableDependencyProviders]);
+
+    // Resolve dependencies - map requirements to actual storedObj + fieldsMetadata
+    const resolvedChildDependencies = useMemo(() => {
+        return resolveDataSourceDependencies(childDependencyRequirements, childAvailableDependencyProviders);
+    }, [childDependencyRequirements, childAvailableDependencyProviders]);
 
     // Construct URLs using urlOverrideDataSource (must be before useCountQuery)
     const url = useMemo(() =>
@@ -94,12 +150,39 @@ function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap
         [modelSchema, urlOverrideDataSourceStoredObj, urlOverrideDataSource?.fieldsMetadata]
     );
 
-    const dataSourcesUrlOverrideDict = useMemo(() => {
-        return dataSources.reduce((acc, {name, schema}) => {
-            acc[name] = getServerUrl(schema, urlOverrideDataSourceStoredObj, urlOverrideDataSource?.fieldsMetadata, undefined, false);
+    // Build URL configuration dict for child data sources using resolved dependencies
+    // Similar to parent, calculate url, httpViewUrl, and wsViewUrl for each child data source
+    const dataSourcesUrlConfig = useMemo(() => {
+        return dataSources.reduce((acc, { name, schema, modelLayoutOption }) => {
+            // Check for a specific urlOverride dependency for the current child data source
+            const childUrlOverrideDep = resolvedChildDependencies[name]?.urlOverride;
+
+            // Determine the stored object and metadata to use for URL generation
+            const urlStoredObj = childUrlOverrideDep?.storedObj || urlOverrideDataSourceStoredObj;
+            const urlFieldsMetadata = childUrlOverrideDep?.fieldsMetadata || urlOverrideDataSource?.fieldsMetadata;
+
+            // Base URL (for mutations and base operations)
+            const childUrl = getServerUrl(schema, urlStoredObj, urlFieldsMetadata, undefined, false);
+
+            // HTTP View URL (always uses view URL for HTTP GET/GET_ALL requests)
+            const childHttpViewUrl = getServerUrl(schema, urlStoredObj, urlFieldsMetadata, undefined, true);
+
+            // Determine if WebSocket should use base URL instead of view URL
+            const childShouldUseBaseUrl = schema.is_large_db_object || schema.is_time_series ||
+                modelLayoutOption?.depending_proto_model_for_cpp_port ||
+                false; // Child data sources don't support server-side pagination/filter/sort
+
+            // WebSocket View URL - uses base URL when childShouldUseBaseUrl, otherwise uses view URL
+            const childWsViewUrl = childShouldUseBaseUrl ? childUrl : childHttpViewUrl;
+
+            acc[name] = {
+                url: childUrl,
+                httpViewUrl: childHttpViewUrl,
+                wsViewUrl: childWsViewUrl
+            };
             return acc;
         }, {});
-    }, [urlOverrideDataSourceStoredObj, urlOverrideDataSource])
+    }, [dataSources, resolvedChildDependencies, urlOverrideDataSourceStoredObj, urlOverrideDataSource]);
 
     const [searchQuery, setSearchQuery] = useState([]);
     const [rows, setRows] = useState([]);
@@ -189,7 +272,54 @@ function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap
     const formValidationRef = useRef({});
     const sourceRef = useRef(null);
     const availableModelNames = useMemo(() => Object.keys(schemaCollections), [schemaCollections]);
+    const crudOverrideDictRef = useRef(getCrudOverrideDict(modelSchema, availableModelNames));
+    const defaultFilterParamDictRef = useRef(getDefaultFilterParamDict(modelSchema, availableModelNames));
+
+    // Build CRUD override dict for child data sources
     const dataSourcesCrudOverrideDictRef = useRef(getDataSourcesCrudOverrideDict(dataSources, availableModelNames));
+
+    // Build default filter param dict for child data sources
+    const dataSourcesDefaultFilterParamDict = useMemo(() => {
+        return getDataSourcesDefaultFilterParamDict(dataSources, availableModelNames);
+    }, [dataSources, availableModelNames]);
+
+    // Build default filters for each child data source using resolved dependencies
+    const dataSourcesDefaultFilters = useMemo(() => {
+        const filtersDict = {};
+
+        dataSources.forEach(({ name, schema }) => {
+            const paramDict = dataSourcesDefaultFilterParamDict?.[name];
+            if (!paramDict) return;
+
+            // Determine source storedObj for default filter resolution
+            let sourceStoredObj = null;
+
+            // First check if child has explicit defaultFilter dependency
+            const childDeps = resolvedChildDependencies[name];
+            if (childDeps?.defaultFilter?.storedObj) {
+                sourceStoredObj = childDeps.defaultFilter.storedObj;
+            } else {
+                // Otherwise, check schema's param_src_model_name and resolve from available providers
+                const paramSrcModelName = schema?.default_filter_param?.param_src_model_name;
+                if (paramSrcModelName && childAvailableDependencyProviders[paramSrcModelName]) {
+                    sourceStoredObj = childAvailableDependencyProviders[paramSrcModelName].storedObj;
+                } else {
+                    // Final fallback to parent's defaultFilterDataSourceStoredObj
+                    sourceStoredObj = defaultFilterDataSourceStoredObj;
+                }
+            }
+
+            // Build default filters array for this data source
+            const filtersArray = buildDefaultFilters(sourceStoredObj, paramDict);
+
+            if (filtersArray.length > 0) {
+                filtersDict[name] = filtersArray;
+            }
+        });
+
+        return filtersDict;
+    }, [dataSources, dataSourcesDefaultFilterParamDict, resolvedChildDependencies, childAvailableDependencyProviders, defaultFilterDataSourceStoredObj]);
+
     const allowedLayoutTypesRef = useRef([LAYOUT_TYPES.ABBREVIATION_MERGE, LAYOUT_TYPES.PIVOT_TABLE, LAYOUT_TYPES.CHART]);
     // refs to identify change
     const optionsRef = useRef(null);
@@ -246,6 +376,42 @@ function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap
         [shouldUseBaseUrl, url, httpViewUrl]
     );
 
+    // Extract params for CRUD override using crudOverrideDataSource (for main model)
+    const params = useMemo(() => {
+        const extractedParams = extractCrudParams(crudOverrideDataSourceStoredObj, crudOverrideDictRef.current);
+        return extractedParams;
+    }, [crudOverrideDataSourceStoredObj]);
+
+    // Build default filters in array format using buildDefaultFilters
+    const defaultFilters = useMemo(() => {
+        const paramDict = defaultFilterParamDictRef.current;
+
+        if (!paramDict) return [];
+
+        // Use buildDefaultFilters to convert paramDict to array format
+        const filtersArray = buildDefaultFilters(defaultFilterDataSourceStoredObj, paramDict);
+
+        return filtersArray;
+    }, [defaultFilterDataSourceStoredObj]);
+
+    // Check if default filters are ready (all required 'src' type params have values)
+    const areDefaultFiltersReady = useMemo(() => {
+        const paramDict = defaultFilterParamDictRef.current;
+        if (!paramDict) return true; // No filters defined, so ready
+
+        // Check if all 'src' type params have their values available
+        for (const paramName in paramDict) {
+            const paramConfig = paramDict[paramName];
+            if (paramConfig.type === 'src') {
+                // Need to wait for data source to be loaded
+                if (!defaultFilterDataSourceStoredObj || !get(defaultFilterDataSourceStoredObj, paramConfig.value)) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }, [defaultFilterDataSourceStoredObj]);
+
     const uiFilters = useMemo(() => {
         const layoutFilters = modelLayoutOption.filters || [];
         return convertFilterTypes(layoutFilters, modelItemFieldsMetadata, MODEL_TYPES.ABBREVIATION_MERGE);
@@ -253,15 +419,17 @@ function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap
 
     // Process data for backend consumption
     // Use modelLayoutData with JSON.stringify to handle reference stability
+    // IMPORTANT: Only default filters go to backend, UI filters are client-side only
     const processedData = useMemo(() => {
         const rowsPerPage = modelLayoutData.rows_per_page || 25;
         const sortOrders = modelLayoutData.sort_orders || [];
 
-        const result = massageDataForBackend(uiFilters, sortOrders, page, rowsPerPage);
+        // Only default filters go to backend (UI filters are view-only, not merged)
+        const result = massageDataForBackend(defaultFilters, sortOrders, page, rowsPerPage);
 
         return result;
     }, [
-        uiFilters,
+        defaultFilters,
         JSON.stringify(modelLayoutData.sort_orders),
         page,
         modelLayoutData.rows_per_page
@@ -370,15 +538,21 @@ function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap
     useEffect(() => {
         let updatedParams = null;
         if (storedObj && Object.keys(storedObj).length > 0) {
-            dataSources.forEach(({ name }) => {
-                const crudOverrideDict = dataSourcesCrudOverrideDictRef.current?.[name];
-                if (crudOverrideDict?.GET_ALL) {
-                    const { paramDict } = crudOverrideDict.GET_ALL;
-                    if (Object.keys(paramDict).length > 0) {
+        dataSources.forEach(({ name }) => {
+            const crudOverrideDict = dataSourcesCrudOverrideDictRef.current?.[name];
+            if (crudOverrideDict?.GET_ALL) {
+                const { paramDict } = crudOverrideDict.GET_ALL;
+                if (paramDict && Object.keys(paramDict).length > 0) {
+                    // Check if this child data source has a crudOverride dependency
+                    const childDeps = resolvedChildDependencies[name];
+                    const sourceStoredObj = childDeps?.crudOverride?.storedObj || storedObj;
+
+                    // Only extract params if source has data
+                    if (sourceStoredObj && Object.keys(sourceStoredObj).length > 0) {
                         Object.keys(paramDict).forEach((k) => {
                             const paramSrc = paramDict[k];
-                            const paramValue = get(storedObj, paramSrc);
-                            if (paramValue !== null || paramValue !== undefined) {
+                            const paramValue = get(sourceStoredObj, paramSrc);
+                            if (paramValue !== null && paramValue !== undefined) {
                                 if (!updatedParams) {
                                     updatedParams = {
                                         [name]: {}
@@ -391,7 +565,8 @@ function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap
                         })
                     }
                 }
-            })
+            }
+        })
         }
         setDataSourcesParams((prev) => {
             if (JSON.stringify(prev) === JSON.stringify(updatedParams)) {
@@ -399,23 +574,51 @@ function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap
             }
             return updatedParams;
         });
-    }, [storedObj])
+    }, [storedObj, dataSources, resolvedChildDependencies])
 
     useEffect(() => {
         if (hasReadByIdWsProperty) {
             return;
         }
 
-        dispatch(actions.getAll());
-    }, [hasReadByIdWsProperty])
+        // Wait for default filters to be ready before executing GETALL
+        if (!areDefaultFiltersReady) {
+            return;
+        }
+
+        let args = { url: httpViewUrl };
+
+        // Handle CRUD override - merge custom endpoint and params
+        if (crudOverrideDictRef.current?.GET_ALL) {
+            const { endpoint, paramDict } = crudOverrideDictRef.current.GET_ALL;
+            // If paramDict requires params but they're not ready yet, wait
+            if (paramDict && Object.keys(paramDict).length > 0 && !params) {
+                return;
+            }
+            // Merge CRUD params
+            args = { ...args, endpoint, params };
+        }
+
+        // for GET_ALL only add processed default filters
+        if (processedData.filters && processedData.filters.length > 0) {
+            args = { ...args, filters: processedData.filters };
+        }
+
+        dispatch(actions.getAll(args));
+    }, [httpViewUrl, JSON.stringify(params), JSON.stringify(processedData.filters), hasReadByIdWsProperty])
 
     useEffect(() => {
         if (dataSourcesCrudOverrideDictRef.current) return;
         if (bufferedFieldMetadata.hide) return;
         dataSources.forEach(({ actions: dsActions, name, url, viewUrl }) => {
-            let args = { url: viewUrl };
+            // Use HTTP View URL from config if available, otherwise use default viewUrl
+            const effectiveUrl = dataSourcesUrlConfig[name]?.httpViewUrl || viewUrl;
+            let args = { url: effectiveUrl };
+
             const crudOverrideDict = dataSourcesCrudOverrideDictRef.current?.[name];
             const params = dataSourcesParams?.[name];
+            const filters = dataSourcesDefaultFilters?.[name];
+
             if (crudOverrideDict?.GET_ALL) {
                 const { endpoint, paramDict } = crudOverrideDict.GET_ALL;
                 if (!params && Object.keys(paramDict).length > 0) {
@@ -423,9 +626,15 @@ function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap
                 }
                 args = { ...args, endpoint, params };
             }
+
+            // Add default filters if available
+            if (filters && filters.length > 0) {
+                args = { ...args, filters };
+            }
+
             dispatch(dsActions.getAll({ ...args }));
         })
-    }, [dataSourcesParams])
+    }, [dataSourcesParams, dataSourcesDefaultFilters, dataSourcesUrlConfig])
 
     useEffect(() => {
         workerRef.current = new Worker(new URL('../../workers/abbreviation-merge-model.worker.js', import.meta.url), { type: 'module' });
@@ -508,7 +717,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap
                 joinSort: modelLayoutOption.join_sort || null,
                 centerJoin: modelLayoutData.joined_at_center,
                 flip: modelLayoutData.flip,
-                rowIds,
+                rowIds: layoutType === LAYOUT_TYPES.PIVOT_TABLE ? rowIds : null,
                 serverSidePaginationEnabled: false // Pass this false as in case of Abbreviation Merge Model we want to enforce client side pagination control in both cases 
             }
 
@@ -521,7 +730,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap
                 showAll,
                 modelLayoutOption,
                 modelLayoutData,
-                rowIds,
+                rowIds: layoutType === LAYOUT_TYPES.PIVOT_TABLE ? rowIds : null,
                 objId
             }
 
@@ -566,7 +775,8 @@ function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap
     // Wait for count query to complete before establishing WebSocket connection
     // This prevents double connection (once without pagination, once with pagination)
     // isWaitingForCount handles both: (1) initial load and (2) filter changes
-    const isWebSocketDelayed = isWebSocketDisabled || isWaitingForCount;
+    // Also wait for default filters to be ready before connecting
+    const isWebSocketDelayed = isWebSocketDisabled || isWaitingForCount || !areDefaultFiltersReady;
 
     socketRef.current = useWebSocketWorker({
         url: wsViewUrl,
@@ -576,10 +786,12 @@ function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap
         selector,
         onWorkerUpdate: handleModelDataSourceUpdate,
         onReconnect: handleReconnect,
+        params,
+        crudOverrideDict: crudOverrideDictRef.current,
         isCppModel: modelLayoutOption.depending_proto_model_for_cpp_port,
         // Parameters for unified endpoint with dynamic parameter inclusion
-        //Passing these nulls because collection view does not support these on backend side 
-        filters: null,
+        // Pass processed default filters to WebSocket for collection views
+        filters: processedData.filters,
         sortOrders: null,
         pagination: null
     })
@@ -592,10 +804,19 @@ function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap
         storedArrayDict: dataSourcesStoredArrayDict,
         dataSourcesCrudOverrideDict: dataSourcesCrudOverrideDictRef.current,
         dataSourcesParams,
+        dataSourcesDefaultFilters,
         connectionByGetAll: modelLayoutOption.ws_connection_by_get_all,
         activeIds,
-        dataSourcesUrlOverrideDict
+        dataSourcesUrlConfig
     });
+
+    // ID Dependency: Auto-assign parent objId based on dependent model's selection
+    useEffect(() => {
+        if (idDependentDataSource && idDependentDataSourceObjId !== null && objId !== idDependentDataSourceObjId) {
+            // Dispatch setObjId to update parent model's ID to match the dependent model's ID
+            dispatch(actions.setObjId(idDependentDataSourceObjId));
+        }
+    }, [idDependentDataSourceObjId, idDependentDataSource, objId]);
 
     useEffect(() => {
         if (modelAbbreviatedItems && !isCreating) {
@@ -988,6 +1209,35 @@ function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap
         }
     }, [dataSources, dataSourcesModeDict, dispatch, currentChartName, cleanedRows])
 
+    /**
+     * Handle bulk patch operations for multiple rows across data sources
+     */
+    const handleBulkPatch = useBulkPatch(MODEL_TYPES.ABBREVIATION_MERGE, {
+        diffConfig: {
+            dataSourcesStoredArrayDict,
+            dataSourcesUpdatedArrayDict,
+            cells: sortedCells,
+            dataSourcesMetadataDict
+        },
+        dispatchConfig: {
+            urlsBySource: Object.fromEntries(
+                dataSources.map(({ name, schema }) => {
+                    const childUrlOverrideDep = resolvedChildDependencies[name]?.urlOverride;
+                    const urlStoredObj = childUrlOverrideDep?.storedObj || urlOverrideDataSourceStoredObj;
+                    const urlFieldsMetadata = childUrlOverrideDep?.fieldsMetadata || urlOverrideDataSource?.fieldsMetadata;
+                    return [name, getServerUrl(schema, urlStoredObj, urlFieldsMetadata)];
+                })
+            ),
+            getActionBySource: (source) => {
+                const dataSource = dataSources.find(ds => ds.name === source);
+                if (!dataSource) {
+                    throw new Error(`Data source ${source} not found`);
+                }
+                return dataSource.actions.partialUpdate;
+            }
+        }
+    });
+
     // A helper function to decide which content to render based on layoutType
     const renderContent = () => {
         let Wrapper = React.Fragment;
@@ -1007,6 +1257,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap
                     pivotEnableOverride: modelLayoutData.pivot_enable_override ?? [],
                     onPivotDataChange: handlePivotDataChange,
                     onPivotCellSelect: setRowIds,
+                    modelName: modelName
                 };
                 wrapperMode = MODES.READ;
                 isReadOnly = true;
@@ -1065,7 +1316,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap
                     dataSourceColors={modelLayoutData.data_source_colors || []}
                     page={page}
                     rowsPerPage={modelLayoutData.rows_per_page || 25}
-                    totalCount={rows.length} //in AbbreviationMergeModel we dont depend on count query count for total rows 
+                    totalCount={rows.length} //in AbbreviationMergeModel we dont depend on count query count for total rows
                     onPageChange={handlePageChange}
                     onRowsPerPageChange={handleRowsPerPageChange}
                     onRowSelect={handleRowSelect}
@@ -1075,6 +1326,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap
                     onButtonToggle={handleButtonToggle}
                     isReadOnly={isReadOnly}
                     onColumnOrdersChange={handleColumnOrdersChange}
+                    onBulkPatch={handleBulkPatch}
                     selectedRows={multiSelectedRows}
                     lastSelectedRowId={lastSelectedRowId}
                     onSelectionChange={handleMultiSelectChange}

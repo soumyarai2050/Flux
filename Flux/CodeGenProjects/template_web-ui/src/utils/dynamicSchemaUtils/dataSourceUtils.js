@@ -207,3 +207,177 @@ export function computeModelToDependentMap(schema) {
 
   return { abbreviationModelToSourcesMap, modelToDependencyMap, abbreviationSourcesSet };
 }
+
+/**
+ * Extracts source model name with fallback strategy.
+ * Priority: 1) Use direct model name field (query_src_model_name/param_src_model_name)
+ *          2) Extract from value source string (query_param_value_src/param_value_src)
+ *
+ * @param {string} directModelName - Direct field like query_src_model_name or param_src_model_name
+ * @param {string} valueSrc - Value source like "model_name.field.path"
+ * @returns {string|null} - Extracted model name or null
+ */
+export function extractSourceModelName(directModelName, valueSrc) {
+  if (directModelName) {
+    return directModelName;
+  }
+  if (valueSrc && typeof valueSrc === 'string') {
+    return valueSrc.split('.')[0] || null;
+  }
+  return null;
+}
+
+/**
+ * Builds a lookup of available models with their storedObj and fieldsMetadata.
+ * Filters out models with null/undefined storedObj or name.
+ *
+ * @param {Array<{name: string, storedObj: object, fieldsMetadata: Array}>} modelConfigs - Array of model configurations
+ * @returns {Object} Map of modelName → { storedObj, fieldsMetadata }
+ *
+ * @example
+ * buildAvailableModelsMap([
+ *   { name: "abc", storedObj: {...}, fieldsMetadata: [...] },
+ *   { name: "def", storedObj: {...}, fieldsMetadata: [...] }
+ * ])
+ * // Returns: { a : { storedObj: {...}, fieldsMetadata: [...] }, ... }
+ */
+export function buildAvailableModelsMap(modelConfigs) {
+  const models = {};
+
+  if (!Array.isArray(modelConfigs)) {
+    return models;
+  }
+
+  modelConfigs.forEach(({ name, storedObj, fieldsMetadata }) => {
+    // Only add models with valid name and storedObj
+    if (name && storedObj) {
+      models[name] = { storedObj, fieldsMetadata };
+    }
+  });
+
+  return models;
+}
+
+/**
+ * Extracts which models each child dataSource depends on for each dependency type.
+ * Checks schema fields with fallback strategy:
+ * - urlOverride: widget_ui_data_element.depending_proto_model_name
+ * - crudOverride: override_default_crud[].query_src_model_name OR query_param_value_src
+ * - defaultFilter: default_filter_param.param_src_model_name OR param_value_src
+ *
+ * @param {Array<{name: string, schema: object}>} dataSources - Array of child data source objects
+ * @param {Array<string>} availableModelNames - List of valid model names for validation
+ * @returns {Object} Map of dataSourceName → { urlOverride?: modelName, crudOverride?: modelName, defaultFilter?: modelName }
+ *
+ * @example
+ */
+export function extractChildDataSourceDependencies(dataSources, availableModelNames) {
+  const requirements = {};
+
+  if (!Array.isArray(dataSources)) {
+    return requirements;
+  }
+
+  dataSources.forEach(({ name, schema }) => {
+    if (!schema) return;
+
+    const deps = {};
+
+    // Extract urlOverride dependency
+    const urlOverrideDep = schema?.widget_ui_data_element?.depending_proto_model_name;
+    if (urlOverrideDep) {
+      deps.urlOverride = urlOverrideDep;
+    }
+
+    // Extract crudOverride dependency from query_src_model_name or query_param_value_src
+    const crudOverrideSrc = schema?.override_default_crud?.find(crud =>
+      crud?.query_src_model_name || crud?.ui_query_params?.length > 0
+    );
+    if (crudOverrideSrc) {
+      const firstParam = crudOverrideSrc.ui_query_params?.[0];
+      const sourceModelName = extractSourceModelName(
+        crudOverrideSrc.query_src_model_name,
+        firstParam?.query_param_value_src
+      );
+
+      if (sourceModelName && (!availableModelNames || availableModelNames.includes(sourceModelName))) {
+        deps.crudOverride = sourceModelName;
+      }
+    }
+
+    // Extract defaultFilter dependency from param_src_model_name or param_value_src
+    const defaultFilterSrc = schema?.default_filter_param;
+    if (defaultFilterSrc?.ui_filter_params && defaultFilterSrc.ui_filter_params.length > 0) {
+      // Get the source model name from the first filter param that has param_value_src
+      const firstSrcParam = defaultFilterSrc.ui_filter_params.find(p => p.param_value_src);
+      const sourceModelName = extractSourceModelName(
+        defaultFilterSrc.param_src_model_name,
+        firstSrcParam?.param_value_src
+      );
+
+      if (sourceModelName && (!availableModelNames || availableModelNames.includes(sourceModelName))) {
+        deps.defaultFilter = sourceModelName;
+      }
+    }
+
+    if (Object.keys(deps).length > 0) {
+      requirements[name] = deps;
+    }
+  });
+
+  return requirements;
+}
+
+/**
+ * Resolves dependency requirements to actual storedObjs and fieldsMetadata from availableModels map.
+ * - urlOverride: Returns { storedObj, fieldsMetadata } (both needed for URL construction)
+ * - crudOverride/defaultFilter: Returns { storedObj } only (fieldsMetadata not needed)
+ * Logs warnings for unresolved dependencies.
+ *
+ * @param {Object} dependencyRequirements - Output from extractChildDataSourceDependencies
+ * @param {Object} availableModels - Output from buildAvailableModelsMap
+ * @returns {Object} Map of dataSourceName → { urlOverride: {storedObj, fieldsMetadata?}, crudOverride: {storedObj}, defaultFilter: {storedObj} }
+ */
+ 
+export function resolveDataSourceDependencies(dependencyRequirements, availableModels) {
+  const dict = {};
+
+  if (!dependencyRequirements || typeof dependencyRequirements !== 'object') {
+    return dict;
+  }
+
+  if (!availableModels || typeof availableModels !== 'object') {
+    return dict;
+  }
+
+  Object.keys(dependencyRequirements).forEach((dataSourceName) => {
+    const deps = dependencyRequirements[dataSourceName];
+    const resolvedDeps = {};
+
+    Object.keys(deps).forEach((depType) => {
+      const requiredModelName = deps[depType];
+      const modelData = availableModels[requiredModelName];
+
+      if (modelData) {
+        // Only include fieldsMetadata for urlOverride dependency
+        if (depType === 'urlOverride') {
+          resolvedDeps[depType] = modelData; // Stores { storedObj, fieldsMetadata }
+        } else {
+          // For crudOverride and defaultFilter, only include storedObj
+          resolvedDeps[depType] = { storedObj: modelData.storedObj };
+        }
+      } else {
+        console.warn(
+          `Child dataSource "${dataSourceName}" requires ${depType} from model "${requiredModelName}" ` +
+          `but it's not available in parent's scope. Available models: ${Object.keys(availableModels).join(', ')}`
+        );
+      }
+    });
+
+    if (Object.keys(resolvedDeps).length > 0) {
+      dict[dataSourceName] = resolvedDeps;
+    }
+  });
+
+  return dict;
+}

@@ -15,7 +15,7 @@ import {
 import { createAutoBoundParams } from '../../utils/core/parameterBindingUtils';
 import { removeRedundantFieldsFromRows } from '../../utils/core/dataTransformation';
 import { cleanAllCache } from '../../cache/attributeCache';
-import { useWebSocketWorker, useDownload, useModelLayout, useConflictDetection, useCountQuery } from '../../hooks';
+import { useWebSocketWorker, useDownload, useModelLayout, useConflictDetection, useCountQuery, useBulkPatch } from '../../hooks';
 import { massageDataForBackend, shouldUsePagination, buildDefaultFilters, extractCrudParams, convertFilterTypes } from '../../utils/core/paginationUtils';
 // custom components
 import { FullScreenModalOptional } from '../../components/ui/Modal';
@@ -602,6 +602,7 @@ function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap }) {
 
     const handleReload = () => {
         handleDiscard();
+        dispatch(actions.setObjId(null));
         // Clear local chart multiselect state on reload for non-ChartNode models
         if (!isChartModel) {
             setChartMultiSelectState({});
@@ -792,6 +793,20 @@ function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap }) {
         }
     }
 
+    // Setup bulk patch hook for REPEATED_ROOT model with selective button support
+    const handleSelectiveButtonPatch = useBulkPatch(MODEL_TYPES.REPEATED_ROOT, {
+        diffConfig: {
+            storedDataArray: storedArray,
+            updatedDataArray: rows,
+            cells: sortedCells,
+            fieldsMetadata
+        },
+        dispatchConfig: {
+            url,
+            action: actions.partialUpdate
+        }
+    });
+
     const handleErrorClear = () => {
         dispatch(actions.setError(null));
     }
@@ -887,6 +902,7 @@ function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap }) {
                     pivotEnableOverride: modelLayoutData.pivot_enable_override ?? [],
                     onPivotDataChange: handlePivotDataChange,
                     onPivotCellSelect: setRowIds,
+                    modelName: derivedModelName,
                 };
                 wrapperMode = MODES.READ;
                 isReadOnly = true;
@@ -944,6 +960,7 @@ function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap }) {
                     onUpdate={handleUpdate}
                     onUserChange={handleUserChange}
                     onButtonToggle={handleButtonToggle}
+                    onSelectiveButtonPatch={handleSelectiveButtonPatch}
                     modelType={MODEL_TYPES.REPEATED_ROOT}
                     storedData={effectiveStoredArray}
                     updatedData={rows}

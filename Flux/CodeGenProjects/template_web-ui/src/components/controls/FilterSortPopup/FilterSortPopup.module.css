@@ -335,3 +335,15 @@ background-color: #106ebe !important; /* Darker Office blue */
   margin-right: 4px; /* Space between chip and clear button */
   white-space: nowrap; /* Prevent text wrapping */
 }
+
+.helpIcon {
+  color: #0078d4 !important;
+  /* Office blue */
+  margin-left: 10px !important;
+  padding: 4px !important;
+}
+
+.helpIcon:hover {
+  color: #106ebe !important;
+  /* Darker blue on hover */
+}

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSelector } from 'react-redux';
 import PivotTableUI from 'react-pivottable/PivotTableUI';
 import TableRenderers from 'react-pivottable/TableRenderers';
+import { aggregators as defaultAggregators } from 'react-pivottable/Utilities';
 import Plot from 'react-plotly.js';
 import createPlotlyRenderer from 'react-pivottable/PlotlyRenderers';
 import Box from '@mui/material/Box';
@@ -28,8 +29,93 @@ import FullScreenModal from '../../../ui/Modal';
 import { cloneDeep } from 'lodash';
 import Resizer from '../../../ui/Resizer/Resizer';
 
-const PlotlyRenderers = createPlotlyRenderer(Plot);
 const PIVOT_SCHEMA_NAME = 'pivot_data';
+
+const PlotWithZoomPreservation = (props) => {
+    return (
+        <Plot 
+            {...props}
+            layout={{
+                ...props.layout,
+                uirevision: 'preserve-zoom'
+            }}
+        />
+    )
+}
+
+const PlotlyRenderers = createPlotlyRenderer(PlotWithZoomPreservation);
+
+const allRenderers = {
+    ...TableRenderers,
+    ...PlotlyRenderers,
+}
+
+// Create a formatter factory that checks field metadata for display_type and number_format
+// projectSchema is the full schema (keyed by modelName)
+// modelName is the name of the model being displayed (e.g., "pair_strat")
+const createFieldAwareFormatter = (fieldName, projectSchema, modelName) => {
+    return (value) => {
+        // Handle null/NaN
+        if (value == null || isNaN(value)) return '';
+
+        // Look up field metadata in schema
+        // Schema structure: projectSchema[modelName].properties[fieldName]
+        let displayType = null;
+        let numberFormat = null;
+
+        if (projectSchema && modelName && projectSchema[modelName]) {
+            const properties = projectSchema[modelName].properties;
+            if (properties && properties[fieldName]) {
+                displayType = properties[fieldName].display_type;
+                numberFormat = properties[fieldName].number_format;
+            }
+        }
+
+        // If display_type is int, render as integer
+        if (displayType === 'int') {
+            return Math.round(value).toString();
+        }
+
+        if (numberFormat) {
+            // number_format like ".3" means 3 decimal places
+            if (numberFormat.startsWith('.')) {
+                const decimals = parseInt(numberFormat.substring(1));
+                return value.toFixed(decimals);
+            }
+        }
+
+        // Otherwise return default formatting
+        return value;
+    };
+};
+
+// Wrap all aggregators to apply field-aware formatting
+const createFieldAwareAggregators = (defaultAggregators, projectSchema, modelName) => {
+    const wrappedAggregators = {};
+
+    Object.entries(defaultAggregators).forEach(([aggName, aggFn]) => {
+        wrappedAggregators[aggName] = (args) => {
+            // args is an array of field names like ['volume', 'price']
+            const fieldName = args && args[0];
+            const baseAggregator = aggFn(args);
+
+            // Return a wrapper function
+            return function() {
+                const aggregatorObj = baseAggregator.apply(this, arguments);
+
+                // Replace format method with field-aware formatter
+                aggregatorObj.format = createFieldAwareFormatter(fieldName, projectSchema, modelName);
+
+                return aggregatorObj;
+            };
+        };
+    });
+
+    return wrappedAggregators;
+};
+
+// Initialize as empty - will be set in component with projectSchema and modelName
+let customAggregators = defaultAggregators;
 
 function PivotTable({
     pivotData,
@@ -41,12 +127,13 @@ function PivotTable({
     onPivotSelect,
     pivotEnableOverride,
     onPivotCellSelect,
+    modelName,
     children
 }) {
     const containerRef = useRef(null);
     const { schema: projectSchema } = useSelector(state => state.schema);
-    const [tableHeight, setTableHeight] = useState(300);
-    const [schema, setSchema] = useState(updatePivotSchema(projectSchema));
+    const [tableHeight, setTableHeight] = useState(720);
+    const [schema] = useState(updatePivotSchema(projectSchema));
     const [selectedIndex, setSelectedIndex] = useState(selectedPivotName ? pivotData.findIndex((o) => o.pivot_name === selectedPivotName) : null);
     const [storedPivotObj, setStoredPivotObj] = useState({});
     const [updatedPivotObj, setUpdatedPivotObj] = useState({});
@@ -54,6 +141,13 @@ function PivotTable({
     const [isCreate, setIsCreate] = useState(false);
     const [showColumnSelector, setShowColumnSelector] = useState(true);
     const [hasPvtUnused, setHasPvtUnused] = useState(false);
+
+    // Initialize field-aware aggregators with projectSchema and modelName
+    useEffect(() => {
+        if (projectSchema && modelName) {
+            customAggregators = createFieldAwareAggregators(defaultAggregators, projectSchema, modelName);
+        }
+    }, [projectSchema, modelName]);
 
     const pivotObjRef = useRef();
     pivotObjRef.current = updatedPivotObj;
@@ -92,7 +186,6 @@ function PivotTable({
     // Attach single Plotly click event listener
     useEffect(() => {
         let unbindClick = null;
-        let unbindAfterPlot = null;
         let attempts = 0;
         const maxAttempts = 20;
 
@@ -106,23 +199,6 @@ function PivotTable({
             unbindClick = bindPlotlyClick(plotlyDiv, (mapped) => {
                 handleChartClick(mapped.label, mapped.title);
             });
-
-            // Also bind to plotly_afterplot to rebind after chart redraws
-            if (plotlyDiv.on && typeof plotlyDiv.on === 'function') {
-                const afterPlotHandler = () => {
-                    // Rebind after plot updates
-                    if (unbindClick) unbindClick();
-                    unbindClick = bindPlotlyClick(plotlyDiv, (mapped) => {
-                        handleChartClick(mapped.label, mapped.title);
-                    });
-                };
-                plotlyDiv.on('plotly_afterplot', afterPlotHandler);
-                unbindAfterPlot = () => {
-                    if (plotlyDiv.removeListener) {
-                        plotlyDiv.removeListener('plotly_afterplot', afterPlotHandler);
-                    }
-                };
-            }
 
             return true;
         };
@@ -140,14 +216,12 @@ function PivotTable({
             return () => {
                 clearInterval(interval);
                 if (unbindClick) unbindClick();
-                if (unbindAfterPlot) unbindAfterPlot();
             };
         }
 
         // Cleanup
         return () => {
             if (unbindClick) unbindClick();
-            if (unbindAfterPlot) unbindAfterPlot();
         };
     }, [updatedPivotObj, handleChartClick]);
 
@@ -413,11 +487,12 @@ function PivotTable({
                             <PivotTableUI
                                 {...updatedPivotObj}
                                 data={data}
+                                aggregators={customAggregators}
                                 aggregatorName={updatedPivotObj.aggregator_name}
                                 rendererName={updatedPivotObj.renderer_name}
                                 valueFilter={updatedPivotObj.value_filter ? JSON.parse(updatedPivotObj.value_filter) : {}}
                                 onChange={handlePivotTableChange}
-                                renderers={Object.assign({}, TableRenderers, PlotlyRenderers)}
+                                renderers={allRenderers}
                                 unusedOrientationCutoff={Infinity}
                                 tableOptions={{
                                     clickCallback: clickCallback

@@ -197,7 +197,7 @@ function ChartView({
     }, [chartData])
 
     useEffect(() => {
-        if (selectedIndex || selectedIndex === 0) {
+        if (selectedIndex && selectedIndex >= 0) {
             const selectedChartOption = chartData[selectedIndex];
             setStoredChartObj(selectedChartOption);
             setUpdatedChartObj(addxpath(cloneDeep(selectedChartOption)));

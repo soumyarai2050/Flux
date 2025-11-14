@@ -4,6 +4,7 @@ import { DB_ID, DATA_TYPES, SHAPE_TYPES, SIZE_TYPES } from '../../constants';
 import { addxpath } from '../core/dataAccess';
 import { getIdFromAbbreviatedKey } from '../core/dataUtils';
 import { toCamelCase } from '../core/stringUtils';
+import { extractSourceModelName } from '../dynamicSchemaUtils/dataSourceUtils';
 
 
 /**
@@ -684,11 +685,11 @@ export function getUniqueValues(rows, filterFieldsMetadata, isAbbreviationMerge 
  * @returns {Object|null} A dictionary of CRUD overrides or null if no overrides are defined.
  */
 export function getCrudOverrideDict(modelSchema, availableModelNames = null) {
-    return modelSchema.override_default_crud?.reduce((acc, { ui_crud_type, query_name, ui_query_params }) => {
+    return modelSchema.override_default_crud?.reduce((acc, { ui_crud_type, query_name, query_src_model_name, ui_query_params }) => {
         let paramDict = null;
         ui_query_params?.forEach(({ query_param_name, query_param_value_src }) => {
-            // Extract model name from query_param_value_src
-            const sourceModelName = query_param_value_src.split('.')[0];
+            // Extract model name using unified utility (checks query_src_model_name first, then extracts from value_src)
+            const sourceModelName = extractSourceModelName(query_src_model_name, query_param_value_src);
 
             // Only include param if no validation needed OR source model exists in schema
             if (!availableModelNames || availableModelNames.includes(sourceModelName)) {
@@ -738,8 +739,8 @@ export function getDefaultFilterParamDict(modelSchema, availableModelNames = nul
     defaultFilter.ui_filter_params.forEach(({ param_name, param_value_src, param_value }) => {
         // Support both derived values (from other models) and direct values
         if (param_value_src) {
-            // Extract model name from param_value_src (e.g., "pair_strat._id" -> "pair_strat")
-            const sourceModelName = param_value_src.split('.')[0];
+            // Extract model name using unified utility (checks param_src_model_name first, then extracts from value_src)
+            const sourceModelName = extractSourceModelName(defaultFilter.param_src_model_name, param_value_src);
 
             // Only include param if no validation needed OR source model exists in schema
             if (!availableModelNames || availableModelNames.includes(sourceModelName)) {
