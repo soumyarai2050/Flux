@@ -6,8 +6,10 @@ export function getDataSourcesFromSchema(modelSchema) {
 
   const dataSourcesSet = new Set();
 
-  // Rule 1: Check for depending_proto_model_name (non-abbreviated models)
-  const dependingModelName = modelSchema?.widget_ui_data_element?.depending_proto_model_name;
+  const connectionDependency = modelSchema.connection_dependency?.[0];
+
+  // Rule 1: Check for connection_dependency (non-abbreviated models)
+  const dependingModelName = connectionDependency?.source_model_name;
   if (dependingModelName) {
     dataSourcesSet.add(dependingModelName);
   }
@@ -23,7 +25,7 @@ export function getDataSourcesFromSchema(modelSchema) {
   }
 
   // Rule 1c: Check default_filter_param for query_src_model_name
-  const defaultFilter = modelSchema?.default_filter_param;
+  const defaultFilter = modelSchema?.default_filter_param?.[0];
   if (defaultFilter && typeof defaultFilter === 'object'){
     if (defaultFilter?.param_src_model_name) {
       dataSourcesSet.add(defaultFilter.param_src_model_name);
@@ -107,8 +109,10 @@ export function getModelDependencyMap(modelSchema) {
 
   const dependencyMap = {};
 
-  // Extract urlOverride (from depending_proto_model_name)
-  const dependingModelName = modelSchema?.widget_ui_data_element?.depending_proto_model_name;
+  const connectionDependency = modelSchema.connection_dependency?.[0];
+
+  // Extract urlOverride (from connection_dependency)
+  const dependingModelName = connectionDependency?.source_model_name;
   if (dependingModelName) {
     dependencyMap.urlOverride = dependingModelName;
   }
@@ -124,13 +128,13 @@ export function getModelDependencyMap(modelSchema) {
   }
 
   // Extract defaultFilter (from default_filter_param)
-  const defaultFilter = modelSchema?.default_filter_param;
+  const defaultFilter = modelSchema?.default_filter_param?.[0];
   if (defaultFilter && typeof defaultFilter === 'object' && defaultFilter?.param_src_model_name) {
     dependencyMap.defaultFilter = defaultFilter.param_src_model_name;
   }
 
-  // Extract idDependent (from depending_proto_model_name_for_id)
-  const idDependentModelName = modelSchema?.depending_proto_model_name_for_id;
+  // Extract idDependent (from id_dependency)
+  const idDependentModelName = modelSchema?.id_dependency?.[0]?.source_model_name;
   if (idDependentModelName) {
     dependencyMap.idDependent = idDependentModelName;
   }
@@ -261,9 +265,9 @@ export function buildAvailableModelsMap(modelConfigs) {
 /**
  * Extracts which models each child dataSource depends on for each dependency type.
  * Checks schema fields with fallback strategy:
- * - urlOverride: widget_ui_data_element.depending_proto_model_name
+ * - urlOverride: connection_dependency[].source_model_name
  * - crudOverride: override_default_crud[].query_src_model_name OR query_param_value_src
- * - defaultFilter: default_filter_param.param_src_model_name OR param_value_src
+ * - defaultFilter: default_filter_param[].param_src_model_name OR param_value_src
  *
  * @param {Array<{name: string, schema: object}>} dataSources - Array of child data source objects
  * @param {Array<string>} availableModelNames - List of valid model names for validation
@@ -283,8 +287,10 @@ export function extractChildDataSourceDependencies(dataSources, availableModelNa
 
     const deps = {};
 
+    const connectionDependency = schema.connection_dependency?.[0];
+
     // Extract urlOverride dependency
-    const urlOverrideDep = schema?.widget_ui_data_element?.depending_proto_model_name;
+    const urlOverrideDep = connectionDependency?.source_model_name;
     if (urlOverrideDep) {
       deps.urlOverride = urlOverrideDep;
     }
@@ -306,7 +312,7 @@ export function extractChildDataSourceDependencies(dataSources, availableModelNa
     }
 
     // Extract defaultFilter dependency from param_src_model_name or param_value_src
-    const defaultFilterSrc = schema?.default_filter_param;
+    const defaultFilterSrc = schema?.default_filter_param?.[0];
     if (defaultFilterSrc?.ui_filter_params && defaultFilterSrc.ui_filter_params.length > 0) {
       // Get the source model name from the first filter param that has param_value_src
       const firstSrcParam = defaultFilterSrc.ui_filter_params.find(p => p.param_value_src);

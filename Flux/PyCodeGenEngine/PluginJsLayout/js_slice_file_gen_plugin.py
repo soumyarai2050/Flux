@@ -156,9 +156,12 @@ class JsSliceFileGenPlugin(BaseJSLayoutPlugin):
                 output_str += JsSliceFileGenPlugin.indentation_space + f"isAbbreviationSource: true,\n"
 
         # Check if this model has ID dependency (depending_proto_model_name_for_id)
-        depending_proto_model_name_for_id = self.get_model_option_from_widget_ui_data_element(message, "depending_proto_model_name_for_id")
-        if depending_proto_model_name_for_id:
-            output_str += JsSliceFileGenPlugin.indentation_space + f"isIdDependent: true,\n"
+        if self.is_option_enabled(message, self.flux_msg_widget_ui_data_element):
+            widget_ui_data_element_dict_list = self.get_complex_option_value_from_proto(
+                message, JsSliceFileGenPlugin.flux_msg_id_dependency, is_option_repeated=True)
+            for widget_ui_data_element_dict in widget_ui_data_element_dict_list:
+                if widget_ui_data_element_dict.get(JsSliceFileGenPlugin.widget_ui_option_depending_proto_model_name_field) in self.message_name_list:
+                    output_str += JsSliceFileGenPlugin.indentation_space + f"isIdDependent: true,\n"
 
         if message_name == "UILayout":
             output_str += JsSliceFileGenPlugin.indentation_space + "extraState: {\n"

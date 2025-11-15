@@ -94,7 +94,6 @@ message ShadowBrokers{
     w: 8,
     h: 10,
     is_repeated: true,
-    server_running_status_lvl: 1,
     widget_ui_data: {
       view_layout: UI_TABLE
     },
@@ -140,7 +139,6 @@ message FxSymbolOverview{
     w: 8,
     h: 10,
     is_repeated: true,
-    server_running_status_lvl: 1,
     widget_ui_data: {
       view_layout: UI_TABLE
     },

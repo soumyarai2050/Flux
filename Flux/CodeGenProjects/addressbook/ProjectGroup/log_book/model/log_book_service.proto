@@ -44,7 +44,6 @@ message PlanAlert {
     widget_ui_data: {
       view_layout: UI_TABLE
     },
-    server_running_status_lvl: 1,
     is_read_only: true,
     is_model_alert_type: true
   };

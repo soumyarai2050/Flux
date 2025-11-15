@@ -36,6 +36,10 @@ function RootModel({ modelName, modelDataSource, modelDependencyMap }) {
     // Extract allowedOperations directly from schema's json_root
     const allowedOperations = useMemo(() => modelSchema?.json_root || null, [modelSchema]);
 
+    const connectionDependency = useMemo(() => {
+        return modelSchema.connection_dependency?.[0];
+    }, [modelSchema]);
+
     // Extract the four data sources from dictionary
     const urlOverrideDataSource = modelDependencyMap?.urlOverride ?? null;
     const crudOverrideDataSource = modelDependencyMap?.crudOverride ?? null;
@@ -176,11 +180,11 @@ function RootModel({ modelName, modelDataSource, modelDependencyMap }) {
     // Determine if WebSocket should use base URL instead of view URL
     const shouldUseBaseUrl = useMemo(() =>
         modelSchema.is_large_db_object || modelSchema.is_time_series ||
-        modelLayoutOption.depending_proto_model_for_cpp_port ||
+        connectionDependency?.use_cpp_port ||
         serverSidePaginationEnabled || serverSideFilterSortEnabled,
         [modelSchema.is_large_db_object, modelSchema.is_time_series,
-         modelLayoutOption.depending_proto_model_for_cpp_port,
-         serverSidePaginationEnabled, serverSideFilterSortEnabled]
+        connectionDependency?.use_cpp_port,
+            serverSidePaginationEnabled, serverSideFilterSortEnabled]
     );
 
     // WebSocket View URL - uses base URL when shouldUseBaseUrl, otherwise uses view URL
@@ -493,7 +497,7 @@ function RootModel({ modelName, modelDataSource, modelDependencyMap }) {
         params,
         crudOverrideDict: crudOverrideDictRef.current,
         defaultFilterParamDict: defaultFilterParamDictRef.current,
-        isCppModel: modelLayoutOption.depending_proto_model_for_cpp_port,
+        isCppModel: connectionDependency?.use_cpp_port,
         // Parameters for unified endpoint with dynamic parameter inclusion
         // Filters now include merged default filter params
         filters: serverSideFilterSortEnabled ? processedData.filters : null,

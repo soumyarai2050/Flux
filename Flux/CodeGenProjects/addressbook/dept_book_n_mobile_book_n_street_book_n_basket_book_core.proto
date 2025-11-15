@@ -30,12 +30,14 @@ message SymbolOverview {
     widget_ui_data: {
       view_layout: UI_TABLE
     },
-    server_running_status_lvl: 2,
-    depending_proto_model_name: "PairPlan",
-    depending_proto_model_field_name_for_host: "PairPlan.host",
-    depending_proto_model_field_name_for_port: "PairPlan.port",
-    depending_proto_model_field_name_for_view_port: "PairPlan.view_port"
     is_read_only: true
+  };
+  option (FluxMsgConnectionDependency) = {
+    server_running_status_lvl: 2,
+    source_model_name: "PairPlan",
+    host_field: "PairPlan.host",
+    port_field: "PairPlan.cpp_port",
+    view_port_field: "PairPlan.view_port"
   };
   option (FluxMsgJsonQuery) = {
     QueryName: "get_symbol_overview_from_symbol",
@@ -94,13 +96,15 @@ message TopOfBook {
     widget_ui_data: {
       view_layout: UI_TABLE
     },
-    server_running_status_lvl: 3,
-    depending_proto_model_name: "PairPlan",
-    depending_proto_model_field_name_for_host: "PairPlan.host",
-    depending_proto_model_field_name_for_port: "PairPlan.cpp_port",
-    depending_proto_model_field_name_for_view_port: "PairPlan.view_port"
-    depending_proto_model_for_cpp_port: true,
     is_read_only: true
+  };
+  option (FluxMsgConnectionDependency) = {
+    server_running_status_lvl: 3,
+    source_model_name: "PairPlan",
+    host_field: "PairPlan.host",
+    port_field: "PairPlan.cpp_port",
+    view_port_field: "PairPlan.view_port"
+    use_cpp_port: true,
   };
   option (FluxMsgJsonQuery) = {
     QueryName: "get_top_of_book_from_symbol",
@@ -159,19 +163,21 @@ message MarketDepth {
     widget_ui_data: {
       view_layout: UI_TABLE
     },
-    server_running_status_lvl: 3,
     join_sort: {
       sort_chore: {
         sort_by: 'side',
         sort_direction: 'desc'
       }
     },
-    depending_proto_model_name: "PairPlan",
-    depending_proto_model_field_name_for_host: "PairPlan.host",
-    depending_proto_model_field_name_for_port: "PairPlan.cpp_port",
-    depending_proto_model_field_name_for_view_port: "PairPlan.view_port"
-    depending_proto_model_for_cpp_port: true,
     is_read_only: true
+  };
+  option (FluxMsgConnectionDependency) = {
+    server_running_status_lvl: 3,
+    source_model_name: "PairPlan",
+    host_field: "PairPlan.host",
+    port_field: "PairPlan.cpp_port",
+    view_port_field: "PairPlan.view_port"
+    use_cpp_port: true,
   };
   option (FluxMsgJsonQuery) = {
     QueryName: "get_market_depths",
@@ -227,13 +233,15 @@ message LastBarter {
     widget_ui_data: {
       view_layout: UI_TABLE
     },
-    server_running_status_lvl: 3,
-    depending_proto_model_name: "PairPlan",
-    depending_proto_model_field_name_for_host: "PairPlan.host",
-    depending_proto_model_field_name_for_port: "PairPlan.cpp_port",
-    depending_proto_model_field_name_for_view_port: "PairPlan.view_port"
-    depending_proto_model_for_cpp_port: true,
     is_read_only: true
+  };
+  option (FluxMsgConnectionDependency) = {
+    server_running_status_lvl: 3,
+    source_model_name: "PairPlan",
+    host_field: "PairPlan.host",
+    port_field: "PairPlan.cpp_port",
+    view_port_field: "PairPlan.view_port"
+    use_cpp_port: true,
   };
   option (FluxMsgUIGetAllLimit) = "100";
   option (FluxMsgStringLength) = 128;

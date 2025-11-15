@@ -117,24 +117,34 @@ message WidgetUIDataElement {
   repeated WidgetUIData widget_ui_data = 13;
   repeated ChartData chart_data = 14;
   repeated ColumnFilter filters = 15;
-  optional string depending_proto_model_name = 16;   // other project's proto model name present in proto_file_name
-                                          // on which current model is dependent
-  optional string depending_proto_model_name_for_id = 17;
-  optional string depending_proto_model_field_name_for_host = 18;
-  optional string depending_proto_model_field_name_for_port = 19;
-  optional string depending_proto_model_field_name_for_view_port = 20;
-  optional bool depending_proto_model_for_cpp_port = 21;
-  optional bool is_model_alert_type = 22;
-  optional JoinSort join_sort = 23;
-  optional bool is_read_only = 24;
-  optional int32 default_rows_per_page = 25;  // supported values = 25, 50
-  optional int32 server_running_status_lvl = 26;
-  optional bool ws_connection_by_get_all = 27;  // for abbreviation widget
-  repeated PivotData pivot_data = 28;
-  optional bool is_graph_model = 29;
-  optional bool is_graph_node_model = 30;
-  optional UIModelType model_type = 31;
+  optional bool is_model_alert_type = 17;
+  optional JoinSort join_sort = 18;
+  optional bool is_read_only = 19;
+  optional int32 default_rows_per_page = 20;  // supported values = 25, 50
+  optional bool ws_connection_by_get_all = 21;  // for abbreviation widget
+  repeated PivotData pivot_data = 22;
+  optional bool is_graph_model = 23;
+  optional bool is_graph_node_model = 24;
+  optional UIModelType model_type = 25;
 }
+
+message ConnectionDependency {
+  optional string source_model_name = 1;   // other project's proto model name present in proto_file_name
+                                          // on which current model is dependent
+  optional string host_field = 2;
+  optional string port_field = 3;
+  optional string view_port_field = 4;
+  optional bool use_cpp_port = 5;
+  optional int32 server_running_status_lvl = 6;
+}
+
+
+message IdDependency {
+  optional string source_model_name = 1;   // other project's proto model name present in proto_file_name
+                                          // on which current model is dependent
+  optional string id_field_name = 2;
+}
+
 
 message WidgetUIOption {
   optional string depending_proto_file_name = 1;  // other project's proto file name on which current model is dependent

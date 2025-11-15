@@ -5,7 +5,7 @@ import "flux_options.proto";
 import "projects_core.proto";
 import "barter_core.proto";
 import "email_book_core.proto";
-import "dept_book_n_phone_book_n_ia_engine_core.proto";
+import "dept_book_n_phone_book_core.proto";
 import "phone_book_n_street_book_core.proto";
 
 package phone_book;
@@ -38,8 +38,7 @@ message PairPlanParams {
     h: 20,
     widget_ui_data: {
       view_layout: UI_TREE
-    },
-    server_running_status_lvl: 2
+    }
   };
   option (FluxMsgStringLength) = 128;
 
@@ -79,7 +78,6 @@ message ChoreLimits {
       view_layout: UI_TABLE,
       edit_layout: UI_TREE
     },
-    server_running_status_lvl: 2,
   };
   option (FluxMsgExecutorOptions) = {
     IsWebSocketModel: true,

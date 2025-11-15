@@ -249,9 +249,11 @@ const useDataSourcesWebsocketWorker = ({
 
     const currentConnectionDict = connectionsRef.current;
     dataSources.forEach(({ name, url }) => {
-      if (!url) return;
+      // Use wsViewUrl from config if available (for urlOverride support), otherwise fall back to url
+      const baseUrl = dataSourcesUrlConfig?.[name]?.wsViewUrl || url;
+      if (!baseUrl) return;
 
-      const wsUrl = getWebSocketUrl(url);
+      const wsUrl = getWebSocketUrl(baseUrl);
       let apiUrl = `${wsUrl}/get-${name}-ws`;
       const crudOverrideDict = dataSourcesCrudOverrideDict?.[name];
       const params = dataSourcesParams?.[name] ?? null;
@@ -339,7 +341,8 @@ const useDataSourcesWebsocketWorker = ({
     JSON.stringify(dataSourcesParams),
     JSON.stringify(dataSourcesDefaultFilters),
     isDisabled,
-    reconnectCounter
+    reconnectCounter,
+    JSON.stringify(dataSourcesUrlConfig)
   ]);
 
   // Cleanup for by-id mode on unmount: close all active connections.

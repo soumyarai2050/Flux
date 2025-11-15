@@ -146,9 +146,15 @@ class BaseProtoPlugin(ABC):
     flux_fld_name_color: ClassVar[str] = "FluxFldNameColor"
     flux_msg_widget_ui_data_element: ClassVar[str] = "FluxMsgWidgetUIDataElement"
     flux_msg_widget_ui_option: ClassVar[str] = "FluxMsgWidgetUIOption"
-    widget_ui_option_depending_proto_model_name_field: ClassVar[str] = "depending_proto_model_name"
-    widget_ui_option_depending_proto_model_name_for_id_field: ClassVar[str] = "depending_proto_model_name_for_id"
-    widget_ui_option_depending_proto_model_for_cpp_port_field: ClassVar[str] = "depending_proto_model_for_cpp_port"
+    widget_ui_option_depending_proto_model_name_field: ClassVar[str] = "source_model_name"
+    widget_ui_option_depending_proto_model_name_for_id_field: ClassVar[str] = "id_field_name"
+    widget_ui_option_depending_proto_model_for_cpp_port_field: ClassVar[str] = "use_cpp_port"
+    widget_ui_option_depending_proto_model_field_name_for_host: ClassVar[str] = \
+        "host_field"
+    widget_ui_option_depending_proto_model_field_name_for_port: ClassVar[str] = \
+        "port_field"
+    widget_ui_option_depending_proto_model_field_name_for_view_port: ClassVar[str] = \
+        "view_port_field"
     widget_ui_option_alert_bubble_source_field: ClassVar[str] = "alert_bubble_source"
     widget_ui_option_alert_bubble_color_field: ClassVar[str] = "alert_bubble_color"
     widget_ui_option_bind_id_fld_field: ClassVar[str] = "bind_id_fld"
@@ -166,16 +172,10 @@ class BaseProtoPlugin(ABC):
     default_filter_param_params_name_field: ClassVar[str] = "param_name"
     default_filter_param_value_src_field: ClassVar[str] = "param_value_src"
     default_filter_param_param_value_field: ClassVar[str] = "param_value"
-    widget_ui_option_depending_proto_model_field_name_for_host: ClassVar[str] = \
-        "depending_proto_model_field_name_for_host"
-    widget_ui_option_depending_proto_model_field_name_for_port: ClassVar[str] = \
-        "depending_proto_model_field_name_for_port"
-    widget_ui_option_depending_proto_model_field_name_for_view_port: ClassVar[str] = \
-        "depending_proto_model_field_name_for_view_port"
-    widget_ui_option_depending_proto_model_field_name_for_ws_port: ClassVar[str] = \
-        "depending_proto_model_field_name_for_ws_port"
     flux_msg_widget_ui_data_element_widget_ui_data_field: ClassVar[str] = "widget_ui_data"
     flux_msg_widget_ui_data_element_is_model_alert_type_field: ClassVar[str] = "is_model_alert_type"
+    flux_msg_connection_dependency: ClassVar[str] = "FluxMsgConnectionDependency"
+    flux_msg_id_dependency: ClassVar[str] = "FluxMsgIdDependency"
     flux_msg_aggregate_query_var_name: ClassVar[str] = "FluxMsgAggregateQueryVarName"
     aggregation_type_update: ClassVar[str] = "AggregateType_UpdateAggregate"
     aggregation_type_filter: ClassVar[str] = "AggregateType_FilterAggregate"
@@ -1140,6 +1140,53 @@ class BaseProtoPlugin(ABC):
         widget_ui_data_option_value_dict = remove_none_values(widget_ui_data_option_value_dict)
         return widget_ui_data_option_value_dict
 
+    def handle_n_get_connection_dependency_option_values_having_msg_name(self, message: protogen.Message,
+                                                                         all_message_dict: Dict[str, protogen.Message]):
+        connection_dependency_option_value_dict_list = \
+            self.get_complex_option_value_from_proto(message,
+                                                     BaseProtoPlugin.flux_msg_connection_dependency, is_option_repeated=True)
+
+        for connection_dependency_option_value_dict in connection_dependency_option_value_dict_list:
+            if connection_dependency_option_value_dict.get(BaseProtoPlugin.widget_ui_option_depending_proto_model_name_field) in all_message_dict:
+                # handling special fields in widget_ui option having message names - converting msg name to snake cased
+                for key, value in connection_dependency_option_value_dict.items():
+                    if key in BaseProtoPlugin.widget_ui_option_fields_having_msg_names:
+                        # special handling if option value have message name
+                        case_handled_value = self.handle_options_value_having_msg_or_fld_name(value, key,
+                                                                     all_message_dict, hard_msg_check=True)
+                        connection_dependency_option_value_dict[key] = case_handled_value
+                    else:
+                        connection_dependency_option_value_dict[key] = value
+
+                # removing none from dict
+                connection_dependency_option_value_dict = remove_none_values(connection_dependency_option_value_dict)
+                return [connection_dependency_option_value_dict]       # since this option is repeated, returning list of values
+        return []
+
+    def handle_n_get_id_dependency_option_values_having_msg_name(self, message: protogen.Message,
+                                                                 all_message_dict: Dict[str, protogen.Message]):
+        id_dependency_option_value_dict_list = \
+            self.get_complex_option_value_from_proto(message,
+                                                     BaseProtoPlugin.flux_msg_id_dependency, is_option_repeated=True)
+
+        for id_dependency_option_value_dict in id_dependency_option_value_dict_list:
+            if id_dependency_option_value_dict.get(BaseProtoPlugin.widget_ui_option_depending_proto_model_name_field) in all_message_dict:
+
+                # handling special fields in widget_ui option having message names - converting msg name to snake cased
+                for key, value in id_dependency_option_value_dict.items():
+                    if key in BaseProtoPlugin.widget_ui_option_fields_having_msg_names:
+                        # special handling if option value have message name
+                        case_handled_value = self.handle_options_value_having_msg_or_fld_name(value, key,
+                                                                     all_message_dict, hard_msg_check=True)
+                        id_dependency_option_value_dict[key] = case_handled_value
+                    else:
+                        id_dependency_option_value_dict[key] = value
+
+                # removing none from dict
+                id_dependency_option_value_dict = remove_none_values(id_dependency_option_value_dict)
+                return [id_dependency_option_value_dict]       # since this option is repeated, returning list of values
+        return []
+
     def _handle_override_defaul_crud_option_values_having_msg_name(
             self, override_default_crud_option_value_dict_list,
             all_message_dict: Dict[str, protogen.Message]):
@@ -1149,6 +1196,28 @@ class BaseProtoPlugin(ABC):
         # removing none from dict
         override_default_crud_option_value_dict_list = remove_none_values(override_default_crud_option_value_dict_list)
         return override_default_crud_option_value_dict_list
+
+    def handle_default_filter_params_option_values_having_msg_name(
+            self, default_filter_params_option_value_dict_list,
+            all_message_dict: Dict[str, protogen.Message]):
+        option_val_list = []
+        for default_filter_params_option_value_dict in default_filter_params_option_value_dict_list:
+            param_src_model_name = default_filter_params_option_value_dict.get(BaseProtoPlugin.default_filter_param_src_model_name_field)
+            if param_src_model_name is None:
+                # if no source then just adding this option val
+                default_filter_params_option_value_dict = self._handle_default_filter_params_option_values_having_msg_name(default_filter_params_option_value_dict,
+                                                                                                                           all_message_dict)
+                # removing none from dict
+                default_filter_params_option_value_dict = remove_none_values(default_filter_params_option_value_dict)
+                option_val_list.append(default_filter_params_option_value_dict)
+            elif param_src_model_name is not None and param_src_model_name in all_message_dict:
+                # if source is present then checking if source is from current project (or combination of projects)
+                default_filter_params_option_value_dict = self._handle_default_filter_params_option_values_having_msg_name(default_filter_params_option_value_dict,
+                                                                                                                           all_message_dict)
+                # removing none from dict
+                default_filter_params_option_value_dict = remove_none_values(default_filter_params_option_value_dict)
+                option_val_list.append(default_filter_params_option_value_dict)
+        return option_val_list
 
     def _handle_default_filter_params_option_values_having_msg_name(self, option_value,
                                                                     all_message_dict: Dict[str, protogen.Message]):
@@ -1184,8 +1253,8 @@ class BaseProtoPlugin(ABC):
                                                                 all_message_dict: Dict[str, protogen.Message]):
         default_filter_param_value_dict_list = \
             self.get_complex_option_value_from_proto(message,
-                                                     BaseProtoPlugin.flux_msg_default_filter_param)
-        return self._handle_default_filter_params_option_values_having_msg_name(
+                                                     BaseProtoPlugin.flux_msg_default_filter_param, is_option_repeated=True)
+        return self.handle_default_filter_params_option_values_having_msg_name(
             default_filter_param_value_dict_list, all_message_dict)
 
     def _get_core_dependency_file_list(self, project_service_file: protogen.File) -> List[protogen.File]:

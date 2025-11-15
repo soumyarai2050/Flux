@@ -66,8 +66,8 @@ export function getSliceConfig(modelSchema, modelName) {
   }
 
   // Check if this model is ID-dependent (depends on another model for ID selection)
-  // Extract from depending_proto_model_name_for_id property in schema
-  if (modelSchema?.depending_proto_model_name_for_id) {
+  // Extract from id_dependency property in schema
+  if (modelSchema?.id_dependency?.[0]?.source_model_name) {
     sliceConfig.isIdDependent = true;
   }
 

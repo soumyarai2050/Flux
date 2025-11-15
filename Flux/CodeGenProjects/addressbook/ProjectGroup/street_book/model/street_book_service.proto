@@ -55,17 +55,20 @@ message SymbolSideSnapshot{
     y: 50,
     w: 10,
     h: 8,
-    is_repeated: True,
+    is_repeated: true,
     widget_ui_data: {
       view_layout: UI_TABLE
     },
-    server_running_status_lvl: 1,
-    depending_proto_model_name: "PairPlan",
-    depending_proto_model_field_name_for_host: "PairPlan.host",
-    depending_proto_model_field_name_for_port: "PairPlan.port",
-    depending_proto_model_field_name_for_view_port: "PairPlan.view_port"
     is_read_only: true
   };
+  option (FluxMsgConnectionDependency) = {
+    server_running_status_lvl: 1,
+    source_model_name: "PairPlan",
+    host_field: "PairPlan.host",
+    port_field: "PairPlan.port",
+    view_port_field: "PairPlan.view_port"
+  };
+
   option (FluxMsgStringLength) = 128;
 
   required int32 id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
@@ -103,11 +106,13 @@ message PlanStatus{
     widget_ui_data: {
       view_layout: UI_TABLE
     },
+  };
+  option (FluxMsgConnectionDependency) = {
     server_running_status_lvl: 2,
-    depending_proto_model_name: "PairPlan",
-    depending_proto_model_field_name_for_host: "PairPlan.host",
-    depending_proto_model_field_name_for_port: "PairPlan.port",
-    depending_proto_model_field_name_for_view_port: "PairPlan.view_port"
+    source_model_name: "PairPlan",
+    host_field: "PairPlan.host",
+    port_field: "PairPlan.port",
+    view_port_field: "PairPlan.view_port"
   };
   option (FluxMsgExecutorOptions) = {
     IsWebSocketModel: true,
@@ -197,8 +202,8 @@ message PlanLimits{
     PatchOp: AggregateType_UNSPECIFIED,
     DeleteOp: AggregateType_UNSPECIFIED,
     ReadByIDWebSocketOp: AggregateType_UNSPECIFIED,
-    PassStoredObjToUpdatePrePostCallback: True,
-    PassStoredObjToPartialUpdatePostCallback: True
+    PassStoredObjToUpdatePrePostCallback: true,
+    PassStoredObjToPartialUpdatePostCallback: true
   };
   option (FluxMsgWidgetUIDataElement) = {
     x: 7,
@@ -208,11 +213,13 @@ message PlanLimits{
     widget_ui_data: {
       view_layout: UI_TABLE
     },
+  };
+  option (FluxMsgConnectionDependency) = {
     server_running_status_lvl: 2,
-    depending_proto_model_name: "PairPlan",
-    depending_proto_model_field_name_for_host: "PairPlan.host",
-    depending_proto_model_field_name_for_port: "PairPlan.port",
-    depending_proto_model_field_name_for_view_port: "PairPlan.view_port"
+    source_model_name: "PairPlan",
+    host_field: "PairPlan.host",
+    port_field: "PairPlan.port",
+    view_port_field: "PairPlan.view_port"
   };
   option (FluxMsgExecutorOptions) = {
     IsWebSocketModel: true,

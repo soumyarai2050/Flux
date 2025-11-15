@@ -723,7 +723,7 @@ export function getCrudOverrideDict(modelSchema, availableModelNames = null) {
  * @returns {Object|null} A dictionary containing paramDict for default filtering, or null if not defined.
  */
 export function getDefaultFilterParamDict(modelSchema, availableModelNames = null) {
-    const defaultFilter = modelSchema.default_filter_param;
+    const defaultFilter = modelSchema.default_filter_param?.[0];
 
     // Check if default_filter_param exists and is an object (not array)
     if (!defaultFilter || typeof defaultFilter !== 'object' || Array.isArray(defaultFilter)) {

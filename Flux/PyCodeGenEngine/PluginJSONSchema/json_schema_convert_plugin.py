@@ -130,7 +130,9 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
     flx_msg_complex_repeated_attribute_options: List[str] = [
         BaseProtoPlugin.flux_msg_button_query,
         BaseProtoPlugin.flux_msg_override_default_crud,
-        BaseProtoPlugin.flux_msg_default_filter_param
+        BaseProtoPlugin.flux_msg_default_filter_param,
+        BaseProtoPlugin.flux_msg_connection_dependency,
+        BaseProtoPlugin.flux_msg_id_dependency
     ]
     # @LOW todo: query_param_field_src should have same query_src_model_name as src model
 
@@ -186,9 +188,8 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                 # else not required: avoiding repetition
             elif field.kind.name.lower() == "message":
                 if self.is_option_enabled(field.message, JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element):
-                    widget_ui_data_option_value_dict = (
-                        self.handle_n_get_ui_widget_data_option_values_having_msg_name(field.message,
-                                                                                       self.all_message_dict))
+                    widget_ui_data_option_value_dict = JsonSchemaConvertPlugin.get_complex_option_value_from_proto(field.message,
+                                                                                                                   JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element)
                     widget_ui_data_list = widget_ui_data_option_value_dict.get("widget_ui_data")
                     # since there will always be single widget_ui_data
                     if widget_ui_data_list and "view_layout" in widget_ui_data_list[0]:
@@ -233,9 +234,8 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         for message in set(message_list):
             self.all_message_dict[message.proto.name] = message
             if self.is_option_enabled(message, JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element):
-                widget_ui_data_option_value_dict = (
-                    self.handle_n_get_ui_widget_data_option_values_having_msg_name(message,
-                                                                                   self.all_message_dict))
+                widget_ui_data_option_value_dict = JsonSchemaConvertPlugin.get_complex_option_value_from_proto(
+                    message, JsonSchemaConvertPlugin.flux_msg_widget_ui_data_element)
                 widget_ui_data_list = widget_ui_data_option_value_dict.get("widget_ui_data")
                 # since there will always be single widget_ui_data
                 if widget_ui_data_list and "view_layout" in widget_ui_data_list[0]:
@@ -570,9 +570,21 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                         # special handling required to case_style field values present in this option
                         option_value_dict: List[Dict] = (
                             self.handle_n_get_default_filter_param_value_having_msg_name(field_or_message_obj, self.all_message_dict))
+                    elif option == JsonSchemaConvertPlugin.flux_msg_connection_dependency:
+                        # special handling required to case_style field values present in this option
+                        option_value_dict: List[Dict] = (
+                            self.handle_n_get_connection_dependency_option_values_having_msg_name(field_or_message_obj, self.all_message_dict))
+                    elif option == JsonSchemaConvertPlugin.flux_msg_id_dependency:
+                        # special handling required to case_style field values present in this option
+                        option_value_dict: List[Dict] = (
+                            self.handle_n_get_id_dependency_option_values_having_msg_name(field_or_message_obj, self.all_message_dict))
                     else:
                         option_value_dict: List[Dict] = \
                             self.get_complex_option_value_from_proto(field_or_message_obj, option, is_option_repeated=True)
+
+                    if not option_value_dict:
+                        continue
+
                     # converting flux_option into json attribute name
                     flux_prefix_removed_option_name = self.__convert_option_name_to_json_attribute_name(option)
                     flux_prefix_removed_option_name_case_styled = \
@@ -941,9 +953,13 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         return output_str
 
     def __handle_connection_details_output(self, message: protogen.Message, indent_count: int) -> str:
-        widget_ui_data_option_value_dict = (
-            self.handle_n_get_ui_widget_data_option_values_having_msg_name(message,
-                                                                           self.all_message_dict))
+        connection_dependency_option_value_dict_list = (
+            self.handle_n_get_connection_dependency_option_values_having_msg_name(message,
+                                                                                  self.all_message_dict))
+        if connection_dependency_option_value_dict_list:
+            connection_dependency_option_value_dict = connection_dependency_option_value_dict_list[0]
+        else:
+            connection_dependency_option_value_dict = {}
 
         # Also checking if msg is from another project used in this project
         is_not_from_this_project: bool = True
@@ -957,13 +973,13 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
 
         json_msg_str = ""
         if not is_not_from_this_project:
-            proto_model_name = widget_ui_data_option_value_dict.get(
+            proto_model_name = connection_dependency_option_value_dict.get(
                 JsonSchemaConvertPlugin.widget_ui_option_depending_proto_model_name_field)
-            dynamic_host = widget_ui_data_option_value_dict.get(
+            dynamic_host = connection_dependency_option_value_dict.get(
                 JsonSchemaConvertPlugin.widget_ui_option_depending_proto_model_field_name_for_host)
-            dynamic_port = widget_ui_data_option_value_dict.get(
+            dynamic_port = connection_dependency_option_value_dict.get(
                 JsonSchemaConvertPlugin.widget_ui_option_depending_proto_model_field_name_for_port)
-            dynamic_view_port = widget_ui_data_option_value_dict.get(
+            dynamic_view_port = connection_dependency_option_value_dict.get(
                 JsonSchemaConvertPlugin.widget_ui_option_depending_proto_model_field_name_for_view_port
             )
             indent_count += 2
@@ -1009,7 +1025,6 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         widget_ui_data_option_value_dict = (
             self.handle_n_get_ui_widget_data_option_values_having_msg_name(message,
                                                                            self.all_message_dict))
-
         widget_ui_data_key = self.__case_style_convert_method(widget_ui_data_prefix_stripped)
 
         if "i" not in widget_ui_data_option_value_dict:

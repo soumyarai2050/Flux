@@ -77,6 +77,10 @@ function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap
         }, {})
     }, [dataSourcesStoredArrayDict, dataSourcesUpdatedObjDict])
 
+    const connectionDependency = useMemo(() => {
+        return modelSchema.connection_dependency?.[0];
+    }, [modelSchema]);
+
     // Extract data sources from modelDependencyMap
     const urlOverrideDataSource = modelDependencyMap?.urlOverride ?? null;
     const crudOverrideDataSource = modelDependencyMap?.crudOverride ?? null;
@@ -169,7 +173,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap
 
             // Determine if WebSocket should use base URL instead of view URL
             const childShouldUseBaseUrl = schema.is_large_db_object || schema.is_time_series ||
-                modelLayoutOption?.depending_proto_model_for_cpp_port ||
+                connectionDependency?.use_cpp_port ||
                 false; // Child data sources don't support server-side pagination/filter/sort
 
             // WebSocket View URL - uses base URL when childShouldUseBaseUrl, otherwise uses view URL
@@ -300,7 +304,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap
                 sourceStoredObj = childDeps.defaultFilter.storedObj;
             } else {
                 // Otherwise, check schema's param_src_model_name and resolve from available providers
-                const paramSrcModelName = schema?.default_filter_param?.param_src_model_name;
+                const paramSrcModelName = schema?.default_filter_param?.[0]?.param_src_model_name;
                 if (paramSrcModelName && childAvailableDependencyProviders[paramSrcModelName]) {
                     sourceStoredObj = childAvailableDependencyProviders[paramSrcModelName].storedObj;
                 } else {
@@ -363,11 +367,11 @@ function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap
     // Determine if WebSocket should use base URL instead of view URL
     const shouldUseBaseUrl = useMemo(() =>
         modelSchema.is_large_db_object || modelSchema.is_time_series ||
-        modelLayoutOption.depending_proto_model_for_cpp_port ||
+        connectionDependency?.use_cpp_port ||
         serverSidePaginationEnabled || serverSideFilterSortEnabled,
         [modelSchema.is_large_db_object, modelSchema.is_time_series,
-         modelLayoutOption.depending_proto_model_for_cpp_port,
-         serverSidePaginationEnabled, serverSideFilterSortEnabled]
+        connectionDependency?.use_cpp_port,
+            serverSidePaginationEnabled, serverSideFilterSortEnabled]
     );
 
     // WebSocket View URL - uses base URL when shouldUseBaseUrl, otherwise uses view URL
@@ -538,35 +542,35 @@ function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap
     useEffect(() => {
         let updatedParams = null;
         if (storedObj && Object.keys(storedObj).length > 0) {
-        dataSources.forEach(({ name }) => {
-            const crudOverrideDict = dataSourcesCrudOverrideDictRef.current?.[name];
-            if (crudOverrideDict?.GET_ALL) {
-                const { paramDict } = crudOverrideDict.GET_ALL;
-                if (paramDict && Object.keys(paramDict).length > 0) {
-                    // Check if this child data source has a crudOverride dependency
-                    const childDeps = resolvedChildDependencies[name];
-                    const sourceStoredObj = childDeps?.crudOverride?.storedObj || storedObj;
+            dataSources.forEach(({ name }) => {
+                const crudOverrideDict = dataSourcesCrudOverrideDictRef.current?.[name];
+                if (crudOverrideDict?.GET_ALL) {
+                    const { paramDict } = crudOverrideDict.GET_ALL;
+                    if (paramDict && Object.keys(paramDict).length > 0) {
+                        // Check if this child data source has a crudOverride dependency
+                        const childDeps = resolvedChildDependencies[name];
+                        const sourceStoredObj = childDeps?.crudOverride?.storedObj || storedObj;
 
-                    // Only extract params if source has data
-                    if (sourceStoredObj && Object.keys(sourceStoredObj).length > 0) {
-                        Object.keys(paramDict).forEach((k) => {
-                            const paramSrc = paramDict[k];
-                            const paramValue = get(sourceStoredObj, paramSrc);
-                            if (paramValue !== null && paramValue !== undefined) {
-                                if (!updatedParams) {
-                                    updatedParams = {
-                                        [name]: {}
+                        // Only extract params if source has data
+                        if (sourceStoredObj && Object.keys(sourceStoredObj).length > 0) {
+                            Object.keys(paramDict).forEach((k) => {
+                                const paramSrc = paramDict[k];
+                                const paramValue = get(sourceStoredObj, paramSrc);
+                                if (paramValue !== null && paramValue !== undefined) {
+                                    if (!updatedParams) {
+                                        updatedParams = {
+                                            [name]: {}
+                                        }
+                                    } else if (!updatedParams[name]) {
+                                        updatedParams[name] = {};
                                     }
-                                } else if (!updatedParams[name]) {
-                                    updatedParams[name] = {};
+                                    updatedParams[name][k] = paramValue;
                                 }
-                                updatedParams[name][k] = paramValue;
-                            }
-                        })
+                            })
+                        }
                     }
                 }
-            }
-        })
+            })
         }
         setDataSourcesParams((prev) => {
             if (JSON.stringify(prev) === JSON.stringify(updatedParams)) {
@@ -788,7 +792,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap
         onReconnect: handleReconnect,
         params,
         crudOverrideDict: crudOverrideDictRef.current,
-        isCppModel: modelLayoutOption.depending_proto_model_for_cpp_port,
+        isCppModel: connectionDependency?.use_cpp_port,
         // Parameters for unified endpoint with dynamic parameter inclusion
         // Pass processed default filters to WebSocket for collection views
         filters: processedData.filters,

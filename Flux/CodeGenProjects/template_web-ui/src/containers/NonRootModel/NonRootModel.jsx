@@ -35,6 +35,10 @@ function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRoo
     // Extract allowedOperations from the PARENT ROOT model's json_root, not the non-root model's
     const allowedOperations = useMemo(() => modelRootSchema?.json_root || null, [modelRootSchema]);
 
+    const connectionDependency = useMemo(() => {
+        return modelSchema.connection_dependency?.[0];
+    }, [modelSchema]);
+
     // Extract the four data sources from dictionary
     const urlOverrideDataSource = modelDependencyMap?.urlOverride ?? null;
     const crudOverrideDataSource = modelDependencyMap?.crudOverride ?? null;
@@ -175,10 +179,10 @@ function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRoo
     // Determine if WebSocket should use base URL instead of view URL
     const shouldUseBaseUrl = useMemo(() =>
         modelSchema.is_large_db_object || modelSchema.is_time_series ||
-        modelLayoutOption.depending_proto_model_for_cpp_port ||
+        connectionDependency?.use_cpp_port ||
         serverSidePaginationEnabled || serverSideFilterSortEnabled,
         [modelSchema.is_large_db_object, modelSchema.is_time_series,
-         modelLayoutOption.depending_proto_model_for_cpp_port,
+         connectionDependency?.use_cpp_port,
          serverSidePaginationEnabled, serverSideFilterSortEnabled]
     );
 
@@ -500,7 +504,7 @@ function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRoo
         params,
         crudOverrideDict: crudOverrideDictRef.current,
         defaultFilterParamDict: defaultFilterParamDictRef.current,
-        isCppModel: modelLayoutOption.depending_proto_model_for_cpp_port,
+        isCppModel: connectionDependency?.use_cpp_port,
         // Parameters for unified endpoint with dynamic parameter inclusion
         // Filters now include merged default filter params
         filters: serverSideFilterSortEnabled ? processedData.filters : null,

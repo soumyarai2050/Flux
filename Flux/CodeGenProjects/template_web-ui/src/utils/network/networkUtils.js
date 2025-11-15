@@ -20,9 +20,10 @@ export function getServerUrl(widgetSchema, linkedObj, linkedFieldsMetadata, requ
         const { host, port, view_port, project_name } = connectionDetails;
 
         // Set url only if linkedObj running field is set to true for dynamic as well as static
-        if (widgetSchema.widget_ui_data_element?.depending_proto_model_name) {
+        const connectionDependency = widgetSchema.connection_dependency?.[0]
+        if (connectionDependency?.source_model_name) {
             const serverReadyStatusFld = linkedFieldsMetadata?.find(col => col.hasOwnProperty('server_ready_status')).key;
-            const requiredStateLvl = widgetSchema.widget_ui_data_element.server_running_status_lvl || 0;
+            const requiredStateLvl = connectionDependency.server_running_status_lvl || 0;
 
             // Check if the linked object exists and its server readiness status meets the requirement.
             if (linkedObj && Object.keys(linkedObj).length && get(linkedObj, serverReadyStatusFld) >= requiredStateLvl) {
@@ -38,12 +39,12 @@ export function getServerUrl(widgetSchema, linkedObj, linkedFieldsMetadata, requ
 
                     // Construct URL based on request type.
                     if (requestType === 'http') {
-                        if (widgetSchema.widget_ui_data_element?.depending_proto_model_for_cpp_port) {
+                        if (connectionDependency?.use_cpp_port) {
                             return `http://${hostVal}:${portVal}`;
                         }
                         return `http://${hostVal}:${portVal}/${project_name}`;
                     } else if (requestType === 'ws') {
-                        if (widgetSchema.widget_ui_data_element?.depending_proto_model_for_cpp_port) {
+                        if (connectionDependency?.use_cpp_port) {
                             return `ws://${hostVal}:${portVal}`;
                         }
                         return `ws://${hostVal}:${portVal}/${project_name}`;
@@ -58,7 +59,7 @@ export function getServerUrl(widgetSchema, linkedObj, linkedFieldsMetadata, requ
                 }
             }
         } else {
-            // Handle cases without `depending_proto_model_name` or when server is not ready.
+            // Handle cases without `source_model_name` or when server is not ready.
             const portVal = isViewUrl ? view_port : port;
             return `http://${host}:${portVal}/${project_name}`;
         }

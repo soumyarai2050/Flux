@@ -249,8 +249,10 @@ message SecPosition {
   required string id = 1 [(FluxFldOrmNoUpdate) = true, (FluxFldServerPopulate) = true, (FluxFldHide) = "True"];
   required Security security = 2 [(FluxFldAutoComplete) = "sec_id:EQT_List, sec_id_source=TICKER", (FluxFldHelp) = "EQT Tickers"];
   optional string figi = 3 [(FluxFldHide) = "True", (FluxFldHelp) = "Bloomberg identifier for this security"];
+  optional int64 open_size = 4;
+  optional int64 headroom_size = 5;
   // per position type (PTH, LOCATE, LONG)
-  repeated Position positions = 4;
+  repeated Position positions = 6;
 }
 
 message Broker {

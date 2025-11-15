@@ -48,13 +48,15 @@ message PlanBrief {
     widget_ui_data: {
       view_layout: UI_TABLE
     },
-    server_running_status_lvl: 1,
     is_repeated: true,
-    depending_proto_model_name: "PairPlan",
-    depending_proto_model_field_name_for_host: "PairPlan.host",
-    depending_proto_model_field_name_for_port: "PairPlan.port",
-    depending_proto_model_field_name_for_view_port: "PairPlan.view_port"
     is_read_only: true
+  };
+  option (FluxMsgConnectionDependency) = {
+    server_running_status_lvl: 1
+    source_model_name: "PairPlan",
+    host_field: "PairPlan.host",
+    port_field: "PairPlan.port",
+    view_port_field: "PairPlan.view_port"
   };
   option (FluxMsgJsonQuery) = {
       QueryName: "get_plan_brief_from_symbol",

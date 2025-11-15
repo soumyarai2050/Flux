@@ -41,6 +41,10 @@ function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap }) {
     const fieldsMetadata = useMemo(() => node?.fieldsMetadata ?? modelDataSource.fieldsMetadata, [node]);
     const derivedModelName = useMemo(() => nodeModelName ?? modelName, [nodeModelName]);
 
+    const connectionDependency = useMemo(() => {
+        return modelSchema.connection_dependency?.[0];
+    }, [modelSchema]);
+
     // Extract the four data sources from dictionary
     // if node is there , modelDependencyMap is empty 
     const urlOverrideDataSource = modelDependencyMap?.urlOverride ?? null;
@@ -185,10 +189,10 @@ function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap }) {
     // Determine if WebSocket should use base URL instead of view URL
     const shouldUseBaseUrl = useMemo(() =>
         modelSchema.is_large_db_object || modelSchema.is_time_series ||
-        modelLayoutOption.depending_proto_model_for_cpp_port ||
+        connectionDependency?.use_cpp_port ||
         serverSidePaginationEnabled || serverSideFilterSortEnabled,
         [modelSchema.is_large_db_object, modelSchema.is_time_series,
-        modelLayoutOption.depending_proto_model_for_cpp_port,
+        connectionDependency?.use_cpp_port,
             serverSidePaginationEnabled, serverSideFilterSortEnabled]
     );
 
@@ -576,7 +580,7 @@ function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap }) {
         crudOverrideDict: crudOverrideDictRef.current,
         defaultFilterParamDict: defaultFilterParamDictRef.current,
         isAlertModel: modelLayoutOption.is_model_alert_type,
-        isCppModel: modelLayoutOption.depending_proto_model_for_cpp_port,
+        isCppModel: connectionDependency?.use_cpp_port,
         // Parameters for unified endpoint with dynamic parameter inclusion
         // Filters now include merged default filter params
         filters: serverSideFilterSortEnabled ? processedData.filters : null,
