@@ -45,7 +45,57 @@
     color: inherit !important;
     height: fit-content;
 }
+
 .columnToggleBtn:active {
-  background-color: rgb(243, 243, 149) !important;
-  color: black !important;
+    background-color: rgb(243, 243, 149) !important;
+    color: black !important;
+}
+
+.highlight-flash {
+    animation: flash-animation 5s ease-out;
+}
+
+@keyframes flash-animation {
+    0% {
+        background-color: yellow;
+    }
+
+    100% {
+        background-color: transparent;
+        /* Or whatever the default cell color is */
+    }
+}
+
+/* Blink animation for value change highlighting - matches Cell.module.css */
+@keyframes blink {
+    from {
+        opacity: 1
+    }
+
+    50% {
+        opacity: 0.8
+    }
+
+    to {
+        opacity: 1
+    }
+}
+
+/* Highlight styles for value changes - matches Cell.module.css behavior */
+.new_update {
+    color: var(--blue-info) !important;
+    font-weight: bold !important;
+    animation: blink 0.5s step-start infinite;
+}
+
+.new_update_increase {
+    color: var(--green-success) !important;
+    font-weight: bold !important;
+    animation: blink 0.5s step-start infinite;
+}
+
+.new_update_decrease {
+    color: var(--red-error) !important;
+    font-weight: bold !important;
+    animation: blink 0.5s step-start infinite;
 }

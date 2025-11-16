@@ -907,6 +907,8 @@ function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap }) {
                     onPivotDataChange: handlePivotDataChange,
                     onPivotCellSelect: setRowIds,
                     modelName: derivedModelName,
+                    fieldsMetadata: fieldsMetadata,
+                    highlightUpdateOverride: modelLayoutData.highlight_update_override || [],
                 };
                 wrapperMode = MODES.READ;
                 isReadOnly = true;

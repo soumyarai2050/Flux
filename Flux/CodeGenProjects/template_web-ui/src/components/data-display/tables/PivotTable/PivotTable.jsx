@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import PivotTableUI from 'react-pivottable/PivotTableUI';
 import TableRenderers from 'react-pivottable/TableRenderers';
+import CustomTableRenderers from './CustomTableRenderer';
 import { aggregators as defaultAggregators } from 'react-pivottable/Utilities';
 import Plot from 'react-plotly.js';
 import createPlotlyRenderer from 'react-pivottable/PlotlyRenderers';
@@ -22,7 +23,8 @@ import { updatePivotSchema } from '../../../../utils/core/chartUtils';
 import { addxpath, clearxpath } from '../../../../utils/core/dataAccess';
 import { bindPlotlyClick } from '../../../../utils/core/plotlyClickMapper';
 import { generateObjectFromSchema, getModelSchema } from '../../../../utils/core/schemaUtils';
-import { MODES } from '../../../../constants';
+import { getTableColumns } from '../../../../utils/ui/tableUtils';
+import { MODES, HIGHLIGHT_STATES } from '../../../../constants';
 import DataTree from '../../trees/DataTree';
 import { ModelCard, ModelCardContent, ModelCardHeader } from '../../../utility/cards';
 import FullScreenModal from '../../../ui/Modal';
@@ -47,29 +49,25 @@ const PlotlyRenderers = createPlotlyRenderer(PlotWithZoomPreservation);
 
 const allRenderers = {
     ...TableRenderers,
+    ...CustomTableRenderers,
     ...PlotlyRenderers,
 }
 
-// Create a formatter factory that checks field metadata for display_type and number_format
-// projectSchema is the full schema (keyed by modelName)
-// modelName is the name of the model being displayed (e.g., "pair_strat")
-const createFieldAwareFormatter = (fieldName, projectSchema, modelName) => {
+// Create a formatter factory that checks fieldsMetadata for display_type and number_format
+const createFieldAwareFormatter = (fieldName, fieldsMetadata) => {
     return (value) => {
         // Handle null/NaN
         if (value == null || isNaN(value)) return '';
 
-        // Look up field metadata in schema
-        // Schema structure: projectSchema[modelName].properties[fieldName]
-        let displayType = null;
-        let numberFormat = null;
+        // Look up field metadata by key
+        const fieldMetadata = fieldsMetadata?.find(f => f.key === fieldName);
 
-        if (projectSchema && modelName && projectSchema[modelName]) {
-            const properties = projectSchema[modelName].properties;
-            if (properties && properties[fieldName]) {
-                displayType = properties[fieldName].display_type;
-                numberFormat = properties[fieldName].number_format;
-            }
+        if (!fieldMetadata) {
+            return value;
         }
+
+        const displayType = fieldMetadata.displayType;
+        const numberFormat = fieldMetadata.numberFormat;
 
         // If display_type is int, render as integer
         if (displayType === 'int') {
@@ -90,7 +88,7 @@ const createFieldAwareFormatter = (fieldName, projectSchema, modelName) => {
 };
 
 // Wrap all aggregators to apply field-aware formatting
-const createFieldAwareAggregators = (defaultAggregators, projectSchema, modelName) => {
+const createFieldAwareAggregators = (defaultAggregators, fieldsMetadata) => {
     const wrappedAggregators = {};
 
     Object.entries(defaultAggregators).forEach(([aggName, aggFn]) => {
@@ -104,7 +102,7 @@ const createFieldAwareAggregators = (defaultAggregators, projectSchema, modelNam
                 const aggregatorObj = baseAggregator.apply(this, arguments);
 
                 // Replace format method with field-aware formatter
-                aggregatorObj.format = createFieldAwareFormatter(fieldName, projectSchema, modelName);
+                aggregatorObj.format = createFieldAwareFormatter(fieldName, fieldsMetadata);
 
                 return aggregatorObj;
             };
@@ -114,7 +112,7 @@ const createFieldAwareAggregators = (defaultAggregators, projectSchema, modelNam
     return wrappedAggregators;
 };
 
-// Initialize as empty - will be set in component with projectSchema and modelName
+// Initialize as empty - will be set in component with fieldsMetadata
 let customAggregators = defaultAggregators;
 
 function PivotTable({
@@ -127,8 +125,10 @@ function PivotTable({
     onPivotSelect,
     pivotEnableOverride,
     onPivotCellSelect,
-    modelName,
-    children
+    children,
+    fieldsMetadata,
+    highlightDuration = 1,
+    highlightUpdateOverride = [],
 }) {
     const containerRef = useRef(null);
     const { schema: projectSchema } = useSelector(state => state.schema);
@@ -142,12 +142,29 @@ function PivotTable({
     const [showColumnSelector, setShowColumnSelector] = useState(true);
     const [hasPvtUnused, setHasPvtUnused] = useState(false);
 
-    // Initialize field-aware aggregators with projectSchema and modelName
+    // Initialize field-aware aggregators with fieldsMetadata
     useEffect(() => {
-        if (projectSchema && modelName) {
-            customAggregators = createFieldAwareAggregators(defaultAggregators, projectSchema, modelName);
+        if (fieldsMetadata && fieldsMetadata.length > 0) {
+            customAggregators = createFieldAwareAggregators(defaultAggregators, fieldsMetadata);
         }
-    }, [projectSchema, modelName]);
+    }, [fieldsMetadata]);
+
+    // Process fieldsMetadata through getTableColumns to add highlightUpdate property
+    const processedFieldsMetadata = useMemo(() => {
+        if (!fieldsMetadata || fieldsMetadata.length === 0) {
+            return fieldsMetadata;
+        }
+        // Use getTableColumns to process metadata with any overrides
+        // This ensures consistent column processing like DataTable does
+        const processedColumns = getTableColumns(
+            fieldsMetadata,
+            mode,
+            { highlightUpdateOverride },  // Pass the highlight overrides from table settings
+            true,  // collectionView = true for PivotTable (uses key instead of tableTitle)
+            false  // repeatedView = false
+        );
+        return processedColumns;
+    }, [fieldsMetadata, mode, highlightUpdateOverride]);
 
     const pivotObjRef = useRef();
     pivotObjRef.current = updatedPivotObj;
@@ -495,7 +512,9 @@ function PivotTable({
                                 renderers={allRenderers}
                                 unusedOrientationCutoff={Infinity}
                                 tableOptions={{
-                                    clickCallback: clickCallback
+                                    clickCallback: clickCallback,
+                                    fieldsMetadata: processedFieldsMetadata,
+                                    highlightDuration: highlightDuration
                                 }}
                                 plotlyConfig={{
                                     staticPlot: false
