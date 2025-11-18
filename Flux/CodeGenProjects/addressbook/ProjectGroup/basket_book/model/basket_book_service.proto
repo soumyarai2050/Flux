@@ -49,7 +49,7 @@ message BasketChore{
     ui_button: {
       unpressed_caption: "UPLOAD",
       pressed_caption: "UPLOAD IN PROGRESS",
-      value_color_map: "true=DEBUG,false=INFO",
+      color: "true=DEBUG,false=INFO",
       button_type: BUTTON_TYPE_RECTANGLE,
       button_size: BUTTON_SIZE_MEDIUM,
       action: "flux_toggle",
@@ -74,7 +74,7 @@ message BasketChore{
     ui_button: {
       unpressed_caption: "UPDATE POS CACHE",
       pressed_caption: "UPDATE IN PROGRESS",
-      value_color_map: "true=DEBUG,false=INFO",
+      color: "true=DEBUG,false=INFO",
       button_type: BUTTON_TYPE_RECTANGLE,
       button_size: BUTTON_SIZE_MEDIUM,
       action: "flux_toggle",

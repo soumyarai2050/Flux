@@ -57,6 +57,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         BaseProtoPlugin.flux_fld_auto_complete,
         BaseProtoPlugin.flux_fld_server_populate,
         BaseProtoPlugin.flux_fld_color,
+        BaseProtoPlugin.flux_fld_color_target,
         BaseProtoPlugin.flux_fld_alert_bubble_source,
         BaseProtoPlugin.flux_fld_alert_bubble_color,
         BaseProtoPlugin.flux_fld_default_value_placeholder_string,

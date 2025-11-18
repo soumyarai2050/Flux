@@ -33,11 +33,9 @@ export function addFieldAttributes(object, attributes) {
                 switch (propertyName) {
                     case 'button':
                         object.type = 'button';
-                        object.color = attributes.button.value_color_map;
                         break;
                     case 'progress_bar':
                         object.type = 'progressBar';
-                        object.color = attributes.progress_bar.value_color_map;
                         break;
                     case 'mapping_src':
                     case 'mapping_underlying_meta_field':
@@ -258,12 +256,10 @@ export function createCollections(schema, currentSchema, callerProps, collection
 
                     if (propertyName === "button") {
                         collection.type = "button";
-                        collection.color = v.button.value_color_map;
                     }
 
                     if (propertyName === "progress_bar") {
                         collection.type = "progressBar";
-                        collection.color = v.progress_bar.value_color_map;
                     }
                     if (propertyName === 'mapping_underlying_meta_field' || propertyName === 'mapping_src') {
                         collection[usageName] = v[propertyName][0];

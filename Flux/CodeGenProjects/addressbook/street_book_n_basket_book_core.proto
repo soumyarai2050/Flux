@@ -57,7 +57,7 @@ message NewChore{
     unpressed_caption: "Cxl",
     pressed_caption: "Removed",
     disabled_captions: "true=Removed"
-    value_color_map: "true=DEBUG,false=ERROR"
+    color: "true=DEBUG,false=ERROR"
     button_type: BUTTON_TYPE_RECTANGLE,
     button_size: BUTTON_SIZE_MEDIUM,
     action: "flux_toggle",

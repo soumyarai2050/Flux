@@ -394,6 +394,7 @@ extend google.protobuf.FieldOptions
   optional string FluxFldNodeMetaQuery = 55297;
   optional string FluxFldEdgeMetaQuery = 55298;
   optional string FluxFldQueryParamBind = 55299; // Bind this field's value to a query parameter when triggering FluxMsgButtonQuery
+  optional string FluxFldColorTarget = 55300; // Use this to specify if FluxFldColor applies to "text" (or "foreground") or "background"
 
   //Complexity Option - 56
   optional string FluxFldCmplxHigh = 56151;

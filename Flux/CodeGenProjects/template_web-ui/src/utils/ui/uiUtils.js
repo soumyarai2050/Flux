@@ -469,8 +469,29 @@ export function getContrastColor(color) {
                 return [parseInt(match[1]), parseInt(match[2]), parseInt(match[3])];
             }
         }
-        // Add other color formats if needed
-        throw new Error('Unsupported color format');
+        // Handle CSS color names by using canvas to resolve them
+        try {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = color;
+            const resolvedColor = ctx.fillStyle;
+
+            // If the color was recognized, convert the resolved color (usually hex) back to RGB
+            if (resolvedColor.startsWith('#')) {
+                return hexToRgb(resolvedColor);
+            } else if (resolvedColor.startsWith('rgb')) {
+                const match = resolvedColor.match(/(\d+), (\d+), (\d+)/);
+                if (match) {
+                    return [parseInt(match[1]), parseInt(match[2]), parseInt(match[3])];
+                }
+            }
+        } catch (e) {
+            // Fallback: if canvas parsing fails, return a default contrast color
+            console.warn(`Could not resolve color "${color}", using default contrast color`);
+            return [0, 0, 0]; // Default to black RGB for contrast calculation
+        }
+
+        throw new Error('Unsupported color format: ' + color);
     }
 
     // Get RGB components of the color

@@ -4,7 +4,7 @@ import { SortComparator } from '../core/sortUtils';
 import { stableSort } from '../core/dataSorting';
 import { getLocalizedValueAndSuffix } from '../formatters/numberUtils';
 import { getIdFromAbbreviatedKey } from '../core/dataUtils';
-import { getColorTypeFromValue } from './colorUtils';
+import { getColorFromMapping } from './colorUtils';
 import { generateRowTrees, generateRowsFromTree, addxpath } from '../core/dataAccess';
 
 
@@ -35,7 +35,7 @@ export function getRowsFromAbbreviation(items, itemsDataDict, itemProps, abbrevi
                     let color = COLOR_TYPES.DEFAULT;
                     if (c.colorSource) {
                         const severityType = get(metadata, c.colorSource);
-                        color = getColorTypeFromValue(c.colorCollection, severityType);
+                        color = getColorFromMapping(c.colorCollection, severityType, null, null, COLOR_TYPES.DEFAULT, false);
                     }
                     let fldValue = get(metadata, c.xpath);
                     if (Array.isArray(fldValue)) {

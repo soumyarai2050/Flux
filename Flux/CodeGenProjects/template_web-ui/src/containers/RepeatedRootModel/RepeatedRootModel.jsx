@@ -81,6 +81,7 @@ function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap }) {
     const [activeRows, setActiveRows] = useState([]);
     const [maxRowSize, setMaxRowSize] = useState(null);
     const [headCells, setHeadCells] = useState([]);
+    const [columns, setColumns] = useState([]);
     const [commonKeys, setCommonKeys] = useState([]);
     const [sortedCells, setSortedCells] = useState([]);
     const [uniqueValues, setUniqueValues] = useState({});
@@ -437,7 +438,7 @@ function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap }) {
         workerRef.current = new Worker(new URL("../../workers/repeated-root-model.worker.js", import.meta.url), { type: 'module' });
 
         workerRef.current.onmessage = (event) => {
-            const { rows, groupedRows, activeRows, maxRowSize, headCells, commonKeys, uniqueValues, sortedCells } = event.data;
+            const { rows, groupedRows, activeRows, maxRowSize, headCells, columns, commonKeys, uniqueValues, sortedCells } = event.data;
 
             startTransition(() => {
                 setRows(rows);
@@ -445,6 +446,7 @@ function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap }) {
                 setActiveRows(activeRows);
                 setMaxRowSize(maxRowSize);
                 setHeadCells(headCells);
+                setColumns(columns);
                 setCommonKeys(commonKeys);
                 setSortedCells(sortedCells);
                 setUniqueValues(uniqueValues);
@@ -907,8 +909,7 @@ function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap }) {
                     onPivotDataChange: handlePivotDataChange,
                     onPivotCellSelect: setRowIds,
                     modelName: derivedModelName,
-                    fieldsMetadata: fieldsMetadata,
-                    highlightUpdateOverride: modelLayoutData.highlight_update_override || [],
+                    columns: columns,
                 };
                 wrapperMode = MODES.READ;
                 isReadOnly = true;

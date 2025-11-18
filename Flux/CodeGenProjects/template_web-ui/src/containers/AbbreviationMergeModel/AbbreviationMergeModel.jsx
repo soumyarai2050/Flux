@@ -195,6 +195,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap
     const [activeIds, setActiveIds] = useState([]);
     const [maxRowSize, setMaxRowSize] = useState(null);
     const [headCells, setHeadCells] = useState([]);
+    const [columns, setColumns] = useState([]);
     const [commonKeys, setCommonKeys] = useState([]);
     const [sortedCells, setSortedCells] = useState([]);
     const [uniqueValues, setUniqueValues] = useState({});
@@ -644,7 +645,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap
         workerRef.current = new Worker(new URL('../../workers/abbreviation-merge-model.worker.js', import.meta.url), { type: 'module' });
 
         workerRef.current.onmessage = (event) => {
-            const { rows, groupedRows, activeRows, maxRowSize, headCells, commonKeys, uniqueValues, sortedCells, activeIds } = event.data;
+            const { rows, groupedRows, activeRows, maxRowSize, headCells, columns, commonKeys, uniqueValues, sortedCells, activeIds } = event.data;
 
             startTransition(() => {
                 setRows(rows);
@@ -653,6 +654,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap
                 setActiveIds(activeIds);
                 setMaxRowSize(maxRowSize);
                 setHeadCells(headCells);
+                setColumns(columns);
                 setCommonKeys(commonKeys);
                 setSortedCells(sortedCells);
                 setUniqueValues(uniqueValues);
@@ -1261,7 +1263,8 @@ function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap
                     pivotEnableOverride: modelLayoutData.pivot_enable_override ?? [],
                     onPivotDataChange: handlePivotDataChange,
                     onPivotCellSelect: setRowIds,
-                    modelName: modelName
+                    modelName: modelName,
+                    columns: columns
                 };
                 wrapperMode = MODES.READ;
                 isReadOnly = true;

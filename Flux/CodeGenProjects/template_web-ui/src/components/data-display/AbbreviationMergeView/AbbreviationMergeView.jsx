@@ -424,7 +424,7 @@ const LoadedView = ({
 
   const handleContextMenu = (e) => {
     // Show context menu if 1+ rows are selected
-    if (localSelectedRows.length >= 1) {
+    if (localSelectedRows.length > 1) {
       e.preventDefault();
       e.stopPropagation();
       // Use cursor position for anchor instead of element reference

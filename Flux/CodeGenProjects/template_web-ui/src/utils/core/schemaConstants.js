@@ -300,6 +300,7 @@ export const fieldProps = [
      * @property {string} usageName - The standardized name used in the UI code.
      */
     { propertyName: "visible_if", usageName: "visible_if" },
+    { propertyName: "color_target", usageName: "colorTarget" },
     { propertyName: "text_area", usageName: "text_area" },
     { propertyName: "chat_context", usageName: "chat_context" },
     { propertyName: "chat_conversation", usageName: "chat_conversation" },

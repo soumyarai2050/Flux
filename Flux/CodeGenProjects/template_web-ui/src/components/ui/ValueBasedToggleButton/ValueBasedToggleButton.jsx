@@ -35,12 +35,16 @@ const ValueBasedToggleButton = (props) => {
         disabledClass = classes.disabled;
     }
 
-    // Resolve color using the centralized utility instead of CSS class lookup
-    const resolvedColor = getResolvedColor(props.color, theme);
+    // Resolve color using the centralized utility with animation support
+    const colorStyleObj = getResolvedColor(props.color, theme, null, true);
+
+    // Determine the final background color
+    const resolvedColor = colorStyleObj ? (colorStyleObj.backgroundColor || colorStyleObj.color) : null;
     const contrastColor = resolvedColor ? getContrastColor(resolvedColor) : 'inherit';
 
-    // Create sx styles for the dynamic color
+    // Create sx styles for the dynamic color (includes animation if present)
     const colorSx = resolvedColor ? {
+        ...colorStyleObj,
         backgroundColor: `${resolvedColor} !important`,
         color: `${contrastColor} !important`,
         '&.Mui-selected': {

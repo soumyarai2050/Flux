@@ -17,8 +17,9 @@ import Check from '@mui/icons-material/Check';
 import styles from './VerticalDataTable.module.css';
 import ClipboardCopier from '../../../utility/ClipboardCopier';
 import ValueBasedToggleButton from '../../../ui/ValueBasedToggleButton';
-import { getColorTypeFromValue } from '../../../../utils/ui/colorUtils';
+import { getColorFromMapping, getResolvedColor } from '../../../../utils/ui/colorUtils';
 import { getSizeFromValue, getShapeFromValue } from '../../../../utils/ui/uiUtils';
+import { useTheme } from '@mui/material/styles';
 
 // ============================================================================
 // Constants
@@ -235,6 +236,12 @@ function VerticalDataTable({
   fieldsMetadata = [],
 }) {
   // ============================================================================
+  // Hooks
+  // ============================================================================
+
+  const theme = useTheme();
+
+  // ============================================================================
   // State Management
   // ============================================================================
 
@@ -400,7 +407,8 @@ function VerticalDataTable({
     const isDisabledValue = disabledValueCaptionDict.hasOwnProperty(String(value));
     const disabledCaption = isDisabledValue ? disabledValueCaptionDict[String(value)] : '';
     const checked = String(value) === buttonConfig.pressed_value_as_text;
-    const color = getColorTypeFromValue(collection, String(value));
+    const colorIdentifier = getColorFromMapping(collection, String(value), null, theme, null, false);
+    const color = getResolvedColor(colorIdentifier, theme, null, true);
     const size = getSizeFromValue(buttonConfig.button_size);
     const shape = getShapeFromValue(buttonConfig.button_type);
 

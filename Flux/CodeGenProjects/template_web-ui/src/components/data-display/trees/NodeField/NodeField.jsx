@@ -14,7 +14,7 @@ import Error from '@mui/icons-material/Error';
 import Clear from '@mui/icons-material/Clear';
 import PropTypes from 'prop-types';
 import { NumericFormat } from 'react-number-format';
-import { getColorTypeFromValue, getResolvedColor } from '../../../../utils/ui/colorUtils';
+import { getColorFromMapping, getResolvedColor } from '../../../../utils/ui/colorUtils';
 import { getValueFromReduxStoreFromXpath } from '../../../../utils/redux/reduxUtils';
 import { isAllowedNumericValue, floatToInt } from '../../../../utils/formatters/numberUtils';
 import { validateConstraints } from '../../../../utils/validation/validationUtils';
@@ -141,14 +141,20 @@ const NodeField = (props) => {
 
     let color = '';
     if (props.data.color) {
-        color = getColorTypeFromValue(props.data, props.data.value);
+        color = getColorFromMapping(props.data, props.data.value, null, theme, null, false);
     }
 
-    // Resolve color using the centralized utility instead of CSS class lookup
-    const resolvedColor = getResolvedColor(color, theme);
+    // Resolve color using the centralized utility, return style object for critical colors with animation
+    const colorStyle = color ? getResolvedColor(color, theme, null, true) : null;
+    const resolvedColor = colorStyle && typeof colorStyle === 'object' && colorStyle.color ? colorStyle.color : colorStyle;
 
-    // Create sx styles for the dynamic color, including overrides for disabled state
-    const colorSx = resolvedColor ? {
+    // Create sx styles for the dynamic color, including overrides for disabled state and critical animation
+    const colorSx = color && resolvedColor ? {
+        // Merge critical animation styles if present
+        ...(typeof colorStyle === 'object' && colorStyle.animation ? {
+            animation: colorStyle.animation,
+            '@keyframes blink': colorStyle['@keyframes blink']
+        } : {}),
         // --- Rules for Select ---
         '& .MuiSelect-select': {
             '&.Mui-disabled': {

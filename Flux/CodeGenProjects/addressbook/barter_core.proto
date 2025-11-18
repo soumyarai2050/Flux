@@ -202,7 +202,7 @@ message Position {
   optional bool pos_disable = 2 [default = false, (FluxFldNoCommonKey) = true, (FluxFldButton) = {
     unpressed_caption: "disable",
     pressed_caption: "enable",
-    value_color_map: "true=DEBUG,false=SUCCESS",
+    color: "true=DEBUG,false=SUCCESS",
     button_type: BUTTON_TYPE_RECTANGLE,
     button_size: BUTTON_SIZE_MEDIUM,
     action: "flux_toggle",
@@ -260,7 +260,7 @@ message Broker {
   required bool bkr_disable = 2 [default=false, (FluxFldNoCommonKey) = true, (FluxFldButton) = {
     unpressed_caption: "disable",
     pressed_caption: "enable",
-    value_color_map: "true=DEBUG,false=SUCCESS"
+    color: "true=DEBUG,false=SUCCESS"
     button_type: BUTTON_TYPE_RECTANGLE,
     button_size: BUTTON_SIZE_MEDIUM,
     action: "flux_toggle",

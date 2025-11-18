@@ -203,7 +203,7 @@ message UIButton{
   optional string disabled_captions = 3; // comma separated list of value=caption
   optional ButtonType button_type = 5;
   optional ButtonSize button_size = 6;
-  optional string value_color_map = 7;  // comma separated list of key=value
+  optional string color = 7;  // comma separated list of key=value
   optional string action = 8;
   required string pressed_value_as_text = 9;
   optional string button_icon_name = 10;
@@ -215,7 +215,7 @@ message UIButton{
 }
 
 message UIProgressBar{
-  optional string value_color_map = 1;  // coma separated list of key=value
+  optional string color = 1;  // coma separated list of key=value
   optional HoverTextType hover_text_type = 2;  // x of y
   optional bool is_reverse = 3; // if this is set to true the progress bar is reversed (e.g: 20 in 0-100 is 20% on progress bar, if is_reverse property is set the same 20 is 80% on the progress bar)
 }

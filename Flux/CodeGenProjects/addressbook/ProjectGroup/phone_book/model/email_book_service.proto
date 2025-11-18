@@ -134,7 +134,7 @@ message SystemControl {
   required bool kill_switch = 2 [default = false, (FluxFldButton) = {
     unpressed_caption: "KILL",
     pressed_caption: "RESUME",
-    value_color_map: "true=CRITICAL,false=ERROR"
+    color: "true=CRITICAL,false=ERROR"
     button_type: BUTTON_TYPE_RECTANGLE,
     button_size: BUTTON_SIZE_MEDIUM,
     action: "flux_toggle",
@@ -146,7 +146,7 @@ message SystemControl {
     unpressed_caption: "PAUSE ALL STRATS",
     pressed_caption: "PAUSE IN PROGRESS",
     disabled_captions: "true=PAUSE IN PROGRESS"
-    value_color_map: "true=DEBUG,false=WARNING"
+    color: "true=DEBUG,false=WARNING"
     button_type: BUTTON_TYPE_RECTANGLE,
     button_size: BUTTON_SIZE_MEDIUM,
     action: "flux_toggle",
@@ -160,7 +160,7 @@ message SystemControl {
     unpressed_caption: "LOAD BUFFERED",
     pressed_caption: "LOAD IN PROGRESS",
     disabled_captions: "true=LOAD IN PROGRESS"
-    value_color_map: "true=DEBUG,false=INFO"
+    color: "true=DEBUG,false=INFO"
     button_type: BUTTON_TYPE_RECTANGLE,
     button_size: BUTTON_SIZE_MEDIUM,
     action: "flux_toggle",
@@ -172,7 +172,7 @@ message SystemControl {
     unpressed_caption: "CXL BASKETS",
     pressed_caption: "CXL IN PROGRESS",
     disabled_captions: "true=CXL IN PROGRESS"
-    value_color_map: "true=CRITICAL,false=ERROR"
+    color: "true=CRITICAL,false=ERROR"
     button_type: BUTTON_TYPE_RECTANGLE,
     button_size: BUTTON_SIZE_MEDIUM,
     action: "flux_toggle",
@@ -347,7 +347,7 @@ message PairPlan {
       disabled_captions: "PlanState_DONE=Done",
       button_type: BUTTON_TYPE_RECTANGLE,
       button_size: BUTTON_SIZE_MEDIUM,
-      value_color_map: "PlanState_READY=INFO,PlanState_ACTIVE=SUCCESS,PlanState_PAUSED=WARNING,PlanState_ERROR=ERROR,PlanState_DONE=DEBUG"
+      color: "PlanState_READY=INFO,PlanState_ACTIVE=SUCCESS,PlanState_PAUSED=WARNING,PlanState_ERROR=ERROR,PlanState_DONE=DEBUG"
       action: "flux_trigger_plan",
       pressed_value_as_text: "PlanState_ACTIVE",
       allow_force_update: true
@@ -451,7 +451,7 @@ message SampleModel{
     ui_button: {
       unpressed_caption: "dismiss",
       pressed_caption: "undo",
-      value_color_map: "true=DEBUG,false=INFO"
+      color: "true=DEBUG,false=INFO"
       button_type: BUTTON_TYPE_RECTANGLE,
       button_size: BUTTON_SIZE_MEDIUM,
       action: "flux_toggle",
@@ -471,7 +471,7 @@ message SampleModel{
     ui_button: {
       unpressed_caption: "dismiss",
       pressed_caption: "undo",
-      value_color_map: "true=DEBUG,false=INFO"
+      color: "true=DEBUG,false=INFO"
       button_type: BUTTON_TYPE_RECTANGLE,
       button_size: BUTTON_SIZE_MEDIUM,
       action: "flux_toggle",

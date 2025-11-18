@@ -67,7 +67,7 @@ const ContextMenu = ({
   const hasButtons = buttonCount > 0;
 
   // Determine if we should show the menu (1+ rows selected and has buttons)
-  const shouldShow = open && selectedRows.length >= 1;
+  const shouldShow = open && selectedRows.length > 1;
 
   // Build menu items as array to avoid Fragment issues with MUI Menu
   const menuItems = [];
@@ -96,7 +96,7 @@ const ContextMenu = ({
       );
     });
 
-    // Add divider before clear selection
+    // Add divider before other options
     menuItems.push(<Divider key="divider" sx={{ my: 0.5 }} />);
   } else {
     // No buttons available message
@@ -107,6 +107,8 @@ const ContextMenu = ({
         </ListItemText>
       </MenuItem>
     );
+    // Add divider even if no buttons
+    menuItems.push(<Divider key="divider" sx={{ my: 0.5 }} />);
   }
 
   // Always add clear selection option

@@ -1,9 +1,10 @@
 import React, { useMemo } from 'react';
 import { useSelector } from 'react-redux';
+import { useTheme } from '@mui/material/styles';
 import PropTypes from 'prop-types';
 import Box from '@mui/material/Box';
 import { DATA_TYPES } from '../../../../constants';
-import { getColorTypeFromValue } from '../../../../utils/ui/colorUtils';
+import { getColorFromMapping } from '../../../../utils/ui/colorUtils';
 import { getShapeFromValue, getSizeFromValue, getHoverTextType, getReducerArrayFromCollections } from '../../../../utils/ui/uiUtils';
 import { capitalizeCamelCase } from '../../../../utils/core/stringUtils';
 import { getValueFromReduxStoreFromXpath } from '../../../../utils/redux/reduxUtils';
@@ -17,6 +18,7 @@ const DynamicMenu = ({
     commonKeys,
     onButtonToggle
 }) => {
+    const theme = useTheme();
     const reducerArray = useMemo(() => getReducerArrayFromCollections(fieldsMetadata), [fieldsMetadata]);
     const reducerDict = useSelector(state => {
         const selected = {};
@@ -114,7 +116,7 @@ const DynamicMenu = ({
                     let disabledCaption = isDisabledValue ? disabledCaptions[String(value)] : '';
                     let checked = String(collection.value) === collection.button.pressed_value_as_text;
                     let xpath = collection.xpath;
-                    let color = getColorTypeFromValue(collection, String(collection.value));
+                    let color = getColorFromMapping(collection.button, String(collection.value), null, theme);
                     let size = getSizeFromValue(collection.button.button_size);
                     let shape = getShapeFromValue(collection.button.button_type);
                     let caption = String(collection.value);

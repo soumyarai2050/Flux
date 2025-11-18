@@ -22,13 +22,14 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { clearxpath } from '../../../../utils/core/dataAccess';
 import { isValidJsonString, toCamelCase, capitalizeCamelCase } from '../../../../utils/core/stringUtils';
 import { getSizeFromValue, getShapeFromValue, getHoverTextType, getReducerArrayFromCollections } from '../../../../utils/ui/uiUtils';
-import { getResolvedColor, getColorTypeFromValue } from '../../../../utils/ui/colorUtils';
+import { getResolvedColor, getColorFromMapping } from '../../../../utils/ui/colorUtils';
 import { getValueFromReduxStoreFromXpath } from '../../../../utils/redux/reduxUtils';
 import { floatToInt, getLocalizedValueAndSuffix } from '../../../../utils/formatters/numberUtils';
 import { validateConstraints } from '../../../../utils/validation/validationUtils';
 import { excludeNullFromObject, formatJSONObjectOrArray } from '../../../../utils/core/objectUtils';
 import { getDateTimeFromInt } from '../../../../utils/formatters/dateUtils';
 import { getDataSourceColor } from '../../../../utils/ui/themeUtils';
+import { getContrastColor } from '../../../../utils/ui/uiUtils';
 import { COLOR_TYPES, DATA_TYPES, DATE_TIME_FORMATS, HIGHLIGHT_STATES, MODEL_TYPES, MODES } from '../../../../constants';
 import JsonView from '../../JsonView';
 import VerticalDataTable from '../VerticalDataTable';
@@ -351,8 +352,9 @@ const Cell = (props) => {
             }
         }
     }
-    let color = getColorTypeFromValue(collection, currentValue);
-    const colorStyle = getResolvedColor(color, theme, null, true);
+    let color = getColorFromMapping(collection, currentValue, null, theme);
+    const isBackgroundColor = collection.colorTarget === 'background';
+    const colorStyle = getResolvedColor(color, theme, null, true, isBackgroundColor);
     let tableCellRemove = dataRemove ? classes.remove : dataAdd ? classes.add : '';
     let disabledClass = disabled ? classes.disabled : '';
     if (props.ignoreDisable) {
@@ -394,7 +396,21 @@ const Cell = (props) => {
         }
         const classesStr = `${classes.cell} ${selectedClass} ${disabledClass} ${tableCellRemove} ${newUpdateClass}`;
         // Only apply colorStyle when there's no highlight update class active
-        const appliedColorStyle = newUpdateClass ? {} : colorStyle;
+        let appliedColorStyle = newUpdateClass ? {} : colorStyle;
+
+        // For chip display columns, add contrast text color if backgroundColor is present
+        if (isBackgroundColor && colorStyle?.backgroundColor && !colorStyle?.animation) {
+            const contrastTextColor = getContrastColor(colorStyle.backgroundColor);
+            appliedColorStyle = {
+                ...appliedColorStyle,
+                color: contrastTextColor,
+                padding: '4px 12px',
+                borderRadius: '16px',
+                display: 'inline-block',
+                width: 'fit-content'
+            };
+        }
+
         return (
             <TableCell
                 className={classesStr}
@@ -913,7 +929,7 @@ const Cell = (props) => {
         const isDisabledValue = disabledValueCaptionDict.hasOwnProperty(String(value));
         const disabledCaption = isDisabledValue ? disabledValueCaptionDict[String(value)] : '';
         const checked = String(value) === collection.button.pressed_value_as_text;
-        const color = getColorTypeFromValue(collection, String(value));
+        const color = getColorFromMapping(collection.button, String(value), null, theme);
         const size = getSizeFromValue(collection.button.button_size);
         const shape = getShapeFromValue(collection.button.button_type);
         let caption = String(value);
@@ -1199,7 +1215,21 @@ const Cell = (props) => {
         }
         const classesStr = classesArray.join(' ');
         // Only apply colorStyle when there's no highlight update class active
-        const appliedColorStyle = newUpdateClass ? {} : colorStyle;
+        let appliedColorStyle = newUpdateClass ? {} : colorStyle;
+
+        // For chip display columns, add contrast text color if backgroundColor is present
+        if (isBackgroundColor && colorStyle?.backgroundColor && !colorStyle?.animation) {
+            const contrastTextColor = getContrastColor(colorStyle.backgroundColor);
+            appliedColorStyle = {
+                ...appliedColorStyle,
+                color: contrastTextColor,
+                padding: '4px 12px',
+                borderRadius: '16px',
+                display: 'inline-block',
+                width: 'fit-content'
+            };
+        }
+
         return (
             <TableCell
                 className={classesStr}

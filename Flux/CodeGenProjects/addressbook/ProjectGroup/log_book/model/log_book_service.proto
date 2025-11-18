@@ -71,7 +71,7 @@ message PlanAlert {
     ui_button: {
       unpressed_caption: "DISMISS ALL",
       pressed_caption: "DISMISS ALL IN PROGRESS",
-      value_color_map: "true=DEBUG,false=INFO",
+      color: "true=DEBUG,false=INFO",
       button_type: BUTTON_TYPE_RECTANGLE,
       button_size: BUTTON_SIZE_MEDIUM,
       action: "flux_toggle",
@@ -109,7 +109,7 @@ message PlanAlert {
   optional bool dismiss = 3 [default=false, (FluxFldIndex) = true, (FluxFldUIUpdateOnly) = true, (FluxFldSequenceNumber) = 1, (FluxFldNoCommonKey) = true, (FluxFldButton) = {
     unpressed_caption: "dismiss",
     pressed_caption: "undo",
-    value_color_map: "true=DEBUG,false=INFO"
+    color: "true=DEBUG,false=INFO"
     button_type: BUTTON_TYPE_RECTANGLE,
     button_size: BUTTON_SIZE_MEDIUM,
     action: "flux_toggle",
@@ -189,7 +189,7 @@ message ContactAlert {
     ui_button: {
       unpressed_caption: "DISMISS ALL",
       pressed_caption: "DISMISS ALL IN PROGRESS",
-      value_color_map: "true=DEBUG,false=INFO",
+      color: "true=DEBUG,false=INFO",
       button_type: BUTTON_TYPE_RECTANGLE,
       button_size: BUTTON_SIZE_MEDIUM,
       action: "flux_toggle",
@@ -207,7 +207,7 @@ message ContactAlert {
   optional bool dismiss = 2 [default = false, (FluxFldIndex) = true, (FluxFldUIUpdateOnly) = true, (FluxFldSequenceNumber) = 1, (FluxFldNoCommonKey) = true, (FluxFldButton) = {
     unpressed_caption: "dismiss",
     pressed_caption: "undo",
-    value_color_map: "true=DEBUG,false=INFO"
+    color: "true=DEBUG,false=INFO"
     button_type: BUTTON_TYPE_RECTANGLE,
     button_size: BUTTON_SIZE_MEDIUM,
     action: "flux_toggle",

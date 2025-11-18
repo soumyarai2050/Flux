@@ -23,8 +23,7 @@ import { updatePivotSchema } from '../../../../utils/core/chartUtils';
 import { addxpath, clearxpath } from '../../../../utils/core/dataAccess';
 import { bindPlotlyClick } from '../../../../utils/core/plotlyClickMapper';
 import { generateObjectFromSchema, getModelSchema } from '../../../../utils/core/schemaUtils';
-import { getTableColumns } from '../../../../utils/ui/tableUtils';
-import { MODES, HIGHLIGHT_STATES } from '../../../../constants';
+import { MODES } from '../../../../constants';
 import DataTree from '../../trees/DataTree';
 import { ModelCard, ModelCardContent, ModelCardHeader } from '../../../utility/cards';
 import FullScreenModal from '../../../ui/Modal';
@@ -126,9 +125,8 @@ function PivotTable({
     pivotEnableOverride,
     onPivotCellSelect,
     children,
-    fieldsMetadata,
+    columns,
     highlightDuration = 1,
-    highlightUpdateOverride = [],
 }) {
     const containerRef = useRef(null);
     const { schema: projectSchema } = useSelector(state => state.schema);
@@ -142,29 +140,12 @@ function PivotTable({
     const [showColumnSelector, setShowColumnSelector] = useState(true);
     const [hasPvtUnused, setHasPvtUnused] = useState(false);
 
-    // Initialize field-aware aggregators with fieldsMetadata
+    // Initialize field-aware aggregators with columns
     useEffect(() => {
-        if (fieldsMetadata && fieldsMetadata.length > 0) {
-            customAggregators = createFieldAwareAggregators(defaultAggregators, fieldsMetadata);
+        if (columns && columns.length > 0) {
+            customAggregators = createFieldAwareAggregators(defaultAggregators, columns);
         }
-    }, [fieldsMetadata]);
-
-    // Process fieldsMetadata through getTableColumns to add highlightUpdate property
-    const processedFieldsMetadata = useMemo(() => {
-        if (!fieldsMetadata || fieldsMetadata.length === 0) {
-            return fieldsMetadata;
-        }
-        // Use getTableColumns to process metadata with any overrides
-        // This ensures consistent column processing like DataTable does
-        const processedColumns = getTableColumns(
-            fieldsMetadata,
-            mode,
-            { highlightUpdateOverride },  // Pass the highlight overrides from table settings
-            true,  // collectionView = true for PivotTable (uses key instead of tableTitle)
-            false  // repeatedView = false
-        );
-        return processedColumns;
-    }, [fieldsMetadata, mode, highlightUpdateOverride]);
+    }, [columns]);
 
     const pivotObjRef = useRef();
     pivotObjRef.current = updatedPivotObj;
@@ -513,7 +494,7 @@ function PivotTable({
                                 unusedOrientationCutoff={Infinity}
                                 tableOptions={{
                                     clickCallback: clickCallback,
-                                    fieldsMetadata: processedFieldsMetadata,
+                                    fieldsMetadata: columns,
                                     highlightDuration: highlightDuration
                                 }}
                                 plotlyConfig={{

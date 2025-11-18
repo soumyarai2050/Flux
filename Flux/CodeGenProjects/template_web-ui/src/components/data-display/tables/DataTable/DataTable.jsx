@@ -454,19 +454,19 @@ const DataTable = ({
   }
 
   const handleContextMenu = (e) => {
+    // Only show custom context menu if multiple rows are selected
+    if (localSelectedRows.length > 1) {
+      // Prevent default context menu and stop propagation for custom menu
+      e.preventDefault();
+      // e.stopPropagation();
 
-    // // ALWAYS prevent default context menu and stop propagation immediately
-    e.preventDefault();
-    // e.stopPropagation();
-
-    // Show context menu if 1+ rows are selected
-    if (localSelectedRows.length >= 1) {
       // Store the cursor position for anchor positioning
       setContextMenuAnchorEl({
         clientX: e.clientX,
         clientY: e.clientY,
       });
     }
+    // If only 1 or 0 rows selected, allow browser default context menu
   }
 
   const handleContextMenuClose = () => {

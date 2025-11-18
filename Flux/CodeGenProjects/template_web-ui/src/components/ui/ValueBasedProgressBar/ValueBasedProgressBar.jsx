@@ -1,13 +1,14 @@
 import React from 'react';
 import LinearProgress from '@mui/material/LinearProgress';
 import Tooltip from '@mui/material/Tooltip';
+import { useTheme } from '@mui/material/styles';
 import { HOVER_TEXT_TYPES } from '../../../constants';
-import { getColorTypeFromPercentage } from '../../../utils/ui/colorUtils';
+import { getColorFromMapping } from '../../../utils/ui/colorUtils';
 import { normalise } from '../../../utils/formatters/numberUtils';
 import classes from './ValueBasedProgressBar.module.css';
 
 export const ValueBasedProgressBarWithHover = (props) => {
-
+    const theme = useTheme();
 
     let percentage = normalise(props.value, props.max, props.min);
     let reverse = props.collection.progressBar.is_reverse ? true : false;
@@ -15,9 +16,11 @@ export const ValueBasedProgressBarWithHover = (props) => {
         percentage = normalise(props.max - props.value, props.max, props.min);
     }
 
-    let color = getColorTypeFromPercentage(props.collection, percentage);
+    let color = getColorFromMapping(props.collection.progressBar, props.value, percentage, theme).toLowerCase();
 
-    let progressBarColorClass = classes[color];
+    // Map resolved CSS color to class if available, otherwise use inline style
+    let progressBarColorClass = classes[color] || '';
+    let inlineStyle = classes[color] ? {} : { backgroundColor: color };
 
     let maxFieldName = '';
     if (props.maxFieldName) {
@@ -40,7 +43,13 @@ export const ValueBasedProgressBarWithHover = (props) => {
 
     return (
         <Tooltip title={hoverText} disableInteractive>
-            <LinearProgress variant="determinate" color='secondary' value={percentage} className={`${progressBarClass} ${progressBarColorClass}`} />
+            <LinearProgress
+                variant="determinate"
+                color='secondary'
+                value={percentage}
+                className={`${progressBarClass} ${progressBarColorClass}`}
+                sx={inlineStyle ? { '& .MuiLinearProgress-bar': { backgroundColor: color } } : {}}
+            />
         </Tooltip>
     )
 }

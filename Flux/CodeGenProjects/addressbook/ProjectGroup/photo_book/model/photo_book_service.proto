@@ -28,7 +28,7 @@ message PlanView{
   optional float average_premium = 4 [(FluxFldNumberFormat) = "%", (FluxFldOrmNoUpdate) = true, (FluxFldNoCommonKey) = true];
   optional float market_premium = 5 [(FluxFldNumberFormat) = "%", (FluxFldOrmNoUpdate) = true, (FluxFldNoCommonKey) = true];
   optional float balance_notional = 6 [(FluxFldDisplayType) = "int", (FluxFldDisplayZero) = true, (FluxFldValMin)="0.0", (FluxFldValMax)="PlanView.max_single_leg_notional", (FluxFldProgressBar) = {
-    value_color_map: "100%=SUCCESS,70%>INFO,30%>WARNING,0%>ERROR",  // chore of condition matching -> left to right (select first match)
+    color: "100%=SUCCESS,70%>INFO,30%>WARNING,0%>ERROR",  // chore of condition matching -> left to right (select first match)
     hover_text_type: HoverTextType_VALUE,
     is_reverse: true
   }];
@@ -39,7 +39,7 @@ message PlanView{
     unpressed_caption: "Unload Plan",
     pressed_caption: "In Progress",
     disabled_captions: "true=In Progress",
-    value_color_map: "true=DEBUG,false=ERROR",
+    color: "true=DEBUG,false=ERROR",
     button_type: BUTTON_TYPE_RECTANGLE,
     button_size: BUTTON_SIZE_MEDIUM,
     action: "flux_toggle",
@@ -51,7 +51,7 @@ message PlanView{
     unpressed_caption: "Recycle Plan",
     pressed_caption: "In Progress",
     disabled_captions: "true=In Progress",
-    value_color_map: "true=DEBUG,false=SUCCESS",
+    color: "true=DEBUG,false=SUCCESS",
     button_type: BUTTON_TYPE_RECTANGLE,
     button_size: BUTTON_SIZE_MEDIUM,
     action: "flux_toggle",

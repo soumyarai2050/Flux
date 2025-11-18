@@ -45,7 +45,7 @@ message Alert{
   optional bool dismiss = 2 [default=false, (FluxFldUIUpdateOnly) = true, (FluxFldSequenceNumber) = 1, (FluxFldNoCommonKey) = true, (FluxFldButton) = {
     unpressed_caption: "dismiss",
     pressed_caption: "undo",
-    value_color_map: "true=DEBUG,false=INFO"
+    color: "true=DEBUG,false=INFO"
     button_type: BUTTON_TYPE_RECTANGLE,
     button_size: BUTTON_SIZE_MEDIUM,
     action: "flux_toggle",

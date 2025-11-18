@@ -255,7 +255,7 @@ message PlanLimits{
     unpressed_caption: "EQT SOD DISABLE",
     pressed_caption: "DISABLING EQT SOD",
     disabled_captions: "true=DISABLING EQT SOD"
-    value_color_map: "true=DEBUG,false=INFO"
+    color: "true=DEBUG,false=INFO"
     button_type: BUTTON_TYPE_RECTANGLE,
     button_size: BUTTON_SIZE_MEDIUM,
     action: "flux_toggle",

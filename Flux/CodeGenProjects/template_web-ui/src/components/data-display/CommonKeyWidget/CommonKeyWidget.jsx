@@ -6,7 +6,7 @@ import IconButton from '@mui/material/IconButton';
 import Collapse from '@mui/material/Collapse';
 import PropTypes from 'prop-types';
 import { clearxpath } from '../../../utils/core/dataAccess';
-import { getColorTypeFromValue, getResolvedColor } from '../../../utils/ui/colorUtils';
+import { getColorFromMapping, getResolvedColor } from '../../../utils/ui/colorUtils';
 import { isValidJsonString } from '../../../utils/core/stringUtils';
 import { floatToInt, getLocalizedValueAndSuffix } from '../../../utils/formatters/numberUtils';
 import { groupCommonKeys } from '../../../utils/core/dataGrouping';
@@ -175,8 +175,8 @@ const CommonKey = (props) => {
     let commonkeyColor = 'var(--dark-text-primary)';
 
     if (collection.color && !collection.progressBar && !collection.button) {
-        const colorIdentifier = getColorTypeFromValue(collection, collection.value);
-        commonkeyColor = getResolvedColor(colorIdentifier, theme, 'var(--dark-text-primary)');
+        const colorValue = getColorFromMapping(collection, collection.value, null, theme);
+        commonkeyColor = getResolvedColor(colorValue, theme, 'var(--dark-text-primary)');
     }
 
     let commonkeyTitleColor = theme.palette.text.tertiary;

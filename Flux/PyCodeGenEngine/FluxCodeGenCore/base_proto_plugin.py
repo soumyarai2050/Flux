@@ -191,6 +191,7 @@ class BaseProtoPlugin(ABC):
     flux_fld_alert_bubble_color: ClassVar[str] = "FluxFldAlertBubbleColor"
     flux_fld_alert_bubble_source: ClassVar[str] = "FluxFldAlertBubbleSource"
     flux_fld_color: ClassVar[str] = "FluxFldColor"
+    flux_fld_color_target: ClassVar[str] = "FluxFldColorTarget"
     flux_fld_server_populate: ClassVar[str] = "FluxFldServerPopulate"
     flux_fld_switch: ClassVar[str] = "FluxFldSwitch"
     flux_fld_orm_no_update: ClassVar[str] = "FluxFldOrmNoUpdate"

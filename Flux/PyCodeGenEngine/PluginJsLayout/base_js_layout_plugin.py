@@ -192,7 +192,7 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
                                     is_option_repeated=True))
                             for id_dependency_option_val in id_dependency_option_val_list:
                                 dependent_msg_name = id_dependency_option_val.get(
-                                    BaseJSLayoutPlugin.widget_ui_option_depending_proto_model_name_for_id_field)
+                                    BaseJSLayoutPlugin.widget_ui_option_depending_proto_model_name_field)
                                 if dependent_msg_name is not None and dependent_msg_name in message_name_list:
                                     dependency_map['idDependent'] = dependent_msg_name
                                     # Keep old structure for backward compatibility

@@ -52,7 +52,7 @@ onmessage = (e) => {
     const updatedCommonKeys = commonKeys.filter((o) => !filterAppliedFields.has(o.key));
     const cells = getFilteredCells(groupedColumns, [...updatedCommonKeys, ...nullColumns], showHidden, showAll, showMore, moreAll, true);
     const sortedCells = sortColumns(cells, columnOrders, joinBy && joinBy.length > 0, centerJoin, flip, true);
-    postMessage({ rows: filteredRows, groupedRows: sortedRows, activeRows, maxRowSize, headCells: groupedColumns, commonKeys: updatedCommonKeys, uniqueValues, sortedCells, activeIds });
+    postMessage({ rows: filteredRows, groupedRows: sortedRows, activeRows, maxRowSize, headCells: groupedColumns, columns, commonKeys: updatedCommonKeys, uniqueValues, sortedCells, activeIds });
 }
 
 export { };

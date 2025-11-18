@@ -9,6 +9,7 @@ import PropTypes from 'prop-types';
 import axios from 'axios';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
+import { useTheme } from '@mui/material/styles';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
@@ -24,7 +25,7 @@ import Delete from '@mui/icons-material/Delete';
 import ValueBasedToggleButton from '../ValueBasedToggleButton';
 import { API_ROOT_URL, API_ROOT_VIEW_URL } from '../../../constants';
 import { AlertErrorMessage } from '../Alert';
-import { getColorTypeFromValue } from '../../../utils/ui/colorUtils';
+import { getColorFromMapping } from '../../../utils/ui/colorUtils';
 import { getSizeFromValue, getShapeFromValue } from '../../../utils/ui/uiUtils';
 import { getErrorDetails } from '../../../utils/core/errorUtils';
 import { getAxiosMethod } from '../../../utils/network/networkUtils';
@@ -50,6 +51,7 @@ const RUN_BUTTON_TEXT = 'RUN';
  * @returns {React.ReactElement} The rendered ButtonQuery component.
  */
 const ButtonQuery = ({ queryObj, url, viewUrl, autoBoundParams = {} }) => {
+    const theme = useTheme();
     const [value, setButtonValue] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
     const [alert, setAlert] = useState(null);
@@ -69,10 +71,10 @@ const ButtonQuery = ({ queryObj, url, viewUrl, autoBoundParams = {} }) => {
         const disabledCaption = isDisabledValue ? disabledValueCaptionDict[String(value)] : '';
         const checked = String(value) === ui_button.pressed_value_as_text;
         const collection = {
-            color: ui_button.value_color_map,
+            color: ui_button.color,
             xpath: 'null'
         };
-        const color = getColorTypeFromValue(collection, String(value));
+        const color = getColorFromMapping(collection, String(value), null, theme);
         const size = getSizeFromValue(ui_button.button_size);
         const shape = getShapeFromValue(ui_button.button_type);
         let caption = String(value);
@@ -85,7 +87,7 @@ const ButtonQuery = ({ queryObj, url, viewUrl, autoBoundParams = {} }) => {
             caption = ui_button.unpressed_caption;
         }
         return { size, shape, color, caption, isDisabledValue };
-    }, [queryObj, value]);
+    }, [queryObj, value, theme]);
 
     const queryOptions = useMemo(() => {
         const { query_data } = queryObj;
