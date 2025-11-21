@@ -2,7 +2,7 @@
 import copy
 import logging
 import os
-from typing import List, Callable, Dict, Tuple, final
+from typing import List, Callable, Dict, Tuple, final, ClassVar
 import time
 from abc import abstractmethod
 from pathlib import PurePath
@@ -63,6 +63,7 @@ class BaseORMModelPlugin(BaseProtoPlugin):
         self.model_import_file_name: str = ""
         self.ts_utils_import_file_name: str = ""
         self.reentrant_lock_non_required_msg: List[protogen.Message] = []
+        self.dependency_file_to_selective_import_model_list_dict: Dict[str, List[str]] = {}
 
     def enum_type_validator(self):
         match self.enum_type:
@@ -583,8 +584,22 @@ class BaseORMModelPlugin(BaseProtoPlugin):
             self.model_file_suffix, str(project_grp_root_dir))
         if dependency_file_path_list:
             output_str += "# Project imports\n"
+
         for dependency_file_path in dependency_file_path_list:
-            output_str += f"from {dependency_file_path} import *\n"
+            if is_main_file:
+                for dependency_file_name, selective_import_model_list in self.dependency_file_to_selective_import_model_list_dict.items():
+                    if dependency_file_name.removesuffix(".proto") in dependency_file_path:
+                        output_str += f"from {dependency_file_path} import "
+                        for selective_import_model in selective_import_model_list:
+                            output_str += f"{selective_import_model}"
+                            if selective_import_model != selective_import_model_list[-1]:
+                                output_str += ", "
+                        output_str += "\n"
+                        break
+                else:
+                    output_str += f"from {dependency_file_path} import *\n"
+            else:
+                output_str += f"from {dependency_file_path} import *\n"
         if dependency_file_path_list:
             output_str += "\n\n"
 
@@ -662,7 +677,6 @@ class BaseORMModelPlugin(BaseProtoPlugin):
         return output_str
 
     def output_file_generate_handler(self, file: protogen.File):
-        # time.sleep(10)
         self.assign_required_data_members(file)
         self.load_root_and_non_root_messages_in_dicts(file.messages)
 
@@ -676,6 +690,55 @@ class BaseORMModelPlugin(BaseProtoPlugin):
 
         all_dependency_protogen_file_list: List[protogen.File] = []
         self.get_dependency_protogen_files(file, all_dependency_protogen_file_list)
+
+        # constructing core file to selective msg names list to be used to generate import statements
+        root_or_query_msg_name_list = [m.proto.name for m in self.root_message_list + self.query_message_list]
+        import_dependency_model_option_val_list = []
+        if BaseORMModelPlugin.is_option_enabled(file, BaseORMModelPlugin.flux_file_import_dependency_model):
+            import_dependency_model_option_val_list = (
+                self.get_complex_option_value_from_proto(file,
+                                                         self.flux_file_import_dependency_model, True))
+        for import_dependency_model_option_val in import_dependency_model_option_val_list:
+            import_file_name: str = import_dependency_model_option_val[
+                BaseORMModelPlugin.import_dependency_model_import_file_name_field]
+            import_model_name_list: List[str] = import_dependency_model_option_val[
+                BaseORMModelPlugin.import_dependency_model_import_model_names_field]
+
+            for import_model_name in import_model_name_list:
+                if import_file_name not in self.dependency_file_to_selective_import_model_list_dict:
+                    self.dependency_file_to_selective_import_model_list_dict[import_file_name] = [import_model_name,
+                                                                                                  f"{import_model_name}BaseModel"]
+                else:
+                    self.dependency_file_to_selective_import_model_list_dict[import_file_name].extend([import_model_name,
+                                                                                                      f"{import_model_name}BaseModel"])
+                if import_model_name in root_or_query_msg_name_list:
+                    self.dependency_file_to_selective_import_model_list_dict[import_file_name].extend([f"{import_model_name}List",
+                                                                                                       f"{import_model_name}BaseModelList"])
+
+        # Adding messages or enums which are used as field types in current project's service proto file but are
+        # from core proto files set in option for selective imports - these msgs or enums are allowed to avoid errors
+        # in generated msgspec ORM model file
+        if import_dependency_model_option_val_list:
+            for message in file.messages:
+                for field in message.fields:
+                    if field.message or field.enum:
+                        if field.message:
+                            import_message_or_enum_name = field.message.proto.name
+                            parent_file = field.message.parent_file.proto.name
+
+                            if parent_file in self.dependency_file_to_selective_import_model_list_dict:
+                                self.dependency_file_to_selective_import_model_list_dict[parent_file].extend(
+                                    [import_message_or_enum_name,
+                                     f"{import_message_or_enum_name}BaseModel"])
+
+                        else:
+                            import_message_or_enum_name = field.enum.proto.name
+                            parent_file = field.enum.parent_file.proto.name
+
+                            if parent_file in self.dependency_file_to_selective_import_model_list_dict:
+                                self.dependency_file_to_selective_import_model_list_dict[parent_file].append(import_message_or_enum_name)
+
+
         self.sort_message_order()
 
         # Adding orm model file

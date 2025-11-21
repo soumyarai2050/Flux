@@ -176,7 +176,11 @@ const CommonKey = (props) => {
 
     if (collection.color && !collection.progressBar && !collection.button) {
         const colorValue = getColorFromMapping(collection, collection.value, null, theme);
-        commonkeyColor = getResolvedColor(colorValue, theme, 'var(--dark-text-primary)');
+        if (colorValue && colorValue.toLowerCase() === 'default') {
+            commonkeyColor = 'var(--dark-text-primary)';
+        } else {
+            commonkeyColor = getResolvedColor(colorValue, theme, 'var(--dark-text-primary)');
+        }
     }
 
     let commonkeyTitleColor = theme.palette.text.tertiary;

@@ -157,6 +157,7 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
         self._current_project_name: str | None = None
         self.__main_file_message_name_list: List[str] = []
         self._current_project_model_file: protogen.File | None = None
+        self._import_dependency_model_option_val_list = []
 
     def __proto_data_type_to_json(self, field: protogen.Field) -> Tuple[str, str]:
         underlying_type = field.kind.name.lower()
@@ -224,12 +225,27 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
             raise Exception(err_str)
 
         for dependency_file in dependencies:
-            if excepted_msg_name_list:
-                for msg in dependency_file.messages:
-                    if msg.proto.name in excepted_msg_name_list:
-                        message_list.append(msg)
-            else:
-                message_list.extend(dependency_file.messages)
+            for import_dependency_model_option_val_ in self._import_dependency_model_option_val_list:
+                import_file_name = import_dependency_model_option_val_[
+                    JsonSchemaConvertPlugin.import_dependency_model_import_file_name_field]
+                import_model_name_list = import_dependency_model_option_val_[
+                    JsonSchemaConvertPlugin.import_dependency_model_import_model_names_field]
+                if dependency_file.proto.name == import_file_name:
+                    for message in dependency_file.messages:
+                        if message.proto.name in import_model_name_list:
+                            if excepted_msg_name_list:
+                                if message.proto.name in excepted_msg_name_list:
+                                    message_list.append(message)
+                            else:
+                                message_list.append(message)
+                    break
+            else:       # if dependency file name not present in any of set options then importing file as usual with messages
+                if excepted_msg_name_list:
+                    for msg in dependency_file.messages:
+                        if msg.proto.name in excepted_msg_name_list:
+                            message_list.append(msg)
+                else:
+                    message_list.extend(dependency_file.messages)
         # else not required: core_or_util_files key is not in yaml dict config
 
         for message in set(message_list):
@@ -1186,6 +1202,13 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
             else:
                 project_name_to_msg_list_dict = {}
 
+            file = file_list[0]  # since first file will be this project's proto file
+
+            if JsonSchemaConvertPlugin.is_option_enabled(file,
+                                                         JsonSchemaConvertPlugin.flux_file_import_dependency_model):
+                self._import_dependency_model_option_val_list = (
+                    self.get_complex_option_value_from_proto(file,
+                                                             self.flux_file_import_dependency_model, True))
             for f in file_list:
                 project_name = f.proto.package
                 msg_list = project_name_to_msg_list_dict.get(project_name)
@@ -1203,12 +1226,18 @@ class JsonSchemaConvertPlugin(BaseProtoPlugin):
                     message_list: List[protogen.Message] = f.messages
                     self._proto_project_name_to_msg_list_dict[f.proto.package] = message_list
                     self.__load_json_layout_and_non_layout_messages_in_dicts(message_list, self._get_core_dependency_file_list(f))
-            file = file_list[0]  # since first file will be this project's proto file
             self.__main_file_message_name_list = [p.proto.name for p in file.messages]
             self._current_project_name = file.proto.package
             self._current_project_model_file = file
         else:
             file: protogen.File = file_or_file_list
+
+            if JsonSchemaConvertPlugin.is_option_enabled(file,
+                                                         JsonSchemaConvertPlugin.flux_file_import_dependency_model):
+                self._import_dependency_model_option_val_list = (
+                    self.get_complex_option_value_from_proto(file,
+                                                             self.flux_file_import_dependency_model, True))
+
             self.__load_json_layout_and_non_layout_messages_in_dicts(file.messages, self._get_core_dependency_file_list(file))
         # Performing Recursion to messages (including nested type) to get json layout, non-layout and enums and
         # adding to their respective data-member

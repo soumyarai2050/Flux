@@ -76,6 +76,8 @@ class BaseProtoPlugin(ABC):
     file_options_standard_prefix = "FluxFile"
     flux_fld_val_is_datetime: ClassVar[str] = "FluxFldValIsDateTime"
     flux_file_import_dependency_model: ClassVar[str] = "FluxFileImportDependencyModel"
+    import_dependency_model_import_file_name_field: ClassVar[str] = "ImportFileName"
+    import_dependency_model_import_model_names_field: ClassVar[str] = "ImportModelName"
     flux_file_date_time_granularity: ClassVar[str] = "FluxFileDateTimeGranularity"
     flux_file_date_time_print_timezone: ClassVar[str] = "FluxFileDateTimePrintTimezone"
     flux_fld_alias: ClassVar[str] = "FluxFldAlias"
@@ -874,7 +876,12 @@ class BaseProtoPlugin(ABC):
             else:
                 with open(model_import_file_path) as import_file:
                     imports_file_content: List[str] = import_file.readlines()
+                    # removing initial comments before imports
+                    content_start_index = imports_file_content.index("import logging\n")
+                    imports_file_content = imports_file_content[content_start_index:]
+
                     imports_file_content_copy: List[str] = copy.deepcopy(imports_file_content)
+
                     match_str_index = imports_file_content.index("    match model_type.lower():\n")
 
                     # checking if already imported
@@ -908,20 +915,20 @@ class BaseProtoPlugin(ABC):
                                       project_grp_root_dir: str) -> List[str]:
         dependency_file_path_list = []
         if file.dependencies:
-            for file_ in file.dependencies:
-                if file_.proto.name != "flux_options.proto":
-                    if file_.proto.name in root_core_proto_files:
+            for file_dependency in file.dependencies:
+                if file_dependency.proto.name != "flux_options.proto":
+                    if file_dependency.proto.name in root_core_proto_files:
                         gen_model_import_path = (
                             self.import_path_from_os_path("PY_CODE_GEN_CORE_PATH",
-                                                          f"ORMModel.{file_.generated_filename_prefix}_{model_file_suffix}"))
-                    elif file_.proto.name in project_grp_core_proto_files:
+                                                          f"ORMModel.{file_dependency.generated_filename_prefix}_{model_file_suffix}"))
+                    elif file_dependency.proto.name in project_grp_core_proto_files:
                         gen_model_import_path = (
                             self.import_path_from_path_str(str(project_grp_root_dir),
-                                                           f"{file_.generated_filename_prefix}_{model_file_suffix}"))
+                                                           f"{file_dependency.generated_filename_prefix}_{model_file_suffix}"))
                     else:
                         gen_model_import_path = (
                             self.import_path_from_os_path("PLUGIN_OUTPUT_DIR",
-                                                          f"{file_.generated_filename_prefix}_{model_file_suffix}"))
+                                                          f"{file_dependency.generated_filename_prefix}_{model_file_suffix}"))
                     dependency_file_path_list.append(gen_model_import_path)
         return dependency_file_path_list
 

@@ -45,6 +45,7 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
         self.current_proto_file_name: str | None = None
         self.proto_file_name_to_message_list_dict: Dict[str, List[protogen.Message]] = {}
         self.file_name_to_dependency_file_names_dict: Dict[str, List[str]] = {}
+        self._import_dependency_model_option_val_list = []
         if (response_field_case_style := os.getenv("RESPONSE_FIELD_CASE_STYLE")) is not None and \
                 len(response_field_case_style):
             self.response_field_case_style: str = response_field_case_style
@@ -76,22 +77,57 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
 
         dependency_file_list = self._get_core_dependency_file_list(file)
 
+        _import_dependency_model_option_val_list = []
         for dependency_file in dependency_file_list:
-            if is_multi_project:
-                file_name = dependency_file.proto.name
-                self.proto_file_name_to_message_list_dict[file_name.split(os.sep)[-1]] = (
-                    dependency_file.messages)
-            for msg in dependency_file.messages:
-                if msg not in message_list:
-                    if selective_msg_name_list:
-                        # selective_msg_name_list is passed when selective msg are going to be added for
-                        # this project
-                        if msg.proto.name in selective_msg_name_list:
+            for import_dependency_model_option_val_ in self._import_dependency_model_option_val_list:
+                import_file_name = import_dependency_model_option_val_[
+                    BaseJSLayoutPlugin.import_dependency_model_import_file_name_field]
+                import_model_name_list = import_dependency_model_option_val_[
+                    BaseJSLayoutPlugin.import_dependency_model_import_model_names_field]
+                if dependency_file.proto.name == import_file_name:
+
+                    if is_multi_project:
+                        file_name = dependency_file.proto.name
+                        file_name_key = file_name.split(os.sep)[-1]
+                        if file_name_key not in self.proto_file_name_to_message_list_dict:
+                            self.proto_file_name_to_message_list_dict[file_name_key] = []
+                        for msg in dependency_file.messages:
+                            if msg.proto.name in import_model_name_list:
+                                self.proto_file_name_to_message_list_dict[file_name.split(os.sep)[-1]].append(msg)
+                            # else not required: if msg not present in option value set in proto file: ignoring
+                    for msg in dependency_file.messages:
+                        if msg not in message_list:
+                            if msg.proto.name in import_model_name_list:
+                                if selective_msg_name_list:
+                                    # selective_msg_name_list is passed when selective msg are going to be added for
+                                    # this project
+                                    if msg.proto.name in selective_msg_name_list:
+                                        message_list.append(msg)
+                                    # else not required: ignoring if not present in selective_msg_name_list
+                                else:
+                                    # normal case: putting all msg in list
+                                    message_list.append(msg)
+                            # else not required: if msg not present in option value set in proto file: ignoring
+                        # else not required: avoiding duplicates in message_list
+                    break
+            else:
+                # If dependency_file not matched in any of option value set in proto file
+
+                if is_multi_project:
+                    file_name = dependency_file.proto.name
+                    self.proto_file_name_to_message_list_dict[file_name.split(os.sep)[-1]] = (
+                        dependency_file.messages)
+                for msg in dependency_file.messages:
+                    if msg not in message_list:
+                        if selective_msg_name_list:
+                            # selective_msg_name_list is passed when selective msg are going to be added for
+                            # this project
+                            if msg.proto.name in selective_msg_name_list:
+                                message_list.append(msg)
+                            # else not required: ignoring if not present in selective_msg_name_list
+                        else:
+                            # normal case: putting all msg in list
                             message_list.append(msg)
-                        # else not required: ignoring if not present in selective_msg_name_list
-                    else:
-                        # normal case: putting all msg in list
-                        message_list.append(msg)
 
     def load_root_message_to_data_member(self, file_or_file_list: protogen.File | List[protogen.File]):
         message_list: List[protogen.Message]
@@ -106,9 +142,17 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
                 project_name_to_msg_list_dict = {}
 
             message_list = []
+            current_file = file_list[0]
             current_full_file_name: str = file_list[0].proto.name   # since first file in list is current proto file
             self.project_name = file_list[0].proto.package
             self.current_proto_file_name = current_full_file_name.split(os.sep)[-1]
+
+            if BaseJSLayoutPlugin.is_option_enabled(current_file,
+                                                    BaseJSLayoutPlugin.flux_file_import_dependency_model):
+                self._import_dependency_model_option_val_list = (
+                    self.get_complex_option_value_from_proto(current_file,
+                                                             self.flux_file_import_dependency_model, True))
+
             for f in file_list:
                 project_name = f.proto.package
                 msg_list = project_name_to_msg_list_dict.get(project_name)
@@ -130,6 +174,13 @@ class BaseJSLayoutPlugin(BaseProtoPlugin, ABC):
                     [file.proto.name for file in f.dependencies]
         else:
             file: protogen.File = file_or_file_list
+
+            if BaseJSLayoutPlugin.is_option_enabled(file,
+                                                    BaseJSLayoutPlugin.flux_file_import_dependency_model):
+                self._import_dependency_model_option_val_list = (
+                    self.get_complex_option_value_from_proto(file,
+                                                             self.flux_file_import_dependency_model, True))
+
             message_list = file.messages
             self.handle_dependency_files(file, message_list)
             self.project_name = file.proto.package

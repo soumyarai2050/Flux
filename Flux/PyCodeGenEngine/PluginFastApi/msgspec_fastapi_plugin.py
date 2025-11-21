@@ -421,8 +421,28 @@ class MsgspecFastApiPlugin(FastapiCallbackFileHandler,
 
         dependency_file_list = self._get_core_dependency_file_list(file)
 
+        import_dependency_model_option_val_list = []
+        if MsgspecFastApiPlugin.is_option_enabled(file,
+                                                  MsgspecFastApiPlugin.flux_file_import_dependency_model):
+            import_dependency_model_option_val_list = (
+                self.get_complex_option_value_from_proto(file,
+                                                         self.flux_file_import_dependency_model, True))
         for dependency_file in dependency_file_list:
-            self.load_root_and_non_root_messages_in_dicts(dependency_file.messages, avoid_non_roots=True)
+            for import_dependency_model_option_val_ in import_dependency_model_option_val_list:
+                import_file_name = import_dependency_model_option_val_[
+                    MsgspecFastApiPlugin.import_dependency_model_import_file_name_field]
+                import_model_name_list = import_dependency_model_option_val_[
+                    MsgspecFastApiPlugin.import_dependency_model_import_model_names_field]
+                if dependency_file.proto.name == import_file_name:
+                    selected_message_list: List[protogen.Message] = []
+                    for message in dependency_file.messages:
+                        if message.proto.name in import_model_name_list:
+                            selected_message_list.append(message)
+                    self.load_root_and_non_root_messages_in_dicts(selected_message_list)
+                    break
+            else:
+                # if dependency file name not present in any of set options then importing file as usual with messages
+                self.load_root_and_non_root_messages_in_dicts(dependency_file.messages)
 
         self.set_req_data_members(file)
 
