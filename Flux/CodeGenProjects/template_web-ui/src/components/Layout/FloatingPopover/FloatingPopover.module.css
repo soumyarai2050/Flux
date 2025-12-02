@@ -1,0 +1,149 @@
+.popover_overlay {
+  position: fixed;
+  width: 50vw;
+  height: 50vh;
+  z-index: 1000;
+  pointer-events: auto;
+  transition: none;
+  will-change: transform;
+}
+
+.popover_resizer {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 30px;
+  height: 30px;
+  cursor: se-resize;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.popover_resizer::before {
+  content: '';
+  width: 20px;
+  height: 20px;
+  background:
+    linear-gradient(135deg, transparent 45%, var(--dark-text-secondary) 45%, var(--dark-text-secondary) 55%, transparent 55%),
+    linear-gradient(135deg, transparent 30%, var(--dark-text-secondary) 30%, var(--dark-text-secondary) 40%, transparent 40%),
+    linear-gradient(135deg, transparent 15%, var(--dark-text-secondary) 15%, var(--dark-text-secondary) 25%, transparent 25%);
+  opacity: 0.5;
+  transition: opacity 0.2s ease;
+}
+
+.popover_resizer:hover::before {
+  opacity: 1;
+  background:
+    linear-gradient(135deg, transparent 45%, var(--dark-text-primary) 45%, var(--dark-text-primary) 55%, transparent 55%),
+    linear-gradient(135deg, transparent 30%, var(--dark-text-primary) 30%, var(--dark-text-primary) 40%, transparent 40%),
+    linear-gradient(135deg, transparent 15%, var(--dark-text-primary) 15%, var(--dark-text-primary) 25%, transparent 25%);
+}
+
+:root[data-theme="light"] .popover_resizer::before {
+  background:
+    linear-gradient(135deg, transparent 45%, var(--light-text-secondary) 45%, var(--light-text-secondary) 55%, transparent 55%),
+    linear-gradient(135deg, transparent 30%, var(--light-text-secondary) 30%, var(--light-text-secondary) 40%, transparent 40%),
+    linear-gradient(135deg, transparent 15%, var(--light-text-secondary) 15%, var(--light-text-secondary) 25%, transparent 25%);
+}
+
+:root[data-theme="light"] .popover_resizer:hover::before {
+  background:
+    linear-gradient(135deg, transparent 45%, var(--light-text-primary) 45%, var(--light-text-primary) 55%, transparent 55%),
+    linear-gradient(135deg, transparent 30%, var(--light-text-primary) 30%, var(--light-text-primary) 40%, transparent 40%),
+    linear-gradient(135deg, transparent 15%, var(--light-text-primary) 15%, var(--light-text-primary) 25%, transparent 25%);
+}
+
+.popover_overlay.grab {
+  cursor: grab;
+}
+
+.popover_overlay.grabbing {
+  cursor: grabbing;
+}
+
+.popover_overlay.default {
+  cursor: default;
+}
+
+.popover_container {
+  width: 100%;
+  height: 100%;
+  background: var(--dark-bg-primary);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--dark-border);
+}
+
+.popover_header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 4px;
+  background: var(--dynamic-navbar-bg);
+  color: var(--dynamic-navbar-text);
+  border-bottom: 1px solid var(--dark-border);
+  flex-shrink: 0;
+  gap: 8px;
+  user-select: none;
+}
+
+.popover_title {
+  font-weight: 300;
+  font-size: 0.8rem;
+  color: inherit;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  padding-left: 6px;
+}
+
+.popover_content {
+  flex: 1;
+  overflow: auto;
+  padding: 8px;
+  position: relative;
+}
+
+.popover_grid_item {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.empty_message {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: var(--dark-text-secondary);
+  font-size: 0.95rem;
+  text-align: center;
+  padding: 20px;
+}
+
+/* Light theme overrides */
+:root[data-theme="light"] .popover_container {
+  background: var(--light-bg-primary);
+  border-color: var(--light-border);
+}
+
+:root[data-theme="light"] .popover_header {
+  border-bottom-color: var(--light-border);
+}
+
+:root[data-theme="light"] .empty_message {
+  color: var(--light-text-secondary);
+}

@@ -1,0 +1,70 @@
+.pvtSortButtonContainer {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+  padding: 8px;
+  background-color: #f5f5f5;
+  border-radius: 4px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.pvtSortButton {
+  flex: 1;
+  padding: 6px 10px;
+  border: 2px solid #ccc;
+  background-color: #ffffff;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: #333;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.pvtSortButton:hover {
+  background-color: #e8e8e8;
+  border-color: #999;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.pvtSortButton:active {
+  background-color: #d0d0d0;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Selected state styling */
+.pvtSortButton.selected {
+  background-color: #4CAF50;
+  color: white;
+  border-color: #2E7D32;
+  font-weight: 700;
+  box-shadow: 0 2px 6px rgba(76, 175, 80, 0.4);
+}
+
+.pvtSortButton.selected:hover {
+  background-color: #45a049;
+  border-color: #1b5e20;
+  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.6);
+}
+
+.pvtSortButton.selected:active {
+  background-color: #388E3C;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Disabled state for Abs button when no base sort selected */
+.pvtSortButton.disabled {
+  background-color: #f0f0f0;
+  color: #999;
+  border-color: #ddd;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.pvtSortButton.disabled:hover {
+  background-color: #f0f0f0;
+  border-color: #ddd;
+  box-shadow: none;
+}
