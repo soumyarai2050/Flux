@@ -72,7 +72,7 @@ const FilterDialog = ({
     debounce((value) => {
       if (value) {
         const lowerCasedValue = value.toLowerCase();
-        const updatedColumns = fieldsMetadata.filter((column) => column[fieldKey]?.toLowerCase().includes(lowerCasedValue));
+        const updatedColumns = fieldsMetadata.filter((column) => column.identifier?.toLowerCase().includes(lowerCasedValue));
         setFilteredColumns(updatedColumns);
       } else {
         setFilteredColumns(fieldsMetadata);
@@ -167,8 +167,7 @@ const FilterDialog = ({
   }, [onFiltersChange, onSortOrdersChange, onClose]);
 
   const handleCopy = (columnId, columnName) => {
-    const fieldKey = isCollectionModel ? 'key' : 'tableTitle';
-    const column = fieldsMetadata.find((meta) => meta[fieldKey] === columnId);
+    const column = fieldsMetadata.find((meta) => meta.identifier === columnId);
     if (!column) {
       console.error(`handleCopy failed, no column found with columnId: ${columnId}`);
       return;
@@ -200,8 +199,6 @@ const FilterDialog = ({
   //     }
   //   }
   // }
-
-  const fieldKey = isCollectionModel ? 'key' : 'tableTitle';
 
   return (
     <Dialog open={isOpen} onClose={handlePopupClose}>
@@ -236,7 +233,8 @@ const FilterDialog = ({
               : meta.elaborateTitle
                 ? meta.tableTitle
                 : meta.title;
-            const fieldName = meta[fieldKey];
+            const fieldName = meta.identifier;
+            const helpText = meta.tableTitle + ': ' + meta.help;
             return (
               <Box key={displayName} className={styles.filter} mb={2}>
                 <span className={styles.filter_name}>{displayName}</span>
@@ -272,6 +270,7 @@ const FilterDialog = ({
                   filterEnable={meta.filterEnable ?? false}
                   clipboardText={clipboardText}
                   serverSideFilterSortEnabled={serverSideFilterSortEnabled}
+                  helpText={helpText}
                 />
                 {filterDict[fieldName]?.filtered_values && (
                   <LinkText

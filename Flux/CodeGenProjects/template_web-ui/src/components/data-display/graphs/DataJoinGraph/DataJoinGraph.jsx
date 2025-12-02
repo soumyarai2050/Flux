@@ -650,7 +650,7 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
     }, [fieldsMetadata, graphAttributes.nodeTypeField]);
 
     const joinTypeColorMapping = useMemo(() => {
-        const joinTypeMeta = fieldsMetadata.find(f => f.key === graphAttributes.edgeTypeField);
+        const joinTypeMeta = fieldsMetadata.find(f => f.identifier === graphAttributes.edgeTypeField);
         return joinTypeMeta?.color || '';
     }, [fieldsMetadata, graphAttributes.edgeTypeField]);
 
@@ -1378,8 +1378,8 @@ const DataJoinGraph = ({ modelName, modelDataSource }) => {
                 );
 
                 const existingJoin = existingJoins.length > 0 ? existingJoins[0] : null;
-                const joinTypeOptions = fieldsMetadata?.find(field => field.key === graphAttributes.edgeTypeField)?.autocomplete_list || [];
-                const filterOperators = fieldsMetadata?.find(field => field.key === graphAttributes.edgeFilterOperator)?.autocomplete_list;
+                const joinTypeOptions = fieldsMetadata?.find(field => field.identifier === graphAttributes.edgeTypeField)?.autocomplete_list || [];
+                const filterOperators = fieldsMetadata?.find(field => field.identifier === graphAttributes.edgeFilterOperator)?.autocomplete_list;
 
                 return (
                     <DataJoinPopup

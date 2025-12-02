@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSelector } from 'react-redux';
-import PivotTableUI from 'react-pivottable/PivotTableUI';
+import PivotTableUIWithSort from './PivotTableUIWithSort';
 import TableRenderers from 'react-pivottable/TableRenderers';
 import CustomTableRenderers from './CustomTableRenderer';
-import { aggregators as defaultAggregators } from 'react-pivottable/Utilities';
+import { aggregators as defaultAggregators, naturalSort } from 'react-pivottable/Utilities';
 import Plot from 'react-plotly.js';
 import createPlotlyRenderer from 'react-pivottable/PlotlyRenderers';
 import Box from '@mui/material/Box';
@@ -34,7 +34,7 @@ const PIVOT_SCHEMA_NAME = 'pivot_data';
 
 const PlotWithZoomPreservation = (props) => {
     return (
-        <Plot 
+        <Plot
             {...props}
             layout={{
                 ...props.layout,
@@ -58,11 +58,12 @@ const createFieldAwareFormatter = (fieldName, fieldsMetadata) => {
         // Handle null/NaN
         if (value == null || isNaN(value)) return '';
 
-        // Look up field metadata by key
-        const fieldMetadata = fieldsMetadata?.find(f => f.key === fieldName);
+        // Look up field metadata by identifier
+        const fieldMetadata = fieldsMetadata?.find(f => f.identifier === fieldName);
 
         if (!fieldMetadata) {
-            return value;
+            // Default to 2 decimal places when no metadata is found
+            return typeof value === 'number' ? value.toFixed(2) : value;
         }
 
         const displayType = fieldMetadata.displayType;
@@ -81,9 +82,23 @@ const createFieldAwareFormatter = (fieldName, fieldsMetadata) => {
             }
         }
 
-        // Otherwise return default formatting
-        return value;
+        // Default to 2 decimal places when no specific format is specified
+        return typeof value === 'number' ? value.toFixed(2) : value;
     };
+};
+
+const getSortFunction = (sortType) => {
+    switch (sortType) {
+        case 'desc':
+            return (a, b) => -naturalSort(a, b);
+        case 'asc_abs':
+            return (a, b) => Math.abs(Number(a)) - Math.abs(Number(b));
+        case 'desc_abs':
+            return (a, b) => Math.abs(Number(b)) - Math.abs(Number(a));
+        case 'asc':
+        default:
+            return naturalSort;
+    }
 };
 
 // Wrap all aggregators to apply field-aware formatting
@@ -97,7 +112,7 @@ const createFieldAwareAggregators = (defaultAggregators, fieldsMetadata) => {
             const baseAggregator = aggFn(args);
 
             // Return a wrapper function
-            return function() {
+            return function () {
                 const aggregatorObj = baseAggregator.apply(this, arguments);
 
                 // Replace format method with field-aware formatter
@@ -139,6 +154,8 @@ function PivotTable({
     const [isCreate, setIsCreate] = useState(false);
     const [showColumnSelector, setShowColumnSelector] = useState(true);
     const [hasPvtUnused, setHasPvtUnused] = useState(false);
+    const [activeSorters, setActiveSorters] = useState({});
+    const [activeSortTypes, setActiveSortTypes] = useState({});
 
     // Initialize field-aware aggregators with columns
     useEffect(() => {
@@ -153,6 +170,32 @@ function PivotTable({
     dataRef.current = data;
     const onPivotCellSelectRef = useRef();
     onPivotCellSelectRef.current = onPivotCellSelect;
+
+    const handleSortChange = useCallback((attr, sortType, isFromPopup = false) => {
+        // If sortType is null, clear the sort for this attribute
+        if (sortType === null) {
+            setActiveSorters(prev => {
+                const updated = { ...prev };
+                delete updated[attr];
+                return updated;
+            });
+            setActiveSortTypes(prev => {
+                const updated = { ...prev };
+                delete updated[attr];
+                return updated;
+            });
+        } else {
+            setActiveSorters(prev => ({
+                ...prev,
+                [attr]: getSortFunction(sortType)
+            }));
+            // Also store the sort type string for display purposes
+            setActiveSortTypes(prev => ({
+                ...prev,
+                [attr]: sortType
+            }));
+        }
+    }, []);
 
     const handleChartClick = useCallback((label, title) => {
         const labelSplit = label.split('-');
@@ -482,7 +525,7 @@ function PivotTable({
                             className={`${styles.pivot_table} ${!showColumnSelector ? styles.hideColumnSelector : ""}`}
                             style={{ height: `${tableHeight}px` }}
                         >
-                            <PivotTableUI
+                            <PivotTableUIWithSort
                                 {...updatedPivotObj}
                                 data={data}
                                 aggregators={customAggregators}
@@ -495,7 +538,10 @@ function PivotTable({
                                 tableOptions={{
                                     clickCallback: clickCallback,
                                     fieldsMetadata: columns,
-                                    highlightDuration: highlightDuration
+                                    highlightDuration: highlightDuration,
+                                    sortCallback: handleSortChange,
+                                    activeSorters: activeSorters,
+                                    activeSortTypes: activeSortTypes
                                 }}
                                 plotlyConfig={{
                                     staticPlot: false

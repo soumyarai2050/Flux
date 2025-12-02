@@ -29,7 +29,8 @@ import {
     selectedPivotNameChangeHandler,
     pivotEnableOverrideChangeHandler,
     pivotDataChangeHandler,
-    quickFiltersChangeHandler
+    quickFiltersChangeHandler,
+    colorRuleOverrideHandler
 } from '../utils/redux/modelHandlers';
 import { LAYOUT_TYPES, MODEL_TYPES, MODES } from '../constants';
 
@@ -38,8 +39,8 @@ function getDefaultViewLayout(layoutData, modelType) {
         modelType === MODEL_TYPES.ABBREVIATION_MERGE
             ? LAYOUT_TYPES.ABBREVIATION_MERGE
             : modelType === MODEL_TYPES.CHART
-            ? LAYOUT_TYPES.TABLE
-            : LAYOUT_TYPES.TABLE
+                ? LAYOUT_TYPES.TABLE
+                : LAYOUT_TYPES.TABLE
     );
 }
 
@@ -50,7 +51,9 @@ const useModelLayout = (modelName, objId, modelType, onColumnsChange, mode) => {
         return JSON.stringify(prev) === JSON.stringify(curr);
     });
 
-    const modelLayoutData = useMemo(() => getWidgetOptionById(modelLayoutOption.widget_ui_data, objId, modelLayoutOption.bind_id_fld), [modelLayoutOption, objId]);
+    const modelLayoutData = useMemo(() => {
+        return getWidgetOptionById(modelLayoutOption.widget_ui_data, objId, modelLayoutOption.bind_id_fld);
+    }, [modelLayoutOption, objId]);
 
     const [isMaximized, setIsMaximized] = useState(false);
     const [page, setPage] = useState(0);
@@ -148,6 +151,10 @@ const useModelLayout = (modelName, objId, modelType, onColumnsChange, mode) => {
 
     const handleHighlightDurationChange = useCallback((updatedHighlightDuration) => {
         highlightDurationChangeHandler(modelHandlerConfigRef.current, updatedHighlightDuration);
+    }, []);
+
+    const handleColorRuleOverrideChange = useCallback((updatedColorRules) => {
+        colorRuleOverrideHandler(modelHandlerConfigRef.current, updatedColorRules);
     }, []);
 
     const handleNoCommonKeyOverrideChange = useCallback((updatedNoCommonKeyOverride, updatedColumns) => {
@@ -269,6 +276,7 @@ const useModelLayout = (modelName, objId, modelType, onColumnsChange, mode) => {
         handleColumnNameOverrideChange,
         handleHighlightUpdateOverrideChange,
         handleHighlightDurationChange,
+        handleColorRuleOverrideChange,
         handleNoCommonKeyOverrideChange,
         handleDataSourceColorsChange,
         handleJoinByChange,

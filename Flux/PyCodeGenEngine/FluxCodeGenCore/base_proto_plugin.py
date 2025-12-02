@@ -186,6 +186,7 @@ class BaseProtoPlugin(ABC):
     flux_msg_crud_shared_lock: ClassVar[str] = "FluxMsgCRUDSharedLock"
     flux_file_crud_host: ClassVar[str] = "FluxFileCRUDHost"
     flux_file_crud_port_offset: ClassVar[str] = "FluxFileCRUDPortOffset"
+    flux_file_add_bare_n_cache_override_callbacks: ClassVar[str] = "FluxFileAddBareNCacheOverrideCallbacks"
     flux_fld_help: ClassVar[str] = "FluxFldHelp"
     flux_fld_ui_update_only: ClassVar[str] = "FluxFldUIUpdateOnly"
     flux_fld_ui_placeholder: ClassVar[str] = "FluxFldUIPlaceholder"
@@ -193,7 +194,11 @@ class BaseProtoPlugin(ABC):
     flux_fld_alert_bubble_color: ClassVar[str] = "FluxFldAlertBubbleColor"
     flux_fld_alert_bubble_source: ClassVar[str] = "FluxFldAlertBubbleSource"
     flux_fld_color: ClassVar[str] = "FluxFldColor"
-    flux_fld_color_target: ClassVar[str] = "FluxFldColorTarget"
+    flux_fld_background_color: ClassVar[str] = "FluxFldBackgroundColor"
+    flux_fld_color_src: ClassVar[str] = "FluxFldColorSrc"
+    flux_fld_background_color_src: ClassVar[str] = "FluxFldBackgroundColorSrc"
+    flux_fld_color_percentage: ClassVar[str] = "FluxFldColorPercentage"
+    flux_fld_background_color_percentage: ClassVar[str] = "FluxFldBackgroundColorPercentage"
     flux_fld_server_populate: ClassVar[str] = "FluxFldServerPopulate"
     flux_fld_switch: ClassVar[str] = "FluxFldSwitch"
     flux_fld_orm_no_update: ClassVar[str] = "FluxFldOrmNoUpdate"
@@ -329,7 +334,11 @@ class BaseProtoPlugin(ABC):
         flux_fld_val_max,
         flux_fld_val_min,
         flux_fld_mapping_underlying_meta_field,
-        flux_fld_mapping_src
+        flux_fld_mapping_src,
+        flux_fld_color_src,
+        flux_fld_background_color_src,
+        flux_fld_color_percentage,
+        flux_fld_background_color_percentage
     ]
     widget_ui_option_fields_having_msg_names: List[str] = [
         widget_ui_option_depending_proto_model_name_field,
@@ -370,7 +379,7 @@ class BaseProtoPlugin(ABC):
                                   "output file name-respective content key-value pair or "
                                   "output file name-dict of insertion points-respective content key-value pair ")
 
-    def is_bool_option_enabled(self, msg_or_fld_option: protogen.Message | protogen.Field, option_name: str) -> bool:
+    def is_bool_option_enabled(self, msg_or_fld_option: protogen.Message | protogen.Field | protogen.File, option_name: str) -> bool:
         if (self.is_option_enabled(msg_or_fld_option, option_name) and
                 self.get_simple_option_value_from_proto(msg_or_fld_option,
                                                         option_name)):

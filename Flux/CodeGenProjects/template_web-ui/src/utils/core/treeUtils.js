@@ -9,6 +9,17 @@ import { getDataxpath, hasxpath } from './dataAccess';
 export const treeState = {};
 
 /**
+ * Checks if a value is null or unset (undefined).
+ * This is used by the hideNullValues filter to determine if a node should be hidden.
+ * @param {*} value - The value to check.
+ * @returns {boolean} True if the value is null or undefined, false otherwise.
+ */
+export function isNullOrUnset(value) {
+    return value === null || value === undefined;
+}
+
+
+/**
  * Checks if a given node (identified by its XPath) is part of a specified subtree.
  * This function is primarily used to determine if a node should be rendered or processed
  * within the context of a collapsed or expanded subtree in the UI.
@@ -1179,9 +1190,9 @@ function createSimpleNode(attributes, propname, dataxpath, xpath, data, currentS
 
 /**
  * Determines whether a node should be added to the tree based on various conditions.
- * Conditions include `serverPopulate`, `hide`, `uiUpdateOnly`, and `mode`.
+ * Conditions include `serverPopulate`, `hide`, `uiUpdateOnly`, `mode`, and `hideNullValues`.
  * @param {Object} node - The node object to check.
- * @param {Object} callerProps - Properties from the calling component, including `mode` and `hide`.
+ * @param {Object} callerProps - Properties from the calling component, including `mode`, `hide`, and `hideNullValues`.
  * @returns {boolean} True if the node should be added, false otherwise.
  */
 function shouldAddNode(node, callerProps) {
@@ -1194,6 +1205,11 @@ function shouldAddNode(node, callerProps) {
 
     // Special handling for boolean buttons in edit mode.
     if (node.type === DATA_TYPES.BOOLEAN && node.button && callerProps.mode === MODES.EDIT) {
+        return false;
+    }
+
+    // If hideNullValues is enabled, filter out nodes with null or undefined values
+    if (callerProps.hideNullValues && isNullOrUnset(node.value)) {
         return false;
     }
 

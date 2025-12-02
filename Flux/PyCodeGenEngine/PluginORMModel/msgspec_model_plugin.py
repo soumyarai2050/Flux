@@ -355,6 +355,12 @@ class MsgspecModelPlugin(DataclassModelPlugin):
             output_str += "\n"
             output_str += self._handle_alias_setattr_output_in_model(alias_name_dict)
 
+        if self.is_bool_option_enabled(message, MsgspecModelPlugin.flux_msg_gen_df_serialize_methods):
+            output_str += "\n"
+            output_str += self.handle_get_polars_schema_method(message)
+            output_str += self.handle_get_polars_cast_expressions_method(message)
+        # else not required: avoiding df helper method related code if not required
+
         output_str += "\n"
         output_str += self._handle_convert_to_dict_for_db_op(message)
 
@@ -664,23 +670,27 @@ class MsgspecModelPlugin(DataclassModelPlugin):
 
         output_str += "    @classmethod\n"
         output_str += f"    def df_to_csv(cls, df: pl.DataFrame, file_path: str, avoid_empty_columns: bool = False, **kwargs) -> None:\n"
-        output_str += f"        df_casted = df.with_columns(cls.get_polars_cast_expressions_for_csv())\n"
+        output_str += f"        if df.is_empty():\n"
+        output_str += f"            # if dataframe is empty, write an empty file with the correct headers\n"
+        output_str += f"            df_casted = pl.DataFrame(schema={message.proto.name}.get_polars_schema())\n"
+        output_str += f"        else:\n"
+        output_str += f"            df_casted = df.with_columns(cls.get_polars_cast_expressions_for_csv())\n"
         if col_names_with_comma_num:
-            output_str += f"        # setting commas in columns having num values\n"
-            output_str += f"        df_casted = df_casted.with_columns([\n"
-            output_str += '            pl.col(c).map_elements(lambda x: f"{x:,}" if x is not None else None, return_dtype=pl.Utf8).alias(c)\n'
-            output_str += f'            for c in {col_names_with_comma_num}\n'
-            output_str += f'        ])\n'
-        output_str += f"        df_casted = df_casted.rename({field_name_to_csv_rename_dict})\n"
-        output_str += f"        if avoid_empty_columns:     # dropping empty columns\n"
-        output_str += f"            # Find columns where all values are None\n"
-        output_str += f"            null_cols = [\n"
-        output_str += f"                c for c in df_casted.columns\n"
-        output_str += f"                if df_casted.select(pl.col(c).is_null().all()).item()\n"
-        output_str += f"            ]\n"
-        output_str += f"            # Drop those columns\n"
-        output_str += f"            df_casted = df_casted.drop(null_cols)\n"
-        output_str += f"        # else not required: writing to csv with empty columns\n"
+            output_str += f"            # setting commas in columns having num values\n"
+            output_str += f"            df_casted = df_casted.with_columns([\n"
+            output_str += '                pl.col(c).map_elements(lambda x: f"{x:,}" if x is not None else None, return_dtype=pl.Utf8).alias(c)\n'
+            output_str += f'                for c in {col_names_with_comma_num}\n'
+            output_str += f'            ])\n'
+        output_str += f"            df_casted = df_casted.rename({field_name_to_csv_rename_dict})\n"
+        output_str += f"            if avoid_empty_columns:     # dropping empty columns\n"
+        output_str += f"                # Find columns where all values are None\n"
+        output_str += f"                null_cols = [\n"
+        output_str += f"                    c for c in df_casted.columns\n"
+        output_str += f"                    if df_casted.select(pl.col(c).is_null().all()).item()\n"
+        output_str += f"                ]\n"
+        output_str += f"                # Drop those columns\n"
+        output_str += f"                df_casted = df_casted.drop(null_cols)\n"
+        output_str += f"            # else not required: writing to csv with empty columns\n"
         output_str += f"        df_casted.write_csv(file_path)\n\n"
 
 

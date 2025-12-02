@@ -28,7 +28,7 @@ export const PivotTableCell = ({
   const timeoutRef = useRef(null);
 
   // Get the collection metadata for this field
-  const collection = fieldsMetadata?.find(f => f.key === fieldName);
+  const collection = fieldsMetadata?.find(f => f.identifier === fieldName);
 
   useEffect(() => {
     // Only apply highlighting if:

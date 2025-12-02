@@ -256,6 +256,17 @@ export function noCommonKeyOverrideChangeHandler(config, updatedNoCommonKeyOverr
 }
 
 /**
+ * @function colorRuleOverrideHandler
+ * @description Handles changes to user-applied color rule overrides for model fields.
+ * @param {object} config - The configuration object for the model handler.
+ * @param {Array<Object>} updatedColorRules - The new array of ColorRule objects with field_name, color_rule, background_color_rule.
+ */
+export function colorRuleOverrideHandler(config, updatedColorRules) {
+  const layoutDataUpdateDict = { color_rules: updatedColorRules };
+  layoutDataChangeHandler(config, layoutDataUpdateDict);
+}
+
+/**
  * @function joinSortChangeHandler
  * @description Handles changes to the 'join sort' setting for a model's layout option.
  * @param {object} config - The configuration object for the model handler.

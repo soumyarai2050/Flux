@@ -27,8 +27,8 @@ import {
 import { DB_ID, DATA_TYPES, MODES, MODEL_TYPES, MIN_ROWS_FOR_PAGINATION } from '../../../constants';
 import TableHeader from '../tables/TableHeader';
 import Cell from '../tables/Cell';
-import { getBufferAbbreviatedOptionLabel } from '../../../utils/ui/uiUtils';
-import { aggregateButtonActionsByType, hasButttonActions } from '../../../utils/bulkPatchUtils';
+import { getBufferAbbreviatedOptionLabel, extractCellDataDependencies } from '../../../utils/ui/uiUtils';
+import { aggregateButtonActionsByState, hasButttonActions } from '../../../utils/bulkPatchUtils';
 import { copyToClipboard } from '../../../utils/core/stringUtils';
 import { clearxpath } from '../../../utils/core/dataAccess';
 import styles from './AbbreviationMergeView.module.css';
@@ -177,6 +177,8 @@ const LoadedView = ({
   dataSourcesModeDict,
   copyHeaders = true,
   maxRowSize,
+  modelName,
+  colorRules,
 }) => {
   const [columns, setColumns] = useState(cells);
   const [columnWidths, setColumnWidths] = useState({});
@@ -439,9 +441,9 @@ const LoadedView = ({
     setContextMenuAnchor(null);
   };
 
-  const handleSelectiveButtonPatchClick = async (selectedRows, selectedButtonType) => {
+  const handleSelectiveButtonPatchClick = async (selectedRows, selectedButtonType, actionCaption, expectedCurrentState) => {
     if (onBulkPatch) {
-      await onBulkPatch(selectedRows, selectedButtonType);
+      await onBulkPatch(selectedRows, selectedButtonType, actionCaption, expectedCurrentState);
     }
   };
 
@@ -474,11 +476,10 @@ const LoadedView = ({
       }
     }
 
-    return aggregateButtonActionsByType(
+    return aggregateButtonActionsByState(
       localSelectedRows,
       selectedRowData,
       cells,
-      {}, // mergedFieldsMetadata - empty for now, will be enhanced later if needed
       MODEL_TYPES.ABBREVIATION_MERGE
     );
   }, [localSelectedRows, rows, cells]);
@@ -772,6 +773,9 @@ const LoadedView = ({
                           stickyPosition={stickyPosition}
                           highlightDuration={highlightDuration}
                           mostRecent={isMostRecent}
+                          data={extractCellDataDependencies(row, cellCopy)}
+                          modelName={modelName}
+                          colorRules={colorRules}
                         />
                       );
                     })}
@@ -909,6 +913,8 @@ const AbbreviationMergeView = ({
   dataSourcesModeDict,
   copyHeaders = true,
   maxRowSize,
+  modelName,
+  colorRules,
 }) => {
   return (
     <>
@@ -964,6 +970,8 @@ const AbbreviationMergeView = ({
         dataSourcesModeDict={dataSourcesModeDict}
         copyHeaders={copyHeaders}
         maxRowSize={maxRowSize}
+        modelName={modelName}
+        colorRules={colorRules}
       />
     </>
   );
@@ -993,6 +1001,7 @@ AbbreviationMergeView.propTypes = {
   onPageChange: PropTypes.func.isRequired,
   onRowsPerPageChange: PropTypes.func.isRequired,
   onBulkPatch: PropTypes.func,
+  colorRules: PropTypes.array,
 };
 
 export default AbbreviationMergeView;

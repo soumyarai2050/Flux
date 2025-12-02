@@ -134,11 +134,51 @@ export const fieldProps = [
      */
     { propertyName: "ui_placeholder", usageName: "placeholder" },
     /**
-     * Sets the associated value color map for the field, used for visual representation.
+     * Sets the associated value color map for the field, used for visual representation (text/foreground color).
      * @property {string} propertyName - The original property name from the schema.
      * @property {string} usageName - The standardized name used in the UI code.
      */
     { propertyName: "color", usageName: "color" },
+    /**
+     * Sets the associated value color map for the field background, used for visual representation.
+     * @property {string} propertyName - The original property name from the schema.
+     * @property {string} usageName - The standardized name used in the UI code.
+     */
+    { propertyName: "background_color", usageName: "backgroundColor" },
+    /**
+     * Specifies a source field path from which the foreground/text color is inherited.
+     * If set, the color rules of the source field will be applied to this field.
+     * Takes precedence over direct color definition if both are specified.
+     * @property {string} propertyName - The original property name from the schema.
+     * @property {string} usageName - The standardized name used in the UI code.
+     */
+    { propertyName: "color_src", usageName: "colorSrc" },
+    /**
+     * Specifies a source field path from which the background color is inherited.
+     * If set, the background color rules of the source field will be applied to this field.
+     * Takes precedence over direct background_color definition if both are specified.
+     * @property {string} propertyName - The original property name from the schema.
+     * @property {string} usageName - The standardized name used in the UI code.
+     */
+    { propertyName: "background_color_src", usageName: "backgroundColorSrc" },
+    /**
+     * Specifies percentage-based coloring for the field's foreground/text color.
+     * Format: "model.min_field|model.max_field|90%>=critical,50%>warning,10%<orange"
+     * The field's value is colored based on its percentage within the min-max range.
+     * All fields must be from the same model (same row).
+     * @property {string} propertyName - The original property name from the schema.
+     * @property {string} usageName - The standardized name used in the UI code.
+     */
+    { propertyName: "color_percentage", usageName: "colorPercentage" },
+    /**
+     * Specifies percentage-based coloring for the field's background color.
+     * Format: "model.min_field|model.max_field|90%>=critical,50%>warning,10%<orange"
+     * The field's background is colored based on its percentage within the min-max range.
+     * All fields must be from the same model (same row).
+     * @property {string} propertyName - The original property name from the schema.
+     * @property {string} usageName - The standardized name used in the UI code.
+     */
+    { propertyName: "background_color_percentage", usageName: "backgroundColorPercentage" },
     /**
      * Displays the field as a button in the UI.
      * @property {string} propertyName - The original property name from the schema.
@@ -300,7 +340,6 @@ export const fieldProps = [
      * @property {string} usageName - The standardized name used in the UI code.
      */
     { propertyName: "visible_if", usageName: "visible_if" },
-    { propertyName: "color_target", usageName: "colorTarget" },
     { propertyName: "text_area", usageName: "text_area" },
     { propertyName: "chat_context", usageName: "chat_context" },
     { propertyName: "chat_conversation", usageName: "chat_conversation" },

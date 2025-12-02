@@ -1,4 +1,6 @@
 import React, { Fragment, useRef, useState } from 'react';
+import { useSelector } from 'react-redux';
+import { useReducerArrayFromCollections } from '../../../hooks';
 import Box from '@mui/material/Box';
 import Tooltip from '@mui/material/Tooltip';
 import ClickAwayListener from '@mui/material/ClickAwayListener';
@@ -6,7 +8,7 @@ import IconButton from '@mui/material/IconButton';
 import Collapse from '@mui/material/Collapse';
 import PropTypes from 'prop-types';
 import { clearxpath } from '../../../utils/core/dataAccess';
-import { getColorFromMapping, getResolvedColor } from '../../../utils/ui/colorUtils';
+import { getResolvedColor, resolveFieldColors } from '../../../utils/ui/colorUtils';
 import { isValidJsonString } from '../../../utils/core/stringUtils';
 import { floatToInt, getLocalizedValueAndSuffix } from '../../../utils/formatters/numberUtils';
 import { groupCommonKeys } from '../../../utils/core/dataGrouping';
@@ -63,7 +65,7 @@ const CommonKeyWidget = React.forwardRef((props, ref) => {
                     return (
                         <Fragment key={i}>
                             {props.lineBreakStart && collection.groupStart && <div className={classes.break_line} />}
-                            <CommonKey collection={collection} />
+                            <CommonKey collection={collection} allCollectionsData={props.commonkeys} colorRules={props.colorRules} />
                             {props.lineBreakEnd && collection.groupEnd && <div className={classes.break_line} />}
                         </Fragment>
                     )
@@ -74,7 +76,8 @@ const CommonKeyWidget = React.forwardRef((props, ref) => {
 })
 
 CommonKeyWidget.propTypes = {
-    commonkeys: PropTypes.array.isRequired
+    commonkeys: PropTypes.array.isRequired,
+    colorRules: PropTypes.array
 };
 
 const CommonKey = (props) => {
@@ -82,8 +85,11 @@ const CommonKey = (props) => {
     const [clipboardText, setClipboardText] = useState(null);
     const jsonTableRef = useRef(null);
     const { collection } = props;
-
+    const { schemaCollections } = useSelector(state => state.schema);
     const theme = useTheme();
+
+    // Fetch Redux data needed for min/max/autocomplete/color source resolution
+    const reducerDict = useReducerArrayFromCollections(collection);
 
     const onOpenAbbreviatedField = () => {
         setOpen(true);
@@ -173,22 +179,40 @@ const CommonKey = (props) => {
     }
 
     let commonkeyColor = 'var(--dark-text-primary)';
+    let commonkeyBackgroundColor = null;
 
-    if (collection.color && !collection.progressBar && !collection.button) {
-        const colorValue = getColorFromMapping(collection, collection.value, null, theme);
-        if (colorValue && colorValue.toLowerCase() === 'default') {
-            commonkeyColor = 'var(--dark-text-primary)';
-        } else {
-            commonkeyColor = getResolvedColor(colorValue, theme, 'var(--dark-text-primary)');
+    // Resolve colors only if this is not a progressBar or button
+    if (!collection.progressBar && !collection.button) {
+        // Use centralized color resolution utility for both foreground and background colors
+        const colorResults = resolveFieldColors(
+            collection,
+            collection.value,
+            collection.modelName,
+            theme,
+            reducerDict,
+            schemaCollections,
+            props.colorRules,
+            collection.identifier
+        );
+
+        // Apply foreground color
+        if (colorResults.resolvedColors.foreground) {
+            commonkeyColor = colorResults.resolvedColors.foreground;
+        }
+
+        // Apply background color
+        if (colorResults.resolvedColors.background) {
+            commonkeyBackgroundColor = colorResults.resolvedColors.background;
         }
     }
 
     let commonkeyTitleColor = theme.palette.text.tertiary;
-    if (collection.nameColor) {
-        const nameColor = collection.nameColor.toLowerCase();
-        if (theme.palette.text[nameColor]) {
-            commonkeyTitleColor = theme.palette.text[nameColor];
-        }
+    if (collection.shownByDoubleClick) {
+        commonkeyTitleColor = getResolvedColor('success', theme, theme.palette.text.tertiary);
+    } else if (collection.shownByToggle) {
+        commonkeyTitleColor = getResolvedColor('info', theme, theme.palette.text.tertiary);
+    } else if (collection.nameColor) {
+        commonkeyTitleColor = getResolvedColor(collection.nameColor, theme, theme.palette.text.tertiary);
     }
 
     let value = collection.value;
@@ -217,7 +241,7 @@ const CommonKey = (props) => {
 
     const groupIndicatorColor = theme.palette.text.tertiary;
 
-    let columnName = collection.title ?? collection.key;
+    let columnName = collection.identifier;
     if (collection.displayName) {
         columnName = collection.displayName;
     } else if (collection.elaborateTitle) {
@@ -239,7 +263,14 @@ const CommonKey = (props) => {
                     {abbreviatedField}
                 </span>
             ) : (
-                <span style={{ color: `${commonkeyColor}` }}>
+                <span style={{
+                    color: `${commonkeyColor}`,
+                    ...(commonkeyBackgroundColor && typeof commonkeyBackgroundColor === 'object'
+                        ? { backgroundColor: commonkeyBackgroundColor.backgroundColor }
+                        : commonkeyBackgroundColor
+                            ? { backgroundColor: commonkeyBackgroundColor }
+                            : {})
+                }}>
                     {value}{numberSuffix}
                 </span>
             )}

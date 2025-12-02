@@ -14,7 +14,7 @@ import {
 } from '../../utils/ui/uiUtils';
 import { createAutoBoundParams } from '../../utils/core/parameterBindingUtils';
 import { cleanAllCache } from '../../cache/attributeCache';
-import { useWebSocketWorker, useDownload, useModelLayout, useConflictDetection, useCountQuery, useBulkPatch } from '../../hooks';
+import { useWebSocketWorker, useDownload, useModelLayout, useConflictDetection, useCountQuery, useBulkPatch, useMarkedColumns } from '../../hooks';
 import { massageDataForBackend, shouldUsePagination, buildDefaultFilters, extractCrudParams, convertFilterTypes } from '../../utils/core/paginationUtils';
 // custom components
 import { FullScreenModalOptional } from '../../components/ui/Modal';
@@ -26,7 +26,7 @@ import { DataTable } from '../../components/data-display/tables';
 import { DataTree } from '../../components/data-display/trees';
 import ConflictPopup from '../../components/utility/ConflictPopup';
 
-function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRootName }) {
+function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRootName, isInPopover = false, onRemoveFromPopover = null }) {
     const { schema: projectSchema, schemaCollections } = useSelector((state) => state.schema);
     const { schema: modelSchema, fieldsMetadata, actions, selector, isAbbreviationSource = false } = modelDataSource;
     const modelRootFieldsMetadata = schemaCollections[modelRootName];
@@ -79,6 +79,7 @@ function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRoo
     const [uniqueValues, setUniqueValues] = useState({});
     const [isProcessingUserActions, setIsProcessingUserActions] = useState(false);
     const [reconnectCounter, setReconnectCounter] = useState(0);
+    const [hideNullValues, setHideNullValues] = useState(false);
 
     const {
         modelLayoutOption,
@@ -125,6 +126,7 @@ function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRoo
         handleMoreAllToggle,
         handleShowHiddenToggle,
         handleShowMoreToggle,
+        handleColorRuleOverrideChange,
     } = useModelLayout(modelName, objId, MODEL_TYPES.NON_ROOT, setHeadCells, mode);
 
     const availableModelNames = useMemo(() => Object.keys(schemaCollections), [schemaCollections]);
@@ -182,8 +184,8 @@ function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRoo
         connectionDependency?.use_cpp_port ||
         serverSidePaginationEnabled || serverSideFilterSortEnabled,
         [modelSchema.is_large_db_object, modelSchema.is_time_series,
-         connectionDependency?.use_cpp_port,
-         serverSidePaginationEnabled, serverSideFilterSortEnabled]
+        connectionDependency?.use_cpp_port,
+            serverSidePaginationEnabled, serverSideFilterSortEnabled]
     );
 
     // WebSocket View URL - uses base URL when shouldUseBaseUrl, otherwise uses view URL
@@ -425,7 +427,8 @@ function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRoo
                 columnOrders: modelLayoutData.column_orders || [],
                 noCommonKeyOverride: modelLayoutData.no_common_key_override || [],
                 xpath: modelName,
-                serverSidePaginationEnabled: false  // Pass this false as in case of Non-RootModel we want to enforce client side pagination control in both cases 
+                serverSidePaginationEnabled: false,  // Pass this false as in case of Non-RootModel we want to enforce client side pagination control in both cases
+                hideNullValues
             }
 
             const updatedOptionsRef = {
@@ -460,7 +463,7 @@ function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRoo
         }
     }, [
         storedObj, updatedObj, objId, fieldsMetadata, modelLayoutData, modelLayoutOption, page, mode,
-        showMore, moreAll, showHidden, showAll
+        showMore, moreAll, showHidden, showAll, hideNullValues
     ])
 
     const handleModelDataSourceUpdate = (updatedArray) => {
@@ -709,6 +712,11 @@ function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRoo
         dispatch(actions.setError(null));
     }
 
+    // Mark columns with shownByToggle flag based on visibility states
+    const { markedHeadCells, markedSortedCells, markedCommonKeys } = useMarkedColumns(
+        headCells, sortedCells, commonKeys, showHidden, showMore, showAll, moreAll
+    );
+
     // Setup bulk patch hook for NON_ROOT model with selective button support
     const handleSelectiveButtonPatch = useBulkPatch(MODEL_TYPES.NON_ROOT, {
         diffConfig: {
@@ -730,11 +738,11 @@ function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRoo
             case LAYOUT_TYPES.TABLE:
                 return (
                     <>
-                        <CommonKeyWidget mode={mode} commonkeys={commonKeys} collapse={modelLayoutData.common_key_collapse} />
+                        <CommonKeyWidget mode={mode} commonkeys={markedCommonKeys} collapse={modelLayoutData.common_key_collapse} colorRules={modelLayoutData.color_rules || []} />
                         <DataTable
                             rows={groupedRows}
                             activeRows={activeRows}
-                            cells={sortedCells}
+                            cells={markedSortedCells}
                             mode={mode}
                             sortOrders={modelLayoutData.sort_orders || []}
                             onSortOrdersChange={handleSortOrdersChange}
@@ -765,6 +773,7 @@ function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRoo
                             uniqueValues={uniqueValues}
                             highlightDuration={modelLayoutData.highlight_duration ?? DEFAULT_HIGHLIGHT_DURATION}
                             serverSideFilterSortEnabled={serverSideFilterSortEnabled}
+                            colorRules={modelLayoutData.color_rules || []}
                         />
                     </>
                 );
@@ -784,6 +793,8 @@ function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRoo
                         showHidden={showHidden}
                         filters={modelLayoutOption.filters || []}
                         isDisabled={isLoading || isProcessingUserActions}
+                        hideNullValues={hideNullValues}
+                        colorRules={modelLayoutData.color_rules || []}
                     />
                 );
             default:
@@ -802,10 +813,12 @@ function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRoo
                     name={modelTitle}
                     isMaximized={isMaximized}
                     onMaximizeToggle={handleFullScreenToggle}
+                    isInPopover={isInPopover}
+                    onRemoveFromPopover={onRemoveFromPopover}
                 >
                     <MenuGroup
                         // column settings
-                        columns={headCells}
+                        columns={markedHeadCells}
                         columnOrders={modelLayoutData.column_orders || []}
                         showAll={showAll}
                         moreAll={moreAll}
@@ -846,7 +859,7 @@ function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRoo
                         onDownload={handleDownload}
                         // edit save
                         onModeToggle={handleModeToggle}
-                        isReadOnly={modelLayoutOption.is_read_only ?? false}
+                        isReadOnly={(modelLayoutOption.is_read_only ?? false) || rows.length === 0}
                         onSave={handleSave}
                         // layout switch
                         layout={layoutType}
@@ -856,7 +869,7 @@ function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRoo
                         isMaximized={isMaximized}
                         onMaximizeToggle={handleFullScreenToggle}
                         // dynamic menu
-                        commonKeys={commonKeys}
+                        commonKeys={markedCommonKeys}
                         onButtonToggle={handleButtonToggle}
                         // button query menu
                         modelSchema={modelSchema}
@@ -892,6 +905,12 @@ function NonRootModel({ modelName, modelDataSource, modelDependencyMap, modelRoo
                         onHighlightDurationChange={handleHighlightDurationChange}
                         noCommonKeyOverride={modelLayoutData.no_common_key_override || []}
                         onNoCommonKeyOverrideChange={handleNoCommonKeyOverrideChange}
+                        // tree settings
+                        hideNullValues={hideNullValues}
+                        onHideNullValuesToggle={setHideNullValues}
+                        // color rule overrides
+                        colorRules={modelLayoutData.color_rules || []}
+                        onColorRuleOverrideChange={handleColorRuleOverrideChange}
                     />
                 </ModelCardHeader>
                 <ModelCardContent

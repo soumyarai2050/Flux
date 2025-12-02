@@ -25,6 +25,7 @@ import 'react-resizable/css/styles.css';
 import styles from './Layout.module.css';
 import Icon, { ToggleIcon } from '../../ui/Icon';
 import { SaveLayoutPopup } from '../../utility/Popup';
+import FloatingPopover from '../FloatingPopover/FloatingPopover';
 import { API_ROOT_URL, API_ROOT_VIEW_URL, COOKIE_NAME } from '../../../config';
 import { DB_ID } from '../../../constants';
 import { useURLParams, useWebSocketWorker } from '../../../hooks';
@@ -92,6 +93,9 @@ const Layout = ({ projectName, theme, onThemeToggle, baseColor, onBaseColorChang
   const [isSaveLayoutPopupOpen, setIsSaveLayoutPopupOpen] = useState(false);
   const [reconnectCounter, setReconnectCounter] = useState(0);
   const [profileId, setProfileId] = useState(''); // save layout by profile input
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const [popoverWidgets, setPopoverWidgets] = useState([]);
+  const [popoverLayout, setPopoverLayout] = useState([]);
   const dispatch = useDispatch();
 
   const { isDraggable, setIsDraggable } = useDraggableContext();
@@ -296,16 +300,16 @@ const Layout = ({ projectName, theme, onThemeToggle, baseColor, onBaseColorChang
    *
    * @param {Object} event - The event object.
    */
-  const handlePopoverOpen = (event) => {
+  const handlePopoverOpen = useCallback((event) => {
     setAnchorEl(event.currentTarget);
-  };
+  }, []);
 
   /**
    * Closes the popover for toggling components.
    */
-  const handlePopoverClose = () => {
+  const handlePopoverClose = useCallback(() => {
     setAnchorEl(null);
-  };
+  }, []);
 
   /**
    * Listens to scroll events and hides the navbar when the page is scrolled away from the top.
@@ -355,69 +359,43 @@ const Layout = ({ projectName, theme, onThemeToggle, baseColor, onBaseColorChang
     root.style.setProperty('--dynamic-bg-medium', `var(${dynamicColorMediumVarName})`);
   }, [selectedBaseColor, theme]);
 
-  if (isLoading || !layout) return <div>Loading layout...</div>;
-  if (!layout && !storedObj.widget_ui_data_elements) return null;
-
-  const popoverId = Boolean(anchorEl) ? 'toggle-popover' : undefined;
-
-  const DraggableIcon = isDraggable ? DoNotTouch : PanTool;
-  const MuiThemeIcon = theme === Theme.LIGHT ? Brightness7 : Brightness4;
-
-  const handleDraggableToggle = () => {
+  /**
+   * Handler for toggling draggable mode.
+   */
+  const handleDraggableToggle = useCallback(() => {
     setIsDraggable((prev) => !prev);
-  }
+  }, []);
 
-  const handleThemeToggle = () => {
+  /**
+   * Handler for toggling theme.
+   */
+  const handleThemeToggle = useCallback(() => {
     onThemeToggle();
-  }
+  }, [onThemeToggle]);
 
-  const handleBaseColorSelectorChange = (value) => {
+  /**
+   * Handler for changing base color.
+   */
+  const handleBaseColorSelectorChange = useCallback((value) => {
     const newColor = value;
     setSelectedBaseColor(newColor);
     if (onBaseColorChange) {
       onBaseColorChange(newColor);
     }
-  };
+  }, [onBaseColorChange]);
 
-  const handleSaveLayoutPopupToggle = () => {
+  /**
+   * Handler for toggling save layout popup.
+   */
+  const handleSaveLayoutPopupToggle = useCallback(() => {
     setIsSaveLayoutPopupOpen((prev) => !prev);
-  }
+  }, []);
 
-  const handleProfileDropdownChange = (selectedValue) => {
-    if (selectedValue === 'reset') {
-      handleReset();
-    } else {
-      const loadedObj = storedArray.find((o) => o.profile_id === selectedValue);
-      if (loadedObj) {
-        dispatch(LayoutActions.setObjId(loadedObj[DB_ID]));
-        dispatch(LayoutActions.setStoredObj(loadedObj));
-        setLayout(loadedObj.widget_ui_data_elements);
-        const newVisibleComponents = loadedObj.widget_ui_data_elements.map(item => item.i);
-        setVisibleComponents(newVisibleComponents);
-        setProfileId(loadedObj.profile_id);
-        sessionStorage.setItem(COOKIE_NAME, loadedObj.profile_id);
-
-        // Apply saved base color if it exists, otherwise use default
-        const baseColor = loadedObj.base_color || DEFAULT_BASE_COLOR;
-
-        setSelectedBaseColor(baseColor);
-        if (onBaseColorChange) {
-          onBaseColorChange(baseColor);
-        }
-
-        // Update URL to reflect the selected profile
-        const currentUrl = new URL(window.location);
-        currentUrl.searchParams.set('layout', loadedObj.profile_id);
-        window.history.pushState({}, '', currentUrl.toString());
-      }
-    }
-  };
-
-  const handleProfileIdChange = (e) => {
+  const handleProfileIdChange = useCallback((e) => {
     setProfileId(e.target.value);
-  };
+  }, []);
 
-  const handleSave = () => {
+  const handleSave = useCallback(() => {
     // Ensure profileId exists (add additional checks if needed)
     if (!profileId) return;
 
@@ -474,9 +452,108 @@ const Layout = ({ projectName, theme, onThemeToggle, baseColor, onBaseColorChang
 
     // Toggle the layout save popup.
     handleSaveLayoutPopupToggle();
-  };
+  }, [profileId, layout, storedArray, storedObj, selectedBaseColor, dispatch, handleSaveLayoutPopupToggle]);
 
-  const handleReset = () => {
+  /**
+   * Computes the maximum y-coordinate in the popover layout.
+   */
+  const getMaxPopoverY = useCallback(() => {
+    return popoverLayout.reduce((max, item) => Math.max(max, item.y + item.h), 0);
+  }, [popoverLayout]);
+
+  /**
+   * Handler for double-click on disabled widget icon in customize menu.
+   * Adds widget to floating popover.
+   */
+  const handleToggleIconDoubleClick = useCallback((widgetId) => {
+    // Only allow double-click on disabled widgets
+    if (visibleComponents.includes(widgetId)) {
+      return; // Widget is enabled, ignore double-click
+    }
+
+    // Check if already in popover
+    if (popoverWidgets.find(w => w.i === widgetId)) {
+      return; // Already in popover
+    }
+
+    // Find widget's default configuration
+    const defaultWidget = allLayouts.find(item => item.i === widgetId);
+    if (!defaultWidget) return;
+
+    // Add to popover with default size at next available position
+    const newPopoverWidget = {
+      ...defaultWidget,
+      x: 0,
+      y: getMaxPopoverY(),
+      w: Math.min(4, defaultWidget.w), // Scale down for 8-col grid
+      h: defaultWidget.h,
+      isMaximized: false
+    };
+
+    setPopoverWidgets(prev => [...prev, newPopoverWidget]);
+    setPopoverLayout(prev => [...prev, newPopoverWidget]);
+    setPopoverOpen(true);
+  }, [visibleComponents, popoverWidgets, popoverLayout, allLayouts, getMaxPopoverY]);
+
+  /**
+   * Handler for removing widget from popover.
+   * PopoverWidgetWrapper handles the mode-based confirmation dialog,
+   * so Layout only needs to process the actual removal here.
+   */
+  const handleRemoveWidgetFromPopover = useCallback((widgetId) => {
+    // Widget is already confirmed to be removed by PopoverWidgetWrapper
+    // No need for additional confirmation here
+    setPopoverWidgets(prev => {
+      const filtered = prev.filter(w => w.i !== widgetId);
+      // Close popover if no widgets left
+      if (filtered.length === 0) {
+        setPopoverOpen(false);
+      }
+      return filtered;
+    });
+    setPopoverLayout(prev => prev.filter(w => w.i !== widgetId));
+    // Disable the widget in the main layout
+    setVisibleComponents(prev => prev.filter(w => w !== widgetId));
+  }, []);
+
+
+  /**
+   * Handler for layout changes in the popover.
+   */
+  const handlePopoverLayoutChange = useCallback((newLayout) => {
+    setPopoverLayout(newLayout);
+
+    // Update popoverWidgets with new positions
+    setPopoverWidgets(prev => prev.map(widget => {
+      const layoutItem = newLayout.find(l => l.i === widget.i);
+      return layoutItem ? { ...widget, ...layoutItem } : widget;
+    }));
+  }, []);
+
+  /**
+   * Handler for closing the floating popover.
+   * Disables all widgets that were in the popover.
+   */
+  const handleFloatingPopoverClose = useCallback(() => {
+    // Disable all widgets in the popover
+    setVisibleComponents(prev => {
+      const widgetsInPopover = popoverWidgets.map(w => w.i);
+      return prev.filter(v => !widgetsInPopover.includes(v));
+    });
+    setPopoverWidgets([]);
+    setPopoverLayout([]);
+    setPopoverOpen(false);
+  }, [popoverWidgets]);
+
+  /**
+   * Handler for resetting layout to default.
+   */
+  const handleReset = useCallback(() => {
+    // Close popover and disable its widgets when resetting to default
+    if (popoverOpen) {
+      handleFloatingPopoverClose();
+    }
+
     sessionStorage.removeItem(COOKIE_NAME);
     setLayout(allLayouts);
     const newVisibleComponents = allLayouts.map(item => item.i);
@@ -494,9 +571,65 @@ const Layout = ({ projectName, theme, onThemeToggle, baseColor, onBaseColorChang
     const currentUrl = new URL(window.location);
     currentUrl.searchParams.delete('layout');
     window.history.pushState({}, '', currentUrl.toString());
-  }
+  }, [allLayouts, dispatch, onBaseColorChange, popoverOpen, handleFloatingPopoverClose]);
+
+  /**
+   * Handler for profile dropdown changes.
+   */
+  const handleProfileDropdownChange = useCallback((selectedValue) => {
+    // Close popover and disable its widgets when switching layouts
+    if (popoverOpen) {
+      handleFloatingPopoverClose();
+    }
+
+    if (selectedValue === 'reset') {
+      handleReset();
+    } else {
+      const loadedObj = storedArray.find((o) => o.profile_id === selectedValue);
+      if (loadedObj) {
+        dispatch(LayoutActions.setObjId(loadedObj[DB_ID]));
+        dispatch(LayoutActions.setStoredObj(loadedObj));
+        setLayout(loadedObj.widget_ui_data_elements);
+        const newVisibleComponents = loadedObj.widget_ui_data_elements.map(item => item.i);
+        setVisibleComponents(newVisibleComponents);
+        setProfileId(loadedObj.profile_id);
+        sessionStorage.setItem(COOKIE_NAME, loadedObj.profile_id);
+
+        // Apply saved base color if it exists, otherwise use default
+        const baseColor = loadedObj.base_color || DEFAULT_BASE_COLOR;
+
+        setSelectedBaseColor(baseColor);
+        if (onBaseColorChange) {
+          onBaseColorChange(baseColor);
+        }
+
+        // Update URL to reflect the selected profile
+        const currentUrl = new URL(window.location);
+        currentUrl.searchParams.set('layout', loadedObj.profile_id);
+        window.history.pushState({}, '', currentUrl.toString());
+      }
+    }
+  }, [storedArray, dispatch, onBaseColorChange, popoverOpen, handleFloatingPopoverClose, handleReset]);
+
+  /**
+   * Handler for toggling widget maximize within popover.
+   */
+  const handleWidgetMaximizeInPopover = useCallback((widgetId) => {
+    setPopoverWidgets(prev => prev.map(widget => {
+      if (widget.i === widgetId) {
+        return { ...widget, isMaximized: !widget.isMaximized };
+      }
+      return widget;
+    }));
+  }, []);
+
+  if (isLoading || !layout) return <div>Loading layout...</div>;
+  if (!layout && !storedObj.widget_ui_data_elements) return null;
 
   // Calculate navbar styling values for render
+  const popoverId = Boolean(anchorEl) ? 'toggle-popover' : undefined;
+  const DraggableIcon = isDraggable ? DoNotTouch : PanTool;
+  const MuiThemeIcon = theme === Theme.LIGHT ? Brightness7 : Brightness4;
   const navbarTextColorValue = cssVar('--dark-text-primary');
 
   return (
@@ -569,18 +702,35 @@ const Layout = ({ projectName, theme, onThemeToggle, baseColor, onBaseColorChang
           }}
         >
           <Grid container spacing={1} sx={{ padding: '5px', width: '300px' }}>
-            {allLayouts.map((item) => (
-              <Grid item key={item.i} lg={2}>
-                <ToggleIcon
-                  title={item.i}
-                  name={item.i}
-                  selected={visibleComponents.includes(item.i)}
-                  onClick={() => toggleComponent(item.i)}
-                >
-                  {getIconText(item.i)}
-                </ToggleIcon>
-              </Grid>
-            ))}
+            {allLayouts.map((item) => {
+              const isInPopover = popoverWidgets.some(w => w.i === item.i);
+              const isDisabled = !visibleComponents.includes(item.i);
+
+              const handleIconClick = () => {
+                // If in popover, single click removes from popover
+                if (isInPopover) {
+                  handleRemoveWidgetFromPopover(item.i);
+                } else {
+                  // Otherwise normal toggle behavior
+                  toggleComponent(item.i);
+                }
+              };
+
+              return (
+                <Grid item key={item.i} lg={2}>
+                  <ToggleIcon
+                    title={item.i}
+                    name={item.i}
+                    selected={visibleComponents.includes(item.i)}
+                    highlighted={isInPopover}
+                    onClick={handleIconClick}
+                    onDoubleClick={isDisabled ? handleToggleIconDoubleClick : undefined}
+                  >
+                    {getIconText(item.i)}
+                  </ToggleIcon>
+                </Grid>
+              );
+            })}
           </Grid>
         </Popover>
       </nav>
@@ -620,6 +770,16 @@ const Layout = ({ projectName, theme, onThemeToggle, baseColor, onBaseColorChang
         profileId={profileId}
         onProfileIdChange={handleProfileIdChange}
         onSave={handleSave}
+      />
+
+      <FloatingPopover
+        open={popoverOpen}
+        widgets={popoverWidgets}
+        layout={popoverLayout}
+        onLayoutChange={handlePopoverLayoutChange}
+        onClose={handleFloatingPopoverClose}
+        onRemoveWidget={handleRemoveWidgetFromPopover}
+        onMaximizeToggle={handleWidgetMaximizeInPopover}
       />
 
     </div>

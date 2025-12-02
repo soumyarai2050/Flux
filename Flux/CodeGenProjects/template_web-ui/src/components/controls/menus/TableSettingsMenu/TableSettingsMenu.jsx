@@ -15,6 +15,7 @@ import Settings from '@mui/icons-material/Settings';
 import Icon from '../../../ui/Icon';
 import MenuItem from '../../../ui/MenuItem';
 import ValueBasedToggleButton from '../../../ui/ValueBasedToggleButton';
+import ColorRuleTab from './ColorRuleTab';
 import { LAYOUT_TYPES, MODEL_TYPES, HIGHLIGHT_STATES } from '../../../../constants';
 import styles from './TableSettingsMenu.module.css';
 
@@ -64,7 +65,9 @@ const TableSettingsMenu = ({
   onHighlightUpdateOverrideChange,
   highlightDuration,
   onHighlightDurationChange,
-  onNoCommonKeyToggle
+  onNoCommonKeyToggle,
+  colorRules = [],
+  onColorRuleOverrideChange
 }) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const [tabIndex, setTabIndex] = useState(0);
@@ -91,12 +94,10 @@ const TableSettingsMenu = ({
     onHighlightDurationChangeRef.current = onHighlightDurationChange;
   }, [onHighlightDurationChange])
 
-  const fieldKey = modelType === MODEL_TYPES.ABBREVIATION_MERGE ? 'key' : 'tableTitle';
-
   useEffect(() => {
     if (searchValue) {
       const lowerCasedValue = searchValue.toLowerCase();
-      const updatedColumns = columns.filter((column) => column[fieldKey]?.toLowerCase().includes(lowerCasedValue));
+      const updatedColumns = columns.filter((column) => column.identifier?.toLowerCase().includes(lowerCasedValue));
       setFilteredColumns(updatedColumns);
     } else {
       setFilteredColumns(columns);
@@ -107,7 +108,7 @@ const TableSettingsMenu = ({
     debounce((value) => {
       if (value) {
         const lowerCasedValue = value.toLowerCase();
-        const updatedColumns = columns.filter((column) => column[fieldKey]?.toLowerCase().includes(lowerCasedValue));
+        const updatedColumns = columns.filter((column) => column.identifier?.toLowerCase().includes(lowerCasedValue));
         setFilteredColumns(updatedColumns);
       } else {
         setFilteredColumns(columns);
@@ -247,10 +248,11 @@ const TableSettingsMenu = ({
             <Tab label="Column Name/Help" />
             <Tab label="Highlight" />
             <Tab label="No Common Key" />
+            <Tab label="Color Rules" />
           </Tabs>
           {/* Tab Content */}
           <Box className={styles.content}>
-            {columns.length > 5 && tabIndex !== 0 && (
+            {columns.length > 5 && tabIndex !== 0 && tabIndex !== 6 && (
               <TextField
                 size="small"
                 label="Column Name"
@@ -314,7 +316,7 @@ const TableSettingsMenu = ({
                   // Only render columns with a sourceIndex of 0.
                   if (column.sourceIndex !== 0) return null;
 
-                  const columnLabel = column.elaborateTitle ? column[fieldKey] : column.key;
+                  const columnLabel = column.elaborateTitle ? column.identifier : column.key;
 
                   // Determine the toggle states and captions.
                   const show = !column.hide;
@@ -326,27 +328,27 @@ const TableSettingsMenu = ({
                   const moreColor = more ? 'info' : 'debug';
 
                   return (
-                    <Box key={column[fieldKey]} className={styles.item}>
+                    <Box key={column.identifier} className={styles.item}>
                       <span className={styles.item_label}>{columnLabel}</span>
                       <ValueBasedToggleButton
-                        name={column[fieldKey]}
+                        name={column.identifier}
                         size="small"
                         selected={show}
                         disabled={false}
                         value={show}
                         caption={showCaption}
-                        xpath={column[fieldKey]}
+                        xpath={column.identifier}
                         color={showColor}
                         onClick={onColumnToggle}
                       />
                       <ValueBasedToggleButton
-                        name={column[fieldKey]}
+                        name={column.identifier}
                         size="small"
                         selected={more}
                         disabled={moreDisabled}
                         value={more}
                         caption={moreCaption}
-                        xpath={column[fieldKey]}
+                        xpath={column.identifier}
                         color={moreColor}
                         onClick={onShowLessToggle}
                       />
@@ -361,23 +363,23 @@ const TableSettingsMenu = ({
                   // Only render columns with a sourceIndex of 0.
                   if (column.sourceIndex !== 0) return null;
 
-                  const columnLabel = column.elaborateTitle ? column[fieldKey] : column.key;
+                  const columnLabel = column.elaborateTitle ? column.identifier : column.key;
                   // Determine the toggle states and captions.
                   const frozen = column.frozenColumn ?? false;
                   const showCaption = frozen ? 'Unfreeze' : 'Freeze';
                   const showColor = frozen ? 'info' : 'debug';
 
                   return (
-                    <Box key={column[fieldKey]} className={styles.item}>
+                    <Box key={column.identifier} className={styles.item}>
                       <span className={styles.item_label}>{columnLabel}</span>
                       <ValueBasedToggleButton
-                        name={column[fieldKey]}
+                        name={column.identifier}
                         size="small"
                         selected={frozen}
                         disabled={false}
                         value={frozen}
                         caption={showCaption}
-                        xpath={column[fieldKey]}
+                        xpath={column.identifier}
                         color={showColor}
                         onClick={onFrozenToggle}
                       />
@@ -392,7 +394,7 @@ const TableSettingsMenu = ({
                   // Only render columns with a sourceIndex of 0.
                   if (column.sourceIndex !== 0) return null;
 
-                  const columnLabel = column.elaborateTitle ? column[fieldKey] : column.key;
+                  const columnLabel = column.elaborateTitle ? column.identifier : column.key;
                   let helpText = column.help;
                   if (modelType === MODEL_TYPES.ABBREVIATION_MERGE) {
                     if (!helpText) {
@@ -402,7 +404,7 @@ const TableSettingsMenu = ({
                   }
 
                   return (
-                    <Box key={column[fieldKey]} className={styles.item_large}>
+                    <Box key={column.identifier} className={styles.item_large}>
                       <span className={styles.item_label}>
                         {columnLabel}
                         <span style={{ margin: '0 10px' }}>
@@ -414,12 +416,12 @@ const TableSettingsMenu = ({
                         </span>
                       </span>
                       <TextField
-                        id={column[fieldKey]}
+                        id={column.identifier}
                         className={styles.text_field}
-                        name={column[fieldKey]}
+                        name={column.identifier}
                         size="small"
-                        value={columnNameOverrideDict[column[fieldKey]] || ''}
-                        onChange={(e) => handleTextChange(e, column[fieldKey])}
+                        value={columnNameOverrideDict[column.identifier] || ''}
+                        onChange={(e) => handleTextChange(e, column.identifier)}
                         onKeyDown={handleKeyDown}
                         onBlur={handleBlur}
                         variant="outlined"
@@ -440,18 +442,18 @@ const TableSettingsMenu = ({
                   // Only render columns with a sourceIndex of 0.
                   if (column.sourceIndex !== 0) return null;
 
-                  const columnLabel = column.elaborateTitle ? column[fieldKey] : column.key;
-                  const highlightState = highlightUpdateOverrideDict[column[fieldKey]] ?? HIGHLIGHT_STATES.NONE;
+                  const columnLabel = column.elaborateTitle ? column.identifier : column.key;
+                  const highlightState = highlightUpdateOverrideDict[column.identifier] ?? HIGHLIGHT_STATES.NONE;
 
                   return (
-                    <Box key={column[fieldKey]} className={styles.item_large}>
+                    <Box key={column.identifier} className={styles.item_large}>
                       <span className={styles.item_label}>
                         {columnLabel}
                       </span>
                       <Select
                         size="small"
                         value={highlightState}
-                        onChange={(e) => handleHighlightUpdateChange(column[fieldKey], e.target.value)}
+                        onChange={(e) => handleHighlightUpdateChange(column.identifier, e.target.value)}
                       >
                         {Object.keys(HIGHLIGHT_STATES).map((item, index) => (
                           <MenuItem key={index} value={HIGHLIGHT_STATES[item]} dense>
@@ -480,23 +482,23 @@ const TableSettingsMenu = ({
                   // Only render columns with a sourceIndex of 0.
                   if (column.sourceIndex !== 0) return null;
 
-                  const columnLabel = column.elaborateTitle ? column[fieldKey] : column.key;
+                  const columnLabel = column.elaborateTitle ? column.identifier : column.key;
                   // Determine the toggle states and captions.
                   const isNoCommonKey = column.noCommonKeyDeduced ?? false;
                   const showCaption = isNoCommonKey ? 'Disable' : 'Enable';
                   const showColor = isNoCommonKey ? 'info' : 'debug';
 
                   return (
-                    <Box key={column[fieldKey]} className={styles.item}>
+                    <Box key={column.identifier} className={styles.item}>
                       <span className={styles.item_label}>{columnLabel}</span>
                       <ValueBasedToggleButton
-                        name={column[fieldKey]}
+                        name={column.identifier}
                         size="small"
                         selected={isNoCommonKey}
                         disabled={false}
                         value={isNoCommonKey}
                         caption={showCaption}
-                        xpath={column[fieldKey]}
+                        xpath={column.identifier}
                         color={showColor}
                         onClick={onNoCommonKeyToggle}
                       />
@@ -504,6 +506,13 @@ const TableSettingsMenu = ({
                   );
                 })}
               </>
+            )}
+            {tabIndex === 6 && (
+              <ColorRuleTab
+                columns={columns}
+                colorRules={colorRules}
+                onColorRuleOverrideChange={onColorRuleOverrideChange}
+              />
             )}
           </Box>
         </Box>
@@ -551,6 +560,16 @@ TableSettingsMenu.propTypes = {
   onColumnOrdersChange: PropTypes.func.isRequired,
   /** Callback to toggle an individual column's "show less" state */
   onShowLessToggle: PropTypes.func.isRequired,
+  /** Array of ColorRule objects for user-applied color overrides */
+  colorRules: PropTypes.arrayOf(
+    PropTypes.shape({
+      field_name: PropTypes.string.isRequired,
+      color_rule: PropTypes.string,
+      background_color_rule: PropTypes.string,
+    })
+  ),
+  /** Callback when color rule overrides are changed */
+  onColorRuleOverrideChange: PropTypes.func,
 };
 
 export default TableSettingsMenu;

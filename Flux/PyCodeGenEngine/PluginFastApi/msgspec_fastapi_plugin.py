@@ -53,6 +53,7 @@ class MsgspecFastApiPlugin(FastapiCallbackFileHandler,
         self.app_is_router: bool = True
         self.custom_id_primary_key_messages: List[protogen.Message] = []
         self.msg_type_to_nested_root_type_field_name_n_type_dict: Dict[protogen.Message, List[Tuple[str, str]]] = {}
+        self.need_cache_n_bare_overrides = False
         self.model_file_suffix = "msgspec_model"
 
     def load_root_and_non_root_messages_in_dicts(self, message_list: List[protogen.Message],
@@ -450,6 +451,9 @@ class MsgspecFastApiPlugin(FastapiCallbackFileHandler,
         self.root_message_list.sort(key=lambda message_: message_.proto.name)
         self.non_root_message_list.sort(key=lambda message_: message_.proto.name)
         self.enum_list.sort(key=lambda message_: message_.proto.name)
+
+        if self.is_bool_option_enabled(file, MsgspecFastApiPlugin.flux_file_add_bare_n_cache_override_callbacks):
+            self.need_cache_n_bare_overrides = True
 
         output_dict: Dict[str, str] = {
             # Adding project´s database.py

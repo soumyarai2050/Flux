@@ -529,18 +529,31 @@ export function getTableColumns(fieldsMetadata, mode, overrideProps = {}, collec
  * @param {boolean} showAll - If true, all cells will be shown, overriding `showHidden`.
  * @param {boolean} showMore - If true, cells marked as 'show less' will be shown.
  * @param {boolean} moreAll - If true, all cells will be shown, overriding `showMore`.
- * @param {boolean} [isAbbreviationMerge=false] - If true, uses 'key' as the field for comparison; otherwise, uses 'tableTitle'.
+ * @param {boolean} [isAbbreviationMerge=false] - Deprecated parameter, kept for backward compatibility.
  * @returns {Array<Object>} An array of filtered head cell objects.
  */
 export function getFilteredCells(headCells, commonKeys, showHidden, showAll, showMore, moreAll, isAbbreviationMerge = false) {
     let updatedCells = cloneDeep(headCells);
+
+    // Mark cells that are shown due to visibility toggle
+    updatedCells = updatedCells.map(cell => {
+        const wasHiddenByDefault = cell.hide && (showHidden || showAll);
+        const wasLessByDefault = cell.showLess && (showMore || moreAll);
+
+        if (wasHiddenByDefault || wasLessByDefault) {
+            cell.shownByToggle = true;
+            cell.nameColor = 'info';
+        }
+        return cell;
+    });
+
     if (!showHidden && !showAll) {
         updatedCells = updatedCells.filter(cell => !cell.hide);
     }
     if (!showMore && !moreAll) {
         updatedCells = updatedCells.filter(cell => !cell.showLess);
     }
-    const fieldKey = isAbbreviationMerge ? 'key' : 'tableTitle';
-    updatedCells = updatedCells.filter(cell => commonKeys.filter(c => c[fieldKey] === cell[fieldKey] && c.sourceIndex === cell.sourceIndex).length === 0)
+    // Use identifier for consistent lookup across model types
+    updatedCells = updatedCells.filter(cell => commonKeys.filter(c => c.identifier === cell.identifier && c.sourceIndex === cell.sourceIndex).length === 0)
     return updatedCells;
 }

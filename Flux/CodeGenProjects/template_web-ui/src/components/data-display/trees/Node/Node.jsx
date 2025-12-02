@@ -186,7 +186,7 @@ const Node = (props) => {
                         )}
                     </div>
                 )}
-                <NodeField data={nodeFieldData} />
+                <NodeField data={nodeFieldData} colorRules={props.colorRules} modelName={props.modelName} />
             </Box>
             {props.data.mode === MODES.EDIT && props.data.key == undefined && !props.data['data-remove'] && (
                 <Box className={classes.menu}>

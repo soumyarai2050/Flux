@@ -30,3 +30,13 @@
 .selected_avatar {
     background-color: var(--dynamic-cell-selected) !important;
 }
+
+.highlighted_icon {
+    background-color: #2196f3 !important;
+    border-radius: 5px;
+}
+
+.highlighted_avatar {
+    background-color: #1976d2 !important;
+    color: white !important;
+}

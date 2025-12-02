@@ -166,6 +166,12 @@ message QuickFilter {
   required string filters = 2;
 }
 
+message ColorRule {
+  required string field_name = 1;
+  optional string color_rule = 2;
+  optional string background_color_rule = 3;
+}
+
 message WidgetUIData{
   // for UI to store the bounded id value
   optional string bind_id_val = 1;
@@ -195,6 +201,7 @@ message WidgetUIData{
   repeated string column_name_override = 25;
   optional string highlight_duration = 26;
   repeated string no_common_key_override = 27;
+  repeated ColorRule color_rules = 28;
 }
 
 message UIButton{

@@ -7,7 +7,7 @@ import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import {
     ChartSettingsMenu, TableSettingsMenu, CreateMenu, DataSourceColorMenu, DownloadMenu, DynamicMenu,
-    EditSaveToggleMenu, FilterMenu, JoinMenu, LayoutSwitchMenu, MaximizeRestoreToggleMenu, PivotSettingsMenu, ReloadMenu, VisibilityMenu
+    EditSaveToggleMenu, FilterMenu, JoinMenu, LayoutSwitchMenu, MaximizeRestoreToggleMenu, PivotSettingsMenu, ReloadMenu, VisibilityMenu, HideNullValuesMenu
 } from '../menus';
 import { MODEL_TYPES } from '../../../constants';
 import { cloneDeep } from 'lodash';
@@ -178,17 +178,20 @@ const MenuGroup = ({
     onHighlightDurationChange,
     noCommonKeyOverride,
     onNoCommonKeyOverrideChange,
+    colorRules = [],
+    onColorRuleOverrideChange,
     autoBoundParams = {},
     isReadOnly = false,
-    serverSideFilterSortEnabled
+    serverSideFilterSortEnabled,
+    hideNullValues = false,
+    onHideNullValuesToggle
 }) => {
     const [anchorEl, setAnchorEl] = useState(null);
 
     const handleColumnToggle = (e, xpath, key, value, ...rest) => {
         const isHidden = value;
-        const fieldKey = modelType === MODEL_TYPES.ABBREVIATION_MERGE ? 'key' : 'tableTitle';
-        const updatedColumns = columns.map((o) => o[fieldKey] === key ? { ...o, hide: isHidden } : o);
-        const meta = fieldsMetadata.find((o) => o[fieldKey] === key);
+        const updatedColumns = columns.map((o) => o.identifier === key ? { ...o, hide: isHidden } : o);
+        const meta = fieldsMetadata.find((o) => o.identifier === key);
         const updatedEnableOverride = cloneDeep(enableOverride);
         const updatedDisableOverride = cloneDeep(disableOverride);
         if (isHidden) {
@@ -219,9 +222,8 @@ const MenuGroup = ({
 
     const handleShowLessToggle = (e, xpath, key, value, ...rest) => {
         const isLess = value;
-        const fieldKey = modelType === MODEL_TYPES.ABBREVIATION_MERGE ? 'key' : 'tableTitle';
-        const updatedColumns = columns.map((o) => o[fieldKey] === key ? { ...o, showLess: isLess } : o);
-        const meta = fieldsMetadata.find((o) => o[fieldKey] === key);
+        const updatedColumns = columns.map((o) => o.identifier === key ? { ...o, showLess: isLess } : o);
+        const meta = fieldsMetadata.find((o) => o.identifier === key);
         const updatedShowLess = cloneDeep(showLess);
         if (isLess) {
             if (meta.showLess !== isLess) {
@@ -265,9 +267,8 @@ const MenuGroup = ({
 
     const handleFrozenToggle = (e, xpath, key, value, ...rest) => {
         const isFrozen = !value;
-        const fieldKey = modelType === MODEL_TYPES.ABBREVIATION_MERGE ? 'key' : 'tableTitle';
-        const updatedColumns = columns.map((o) => o[fieldKey] === key ? { ...o, frozenColumn: isFrozen } : o);
-        const meta = fieldsMetadata.find((o) => o[fieldKey] === key);
+        const updatedColumns = columns.map((o) => o.identifier === key ? { ...o, frozenColumn: isFrozen } : o);
+        const meta = fieldsMetadata.find((o) => o.identifier === key);
         if (!meta) return;
         const updatedFrozenColumns = cloneDeep(frozenColumns);
         if (isFrozen) {
@@ -287,9 +288,8 @@ const MenuGroup = ({
 
     const handleNoCommonKeyToggle = (e, xpath, key, value, ...rest) => {
         const isNoCommonKey = !value;
-        const fieldKey = modelType === MODEL_TYPES.ABBREVIATION_MERGE ? 'key' : 'tableTitle';
-        const updatedColumns = columns.map((o) => o[fieldKey] === key ? { ...o, noCommonKeyDeduced: isNoCommonKey } : o);
-        const meta = fieldsMetadata.find((o) => o[fieldKey] === key);
+        const updatedColumns = columns.map((o) => o.identifier === key ? { ...o, noCommonKeyDeduced: isNoCommonKey } : o);
+        const meta = fieldsMetadata.find((o) => o.identifier === key);
         if (!meta) return;
         const updatedNoCommonKeyOverride = cloneDeep(noCommonKeyOverride);
         const idx = updatedNoCommonKeyOverride.indexOf(key);
@@ -336,6 +336,7 @@ const MenuGroup = ({
         'layout-switch',
         'maximize-restore',
         'reload',
+        'hide-null-values',
     ];
 
     const renderMenu = (menuName, menuType = 'icon') => {
@@ -368,6 +369,8 @@ const MenuGroup = ({
                         highlightDuration={highlightDuration}
                         onHighlightDurationChange={onHighlightDurationChange}
                         onNoCommonKeyToggle={handleNoCommonKeyToggle}
+                        colorRules={colorRules}
+                        onColorRuleOverrideChange={onColorRuleOverrideChange}
                     />
                 );
             case 'filter':
@@ -545,6 +548,20 @@ const MenuGroup = ({
                         pivotEnableOverride={pivotEnableOverride}
                     />
                 );
+            case 'hide-null-values':
+                // Only render this menu when in tree layout
+                if (layout !== 'UI_TREE') return null;
+                return (
+                    <HideNullValuesMenu
+                        key={menuKey}
+                        hideNullValues={hideNullValues}
+                        onHideNullValuesToggle={onHideNullValuesToggle}
+                        menuType={menuType}
+                        isPinned={pinned.includes(menuName)}
+                        onMenuClose={handleMenuClose}
+                        onPinToggle={handlePinToggle}
+                    />
+                );
             default:
                 return null;
         }
@@ -664,8 +681,12 @@ MenuGroup.propTypes = {
     onHighlightDurationChange: PropTypes.func,
     noCommonKeyOverride: PropTypes.array,
     onNoCommonKeyOverrideChange: PropTypes.func,
+    colorRules: PropTypes.array,
+    onColorRuleOverrideChange: PropTypes.func,
     autoBoundParams: PropTypes.object,
     isReadOnly: PropTypes.bool,
+    hideNullValues: PropTypes.bool,
+    onHideNullValuesToggle: PropTypes.func,
 };
 
 export default MenuGroup;

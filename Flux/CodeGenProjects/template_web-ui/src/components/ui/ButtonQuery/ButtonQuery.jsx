@@ -5,6 +5,7 @@
  */
 
 import React, { useMemo, useRef, useState } from 'react';
+import { useSelector } from 'react-redux';
 import PropTypes from 'prop-types';
 import axios from 'axios';
 import dayjs from 'dayjs';
@@ -52,6 +53,7 @@ const RUN_BUTTON_TEXT = 'RUN';
  */
 const ButtonQuery = ({ queryObj, url, viewUrl, autoBoundParams = {} }) => {
     const theme = useTheme();
+    const { schemaCollections } = useSelector(state => state.schema);
     const [value, setButtonValue] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
     const [alert, setAlert] = useState(null);
@@ -72,9 +74,33 @@ const ButtonQuery = ({ queryObj, url, viewUrl, autoBoundParams = {} }) => {
         const checked = String(value) === ui_button.pressed_value_as_text;
         const collection = {
             color: ui_button.color,
+            colorSrc: ui_button.colorSrc,
+            backgroundColor: ui_button.backgroundColor,
+            backgroundColorSrc: ui_button.backgroundColorSrc,
             xpath: 'null'
         };
-        const color = getColorFromMapping(collection, String(value), null, theme);
+
+        // Resolve foreground color with color_src support
+        let color = null;
+        if (ui_button.color || ui_button.colorSrc) {
+            // ButtonQuery doesn't have parent data context, pass null for now
+            color = getColorFromMapping(collection, String(value), null, theme, null, false, null, schemaCollections);
+        }
+
+        // Resolve background color independently with background_color_src support
+        let backgroundColor = null;
+        if (ui_button.backgroundColor || ui_button.backgroundColorSrc) {
+            const bgColorCollection = {
+                ...collection,
+                color: ui_button.backgroundColor,
+                colorSrc: ui_button.backgroundColorSrc
+            };
+            backgroundColor = getColorFromMapping(bgColorCollection, String(value), null, theme, null, false, null, schemaCollections);
+        }
+
+        // For now, use color for the button (buttons typically show via backgroundColor in ValueBasedToggleButton)
+        // If backgroundColor is set, use it instead
+        const buttonColor = backgroundColor || color;
         const size = getSizeFromValue(ui_button.button_size);
         const shape = getShapeFromValue(ui_button.button_type);
         let caption = String(value);
@@ -86,7 +112,7 @@ const ButtonQuery = ({ queryObj, url, viewUrl, autoBoundParams = {} }) => {
         } else if (!checked && ui_button.unpressed_caption) {
             caption = ui_button.unpressed_caption;
         }
-        return { size, shape, color, caption, isDisabledValue };
+        return { size, shape, color: buttonColor, caption, isDisabledValue };
     }, [queryObj, value, theme]);
 
     const queryOptions = useMemo(() => {

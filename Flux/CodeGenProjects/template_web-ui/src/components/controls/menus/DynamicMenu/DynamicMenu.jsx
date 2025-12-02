@@ -19,6 +19,7 @@ const DynamicMenu = ({
     onButtonToggle
 }) => {
     const theme = useTheme();
+    const { schemaCollections } = useSelector(state => state.schema);
     const reducerArray = useMemo(() => getReducerArrayFromCollections(fieldsMetadata), [fieldsMetadata]);
     const reducerDict = useSelector(state => {
         const selected = {};
@@ -88,6 +89,13 @@ const DynamicMenu = ({
                         maxFieldName = max.substring(max.lastIndexOf(".") + 1);
                         max = getValueFromReduxStoreFromXpath(reducerDict, max);
                     }
+
+                    // Resolve target for deviation mode
+                    let target = collection.target;
+                    if (typeof (target) === DATA_TYPES.STRING) {
+                        target = getValueFromReduxStoreFromXpath(reducerDict, target);
+                    }
+
                     let hoverType = getHoverTextType(collection.progressBar.hover_text_type);
 
                     return (
@@ -97,6 +105,7 @@ const DynamicMenu = ({
                                 value={value}
                                 min={min}
                                 max={max}
+                                target={target}
                                 valueFieldName={valueFieldName}
                                 maxFieldName={maxFieldName}
                                 hoverType={hoverType}
@@ -116,7 +125,8 @@ const DynamicMenu = ({
                     let disabledCaption = isDisabledValue ? disabledCaptions[String(value)] : '';
                     let checked = String(collection.value) === collection.button.pressed_value_as_text;
                     let xpath = collection.xpath;
-                    let color = getColorFromMapping(collection.button, String(collection.value), null, theme);
+                    // Support color_src for button colors
+                    let color = getColorFromMapping(collection.button, String(collection.value), null, theme, null, false, commonKeys, schemaCollections);
                     let size = getSizeFromValue(collection.button.button_size);
                     let shape = getShapeFromValue(collection.button.button_type);
                     let caption = String(collection.value);

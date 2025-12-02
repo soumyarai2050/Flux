@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, memo, useMemo } from 'react';
 import { useSelector } from 'react-redux';
+import { useReducerArrayFromCollections } from '../../../../hooks';
 import _, { cloneDeep, debounce, isEqual } from 'lodash';
 import PropTypes from 'prop-types';
 import { NumericFormat } from 'react-number-format';
@@ -20,9 +21,9 @@ import Clear from '@mui/icons-material/Clear';
 import { useTheme } from '@mui/material/styles';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { clearxpath } from '../../../../utils/core/dataAccess';
-import { isValidJsonString, toCamelCase, capitalizeCamelCase } from '../../../../utils/core/stringUtils';
+import { isValidJsonString, toCamelCase } from '../../../../utils/core/stringUtils';
 import { getSizeFromValue, getShapeFromValue, getHoverTextType, getReducerArrayFromCollections } from '../../../../utils/ui/uiUtils';
-import { getResolvedColor, getColorFromMapping } from '../../../../utils/ui/colorUtils';
+import { getColorFromMapping, constructSourceFieldXpath, resolveColorFromSource, resolveColorFromPercentage, resolveFieldColors } from '../../../../utils/ui/colorUtils';
 import { getValueFromReduxStoreFromXpath } from '../../../../utils/redux/reduxUtils';
 import { floatToInt, getLocalizedValueAndSuffix } from '../../../../utils/formatters/numberUtils';
 import { validateConstraints } from '../../../../utils/validation/validationUtils';
@@ -67,22 +68,14 @@ const Cell = (props) => {
     } = props;
 
     const theme = useTheme();
-    const { collection } = props;
+    const { collection, modelName } = props;
     // const state = useSelector(state => state);
-    const reducerArray = useMemo(() => getReducerArrayFromCollections([props.collection]), [props.collection]);
-    const reducerDict = useSelector(state => {
-        const selected = {};
-        reducerArray.forEach(reducerName => {
-            const fieldName = 'modified' + capitalizeCamelCase(reducerName);
-            selected[reducerName] = {
-                [fieldName]: state[reducerName]?.[fieldName],
-            }
-        })
-        return selected;
-    }, (prev, curr) => {
-        return JSON.stringify(prev) === JSON.stringify(curr);
-    })
-    const { schema } = useSelector(state => state.schema);
+
+    // Fetch Redux data needed for min/max/autocomplete/color source resolution
+    const reducerDict = useReducerArrayFromCollections(props.collection);
+    const { schema, schemaCollections } = useSelector(state => state.schema);
+    // Get the collections array for this model
+    const modelCollections = modelName && schemaCollections ? schemaCollections[modelName] : null;
     const [active, setActive] = useState(false);
     const [open, setOpen] = useState(false);
     const [oldValue, setOldValue] = useState(null);
@@ -352,9 +345,26 @@ const Cell = (props) => {
             }
         }
     }
-    let color = getColorFromMapping(collection, currentValue, null, theme);
-    const isBackgroundColor = collection.colorTarget === 'background';
-    const colorStyle = getResolvedColor(color, theme, null, true, isBackgroundColor);
+    // Single memoized color resolution for both foreground and background
+    // Handles override check, color rules, and percentage-based coloring
+    // with single call to centralized utility - reduces code duplication
+    const colorResults = useMemo(() => {
+        return resolveFieldColors(
+            collection,
+            currentValue,
+            modelName,
+            theme,
+            reducerDict,
+            schemaCollections,
+            props.colorRules,
+            collection.key,
+            props.data
+        );
+    }, [collection, currentValue, modelName, theme, reducerDict, schemaCollections, props.colorRules, collection.key, props.data]);
+
+    // Extract styles directly from colorResults - resolveFieldColors already returns resolved colors and styles
+    const foregroundStyle = colorResults?.styles?.foreground;
+    const backgroundStyle = colorResults?.styles?.background;
     let tableCellRemove = dataRemove ? classes.remove : dataAdd ? classes.add : '';
     let disabledClass = disabled ? classes.disabled : '';
     if (props.ignoreDisable) {
@@ -396,11 +406,28 @@ const Cell = (props) => {
         }
         const classesStr = `${classes.cell} ${selectedClass} ${disabledClass} ${tableCellRemove} ${newUpdateClass}`;
         // Only apply colorStyle when there's no highlight update class active
-        let appliedColorStyle = newUpdateClass ? {} : colorStyle;
+        let appliedColorStyle = newUpdateClass ? {} : {};
 
-        // For chip display columns, add contrast text color if backgroundColor is present
-        if (isBackgroundColor && colorStyle?.backgroundColor && !colorStyle?.animation) {
-            const contrastTextColor = getContrastColor(colorStyle.backgroundColor);
+        // Merge foreground and background colors
+        if (foregroundStyle?.color) {
+            appliedColorStyle.color = foregroundStyle.color;
+        }
+        if (backgroundStyle?.backgroundColor) {
+            appliedColorStyle.backgroundColor = backgroundStyle.backgroundColor;
+        }
+
+        // Merge animations from either foreground or background
+        if (foregroundStyle?.animation) {
+            appliedColorStyle.animation = foregroundStyle.animation;
+        } else if (backgroundStyle?.animation) {
+            appliedColorStyle.animation = backgroundStyle.animation;
+        }
+
+        // Apply chip/badge styling for severity field with background color
+        // Note: Critical colors already include chip styling from getResolvedColor,
+        // so we only need to add it if it's not already present
+        if (collection.identifier === 'severity' && appliedColorStyle.backgroundColor && !appliedColorStyle.borderRadius) {
+            const contrastTextColor = getContrastColor(appliedColorStyle.backgroundColor);
             appliedColorStyle = {
                 ...appliedColorStyle,
                 color: contrastTextColor,
@@ -673,8 +700,12 @@ const Cell = (props) => {
                         value={value}
                         disabled={disabled}
                         thousandSeparator=','
-                        onValueChange={(values, sourceInfo) => handleTextChange(sourceInfo.event, type, xpath, values.value, dataxpath,
-                            validateConstraints(collection, values.value, min, max), dataSourceId, collection.source)}
+                        onValueChange={(values, sourceInfo) => {
+                            if (sourceInfo.source === 'prop') return;  // skip the update
+
+                            handleTextChange(sourceInfo.event, type, xpath, values.value, dataxpath,
+                                validateConstraints(collection, values.value, min, max), dataSourceId, collection.source)
+                        }}
                         variant='outlined'
                         decimalScale={decimalScale}
                         placeholder={placeholder}
@@ -1005,6 +1036,13 @@ const Cell = (props) => {
             maxFieldName = max.substring(max.lastIndexOf(".") + 1);
             max = getValueFromReduxStoreFromXpath(reducerDict, max);
         }
+
+        // Resolve target for deviation mode
+        let target = collection.target;
+        if (typeof (target) === DATA_TYPES.STRING) {
+            target = getValueFromReduxStoreFromXpath(reducerDict, target);
+        }
+
         const hoverType = getHoverTextType(collection.progressBar.hover_text_type);
         classesArray.push(classes.cell_no_padding);
         const classesStr = classesArray.join(' ');
@@ -1024,6 +1062,7 @@ const Cell = (props) => {
                     value={value}
                     min={min}
                     max={max}
+                    target={target}
                     valueFieldName={valueFieldName}
                     maxFieldName={maxFieldName}
                     hoverType={hoverType}
@@ -1186,6 +1225,21 @@ const Cell = (props) => {
         originalValue = originalValue.toLocaleString();
 
         const classesStr = classesArray.join(' ');
+
+        // Merge foreground and background colors for edit mode with previous/modified display
+        let editModeColorStyle = {};
+        if (foregroundStyle?.color) {
+            editModeColorStyle.color = foregroundStyle.color;
+        }
+        if (backgroundStyle?.backgroundColor) {
+            editModeColorStyle.backgroundColor = backgroundStyle.backgroundColor;
+        }
+        if (foregroundStyle?.animation) {
+            editModeColorStyle.animation = foregroundStyle.animation;
+        } else if (backgroundStyle?.animation) {
+            editModeColorStyle.animation = backgroundStyle.animation;
+        }
+
         return (
             <TableCell
                 className={classesStr}
@@ -1197,7 +1251,7 @@ const Cell = (props) => {
                 onMouseEnter={handleCellMouseEnter}
                 data-xpath={xpath}
                 data-dataxpath={dataxpath}>
-                <div style={colorStyle}>
+                <div style={editModeColorStyle}>
                     {originalValue ? <span className={classes.previous}>{originalValue}{numberSuffix}</span> : <span className={classes.previous}>{originalValue}</span>}
                     {value ? <span className={classes.modified}>{value}{numberSuffix}</span> : <span className={classes.modified}>{value}</span>}
                     {validationError.current && (
@@ -1215,19 +1269,39 @@ const Cell = (props) => {
         }
         const classesStr = classesArray.join(' ');
         // Only apply colorStyle when there's no highlight update class active
-        let appliedColorStyle = newUpdateClass ? {} : colorStyle;
+        let appliedColorStyle = {};
 
-        // For chip display columns, add contrast text color if backgroundColor is present
-        if (isBackgroundColor && colorStyle?.backgroundColor && !colorStyle?.animation) {
-            const contrastTextColor = getContrastColor(colorStyle.backgroundColor);
-            appliedColorStyle = {
-                ...appliedColorStyle,
-                color: contrastTextColor,
-                padding: '4px 12px',
-                borderRadius: '16px',
-                display: 'inline-block',
-                width: 'fit-content'
-            };
+        // Skip color application if highlight update class is active
+        if (!newUpdateClass) {
+            // Merge foreground and background colors
+            if (foregroundStyle?.color) {
+                appliedColorStyle.color = foregroundStyle.color;
+            }
+            if (backgroundStyle?.backgroundColor) {
+                appliedColorStyle.backgroundColor = backgroundStyle.backgroundColor;
+            }
+
+            // Merge animations from either foreground or background
+            if (foregroundStyle?.animation) {
+                appliedColorStyle.animation = foregroundStyle.animation;
+            } else if (backgroundStyle?.animation) {
+                appliedColorStyle.animation = backgroundStyle.animation;
+            }
+
+            // Apply chip/badge styling for severity field with background color
+            // Note: Critical colors already include chip styling from getResolvedColor,
+            // so we only need to add it if it's not already present
+            if (collection.identifier === 'severity' && appliedColorStyle.backgroundColor && !appliedColorStyle.borderRadius) {
+                const contrastTextColor = getContrastColor(appliedColorStyle.backgroundColor);
+                appliedColorStyle = {
+                    ...appliedColorStyle,
+                    color: contrastTextColor,
+                    padding: '4px 12px',
+                    borderRadius: '16px',
+                    display: 'inline-block',
+                    width: 'fit-content'
+                };
+            }
         }
 
         return (

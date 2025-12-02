@@ -59,18 +59,26 @@ class FastapiCallbackOverrideSetInstanceHandler(BaseFastapiPlugin, ABC):
         for model_type in model_type_list:
             output_str += f'\t\tcase "{model_type}":\n'
             if (project_dir := os.getenv("PROJECT_DIR")) is not None and len(project_dir):
-                if model_type in ["beanie", "dataclass", "msgspec"]:
-                    native_override_routes_callback_class_name = self.beanie_native_override_routes_callback_class_name
-                    base_override_routes_callback_class_name = self.beanie_bare_override_routes_callback_class_name
+                if self.need_cache_n_bare_overrides:
+                    if model_type in ["beanie", "dataclass", "msgspec"]:
+                        native_override_routes_callback_class_name = self.beanie_native_override_routes_callback_class_name
+                        base_override_routes_callback_class_name = self.beanie_bare_override_routes_callback_class_name
+                    else:
+                        native_override_routes_callback_class_name = self.cache_native_override_routes_callback_class_name
+                        base_override_routes_callback_class_name = self.cache_bare_override_routes_callback_class_name
+                    for override_routes_callback_class_name in [native_override_routes_callback_class_name,
+                                                                base_override_routes_callback_class_name]:
+                        callback_override_path = \
+                            self.import_path_from_os_path("PROJECT_DIR", f"app.{override_routes_callback_class_name}")
+                        routes_callback_class_name_override_camel_cased = \
+                            convert_to_capitalized_camel_case(override_routes_callback_class_name)
+                        output_str += f"\t\t\tfrom {callback_override_path} import " \
+                                      f"{routes_callback_class_name_override_camel_cased}\n"
                 else:
-                    native_override_routes_callback_class_name = self.cache_native_override_routes_callback_class_name
-                    base_override_routes_callback_class_name = self.cache_bare_override_routes_callback_class_name
-                for override_routes_callback_class_name in [native_override_routes_callback_class_name,
-                                                            base_override_routes_callback_class_name]:
                     callback_override_path = \
-                        self.import_path_from_os_path("PROJECT_DIR", f"app.{override_routes_callback_class_name}")
+                        self.import_path_from_os_path("PROJECT_DIR", f"app.{self.base_native_override_routes_callback_class_name}")
                     routes_callback_class_name_override_camel_cased = \
-                        convert_to_capitalized_camel_case(override_routes_callback_class_name)
+                        convert_to_capitalized_camel_case(self.base_native_override_routes_callback_class_name)
                     output_str += f"\t\t\tfrom {callback_override_path} import " \
                                   f"{routes_callback_class_name_override_camel_cased}\n"
                 output_str += "\n"
@@ -79,29 +87,34 @@ class FastapiCallbackOverrideSetInstanceHandler(BaseFastapiPlugin, ABC):
                 logging.exception(err_str)
                 raise Exception(err_str)
 
-            output_str += \
-                f"\t\t\tif {self.routes_callback_class_name}." \
-                f"{self.routes_callback_file_name}_instance is None:\n"
-            output_str += f'\t\t\t\toverride_type = config_yaml_dict.get("{model_type}_override_type")\n'
-            output_str += f'\t\t\t\tif override_type is None or override_type.lower() == "bare":\n'
-            routes_callback_class_name_override_camel_cased = \
-                convert_to_capitalized_camel_case(base_override_routes_callback_class_name)
-            output_str += f'\t\t\t\t\tcallback_override = {routes_callback_class_name_override_camel_cased}()\n'
-            output_str += f'\t\t\t\telif override_type.lower() == "native":\n'
-            routes_callback_class_name_override_camel_cased = \
-                convert_to_capitalized_camel_case(native_override_routes_callback_class_name)
-            output_str += f'\t\t\t\t\tcallback_override = {routes_callback_class_name_override_camel_cased}()\n'
-            output_str += f'\t\t\t\telse:\n'
-            output_str += f'\t\t\t\t\terr_str = f"Unsupported config value of {model_type}_override_type: ' + \
-                          '{override_type}"\n'
-            output_str += '\t\t\t\t\tlogging.exception(err_str)\n'
-            output_str += '\t\t\t\t\traise Exception(err_str)\n'
-            output_str += f"\t\t\t\t{self.routes_callback_class_name}.set_instance(callback_override)\n"
-            output_str += "\t\t\telse:\n"
-            output_str += f'\t\t\t\terr_str = f"set instance for ModelType {model_type} called more than ' \
-                          f'once in one session"\n'
-            output_str += '\t\t\t\tlogging.exception(err_str)\n'
-            output_str += '\t\t\t\traise Exception(err_str)\n'
+            if self.need_cache_n_bare_overrides:
+                output_str += \
+                    f"\t\t\tif {self.routes_callback_class_name}." \
+                    f"{self.routes_callback_file_name}_instance is None:\n"
+                output_str += f'\t\t\t\toverride_type = config_yaml_dict.get("{model_type}_override_type")\n'
+                output_str += f'\t\t\t\tif override_type is None or override_type.lower() == "bare":\n'
+                routes_callback_class_name_override_camel_cased = \
+                    convert_to_capitalized_camel_case(base_override_routes_callback_class_name)
+                output_str += f'\t\t\t\t\tcallback_override = {routes_callback_class_name_override_camel_cased}()\n'
+                output_str += f'\t\t\t\telif override_type.lower() == "native":\n'
+                routes_callback_class_name_override_camel_cased = \
+                    convert_to_capitalized_camel_case(native_override_routes_callback_class_name)
+                output_str += f'\t\t\t\t\tcallback_override = {routes_callback_class_name_override_camel_cased}()\n'
+                output_str += f'\t\t\t\telse:\n'
+                output_str += f'\t\t\t\t\terr_str = f"Unsupported config value of {model_type}_override_type: ' + \
+                              '{override_type}"\n'
+                output_str += '\t\t\t\t\tlogging.exception(err_str)\n'
+                output_str += '\t\t\t\t\traise Exception(err_str)\n'
+                output_str += "\t\t\telse:\n"
+                output_str += f'\t\t\t\terr_str = f"set instance for ModelType {model_type} called more than ' \
+                              f'once in one session"\n'
+                output_str += '\t\t\t\tlogging.exception(err_str)\n'
+                output_str += '\t\t\t\traise Exception(err_str)\n'
+            else:
+                routes_callback_class_name_override_camel_cased = \
+                    convert_to_capitalized_camel_case(self.base_native_override_routes_callback_class_name)
+                output_str += f'\t\t\tcallback_override = {routes_callback_class_name_override_camel_cased}()\n'
+            output_str += f"\t\t\t{self.routes_callback_class_name}.set_instance(callback_override)\n"
         output_str += '\t\tcase other:\n'
         output_str += '\t\t\terr_str = f"unsupported db type {model_type}"\n'
         output_str += '\t\t\tlogging.exception(err_str)\n'
@@ -125,9 +138,16 @@ class FastapiCallbackOverrideSetInstanceHandler(BaseFastapiPlugin, ABC):
                 PurePath(project_path) / "app" / self.cache_native_override_routes_callback_class_name
             cache_bare_callback_override_path = \
                 PurePath(project_path) / "app" / self.cache_bare_override_routes_callback_class_name
-            for file_path in [base_native_callback_override_path, beanie_native_callback_override_path,
-                              beanie_bare_callback_override_path, cache_native_callback_override_path,
-                              cache_bare_callback_override_path]:
+
+            # if option is set then only creating multiple variants of callback classes else only creating base class
+            if self.need_cache_n_bare_overrides:        # dynamically set - ignore warning
+                callback_override_set = [base_native_callback_override_path, beanie_native_callback_override_path,
+                                          beanie_bare_callback_override_path, cache_native_callback_override_path,
+                                          cache_bare_callback_override_path]
+            else:
+                callback_override_set = [base_native_callback_override_path]
+
+            for file_path in callback_override_set:
                 if not os.path.exists(f"{file_path}.py"):
                     with open(f"{file_path}.py", "w") as f:
                         base_native_override_class_name = \

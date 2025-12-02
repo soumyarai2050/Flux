@@ -10,6 +10,31 @@
     width: 100%;
 }
 
+/* Deviation Mode Styles */
+.deviation_bar_track {
+    position: relative;
+    width: 100%;
+    height: 5px;
+    background-color: var(--dark-bg-secondary);
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+.deviation_bar {
+    position: absolute;
+    top: 0;
+    height: 50%;
+    border-radius: 0px;
+    will-change: left, width;
+    transition: left 0.3s ease-in-out, width 0.3s ease-in-out;
+}
+
+.deviation_bar_cell {
+    height: 25px !important;
+    border-radius: 0px;
+}
+
+/* Color classes for MUI LinearProgress components */
 .critical :global .MuiLinearProgress-bar1Determinate {
     background-color: var(--red-critical) !important;
     animation: blink 0.5s step-start infinite;
@@ -36,6 +61,36 @@
 }
 
 .default :global .MuiLinearProgress-bar1Determinate {
+    background-color: var(--dark-bg-secondary) !important;
+}
+
+/* Color styles for deviation bar divs (when used as custom elements) */
+.deviation_bar.critical {
+    background-color: var(--red-critical) !important;
+    animation: blink 0.5s step-start infinite;
+}
+
+.deviation_bar.error {
+    background-color: var(--red-error) !important;
+}
+
+.deviation_bar.warning {
+    background-color: var(--yellow-warning) !important;
+}
+
+.deviation_bar.info {
+    background-color: var(--blue-info) !important;
+}
+
+.deviation_bar.debug {
+    background-color: var(--grey-debug) !important;
+}
+
+.deviation_bar.success {
+    background-color: var(--green-success) !important;
+}
+
+.deviation_bar.default {
     background-color: var(--dark-bg-secondary) !important;
 }
 

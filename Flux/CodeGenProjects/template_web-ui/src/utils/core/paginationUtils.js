@@ -68,10 +68,8 @@ export function convertFilterTypes(filters, fieldsMetadata, modelType) {
   }
 
   return filters.map(filter => {
-    // Determine how to match field metadata based on model type
-    const matchField = (modelType === MODEL_TYPES.ABBREVIATION_MERGE)
-      ? fieldsMetadata?.find(f => f.key === filter.column_name)
-      : fieldsMetadata?.find(f => f.tableTitle === filter.column_name);
+    // Determine how to match field metadata using identifier
+    const matchField = fieldsMetadata?.find(f => f.identifier === filter.column_name);
 
     const underlyingType = matchField?.underlyingtype || matchField?.type;
 

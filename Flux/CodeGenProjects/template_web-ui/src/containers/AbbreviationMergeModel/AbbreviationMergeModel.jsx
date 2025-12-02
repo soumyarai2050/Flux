@@ -18,7 +18,7 @@ import { createAutoBoundParams } from '../../utils/core/parameterBindingUtils';
 import { removeRedundantFieldsFromRows } from '../../utils/core/dataTransformation';
 import { dataSourcesSelectorEquality } from '../../utils/redux/selectorUtils';
 import { cleanAllCache } from '../../cache/attributeCache';
-import { useWebSocketWorker, useDataSourcesWebsocketWorker, useDownload, useModelLayout, useConflictDetection, useCountQuery, useBulkPatch } from '../../hooks';
+import { useWebSocketWorker, useDataSourcesWebsocketWorker, useDownload, useModelLayout, useConflictDetection, useCountQuery, useBulkPatch, useMarkedColumns } from '../../hooks';
 import { massageDataForBackend, convertFilterTypes, extractCrudParams, buildDefaultFilters } from '../../utils/core/paginationUtils';
 import { buildAvailableModelsMap, extractChildDataSourceDependencies, resolveDataSourceDependencies } from '../../utils/dynamicSchemaUtils/dataSourceUtils';
 // custom components
@@ -52,7 +52,7 @@ function getEffectiveStoredArrayDict(dataSourcesStoredArrayDict, effectiveStored
     return dict;
 }
 
-function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap, dataSources }) {
+function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap, dataSources, isInPopover = false, onRemoveFromPopover = null }) {
     const { schema: projectSchema, schemaCollections } = useSelector((state) => state.schema);
 
     const { schema: modelSchema, fieldsMetadata: modelFieldsMetadata, actions, selector } = modelDataSource;
@@ -255,6 +255,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap
         handleMoreAllToggle,
         handleShowHiddenToggle,
         handleShowMoreToggle,
+        handleColorRuleOverrideChange,
     } = useModelLayout(modelName, objId, MODEL_TYPES.ABBREVIATION_MERGE, setHeadCells, mode);
 
     // Current chart's multiselect state (derived after modelLayoutData is available)
@@ -1156,6 +1157,11 @@ function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap
         dispatch(actions.setError(null));
     }
 
+    // Mark columns with shownByToggle flag based on visibility states
+    const { markedHeadCells, markedSortedCells, markedCommonKeys } = useMarkedColumns(
+        headCells, sortedCells, commonKeys, showHidden, showMore, showAll, moreAll
+    );
+
     const debouncedRowSelect = useRef(
         debounce((id) => {
             dataSources.forEach(({ actions: dsActions }) => {
@@ -1301,7 +1307,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap
 
         return (
             <Wrapper {...wrapperProps} >
-                <CommonKeyWidget mode={wrapperMode} commonkeys={commonKeys} collapse={modelLayoutData.common_key_collapse} />
+                <CommonKeyWidget mode={wrapperMode} commonkeys={markedCommonKeys} collapse={modelLayoutData.common_key_collapse} colorRules={modelLayoutData.color_rules || []} />
                 <AbbreviationMergeView
                     bufferedFieldMetadata={bufferedFieldMetadata}
                     loadedFieldMetadata={loadedFieldMetadata}
@@ -1313,7 +1319,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap
                     mode={wrapperMode}
                     rows={groupedRows}
                     activeRows={activeRows}
-                    cells={sortedCells}
+                    cells={markedSortedCells}
                     sortOrders={modelLayoutData.sort_orders || []}
                     onSortOrdersChange={handleSortOrdersChange}
                     dataSourcesStoredArrayDict={effectiveStoredArrayDict}
@@ -1346,6 +1352,8 @@ function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap
                     baselineDictionary={baselineDictionaryRef.current}
                     dataSourcesModeDict={dataSourcesModeDict}
                     maxRowSize={maxRowSize}
+                    modelName={dataSources[0]?.name}
+                    colorRules={modelLayoutData.color_rules || []}
                 />
             </Wrapper>
         )
@@ -1362,10 +1370,12 @@ function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap
                     name={modelTitle}
                     isMaximized={isMaximized}
                     onMaximizeToggle={handleFullScreenToggle}
+                    isInPopover={isInPopover}
+                    onRemoveFromPopover={onRemoveFromPopover}
                 >
                     <MenuGroup
                         // column settings
-                        columns={headCells}
+                        columns={markedHeadCells}
                         columnOrders={modelLayoutData.column_orders || []}
                         showAll={showAll}
                         moreAll={moreAll}
@@ -1405,7 +1415,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap
                         onDownload={handleDownload}
                         // edit save
                         onModeToggle={handleModeToggle}
-                        isReadOnly={modelLayoutOption.is_read_only ?? false}
+                        isReadOnly={(modelLayoutOption.is_read_only ?? false) || rows.length === 0}
                         onSave={handleSave}
                         // layout switch
                         layout={layoutType}
@@ -1415,7 +1425,7 @@ function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap
                         isMaximized={isMaximized}
                         onMaximizeToggle={handleFullScreenToggle}
                         // dynamic menu
-                        commonKeys={commonKeys}
+                        commonKeys={markedCommonKeys}
                         onButtonToggle={handleButtonToggle}
                         // button query menu
                         modelSchema={modelSchema}
@@ -1457,6 +1467,9 @@ function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap
                         onHighlightDurationChange={handleHighlightDurationChange}
                         noCommonKeyOverride={modelLayoutData.no_common_key_override || []}
                         onNoCommonKeyOverrideChange={handleNoCommonKeyOverrideChange}
+                        // color rule overrides
+                        colorRules={modelLayoutData.color_rules || []}
+                        onColorRuleOverrideChange={handleColorRuleOverrideChange}
                     />
                 </ModelCardHeader>
                 <ModelCardContent

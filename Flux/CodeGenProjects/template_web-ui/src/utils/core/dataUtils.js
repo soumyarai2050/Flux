@@ -113,14 +113,8 @@ export function getCollectionByName(collections, name, isCollectionType = false)
     if (!collections) {
         throw new Error(`getCollectionByName failed: 'collections' list is null or undefined. Received: ${collections}`);
     }
-    let collection;
-    if (isCollectionType) {
-        // Find collection by 'key' if it's a collection type.
-        collection = collections.find(collection => collection.key === name);
-    } else {
-        // Find collection by 'tableTitle' otherwise.
-        collection = collections.find(collection => collection.tableTitle === name);
-    }
+    // Find collection by 'identifier' for consistent lookup across model types
+    const collection = collections.find(collection => collection.identifier === name);
     if (!collection) {
         throw new Error(`getCollectionByName failed: no collection object found for name: ${name}`);
     }

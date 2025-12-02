@@ -60,8 +60,50 @@ function makeRenderer(opts = {}) {
             const pivotData = new PivotData(this.props);
             const colAttrs = pivotData.props.cols;
             const rowAttrs = pivotData.props.rows;
-            const rowKeys = pivotData.getRowKeys();
-            const colKeys = pivotData.getColKeys();
+            let rowKeys = pivotData.getRowKeys();
+            let colKeys = pivotData.getColKeys();
+
+            // Apply custom sorting if sorters are provided via tableOptions
+            const activeSorters = (this.props.tableOptions && this.props.tableOptions.activeSorters) || {};
+            const activeSortTypes = (this.props.tableOptions && this.props.tableOptions.activeSortTypes) || {};
+
+            // Map sort type to icon and tooltip
+            const sortIconMap = {
+                'asc': { icon: '↓', tooltip: 'A to Z' },
+                'desc': { icon: '↑', tooltip: 'Z to A' },
+                'asc_abs': { icon: '↓±', tooltip: '(Abs)' },
+                'desc_abs': { icon: '↑±', tooltip: '(Abs)' }
+            };
+
+            // Sort row keys if a sorter is active for any row attribute
+            if (Object.keys(activeSorters).length > 0) {
+                rowKeys = rowKeys.sort((a, b) => {
+                    for (let i = 0; i < rowAttrs.length; i++) {
+                        const attr = rowAttrs[i];
+                        // Look for row-prefixed sorter
+                        const sorterKey = `row_${attr}`;
+                        if (activeSorters[sorterKey]) {
+                            const result = activeSorters[sorterKey](a[i], b[i]);
+                            if (result !== 0) return result;
+                        }
+                    }
+                    return 0;
+                });
+
+                // Sort column keys if a sorter is active for any column attribute
+                colKeys = colKeys.sort((a, b) => {
+                    for (let i = 0; i < colAttrs.length; i++) {
+                        const attr = colAttrs[i];
+                        // Look for column-prefixed sorter
+                        const sorterKey = `col_${attr}`;
+                        if (activeSorters[sorterKey]) {
+                            const result = activeSorters[sorterKey](a[i], b[i]);
+                            if (result !== 0) return result;
+                        }
+                    }
+                    return 0;
+                });
+            }
             const grandTotalAggregator = pivotData.getAggregator([], []);
 
             // Extract field names from vals array (the aggregated field names)
@@ -145,14 +187,33 @@ function makeRenderer(opts = {}) {
             return (
                 <table className="pvtTable">
                     <thead>
-                        {colAttrs.map(function (c, j) {
+                        {colAttrs.map((c, j) => {
                             return (
                                 <tr key={`colAttr${j}`}>
                                     {j === 0 && rowAttrs.length !== 0 && (
                                         <th colSpan={rowAttrs.length} rowSpan={colAttrs.length} />
                                     )}
-                                    <th className="pvtAxisLabel">{c}</th>
-                                    {colKeys.map(function (colKey, i) {
+                                    {/* <th className="pvtAxisLabel">{c}</th>
+                                     */}
+                                    <th className="pvtAxisLabel">
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                            <span>{c}</span>
+                                            {activeSortTypes[`col_${c}`] && sortIconMap[activeSortTypes[`col_${c}`]] && (
+                                                <span
+                                                    style={{
+                                                        color: '#4CAF50',
+                                                        fontWeight: 'bold',
+                                                        cursor: 'pointer',
+                                                        fontSize: '14px'
+                                                    }}
+                                                    title={sortIconMap[activeSortTypes[`col_${c}`]].tooltip}
+                                                >
+                                                    {sortIconMap[activeSortTypes[`col_${c}`]].icon}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </th>
+                                    {colKeys.map((colKey, i) => {
                                         const x = spanSize(colKeys, i, j);
                                         if (x === -1) {
                                             return null;
@@ -189,10 +250,28 @@ function makeRenderer(opts = {}) {
 
                         {rowAttrs.length !== 0 && (
                             <tr>
-                                {rowAttrs.map(function (r, i) {
+                                {rowAttrs.map((r, i) => {
                                     return (
+                                        // <th className="pvtAxisLabel" key={`rowAttr${i}`}>
+                                        //     {r}
+                                        // </th>
                                         <th className="pvtAxisLabel" key={`rowAttr${i}`}>
-                                            {r}
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <span>{r}</span>
+                                                {activeSortTypes[`row_${r}`] && sortIconMap[activeSortTypes[`row_${r}`]] && (
+                                                    <span
+                                                        style={{
+                                                            color: '#4CAF50',
+                                                            fontWeight: 'bold',
+                                                            cursor: 'pointer',
+                                                            fontSize: '14px'
+                                                        }}
+                                                        title={sortIconMap[activeSortTypes[`row_${r}`]].tooltip}
+                                                    >
+                                                        {sortIconMap[activeSortTypes[`row_${r}`]].icon}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </th>
                                     );
                                 })}
@@ -204,11 +283,11 @@ function makeRenderer(opts = {}) {
                     </thead>
 
                     <tbody>
-                        {rowKeys.map(function (rowKey, i) {
+                        {rowKeys.map((rowKey, i) => {
                             const totalAggregator = pivotData.getAggregator(rowKey, []);
                             return (
                                 <tr key={`rowKeyRow${i}`}>
-                                    {rowKey.map(function (txt, j) {
+                                    {rowKey.map((txt, j) => {
                                         const x = spanSize(rowKeys, i, j);
                                         if (x === -1) {
                                             return null;
@@ -228,7 +307,7 @@ function makeRenderer(opts = {}) {
                                             </th>
                                         );
                                     })}
-                                    {colKeys.map(function (colKey, j) {
+                                    {colKeys.map((colKey, j) => {
                                         const aggregator = pivotData.getAggregator(rowKey, colKey);
                                         const rawValue = aggregator.value();
                                         const formattedValue = aggregator.format(rawValue);
@@ -285,7 +364,7 @@ function makeRenderer(opts = {}) {
                                 Totals
                             </th>
 
-                            {colKeys.map(function (colKey, i) {
+                            {colKeys.map((colKey, i) => {
                                 const totalAggregator = pivotData.getAggregator([], colKey);
                                 return (
                                     <td

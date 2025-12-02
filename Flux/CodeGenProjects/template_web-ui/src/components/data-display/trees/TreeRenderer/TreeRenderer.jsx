@@ -53,6 +53,9 @@ const TreeRenderer = ({
     animatingNodes,
     // Original toggle function for default expansion
     originalHandleNodeToggle,
+    // Color rules override
+    colorRules = [],
+    modelName,
 }) => {
     if (element.id === "root") return null;
 
@@ -579,6 +582,7 @@ const TreeRenderer = ({
                     visualState={visualState}
                     pinnedFilters={pinnedFilters}
                     enableQuickFilterPin={enableQuickFilterPin}
+                    colorRules={ComponentToRender === Node ? colorRules : undefined}
                 />
             </li>
         );

@@ -28,6 +28,7 @@ import ClearAll from '@mui/icons-material/ClearAll';
 import Save from '@mui/icons-material/Save';
 import { getDataxpathV2, generateRowTrees, clearxpath } from '../../../../utils/core/dataAccess';
 import { copyToClipboard } from '../../../../utils/core/stringUtils';
+import { extractCellDataDependencies } from '../../../../utils/ui/uiUtils';
 import { cloneDeep, get, set } from 'lodash';
 import { DB_ID, MODES, DATA_TYPES, MODEL_TYPES, MIN_ROWS_FOR_PAGINATION } from '../../../../constants';
 import { flux_toggle, flux_trigger_strat } from '../../../../projectSpecificUtils';
@@ -39,7 +40,8 @@ import { useScrollIndicators, useKeyboardNavigation } from '../../../../hooks';
 import TablePaginationControl from '../../../controls/table-controls/TablePaginationControl';
 import ScrollIndicators from '../../../controls/table-controls/ScrollIndicators';
 import { ContextMenu } from '../../../ui/ContextMenu';
-import { hasButttonActions, aggregateButtonActionsByType } from '../../../../utils/bulkPatchUtils';
+import { hasButttonActions, aggregateButtonActionsByState } from '../../../../utils/bulkPatchUtils';
+import HideNullValuesMenu from '../../../controls/menus/HideNullValuesMenu';
 // import { useBoundaryScrollDetection } from '../../../hooks';
 
 const DataTable = ({
@@ -84,6 +86,9 @@ const DataTable = ({
   onSelectionChange: externalOnSelectionChange,
   totalCount,
   serverSideFilterSortEnabled,
+  hideNullValues = false,
+  onHideNullValuesToggle,
+  colorRules = [],
 }) => {
 
   const { schema: projectSchema } = useSelector((state) => state.schema);
@@ -127,7 +132,7 @@ const DataTable = ({
   // Profile change detection - reset selections when layout profile changes
   const currentProfileId = useSelector(state => state.ui_layout?.storedUILayoutObj?.profile_id);
   const prevProfileIdRef = useRef(currentProfileId);
-  
+
   //on profile change resetting all selection points
   useEffect(() => {
     if (prevProfileIdRef.current && prevProfileIdRef.current !== currentProfileId) {
@@ -473,7 +478,6 @@ const DataTable = ({
     setContextMenuAnchorEl(null);
   }
 
- 
   const handleRowsPerPageChange = (e) => {
     const updatedRowsPerPage = parseInt(e.target.value, 10);
     onRowsPerPageChange(updatedRowsPerPage);
@@ -613,12 +617,12 @@ const DataTable = ({
       }
     });
 
-    // Now aggregate button actions from the selected rows
-    return aggregateButtonActionsByType(
+    // Now aggregate button actions from the selected rows grouped by state
+    // This creates a hierarchical structure with sub-actions for different states
+    return aggregateButtonActionsByState(
       localSelectedRows,
       selectedRowData,
       cells,
-      fieldsMetadata,
       modelType
     );
   }, [localSelectedRows, rows, cells, fieldsMetadata, modelType]);
@@ -782,7 +786,10 @@ const DataTable = ({
                           onAutocompleteOptionChange={handleAutocompleteChange}
                           onDateTimeChange={handleDateTimeChange}
                           stickyPosition={stickyPosition}
+                          modelName={modelName}
+                          data={extractCellDataDependencies(row, cell)}
                           highlightDuration={highlightDuration}
+                          colorRules={colorRules}
                         />
                       );
                     })}
@@ -820,6 +827,14 @@ const DataTable = ({
       >
         <ModelCard>
           <ModelCardHeader name={modelName}>
+            <HideNullValuesMenu
+              hideNullValues={hideNullValues}
+              onHideNullValuesToggle={onHideNullValuesToggle}
+              isPinned={false}
+              onPinToggle={() => {}}
+              menuType="icon"
+              onMenuClose={() => {}}
+            />
             <Icon name='save' title='save' onClick={handleModalToggle}><Save fontSize='small' color='white' /></Icon>
           </ModelCardHeader>
           <ModelCardContent>
@@ -836,6 +851,8 @@ const DataTable = ({
               selectedId={selectedId}
               treeLevel={10}
               disablePagination={true}
+              hideNullValues={hideNullValues}
+              colorRules={colorRules}
             />
           </ModelCardContent>
         </ModelCard>

@@ -225,6 +225,7 @@ export function createCollections(schema, currentSchema, callerProps, collection
         if (primitiveDataTypes.includes(v.type)) {
             collection.key = k;
             collection.tableTitle = objectxpath ? objectxpath + '.' + k : k;
+            collection.identifier = collection.tableTitle;
             collection.sequenceNumber = sequence.sequence;
             sequence.sequence += 1;
             collection.xpath = xpath ? xpath + '.' + k : k;
@@ -311,6 +312,7 @@ export function createCollections(schema, currentSchema, callerProps, collection
             collection.key = k;
             let elaborateTitle = objectxpath ? objectxpath + '.' + k : k;
             collection.tableTitle = elaborateTitle;
+            collection.identifier = collection.tableTitle;
             collection.sequenceNumber = sequence.sequence;
             sequence.sequence += 1;
             let updatedxpath = xpath ? xpath + '.' + k : k;
@@ -376,6 +378,7 @@ export function createCollections(schema, currentSchema, callerProps, collection
             collection.key = k;
             let elaborateTitle = objectxpath ? objectxpath + '.' + k : k;
             collection.tableTitle = elaborateTitle;
+            collection.identifier = collection.tableTitle;
             collection.sequenceNumber = sequence.sequence;
             sequence.sequence += 1;
             let updatedxpath = xpath ? xpath + '.' + k : k;

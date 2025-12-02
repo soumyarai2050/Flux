@@ -94,6 +94,8 @@ export function getAbbreviatedCollections(widgetCollectionsDict, loadListFieldAt
         collection.elaborateTitle = false;
         collection.sequenceNumber = sequenceNumber;
         collection.type = 'alert_bubble'
+        // Set identifier for consistent lookup across model types (uses key for abbreviated collections)
+        collection.identifier = collection.key;
         // source to fetch value of bubble
         const bubbleSource = loadListFieldAttrs.alertBubbleSource;
         collection.alertBubbleSource = bubbleSource;
@@ -155,6 +157,8 @@ export function getAbbreviatedCollections(widgetCollectionsDict, loadListFieldAt
             collection.rootLevel = false;
             collection.key = title;
             collection.title = title;
+            // Set identifier for consistent lookup across model types (uses key for abbreviated collections)
+            collection.identifier = collection.key;
             // TODO: check the scenario in which xpath and tableTitle are different
             collection.tableTitle = xpath;
             collection.xpath = xpath;
@@ -362,15 +366,29 @@ export function sortColumns(collections, columnOrders, groupBy = false, center =
 export function getReducerArrayFromCollections(collections) {
     const reducerArray = [];
     collections
-        .filter(col => typeof col.min === DATA_TYPES.STRING || typeof col.max === DATA_TYPES.STRING || col.dynamic_autocomplete)
+        .filter(col => {
+            const hasMinString = typeof col.min === DATA_TYPES.STRING;
+            const hasMaxString = typeof col.max === DATA_TYPES.STRING;
+            const hasDynamicAutocomplete = col.dynamic_autocomplete;
+            const hasColorSrc = typeof col.colorSrc === DATA_TYPES.STRING;
+            const hasBackgroundColorSrc = typeof col.backgroundColorSrc === DATA_TYPES.STRING;
+
+            return hasMinString || hasMaxString || hasDynamicAutocomplete || hasColorSrc || hasBackgroundColorSrc;
+        })
         .map(col => {
-            const dynamicListenProperties = ['min', 'max', 'autocomplete'];
+            const dynamicListenProperties = ['min', 'max', 'autocomplete', 'colorSrc', 'backgroundColorSrc'];
             dynamicListenProperties.forEach(property => {
                 if (col.hasOwnProperty(property) && typeof col[property] === DATA_TYPES.STRING) {
                     if (property === 'autocomplete' && !col.dynamic_autocomplete) {
                         return;
                     }
-                    const reducerName = col[property].split('.')[0];
+                    // For colorSrc and backgroundColorSrc, extract the path part before pipe (if present)
+                    // E.g., "model.field|5>ERROR" → "model.field"
+                    let pathPart = col[property];
+                    if ((property === 'colorSrc' || property === 'backgroundColorSrc') && pathPart.includes('|')) {
+                        pathPart = pathPart.split('|')[0].trim();
+                    }
+                    const reducerName = pathPart.split('.')[0];
                     if (!reducerArray.includes(reducerName)) {
                         reducerArray.push(reducerName);
                     }
@@ -899,4 +917,80 @@ export function getShapeFromValue(value) {
 export function getHoverTextType(value) {
     let hoverType = value.trim();
     return hoverType;
+}
+
+/**
+ * Extracts only the fields that the Cell component needs for color resolution.
+ * This optimization prevents unnecessary re-renders when unrelated row fields change.
+ *
+ * The Cell component uses props.data only to resolve colors based on:
+ * - colorSrc: Direct field reference for foreground color
+ * - colorPercentage: Min/max fields for percentage-based foreground color
+ * - backgroundColorSrc: Direct field reference for background color
+ * - backgroundColorPercentage: Min/max fields for percentage-based background color
+ *
+ * By extracting only these color-dependent fields, we create a smaller object
+ * that prevents the useMemo dependency in Cell (lines 385, 428) from triggering
+ * on unrelated row field changes.
+ */
+export function extractCellDataDependencies(row, collection) {
+    if (!collection || !row) {
+        return {}; 
+    }
+
+    const fieldsToExtract = new Set();
+
+    // Extract fields from colorSrc configuration
+    if (collection.colorSrc) {
+        const sourcePath = collection.colorSrc.split('|')[0]; // Get field before | separator
+        fieldsToExtract.add(sourcePath);
+    }
+
+    // Extract min/max fields from colorPercentage configuration
+    if (collection.colorPercentage) {
+        const parts = collection.colorPercentage.split('|');
+        fieldsToExtract.add(parts[0]); // min field
+        if (parts[1]) {
+            fieldsToExtract.add(parts[1]); // max field
+        }
+    }
+
+    // Extract fields from backgroundColorSrc configuration
+    if (collection.backgroundColorSrc) {
+        const sourcePath = collection.backgroundColorSrc.split('|')[0];
+        fieldsToExtract.add(sourcePath);
+    }
+
+    // Extract min/max fields from backgroundColorPercentage configuration
+    if (collection.backgroundColorPercentage) {
+        const parts = collection.backgroundColorPercentage.split('|');
+        fieldsToExtract.add(parts[0]); // min field
+        if (parts[1]) {
+            fieldsToExtract.add(parts[1]); // max field
+        }
+    }
+
+    // If no color dependencies exist, return empty object
+    // This happens when the cell has no color configuration
+    // Returning empty object instead of full row prevents unnecessary re-renders
+    if (fieldsToExtract.size === 0) {
+        return {};
+    }
+
+    // Extract only the color-dependent fields using lodash get()
+    // This safely handles nested paths like "dashboard.rt_dash.severity"
+    const optimized = {};
+    fieldsToExtract.forEach(fieldPath => {
+        // First try the full path (handles nested structures like "dashboard.rt_dash.severity")
+        let value = get(row, fieldPath);
+
+        if (value === undefined && fieldPath.includes('.')) {
+            const fieldName = fieldPath.split('.').pop();
+            value = get(row, fieldName);
+        }
+
+        optimized[fieldPath] = value;
+    });
+
+    return optimized;
 }

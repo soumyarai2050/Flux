@@ -69,8 +69,6 @@ const JoinMenu = ({
 
   if (![MODEL_TYPES.ABBREVIATION_MERGE, MODEL_TYPES.REPEATED_ROOT].includes(modelType)) return null;
 
-  const keyField = modelType === MODEL_TYPES.ABBREVIATION_MERGE ? 'key' : 'tableTitle';
-
   const renderMenu = (menuName) => {
     const PinCompononent = isPinned ? PushPin : PushPinOutlined;
     switch (menuName) {
@@ -155,16 +153,16 @@ const JoinMenu = ({
         onClose={handlePopoverClose}
       >
         {fieldsMetadata.map((meta) => (
-          <MenuItem key={meta[keyField]} dense>
+          <MenuItem key={meta.identifier} dense>
             <FormControlLabel
               sx={{ display: 'flex', flex: 1 }}
               size='small'
-              label={meta[keyField]}
+              label={meta.identifier}
               control={
                 <Checkbox
                   size='small'
-                  checked={joinBy.includes(meta[keyField])}
-                  onChange={(e) => onJoinByChange(e, meta[keyField])}
+                  checked={joinBy.includes(meta.identifier)}
+                  onChange={(e) => onJoinByChange(e, meta.identifier)}
                 />
               }
             />

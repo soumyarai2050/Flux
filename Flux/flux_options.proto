@@ -210,7 +210,7 @@ extend google.protobuf.FileOptions
   repeated FluxImportFileModel FluxFileImportDependencyModel = 55255;
   optional DateTimeGranularity FluxFileDateTimeGranularity = 55256 [default=MILLI_SEC];
   optional string FluxFileDateTimePrintTimezone = 55257; // to know what should be tz of datetime that we show through any medium
-
+  optional bool FluxFileAddBareNCacheOverrideCallbacks = 55258;
 }
 
 extend google.protobuf.MessageOptions
@@ -394,7 +394,11 @@ extend google.protobuf.FieldOptions
   optional string FluxFldNodeMetaQuery = 55297;
   optional string FluxFldEdgeMetaQuery = 55298;
   optional string FluxFldQueryParamBind = 55299; // Bind this field's value to a query parameter when triggering FluxMsgButtonQuery
-  optional string FluxFldColorTarget = 55300; // Use this to specify if FluxFldColor applies to "text" (or "foreground") or "background"
+  optional string FluxFldBackgroundColor = 55300; // Use this to set display color of a field's background based on static or dynamic rules
+  optional string FluxFldColorSrc = 55301; // Use this to set field color based on value of another field with option to override existing color rules
+  optional string FluxFldBackgroundColorSrc = 55302; // Use this to set field background color based on value of another field with option to override existing rules
+  optional string FluxFldColorPercentage = 55303; // Use this for color based on percentage calculated from min, max, target source field and current value with color rule
+  optional string FluxFldBackgroundColorPercentage = 55304; // Use this for background color based on percentage calculated from min, max, target source field and current value with color rule
 
   //Complexity Option - 56
   optional string FluxFldCmplxHigh = 56151;

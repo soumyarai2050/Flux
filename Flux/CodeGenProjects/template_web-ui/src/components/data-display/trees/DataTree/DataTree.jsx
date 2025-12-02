@@ -44,7 +44,9 @@ const DataTree = ({
     pinnedFilters = [],
     isDisabled = false,
     enableQuickFilterPin = false,
-    disablePagination = false
+    disablePagination = false,
+    hideNullValues = false,
+    colorRules = []
 }) => {
     const [treeData, setTreeData] = useState([]);
     const [originalTree, setOriginalTree] = useState([]);
@@ -169,11 +171,11 @@ const DataTree = ({
             ITEMS_PER_PAGE, DATA_TYPES,
             enableObjectPagination, filters,
             quickFilter, pinnedFilters: cleanPinnedFilters,
-            disablePagination
+            disablePagination, hideNullValues, colorRules
         };
     }, [
         projectSchema, modelName, updatedData, storedData, subtree, mode, xpath,
-        selectedId, showHidden, paginatedNodes, enableObjectPagination, filters, quickFilter, pinnedFilters, disablePagination
+        selectedId, showHidden, paginatedNodes, enableObjectPagination, filters, quickFilter, pinnedFilters, disablePagination, hideNullValues, colorRules
     ]);
 
     // Main effect to communicate with the worker when props change.
@@ -213,7 +215,7 @@ const DataTree = ({
         }
     }, [
         projectSchema, modelName, updatedData, storedData, subtree, mode, xpath,
-        selectedId, showHidden, paginatedNodes, enableObjectPagination, filters, quickFilter, pinnedFilters, disablePagination
+        selectedId, showHidden, paginatedNodes, enableObjectPagination, filters, quickFilter, pinnedFilters, disablePagination, hideNullValues, colorRules
     ]);
 
     // Resets the full regeneration flag after a forced remount.
@@ -430,6 +432,8 @@ const DataTree = ({
                 getNodeAnimationProps={getNodeAnimationProps}
                 animatingNodes={animatingNodes}
                 originalHandleNodeToggle={handleNodeToggle}
+                colorRules={colorRules}
+                modelName={modelName}
             />
         );
     };
@@ -664,7 +668,8 @@ DataTree.propTypes = {
     pinnedFilters: PropTypes.array,
     isDisabled: PropTypes.bool,
     enableQuickFilterPin: PropTypes.bool,
-    disablePagination: PropTypes.bool
+    disablePagination: PropTypes.bool,
+    hideNullValues: PropTypes.bool
 };
 
 DataTree.defaultProps = {
@@ -675,7 +680,8 @@ DataTree.defaultProps = {
     filters: [],
     isDisabled: false,
     enableQuickFilterPin: false,
-    disablePagination: false
+    disablePagination: false,
+    hideNullValues: false
 };
 
 export default DataTree;

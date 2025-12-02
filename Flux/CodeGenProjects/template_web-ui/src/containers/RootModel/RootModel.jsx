@@ -14,7 +14,7 @@ import {
 } from '../../utils/ui/uiUtils';
 import { createAutoBoundParams } from '../../utils/core/parameterBindingUtils';
 import { cleanAllCache } from '../../cache/attributeCache';
-import { useWebSocketWorker, useDownload, useModelLayout, useConflictDetection, useCountQuery, useBulkPatch } from '../../hooks';
+import { useWebSocketWorker, useDownload, useModelLayout, useConflictDetection, useCountQuery, useBulkPatch, useMarkedColumns } from '../../hooks';
 import { massageDataForBackend, shouldUsePagination, buildDefaultFilters, extractCrudParams, convertFilterTypes } from '../../utils/core/paginationUtils';
 // custom components
 import { FullScreenModalOptional } from '../../components/ui/Modal';
@@ -29,7 +29,7 @@ import DataJoinGraph from '../../components/data-display/graphs/DataJoinGraph/Da
 import ChatView from '../../components/data-display/ChatView';
 import Box from '@mui/material/Box';
 
-function RootModel({ modelName, modelDataSource, modelDependencyMap }) {
+function RootModel({ modelName, modelDataSource, modelDependencyMap, isInPopover = false, onRemoveFromPopover = null }) {
     const { schema: projectSchema, schemaCollections } = useSelector((state) => state.schema);
     const { schema: modelSchema, fieldsMetadata, actions, selector, isAbbreviationSource = false } = modelDataSource;
     const { storedObj, updatedObj, objId, mode, allowUpdates, isCreating, error, isLoading, popupStatus } = useSelector(selector);
@@ -80,6 +80,7 @@ function RootModel({ modelName, modelDataSource, modelDependencyMap }) {
     const [uniqueValues, setUniqueValues] = useState({});
     const [isProcessingUserActions, setIsProcessingUserActions] = useState(false);
     const [reconnectCounter, setReconnectCounter] = useState(0);
+    const [hideNullValues, setHideNullValues] = useState(false);
 
     const {
         modelLayoutOption,
@@ -108,6 +109,7 @@ function RootModel({ modelName, modelDataSource, modelDependencyMap }) {
         handleColumnNameOverrideChange,
         handleHighlightUpdateOverrideChange,
         handleHighlightDurationChange,
+        handleColorRuleOverrideChange,
         handleNoCommonKeyOverrideChange,
         // handleDataSourceColorsChange,
         // handleJoinByChange,
@@ -431,7 +433,8 @@ function RootModel({ modelName, modelDataSource, modelDependencyMap }) {
                 highlightUpdateOverride: modelLayoutData.highlight_update_override || [],
                 columnOrders: modelLayoutData.column_orders || [],
                 noCommonKeyOverride: modelLayoutData.no_common_key_override || [],
-                serverSidePaginationEnabled: false // Pass this false as in case of RootModel we want to enforce client side pagination control in both cases 
+                serverSidePaginationEnabled: false, // Pass this false as in case of RootModel we want to enforce client side pagination control in both cases
+                hideNullValues
             }
 
             const updatedOptionsRef = {
@@ -466,7 +469,7 @@ function RootModel({ modelName, modelDataSource, modelDependencyMap }) {
         }
     }, [
         storedObj, updatedObj, objId, fieldsMetadata, modelLayoutData, modelLayoutOption, page, mode,
-        showMore, moreAll, showHidden, showAll
+        showMore, moreAll, showHidden, showAll, hideNullValues
     ])
 
     const handleModelDataSourceUpdate = (updatedArray) => {
@@ -718,17 +721,22 @@ function RootModel({ modelName, modelDataSource, modelDependencyMap }) {
         dispatch(actions.setError(null));
     }
 
+    // Mark columns with shownByToggle flag based on visibility states
+    const { markedHeadCells, markedSortedCells, markedCommonKeys } = useMarkedColumns(
+        headCells, sortedCells, commonKeys, showHidden, showMore, showAll, moreAll
+    );
+
     // A helper function to decide which content to render based on layoutType
     const renderContent = () => {
         switch (layoutType) {
             case LAYOUT_TYPES.TABLE:
                 return (
                     <>
-                        <CommonKeyWidget mode={mode} commonkeys={commonKeys} collapse={modelLayoutData.common_key_collapse} />
+                        <CommonKeyWidget mode={mode} commonkeys={markedCommonKeys} collapse={modelLayoutData.common_key_collapse} colorRules={modelLayoutData.color_rules} />
                         <DataTable
                             rows={groupedRows}
                             activeRows={activeRows}
-                            cells={sortedCells}
+                            cells={markedSortedCells}
                             mode={mode}
                             sortOrders={modelLayoutData.sort_orders || []}
                             onSortOrdersChange={handleSortOrdersChange}
@@ -759,6 +767,9 @@ function RootModel({ modelName, modelDataSource, modelDependencyMap }) {
                             uniqueValues={uniqueValues}
                             highlightDuration={modelLayoutData.highlight_duration ?? DEFAULT_HIGHLIGHT_DURATION}
                             serverSideFilterSortEnabled={serverSideFilterSortEnabled}
+                            hideNullValues={hideNullValues}
+                            onHideNullValuesToggle={setHideNullValues}
+                            colorRules={modelLayoutData.color_rules || []}
                         />
                     </>
                 );
@@ -778,6 +789,8 @@ function RootModel({ modelName, modelDataSource, modelDependencyMap }) {
                         showHidden={showHidden}
                         filters={modelLayoutOption.filters || []}
                         isDisabled={isLoading || isProcessingUserActions}
+                        hideNullValues={hideNullValues}
+                        colorRules={modelLayoutData.color_rules || []}
                     />
                 );
             case LAYOUT_TYPES.GRAPH:
@@ -812,10 +825,12 @@ function RootModel({ modelName, modelDataSource, modelDependencyMap }) {
                     name={modelTitle}
                     isMaximized={isMaximized}
                     onMaximizeToggle={handleFullScreenToggle}
+                    isInPopover={isInPopover}
+                    onRemoveFromPopover={onRemoveFromPopover}
                 >
                     <MenuGroup
                         // column settings
-                        columns={headCells}
+                        columns={markedHeadCells}
                         columnOrders={modelLayoutData.column_orders || []}
                         showAll={showAll}
                         moreAll={moreAll}
@@ -856,7 +871,7 @@ function RootModel({ modelName, modelDataSource, modelDependencyMap }) {
                         onDownload={handleDownload}
                         // edit save
                         onModeToggle={handleModeToggle}
-                        isReadOnly={modelLayoutOption.is_read_only ?? false}
+                        isReadOnly={(modelLayoutOption.is_read_only ?? false) || rows.length === 0}
                         onSave={handleSave}
                         // layout switch
                         layout={layoutType}
@@ -866,7 +881,7 @@ function RootModel({ modelName, modelDataSource, modelDependencyMap }) {
                         isMaximized={isMaximized}
                         onMaximizeToggle={handleFullScreenToggle}
                         // dynamic menu
-                        commonKeys={commonKeys}
+                        commonKeys={markedCommonKeys}
                         onButtonToggle={handleButtonToggle}
                         // button query menu
                         modelSchema={modelSchema}
@@ -902,6 +917,11 @@ function RootModel({ modelName, modelDataSource, modelDependencyMap }) {
                         onHighlightDurationChange={handleHighlightDurationChange}
                         noCommonKeyOverride={modelLayoutData.no_common_key_override || []}
                         onNoCommonKeyOverrideChange={handleNoCommonKeyOverrideChange}
+                        colorRules={modelLayoutData.color_rules || []}
+                        onColorRuleOverrideChange={handleColorRuleOverrideChange}
+                        // tree settings
+                        hideNullValues={hideNullValues}
+                        onHideNullValuesToggle={setHideNullValues}
                     />
                 </ModelCardHeader>
                 <ModelCardContent

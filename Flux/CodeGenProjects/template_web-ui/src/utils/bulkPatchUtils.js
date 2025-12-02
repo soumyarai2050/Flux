@@ -79,6 +79,35 @@ export const calculateNewValue = (action, currentValue) => {
 };
 
 /**
+ * Determine which caption to show based on current value
+ * Uses button metadata: pressed_caption, unpressed_caption, pressed_value_as_text
+ *
+ * @param {*} currentValue - The current value of the button field
+ * @param {Object} cellMetadata - Cell metadata object containing button configuration
+ * @returns {string|null} The caption to display (e.g., "enable", "disable") or null if no button
+ *
+ * @example
+ * // If currentValue is true and pressed_value_as_text is "true", returns pressed_caption ("enable")
+ * // If currentValue is false, returns unpressed_caption ("disable")
+ */
+export const determineActionCaption = (currentValue, cellMetadata) => {
+  const button = cellMetadata?.button;
+  if (!button) return null;
+
+  // Convert currentValue to string for comparison
+  const currentValueStr = String(currentValue);
+  const pressedValueStr = button.pressed_value_as_text;
+
+  // If current value matches pressed state, show pressed_caption
+  // Otherwise show unpressed_caption
+  if (currentValueStr === pressedValueStr) {
+    return button.pressed_caption;
+  } else {
+    return button.unpressed_caption;
+  }
+};
+
+/**
  * Check if a button field is disabled via field metadata
  *
  * @param {String} fieldName - The field name (e.g., 'bkr_disable', 'pos_disable')
@@ -87,7 +116,7 @@ export const calculateNewValue = (action, currentValue) => {
  */
 export const isButtonActionDisabled = (fieldName, cell) => {
   if (!fieldName || !cell) return false;
-  return cell.serverPopulate === true;   //TODO: add more flags here which prevent button to go in disabled state 
+  return cell.serverPopulate === true;   //TODO: add more flags here which prevent button to go in disabled state
 };
 
 /**
@@ -171,6 +200,146 @@ export const aggregateButtonActionsByType = (
 };
 
 /**
+ * Aggregate button actions from selected rows grouped by ACTUAL CURRENT VALUE
+ * Returns buttons with sub-actions showing different state transitions
+ *
+ * KEY DIFFERENCE: Groups by actual current values, not by captions
+ * Example: For strat_state with values [SNOOZED, PAUSED, ACTIVE]:
+ *   - Creates 3 sub-actions (one per unique actual value)
+ *   - Each shows the ACTION caption (what will happen next), not current state
+ *   - SNOOZED group → caption "activate" (what button does to SNOOZED state)
+ *
+ * @param {Array} selectedRowIds - Array of selected row IDs
+ * @param {Array} rows - Row data array
+ * @param {Array} cells - Cell metadata array
+ * @param {String} modelType - Model type: 'root', 'non_root', 'repeated_root', or 'abbreviation_merge'
+ * @returns {Object} Aggregated buttons with sub-actions:
+ *   {
+ *     displayName: {
+ *       tableTitle: string,
+ *       displayName: string,
+ *       totalCount: number,
+ *       isDisabled: boolean,
+ *       cellMetadata: object,
+ *       subActions: {
+ *         currentValue1: { caption, count, affectedRowIds, expectedCurrentState, color },
+ *         currentValue2: { caption, count, affectedRowIds, expectedCurrentState, color }
+ *       }
+ *     }
+ *   }
+ */
+export const aggregateButtonActionsByState = (
+  selectedRowIds,
+  rows,
+  cells,
+  modelType = 'root'
+) => {
+  if (!selectedRowIds || selectedRowIds.length === 0) return {};
+  if (!rows || !cells) return {};
+
+  const aggregatedButtons = {};
+
+  // Find all cells that have button actions
+  const buttonCells = cells.filter(c => c.button && c.button.action);
+
+  buttonCells.forEach(cell => {
+    const tableTitle = cell.tableTitle;
+    const key = cell.key;
+    const displayName = cell.title;
+
+    // Parse color metadata
+    const colorMap = {};
+    if (cell.button && cell.button.color) {
+      cell.button.color.split(',').forEach(pair => {
+        const [state, color] = pair.split('=');
+        if (state && color) {
+          colorMap[state.trim()] = color.trim();
+        }
+      });
+    }
+
+    // Group rows by ACTUAL CURRENT VALUE (not by caption)
+    // Key is the string representation of the current value
+    const stateGroups = {}; // { currentValueStr: { rowIds: [], currentValue: actualValue } }
+    const allAffectedRowIds = [];
+
+    // Check each selected row to see if it has this button field
+    selectedRowIds.forEach(selectedId => {
+      const row = rows.find(r => r['data-id'] === selectedId || r.DB_ID === selectedId);
+      if (!row) {
+        return;
+      }
+
+      const fieldToCheck = modelType === 'abbreviation_merge' ? key : tableTitle;
+
+      // Get the current value
+      const currentValue = (row[fieldToCheck] !== undefined && row[fieldToCheck] !== null)
+        ? row[fieldToCheck]
+        : (row[tableTitle] !== undefined && row[tableTitle] !== null)
+          ? row[tableTitle]
+          : (row[key] !== undefined && row[key] !== null)
+            ? row[key]
+            : undefined;
+
+      if (currentValue === undefined) {
+        return;
+      }
+
+      allAffectedRowIds.push(selectedId);
+
+      // Use the STRING representation of current value as the grouping key
+      const currentValueStr = String(currentValue);
+
+      if (!stateGroups[currentValueStr]) {
+        stateGroups[currentValueStr] = {
+          rowIds: [],
+          currentValue, // Store actual value for later
+        };
+      }
+
+      stateGroups[currentValueStr].rowIds.push(selectedId);
+    });
+
+    // Only add button if it affects at least one selected row
+    if (allAffectedRowIds.length > 0) {
+      const fieldIdentifier = modelType === 'abbreviation_merge' ? key : (key || tableTitle);
+      const displayTableTitle = modelType === 'abbreviation_merge' ? key : tableTitle;
+
+      // Build sub-actions object
+      // Each sub-action key is the current value, caption is the ACTION to perform on that value
+      const subActions = {};
+      Object.entries(stateGroups).forEach(([currentValueStr, group]) => {
+        // Determine the action caption for this current state
+        // This will be pressed_caption, unpressed_caption, or custom caption based on state
+        const actionCaption = determineActionCaption(group.currentValue, cell) || 'action';
+
+        // Get color for this current state
+        const color = colorMap[currentValueStr] || 'default';
+
+        subActions[currentValueStr] = {
+          caption: actionCaption, // The action caption (what will happen)
+          count: group.rowIds.length,
+          affectedRowIds: group.rowIds,
+          expectedCurrentState: group.currentValue, // The current value to filter by
+          color,
+        };
+      });
+
+      aggregatedButtons[displayName] = {
+        tableTitle: displayTableTitle,
+        displayName,
+        totalCount: allAffectedRowIds.length,
+        isDisabled: isButtonActionDisabled(fieldIdentifier, cell),
+        cellMetadata: cell,
+        subActions,
+      };
+    }
+  });
+
+  return aggregatedButtons;
+};
+
+/**
  * Generate diffs for bulk patch operations (RepeatedRootModel)
  * Creates individual diffs for each selected row with updated values
  *
@@ -188,7 +357,8 @@ export const generateBulkPatchDiffs = (
   updatedDataArray,
   cells,
   fieldsMetadata,
-  selectedButtonType = null
+  selectedButtonType = null,
+  expectedCurrentState = null
 ) => {
   if (!selectedRowIds || selectedRowIds.length === 0) return [];
 
@@ -211,9 +381,17 @@ export const generateBulkPatchDiffs = (
     const allActions = extractButtonActionsFromRow(updatedObj, cells);
 
     // Filter actions by selectedButtonType if specified
-    const actions = selectedButtonType
+    let actions = selectedButtonType
       ? allActions.filter(action => action.cellMetadata.tableTitle === selectedButtonType)
       : allActions;
+
+    // NEW: Filter by expectedCurrentState if provided
+    if (expectedCurrentState !== null) {
+      actions = actions.filter(action => {
+        const matches = action.currentValue === expectedCurrentState;
+        return matches;
+      });
+    }
 
     if (selectedButtonType && actions.length === 0) {
       console.log(`[BulkPatch] No actions found for button type: ${selectedButtonType} in row ${rowId}`);
@@ -263,7 +441,8 @@ export const generateBulkPatchDiffForRootModel = (
   rows,
   cells,
   fieldsMetadata,
-  selectedButtonType = null
+  selectedButtonType = null,
+  expectedCurrentState = null
 ) => {
   if (!selectedRowIds || selectedRowIds.length === 0) return null;
   if (!storedObj || !updatedObj || !rows) {
@@ -273,6 +452,7 @@ export const generateBulkPatchDiffForRootModel = (
 
   // Build button action map from cells using tableTitle (not cell.key)
   const buttonActionMap = {};
+  const buttonCellMap = {}; // Store cell metadata for state checking
   cells.forEach(cell => {
     if (cell.button && cell.button.action) {
       const buttonName = cell.tableTitle;
@@ -290,6 +470,7 @@ export const generateBulkPatchDiffForRootModel = (
 
       // Store using SHORT name as key (since xpath_ keys extract to short names)
       buttonActionMap[shortName] = cell.button.action;
+      buttonCellMap[shortName] = cell; // Store cell for caption checking
     }
   });
 
@@ -319,6 +500,12 @@ export const generateBulkPatchDiffForRootModel = (
       // Get current value
       const currentValue = get(updatedObj, xpath);
       if (currentValue === undefined) return;
+
+      //  Filter by expectedCurrentState if provided
+      if (expectedCurrentState !== null && currentValue !== expectedCurrentState) {
+        console.log(`[BulkPatch] Skipping ${fieldName} for row ${selectedId}: currentValue=${currentValue} does not match expectedState=${expectedCurrentState}`);
+        return;
+      }
 
       // Calculate new value
       const newValue = calculateNewValue(buttonActionMap[fieldName], currentValue);
@@ -394,7 +581,8 @@ export const generateBulkPatchDiffsForMergeView = (
   dataSourcesUpdatedArrayDict,
   cells,
   dataSourcesMetadataDict,
-  selectedButtonType = null
+  selectedButtonType = null,
+  expectedCurrentState = null
 ) => {
   if (!selectedRowIds || selectedRowIds.length === 0) {
     console.warn('No rows selected for bulk patch');
@@ -444,7 +632,7 @@ export const generateBulkPatchDiffsForMergeView = (
       }
 
       // Filter actions by selectedButtonType if specified
-      const actions = selectedButtonType
+      let actions = selectedButtonType
         ? allActions.filter(action => {
           // Match by:
           // 1. Full tableTitle match
@@ -471,6 +659,17 @@ export const generateBulkPatchDiffsForMergeView = (
           return matched;
         })
         : allActions;
+
+      // Filter by expectedCurrentState if provided
+      if (expectedCurrentState !== null) {
+        actions = actions.filter(action => {
+          const matches = action.currentValue === expectedCurrentState;
+          if (!matches) {
+            console.log(`[BulkPatch] [${source}] Skipping action in row ${rowId}: currentValue=${action.currentValue} does not match expectedState=${expectedCurrentState}`);
+          }
+          return matches;
+        });
+      }
 
       if (actions.length > 0) {
         console.log(`  Found ${actions.length} button actions`);
@@ -542,7 +741,7 @@ export const generateBulkPatchDiffsForMergeView = (
  *   dataSourcesStoredArrayDict, dataSourcesUpdatedArrayDict, cells, dataSourcesMetadataDict
  * });
  */
-export const generateBulkPatchDiff = (modelType, selectedRowIds, config, selectedButtonType = null) => {
+export const generateBulkPatchDiff = (modelType, selectedRowIds, config, selectedButtonType = null, expectedCurrentState = null) => {
   if (!selectedRowIds?.length) {
     console.warn('[BulkPatch] No rows selected for bulk patch');
     return modelType === 'abbreviation_merge'
@@ -563,7 +762,8 @@ export const generateBulkPatchDiff = (modelType, selectedRowIds, config, selecte
         config.rows,
         config.cells,
         config.fieldsMetadata,
-        selectedButtonType
+        selectedButtonType,
+        expectedCurrentState
       );
 
     case 'repeated_root':
@@ -575,7 +775,8 @@ export const generateBulkPatchDiff = (modelType, selectedRowIds, config, selecte
         config.updatedDataArray,
         config.cells,
         config.fieldsMetadata,
-        selectedButtonType
+        selectedButtonType,
+        expectedCurrentState
       );
 
     case 'abbreviation_merge':
@@ -587,7 +788,8 @@ export const generateBulkPatchDiff = (modelType, selectedRowIds, config, selecte
         config.dataSourcesUpdatedArrayDict,
         config.cells,
         config.dataSourcesMetadataDict,
-        selectedButtonType
+        selectedButtonType,
+        expectedCurrentState
       );
 
     default:

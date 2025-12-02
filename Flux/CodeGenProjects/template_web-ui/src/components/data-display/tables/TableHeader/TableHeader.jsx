@@ -9,6 +9,7 @@ import { useTheme } from '@mui/material/styles';
 import { useDraggableContext } from '../../../../contexts/DraggableContext';
 import { getFilterDict } from '../../../../utils/core/dataFiltering';
 import { getSortOrderDict } from '../../../../utils/core/dataSorting';
+import { getResolvedColor } from '../../../../utils/ui/colorUtils';
 import FilterSortPopup from '../../../controls/FilterSortPopup';
 import styles from './TableHeader.module.css';
 
@@ -30,7 +31,8 @@ const SortableHeaderCell = ({
     onApply,
     onCopy,
     clipboardText,
-    serverSideFilterSortEnabled
+    serverSideFilterSortEnabled,
+    helpText
 }) => {
     const { attributes, listeners, setNodeRef, transform, transition } = useSortable({
         id: columnId,
@@ -60,9 +62,16 @@ const SortableHeaderCell = ({
     };
 
     let tableHeadColor = 'white';
-    if (column.nameColor) {
-        const color = column.nameColor.toLowerCase();
-        tableHeadColor = theme.palette.text[color];
+    let cellClassName = styles.cell;
+
+    if (column.shownByDoubleClick) {
+        tableHeadColor = getResolvedColor('success', theme, 'white');
+        cellClassName = `${styles.cell} ${styles.success}`;
+    } else if (column.shownByToggle) {
+        tableHeadColor = getResolvedColor('info', theme, 'white');
+        cellClassName = `${styles.cell} ${styles.info}`;
+    } else if (column.nameColor) {
+        tableHeadColor = getResolvedColor(column.nameColor, theme, 'white');
     }
 
     let columnName = column.title ?? column.key;
@@ -74,7 +83,7 @@ const SortableHeaderCell = ({
 
     return (
         <TableCell
-            className={styles.cell}
+            className={cellClassName}
             sx={{
                 color: tableHeadColor,
                 position: column.frozenColumn ? 'sticky' : 'static',
@@ -111,7 +120,7 @@ const SortableHeaderCell = ({
                 filterEnable={column.filterEnable ?? false}
                 clipboardText={clipboardText}
                 serverSideFilterSortEnabled={serverSideFilterSortEnabled}
-                helpText={column.help}
+                helpText={helpText}
             />
         </TableCell>
     );
@@ -138,8 +147,6 @@ const TableHeader = ({
     const [filterDict, setFilterDict] = useState(getFilterDict(filters));
     const [sortOrderDict, setSortOrderDict] = useState(getSortOrderDict(sortOrders));
     const [clipboardText, setClipboardText] = useState(null);
-
-    const keyField = collectionView ? 'key' : 'tableTitle';
 
     // Update filterDict whenever the filters prop changes.
     useEffect(() => {
@@ -218,7 +225,7 @@ const TableHeader = ({
     }, [onFiltersChange, onSortOrdersChange]);
 
     const handleCopy = (columnId, columnName) => {
-        const column = columns.find((meta) => meta[keyField] === columnId);
+        const column = columns.find((meta) => meta.identifier === columnId);
 
         if (!column) {
             console.error(`handleCopy failed, no column found with columnId: ${columnId}`);
@@ -248,18 +255,19 @@ const TableHeader = ({
         tableHeadClasses += ` ${styles.sticky}`;
     }
 
-    const sortableItems = useMemo(() => columns.map((column) => column[keyField]), [columns]);
+    const sortableItems = useMemo(() => columns.map((column) => column.identifier), [columns]);
 
     return (
         <TableHead className={tableHeadClasses}>
             <SortableContext items={sortableItems}>
                 <TableRow>
                     {columns.map((column) => {
-                        const columnKey = column[keyField];
+                        const columnKey = column.identifier;
                         const uniqueColumnKey = columnKey + column.sourceIndex;
                         const columnFilter = filterDict[columnKey];
                         const columnSort = sortOrderDict[columnKey];
                         const columnUniqueValues = uniqueValues[columnKey];
+                        const helpText = column.tableTitle + ': ' + column.help;
                         return (
                             <SortableHeaderCell
                                 key={uniqueColumnKey}
@@ -280,6 +288,7 @@ const TableHeader = ({
                                 onCopy={handleCopy}
                                 clipboardText={clipboardText}
                                 serverSideFilterSortEnabled={serverSideFilterSortEnabled}
+                                helpText={helpText}
                             />
                         );
                     })}

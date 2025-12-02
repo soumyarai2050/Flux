@@ -13,3 +13,5 @@ export { default as useModelLayout } from './useModelLayout';
 export { default as useConflictDetection } from './useConflictDetection';
 export { default as useCountQuery } from './useCountQuery';
 export { default as useBulkPatch } from './useBulkPatch';
+export { default as useReducerArrayFromCollections } from './useReducerArrayFromCollections';
+export { useMarkedColumns } from './useMarkedColumns';

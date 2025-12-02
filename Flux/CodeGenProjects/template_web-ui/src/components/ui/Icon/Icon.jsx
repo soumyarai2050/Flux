@@ -62,24 +62,29 @@ Icon.propTypes = {
  * @param {boolean} props.selected - If true, indicates the icon is in a toggled/selected state.
  * @param {string} props.name - The name attribute for the ToggleButton and value for onClick.
  * @param {function} props.onClick - Callback function for click events, receives the `name` prop as an argument.
+ * @param {function} [props.onDoubleClick] - Callback function for double-click events, receives the `name` prop as an argument.
+ * @param {boolean} [props.highlighted=false] - If true, applies a highlighted (blue) style to indicate widget is in popover.
  * @param {React.ReactNode} props.children - The content to be rendered inside the Avatar (e.g., a single character or an icon).
  * @returns {React.ReactElement} The rendered ToggleIcon component.
  */
-export const ToggleIcon = ({ title, selected, name, onClick, children }) => {
+export const ToggleIcon = ({ title, selected, name, onClick, onDoubleClick, highlighted = false, children }) => {
     const selectedIconClass = selected ? classes.selected_icon : '';
+    const highlightedClass = highlighted ? classes.highlighted_icon : '';
     const selectedAvatarClass = selected ? classes.selected_avatar : '';
+    const highlightedAvatarClass = highlighted ? classes.highlighted_avatar : '';
 
     return (
         <Tooltip title={title} disableInteractive>
             <ToggleButton
-                className={`${classes.toggle_icon} ${selectedIconClass}`}
+                className={`${classes.toggle_icon} ${selectedIconClass} ${highlightedClass}`}
                 size='small'
                 name={name}
                 selected={selected}
                 value={name}
                 onClick={() => onClick(name)}
+                onDoubleClick={onDoubleClick ? () => onDoubleClick(name) : undefined}
             >
-                <Avatar className={`${classes.avatar} ${selectedAvatarClass}`}>{children}</Avatar>
+                <Avatar className={`${classes.avatar} ${selectedAvatarClass} ${highlightedAvatarClass}`}>{children}</Avatar>
             </ToggleButton>
         </Tooltip>
     );
@@ -90,6 +95,8 @@ ToggleIcon.propTypes = {
     selected: PropTypes.bool.isRequired,
     name: PropTypes.string.isRequired,
     onClick: PropTypes.func.isRequired,
+    onDoubleClick: PropTypes.func,
+    highlighted: PropTypes.bool,
     children: PropTypes.node.isRequired,
 };
 

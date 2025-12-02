@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useSelector } from 'react-redux';
+import { useReducerArrayFromCollections } from '../../../../hooks';
 import { COLOR_TYPES, DATA_TYPES, DATE_TIME_FORMATS, MODES } from '../../../../constants';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
@@ -14,11 +15,11 @@ import Error from '@mui/icons-material/Error';
 import Clear from '@mui/icons-material/Clear';
 import PropTypes from 'prop-types';
 import { NumericFormat } from 'react-number-format';
-import { getColorFromMapping, getResolvedColor } from '../../../../utils/ui/colorUtils';
+import { resolveFieldColors } from '../../../../utils/ui/colorUtils';
 import { getValueFromReduxStoreFromXpath } from '../../../../utils/redux/reduxUtils';
 import { isAllowedNumericValue, floatToInt } from '../../../../utils/formatters/numberUtils';
 import { validateConstraints } from '../../../../utils/validation/validationUtils';
-import { getReducerArrayFromCollections } from '../../../../utils/ui/uiUtils';
+import { getContrastColor, getReducerArrayFromCollections } from '../../../../utils/ui/uiUtils';
 import { capitalizeCamelCase } from '../../../../utils/core/stringUtils';
 import { getDateTimeFromInt } from '../../../../utils/formatters/dateUtils';
 import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
@@ -34,21 +35,10 @@ const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 const NodeField = (props) => {
     const theme = useTheme();
+    const { schemaCollections } = useSelector(state => state.schema);
 
-    // const state = useSelector(state => state);
-    const reducerArray = useMemo(() => getReducerArrayFromCollections([props.data]), [props.data]);
-    const reducerDict = useSelector(state => {
-        const selected = {};
-        reducerArray.forEach(reducerName => {
-            const fieldName = 'modified' + capitalizeCamelCase(reducerName);
-            selected[reducerName] = {
-                [fieldName]: state[reducerName]?.[fieldName],
-            }
-        })
-        return selected;
-    }, (prev, curr) => {
-        return JSON.stringify(prev) === JSON.stringify(curr);
-    })
+    // Fetch Redux data needed for min/max/autocomplete/color source resolution
+    const reducerDict = useReducerArrayFromCollections(props.data);
     const validationError = useRef(null);
     const [inputValue, setInputValue] = useState(props.data.value);
     const [focus, setFocus] = useState(false);
@@ -139,35 +129,20 @@ const NodeField = (props) => {
         }
     }
 
-    let color = '';
-    if (props.data.color) {
-        color = getColorFromMapping(props.data, props.data.value, null, theme, null, false);
-    }
-
-    // Resolve color using the centralized utility, return style object for critical colors with animation
-    const colorStyle = color ? getResolvedColor(color, theme, null, true) : null;
-    const resolvedColor = colorStyle && typeof colorStyle === 'object' && colorStyle.color ? colorStyle.color : colorStyle;
-
-    // Create sx styles for the dynamic color, including overrides for disabled state and critical animation
-    const colorSx = color && resolvedColor ? {
-        // Merge critical animation styles if present
-        ...(typeof colorStyle === 'object' && colorStyle.animation ? {
-            animation: colorStyle.animation,
-            '@keyframes blink': colorStyle['@keyframes blink']
-        } : {}),
-        // --- Rules for Select ---
-        '& .MuiSelect-select': {
-            '&.Mui-disabled': {
-                backgroundColor: resolvedColor,
-            }
-        },
-        '& .MuiCheckbox-root': {
-            color: resolvedColor,
-            '&.Mui-disabled': {
-                color: resolvedColor,
-            }
-        }
-    } : {};
+    // Resolve foreground and background colors using centralized utility
+    // Handles color, colorSrc, and colorPercentage properties independently
+    // Also supports user-applied color rule overrides (highest priority)
+    const colorResults = resolveFieldColors(
+        props.data,
+        props.data.value,
+        props.modelName,
+        theme,
+        reducerDict,
+        schemaCollections,
+        props.colorRules,
+        props.data.key
+    );
+    const colorSx = colorResults.colorSx;
 
     // Handle dataStatus classes
     let dataStatusClass = '';
@@ -395,8 +370,14 @@ const NodeField = (props) => {
                 disabled={disabled}
                 thousandSeparator=','
                 // isAllowed={(values) => isAllowedNumericValue(values.value, min, max)}
-                onValueChange={(values, sourceInfo) => handleTextChange(sourceInfo.event, props.data.type, props.data.xpath, values.value, props.data.dataxpath,
-                    validateConstraints(props.data, values.value, min, max))}
+                // onValueChange={(values, sourceInfo) => handleTextChange(sourceInfo.event, props.data.type, props.data.xpath, values.value, props.data.dataxpath,
+                //     validateConstraints(props.data, values.value, min, max))}
+                onValueChange={(values, sourceInfo) => {
+                    if (sourceInfo.source === 'prop') return;  // skip the update
+
+                    handleTextChange(sourceInfo.event, props.data.type, props.data.xpath, values.value, props.data.dataxpath,
+                        validateConstraints(props.data, values.value, min, max))
+                }}
                 variant='outlined'
                 decimalScale={decimalScale}
                 placeholder={placeholder}

@@ -79,7 +79,7 @@ import {
 export const useBulkPatch = (modelType, config) => {
   const dispatch = useDispatch();
 
-  const handleBulkPatch = useCallback(async (selectedRowIds, selectedButtonType = null) => {
+  const handleBulkPatch = useCallback(async (selectedRowIds, selectedButtonType = null, actionCaption = null, expectedCurrentState = null) => {
     // Step 1: Validate input
     if (!selectedRowIds || selectedRowIds.length < 1) {
       const message = 'Bulk patch requires at least 1 selected row';
@@ -101,7 +101,8 @@ export const useBulkPatch = (modelType, config) => {
         modelType,
         selectedRowIds,
         config.diffConfig,
-        selectedButtonType
+        selectedButtonType,
+        expectedCurrentState
       );
 
       // Check for empty results based on model type
