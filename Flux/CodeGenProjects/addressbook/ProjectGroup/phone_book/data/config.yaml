@@ -27,7 +27,7 @@ dataclass_override_type: "native"
 beanie_override_type: "native"
 cache_override_type: "bare"
 
-# to be used in pair_plan_log_book to take out counts of created from waiting queue to execute create in db
+# to be used in phone_log_book to take out counts of created from waiting queue to execute create in db
 contact_alert_configs:
   transaction_counts_per_call: 5
   transaction_timeout_secs: 2  # secs
@@ -46,7 +46,7 @@ log_level: "debug"  # log lvl in int or basic log lvl name
 # to be used by plugins to take proto files from these projects to generate combined output
 multi_project_plugin:
   - "street_book"
-  - "log_book"
+  - "log_analyzer"
   - "photo_book"
   - "basket_book":
       - "BasketChore"

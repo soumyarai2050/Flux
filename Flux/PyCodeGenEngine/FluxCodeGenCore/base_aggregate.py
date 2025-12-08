@@ -829,7 +829,7 @@ async def detect_multiple_page_changes(
         deleted_item_ids: list,  # List of _id values for deleted documents
         model_class,  # Model class for type hints and structure
         updated_items: list[dict] = None  # List of updated documents (must have _id and at least one updated field)
-) -> list[dict]:
+) -> Dict[str, Any]:
     """
     Detects changes across multiple pages of data using MongoDB aggregation pipeline.
     All logic is handled in MongoDB aggregation pipeline for performance benefits.
@@ -1112,14 +1112,14 @@ async def detect_multiple_page_changes(
             facet_stage[f"{page_id}_after"].extend(after_pipeline)
 
         if not facet_stage:
-            return []
+            return {}
 
         result = await collection.aggregate([{"$facet": facet_stage}]).to_list(1)
         if not result:
-            return []
+            return {}
 
         all_pages_data = result[0]
-        final_reports = []
+        final_reports = {}
 
         for page_def in page_definitions:
             page_id = page_def["page_id"]
@@ -1510,7 +1510,7 @@ async def detect_multiple_page_changes(
                     if "_new_bottom" in change:
                         del change["_new_bottom"]
 
-            final_reports.append({"page_id": page_id, "changes": final_changes})
+            final_reports[page_id] = final_changes
 
         return final_reports
 

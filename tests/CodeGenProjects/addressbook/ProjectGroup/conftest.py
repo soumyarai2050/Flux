@@ -90,7 +90,7 @@ def clean_and_set_limits(expected_chore_limits_, expected_contact_limits_, expec
     clear_cache_in_model()
 
     # updating contact_alert
-    clean_log_book_alerts()
+    clean_log_analyzer_alerts()
 
     # updating plan_collection
     renew_plan_collection()

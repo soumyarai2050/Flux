@@ -15,6 +15,7 @@ import Settings from '@mui/icons-material/Settings';
 import Icon from '../../../ui/Icon';
 import MenuItem from '../../../ui/MenuItem';
 import ValueBasedToggleButton from '../../../ui/ValueBasedToggleButton';
+import CustomToolTip from '../../../ui/CustomToolTip';
 import ColorRuleTab from './ColorRuleTab';
 import { LAYOUT_TYPES, MODEL_TYPES, HIGHLIGHT_STATES } from '../../../../constants';
 import styles from './TableSettingsMenu.module.css';
@@ -409,9 +410,9 @@ const TableSettingsMenu = ({
                         {columnLabel}
                         <span style={{ margin: '0 10px' }}>
                           {helpText && (
-                            <Tooltip title={helpText} disableInteractive>
+                            <CustomToolTip title={helpText}>
                               <Help sx={{ cursor: 'pointer' }} color="info" fontSize="small" />
-                            </Tooltip>
+                            </CustomToolTip>
                           )}
                         </span>
                       </span>

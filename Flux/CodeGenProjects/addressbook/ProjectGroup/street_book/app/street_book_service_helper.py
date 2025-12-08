@@ -15,8 +15,8 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.ORMModel.street_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_service_helper import (
     email_book_service_http_client, get_symbol_side_key)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import (
-    log_book_service_http_client)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_log_book.app.phone_log_book_service_helper import (
+    phone_log_book_service_http_client)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.app.post_book_service_helper import (
     post_book_service_http_client)
 from FluxPythonUtils.scripts.general_utility_functions import parse_to_int, get_symbol_side_pattern
@@ -36,7 +36,7 @@ def all_service_up_check(executor_client: StreetBookServiceHttpClient, ignore_er
             post_book_service_http_client.get_all_ui_layout_client())
 
         ui_layout_list: List[UILayoutBaseModel] = (
-            log_book_service_http_client.get_all_ui_layout_client())
+            phone_log_book_service_http_client.get_all_ui_layout_client())
 
         ui_layout_list: List[UILayoutBaseModel] = (
             executor_client.get_all_ui_layout_client())
@@ -44,7 +44,7 @@ def all_service_up_check(executor_client: StreetBookServiceHttpClient, ignore_er
     except Exception as _e:
         if not ignore_error:
             logging.exception("all_service_up_check test failed - tried "
-                              "get_all_ui_layout_client of phone_book, street_book and log_book ;;;"
+                              "get_all_ui_layout_client of phone_book, street_book and log_analyzer ;;;"
                               f"exception: {_e}", exc_info=True)
         # else not required - silently ignore error is true
         return False
@@ -59,7 +59,7 @@ def all_view_service_up_check(executor_client: StreetBookServiceHttpClient, igno
             post_book_service_http_client.get_all_ui_layout_client())
 
         ui_layout_list: List[UILayoutBaseModel] = (
-            log_book_service_http_client.get_all_ui_layout_client())
+            phone_log_book_service_http_client.get_all_ui_layout_client())
 
         ui_layout_list: List[UILayoutBaseModel] = (
             executor_client.get_all_ui_layout_client())
@@ -67,7 +67,7 @@ def all_view_service_up_check(executor_client: StreetBookServiceHttpClient, igno
     except Exception as _e:
         if not ignore_error:
             logging.exception("all_service_up_check test failed - tried "
-                              "get_all_ui_layout_client of phone_book, street_book and log_book ;;;"
+                              "get_all_ui_layout_client of phone_book, street_book and log_analyzer ;;;"
                               f"exception: {_e}", exc_info=True)
         # else not required - silently ignore error is true
         return False

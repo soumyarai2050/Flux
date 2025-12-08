@@ -8,10 +8,10 @@ import TextField from '@mui/material/TextField';
 import Autocomplete from '@mui/material/Autocomplete';
 import Checkbox from '@mui/material/Checkbox';
 import InputAdornment from '@mui/material/InputAdornment';
-import Tooltip from '@mui/material/Tooltip';
 import IconButton from '@mui/material/IconButton';
 import { useTheme } from '@mui/material/styles';
 import Error from '@mui/icons-material/Error';
+import CustomToolTip from '../../../ui/CustomToolTip';
 import Clear from '@mui/icons-material/Clear';
 import PropTypes from 'prop-types';
 import { NumericFormat } from 'react-number-format';
@@ -160,7 +160,7 @@ const NodeField = (props) => {
         validationError.current = validateConstraints(props.data, value);
 
         const endAdornment = validationError.current ? (
-            <InputAdornment position='end'><Tooltip title={validationError.current} disableInteractive><Error color='error' /></Tooltip></InputAdornment>
+            <InputAdornment position='end'><CustomToolTip title={validationError.current}><Error color='error' /></CustomToolTip></InputAdornment>
         ) : null;
         const inputProps = endAdornment ? {
             endAdornment: endAdornment
@@ -236,7 +236,7 @@ const NodeField = (props) => {
         let value = props.data.value ? props.data.value : props.data.value === false ? false : null;
         validationError.current = validateConstraints(props.data, value);
         const endAdornment = validationError.current ? (
-            <InputAdornment position='end'><Tooltip title={validationError.current} disableInteractive><Error color='error' /></Tooltip></InputAdornment>
+            <InputAdornment position='end'><CustomToolTip title={validationError.current}><Error color='error' /></CustomToolTip></InputAdornment>
         ) : null;
         const inputProps = endAdornment ? {
             endAdornment: endAdornment
@@ -261,7 +261,7 @@ const NodeField = (props) => {
 
         validationError.current = validateConstraints(props.data, value);
         const endAdornment = validationError.current ? (
-            <InputAdornment position='end'><Tooltip title={validationError.current} disableInteractive><Error color='error' /></Tooltip></InputAdornment>
+            <InputAdornment position='end'><CustomToolTip title={validationError.current}><Error color='error' /></CustomToolTip></InputAdornment>
         ) : null;
         return (
             <Select
@@ -346,7 +346,7 @@ const NodeField = (props) => {
                     <InputAdornment position='end'>$</InputAdornment>
                 )}
                 {validationError.current && (
-                    <InputAdornment position='end'><Tooltip title={validationError.current} disableInteractive><Error color='error' /></Tooltip></InputAdornment>
+                    <InputAdornment position='end'><CustomToolTip title={validationError.current}><Error color='error' /></CustomToolTip></InputAdornment>
                 )}
 
             </>
@@ -400,7 +400,7 @@ const NodeField = (props) => {
         let value = props.data.value || null;
         validationError.current = validateConstraints(props.data, value);
         const endAdornment = validationError.current ? (
-            <InputAdornment position='end'><Tooltip title={validationError.current} disableInteractive><Error color='error' /></Tooltip></InputAdornment>
+            <InputAdornment position='end'><CustomToolTip title={validationError.current}><Error color='error' /></CustomToolTip></InputAdornment>
         ) : null;
         const inputProps = endAdornment ? {
             endAdornment: endAdornment
@@ -490,7 +490,7 @@ const NodeField = (props) => {
         let value = inputValue ? inputValue : '';
         validationError.current = validateConstraints(props.data, value);
         const endAdornment = validationError.current ? (
-            <InputAdornment position='end'><Tooltip title={validationError.current} disableInteractive><Error color='error' /></Tooltip></InputAdornment>
+            <InputAdornment position='end'><CustomToolTip title={validationError.current}><Error color='error' /></CustomToolTip></InputAdornment>
         ) : null;
         const inputProps = endAdornment ? {
             endAdornment: endAdornment

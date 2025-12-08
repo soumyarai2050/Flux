@@ -26,6 +26,7 @@ import ArrowDownward from '@mui/icons-material/ArrowDownward';
 import HelpOutline from '@mui/icons-material/HelpOutline';
 import { debounce } from 'lodash';
 import ClipboardCopier from '../../utility/ClipboardCopier';
+import CustomToolTip from '../../ui/CustomToolTip';
 import styles from './FilterSortPopup.module.css';
 
 // Simple virtual scrolling component
@@ -505,7 +506,7 @@ const FilterSortPopup = ({
               </div>
               <Typography >Copy</Typography>
               {helpText && (
-                <Tooltip title={helpText} disableInteractive placement="top">
+                <CustomToolTip title={helpText} placement="top">
                   <IconButton
                     size="small"
                     className={styles.helpIcon}
@@ -514,7 +515,7 @@ const FilterSortPopup = ({
                   >
                     <HelpOutline fontSize="small" />
                   </IconButton>
-                </Tooltip>
+                </CustomToolTip>
               )}
             </div>
           </div>

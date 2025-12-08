@@ -1,0 +1,99 @@
+# ui specific configs
+  # ui_port needs code regeneration if changed and it should ideally be symmetric with server port like
+  # if server port is 8020 then ui_port should be 3020
+ui_port: "3030"
+
+# server specific configs
+server_host: "127.0.0.1"
+main_server_beanie_port: "9070"
+view_port: "9075"
+main_server_cache_port: "9076"
+min_refresh_interval: 20
+custom_logger_lvls:
+  - TIMING: 15
+  - JUNK: 5
+
+#use_view_clients: True
+log_mongo_uri: True
+mongo_server: "mongodb://localhost:27017/?replicaSet=rs0&authSource=admin"
+
+# below 2 configs are used to check types of override files to be initialized by fastapi launch script
+# supported values: "native" or "bare"
+msgspec_override_type: "native"
+dataclass_override_type: "native"
+beanie_override_type: "native"
+cache_override_type: "bare"
+
+# to be used in pair_plan_phone_log_book to take out counts of created from waiting queue to execute create in db
+contact_alert_configs:
+  transaction_counts_per_call_for_server: 200
+  transaction_timeout_secs: 2  # secs
+plan_alert_config:
+  transaction_counts_per_call_for_server: 200
+  transaction_timeout_secs: 2  # secs
+max_fetch_from_patch_queue_for_db_updates: 20
+max_fetch_from_patch_queue_for_server: 500
+# to be used in loop wait in script to update performance analysis data
+raw_performance_data_processor_loop_wait: 2  # sec
+no_activity_timeout_secs: 60  # sec
+
+perf_bench_client_connection_fail_retry_secs: 300  # 5 minutes
+regex_list_refresh_time_wait: 30
+log_level: "debug"  # log lvl in int or basic log lvl name
+
+# to run log analyzer in simulator mode
+simulate_phone_log_book: True
+
+# patterns used for specific tasks in log analyzer
+field_seperator: "~~"
+key_val_seperator: "^^"
+pattern_for_log_simulator: "$$$"
+pattern_for_pair_plan_db_updates: "^*^"
+pattern_for_plan_view_db_updates: "^^^"
+pattern_to_restart_tail_process: "---"
+pattern_to_force_kill_tail_process: "-@-"
+pattern_to_remove_file_from_created_cache: "-*-"
+
+# suppress_alert_regex configs
+regex_file_name: "suppress_alert_regex.txt"
+regex_lock_file_name: "suppress_alert_regex.txt.lock"
+
+plan_pause_regex_pattern:
+  - "^LMT_UP_DN:"
+  - "^Chore found overfilled for"
+pos_disable_regex_pattern:
+  - "^EXT:"
+
+no_activity_init_timeout: 60   # secs
+# those with path and component_name will be assumed to exist within log analyzer's no_activity_init_timeout
+# also below regex values need to have path starting after ProjectGroup dir
+# todo: LAZY: test for critical time ranges
+critical_log_regex_file_names:
+  phone_book_.*\.log:
+    path: "phone_book/log/"
+    critical_time_ranges:
+      - start_time: NONE
+        end_time: NONE
+    component_name: "phone_book"
+  post_book_.*\.log:
+    path: "post_book/log/"
+    critical_time_ranges:
+      - start_time: NONE
+        end_time: NONE
+    component_name: "post_book"
+  photo_book_.*\.log:
+    path: "photo_book/log/"
+    critical_time_ranges:
+      - start_time: NONE
+        end_time: NONE
+    component_name: "photo_book"
+  basket_book_.*\.log:
+    path: "basket_book/log/"
+    critical_time_ranges:
+      - start_time: NONE
+        end_time: NONE
+    component_name: "basket_book"
+  street_book.*\.log:
+    critical_time_ranges:
+      - start_time: NONE
+        end_time: NONE

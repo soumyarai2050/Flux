@@ -7,9 +7,9 @@ from FluxPythonUtils.scripts.general_utility_functions import configure_logger
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.pyscripts.utility_functions import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_helper import (
     photo_book_service_http_client)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_log_book.app.base_log_book_service_helper import (
     UpdateType)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import plan_view_client_call_log_str
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_log_book.app.phone_log_book_service_helper import plan_view_client_call_log_str
 
 
 def main():

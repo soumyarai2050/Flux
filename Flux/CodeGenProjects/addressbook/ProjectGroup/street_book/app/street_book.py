@@ -1497,7 +1497,7 @@ class StreetBook(BaseBook):
                     self.plan_limit, plan_limits_update_date_time = plan_limits_tuple
 
                 # uncomment below code to test stress perf
-                # func_for_log_book_perf_check(pair_plan_id)
+                # func_for_log_analyzer_perf_check(pair_plan_id)
 
                 # 3. check if any cxl chore is requested and send out [continue new loop after]
                 if self.process_cxl_request():
@@ -1619,13 +1619,13 @@ class StreetBook(BaseBook):
         return 0
 
 
-def func_for_log_book_perf_check(pair_plan_id: int):
+def func_for_log_analyzer_perf_check(pair_plan_id: int):
     """
     This function is not a part of any code just kept for now temporarily for verifying perf of plan_view
     updates through log analyzer
     """
-    from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import UpdateType
-    from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import plan_view_client_call_log_str
+    from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_log_book.app.base_log_book_service_helper import UpdateType
+    from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_log_book.app.phone_log_book_service_helper import plan_view_client_call_log_str
     from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_helper import \
         photo_book_service_http_client, PlanViewBaseModel
     date_time = DateTime.now()

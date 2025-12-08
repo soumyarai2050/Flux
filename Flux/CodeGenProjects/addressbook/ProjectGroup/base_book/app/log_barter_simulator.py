@@ -13,7 +13,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.bartering_link_base import BarteringLinkBase
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.executor_config_loader import (
     executor_config_yaml_dict, EXECUTOR_PROJECT_DATA_DIR)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_log_book.app.phone_log_book_service_helper import (
     get_field_seperator_pattern, get_key_val_seperator_pattern, get_pattern_for_log_simulator)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book_helper import (
     get_bkr_from_underlying_account)

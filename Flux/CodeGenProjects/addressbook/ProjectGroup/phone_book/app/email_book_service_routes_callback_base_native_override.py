@@ -34,7 +34,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_ser
     get_matching_plan_from_symbol_n_side, handle_shadow_broker_updates,
     handle_shadow_broker_creates, ps_view_port, is_view_service_up)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book_helper import get_dismiss_filter_brokers
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import plan_view_client_call_log_str
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_log_book.app.phone_log_book_service_helper import plan_view_client_call_log_str
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import (
     get_pair_plan_log_key, get_pair_plan_dict_log_key, pair_plan_id_key, symbol_side_key)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.aggregate import (
@@ -53,7 +53,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.bartering_link 
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_helper import (
     photo_book_service_http_client)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.service_state import ServiceState
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_log_book.app.phone_log_book_service_helper import (
     UpdateType, enable_disable_plan_alerts_log_str)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.static_data import SecurityRecordManager
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.app.executor_config_loader import executor_config_yaml_dict

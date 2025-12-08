@@ -13,6 +13,7 @@ import AddOutlined from '@mui/icons-material/AddOutlined';
 import RemoveOutlined from '@mui/icons-material/RemoveOutlined';
 import { DATA_TYPES, MODES } from '../../../../constants';
 import { Icon } from '../../../ui/Icon';
+import CustomToolTip from '../../../ui/CustomToolTip';
 import PropTypes from 'prop-types';
 import classes from './HeaderField.module.css';
 import { get } from 'lodash';
@@ -212,9 +213,9 @@ const HeaderField = (props) => {
 
                 {
                     props.data.help && (
-                        <Tooltip title={props.data.help} disableInteractive>
+                        <CustomToolTip title={props.data.help}>
                             <HelpOutline fontSize='small' />
-                        </Tooltip>
+                        </CustomToolTip>
                     )
                 }
             </Box>

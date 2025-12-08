@@ -73,8 +73,8 @@ export function getRowsFromAbbreviation(items, itemsDataDict, itemProps, abbrevi
                     }
                 } else {
                     value = get(metadata, c.xpath);
-                    let [, v] = getLocalizedValueAndSuffix(c, value);
-                    value = v;
+                    // let [, v] = getLocalizedValueAndSuffix(c, value);
+                    // value = v;
                 }
                 row[c.key] = value;
             })

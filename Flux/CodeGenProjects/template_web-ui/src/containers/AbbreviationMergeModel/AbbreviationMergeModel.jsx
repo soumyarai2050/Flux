@@ -1415,7 +1415,8 @@ function AbbreviationMergeModel({ modelName, modelDataSource, modelDependencyMap
                         onDownload={handleDownload}
                         // edit save
                         onModeToggle={handleModeToggle}
-                        isReadOnly={(modelLayoutOption.is_read_only ?? false) || rows.length === 0}
+                        isReadOnly={(modelLayoutOption.is_read_only ?? false)}
+                        disableEdit={rows.length === 0 & !isCreating}
                         onSave={handleSave}
                         // layout switch
                         layout={layoutType}

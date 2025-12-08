@@ -857,7 +857,11 @@ export function isValidColorRule(rule) {
         // Percentage rule: 75%>pink, 50%<green, 0%=yellow, etc.
         const percentageRuleRegex = /^([+\-]?\d+(?:\.\d+)?)%\s*(?:>=|>|<=|<|=)\s*(.+)$/;
 
-        return numericRuleRegex.test(singleRule) || percentageRuleRegex.test(singleRule);
+        // Value-based color map: Severity_CRITICAL=CRITICAL, status_ACTIVE=green, etc.
+        // Matches: [key]=[value] where key can be alphanumeric/underscore, value can be alphanumeric/underscore or hex color
+        const valueMapRuleRegex = /^([a-zA-Z0-9_]+)\s*=\s*([a-zA-Z0-9_#]+)$/;
+
+        return numericRuleRegex.test(singleRule) || percentageRuleRegex.test(singleRule) || valueMapRuleRegex.test(singleRule);
     });
 }
 
@@ -1366,6 +1370,7 @@ export function resolveFieldColors(
             '& .MuiInputBase-input': {
                 color: resolvedForegroundColor || 'inherit',
                 backgroundColor: resolvedBackgroundColor || 'inherit',
+                WebkitTextFillColor: resolvedForegroundColor || 'inherit',
                 '&.Mui-disabled': {
                     WebkitTextFillColor: resolvedForegroundColor || 'inherit',
                 }

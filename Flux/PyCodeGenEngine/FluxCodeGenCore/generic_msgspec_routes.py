@@ -99,18 +99,16 @@ async def broadcast_all_from_active_ws_data_set(active_ws_data_set: List[WSData]
         elif ws_data.has_pagination_with_or_without_filters:    # has pagination might also have filters and sort along with pagination
             page_changes = kwargs.get("page_changes")
             if page_changes is not None:
-                for page_change in page_changes:
-                    if page_change.get("page_id") == ws_data.id:
-                        change_list = page_change.get("changes")
-                        if not change_list:
-                            # create or delete didn't impact in any change on this page
-                            continue
-                        if len(change_list) == 1:
-                            # to send obj to ws notification if only single obj is to be sent - this is how
-                            # UI expects ws updates
-                            change_list = change_list[0]
-                        json_str = orjson.dumps(change_list, default=non_jsonable_types_handler).decode("utf-8")
-                        break
+                change_list = page_changes.get(ws_data.id)
+                if change_list is not None:
+                    if not change_list:
+                        # create or delete didn't impact in any change on this page
+                        continue
+                    if len(change_list) == 1:
+                        # to send obj to ws notification if only single obj is to be sent - this is how
+                        # UI expects ws updates
+                        change_list = change_list[0]
+                    json_str = orjson.dumps(change_list, default=non_jsonable_types_handler).decode("utf-8")
                 else:
                     logging.error("Unexpected: ws found with ws_data having flag has_pagination_with_or_without_filters True but page_id not "
                                   f"found in detected changes ;;; {ws_data=}, {page_changes=}")
@@ -162,18 +160,16 @@ async def broadcast_from_active_ws_data_set(active_ws_data_set: List[WSData], ms
         elif ws_data.has_pagination_with_or_without_filters:    # might also have filters and sort along with pagination - handled already
             page_changes = kwargs.get("page_changes")
             if page_changes is not None:
-                for page_change in page_changes:
-                    if page_change.get("page_id") == ws_data.id:
-                        change_list = page_change.get("changes")
-                        if not change_list:
-                            # create or delete didn't impact in any change on this page
-                            continue
-                        if len(change_list) == 1:
-                            # to send obj to ws notification if only single obj is to be sent - this is how
-                            # UI expects ws updates
-                            change_list = change_list[0]
-                        json_str = orjson.dumps(change_list, default=non_jsonable_types_handler).decode("utf-8")
-                        break
+                change_list = page_changes.get(ws_data.id)
+                if change_list is not None:
+                    if not change_list:
+                        # create or delete didn't impact in any change on this page
+                        continue
+                    if len(change_list) == 1:
+                        # to send obj to ws notification if only single obj is to be sent - this is how
+                        # UI expects ws updates
+                        change_list = change_list[0]
+                    json_str = orjson.dumps(change_list, default=non_jsonable_types_handler).decode("utf-8")
                 else:
                     logging.error("Unexpected: ws found with ws_data having flag has_pagination_with_or_without_filters True but page_id not "
                                   f"found in detected changes ;;; {ws_data=}, {page_changes=}")
@@ -345,13 +341,12 @@ async def get_detected_changes_in_pagination(msgspec_class_type: Type[MsgspecMod
          # else not required: No special handling required for ws without pagination
 
     if page_definitions:
-        detected_changes: List[Dict] = await detect_multiple_page_changes(msgspec_class_type.collection_obj,
+        detected_changes: Dict = await detect_multiple_page_changes(msgspec_class_type.collection_obj,
                                                                           page_definitions, created_obj_list,
                                                                           deleted_obj_list, msgspec_class_type,
                                                                           update_obj_list)
 
-        for page_change in detected_changes:
-            change_detected_obj_json_list = page_change.get("changes")
+        for page_id, change_detected_obj_json_list in detected_changes.items():
             # handling all datetime fields - converting to epoch int values - caller of this function will handle
             # these fields back if required
             for change_detected_obj_json in change_detected_obj_json_list:
@@ -408,11 +403,11 @@ async def generic_post_http(msgspec_class_type: Type[MsgspecModel],
 
 
 async def update_pagination_change_data_post_update_agg_execution(msgspec_class_type, detected_changes: Dict):
-    page_changes = detected_changes.get("page_changes")
+    page_changes: Dict = detected_changes.get("page_changes")
 
     fetch_id_list = []
-    for page_change in page_changes:    # each page
-        for json_obj in page_change.get("changes"):     # each change detected doc in page
+    for page_id, page_changes in page_changes.items():    # each page
+        for json_obj in page_changes:     # each change detected doc in page
             if len(json_obj) > 1:       # if is not deleted obj
                 _id = json_obj.get("_id")
                 fetch_id_list.append(_id)
@@ -429,9 +424,8 @@ async def update_pagination_change_data_post_update_agg_execution(msgspec_class_
 
             id_to_obj_json_dict[obj_json.get("_id")] = obj_json
 
-        for page_change in page_changes:  # each page
-            changes_list = page_change.get("changes")
-            for idx, json_obj in enumerate(changes_list):  # each change detected doc in page
+        for page_id, page_changes in page_changes.items():  # each page
+            for idx, json_obj in enumerate(page_changes):  # each change detected doc in page
                 if len(json_obj) > 1:  # if is not deleted obj
                     _id = json_obj.get("_id")
                     new_top = json_obj.get("new_top")
@@ -443,7 +437,7 @@ async def update_pagination_change_data_post_update_agg_execution(msgspec_class_
                     if new_bottom:
                         fetched_json_obj["new_bottom"] = new_bottom
 
-                    changes_list[idx] = fetched_json_obj
+                    page_changes[idx] = fetched_json_obj
 
 
 @http_except_n_log_error(status_code=500)
@@ -1569,7 +1563,7 @@ async def watch_specific_collection_with_stream(msgspec_class_type: Type[Msgspec
                 document_id = change['documentKey']['_id']
                 if 'fullDocument' in change and change['fullDocument']:
                     updated_or_created_obj = change['fullDocument']
-                    logging.debug(f"STREAM - Full document: {updated_or_created_obj}")
+                    logging.debug(f"STREAM - Table: {msgspec_class_type.__name__} - Full document: {updated_or_created_obj}")
                     if filter_ws_updates_callable is not None:
                         if not filter_ws_updates_callable(updated_or_created_obj):
                             # if filter check fails for obj then avoiding ws update
@@ -1577,6 +1571,8 @@ async def watch_specific_collection_with_stream(msgspec_class_type: Type[Msgspec
                         # else not required: if passes check allowing it for ws update
                     # else not required: if no filter_ws_updates_callable passed - no need for any handling
                     if change['operationType'] == 'insert' and filter_agg_pipeline_callable_for_create_obj is not None:
+                        # Special handling if insert happened but filter_agg also is required post update for ws broadcast
+
                         filter_agg_pipeline = filter_agg_pipeline_callable_for_create_obj(updated_or_created_obj)
                         fetched_obj: Dict | None = await get_obj(msgspec_class_type, document_id, filter_agg_pipeline)
 
@@ -1586,6 +1582,8 @@ async def watch_specific_collection_with_stream(msgspec_class_type: Type[Msgspec
                         await publish_ws(msgspec_class_type, document_id, fetched_obj,
                                          update_ws_with_id=True)
                     elif change['operationType'] == 'update' and filter_agg_pipeline_callable_for_update_obj is not None:
+                        # Special handling if update happened but filter_agg also is required post update for ws broadcast
+
                         filter_agg_pipeline = filter_agg_pipeline_callable_for_update_obj(updated_or_created_obj)
                         fetched_obj: Dict | None = await get_obj(msgspec_class_type, document_id, filter_agg_pipeline)
 
@@ -1595,6 +1593,10 @@ async def watch_specific_collection_with_stream(msgspec_class_type: Type[Msgspec
                         await publish_ws(msgspec_class_type, document_id, fetched_obj,
                                          update_ws_with_id=True)
                     else:
+                        # Rest simple update and create cases where no filter_agg needs to be called comes here
+
+                        # logs updates description including updated fields if update happened else None in rest cases
+                        logging.debug(f'Updates Desc: {change.get("updateDescription")}')
                         # handling all datetime fields - converting to epoch int values - caller of this function will handle
                         # these fields back if required
                         msgspec_class_type.convert_ts_fields_from_datetime_to_epoch_int(updated_or_created_obj)

@@ -28,7 +28,7 @@ else:
     clients_list = [email_book_service_beanie_web_client, email_book_service_cache_web_client]
 
 
-# test cases requires phone_book and log_book database to be present
+# test cases requires phone_book and log_analyzer database to be present
 def test_deep_clean_database_n_logs():
     drop_all_databases()
     clean_project_logs()
@@ -4161,11 +4161,11 @@ def test_pair_plan_related_models_update_counters(static_data_, clean_and_set_li
 # @@@ deprecated: Not applicable anymore after ContactAlert model changes
 # @pytest.mark.nightly
 # def test_contact_alert_updates(static_data_, clean_and_set_limits, sample_alert):
-#     stored_contact_alert = log_book_web_client.get_contact_alert_client(contact_alert_id=1)
+#     stored_contact_alert = log_analyzer_web_client.get_contact_alert_client(contact_alert_id=1)
 #
 #     alert = copy.deepcopy(sample_alert)
 #     contact_alert_basemodel = ContactAlertBaseModel(_id=1, alerts=[alert])
-#     updated_contact_alert = log_book_web_client.patch_contact_alert_client(
+#     updated_contact_alert = log_analyzer_web_client.patch_contact_alert_client(
 #             jsonable_encoder(contact_alert_basemodel, by_alias=True, exclude_none=True))
 #     assert stored_contact_alert.alert_update_seq_num + 1 == updated_contact_alert.alert_update_seq_num, \
 #         f"Mismatched alert_update_seq_num: expected {stored_contact_alert.alert_update_seq_num + 1}, " \
@@ -4175,7 +4175,7 @@ def test_pair_plan_related_models_update_counters(static_data_, clean_and_set_li
 #     for loop_count in range(max_loop_count):
 #         alert.alert_brief = f"Test update - {loop_count}"
 #         contact_alert_basemodel = ContactAlertBaseModel(_id=1, alerts=[alert])
-#         alert_updated_contact_alert = log_book_web_client.patch_contact_alert_client(
+#         alert_updated_contact_alert = log_analyzer_web_client.patch_contact_alert_client(
 #                 jsonable_encoder(contact_alert_basemodel, by_alias=True, exclude_none=True))
 #         assert updated_contact_alert.alert_update_seq_num + (loop_count + 1) == \
 #                alert_updated_contact_alert.alert_update_seq_num, (
@@ -6688,7 +6688,7 @@ def test_plan_pause_on_sell_negative_consumable_cxl_qty_due_to_waived_min_rollin
 
 @pytest.mark.nightly
 def test_alert_agg_sequence_in_contact_alerts(clean_and_set_limits, sample_alert):
-    contact_alerts = log_book_web_client.get_all_contact_alert_client()
+    contact_alerts = log_analyzer_web_client.get_all_contact_alert_client()
 
     sev = [Severity.Severity_CRITICAL, Severity.Severity_ERROR, Severity.Severity_WARNING,
            Severity.Severity_INFO, Severity.Severity_DEBUG]
@@ -6706,7 +6706,7 @@ def test_alert_agg_sequence_in_contact_alerts(clean_and_set_limits, sample_alert
             counter = 0
 
         contact_alerts.append(alert)
-        log_book_web_client.handle_contact_alerts_query_client(payload)
+        log_analyzer_web_client.handle_contact_alerts_query_client(payload)
 
     # sorting alert list for this test comparison
     contact_alerts.sort(key=lambda x: x.last_update_analyzer_time, reverse=False)
@@ -6718,7 +6718,7 @@ def test_alert_agg_sequence_in_contact_alerts(clean_and_set_limits, sample_alert
                 if alert.severity == sev.value:
                     sorted_alert_list.append(alert)
     time.sleep(5)
-    agg_sorted_alerts: List[ContactAlertBaseModel] = log_book_web_client.get_all_contact_alert_client()
+    agg_sorted_alerts: List[ContactAlertBaseModel] = log_analyzer_web_client.get_all_contact_alert_client()
     for alert in agg_sorted_alerts:
         alert.last_update_analyzer_time = pendulum.parse(str(alert.last_update_analyzer_time)).in_timezone("utc")
     for alert in contact_alerts:
@@ -6763,10 +6763,10 @@ def test_alert_agg_sequence_in_plan_alert(static_data_, clean_and_set_limits, le
             counter = 0
 
         new_plan_alerts.append(alert)
-        log_book_web_client.handle_plan_alerts_with_plan_id_query_client(payload)
+        log_analyzer_web_client.handle_plan_alerts_with_plan_id_query_client(payload)
     time.sleep(5)
 
-    agg_sorted_alerts: List[PlanAlertBaseModel] = log_book_web_client.filtered_plan_alert_by_plan_id_query_client(active_pair_plan.id)
+    agg_sorted_alerts: List[PlanAlertBaseModel] = log_analyzer_web_client.filtered_plan_alert_by_plan_id_query_client(active_pair_plan.id)
 
     # putting all alerts apart from newly added alerts
     already_existing_alerts = []
@@ -6814,9 +6814,9 @@ def test_alert_agg_sequence_in_plan_alert(static_data_, clean_and_set_limits, le
 #         alert_list.append(alert)
 #         contact_alert_basemodel = ContactAlertBaseModel(_id=1, alerts=[alert])
 #         json_obj = jsonable_encoder(contact_alert_basemodel, by_alias=True, exclude_none=True)
-#         updated_contact_alert = log_book_web_client.patch_contact_alert_client(json_obj)
+#         updated_contact_alert = log_analyzer_web_client.patch_contact_alert_client(json_obj)
 #
-#     contact_alert = log_book_web_client.get_contact_alert_client(contact_alert_id=1)
+#     contact_alert = log_analyzer_web_client.get_contact_alert_client(contact_alert_id=1)
 #     agg_sorted_alerts: List[Alert] = contact_alert.alerts
 #     # for alert in agg_sorted_alerts:
 #     #     alert.last_update_date_time = pendulum.parse(str(alert.last_update_date_time)).in_timezone("utc")
@@ -8029,7 +8029,7 @@ def _frequent_update_plan_view_in_plan(buy_symbol, sell_symbol, pair_plan_,
 
 
 @pytest.mark.nightly
-def test_log_book_frequent_pair_plan_updates(
+def test_log_analyzer_frequent_pair_plan_updates(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
         expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         market_depth_basemodel_list, last_barter_fixture_list,

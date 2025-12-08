@@ -229,7 +229,7 @@ function makeRenderer(opts = {}) {
                                                         : 1
                                                 }
                                             >
-                                                {colKey[j]}
+                                                {String(colKey[j])}
                                             </th>
                                         );
                                     })}
@@ -303,7 +303,7 @@ function makeRenderer(opts = {}) {
                                                         : 1
                                                 }
                                             >
-                                                {txt}
+                                                {String(txt)}
                                             </th>
                                         );
                                     })}

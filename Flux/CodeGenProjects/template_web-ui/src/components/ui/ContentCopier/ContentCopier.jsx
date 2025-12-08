@@ -26,7 +26,7 @@ const ContentCopier = ({ text }) => {
             onClick={handleCopy}
             size="small"
         >
-            {copied ? <Check sx={{ color: 'var(--blue-info)' }} fontSize="small" /> : <ContentCopy fontSize="small" />}
+            {copied ? <Check sx={{ color: 'var(--blue-info)', fontSize: 16 }} /> : <ContentCopy sx={{ fontSize: 16 }} />}
         </IconButton>
     );
 };

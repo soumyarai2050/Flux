@@ -192,7 +192,7 @@ const ColorRuleTab = ({
 
     if (!parsed) {
       // Fallback for unparseable values
-      return <span style={{ fontSize: '10px', color: 'white' }}>{value}</span>;
+      return <span style={{ fontSize: '10px', color: 'white', wordBreak:'break-all' }}>{value}</span>;
     }
 
     // Case 1: min|max|rule format
@@ -267,10 +267,10 @@ const ColorRuleTab = ({
 
     // Case 4: direct rule format (e.g., "50>blue")
     if (parsed.type === 'directRule') {
-      return <span style={{ fontSize: '10px', color: 'white' }}>{parsed.rule}</span>;
+      return <span style={{ fontSize: '10px', color: 'white', wordBreak:'break-all' }}>{parsed.rule}</span>;
     }
 
-    return <span style={{ fontSize: '10px', color: 'white' }}>{value}</span>;
+    return <span style={{ fontSize: '10px', color: 'white', wordBreak:'break-all' }}>{value}</span>;
   };
 
   return (
@@ -305,7 +305,7 @@ const ColorRuleTab = ({
               <div style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: '1.7' }}>
                 <p style={{ margin: '0 0 10px 0' }}>
                   <strong>Direct Rules:</strong> Apply color based on cell value<br />
-                  <code style={{ backgroundColor: 'var(--dynamic-bg-medium)', padding: '2px 4px', borderRadius: '2px' }}>10>error</code>, <code style={{ backgroundColor: 'var(--dynamic-bg-medium)', padding: '2px 4px', borderRadius: '2px' }}>15%>red</code>
+                  <code style={{ backgroundColor: 'var(--dynamic-bg-medium)', padding: '2px 4px', borderRadius: '2px' }}>10{'>'}error</code>, <code style={{ backgroundColor: 'var(--dynamic-bg-medium)', padding: '2px 4px', borderRadius: '2px' }}>15%{'>'}red</code>
                 </p>
                 <p style={{ margin: '0 0 10px 0' }}>
                   <strong>Supported Colors:</strong> Hex colors (#FF0000) {'&'} semantic colors (info, error, critical, warning, debug)
@@ -358,7 +358,7 @@ const ColorRuleTab = ({
       {selectedFieldName && (
         <div style={{ padding: '12px', borderBottom: '2px solid var(--dynamic-border)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-            <p style={{ margin: '0', fontSize: '12px', fontWeight: 'bold' }}>EDIT RULE: {selectedFieldName}</p>
+            <p style={{ margin: '0', fontSize: '12px', fontWeight: 'bold' }}>EDIT RULE: {selectedFieldName.includes('.') ? selectedFieldName.split('.').pop() : selectedFieldName}</p>
             <button
               onClick={() => setSelectedFieldName('')}
               style={{
@@ -463,7 +463,11 @@ const ColorRuleTab = ({
             );
           }
 
-          return Array.from(fieldsWithRules.entries()).map(([fieldName, data]) => (
+          return Array.from(fieldsWithRules.entries()).map(([fieldName, data]) => {
+            // Extract just the key part (last part after . or the whole string if no .)
+            const displayName = fieldName.includes('.') ? fieldName.split('.').pop() : fieldName;
+
+            return (
             <div key={fieldName} style={{ marginBottom: '12px' }}>
               {/* User Override Card */}
               {data.override && (
@@ -478,9 +482,9 @@ const ColorRuleTab = ({
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                    <div>
+                    <div style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
                       <p style={{ margin: '0', fontSize: '11px', fontWeight: 'bold', color: 'white' }}>
-                        {fieldName}
+                        {displayName}
                       </p>
                       <p style={{ margin: '2px 0 0 0', fontSize: '9px', color: 'rgba(255, 255, 255, 0.8)' }}>
                         Override
@@ -529,13 +533,13 @@ const ColorRuleTab = ({
                     {data.override.color_rule && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span style={{ fontSize: '9px', fontWeight: '600', minWidth: '70px', opacity: 0.9 }}>Text Color:</span>
-                        <span style={{ fontSize: '10px', color: 'rgba(255, 255, 255, 0.95)' }}>{data.override.color_rule}</span>
+                        <span style={{ fontSize: '10px', color: 'rgba(255, 255, 255, 0.95)', wordBreak: 'break-all' }}>{data.override.color_rule}</span>
                       </div>
                     )}
                     {data.override.background_color_rule && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span style={{ fontSize: '9px', fontWeight: '600', minWidth: '70px', opacity: 0.9 }}>BG Color:</span>
-                        <span style={{ fontSize: '10px', color: 'rgba(255, 255, 255, 0.95)' }}>{data.override.background_color_rule}</span>
+                        <span style={{ fontSize: '10px', color: 'rgba(255, 255, 255, 0.95)'-all, wordBreak: 'break-all' }}>{data.override.background_color_rule}</span>
                       </div>
                     )}
                   </div>
@@ -554,9 +558,9 @@ const ColorRuleTab = ({
                   }}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                    <div>
+                    <div style={{ wordBreak: 'break-word', overflowWrap: 'break-word' }}>
                       <p style={{ margin: '0', fontSize: '11px', fontWeight: 'bold', color: 'white' }}>
-                        {fieldName}
+                        {displayName}
                       </p>
                       <p style={{ margin: '2px 0 0 0', fontSize: '9px', color: 'rgba(255, 255, 255, 0.8)' }}>
                         Schema
@@ -627,7 +631,8 @@ const ColorRuleTab = ({
                 </div>
               )}
             </div>
-          ));
+            );
+          });
         })()}
       </div>
     </>

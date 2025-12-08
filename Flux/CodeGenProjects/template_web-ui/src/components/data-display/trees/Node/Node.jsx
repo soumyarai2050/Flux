@@ -9,6 +9,7 @@ import RemoveCircle from '@mui/icons-material/RemoveCircle';
 import PushPin from '@mui/icons-material/PushPin';
 import PushPinOutlined from '@mui/icons-material/PushPinOutlined';
 import { Icon } from '../../../ui/Icon';
+import CustomToolTip from '../../../ui/CustomToolTip';
 import NodeField from '../NodeField';
 import PropTypes from 'prop-types';
 import classes from './Node.module.css';
@@ -142,7 +143,7 @@ const Node = (props) => {
                             </span>
                         )}
                         <div style={{ minWidth: '20px', display: 'flex', alignItems: 'center', marginLeft: '10px' }}>
-                            {props.data.help && <Tooltip title={props.data.help} disableInteractive><HelpOutline sx={{ cursor: 'pointer' }} fontSize='small' color='info' /></Tooltip>}
+                            {props.data.help && <CustomToolTip title={props.data.help}><HelpOutline sx={{ cursor: 'pointer' }} fontSize='small' color='info' /></CustomToolTip>}
                         </div>
                         {showPinIcon && (
                             <Icon

@@ -124,4 +124,8 @@
     --dark-secondary-main: var(--dark-bg-secondary);
     --dark-secondary-light: var(--dark-border-default);
     --dark-secondary-dark: var(--dark-bg-primary);
+
+    /* === DYNAMIC VARIABLES*/
+    /* Popover background - adapts to theme color and light/dark mode */
+    --dynamic-popover-bg: var(--light-bg-primary);
 }

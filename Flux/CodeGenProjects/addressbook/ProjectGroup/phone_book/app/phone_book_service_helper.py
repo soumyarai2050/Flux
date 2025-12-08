@@ -14,7 +14,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.model_extensio
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.static_data import SecurityRecord, SecType
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.app.phone_book_models_log_keys import (
     get_symbol_side_key)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import pair_plan_client_call_log_str
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_log_book.app.phone_log_book_service_helper import pair_plan_client_call_log_str
 
 if os.getenv("DASH_MODE"):
     from Flux.CodeGenProjects.AddressBook.ProjectGroup.dept_book.app.dept_book_service_helper import (
@@ -391,7 +391,7 @@ def guaranteed_call_pair_plan_client(basemodel_type: Type[MsgspecModel] | None, 
                                       **kwargs):
     """
     Call phone_book client call but if call fails for connection error or server not ready error logs it
-    with specific pattern which is matched by pair_plan_log_book and the call is call from there in loop till
+    with specific pattern which is matched by phone_log_book and the call is call from there in loop till
     it is successfully done
     :param basemodel_type: BaseModel of Document type need to update/create,
                                     pass None if callable is query method
@@ -1007,5 +1007,5 @@ def get_both_sym_side_key_from_pair_plan(pair_plan: PairPlan | PairPlanBaseModel
     return key
 
 
-def get_reset_log_book_cache_wrapper_pattern():
+def get_reset_log_analyzer_cache_wrapper_pattern():
     return "-~-"

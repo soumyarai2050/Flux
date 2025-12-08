@@ -889,6 +889,8 @@ function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap, isI
         }
     }, [isChartModel, currentStateKey, dispatch, actions, handleTableSelectionChange]);
 
+    const isCreating = false; // RepeatedRootModel doesn't support creating mode, always false for consistency
+
     const cleanedRows = useMemo(() => {
         if ([LAYOUT_TYPES.CHART, LAYOUT_TYPES.PIVOT_TABLE].includes(layoutType)) {
             return removeRedundantFieldsFromRows(rows);
@@ -1056,7 +1058,8 @@ function RepeatedRootModel({ modelName, modelDataSource, modelDependencyMap, isI
                         // download
                         onDownload={handleDownload}
                         // edit save
-                        isReadOnly={(modelLayoutOption.is_read_only ?? false) || rows.length === 0}
+                        isReadOnly={(modelLayoutOption.is_read_only ?? false)}
+                        disableEdit={rows.length === 0 & !isCreating}
                         onModeToggle={handleModeToggle}
                         onSave={handleSave}
                         // layout switch

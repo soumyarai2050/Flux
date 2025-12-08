@@ -1,0 +1,24 @@
+syntax = "proto2";
+
+import "flux_options.proto";
+
+option (FluxFileDateTimeGranularity) = MILLI_SEC;
+option (FluxFileDateTimePrintTimezone) = "LOCAL";
+
+message AlertMeta {
+  option (FluxMsgStringLength) = 128;
+
+  optional string component_file_path = 1;
+  optional string source_file_name = 2;
+  optional int32 line_num = 3;
+  optional int64 alert_create_date_time = 4 [(FluxFldValIsDateTime) = true];
+  optional string first_detail = 5;
+  optional string latest_detail = 6;
+}
+
+message ShutDownLogAnalyzer {
+  option (FluxMsgJsonQuery) = {
+      QueryName: "shutdown_log_analyzer"
+  };
+  optional bool temp = 1;
+}

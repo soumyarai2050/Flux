@@ -18,7 +18,7 @@ mongo_server: "mongodb://localhost:27017/?replicaSet=rs0&authSource=admin"
 
 # to be used by plugins to take proto files from these projects to generate combined output
 multi_project_plugin:
-  - log_book:
+  - log_analyzer:
       - "ContactAlert"
   - phone_book:
       - "SystemControl"

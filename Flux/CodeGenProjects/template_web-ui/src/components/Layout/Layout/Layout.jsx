@@ -339,6 +339,11 @@ const Layout = ({ projectName, theme, onThemeToggle, baseColor, onBaseColorChang
     const navbarTextColorValue = cssVar('--dark-text-primary');
     const dynamicColorMediumVarName = currentSelectedPalette.medium; 
 
+    // Determine popover background color
+    // Light mode: use light shade of selected color
+    // Dark mode: use black (--dark-bg-primary)
+    const popoverBgColorVarName = isLightMode ? currentSelectedPalette.light : '--dark-bg-primary';
+
     // Fix dark mode multi-select colors
     let cellSelectedColorVarName, recentVarName;
     if (isLightMode) {
@@ -357,6 +362,7 @@ const Layout = ({ projectName, theme, onThemeToggle, baseColor, onBaseColorChang
     root.style.setProperty('--dynamic-cell-selected', `var(${cellSelectedColorVarName})`);
     root.style.setProperty('--dynamic-cell-selected-recent', `var(${recentVarName})`);
     root.style.setProperty('--dynamic-bg-medium', `var(${dynamicColorMediumVarName})`);
+    root.style.setProperty('--dynamic-popover-bg', `var(${popoverBgColorVarName})`);
   }, [selectedBaseColor, theme]);
 
   /**
@@ -780,6 +786,7 @@ const Layout = ({ projectName, theme, onThemeToggle, baseColor, onBaseColorChang
         onClose={handleFloatingPopoverClose}
         onRemoveWidget={handleRemoveWidgetFromPopover}
         onMaximizeToggle={handleWidgetMaximizeInPopover}
+        theme={theme}
       />
 
     </div>

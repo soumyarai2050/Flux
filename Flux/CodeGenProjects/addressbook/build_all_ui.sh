@@ -8,7 +8,7 @@ project_names=(
     "dept_book"
     "mobile_book"
     "post_book"
-    "log_book"
+    "log_analyzer"
     "street_book"
     "photo_book"
     "basket_book"

@@ -34,7 +34,7 @@ from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.app.basket_book_h
     config_yaml_dict, be_host, be_port, CURRENT_PROJECT_DIR, capped_by_size_text)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.base_book import BaseBook
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.mobile_book.app.mobile_book_shared_memory_consumer import SymbolCacheContainer, SymbolCache
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.md_streaming_manager import MDStreamingManager
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.contact_log_book.app.md_streaming_manager import MDStreamingManager
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.basket_book.generated.ORMModel.basket_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ORMModel.street_book_n_post_book_n_basket_book_core_msgspec_model import *

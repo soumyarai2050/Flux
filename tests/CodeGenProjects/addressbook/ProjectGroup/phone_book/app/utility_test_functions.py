@@ -20,7 +20,7 @@ from datetime import timedelta
 os.environ["ModelType"] = "msgspec"
 
 # project imports
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.ORMModel.log_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_analyzer.generated.ORMModel.log_analyzer_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.FastApi.email_book_service_http_client import \
     EmailBookServiceHttpClient
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.base_book.app.static_data import SecurityRecordManager
@@ -30,8 +30,8 @@ from FluxPythonUtils.scripts.general_utility_functions import clean_mongo_collec
 from FluxPythonUtils.scripts.file_n_general_utility_functions import YAMLConfigurationManager
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.FastApi.street_book_service_http_client import (
     StreetBookServiceHttpClient)
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.FastApi.log_book_service_http_client import (
-    LogBookServiceHttpClient)
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_analyzer.generated.FastApi.log_analyzer_service_http_client import (
+    LogAnalyzerServiceHttpClient)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.post_book.app.post_book_service_helper import (
     post_book_service_http_client)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *
@@ -53,7 +53,7 @@ PAIR_STRAT_ENGINE_DIR = code_gen_projects_dir_path / "AddressBook" / "ProjectGro
 ps_config_yaml_path: PurePath = PAIR_STRAT_ENGINE_DIR / "data" / "config.yaml"
 ps_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(ps_config_yaml_path))
 
-LOG_ANALYZER_DIR = code_gen_projects_dir_path / "AddressBook" / "ProjectGroup" / "log_book"
+LOG_ANALYZER_DIR = code_gen_projects_dir_path / "AddressBook" / "ProjectGroup" / "log_analyzer"
 la_config_yaml_path = LOG_ANALYZER_DIR / "data" / "config.yaml"
 la_config_yaml_dict = YAMLConfigurationManager.load_yaml_configurations(str(la_config_yaml_path))
 
@@ -116,8 +116,8 @@ email_book_service_native_view_web_client: EmailBookServiceHttpClient = \
     EmailBookServiceHttpClient.set_or_get_if_instance_exists(host=PAIR_STRAT_BEANIE_HOST,
                                                                 port=parse_to_int(PAIR_STRAT_BEANIE_PORT),
                                                                 view_port=parse_to_int(PAIR_STRAT_VIEW_PORT))
-log_book_web_client: LogBookServiceHttpClient = (
-    LogBookServiceHttpClient.set_or_get_if_instance_exists(host=LOG_ANALYZER_BEANIE_HOST,
+log_analyzer_web_client: LogAnalyzerServiceHttpClient = (
+    LogAnalyzerServiceHttpClient.set_or_get_if_instance_exists(host=LOG_ANALYZER_BEANIE_HOST,
                                                                port=parse_to_int(LOG_ANALYZER_BEANIE_PORT)))
 photo_book_web_client: PhotoBookServiceHttpClient = (
     PhotoBookServiceHttpClient.set_or_get_if_instance_exists(host=STRAT_VIEW_BEANIE_HOST,
@@ -148,7 +148,7 @@ def get_utc_date_time() -> pendulum.DateTime:
 def clean_all_collections_ignoring_ui_layout() -> None:
     mongo_server_uri: str = get_mongo_server_uri()
     for db_name in get_mongo_db_list(mongo_server_uri):
-        if "log_book" == db_name:
+        if "log_analyzer" == db_name:
             clean_mongo_collections(mongo_server_uri=mongo_server_uri, database_name=db_name,
                                     ignore_collections=["UILayout", "ContactAlert", "PlanAlert",
                                                         "RawPerformanceData", "ProcessedPerformanceAnalysis"])
@@ -165,7 +165,7 @@ def clean_all_collections_ignoring_ui_layout() -> None:
 def drop_all_databases() -> None:
     mongo_server_uri: str = get_mongo_server_uri()
     for db_name in get_mongo_db_list(mongo_server_uri):
-        if "log_book" == db_name or "phone_book" == db_name or "post_book" == db_name or \
+        if "log_analyzer" == db_name or "phone_book" == db_name or "post_book" == db_name or \
                 "photo_book" == db_name or "street_book_" in db_name:
             drop_mongo_database(mongo_server_uri=mongo_server_uri, database_name=db_name)
         # else ignore drop database
@@ -176,19 +176,19 @@ def clean_project_logs():
     barter_engine_dir: PurePath = code_gen_projects_path / "AddressBook" / "ProjectGroup"
     phone_book_dir: PurePath = barter_engine_dir / "phone_book"
     post_book_dir: PurePath = barter_engine_dir / "post_book"
-    log_book_dir: PurePath = barter_engine_dir / "log_book"
+    log_analyzer_dir: PurePath = barter_engine_dir / "log_analyzer"
     street_book_dir: PurePath = barter_engine_dir / "street_book"
     photo_book_dir: PurePath = barter_engine_dir / "photo_book"
 
     delete_file_glob_pattens: List[str] = [
         str(phone_book_dir / "log" / "*.log*"),
         str(post_book_dir / "log" / "*.log*"),
-        str(log_book_dir / "log" / "*.log*"),
+        str(log_analyzer_dir / "log" / "*.log*"),
         str(street_book_dir / "log" / "*.log*"),
         str(photo_book_dir / "log" / "*.log*"),
         str(phone_book_dir / "scripts" / "fx_so.sh*"),
         str(phone_book_dir / "data" / "*.json.lock"),
-        str(log_book_dir / "log" / "tail_executors" / "*.log*"),
+        str(log_analyzer_dir / "log" / "tail_executors" / "*.log*"),
         str(street_book_dir / "data" / "executor_*_simulate_config.yaml"),
         str(street_book_dir / "scripts" / "*ps_id_*.sh*")
     ]
@@ -203,22 +203,22 @@ def clean_project_logs():
         os.remove(matched_file)
 
 #
-# def run_pair_plan_log_book(executor_n_log_book: 'ExecutorNLogBookManager'):
-#     log_book = pexpect.spawn("python phone_book_log_book.py &",
+# def run_phone_log_book(executor_n_log_analyzer: 'ExecutorNLogAnalyzerManager'):
+#     log_analyzer = pexpect.spawn("python phone_book_log_analyzer.py &",
 #                                  cwd=project_app_dir_path)
-#     log_book.timeout = None
-#     log_book.logfile = sys.stdout.buffer
-#     executor_n_log_book.pair_plan_log_book_pid = log_book.pid
-#     print(f"pair_plan_log_book PID: {log_book.pid}")
-#     log_book.expect("CRITICAL: log analyzer running in simulation mode...")
-#     log_book.interact()
+#     log_analyzer.timeout = None
+#     log_analyzer.logfile = sys.stdout.buffer
+#     executor_n_log_analyzer.phone_log_book_pid = log_analyzer.pid
+#     print(f"phone_log_book PID: {log_analyzer.pid}")
+#     log_analyzer.expect("CRITICAL: log analyzer running in simulation mode...")
+#     log_analyzer.interact()
 #
 #
-# def run_executor(executor_n_log_book: 'ExecutorNLogBookManager'):
+# def run_executor(executor_n_log_analyzer: 'ExecutorNLogAnalyzerManager'):
 #     executor = pexpect.spawn("python street_book.py &", cwd=project_app_dir_path)
 #     executor.timeout = None
 #     executor.logfile = sys.stdout.buffer
-#     executor_n_log_book.executor_pid = executor.pid
+#     executor_n_log_analyzer.executor_pid = executor.pid
 #     print(f"executor PID: {executor.pid}")
 #     executor.expect(pexpect.EOF)
 #     executor.interact()
@@ -238,32 +238,32 @@ def clean_project_logs():
 #         return False
 
 #
-# class ExecutorNLogBookManager:
+# class ExecutorNLogAnalyzerManager:
 #     """
-#     Context manager to handle running of barter_executor and log_book in threads and after test is completed,
+#     Context manager to handle running of barter_executor and log_analyzer in threads and after test is completed,
 #     handling killing of the both processes and cleaning the slate
 #     """
 #
 #     def __init__(self):
 #         # p_id(s) are getting populated by their respective thread target functions
 #         self.executor_pid = None
-#         self.pair_plan_log_book_pid = None
+#         self.phone_log_book_pid = None
 #
 #     def __enter__(self):
 #         executor_thread = threading.Thread(target=run_executor, args=(self,))
-#         pair_plan_log_book_thread = threading.Thread(target=run_pair_plan_log_book, args=(self,))
+#         phone_log_book_thread = threading.Thread(target=run_phone_log_book, args=(self,))
 #         executor_thread.start()
-#         pair_plan_log_book_thread.start()
-#         # delay for executor and log_book to get started and ready
+#         phone_log_book_thread.start()
+#         # delay for executor and log_analyzer to get started and ready
 #         time.sleep(20)
 #         return self
 #
 #     def __exit__(self, exc_type, exc_value, exc_traceback):
 #         assert kill_process(self.executor_pid), \
 #             f"Something went wrong while killing barter_executor process, pid: {self.executor_pid}"
-#         assert kill_process(self.pair_plan_log_book_pid), \
-#             f"Something went wrong while killing pair_plan_log_book process, " \
-#             f"pid: {self.pair_plan_log_book_pid}"
+#         assert kill_process(self.phone_log_book_pid), \
+#             f"Something went wrong while killing phone_log_book process, " \
+#             f"pid: {self.phone_log_book_pid}"
 #
 #         # Env var based post test cleaning
 #         clean_env_var = os.environ.get("ENABLE_CLEAN_SLATE")
@@ -2911,11 +2911,11 @@ def wait_for_get_new_chore_placed_from_tob(wait_stop_px: int | float, symbol_to_
                           f"symbol - {symbol_to_check} and wait_stop_px - {wait_stop_px}"
 
 
-def clean_log_book_alerts():
-    contact_alert_list = log_book_web_client.get_all_contact_alert_client()
+def clean_log_analyzer_alerts():
+    contact_alert_list = log_analyzer_web_client.get_all_contact_alert_client()
     for alert in contact_alert_list:
         if "Log analyzer running in simulation mode" not in alert.alert_brief:
-            log_book_web_client.delete_contact_alert_client(alert.id)
+            log_analyzer_web_client.delete_contact_alert_client(alert.id)
 
 
 def renew_plan_collection():
@@ -3202,7 +3202,7 @@ def create_pre_chore_test_requirements(leg1_symbol: str, leg2_symbol: str, pair_
     return active_pair_plan, executor_web_client
 
 
-def create_pre_chore_test_requirements_for_log_book(leg1_symbol: str, leg2_symbol: str,
+def create_pre_chore_test_requirements_for_log_analyzer(leg1_symbol: str, leg2_symbol: str,
                                                         pair_plan_: PairPlanBaseModel,
                                                         expected_plan_limits_: PlanLimits,
                                                         expected_start_status_: PlanStatus,
@@ -4350,7 +4350,7 @@ def underlying_pre_requisites_for_limit_test(buy_sell_symbol_list, pair_plan_, e
 
 
 def check_alert_str_in_contact_alert(check_str: str, assert_fail_msg: str):
-    contact_alerts = log_book_web_client.get_all_contact_alert_client()
+    contact_alerts = log_analyzer_web_client.get_all_contact_alert_client()
     for alert in contact_alerts:
         if re.search(check_str, alert.alert_brief):
             return alert
@@ -4362,7 +4362,7 @@ def check_alert_str_in_contact_alert(check_str: str, assert_fail_msg: str):
 def check_alert_str_in_plan_alerts_n_contact_alerts(activated_pair_plan_id: int, check_str: str,
                                                        assert_fail_msg: str):
     # Checking alert in plan_alert
-    plan_alerts = log_book_web_client.filtered_plan_alert_by_plan_id_query_client(activated_pair_plan_id)
+    plan_alerts = log_analyzer_web_client.filtered_plan_alert_by_plan_id_query_client(activated_pair_plan_id)
     for alert in plan_alerts:
         if re.search(check_str, alert.alert_brief):
             return alert

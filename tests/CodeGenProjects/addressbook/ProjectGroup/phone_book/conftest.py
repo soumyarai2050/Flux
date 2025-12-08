@@ -11,7 +11,7 @@ os.environ["ModelType"] = "msgspec"
 # Project Imports
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.street_book.generated.ORMModel.street_book_service_model_imports import *
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_book.generated.ORMModel.email_book_service_model_imports import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.generated.ORMModel.log_book_service_model_imports import *
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_analyzer.generated.ORMModel.log_analyzer_service_model_imports import *
 from FluxPythonUtils.scripts.file_n_general_utility_functions import YAMLConfigurationManager
 from tests.CodeGenProjects.AddressBook.ProjectGroup.conftest import *
 

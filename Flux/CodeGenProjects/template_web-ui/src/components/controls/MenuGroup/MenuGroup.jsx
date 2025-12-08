@@ -184,7 +184,8 @@ const MenuGroup = ({
     isReadOnly = false,
     serverSideFilterSortEnabled,
     hideNullValues = false,
-    onHideNullValuesToggle
+    onHideNullValuesToggle,
+    disableEdit
 }) => {
     const [anchorEl, setAnchorEl] = useState(null);
 
@@ -477,7 +478,7 @@ const MenuGroup = ({
                         isPinned={pinned.includes(menuName)}
                         onMenuClose={handleMenuClose}
                         onPinToggle={handlePinToggle}
-                        disabled={isReadOnly || (isAbbreviationSource && isCreating)}
+                        disabled={isReadOnly || disableEdit || (isAbbreviationSource && isCreating)}
                     />
                 );
             case 'layout-switch':

@@ -73,13 +73,18 @@
 .popover_container {
   width: 100%;
   height: 100%;
-  background: var(--dark-bg-primary);
+  background: var(--dynamic-popover-bg);
   border-radius: 8px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid var(--dark-border);
+  border: 1px solid var(--light-border);
+}
+
+[data-theme="dark"] .popover_container {
+  background: var(--dark-bg-primary);
+  border-color: var(--dark-border);
 }
 
 .popover_header {

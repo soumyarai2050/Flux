@@ -14,7 +14,7 @@ from FluxPythonUtils.scripts.general_utility_functions import (
     handle_refresh_configurable_data_members)
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.generated.FastApi.photo_book_service_routes_msgspec_callback import PhotoBookServiceRoutesCallback
 from Flux.CodeGenProjects.AddressBook.ProjectGroup.photo_book.app.photo_book_helper import *
-from Flux.CodeGenProjects.AddressBook.ProjectGroup.log_book.app.log_book_service_helper import (
+from Flux.CodeGenProjects.AddressBook.ProjectGroup.phone_log_book.app.phone_log_book_service_helper import (
     handle_patch_db_queue_updater, get_update_obj_list_for_ledger_type_update,
     get_update_obj_for_snapshot_type_update, UpdateType, non_existing_obj_read_fail_regex_pattern,
     get_field_seperator_pattern, get_pattern_to_remove_file_from_created_cache,

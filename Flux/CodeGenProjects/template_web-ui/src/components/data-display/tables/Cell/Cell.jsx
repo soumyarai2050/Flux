@@ -18,6 +18,7 @@ import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import ContentCopy from '@mui/icons-material/ContentCopy';
 import Error from '@mui/icons-material/Error';
 import Clear from '@mui/icons-material/Clear';
+import CustomToolTip from '../../../ui/CustomToolTip';
 import { useTheme } from '@mui/material/styles';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { clearxpath } from '../../../../utils/core/dataAccess';
@@ -461,7 +462,7 @@ const Cell = (props) => {
             validationError.current = validateConstraints(collection, value);
 
             const endAdornment = validationError.current ? (
-                <InputAdornment position='end'><Tooltip title={validationError.current} disableInteractive><Error color='error' /></Tooltip></InputAdornment>
+                <InputAdornment position='end'><CustomToolTip title={validationError.current}><Error color='error' /></CustomToolTip></InputAdornment>
             ) : null;
             const inputProps = endAdornment ? {
                 endAdornment: endAdornment
@@ -592,7 +593,7 @@ const Cell = (props) => {
         } else if (type === DATA_TYPES.ENUM) {
             validationError.current = validateConstraints(collection, value);
             const endAdornment = validationError.current ? (
-                <InputAdornment position='end'><Tooltip title={validationError.current} disableInteractive><Error color='error' /></Tooltip></InputAdornment>
+                <InputAdornment position='end'><CustomToolTip title={validationError.current}><Error color='error' /></CustomToolTip></InputAdornment>
             ) : null;
             const classesStr = `${classes.cell_input_field} ${selectedClass}`;
             return (
@@ -668,7 +669,7 @@ const Cell = (props) => {
                         <InputAdornment position='end'>$</InputAdornment>
                     )}
                     {validationError.current && (
-                        <InputAdornment position='end'><Tooltip title={validationError.current} disableInteractive><Error color='error' /></Tooltip></InputAdornment>
+                        <InputAdornment position='end'><CustomToolTip title={validationError.current}><Error color='error' /></CustomToolTip></InputAdornment>
                     )}
                 </>
             ) : null;
@@ -725,7 +726,7 @@ const Cell = (props) => {
         } else if (type === DATA_TYPES.DATE_TIME) {
             validationError.current = validateConstraints(collection, value);
             const endAdornment = validationError.current ? (
-                <InputAdornment position='end'><Tooltip title={validationError.current} disableInteractive><Error color='error' /></Tooltip></InputAdornment>
+                <InputAdornment position='end'><CustomToolTip title={validationError.current}><Error color='error' /></CustomToolTip></InputAdornment>
             ) : null;
             const inputProps = endAdornment ? {
                 endAdornment: endAdornment
@@ -825,7 +826,7 @@ const Cell = (props) => {
         } else if (type === DATA_TYPES.STRING && !collection.abbreviated) {
             validationError.current = validateConstraints(collection, value);
             const endAdornment = validationError.current ? (
-                <InputAdornment position='end'><Tooltip title={validationError.current} disableInteractive><Error color='error' /></Tooltip></InputAdornment>
+                <InputAdornment position='end'><CustomToolTip title={validationError.current}><Error color='error' /></CustomToolTip></InputAdornment>
             ) : null;
             const inputProps = endAdornment ? {
                 endAdornment: endAdornment
@@ -1255,7 +1256,7 @@ const Cell = (props) => {
                     {originalValue ? <span className={classes.previous}>{originalValue}{numberSuffix}</span> : <span className={classes.previous}>{originalValue}</span>}
                     {value ? <span className={classes.modified}>{value}{numberSuffix}</span> : <span className={classes.modified}>{value}</span>}
                     {validationError.current && (
-                        <Tooltip sx={{ marginLeft: '20px' }} title={validationError.current} disableInteractive><Error color='error' /></Tooltip>
+                        <CustomToolTip title={validationError.current}><Error sx={{ marginLeft: '20px' }} color='error' /></CustomToolTip>
                     )}
                 </div>
             </TableCell>
@@ -1320,7 +1321,7 @@ const Cell = (props) => {
                     // value ? <span>{value}{numberSuffix}</span> : <span>{value}</span>} */}
                     {value ? <span>{value}{numberSuffix}</span> : <span>{value}</span>}
                     {validationError.current && (
-                        <Tooltip title={validationError.current} sx={{ marginLeft: '20px' }} disableInteractive><Error color='error' /></Tooltip>
+                        <CustomToolTip title={validationError.current}><Error sx={{ marginLeft: '20px' }} color='error' /></CustomToolTip>
                     )}
                 </div>
             </TableCell>

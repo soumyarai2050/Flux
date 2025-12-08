@@ -2,7 +2,6 @@ import React, { useState, useCallback, useMemo, useRef } from 'react';
 import PropTypes from 'prop-types';
 import { motion, useMotionValue, useTransform } from 'framer-motion';
 import { Responsive, WidthProvider } from 'react-grid-layout';
-import PictureInPictureAltIcon from '@mui/icons-material/PictureInPictureAlt';
 import DoNotTouch from '@mui/icons-material/DoNotTouch';
 import PanTool from '@mui/icons-material/PanTool';
 import PopoverWidgetWrapper from './PopoverWidgetWrapper';
@@ -38,7 +37,8 @@ const FloatingPopover = ({
   layout,
   onLayoutChange,
   onRemoveWidget,
-  onMaximizeToggle
+  onMaximizeToggle,
+  theme
 }) => {
   const [popoverWidgetsDraggable, setPopoverWidgetsDraggable] = useState(false);
   const [isDraggingPopover, setIsDraggingPopover] = useState(false);
@@ -147,6 +147,7 @@ const FloatingPopover = ({
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       className={`${styles.popover_overlay} ${cursorClass}`}
+      data-theme={theme === 'dark' ? 'dark' : 'light'}
       style={{
         left: 'calc(25%)',
         top: 'calc(25%)',
@@ -161,7 +162,6 @@ const FloatingPopover = ({
           title="Drag to resize"
         />
         <div className={styles.popover_header}>
-          <PictureInPictureAltIcon fontSize="small" style={{ marginLeft: '4px', flexShrink: 0 }} />
           <span className={styles.popover_title}>
             Floating Workspace
           </span>
@@ -171,7 +171,7 @@ const FloatingPopover = ({
             onClick={handlePopoverWidgetsDragToggle}
             data-interactive
           >
-            <DraggableIcon fontSize="small" />
+            <DraggableIcon fontSize="small"  color='white'/>
           </Icon>
         </div>
         <div className={styles.popover_content}>
@@ -232,6 +232,7 @@ FloatingPopover.propTypes = {
   onLayoutChange: PropTypes.func.isRequired,
   onRemoveWidget: PropTypes.func.isRequired,
   onMaximizeToggle: PropTypes.func.isRequired,
+  theme: PropTypes.string,
 };
 
 export default FloatingPopover;

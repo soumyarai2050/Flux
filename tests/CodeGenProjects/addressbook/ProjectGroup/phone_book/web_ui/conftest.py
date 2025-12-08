@@ -314,7 +314,7 @@ def expected_contact_status_() -> ContactStatusBaseModel:
 def db_names_list(buy_sell_symbol_list) -> List:
     db_names_list = [
         f"phone_book_{PAIR_STRAT_BEANIE_PORT}",
-        f"log_book_{LOG_ANALYZER_BEANIE_PORT}",
+        f"log_analyzer_{LOG_ANALYZER_BEANIE_PORT}",
     ]
 
     for i in range(len(buy_sell_symbol_list)):
@@ -376,7 +376,7 @@ def clean_and_set_limits(expected_chore_limits_, expected_contact_limits_, expec
     clear_cache_in_model()
 
     # updating contact_alert
-    clean_log_book_alerts()
+    clean_log_analyzer_alerts()
 
     # setting limits
     set_n_verify_limits(expected_chore_limits_, expected_contact_limits_)

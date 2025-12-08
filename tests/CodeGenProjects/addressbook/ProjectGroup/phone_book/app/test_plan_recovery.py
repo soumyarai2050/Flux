@@ -780,7 +780,7 @@ def test_pair_plan_crash_recovery(
 
 # todo: Currently broken - DB updates from log analyzer currently only updates plan_view
 @pytest.mark.recovery1
-def _test_update_pair_plan_from_pair_plan_log_book(
+def _test_update_pair_plan_from_phone_log_book(
         static_data_, clean_and_set_limits, leg1_leg2_symbol_list, pair_plan_,
         expected_plan_limits_, expected_plan_status_, symbol_overview_obj_list,
         market_depth_basemodel_list, last_barter_fixture_list,
@@ -1096,7 +1096,7 @@ def test_recover_kill_switch_when_bartering_server_has_enabled(
 
         # validating if bartering_link.trigger_kill_switch got called
         check_str = "Called BarteringLink.BarteringLink.trigger_kill_switch"
-        contact_alerts = log_book_web_client.get_all_contact_alert_client()
+        contact_alerts = log_analyzer_web_client.get_all_contact_alert_client()
         for alert in contact_alerts:
             if re.search(check_str, alert.alert_brief):
                 assert False, \

@@ -24,7 +24,7 @@ dataclass_override_type: "native"
 beanie_override_type: "native"
 cache_override_type: "bare"
 
-# to be used in pair_plan_log_book to take out counts of created from waiting queue to execute create in db
+# to be used in phone_log_book to take out counts of created from waiting queue to execute create in db
 raw_perf_data_config:
   transaction_counts_per_call: 500
   transaction_timeout_secs: 60  # secs
@@ -35,7 +35,7 @@ raw_performance_data_processor_loop_wait: 2  # sec
 log_level: "debug"  # log lvl in int or basic log lvl name
 
 # to run log analyzer in simulator mode
-simulate_log_book: True
+simulate_log_analyzer: True
 
 # to be used in post_book_service
 post_book_queue_update_limit: 10
