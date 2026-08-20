@@ -31,7 +31,14 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
 
     def get_field_names(self, messages: List[protogen.Message]) -> None:
         for message in messages:
-            if CppDbHandlerPlugin.is_option_enabled(message, CppDbHandlerPlugin.flux_msg_json_root):
+            # ENABLE_CPP_OTHER -- all is shared client/server documentation
+            # output, so include Python-server, C++-server, and TS roots.
+            has_root, _ = self.get_root_op_keys_union(
+                message,
+                include_python_root=True,
+                include_cpp_root=True,
+                include_ts_root=True)
+            if has_root:
                 field_names = [field.proto.name for field in message.fields]
 
                 for field_name in field_names:
@@ -104,11 +111,18 @@ class CppDbHandlerPlugin(BaseProtoPlugin):
         for message in self.root_message_list:
             message_name: str = message.proto.name
             message_name_snake_cased: str = convert_camel_case_to_specific_case(message_name)
-            if CppDbHandlerPlugin.is_option_enabled(message, CppDbHandlerPlugin.flux_msg_json_root):
+            # ENABLE_CPP_OTHER -- all is shared client/server documentation
+            # output, so include Python-server, C++-server, and TS roots.
+            has_root, _ = self.get_root_op_keys_union(
+                message,
+                include_python_root=True,
+                include_cpp_root=True,
+                include_ts_root=True)
+            if has_root:
                 for field in message.fields:
                     field_name: str = field.proto.name
                     field_name_snake_cased: str = convert_camel_case_to_specific_case(field_name)
-                    if CppDbHandlerPlugin.is_option_enabled(field, "FluxFldPk"):
+                    if CppDbHandlerPlugin.is_option_enabled(field, CppDbHandlerPlugin.flux_fld_PK):
 
                         output_content += self.generate_encode_list_comment(message, message_name, message_name_snake_cased)
 

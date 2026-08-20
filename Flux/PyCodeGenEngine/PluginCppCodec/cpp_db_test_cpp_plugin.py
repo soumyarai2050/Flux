@@ -54,6 +54,23 @@ class CppDbTestCppPlugin(BaseProtoPlugin):
 
         output_content += self.headers_generate_handler(class_name_snake_cased)
 
+        # ----------------------------------------------------------------------
+        # CODEC EMISSION GATE MIRROR - LOCKSTEP ANCHOR (currently DORMANT)
+        # The block below is intentionally commented out. This plugin currently
+        # emits an include-only .cpp with no per-message logic. If/when this
+        # block is restored to emit per-rooted-message data, its gate MUST
+        # mirror the prepare_doc/prepare_list_doc emission gate in
+        # PyCodeGenEngine/PluginCppCodec/cpp_db_codec_plugin.py
+        # (around Line 329-331 - currently flux_msg_json_root or
+        # flux_msg_json_root_time_series'). Diverging gates produce
+        # undefined-symbol link errors at C++ build time.
+        # Sibling: PyCodeGenEngine/PluginCppTest/cpp_codec_test_plugin.py
+        # _is_current_codec_root() (around line 36) - the live mirror today.
+        # Any change here (restoring the block, OR changing the codec gate) >
+        # coordinate edits across all three files + regen to verify symbol
+        # parity. Audit context:
+        # /export/home/sumkumar/.claude/projects/-export-home-sumkumar-data-sumkumar-apps-trade-engine/memory/project_root_option_gate_audit.md
+        # ----------------------------------------------------------------------
         # for message in self.root_message_list:
         #     if CppDbTestCppPlugin.is_option_enabled(message, CppDbTestCppPlugin.flux_msg_json_root):
         #         for field in message.fields:
